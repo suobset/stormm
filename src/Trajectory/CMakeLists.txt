@@ -1,0 +1,5 @@
+add_library(amber_ascii amber_ascii.cpp)
+add_library(coordinateframe coordinateframe.cpp)
+add_library(phasespace phasespace.cpp)
+add_library(trajectory_enumerators trajectory_enumerators.cpp)
+add_library(write_frame write_frame.cpp)

@@ -1,0 +1,417 @@
+#include "../../src/FileManagement/file_listing.h"
+#include "../../src/Constants/scaling.h"
+#include "../../src/Constants/symbol_values.h"
+#include "../../src/Math/matrix_ops.h"
+#include "../../src/Parsing/polynumeric.h"
+#include "../../src/Random/random.h"
+#include "../../src/Reporting/error_format.h"
+#include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/phasespace.h"
+#include "../../src/Topology/atomgraph.h"
+#include "../../src/UnitTesting/unit_test.h"
+
+using omni::constants::small;
+using omni::diskutil::DrivePathType;
+using omni::diskutil::getDrivePathType;
+using omni::diskutil::osSeparator;
+using omni::diskutil::PrintSituation;
+using omni::errors::rtWarn;
+using omni::math::computeBoxTransform;
+using omni::math::extractBoxDimensions;
+using omni::parse::NumberFormat;
+using omni::parse::polyNumericVector;
+using omni::random::Xoroshiro128pGenerator;
+using omni::random::Ran2Generator;
+using omni::symbols::pi;
+using omni::topology::UnitCellType;
+using namespace omni::testing;
+using namespace omni::trajectory;
+
+//-------------------------------------------------------------------------------------------------
+// A function that creates a PhaseSpace object filled with random coordinates normally distributed
+// about the origin.
+//
+// Arguments:
+//   particle_count:  The number of particles to create
+//   sigma:           Width of the normal distribution
+//   igseed:          Random number generator seed
+//-------------------------------------------------------------------------------------------------
+PhaseSpace createRandomParticles(const int particle_count, const double sigma = 5.0,
+                                 const int igseed = -1) {
+  const int actual_seed = (igseed == -1) ? particle_count : igseed;
+  Xoroshiro128pGenerator xrs_rng(actual_seed);
+  PhaseSpace result(particle_count);
+  PhaseSpaceWriter psw = result.data();
+  for (int i = 0; i < particle_count; i++) {
+    psw.xcrd[i] = sigma * xrs_rng.gaussianRandomNumber();
+    psw.ycrd[i] = sigma * xrs_rng.gaussianRandomNumber();
+    psw.zcrd[i] = sigma * xrs_rng.gaussianRandomNumber();
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
+int main(int argc, char* argv[]) {
+
+  // Some baseline initialization
+  TestEnvironment oe(argc, argv);
+
+  // Section 1
+  section("Coordinate reading");
+
+  // Section 2
+  section("Coordinate manipulation");
+
+  // Section 3
+  section("Coordinate object integration");
+
+  // Section 4
+  section("Coordinate object C++ handling");
+
+  // If one or more of the coordinate files is missing, this will cause tests to be skipped.
+  // Do not report immediately, as one missing file likely means other missing files.  Wait
+  // until the end and then alert the user that some tests were aborted.
+  bool missing_files = false;
+
+  // Test (delayed) file reading for an input coordinate set
+  section(1);
+  const char osc = osSeparator();
+  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
+  const bool tip3p_exists = (getDrivePathType(tip3p_crd_name) == DrivePathType::FILE);
+  const TestPriority do_tip3p = (tip3p_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  PhaseSpace tip3p;
+  if (tip3p_exists) {
+    tip3p.buildFromFile(tip3p_crd_name, CoordinateFileKind::AMBER_INPCRD);
+  }
+  else {
+    missing_files = true;
+  }
+  PhaseSpaceWriter tip3pwr = tip3p.data();
+  check(tip3pwr.natom, RelationalOperator::EQUAL, 768, "The TIP3P Amber input coordinates "
+        "file " + tip3p.getFileName() + " contains the wrong number of atoms.", do_tip3p);
+  double oh_mean = 0.0;
+  if (tip3p_exists) {
+    for (int i = 0; i < tip3pwr.natom; i += 3) {
+      const double oh1x = tip3pwr.xcrd[i + 1] - tip3pwr.xcrd[i];
+      const double oh1y = tip3pwr.ycrd[i + 1] - tip3pwr.ycrd[i];
+      const double oh1z = tip3pwr.zcrd[i + 1] - tip3pwr.zcrd[i];
+      const double oh2x = tip3pwr.xcrd[i + 2] - tip3pwr.xcrd[i];
+      const double oh2y = tip3pwr.ycrd[i + 2] - tip3pwr.ycrd[i];
+      const double oh2z = tip3pwr.zcrd[i + 2] - tip3pwr.zcrd[i];
+      oh_mean += sqrt((oh1x * oh1x) + (oh1y * oh1y) + (oh1z * oh1z));
+      oh_mean += sqrt((oh2x * oh2x) + (oh2y * oh2y) + (oh2z * oh2z));
+    }
+    oh_mean /= 2.0 * static_cast<double>(tip3pwr.natom / 3);
+  }
+  check(oh_mean, RelationalOperator::EQUAL, Approx(0.9572).margin(1.0e-3), "O-H bond lengths in "
+        "TIP3P water deviate too wildly from the prescribed 0.9572 Angstroms.", do_tip3p);
+  check(tip3pwr.ycrd[32], RelationalOperator::EQUAL, Approx(7.9019706).margin(1.0e-7),
+        "Coordinates read from an Amber .inpcrd file are incorrect.", do_tip3p);
+  std::vector<double> gdims(6);
+  for (int i = 0; i < 3; i++) {
+    gdims[i] = 23.3662499;
+    gdims[i + 3] = 109.4712190 * pi / 180.0;
+  }
+  std::vector<double> box_xfrm(9);
+  std::vector<double> inv_xfrm(9);
+  computeBoxTransform(gdims, box_xfrm.data(), inv_xfrm.data());
+  const std::vector<double> t3box = (tip3p_exists) ? tip3p.getBoxSpaceTransform() :
+                                                     std::vector<double>(9, 0.0);
+  check(t3box, RelationalOperator::EQUAL, Approx(box_xfrm).margin(1.0e-7), "The box "
+        "transformation was not computed properly for " + tip3p.getFileName() + ".", do_tip3p);
+  const std::vector<double> t3inv = (tip3p_exists) ? tip3p.getInverseTransform() :
+                                                     std::vector<double>(9, 0.0);
+  check(t3inv, RelationalOperator::EQUAL, Approx(inv_xfrm).margin(1.0e-7), "The inverse "
+        "transformation was not computed properly for " + tip3p.getFileName() + ".", do_tip3p);
+
+  // Test the copy constructor.  Stretch the original object after copying to ensure independence
+  // of the copy.
+  const PhaseSpace tip3p_copy = tip3p;
+  const PhaseSpaceReader tip3pcr = tip3p_copy.data();
+  oh_mean = 0.0;
+  double orig_oh_mean = 0.0;
+  if (tip3p_exists) {
+    for (int i = 0; i < tip3pcr.natom; i++) {
+      tip3pwr.xcrd[i] *= 1.5;
+      tip3pwr.ycrd[i] *= 1.5;
+      tip3pwr.zcrd[i] *= 1.5;
+    }
+    for (int i = 0; i < tip3pcr.natom; i += 3) {
+      const double oh1x = tip3pcr.xcrd[i + 1] - tip3pcr.xcrd[i];
+      const double oh1y = tip3pcr.ycrd[i + 1] - tip3pcr.ycrd[i];
+      const double oh1z = tip3pcr.zcrd[i + 1] - tip3pcr.zcrd[i];
+      const double oh2x = tip3pcr.xcrd[i + 2] - tip3pcr.xcrd[i];
+      const double oh2y = tip3pcr.ycrd[i + 2] - tip3pcr.ycrd[i];
+      const double oh2z = tip3pcr.zcrd[i + 2] - tip3pcr.zcrd[i];
+      oh_mean += sqrt((oh1x * oh1x) + (oh1y * oh1y) + (oh1z * oh1z));
+      oh_mean += sqrt((oh2x * oh2x) + (oh2y * oh2y) + (oh2z * oh2z));
+    }
+    oh_mean /= 2.0 * static_cast<double>(tip3pcr.natom / 3);
+    for (int i = 0; i < tip3pwr.natom; i += 3) {
+      const double oh1x = tip3pwr.xcrd[i + 1] - tip3pwr.xcrd[i];
+      const double oh1y = tip3pwr.ycrd[i + 1] - tip3pwr.ycrd[i];
+      const double oh1z = tip3pwr.zcrd[i + 1] - tip3pwr.zcrd[i];
+      const double oh2x = tip3pwr.xcrd[i + 2] - tip3pwr.xcrd[i];
+      const double oh2y = tip3pwr.ycrd[i + 2] - tip3pwr.ycrd[i];
+      const double oh2z = tip3pwr.zcrd[i + 2] - tip3pwr.zcrd[i];
+      orig_oh_mean += sqrt((oh1x * oh1x) + (oh1y * oh1y) + (oh1z * oh1z));
+      orig_oh_mean += sqrt((oh2x * oh2x) + (oh2y * oh2y) + (oh2z * oh2z));
+    }
+    orig_oh_mean /= 2.0 * static_cast<double>(tip3pwr.natom / 3);
+  }
+  check(oh_mean, RelationalOperator::EQUAL, Approx(0.9572).margin(1.0e-3), "The PhaseSpace "
+        "object's copy constructor does not create an independent copy.", do_tip3p);
+  check(orig_oh_mean, RelationalOperator::EQUAL, Approx(1.4358).margin(1.0e-3), "Manipulating a "
+        "PhaseSpace object by scaling its coordinates does not produce the expected effect.",
+        do_tip3p);
+  const std::vector<double> cp3inv = (tip3p_exists) ? tip3p_copy.getInverseTransform() :
+                                                      std::vector<double>(9, 0.0);
+  check(cp3inv, RelationalOperator::EQUAL, Approx(inv_xfrm).margin(1.0e-7), "The inverse "
+        "transformation was not computed properly for " + tip3p.getFileName() + ".", do_tip3p);
+  check(tip3p_copy.getUnitCellType() == UnitCellType::TRICLINIC, "The unit cell type of " +
+        tip3p.getFileName() + " is incorrectly interpreted.", do_tip3p);
+
+  // Reset the original tip3p PhaseSpace object
+  if (tip3p_exists) {
+    for (int i = 0; i < tip3pcr.natom; i++) {
+      tip3pwr.xcrd[i] /= 1.5;
+      tip3pwr.ycrd[i] /= 1.5;
+      tip3pwr.zcrd[i] /= 1.5;
+    }
+  }
+
+  // Try reading some additional coordinate files: trpcage in isolated boundary conditions
+  const std::string trpcage_crd_name = base_crd_name + osc + "trpcage.inpcrd";
+  const bool trpcage_exists = (getDrivePathType(trpcage_crd_name) == DrivePathType::FILE);
+  const TestPriority do_trpcage = (trpcage_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  PhaseSpace trpcage;
+  if (trpcage_exists) {
+    trpcage.buildFromFile(trpcage_crd_name, CoordinateFileKind::AMBER_INPCRD);
+  }
+  else {
+    missing_files = true;
+  }
+  check(trpcage.getAtomCount(), RelationalOperator::EQUAL, 304, "The number of atoms in the "
+        "Trp-cage (isolated boundary conditions) system is incorrect.", do_trpcage);
+  check(trpcage.getUnitCellType() == UnitCellType::NONE, "Isolated boundary conditions are not "
+        "properly interpreted in the Trp-cage system.", do_trpcage);
+  PhaseSpaceWriter trpcage_wr = trpcage.data();
+  check(trpcage_wr.zcrd[51], RelationalOperator::EQUAL, Approx(4.233).margin(1.0e-7),
+        "Coordinates of the Trp-cage system (isolated boundary conditions) are incorect.",
+        do_trpcage);
+  const std::string trpcage_iso_snapshot = base_crd_name + osc + "trpcage_iso_sample.m";
+  const std::string tip5p_vel_snapshot = base_crd_name + osc + "tip5p_velocity_sample.m";
+  const bool snps_exist = (getDrivePathType(trpcage_iso_snapshot) == DrivePathType::FILE &&
+                           getDrivePathType(tip5p_vel_snapshot) == DrivePathType::FILE);
+  const TestPriority snap_check = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  snapshot(trpcage_iso_snapshot, polyNumericVector(trpcage.getInterlacedCoordinates(20, 100)),
+           "trp_part_crd", 1.0e-4, "Reconstructed partial coordinates of the Trp-cage system are "
+           "incorrect.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           PrintSituation::OVERWRITE, snap_check);
+
+  // Read TIP5P in a periodic, cubic unit cell.  It has velocities.
+  const std::string tip5p_crd_name = base_crd_name + osc + "tip5p.rst";
+  const bool tip5p_exists = (getDrivePathType(trpcage_crd_name) == DrivePathType::FILE);
+  const TestPriority do_tip5p = (tip5p_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  PhaseSpace tip5p;
+  if (tip5p_exists) {
+    tip5p.buildFromFile(tip5p_crd_name, CoordinateFileKind::AMBER_ASCII_RST);
+  }
+  else {
+    missing_files = true;
+  }
+  check(tip5p.getAtomCount(), RelationalOperator::EQUAL, 1080, "The number of atoms in the TIP5P "
+        "system is incorrect.", do_tip5p);
+  PhaseSpaceWriter tip5pwr = tip5p.data();
+  check(tip5pwr.unit_cell == UnitCellType::ORTHORHOMBIC, "An orthorhombic unit cell is not "
+        "correctly interpreted in the TIP5P system.", do_tip5p);
+  snapshot(tip5p_vel_snapshot,
+           polyNumericVector(tip5p.getInterlacedCoordinates(20, 100, TrajectoryKind::VELOCITIES)),
+           "t5p_part_vel", 1.0e-4, "Reconstructed partial velocities of the TIP5P system are "
+           "incorrect.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
+           PrintSituation::OVERWRITE, do_trpcage);
+  
+  // Read ubiquitin, solvated in a very small octahedral cell (there is an odd number of atoms)
+  const std::string ubiquitin_crd_name = base_crd_name + osc + "ubiquitin.inpcrd";
+  const bool ubiquitin_exists = (getDrivePathType(trpcage_crd_name) == DrivePathType::FILE);
+  const TestPriority do_ubiquitin = (ubiquitin_exists) ? TestPriority::CRITICAL :
+                                                         TestPriority::ABORT;
+  PhaseSpace ubiquitin;
+  if (ubiquitin_exists) {
+    ubiquitin.buildFromFile(ubiquitin_crd_name, CoordinateFileKind::AMBER_INPCRD);
+  }
+  else {
+    missing_files = true;
+  }
+  check(ubiquitin.getAtomCount(), RelationalOperator::EQUAL, 3105, "The number of atoms in the "
+        "ubiquitin system is incorrect.");
+  double ub_lx, ub_ly, ub_lz, ub_alpha, ub_beta, ub_gamma;
+  extractBoxDimensions(&ub_lx, &ub_ly, &ub_lz, &ub_alpha, &ub_beta, &ub_gamma,
+                       ubiquitin.getInverseTransform().data());
+  std::vector<double> box_dimensions = { ub_lx, ub_ly, ub_lz, ub_alpha, ub_beta, ub_gamma };
+  std::vector<double> box_target(6);
+  for (int i = 0; i < 3; i++) {
+    box_target[i    ] =  36.2646985;
+    box_target[i + 3] = 109.4712190 * pi / 180.0;
+  }
+  check(box_dimensions, RelationalOperator::EQUAL, Approx(box_target).margin(small),
+        "Ubiquitin is solvated in a truncated, octahedral box, but this was not found by "
+        "extracting the box dimensions from the inverse transformation matrix.", do_ubiquitin);
+
+  // Read Trp-cage as a CoordinateFrame object
+  CoordinateFrame trpcage_coord_frame;
+  if (trpcage_exists) {
+    trpcage_coord_frame.buildFromFile(trpcage_crd_name, CoordinateFileKind::AMBER_INPCRD);
+  }
+  check(trpcage_coord_frame.getInterlacedCoordinates(), RelationalOperator::EQUAL,
+        trpcage.getInterlacedCoordinates(), "Coordinates read by the CoordinateFrame and "
+        "PhaseSpace objects do not agree.", do_trpcage);
+  check(trpcage_coord_frame.getUnitCellType() == UnitCellType::NONE, "The Trp-cage system read as "
+        "a CoordinateFrame object was not correctly found to have isolated boundary conditions.",
+        do_trpcage);
+
+  // Try making an ARRAY-kind CoordinateFrame based on an existing PhaseSpace object
+  CoordinateFrame tip5p_coord_frame(&tip5p);
+  CoordinateFrameWriter tip5p_coord_frame_wr = tip5p_coord_frame.data();
+  check(tip5p_coord_frame.getAtomCount(), RelationalOperator::EQUAL, tip5p.getAtomCount(),
+        "Making an ARRAY-kind CoordinateFrame based on a PhaseSpace object obtains the wrong "
+        "number of atoms.", do_tip5p);
+  check(tip5p_coord_frame.getUnitCellType() == tip5p.getUnitCellType(), "Making an ARRAY-kind "
+        "CoordinateFrame based on a PhaseSpace object obtains the wrong unit cell type.",
+        do_tip5p);
+ 
+  // Try making a POINTER-kind CoordinateFrame object based on an existing PhaseSpace object
+  CoordinateFrameWriter tip5p_access = getCoordinateFrameWriter(&tip5p);
+  check(tip5p_access.natom, RelationalOperator::EQUAL, tip5p.getAtomCount(), "Making a "
+        "CoordinateFrameWriter based on a PhaseSpace object obtains the wrong number of atoms.",
+        do_tip5p);
+  check(tip5p_access.unit_cell == tip5p.getUnitCellType(), "Making a CoordinateFrameWriter "
+        "based on a PhaseSpace object obtains the wrong unit cell type.", do_tip5p);
+  const std::vector<double> tip5p_orig_crd = tip5p.getInterlacedCoordinates();
+  if (tip5p_exists) {
+    for (int i = 0; i < tip5p_access.natom; i++) {
+      tip5p_access.xcrd[i] *= 1.7;
+      tip5p_access.ycrd[i] *= 0.8;
+      tip5p_access.zcrd[i] *= 2.9;
+    }
+  }
+  check(tip5p_coord_frame.getInterlacedCoordinates(), RelationalOperator::EQUAL,
+        tip5p_orig_crd, "The ARRAY-kind CoordinateFrame object does not keep an independent set "
+        "of coordinates after being created from a PhaseSpace object.", do_tip5p);
+  box_target[0] = 18.9668845;
+  box_target[1] = 18.7716607;
+  box_target[2] = 18.7928724;
+  for (int i = 3; i < 6; i++) {
+    box_target[i] = 0.5 * pi;
+  }
+  check(tip5p_coord_frame.getBoxDimensions(), RelationalOperator::EQUAL,
+        Approx(box_target).margin(1.0e-7), "Box dimensions stored in a CoordinateFrame object "
+        "built from an input file do not meet expectations.", do_tip5p);
+  std::vector<double> access_dims(6);
+  for (int i = 0; i < 6; i++) {
+    access_dims[i] = tip5p_access.boxdim[i];
+  }
+  check(access_dims, RelationalOperator::EQUAL, Approx(box_target).margin(1.0e-7),
+        "Box dimensions obtained from a CoordinateFrameWriter object targeting a PhaseSpace "
+        "object do not meet expectations.", do_tip5p);
+  
+  // Report missing files
+  if (missing_files) {
+    rtWarn("One or more coordinate and topology files required by this test program were not "
+           "found, causing some tests to be skipped.  Make sure that the $OMNI_SOURCE environment "
+           "variable is set to the root directory with src/ and test/ subdirectories, then re-run "
+           "the tests to ensure that the libraries are working as intended.", "test_phasespace");
+  }
+  if (snps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
+    rtWarn("One or more of the snapshot files required by this test program were not found, "
+           "causing some tests to be skipped.  Make sure that the $OMNI_SOURCE environment "
+           "variable is set to the root directory with src/ and test/ subdirectories.  If this "
+           "error was encountered without also triggering a warning about the actual topology and "
+           "coordinate files, the installation may be corrupted.", "test_phasespace");
+  }
+
+  // Try using the PhaseSpace object's copy, copy assignment, and move constructors
+  section(4);
+  std::vector<PhaseSpace> psvec;
+  psvec.reserve(4);
+  TestPriority do_aggregate_tests;
+  if (ubiquitin_exists && tip5p_exists && tip3p_exists && trpcage_exists) {
+    psvec.push_back(PhaseSpace(ubiquitin_crd_name, CoordinateFileKind::AMBER_INPCRD));
+    psvec.push_back(PhaseSpace(tip5p_crd_name, CoordinateFileKind::AMBER_INPCRD));
+    psvec.push_back(PhaseSpace(tip3p_crd_name, CoordinateFileKind::AMBER_INPCRD));
+    psvec.push_back(PhaseSpace(trpcage_crd_name, CoordinateFileKind::AMBER_INPCRD));
+    do_aggregate_tests = TestPriority::CRITICAL;
+  }
+  else {
+    psvec.push_back(PhaseSpace());
+    psvec.push_back(PhaseSpace());
+    psvec.push_back(PhaseSpace());
+    psvec.push_back(PhaseSpace());
+    do_aggregate_tests = TestPriority::ABORT;
+  }
+  std::vector<double> fifth_atoms(12);
+  const std::vector<double> fifth_atom_answer = {  16.1156366,  16.6966148,  28.8721505,
+                                                    5.7666007,   6.4934467,   8.8166586,
+                                                    6.6229624,   9.9389213,  16.9374141,
+                                                   -8.6080000,   3.1350000,  -1.6180000 };
+  for (int i = 0; i < 4; i++) {
+    std::vector<double> xyz = psvec[i].getInterlacedCoordinates(4, 5);
+    for (int j = 0; j < 3; j++) {
+      fifth_atoms[(3 * i) + j] = xyz[j];
+    }
+  }
+  check(fifth_atoms, RelationalOperator::EQUAL, Approx(fifth_atom_answer).margin(1.0e-6),
+        "Coordinates of atoms from a Standard Template Library vector of PhaseSpace objects "
+        "created with the push_back method are incorrect.");
+  psvec.resize(0);
+  for (int i = 0; i < 4; i++) {
+    psvec.push_back(createRandomParticles(400 - (4 * i)));
+  }
+  const std::vector<double> set_sums_ans = {  134.9269358607,  -69.4279326838,  206.6680541060,
+                                              -40.6839444224,   18.5285675110,   40.5098113458,
+                                              194.1565672645,  -32.0942116109,  -54.6531300763,
+                                              126.2101616896, -237.2226895779,  -73.2000205367 };
+  std::vector<double> set_sums(12);
+  for (int i = 0; i < 4; i++) {
+    double xsum = 0.0;
+    double ysum = 0.0;
+    double zsum = 0.0;
+    if (i < 2) {
+
+      // Test the copy assignment constructor
+      PhaseSpace pscopy;
+      pscopy = psvec[i];
+      const PhaseSpaceWriter psw = pscopy.data();
+      for (int j = 0; j < psw.natom; j++) {
+        xsum += psw.xcrd[j];
+        ysum += psw.ycrd[j];
+        zsum += psw.zcrd[j];
+      }
+    }
+    else {
+
+      // Test the copy constructor
+      const PhaseSpace pscopy(psvec[i]);
+      const PhaseSpaceReader psr = pscopy.data();
+      for (int j = 0; j < psr.natom; j++) {
+        xsum += psr.xcrd[j];
+        ysum += psr.ycrd[j];
+        zsum += psr.zcrd[j];
+      }      
+    }
+    set_sums[(3 * i)    ] = xsum;
+    set_sums[(3 * i) + 1] = ysum;
+    set_sums[(3 * i) + 2] = zsum;
+  }
+  check(set_sums, RelationalOperator::EQUAL, Approx(set_sums_ans).margin(1.0e-8), "Sums of "
+        "random particle coordinates obtained from PhaseSpace objects after std::vector "
+        "push_back() and subsequent copy assignment operations do not meet expectations.");
+  
+  // Summary evaluation
+  printTestSummary(oe.getVerbosity());
+
+  return 0;
+}

@@ -1,0 +1,4 @@
+add_library(amber_prmtop_util amber_prmtop_util.cpp)
+add_library(atomgraph_abstracts atomgraph_abstracts.cpp)
+add_library(atomgraph atomgraph.cpp)
+add_library(atomgraph_refinement atomgraph_refinement.cpp)

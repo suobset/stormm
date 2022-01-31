@@ -1,0 +1,412 @@
+// -*-c++-*-
+#ifndef OMNI_ATOMGRAPH_ABSTRACTS_H
+#define OMNI_ATOMGRAPH_ABSTRACTS_H
+
+#include "atomgraph_enumerators.h"
+
+namespace omni {
+namespace topology {
+
+/// \brief Unguarded struct to store the ingredients of a single Urey-Bradley interaction
+template <typename T> struct UreyBradleyTerm {
+  int i_atom;     ///< Atom i in the term
+  int k_atom;     ///< Atom k in the term (there is no atom j in this harmonic two-body potential)
+  int param_idx;  ///< Parameter index (for tracing purposes--critical values are given next)
+  T keq;          ///< Harmonic stretching stiffness
+  T leq;          ///< Harmonic equilibrium length (Angstroms)
+};
+
+/// \brief Unguarded struct to store the ingredients of a single CHARMM improper dihedral
+template <typename T> struct CharmmImprTerm {
+  int i_atom;     ///< First atom in the term
+  int j_atom;     ///< Second (central) atom in the term
+  int k_atom;     ///< Third atom in the term
+  int l_atom;     ///< Fourth atom in the term
+  int param_idx;  ///< Parameter index (for tracing purposes--critical values are given next)
+  T keq;          ///< Harmonic planar angle stiffness
+  T phi_eq;       ///< Harmonic equilibrium angle (radians)
+};
+
+/// \brief Unguarded struct to store the ingredients of a single CMAP interaction
+template <typename T> struct CmapTerm {
+  int i_atom;     ///< First atom in the first dihedral term
+  int j_atom;     ///< Second atom in the first dihedral term, or first atom in the second
+  int k_atom;     ///< Third atom in the first dihedral term, or second atom in the second
+  int l_atom;     ///< Fourth atom in the first dihedral term, or third atom in the second
+  int m_atom;     ///< Fourth atom in the second dihedral term
+  int surf_idx;   ///< Surface term index (for tracing purposes--dimensions of a CMAP and a
+                  ///<   pointer to it are given next)
+  int surf_dim;   ///< Dimension of the (square, periodic) CMAP potential grid
+  T* surf;        ///< Pointer to the surface potential values (stored in column-major format)
+};
+
+/// \brief Unguarded struct to store the ingredients of a single bond stretching interaction
+template <typename T> struct BondTerm {
+  int i_atom;     ///< Atom i in the term
+  int j_atom;     ///< Atom j in the term
+  int param_idx;  ///< Parameter index (for tracing purposes--critical values are given next)
+  T keq;          ///< Harmonic stretching stiffness
+  T leq;          ///< Harmonic equilibrium length (Angstroms)
+};
+
+/// \brief Unguarded struct to store the ingredients of a single bond angle interaction
+template <typename T> struct AngleTerm {
+  int i_atom;     ///< First atom in the term
+  int j_atom;     ///< Second (central) atom in the term
+  int k_atom;     ///< Third atom in the term
+  int param_idx;  ///< Parameter index (for tracing purposes--critical values are given next)
+  T keq;          ///< Harmonic angle stiffness
+  T theta_eq;     ///< Harmonic equilibrium angle (radians)
+};
+
+/// \brief Unguarded struct to store the ingredients of a single dihedral (proper or improper)
+///        torsion interaction.  The trefoil improper torsion scheme used by OpenMM is implemented
+///        by applying multiple improper dihedrals of the Amber format, where the third atom is
+///        taken to be the central atom.
+template <typename T> struct DihedralTerm {
+  int i_atom;     ///< First atom in the dihedral
+  int j_atom;     ///< Second atom in the dihedral
+  int k_atom;     ///< Third atom in the dihedral (central atom if this is an improper)
+  int l_atom;     ///< Fourth atom in the dihedral
+  int param_idx;  ///< Parameter index (for tracing purposes--critical values are given next)
+  T amplitude;    ///< Cosine series amplitude
+  T phase;        ///< Phase angle for the dihedral
+  T periodicity;  ///< Periodicity of the dihedral (integral value, but given as a real number)
+  T elec_screen;  ///< Electrostatic screening (electrostatic 1:4 interactions will be computed at
+                  ///<   this intensity relative to their normal values)
+  T vdw_screen;   ///< van-der Waals screening (van-der Waals 1:4 interactions will be computed at
+                  ///<   this intensity relative to their normal values)
+};
+
+/// \brief Information need for bonded calculations.  Templating is used to serve either of two
+///        levels of precision: single (which, on almost any machine and HPC accelerator card,
+///        will be fp32) or double (fp64).  Parameters for bonds, the highest frequency terms in
+///        any system by a factor of roughly 5, will always be stored in double precision, as will
+///        parameters for bond angles, the next highest frequency group of terms.  The precision of
+///        other parameters varies according to the template parameter.
+template <typename T> struct ValenceKit {
+
+  /// \brief The constructor takes a Fortran77-worthy list of arguments.  It would not be any
+  ///        cleaner to make this object a friend of or nested struct within AtomGraph, due to its
+  ///        templated nature.
+  ///
+  ///        See the descriptions of eponymous member variables (minus _in) within the ValenceKit
+  ///        object for descriptions of each parameter.
+  explicit ValenceKit(int nbond_in, int nangl_in, int ndihe_in, int nbond_param_in,
+                      int nangl_param_in, int ndihe_param_in, int ninfr14_in, int nattn14_param_in,
+                      int nubrd_in, int ncimp_in, int ncmap_in, int nubrd_param_in,
+                      int ncimp_param_in, int ncmap_surf_in, const double* bond_keq_in,
+                      const double* bond_leq_in, const double* angl_keq_in,
+                      const double* angl_leq_in, const T* dihe_amp_in, const T* dihe_freq_in,
+                      const T* dihe_phi_in, const T* attn14_elec_in, const T* attn14_vdw_in,
+                      const int* bond_i_atoms_in, const int* bond_j_atoms_in,
+                      const int* bond_param_idx_in, const char4* bond_modifiers_in,
+                      const int* angl_i_atoms_in, const int* angl_j_atoms_in,
+                      const int* angl_k_atoms_in, const int* angl_param_idx_in,
+                      const char4* angl_modifiers_in, const int* dihe_i_atoms_in,
+                      const int* dihe_j_atoms_in, const int* dihe_k_atoms_in,
+                      const int* dihe_l_atoms_in, const int* dihe_param_idx_in,
+                      const int* dihe14_param_idx_in, const char4* dihe_modifiers_in,
+                      const int* infr14_i_atoms_in, const int* infr14_j_atoms_in,
+                      const int* infr14_param_idx_in, const int* ubrd_i_atoms_in,
+                      const int* ubrd_k_atoms_in, const int* ubrd_param_idx_in,
+                      const int* cimp_i_atoms_in, const int* cimp_j_atoms_in,
+                      const int* cimp_k_atoms_in, const int* cimp_l_atoms_in,
+                      const int* cimp_param_idx_in, const int* cmap_i_atoms_in,
+                      const int* cmap_j_atoms_in, const int* cmap_k_atoms_in,
+                      const int* cmap_l_atoms_in, const int* cmap_m_atoms_in,
+                      const int* cmap_dim_in, const int* cmap_surf_bounds_in,
+                      const int* cmap_patch_bounds_in, const int* cmap_surf_idx_in,
+                      const double* ubrd_keq_in, const double* ubrd_leq_in, const T* cimp_keq_in,
+                      const T* cimp_phi_in, const T* cmap_surf_in, const T* cmap_dphi_in,
+                      const T* cmap_dpsi_in, const T* cmap_dphi_dpsi_in, const T* cmap_patches_in,
+                      const int* bond_asgn_atoms_in, const int* bond_asgn_index_in,
+                      const int* bond_asgn_terms_in, const int* bond_asgn_bounds_in,
+                      const int* angl_asgn_atoms_in, const int* angl_asgn_index_in,
+                      const int* angl_asgn_terms_in, const int* angl_asgn_bounds_in,
+                      const int* dihe_asgn_atoms_in, const int* dihe_asgn_index_in,
+                      const int* dihe_asgn_terms_in, const int* dihe_asgn_bounds_in,
+                      const int* ubrd_asgn_atoms_in, const int* ubrd_asgn_index_in,
+                      const int* ubrd_asgn_terms_in, const int* ubrd_asgn_bounds_in,
+                      const int* cimp_asgn_atoms_in, const int* cimp_asgn_index_in,
+                      const int* cimp_asgn_terms_in, const int* cimp_asgn_bounds_in,
+                      const int* cmap_asgn_atoms_in, const int* cmap_asgn_index_in,
+                      const int* cmap_asgn_terms_in, const int* cmap_asgn_bounds_in);
+
+  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \{
+  ValenceKit(const ValenceKit &original) = default;
+  ValenceKit(ValenceKit &&original) = default;
+  //ValenceKit& operator=(const ValenceKit &other) = default;
+  //ValenceKit& operator=(ValenceKit &&other) = default;
+  /// \}
+  
+  // The purpose of this struct is to store a collection of pointers for HPC kernels.  As such, it
+  // does not have any private member variables.  As a provider of parameters, it also does not
+  // allow modification of the data that it points to.
+  const int nbond;              ///< Number of bonds in the system
+  const int nangl;              ///< Number of bond angles in the system
+  const int ndihe;              ///< Number of dihedrals or torsions (includes cosine-based
+                                ///<   improper torsions) in the system
+  const int nbond_param;        ///< Number of unique bond parameters
+  const int nangl_param;        ///< Number of unqiue bond angle parameters
+  const int ndihe_param;        ///< Number of unique cosine dihedral parameters
+  const int ninfr14;            ///< The number of inferred 1:4 exclusions
+  const int nattn14_param;      ///< Number of 1:4 attenuation factor pairs (vdW, electrostatic)
+  const int nubrd;              ///< Number of Urey-Bradley 1:3 harmonic angle interactions
+  const int ncimp;              ///< Number of CHARMM harmonic improper interactions
+  const int ncmap;              ///< Number of CHARMM CMAP surface spline-based interactions
+  const int nubrd_param;        ///< Number of unique Urey-Bradley parameters
+  const int ncimp_param;        ///< Number of unique CHARMM harmonic improper parameters
+  const int ncmap_surf;         ///< Number of unique CMAP surfaces
+  const double* bond_keq;       ///< Equilibrium stiffness constants for all unique bonds
+  const double* bond_leq;       ///< Equilibrium lengths for all unique bonds
+  const double* angl_keq;       ///< Equilibrium stiffness constants for all unique bond angles
+  const double* angl_leq;       ///< Equilibrium lengths for all unique bond angles
+  const T* dihe_amp;            ///< Amplitudes for all unique cosine-based dihedrals
+  const T* dihe_freq;           ///< Periodicities for cosine-based dihedral / torsion terms
+  const T* dihe_phi;            ///< Phase angles for cosine-based dihedral / torsion terms
+  const T* attn14_elec;         ///< Electrostatic 1:4 attenuation parameters, including a zero for
+                                ///<   no 1:4 interaction.  The arrays dihe14_param_idx and
+                                ///<   infr14_param_idx both index into this array.
+  const T* attn14_vdw;          ///< van-der Waals 1:4 attenuation parameters, including a zero for
+                                ///<   no 1:4 interaction.  The arrays dihe14_param_idx and
+                                ///<   infr14_param_idx both index into this array.
+  const int* bond_i_atoms;      ///< Array of first atoms in each bond
+  const int* bond_j_atoms;      ///< Array of second atoms in each bond
+  const int* bond_param_idx;    ///< Parameter indices for each bond in the system
+  const char4* bond_modifiers;  ///< Modifying details of each bond stretching term
+  const int* angl_i_atoms;      ///< Array of first atoms in each bond angle
+  const int* angl_j_atoms;      ///< Array of second atoms in each bond angle
+  const int* angl_k_atoms;      ///< Array of third atoms in each bond angle
+  const int* angl_param_idx;    ///< Parameter indices for each bond angle in the system
+  const char4* angl_modifiers;  ///< Modifying details of each angle bending term
+  const int* dihe_i_atoms;      ///< Array of first atoms in each cosine-based dihedral
+  const int* dihe_j_atoms;      ///< Array of second atoms in each cosine-based dihedral
+  const int* dihe_k_atoms;      ///< Array of third atoms in each cosine-based dihedral (these are
+                                ///<   the center atoms if the dihedral describes a cosine-based
+                                ///<   improper)
+  const int* dihe_l_atoms;      ///< Array of fourth atoms in each cosine-based dihedral
+  const int* dihe_param_idx;    ///< Parameter indices for each cosine-based dihedral in the system
+  const int* dihe14_param_idx;  ///< Parameter indices for 1:4 attenuated interactions handled by
+                                ///<   each dihedral through their I and L atoms
+  const char4* dihe_modifiers;  ///< Modifying details of each dihedral term, including whether it
+                                ///<   is a proper or improper dihedral with or without a 1:4
+                                ///<   attenuated interaction
+  const int* infr14_i_atoms;    ///< Inferred 1:4 interactions' I atoms.  These cannot be handled
+                                ///<   directly by any dihedrals and so must be treated as separate
+                                ///<   terms.
+  const int* infr14_j_atoms;    ///< Inferred 1:4 interactions' J atoms
+  const int* infr14_param_idx;  ///< Indices into the arrays of 1:4 attenuation parameters for the
+                                ///<   set of 1:4 interactions with inferred parameters
+  const int* ubrd_i_atoms;      ///< First atoms in each Urey-Bradley harmonic angle interaction
+  const int* ubrd_k_atoms;      ///< Second atoms in each Urey-Bradley harmonic angle interaction
+  const int* ubrd_param_idx;    ///< Parameter indices for each Urey-Bradley interaction
+  const int* cimp_i_atoms;      ///< First atoms in each CHARMM harmonic improper dihedral
+  const int* cimp_j_atoms;      ///< Second atoms in each CHARMM harmonic improper dihedral
+  const int* cimp_k_atoms;      ///< Third (center) atoms in each CHARMM harmonic improper dihedral
+  const int* cimp_l_atoms;      ///< Fourth atoms in each CHARMM harmonic improper dihedral
+  const int* cimp_param_idx;    ///< Parameter indices for each CHARMM harmonic improper dihedral
+  const int* cmap_i_atoms;      ///< First atoms of the first dihedral in each CHARMM CMAP term
+  const int* cmap_j_atoms;      ///< Second atoms of the first dihedral, first atoms of the second
+                                ///<   dihedral, in each CHARMM CMAP term
+  const int* cmap_k_atoms;      ///< Third atoms of the first dihedral, second atoms of the second
+                                ///<   dihedral, in each CHARMM CMAP term
+  const int* cmap_l_atoms;      ///< Fourth atoms of the first dihedral, third atoms of the second
+                                ///<   dihedral, in each CHARMM CMAP term
+  const int* cmap_m_atoms;      ///< Fourth atoms of the second dihedral in each CHARMM CMAP term
+  const int* cmap_dim;          ///< Dimension of each CMAP surface (each surface is a square grid)
+  const int* cmap_surf_bounds;  ///< Bounds array for individual CMAP surfaces
+  const int* cmap_patch_bounds; ///< Bounds array for individual CMAP surfaces composed of patch
+                                ///<   matrices (this array is basically 16 times cmap_surf_bounds)
+  const int* cmap_surf_idx;     ///< Parameter (surface) indices for CHARMM CMAP interactions
+  const double* ubrd_keq;       ///< Array of unique Urey-Bradley 1:3 harmonic stiffnesses
+  const double* ubrd_leq;       ///< Array of unique Urey-Bradley 1:3 harmonic equilibrium lengths
+  const T* cimp_keq;            ///< Array of unique CHARMM harmonic improper dihedral stiffnesses
+  const T* cimp_phi;            ///< Array of unique CHARMM harmonic improper dihedral phase angles
+  const T* cmap_surf;           ///< Array of CHARMM CMAP surface values
+  const T* cmap_dphi;           ///< Array of CHARMM CMAP surface "phi" derivative values
+  const T* cmap_dpsi;           ///< Array of CHARMM CMAP surface "psi" derivative values
+  const T* cmap_dphi_dpsi;      ///< Array of CHARMM CMAP surface cross derivative values
+  const T* cmap_patches;        ///< Array of interlaced CHARMM CMAP patch matrices
+
+  // The following arrays provide a different perspective on the valence terms.  Each bond, angle,
+  // dihedral, Urey-Bradley, CMAP, and other valence term is assigned to one of its constituent
+  // atoms.  Atoms are then responsible for executing any of their assigned terms.  Atom a_idx
+  // is responsible for terms in each array indexed by [(term)_asgn_bounds[a_idx] ...
+  // (term)_asgn_bounds[a_idx] + 1), which provides the relevant elements of the associated
+  // (term)_asgn_index array (for the parameter index) or the (term)_assigned_atoms array
+  // (multiply by (number of atoms in the term - 1), but this lists all other atoms in the term).
+  // This allows instant lookup of all relevant bonds, angles, CMAPs, etc. based on any given atom
+  // number, although to get all bonds in a given molecule one still has to loop over all atoms in
+  // the molecule.  To find all bonds associated with a given atom a_idx, look for all bonds that
+  // a_idx itself is responsible for and then cycle through its 1:2 exclusions neighbor list to see
+  // which of those atom are responsible for bonds back to a_idx.  That will enumerate all bonds,
+  // with parameters, affecting atom a_idx.
+  const int* bond_asgn_atoms;  ///< Other atoms for bond terms (one atom per term)
+  const int* bond_asgn_index;  ///< Parameter indices for bond terms
+  const int* bond_asgn_terms;  ///< Bond term indices assigned to each atom (i.e. the 5th atom is
+                               ///<   assigned bond terms with indices 18, 20, and 21)
+  const int* bond_asgn_bounds; ///< Bounds for each atom's assigned bond list
+  const int* angl_asgn_atoms;  ///< Other atoms for bond angle terms (two atoms per term)
+  const int* angl_asgn_index;  ///< Parameter indices for bond angle terms
+  const int* angl_asgn_terms;  ///< Angle term indices assigned to each atom (i.e. the 9th atom is
+                               ///<   assigned angle terms with indices 46, 48, and 50)
+  const int* angl_asgn_bounds; ///< Bounds for each atom's assigned bond angle list
+  const int* dihe_asgn_atoms;  ///< Other atoms for dihedral terms (three atoms per term)
+  const int* dihe_asgn_index;  ///< Parameter indices for dihedral terms
+  const int* dihe_asgn_terms;  ///< Dihedral term indices assigned to each atom (i.e. the 4th atom
+                               ///<   is assigned dihedral terms with indices 27, 28, and 29)
+  const int* dihe_asgn_bounds; ///< Bounds for each atom's assigned dihedral list
+  const int* ubrd_asgn_atoms;  ///< Other atoms for Urey-Bradley terms (one atom per term)
+  const int* ubrd_asgn_index;  ///< Parameter indices for Urey-Bradley terms
+  const int* ubrd_asgn_terms;  ///< Urey-Bradley term indices assigned to each atom
+  const int* ubrd_asgn_bounds; ///< Bounds for each atom's assigned Urey-Bradley list
+  const int* cimp_asgn_atoms;  ///< Other atoms for CHARMM impropers (three atoms per term)
+  const int* cimp_asgn_index;  ///< Parameter indices for CHARMM improper dihedral terms
+  const int* cimp_asgn_terms;  ///< CHARMM improper term indices assigned to each atom
+  const int* cimp_asgn_bounds; ///< Bounds for each atom's assigned CHARMM improper list
+  const int* cmap_asgn_atoms;  ///< Other atoms for CMAP terms (four atoms per term)
+  const int* cmap_asgn_index;  ///< Parameter indices for CMAP terms
+  const int* cmap_asgn_terms;  ///< CMAP term indices assigned to each atom
+  const int* cmap_asgn_bounds; ///< Bounds for each atom's assigned CMAP list
+};
+
+/// \brief Information needed for non-bonded real-space calculations.  Templating is used as above,
+///        to provide different levels of precision in the real number representation.
+template <typename T> struct NonbondedKit {
+
+  /// \brief As with most other astracts, the constructor is the only member function of
+  ///        significance.  It takes a long list of arguments one for each of its member variables.
+  explicit NonbondedKit(int natom_in, int n_lj_types_in, const T coulomb_constant_in,
+                        const T* charge_in, const int* q_idx_in, const int* lj_idx_in,
+                        const T* q_parameter_in, const T* lja_coeff_in, const T* ljb_coeff_in,
+                        const T* ljc_coeff_in, const T* lja_14_coeff_in, const T* ljb_14_coeff_in,
+                        const T* ljc_14_coeff_in, const int* nb11x_in, const int* nb11_bounds_in,
+                        const int* nb12x_in, const int* nb12_bounds_in, const int* nb13x_in,
+                        const int* nb13_bounds_in, const int* nb14x_in, const int* nb14_bounds_in,
+                        const T* lj_type_corr_in);
+
+  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \{
+  NonbondedKit(const NonbondedKit &original) = default;
+  NonbondedKit(NonbondedKit &&original) = default;
+  //NonbondedKit& operator=(const NonbondedKit &other) = default;
+  //NonbondedKit& operator=(NonbondedKit &&other) = default;
+  /// \}
+
+  // Member variables again store a collection of atomic parameters
+  const int natom;          ///< The number of atoms in the system
+  const int n_lj_types;     ///< The number of atoms in the system
+  const T coulomb_constant; ///< Coulomb's constant in units of kcal-A/mol-e^2
+  const T* charge;          ///< Partial atomic charges on all atoms
+  const int* q_idx;         ///< Bartial charge type indices for all atoms
+  const int* lj_idx;        ///< Lennard-Jones type indices of all atoms
+  const T* q_parameter;     ///< Partial atomic charges for each charge type (this will almost
+                            ///<   certainly be smaller than the array of charges for every atom,
+                            ///<   as there are only about 350 unique chargees in a protein force
+                            ///<   field and two in most water models).  The representation here is
+                            ///<   not more memory-efficient than accessing the single-precision
+                            ///<   charge data, however, as the 32-bit index is a memory access of
+                            ///<   its own.  However, in the AtomGraphSynthesis an array of
+                            ///<   bit-packed unsigned integers that delivers both the charge and
+                            ///<   Lennard-Jones parameter indices for each atom will offer the
+                            ///<   most performant solution.
+  const T* lja_coeff;       ///< Lennard-Jones A coefficients for all atoms, tabulated as a square
+                            ///<   matrix of rank (number of Lennard-Jones types)
+  const T* ljb_coeff;       ///< Lennard_jones B coefficients, again tabulated as a square matrix
+  const T* ljc_coeff;       ///< Lennard_jones C coefficients, again tabulated as a square matrix
+  const T* lja_14_coeff;    ///< Lennard-Jones A coefficients for 1:4 interactions, tabulated as a
+                            ///<   square matrix in the same form as lja_coeff
+  const T* ljb_14_coeff;    ///< Lennard_jones B coefficients for 1:4 interactions
+  const T* ljc_14_coeff;    ///< Lennard_jones C coefficients for 1:4 interactions
+  const int* nb11x;         ///< Non-bonded 1:1 exclusions, applicable to virtual sites
+  const int* nb11_bounds;   ///< Non-bonded 1:1 exclusion array bounds for each atom
+  const int* nb12x;         ///< Non-bonded 1:2 exclusions, applicable to bonded atoms
+  const int* nb12_bounds;   ///< Non-bonded 1:2 exclusion array bounds for each atom
+  const int* nb13x;         ///< Non-bonded 1:3 exclusions, applicable to atoms in bond angles and
+                            ///<   Urey-Bradley terms
+  const int* nb13_bounds;   ///< Non-bonded 1:3 exclusion array bounds for each atom
+  const int* nb14x;         ///< Non-bonded 1:4 exclusions, applicable to atoms in proper torsions
+  const int* nb14_bounds;   ///< Non-bonded 1:4 exclusion array bounds for each atom
+  const T* lj_type_corr;    ///< Lennard-Jones energy corrections for each atom type (used only
+                            ///<   in energy calculations)
+};
+
+/// \brief Information needed for Generalized Born (and perhaps other) implicit solvent methods.
+///        This information is collected into an object separate from the non-bonded kit because
+///        only a subset of calculations will use GB for the solvent conditions.
+template <typename T> struct ImplicitSolventKit {
+
+  explicit ImplicitSolventKit(int natom_in, ImplicitSolventModel igb_in, T dielectric_in,
+                              T saltcon_in, const int* neck_gb_idx_in, const T* pb_radii_in,
+                              const T* gb_screen_in, const T* gb_alpha_in,
+                              const T* gb_beta_in, const T* gb_gamma_in);
+
+  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \{
+  ImplicitSolventKit(const ImplicitSolventKit &original) = default;
+  ImplicitSolventKit(ImplicitSolventKit &&original) = default;
+  //ImplicitSolventKit& operator=(const ImplicitSolventKit &other) = default;
+  //ImplicitSolventKit& operator=(ImplicitSolventKit &&other) = default;
+  /// \}
+
+  // Member variables again store a collection of atomic parameters
+  const int natom;                ///< The number of atoms in the system
+  const ImplicitSolventModel igb; ///< The flavor of Generalized Born to use, i.e. Hawkins /
+                                  ///<   Cramer / Truhlar
+  const T dielectric;             ///< The dielectric constant to use (default 80.0)
+  const T saltcon;                ///< The salt concentration to use in GB calculations
+  const int* neck_gb_idx;         ///< Neck GB indicies for all atoms, applicable for Mongan's
+                                  ///<   "neck" GB models
+  const T* pb_radii;              ///< Atomic PB radii
+  const T* gb_screen;             ///< Generalized Born screening factors
+  const T* gb_alpha;              ///< Generalized born alpha parameters (one parameter per atom)
+  const T* gb_beta;               ///< Generalized born beta parameters (one parameter per atom)
+  const T* gb_gamma;              ///< Generalized born gamma parameters (one parameter per atom)
+};
+
+/// \brief Information on atoms and residues which may be useful for applying atom masks or
+///        identifying specific parts of the sytem
+struct ChemicalDetailsKit {
+
+  /// \brief Simple constructor based on many detais.  This, like other abstracts, will most likely
+  ///        be produced by some AtomGraph member function.
+  ChemicalDetailsKit(int natom_in, int nres_in, int nmol_in, const char4* atom_names_in,
+                     const char4* res_names_in, const char4* atom_types_in,
+                     const int* z_numbers_in, const int* res_limits_in, const int* atom_numbers_in,
+                     const int* res_numbers_in, const int* mol_home_in, const int* mol_contents_in,
+                     const int* mol_limits_in);
+
+  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \{
+  ChemicalDetailsKit(const ChemicalDetailsKit &original) = default;
+  ChemicalDetailsKit(ChemicalDetailsKit &&original) = default;
+  //ChemicalDetailsKit& operator=(const ChemicalDetailsKit &other) = default;
+  //ChemicalDetailsKit& operator=(ChemicalDetailsKit &&other) = default;
+  /// \}
+
+  // Member variables store the atom count, residue count, and other ways to quantify the system
+  // in addition to many useful pointers
+  const int natom;         ///< The number of atoms in the system
+  const int nres;          ///< The number of residues in the system
+  const int nmol;          ///< The number of molecules in the system
+  const char4* atom_names; ///< Names of all atoms in the system
+  const char4* res_names;  ///< Names of all residues in the system
+  const char4* atom_types; ///< Atom type names for all atoms in the system
+  const int* z_numbers;    ///< Atomic numbers for all atoms in the system
+  const int* res_limits;   ///< Residue limits, a capped (exclusive) prefix sum
+  const int* atom_numbers; ///< Structural atom numbers for every atom
+  const int* res_numbers;  ///< Structural residue numbers for every atom (atom, not residue, even
+                           ///<   though the numbers refer to residues)
+  const int* mol_home;     ///< Molecule index to which each atom belongs
+  const int* mol_contents; ///< Contents of every molecule in the system, as lists of atom indices
+  const int* mol_limits;   ///< Molecule limits, the bounds by which to read mol_contents
+};
+
+} // namespace topology
+} // namespace omni
+
+#include "atomgraph_abstracts.tpp"
+
+#endif

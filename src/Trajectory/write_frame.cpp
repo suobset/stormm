@@ -1,0 +1,106 @@
+#include <cstring>
+#include "Parsing/ascii_numbers.h"
+#include "Parsing/polynumeric.h"
+#include "write_frame.h"
+
+namespace omni {
+namespace trajectory {
+
+using parse::NumberFormat;
+using parse::PolyNumeric;
+
+//-------------------------------------------------------------------------------------------------
+void writeFrame(std::ofstream *foutp, const std::string &filename, const CoordinateFileKind kind,
+                int natom, const double* x_crd, const double* y_crd, const double* z_crd,
+                const double* x_vel, const double* y_vel, const double* z_vel,
+                const double* box_dimensions) {
+
+  // Declare arrays that will be filled out later, as necessary
+  std::vector<PolyNumeric> pn_allcrd;
+  std::vector<PolyNumeric> pn_allvel;
+
+  // Lay out the appropriate coordinates array: PolyNumeric for ASCII text speed printing,
+  // double-precision real vector for NetCDF and other formats
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    pn_allcrd.resize(3 * natom);
+    for (int i = 0; i < natom; i++) {
+      pn_allcrd[3*i    ].d = x_crd[i];
+      pn_allcrd[3*i + 1].d = y_crd[i];
+      pn_allcrd[3*i + 2].d = z_crd[i];
+    }
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  }
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    pn_allvel.resize(3 * natom);
+    for (int i = 0; i < natom; i++) {
+      pn_allvel[3*i    ].d = x_vel[i];
+      pn_allvel[3*i + 1].d = y_vel[i];
+      pn_allvel[3*i + 2].d = z_vel[i];
+    }
+    break;
+  }
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+    printNumberSeries(foutp, pn_allcrd, 8, 10, 3, NumberFormat::STANDARD_REAL, "writeFrame",
+                      "Write a frame to an Amber-format .crd trajectory file, " + filename +
+                      ".");
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+    printNumberSeries(foutp, pn_allcrd, 6, 12, 7, NumberFormat::STANDARD_REAL, "writeFrame",
+                      "Write a frame to an Amber-format input coordinates file, " + filename +
+                      ".");
+    break;
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    printNumberSeries(foutp, pn_allcrd, 6, 12, 7, NumberFormat::STANDARD_REAL, "writeFrame",
+                      "Write a frame to an Amber-format input coordinates file, " + filename +
+                      ".");
+    printNumberSeries(foutp, pn_allvel, 6, 12, 7, NumberFormat::STANDARD_REAL, "writeFrame",
+                      "Write a frame to an Amber-format input coordinates file, " + filename +
+                      ".");
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+    break;
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void writeFrame(std::ofstream *foutp, const std::string &filename, const CoordinateFileKind kind,
+                const std::vector<double> &x_crd, const std::vector<double> &y_crd,
+                const std::vector<double> &z_crd, const std::vector<double> &x_vel,
+                const std::vector<double> &y_vel, const std::vector<double> &z_vel,
+                const std::vector<double> &box_dimensions) {
+
+  // Check that all arrays are of the same size
+  if (x_crd.size() != y_crd.size() || x_crd.size() != z_crd.size()) {
+    rtErr("Coordinates cannot be written for x, y, and z vectors of different lengths (" +
+          std::to_string(x_crd.size()) + ", " + std::to_string(y_crd.size()) + ", " + 
+          std::to_string(x_crd.size()) + ").", "writeAmberCrd");
+  }
+
+  // Check that all required data is present
+
+  // Check that the box dimensions array is of the correct size
+  if (box_dimensions.size() != 6) {
+    rtErr("Invalid vector for box dimensions (" + std::to_string(box_dimensions.size()) + ").",
+          "writeAmberCrd");
+  }
+  writeFrame(foutp, filename, kind, x_crd.size(), x_crd.data(), y_crd.data(), z_crd.data(),
+             x_vel.data(), y_vel.data(), z_vel.data(), box_dimensions.data());
+}
+
+} // namespace trajectory
+} // namespace omni

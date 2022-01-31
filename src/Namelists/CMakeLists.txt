@@ -1,0 +1,5 @@
+add_library(input input.cpp)
+add_library(namelist_element namelist_element.cpp)
+add_library(namelist_emulator namelist_emulator.cpp)
+add_library(nml_files nml_files.cpp)
+add_library(nml_rst nml_rst.cpp)

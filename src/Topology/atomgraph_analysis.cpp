@@ -1,0 +1,536 @@
+#include <cmath>
+#include "Constants/scaling.h"
+#include "UnitTesting/approx.h"
+#include "atomgraph_analysis.h"
+
+namespace omni {
+namespace topology {
+
+using testing::Approx;
+
+//-------------------------------------------------------------------------------------------------
+WaterModel identifyWaterModel(const AtomGraph &ag) {
+
+  // Obtain the necessary abstracts
+  const ValenceKit<double> vnkit = ag.getDoublePrecisionValenceKit();
+  const ChemicalDetailsKit cdkit = ag.getChemicalDetailsKit();
+  const NonbondedKit<double> nbkit = ag.getDoublePrecisionNonbondedKit();
+
+  // Search for molecules with the chemical formula H2O.
+  std::vector<int> waters;
+  for (int i = 0; i < cdkit.nmol; i++) {
+
+    // Determine whether the molecule is water
+    int n_hydrogen = 0;
+    int n_oxygen = 0;
+    int n_other_atoms = 0;
+    for (int j = cdkit.mol_limits[i]; j < cdkit.mol_limits[i + 1]; j++) {
+      const int element_number = cdkit.z_numbers[cdkit.mol_contents[j]];
+      n_hydrogen += (element_number == 1);
+      n_oxygen += (element_number == 8);
+      n_other_atoms += (element_number > 0 && element_number != 1 && element_number != 8);
+    }
+    if (n_hydrogen == 2 && n_oxygen == 1 && n_other_atoms == 0) {
+      waters.push_back(i);
+    }
+  }
+
+  // Possible problems that may be encountered
+  bool non_neutral_water = false;
+
+  // Search the water molecules found for consistency and try to identify a particular model.
+  // Return immediately if there is no water in the system.
+  const int n_waters = waters.size();
+  if (n_waters == 0) {
+    return WaterModel::NONE;
+  }
+  std::vector<WaterModel> water_types(n_waters, WaterModel::UNKNOWN);
+  for (int i = 0; i < n_waters; i++) {
+    const int mol_contents_llim = cdkit.mol_limits[waters[i]];
+    const int mol_contents_hlim = cdkit.mol_limits[waters[i] + 1];
+
+    // Only three, four, and five-point water models are covered.
+    if (mol_contents_hlim - mol_contents_llim < 3 || mol_contents_hlim - mol_contents_llim > 5) {
+      continue;
+    }
+
+    // Find the non-bonded parameters, O-H equilibrium length, H-H equilibrium length (if
+    // applicable), and H-O-H equilibrium angle (if applicable)
+    double h_charge = 0.0;
+    double h_ljsig  = 0.0;
+    double h_ljeps  = 0.0;
+    double o_charge = 0.0;
+    double o_ljsig  = 0.0;
+    double o_ljeps  = 0.0;
+    double ep_charge = 0.0;
+    double oh_leq = 0.0;
+    double hh_leq = 0.0;
+    double hoh_leq = 0.0;
+    double oh_keq = 0.0;
+    double hh_keq = 0.0;
+    double hoh_keq = 0.0;
+    double nep = 0.0;
+    for (int j = mol_contents_llim; j < mol_contents_hlim; j++) {
+      const int j_particle = cdkit.mol_contents[j];
+      const int znum_j = cdkit.z_numbers[j_particle];
+
+      // Seek hydrogen, oxygen, and massless site non-bonded parameters
+      if (znum_j == 8) {
+        o_charge = nbkit.charge[j_particle];
+        const int o_ljidx = nbkit.lj_idx[j_particle] * (nbkit.n_lj_types + 1);
+        const double o_lja = nbkit.lja_coeff[o_ljidx];
+        const double o_ljb = nbkit.ljb_coeff[o_ljidx];
+        if (o_ljb > constants::tiny) {
+          o_ljsig = pow(o_lja / o_ljb, 1.0 / 6.0);
+          o_ljeps = 0.25 * o_lja / pow(o_ljsig, 12.0);
+        }
+        else {
+          o_ljsig = 0.0;
+          o_ljeps = 0.0;
+        }
+      }
+      else if (znum_j == 1) {
+        h_charge = nbkit.charge[j_particle];
+        const int h_ljidx = nbkit.lj_idx[j_particle] * (nbkit.n_lj_types + 1);
+        const double h_lja = nbkit.lja_coeff[h_ljidx];
+        const double h_ljb = nbkit.ljb_coeff[h_ljidx];
+        if (h_ljb > constants::tiny) {
+          h_ljsig = pow(h_lja / h_ljb, 1.0 / 6.0);
+          h_ljeps = 0.25 * h_lja / pow(h_ljsig, 12.0);
+        }
+        else {
+          h_ljsig = 0.0;
+          h_ljeps = 0.0;
+        }
+      }
+      else if (znum_j == 0) {
+        ep_charge = nbkit.charge[j_particle];
+        nep += 1.0;
+      }
+
+      // Find bond equilibrium lengths and stiffnesses
+      for (int k = vnkit.bond_asgn_bounds[j_particle];
+           k < vnkit.bond_asgn_bounds[j_particle + 1]; k++) {
+        const int k_particle = vnkit.bond_asgn_atoms[k];
+        const int znum_k = cdkit.z_numbers[k_particle];
+        if ((znum_j == 8 && znum_k == 1) || (znum_j == 1 && znum_k == 8)) {
+          const int oh_param_idx = vnkit.bond_asgn_index[k];
+          oh_keq = vnkit.bond_keq[oh_param_idx];
+          oh_leq = vnkit.bond_leq[oh_param_idx];
+        }
+        else if (znum_j == 1 && znum_k == 1) {
+          const int hh_param_idx = vnkit.bond_asgn_index[k];
+          hh_keq = vnkit.bond_keq[hh_param_idx];
+          hh_leq = vnkit.bond_leq[hh_param_idx];
+        }
+      }
+    }
+
+    // Check that the charges make sense -- this will fail in cases like "Six-Site" water or
+    // TIP7P, which do have more than one flavor of virtual site, but these are extremely rare
+    // edge cases and the water model will just remain "UNKNOWN."
+    if (o_charge + (2.0 * h_charge) + (nep * ep_charge) != Approx(0.0).margin(1.0e-5)) {
+      non_neutral_water = true;
+      continue;
+    }
+
+    // Identify this water molecule
+    WaterModel charge_details = WaterModel::UNKNOWN;
+    if (ep_charge == Approx(0.0).margin(1.0e-3)) {
+      if (o_charge == Approx(-0.8952).margin(1.0e-3) &&
+          h_charge == Approx(0.4476).margin(1.0e-3)) {
+        charge_details = WaterModel::OPC3;
+      }
+      else if (o_charge == Approx(-0.82).margin(1.0e-3) &&
+               h_charge == Approx(0.41).margin(1.0e-3)) {
+
+        // Shared by SPC_FW
+        charge_details = WaterModel::SPC;
+      }
+      else if (o_charge == Approx(-0.8476).margin(1.0e-3) &&
+               h_charge == Approx(0.4238).margin(1.0e-3)) {
+
+        // Shared by SPC_EB
+        charge_details = WaterModel::SPC_E;
+      }
+      else if (o_charge == Approx(-0.870).margin(1.0e-3) &&
+               h_charge == Approx(0.435).margin(1.0e-3)) {
+        charge_details = WaterModel::SPC_HW;
+      }
+      else if (o_charge == Approx(-0.834).margin(1.0e-3) &&
+               h_charge == Approx(0.417).margin(1.0e-3)) {
+
+        // Shared by TIP3P_EW and TIP3P_FW
+        charge_details = WaterModel::TIP3P;
+      }
+    }
+    else {
+      if (o_charge == Approx(0.0).margin(1.0e-3)) {
+        if (ep_charge == Approx(-1.3582).margin(1.0e-3) &&
+            h_charge == Approx(0.6791).margin(1.0e-3)) {
+          charge_details = WaterModel::OPC;
+        }
+        else if (ep_charge == Approx(-1.04).margin(1.0e-3) &&
+                 h_charge == Approx(0.52).margin(1.0e-3)) {
+          charge_details = WaterModel::TIP4P;
+        }
+        else if (ep_charge == Approx(-1.04844).margin(1.0e-3) &&
+                 h_charge == Approx(0.52422).margin(1.0e-3)) {
+          charge_details = WaterModel::TIP4P_EW;
+        }
+        else if (ep_charge == Approx(-1.1128).margin(1.0e-3) &&
+                 h_charge == Approx(0.5564).margin(1.0e-3)) {
+
+          // Shared by TIP4P_2005F
+          charge_details = WaterModel::TIP4P_2005;
+        }
+        else if (ep_charge == Approx(-1.1794).margin(1.0e-3) &&
+                 h_charge == Approx(0.5897).margin(1.0e-3)) {
+          charge_details = WaterModel::TIP4P_ICE;
+        }
+        else if (ep_charge == Approx(-1.054).margin(1.0e-3) &&
+                 h_charge == Approx(0.527).margin(1.0e-3)) {
+          charge_details = WaterModel::TIP4P_EPS;
+        }
+        else if (ep_charge == Approx(-1.16).margin(1.0e-3) &&
+                 h_charge == Approx(0.58).margin(1.0e-3)) {
+          charge_details = WaterModel::TIP4P_D;
+        }
+        else if (ep_charge == Approx(-0.241).margin(1.0e-3) &&
+                 h_charge == Approx(0.241).margin(1.0e-3)) {
+
+          // Shared by TIP5P_EW
+          charge_details = WaterModel::TIP5P;
+        }
+      }
+      else {
+
+        // TIP5P-2018 is the lone model that puts charge on both the oxygen and the virtual sites
+        if (o_charge == Approx(-0.641114).margin(1.0e-3) &&
+            ep_charge == Approx(-0.07358).margin(1.0e-3) &&
+            h_charge == Approx(0.394137).margin(1.0e-3)) {
+          charge_details = WaterModel::TIP5P_2018;
+        }
+        else {
+          charge_details = WaterModel::UNKNOWN;
+        }
+      }
+    }
+
+    // Continue to identify Lennard-Jones properties
+    WaterModel lennard_jones_details = WaterModel::UNKNOWN;
+    if (h_ljsig < constants::tiny) {
+      if (o_ljsig == Approx(3.17427).margin(1.0e-3) &&
+          o_ljeps == Approx(0.163406).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::OPC3;
+      }
+      else if (o_ljsig == Approx(3.16572).margin(1.0e-3) &&
+               o_ljeps == Approx(0.155354).margin(1.0e-3)) {
+
+        // Also SPC_E, SPC_EB, SPC_HW, and SPC_FW
+        lennard_jones_details = WaterModel::SPC;
+      }
+      else if (o_ljsig == Approx(3.1507).margin(1.0e-3) &&
+               o_ljeps == Approx(0.1521).margin(1.0e-3)) {
+
+        // Also TIP3P_FW
+        lennard_jones_details = WaterModel::TIP3P;
+      }
+      else if (o_ljsig == Approx(3.19405).margin(1.0e-3) &&
+               o_ljeps == Approx(0.0980).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP3P_EW;
+      }
+      else if (o_ljsig == Approx(3.16655).margin(1.0e-3) &&
+               o_ljeps == Approx(0.21280).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::OPC;
+      }
+      else if (o_ljsig == Approx(3.15365).margin(1.0e-3) &&
+               o_ljeps == Approx(0.1550).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P;
+      }
+      else if (o_ljsig == Approx(3.16435).margin(1.0e-3) &&
+               o_ljeps == Approx(0.16275).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P_EW;
+      }
+      else if (o_ljsig == Approx(3.1589).margin(1.0e-3) &&
+               o_ljeps == Approx(0.18521).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P_2005;
+      }
+      else if (o_ljsig == Approx(3.1668).margin(1.0e-3) &&
+               o_ljeps == Approx(0.21085).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P_ICE;
+      }
+      else if (o_ljsig == Approx(3.1644).margin(1.0e-3) &&
+               o_ljeps == Approx(0.18521).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P_2005F;
+      }
+      else if (o_ljsig == Approx(3.165).margin(1.0e-3) &&
+               o_ljeps == Approx(0.1848).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P_EPS;
+      }
+      else if (o_ljsig == Approx(3.165).margin(1.0e-3) &&
+               o_ljeps == Approx(0.22384).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP4P_D;
+      }
+      else if (o_ljsig == Approx(3.12).margin(1.0e-3) &&
+               o_ljeps == Approx(0.16).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP5P;
+      }
+      else if (o_ljsig == Approx(3.097).margin(1.0e-3) &&
+               o_ljeps == Approx(0.17801).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP5P_EW;
+      }
+      else if (o_ljsig == Approx(3.145).margin(1.0e-3) &&
+               o_ljeps == Approx(0.1888).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP5P_2018;
+      }
+    }
+    else {
+      if (o_ljsig == Approx(3.1507).margin(1.0e-3) && o_ljeps == Approx(0.1521).margin(1.0e-3) &&
+          h_ljsig == Approx(0.4000).margin(1.0e-3) && h_ljeps == Approx(0.0460).margin(1.0e-3)) {
+        lennard_jones_details = WaterModel::TIP3P_CHARMM;
+      }
+    }
+
+    // Finally, identify the geometric properties
+    WaterModel geometry_details = WaterModel::UNKNOWN;
+    if (oh_leq == Approx(0.8724).margin(1.0e-3)) {
+      geometry_details = WaterModel::OPC;
+    }
+    else if (oh_leq == Approx(1.0).margin(1.0e-3)) {
+
+      // Also SPC_E and SPC_HW
+      geometry_details = WaterModel::SPC;
+    }
+    else if (oh_leq == Approx(1.012).margin(1.0e-3)) {
+      geometry_details = WaterModel::SPC_FW;
+    }
+    else if (oh_leq == Approx(1.01).margin(1.0e-3)) {
+      geometry_details = WaterModel::SPC_EB;
+    }
+    else if (oh_leq == Approx(0.9572).margin(1.0e-3)) {
+
+      // Also TIP3P_CHARMM, TIP3P_EW, TIP4P, TIP4P_EW, TIP4P_2005, TIP4P_ICE, TIP4P_EPS,
+      // TIP4P_D, TIP4P_F, TIP4P_2005F, TIP5P, TIP5P_EW, TIP5P_2018
+      geometry_details = WaterModel::TIP3P;
+    }
+    else if (oh_leq == Approx(0.96).margin(1.0e-3)) {
+      geometry_details = WaterModel::TIP3P_FW;
+    }
+
+    // Verify that all of the details are consistent with one water model
+    WaterModel this_water = WaterModel::UNKNOWN;
+    switch (charge_details) {
+    case WaterModel::NONE:
+    case WaterModel::UNKNOWN:
+    case WaterModel::CHIMERA:
+    case WaterModel::MULTIPLE:
+    case WaterModel::MULTI_CHIMERA:
+      break;
+    case WaterModel::OPC3:
+      if (lennard_jones_details == WaterModel::OPC3 && geometry_details == WaterModel::OPC3) {
+        this_water = WaterModel::OPC3;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::SPC:
+    case WaterModel::SPC_FW:
+      if (lennard_jones_details == WaterModel::SPC && geometry_details == WaterModel::SPC) {
+        this_water = WaterModel::SPC;
+      }
+      else if (lennard_jones_details == WaterModel::SPC &&
+               geometry_details == WaterModel::SPC_FW) {
+        this_water = WaterModel::SPC_FW;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::SPC_E:
+    case WaterModel::SPC_EB:
+      if (lennard_jones_details == WaterModel::SPC && geometry_details == WaterModel::SPC) {
+        this_water = WaterModel::SPC_E;
+      }
+      else if (lennard_jones_details == WaterModel::SPC &&
+               geometry_details == WaterModel::SPC_EB) {
+        this_water = WaterModel::SPC_EB;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::SPC_HW:
+      if (lennard_jones_details == WaterModel::SPC && geometry_details == WaterModel::SPC) {
+        this_water = WaterModel::SPC_HW;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP3P:
+    case WaterModel::TIP3P_FW:
+    case WaterModel::TIP3P_EW:
+    case WaterModel::TIP3P_CHARMM:
+      if (lennard_jones_details == WaterModel::TIP3P && geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP3P;
+      }
+      else if (lennard_jones_details == WaterModel::TIP3P &&
+               geometry_details == WaterModel::TIP3P_FW) {
+        this_water = WaterModel::TIP3P_FW;
+      }
+      else if (lennard_jones_details == WaterModel::TIP3P_EW &&
+               geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP3P_EW;
+      }
+      else if (lennard_jones_details == WaterModel::TIP3P_CHARMM &&
+               geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP3P_CHARMM;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::OPC:
+      if (lennard_jones_details == WaterModel::OPC && geometry_details == WaterModel::OPC) {
+        this_water = WaterModel::OPC;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P:
+      if (lennard_jones_details == WaterModel::TIP4P && geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P_EW:
+      if (lennard_jones_details == WaterModel::TIP4P_EW && geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P_EW;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P_2005:
+      if (lennard_jones_details == WaterModel::TIP4P_2005 &&
+          geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P_2005;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P_ICE:
+      if (lennard_jones_details == WaterModel::TIP4P_ICE &&
+          geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P_ICE;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P_EPS:
+      if (lennard_jones_details == WaterModel::TIP4P_EPS &&
+          geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P_EPS;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P_D:
+      if (lennard_jones_details == WaterModel::TIP4P_D && geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P_D;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP4P_2005F:
+      if (lennard_jones_details == WaterModel::TIP4P_2005F &&
+          geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP4P_2005F;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP5P:
+      if (lennard_jones_details == WaterModel::TIP5P && geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP5P;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP5P_EW:
+      if (lennard_jones_details == WaterModel::TIP5P_EW && geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP5P_EW;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    case WaterModel::TIP5P_2018:
+      if (lennard_jones_details == WaterModel::TIP5P_2018 &&
+          geometry_details == WaterModel::TIP3P) {
+        this_water = WaterModel::TIP5P_2018;
+      }
+      else if (lennard_jones_details != WaterModel::UNKNOWN ||
+               geometry_details != WaterModel::UNKNOWN) {
+        this_water = WaterModel::CHIMERA;
+      }
+      break;
+    }
+
+    // Catalog the result
+    water_types[i] = this_water;
+  }
+
+  // Scan all waters and seek consensus
+  bool water_homogeneous = true;
+  for (int i = 1; i < n_waters; i++) {
+    water_homogeneous = (water_homogeneous && water_types[i] == water_types[0]);
+  }
+  if (water_homogeneous) {
+    return water_types[0];
+  }
+  else {
+
+    // There are multiple water models.  See if there any of them are chimeric.
+    bool has_chimera = false;
+    for (int i = 0; i < n_waters; i++) {
+      has_chimera = (has_chimera || water_types[i] == WaterModel::CHIMERA);
+    }
+    if (has_chimera) {
+      return WaterModel::MULTI_CHIMERA;
+    }
+    else {
+      return WaterModel::MULTIPLE;
+    }
+  }
+  __builtin_unreachable();
+}
+
+} // namespace topology
+} // namespace omni

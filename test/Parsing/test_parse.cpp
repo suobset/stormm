@@ -1,0 +1,318 @@
+#include "../../src/FileManagement/file_listing.h"
+#include "../../src/Parsing/parse.h"
+#include "../../src/Parsing/polynumeric.h"
+#include "../../src/Reporting/error_format.h"
+#include "../../src/Topology/amber_prmtop_util.h"
+#include "../../src/UnitTesting/unit_test.h"
+
+using omni::diskutil::DrivePathType;
+using omni::diskutil::getDrivePathType;
+using omni::errors::rtWarn;
+using omni::math::sum;
+using omni::diskutil::osSeparator;
+using omni::topology::amberPrmtopData;
+
+using namespace omni::parse;
+using namespace omni::testing;
+
+int main(int argc, char* argv[]) {
+
+  // Some baseline initialization
+  TestEnvironment oe(argc, argv);
+
+  // Section 1 (this illustrates "forward declaration" of test sections)
+  section("TextFile manipulation and abstraction");
+
+  // Section 2
+  section("TextGuard operation, putting bounds on quoted or commented text within a character "
+          "stream");
+
+  // Section 3
+  section("Test number format verification, extraction, and display");
+
+  // Section 4
+  section("Test character conversion and ASCII text table correspondence");
+
+  // Section 5
+  section("Test formatted column data reading");
+
+  // Section 6
+  section("Test string comparisons with wildcards");
+
+  // Test the TextFile object and its features
+  section(1);
+  const std::string something_path = oe.getOmniSourcePath() + osSeparator() + "test" +
+                                     osSeparator() + "Parsing" + osSeparator() + "something.txt";
+  const bool sfile_exists = (getDrivePathType(something_path) == DrivePathType::FILE);
+  const TextFile tf = (sfile_exists) ? TextFile(something_path) : TextFile();
+  if (sfile_exists == false) {
+    rtWarn("Text file " + something_path + " was not found.  Make sure that the $OMNI_SOURCE "
+           "environment variable is set to the root of the source tree, where src/ and test/ "
+           "subdirectories can be found.  Many subsequent tests will be skipped until this file "
+           "is available.", "test_parse");
+  }
+  const TestPriority sfile_check = (sfile_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  check(tf.getFileName(), RelationalOperator::EQUAL, oe.getOmniSourcePath() + osSeparator() +
+        "test" + osSeparator() + "Parsing" + osSeparator() + "something.txt", "Text file name was "
+        "not properly identified.", sfile_check);
+  check(tf.getLineCount(), RelationalOperator::EQUAL, 40, "TextFile object records an incorrect "
+        "number of lines.", sfile_check);
+  const int llim5 = (sfile_exists) ? tf.getLineLimits(5) : 0;
+  check(llim5, RelationalOperator::EQUAL, 150, "TextFile line limits are incorrect.", sfile_check);
+  const char gt54 = (sfile_exists) ? tf.getText(54) : ' ';
+  const char gt56 = (sfile_exists) ? tf.getText(56) : ' ';
+  check(gt54 == 'e' && gt56 == 't', "TextFile contains incorrect text.", sfile_check);
+  const TextFile::Reader tfr = tf.data();
+  check(tfr.line_count, RelationalOperator::EQUAL, tf.getLineCount(), "TextFile::Reader nested "
+        "struct does not produce a line count in agreement with the original struct.",
+        sfile_check);
+  const bool comp15 = (sfile_exists) ? (tfr.line_limits[15] == tf.getLineLimits(15)) : false;
+  check(comp15, "TextFile::Reader does not report line limits in agreement with the original "
+        "struct.", sfile_check);
+
+  // Test the comment and quotation masking
+  section(2);
+  const std::vector<TextGuard> comments = { TextGuard("//"),
+                                            TextGuard("/*", "*/", LineSpan::MULTIPLE) };
+  const std::vector<TextGuard> quotations = { TextGuard("'", "'"),
+                                              TextGuard("\"", "\"", LineSpan::MULTIPLE) };
+  const std::vector<bool> commented_text = markGuardedText(tfr, comments, quotations);
+  const std::vector<bool> quoted_text = markGuardedText(tfr, quotations, comments);
+  check(tfr.line_limits[tfr.line_count], RelationalOperator::EQUAL, commented_text.size(),
+        "Size of comments mask vector does not match the reference text file.", sfile_check);
+  check(tfr.line_limits[tfr.line_count], RelationalOperator::EQUAL, commented_text.size(),
+        "Size of quotations mask vector does not match the reference text file.", sfile_check);
+  check(sum<int>(commented_text), RelationalOperator::EQUAL, 683, "An incorrect number of "
+        "characters were marked as being within comments in \"" + tf.getFileName() + "\".",
+        sfile_check);
+  check(sum<int>(quoted_text), RelationalOperator::EQUAL, 269, "An incorrect number of "
+        "characters were marked as being within quotations in \"" + tf.getFileName() + "\".",
+        sfile_check);
+
+  // Test scope evaluation
+  const std::string exprsn("90 + (7 * 8) + ((t - v) * g + 8) / x");
+  const std::vector<TextGuard> scope_characters = { TextGuard("(", ")"), TextGuard("{", "}"),
+                                                    TextGuard("[", "]") };
+  const std::vector<int> ex_ops = resolveScopes(exprsn, scope_characters);
+  const std::vector<int> expected_scp = { 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 2,
+                                          2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 };
+  check(ex_ops, RelationalOperator::EQUAL, expected_scp, "Scope resolution did not produce the "
+        "correct result.", sfile_check);
+
+  // Test some of the exceptions thrown by text guarding
+  const std::vector<TextGuard> braces = { TextGuard("{", "}", LineSpan::MULTIPLE) };
+  const std::vector<TextGuard> brackets = { TextGuard("[", "]", LineSpan::SINGLE) };
+  const std::vector<bool> braced_text = markGuardedText(tfr, braces, comments + quotations);
+  check(sum<int>(braced_text), RelationalOperator::EQUAL, 48, "An incorrect number of "
+        "characters were marked as being within braces in \"" + tf.getFileName() + "\".",
+        sfile_check);
+  CHECK_THROWS(const TextGuard bad_txg_a("", "|"), "Initializing a TextGuard object without a "
+               "left-hand, initiating delimiter did not throw an error.");
+  CHECK_THROWS(const TextGuard bad_txg_b("|", "", LineSpan::MULTIPLE), "Initializing a TextGuard "
+               "object with multiple line span capability and no right-hand, terminating "
+               "delimiter did not throw an error.");
+  CHECK_THROWS_SOFT(const std::vector<bool> bracketed_text =
+                    markGuardedText(tfr, brackets, comments + quotations), "Failure to terminate "
+                    "a single-line text guard sequence (\"[\", \"]\") in file \"" +
+                    tf.getFileName() + "\" did not throw an error.", sfile_check);
+
+  // Test number interpretation
+  section(3);
+  double dbl_real = 0.000201;
+  check(realToString(dbl_real, 4), RelationalOperator::EQUAL, "0.0002", "realToString() reports "
+        "an incorrect representation.");
+  check(realToString(dbl_real, 6), RelationalOperator::EQUAL, "0.000201", "realToString() reports "
+        "an incorrect representation.");
+  check(realToString(dbl_real, 10, 6), RelationalOperator::EQUAL, "  0.000201", "realToString() "
+        "reports an incorrect representation.");
+  check(realToString(dbl_real, 10, 6, NumberFormat::STANDARD_REAL,
+                     NumberPrintStyle::LEADING_ZEROS), RelationalOperator::EQUAL, "000.000201",
+        "realToString() reports an incorrect representation.");
+  check(realDecimalPlaces(dbl_real, 4), RelationalOperator::EQUAL, 4, "Incorrect number of "
+        "decimal places reported by realDecimalPlaces for " + realToString(dbl_real, 6) + ".");
+  CHECK_THROWS(const std::string test_dbl_str_a =
+               realToString(dbl_real, 15, 4, NumberFormat::INTEGER), "An incorrect numerical "
+               "format was passed to realToString() without being trapped.");
+  CHECK_THROWS(const std::string test_dbl_str_b = realToString(dbl_real, 65), "An obscenely long "
+               "real number format was permitted.");
+  CHECK_THROWS(const std::string test_dbl_str_c = realToString(dbl_real, 16, 78), "An obscene "
+               "number of decimal places was permitted in a real number.");
+  CHECK_THROWS(const std::string test_dbl_str_d = realToString(dbl_real, 16, 15), "The number of "
+               "decimal places was permitted to exceed the overall format in a real number.");
+  CHECK_THROWS(const std::string test_dbl_str_e =
+               realToString(dbl_real, 16, 12, NumberFormat::SCIENTIFIC), "The number of "
+               "decimal places was permitted to exceed the overall (scientific notation) format "
+               "in a real number.");
+  dbl_real = 686.4;
+  check(realDecimalPlaces(dbl_real), RelationalOperator::EQUAL, 1, "Incorrect number of "
+        "decimal places reported by realDecimalPlaces() for " + realToString(dbl_real, 5) + ".");
+  check(realToString(dbl_real, 12, 5, NumberFormat::SCIENTIFIC), RelationalOperator::EQUAL,
+        " 6.86400e+02", "realToString() reports an incorrect representation.");
+  check(realToString(dbl_real, 12, 5, NumberFormat::SCIENTIFIC, NumberPrintStyle::LEADING_ZEROS),
+        RelationalOperator::EQUAL, "06.86400e+02", "realToString() reports an incorrect "
+        "representation.");
+  check(realToString(-dbl_real, 12, 5, NumberFormat::SCIENTIFIC, NumberPrintStyle::LEADING_ZEROS),
+        RelationalOperator::EQUAL, "-6.86400e+02", "realToString() reports an incorrect "
+        "representation.");
+  check(realToString(-2.0 * dbl_real, 14, 5, NumberFormat::SCIENTIFIC,
+                     NumberPrintStyle::LEADING_ZEROS), RelationalOperator::EQUAL, "-001.37280e+03",
+        "realToString() reports an incorrect representation.");
+
+  // Test character conversion
+  section(4);
+  check(uppercase('a') == 'A', "Conversion of 'a' to 'A' failed.");
+  check(uppercase('g') == 'G', "Conversion of 'g' to 'G' failed.");
+  check(uppercase('z') == 'Z', "Conversion of 'z' to 'Z' failed.");
+  check(uppercase('#') == '#', "Uppercase conversion of '#' changed the character.");
+  check(lowercase('A') == 'a', "Conversion of 'A' to 'a' failed.");
+  check(lowercase('G') == 'g', "Conversion of 'G' to 'g' failed.");
+  check(lowercase('Z') == 'z', "Conversion of 'Z' to 'a' failed.");
+  check(lowercase('<') == '<', "Lowercase conversion of '<' changed the character.");
+  check(lowercase(std::string("@!&%AJOfjoTP782bi__<")), RelationalOperator::EQUAL,
+        "@!&%ajofjotp782bi__<", "Lowercase conversion of a mixed C++ string failed.");
+  check(uppercase(std::string("ggz_a@!&%AJOfjoTP782bi!*x")), RelationalOperator::EQUAL,
+        "GGZ_A@!&%AJOFJOTP782BI!*X", "Uppercase conversion of a mixed C++ string failed.");
+  check(lowercase("@!&%AJOfjoTP782bi__<"), RelationalOperator::EQUAL,
+        "@!&%ajofjotp782bi__<", "Lowercase conversion of a mixed, const C-style string failed.");
+  check(uppercase("ttyl78_0bama"), RelationalOperator::EQUAL, "TTYL78_0BAMA",
+        "Lowercase conversion of a mixed, const C-style string failed.");
+  char test_str[32];
+  sprintf(test_str, "upaiwof89xxv");
+  uppercase(test_str);
+  check(std::string(test_str), RelationalOperator::EQUAL, "UPAIWOF89XXV",
+        "Uppercase conversion of a mixed C-style string failed.");
+  sprintf(test_str, "upaiwof89xxv");
+  uppercase(test_str, 4);
+  check(std::string(test_str), RelationalOperator::EQUAL, "UPAIwof89xxv",
+        "Uppercase partial conversion of a mixed C-style string failed.");
+  sprintf(test_str, "VDNnL@)*cCB");
+  lowercase(test_str);
+  check(std::string(test_str), RelationalOperator::EQUAL, "vdnnl@)*ccb",
+        "Lowercase conversion of a mixed C-style string failed.");
+  sprintf(test_str, "VDNnL@)*cCB");
+  lowercase(test_str, 4);
+  check(std::string(test_str), RelationalOperator::EQUAL, "vdnnL@)*cCB",
+        "Lowercase partial conversion of a mixed C-style string failed.");
+
+  // Test formatted column data reading: starting with integers
+  section(5);
+  const std::string spsh_path = oe.getOmniSourcePath() + osSeparator() + "test" + osSeparator() +
+                                "Parsing" + osSeparator() + "formatted_numbers.txt";
+  const bool pfile_exists = (getDrivePathType(spsh_path) == DrivePathType::FILE);
+  if (pfile_exists == false) {
+    rtWarn("Data file " + spsh_path + " was not found.  Make sure that the $OMNI_SOURCE "
+           "environment variable is set to the root of the source tree, where src/ and test/ "
+           "subdirectories can be found.  Many subsequent tests will be skipped until this file "
+           "is available.", "test_parse");
+  }
+  const TextFile spreadsheet = (pfile_exists) ? TextFile(spsh_path) : TextFile();
+  const TestPriority pfile_check = (pfile_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  PolyNumeric one_pn;
+  one_pn.i = 0;
+  const std::vector<PolyNumeric> blank_pn = std::vector<PolyNumeric>(1, one_pn);
+  const std::vector<PolyNumeric> apn_ints = (pfile_exists) ?
+    amberPrmtopData(spreadsheet, 1, NumberFormat::INTEGER, 4, 4, 14) : blank_pn;
+  const std::vector<PolyNumeric> bpn_ints = (pfile_exists) ?
+    amberPrmtopData(spreadsheet, 1, NumberFormat::INTEGER, 4, 4, 12, 14) : blank_pn;
+  const std::vector<int> astd_ints = intFromPolyNumeric(apn_ints);
+  const std::vector<int> bstd_ints = intFromPolyNumeric(bpn_ints);
+  check(astd_ints == Approx(bstd_ints), "Integer vectors read from " + tf.getFileName() +
+        " should be identical, irrespective of the soft limit on reading by amberPrmtopData().",
+        pfile_check);
+  check(astd_ints[5], RelationalOperator::EQUAL, 90, "Formatter integers read by "
+        "amberPrmtopData() from " + tf.getFileName() + " do not appear to be correct.",
+        pfile_check);
+  const std::vector<PolyNumeric> pn_dbls = (pfile_exists) ?
+    amberPrmtopData(spreadsheet, 8, NumberFormat::STANDARD_REAL, 5, 14, 23) : blank_pn;
+  CHECK_THROWS_SOFT(const std::vector<PolyNumeric> spn_dbls =
+                    amberPrmtopData(spreadsheet, 8, NumberFormat::INTEGER, 5, 14, 23), "Formatted "
+                    "integer reading by amberPrmtopData() from " + tf.getFileName() + " passes "
+                    "despite the numbers having general format.", pfile_check);
+
+  // Test formatted data reading with general-format reals
+  const double pn16d = (pfile_exists) ? pn_dbls[16].d : 0.0;
+  check(pn16d, RelationalOperator::EQUAL, Approx(20.29945545).margin(1.0e-9), "General format "
+        "real numbers read by amberPrmtopData() from " + tf.getFileName() + " are incorrect.",
+        pfile_check);
+  CHECK_THROWS_SOFT(const std::vector<PolyNumeric> pn_dbls_ii =
+                    amberPrmtopData(spreadsheet, 8, NumberFormat::STANDARD_REAL, 5, 14, 24),
+                    "Formatted real number reading by amberPrmtopData() from " + tf.getFileName() +
+                    " passes despite there not being enough numbers in the file.", pfile_check);
+  CHECK_THROWS_SOFT(const std::vector<PolyNumeric> pn_dbls_iii =
+                    amberPrmtopData(spreadsheet, 8, NumberFormat::STANDARD_REAL, 5, 14, 10, 18),
+                    "Formatted real number reading by amberPrmtopData() from " + tf.getFileName() +
+                    " passes despite there being too many numbers in the file.", pfile_check);
+  CHECK_THROWS_SOFT(const std::vector<PolyNumeric> pn_dbls_iv =
+                    amberPrmtopData(spreadsheet, 8, NumberFormat::STANDARD_REAL, 4, 14, 23),
+                    "Formatted real number reading by amberPrmtopData() from " + tf.getFileName() +
+                    " passes despite there being too many numbers per line in the file.",
+                    pfile_check);
+  CHECK_THROWS_SOFT(const std::vector<PolyNumeric> pn_dbls_iv =
+                    amberPrmtopData(spreadsheet, 8, NumberFormat::STANDARD_REAL, 6, 14, 23),
+                    "Formatted real number reading by amberPrmtopData() from " +
+                    spreadsheet.getFileName() + " passes despite there being insufficient numbers "
+                    "per line in the file.", pfile_check);
+
+  // Test scientific notation reading
+  const std::vector<PolyNumeric> spn_dbls = (pfile_exists) ?
+    amberPrmtopData(spreadsheet, 15, NumberFormat::SCIENTIFIC, 5, 14, 17) : blank_pn;
+  std::vector<double> std_dbls = doubleFromPolyNumeric(spn_dbls);
+  const double stdb3 = (pfile_exists) ? std_dbls[3] : 0.0;
+  check(stdb3, RelationalOperator::EQUAL, -49.123, "Formatted scientific notation number "
+        "reading by amberPrmtopData() from " + spreadsheet.getFileName() + " fails.", pfile_check);
+  check(sum<double>(std_dbls), RelationalOperator::EQUAL, Approx(-249.7637).margin(1.0e-8),
+        "Formatted scientific notation number reading by amberPrmtopData() from " +
+        spreadsheet.getFileName() + " fails in the sum.", pfile_check);
+  CHECK_THROWS_SOFT(const std::vector<PolyNumeric> spn_dbls2 =
+                    amberPrmtopData(spreadsheet, 8, NumberFormat::SCIENTIFIC, 5, 14, 23),
+                    "Formatted number reading in scientific notation by amberPrmtopData() from " +
+                    spreadsheet.getFileName() + " passes despite the numbers having general "
+                    "format.", pfile_check);
+
+  // Finally, try char4 data and operator overloading
+  const std::vector<PolyNumeric> pn_chrs = (pfile_exists) ?
+    amberPrmtopData(spreadsheet, 23, NumberFormat::CHAR4, 20, 4, 98) : blank_pn;
+  std::string pn_example = (pfile_exists) ? char4ToString(pn_chrs[47].c4) : std::string("");
+  check(pn_example, RelationalOperator::EQUAL, "CD1 ", "Vectorized char4 data read by "
+        "amberPrmtopData() from " + spreadsheet.getFileName() + " does not appear to be correct.",
+        pfile_check);
+  pn_example = (pfile_exists) ? pn_example + pn_chrs[48].c4 : pn_example;
+  check(pn_example, RelationalOperator::EQUAL, "CD1 HD1 ", "Operator += overloading produces "
+        "incorrect results.", pfile_check);
+
+  // Test custom string comparison functions
+  section(6);
+  const std::string tw_a("ThisWord");
+  const std::string tw_b("thisword");
+  const std::string tw_c("ThisWord T7J");
+  const std::string tw_d("thisword t7j");
+  check(strncmpCased(tw_a, tw_b, CaseSensitivity::YES) == false, "Case-sensitive "
+        "string comparison fails to differentiate \"" + tw_a + "\" and \"" + tw_b + "\".");
+  check(strncmpCased(tw_a, tw_b, CaseSensitivity::NO), "Case-insensitive "
+        "string comparison still differentiates \"" + tw_a + "\" and \"" + tw_b + "\".");
+  check(strncmpCased(tw_c, tw_d, CaseSensitivity::NO), "Case-insensitive "
+        "string comparison still differentiates \"" + tw_c + "\" and \"" + tw_d + "\".");
+  const std::string tw_regexp_a("Th*W*?d");
+  const std::vector<WildCardKind> wildcards_a = { WildCardKind::NONE, WildCardKind::NONE,
+                                                  WildCardKind::FREE_STRETCH, WildCardKind::NONE,
+                                                  WildCardKind::FREE_STRETCH,
+                                                  WildCardKind::FREE_CHARACTER,
+                                                  WildCardKind::NONE };
+  check(strcmpWildCard(tw_a, tw_regexp_a, wildcards_a), "Case-sensitive string matching with "
+        "wildcards fails to equate \"" + tw_a + "\" with \"" + tw_regexp_a + "\"."); 
+  check(strcmpWildCard(tw_b, tw_regexp_a, wildcards_a) == false, "Case-sensitive string matching "
+        "with wildcards equates \"" + tw_b + "\" with \"" + tw_regexp_a + "\".");
+  const std::string tw_e("  This is a very long string with white space at either end.  ");
+  const std::string tw_regexp_b(" * ");
+  const std::vector<WildCardKind> wildcards_b = { WildCardKind::NONE, WildCardKind::FREE_STRETCH,
+                                                  WildCardKind::NONE };
+  const std::string tw_regexp_c("T*.");
+  check(strcmpWildCard(tw_e, tw_regexp_c, wildcards_b), "Case-sensitive string matching "
+        "with wildcards fails to equate \"" + tw_e + "\" with \"" + tw_regexp_c + "\".");
+  const std::string tw_regexp_d("T*k");
+  check(strcmpWildCard(tw_e, tw_regexp_d, wildcards_b) == false, "Case-sensitive string matching "
+        "with wildcards incorrectly equates \"" + tw_e + "\" with \"" + tw_regexp_d + "\".");
+
+  // Summary evaluation
+  printTestSummary(oe.getVerbosity());
+}

@@ -1,0 +1,242 @@
+// -*-c++-*-
+#ifndef OMNI_COORDINATE_FRAME_H
+#define OMNI_COORDINATE_FRAME_H
+
+#include "Cuda/hybrid.h"
+#include "Topology/atomgraph.h"
+#include "phasespace.h"
+
+namespace omni {
+namespace trajectory {
+
+using cuda::Hybrid;
+using cuda::HybridKind;
+using cuda::HybridTargetLevel;
+using topology::AtomGraph;
+
+/// \brief Collect C-style pointers for the elements of a read-only CoordinateFrame object.
+struct CoordinateFrameReader {
+
+  /// \brief Constructor feeds all arguments straight to the inline initialization list
+  CoordinateFrameReader(const int natom_in, const UnitCellType unit_cell_in, const double* xcrd_in,
+                        const double* ycrd_in, const double* zcrd_in, const double* umat_in,
+                        const double* invu_in, const double* boxdim_in);
+
+  const int natom;               ///< The number of atoms in the system
+  const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  const double* xcrd;            ///< Cartesian X coordinates of all atoms
+  const double* ycrd;            ///< Cartesian Y coordinates of all atoms
+  const double* zcrd;            ///< Cartesian Z coordinates of all atoms
+  const double* umat;            ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  const double* invu;            ///< Inverse transformation matrix out of box space
+  const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
+};
+
+/// \brief Collect C-style pointers for the elements of a writable CoordinateFrame object.
+struct CoordinateFrameWriter {
+
+  /// \brief Constructor feeds all arguments straight to the inline initialization list
+  CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in, double* xcrd_in,
+                        double* ycrd_in, double* zcrd_in, double* umat_in, double* invu_in,
+                        double* boxdim_in);
+
+  const int natom;               ///< The number of atoms in the system
+  const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  double* xcrd;                  ///< Cartesian X coordinates of all atoms
+  double* ycrd;                  ///< Cartesian Y coordinates of all atoms
+  double* zcrd;                  ///< Cartesian Z coordinates of all atoms
+  double* umat;                  ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  double* invu;                  ///< Inverse transformation matrix out of box space
+  const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
+};
+
+/// \brief Store the coordinates and box information for a frame, only.  This abrdiged struct can
+///        serve when the full PhaseSpace object would allocate too much memory.  It also comes
+///        with its own POINTER mode, such that it allocates no memory of its own and merely points
+///        to another CoordinateFrame object or PhaseSpace object that does have memory allocated.
+struct CoordinateFrame {
+
+  /// \brief There are several options for construction of this abridged, coordinate-only object.
+  ///
+  /// Overloaded:
+  ///   - Allocate to hold a given number of atoms
+  ///   - From an atom count and a set of double-precision C-style arrays, including coordinates
+  ///     and box dimensions
+  ///   - Create from any of the coordinate file formats (velocities will not be read, even if
+  ///     they are available)
+  ///   - From an existing PhaseSpace object (as a pointer or a copy if the PhaseSpace object is
+  ///     non-const, otherwise only as a copy)
+  ///
+  /// \param  natom_in         The number of atoms expected
+  /// \param  xcrd_in          Cartesian X coordinates of all particles
+  /// \param  ycrd_in          Cartesian Y coordinates of all particles
+  /// \param  zcrd_in          Cartesian Z coordinates of all particles
+  /// \param  umat_in          Matrix to transform coordinates into box space (3 x 3)
+  /// \param  invu_in          Matrix to transform coordinates into real space (3 x 3)
+  /// \param  file_name_in     File to read from
+  /// \param  frame_number_in  Frame number of the file to read (default 0, the first frame)
+  /// \param  ps               Pre-existing object with complete description of the system state
+  /// \param  mode_in          Indicates whether the CoordinateFrame will point to or become an
+  ///                          independent copy of the PhaseSpace object (final constructor only)
+  /// \{
+  CoordinateFrame(int natom_in = 0, UnitCellType unit_cell_in = UnitCellType::NONE);
+  CoordinateFrame(int natom_in, UnitCellType unit_cell_in, const double* xcrd_in,
+                  const double* ycrd_in, const double* zcrd_in, const double* umat_in = nullptr,
+                  const double* invu_in = nullptr, const double* boxdim_in = nullptr);
+  CoordinateFrame(const std::string &file_name_in, CoordinateFileKind file_kind,
+                  int frame_number_in = 0);
+  CoordinateFrame(PhaseSpace *ps);
+  CoordinateFrame(const PhaseSpace &ps);
+  /// \}
+
+  /// \brief Copy constructor handles assignment of internal POINTER-kind Hybrid objects
+  ///
+  /// \param original  The PhaseSpace object from which to make a deep copy
+  CoordinateFrame(const CoordinateFrame &original);
+
+  /// \brief Copy assignment operator likewise handles reassignment of internal POINTER-kind
+  ///        Hybrid objects
+  ///
+  /// \param other     Another way to say original, in a different semantic context
+  CoordinateFrame& operator=(const CoordinateFrame &other);
+
+  /// \brief Move constructor works in similar fashion to the PhaseSpace move constructor,
+  ///        with std::move and no need for reassignment of the underlying POINTER-kind Hybrid
+  ///        objects.
+  ///
+  /// \param original  The PhaseSpace object from which to make a deep copy
+  CoordinateFrame(CoordinateFrame &&original);
+
+  /// \brief Move assignment operator
+  ///
+  /// \param other     Another way to say original, in a different semantic context
+  CoordinateFrame& operator=(CoordinateFrame &&other);
+
+  /// \brief Fill the object from information some coordinate, restart, or trajectory file.
+  ///
+  /// \param file_name     Name of the file from which to obtain coordinates
+  /// \param file_kind     The type of coordinate-containing input file
+  /// \param frame_number  The frame number to read (if the file is a trajectory, not a single
+  ///                      point from the system's phase space)
+  void buildFromFile(const std::string &file_name_in, const CoordinateFileKind file_kind,
+                     int frame_number = 0);
+
+  /// \brief Get the number of atoms in the frame
+  int getAtomCount() const;
+
+  /// \brief Get the unit cell type of the coordinate system
+  UnitCellType getUnitCellType() const;
+
+  /// \brief Get the coordinates returned in an X/Y/Z interlaced manner
+  ///
+  /// Overloaded:
+  ///   - Get all coordinates
+  ///   - Get coordinates for a range of atoms
+  ///
+  /// \param low_index   The lower atom index of a range
+  /// \param high_index  The upper atom index of a range
+  /// \param kind        Specify coordinates, velocities, or forces--anything that could be thought
+  ///                    of as a trajectory
+  /// \param tier        Level at which to extract the data
+  /// \{
+  std::vector<double>
+  getInterlacedCoordinates(TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<double>
+  getInterlacedCoordinates(int low_index, int high_index,
+                           TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+
+  /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The
+  ///        result should be interpreted as a 3x3 matrix in column-major format.
+  ///
+  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  std::vector<double> getBoxSpaceTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the transformation matrix to take coordinates from fractional space back into
+  ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
+  ///
+  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  std::vector<double> getInverseTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the box dimensions in their pure form.  Holding the box dimensions and the
+  ///        transformation matrices they imply in separate member variables represents a
+  ///        liability, that they might at some point become inconsistent, but it also prevents
+  ///        having to continuously extract box dimensions from transformation matrices each time
+  ///        the box needs to be resized (beyond isotropic scaling, this is not a trivial process).
+  ///
+  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)  
+  std::vector<double> getBoxDimensions(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
+#ifdef OMNI_USE_HPC
+  /// \brief Upload all information
+  void upload();
+
+  /// \brief Download all information
+  void download();
+#endif
+  /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
+  ///        access to any of its member variables.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only object
+  ///   - Get a writeable object
+  /// \{
+  const CoordinateFrameReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  CoordinateFrameWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
+private:
+  std::string file_name;              ///< File from which this frame was derived, if applicable.
+  int frame_number;                   ///< The frame number at which this frame appears in the
+                                      ///<   trajectory file, if applicable.  Indexing begins at 0.
+  int atom_count;                     ///< The number of atoms in the system
+  UnitCellType unit_cell;             ///< The type of unit cell (can be inferred from the
+                                      ///<   transformation matrices)
+  Hybrid<double> x_coordinates;       ///< Cartesian X coordinates of all particles
+  Hybrid<double> y_coordinates;       ///< Cartesian Y coordinates of all particles
+  Hybrid<double> z_coordinates;       ///< Cartesian Z coordinates of all particles
+  Hybrid<double> box_space_transform; ///< Matrix to transform coordinates into box space (3 x 3)
+  Hybrid<double> inverse_transform;   ///< Matrix to transform coordinates into real space (3 x 3)
+  Hybrid<double> box_dimensions;      ///< Three lengths and three angles defining the box (lengths
+                                      ///<   are given in Angstroms, angles in radians)
+
+  /// All of the above Hybrid objects can either be pointers into this single large array, which
+  /// will then be segmented to hold each type of information with zero-padding to accommodate the
+  /// HPC warp size, or pointers into a PhaseSpace object's own data array, in which case this
+  /// array is likewise a pointer into the same PhaseSpace object's data array.  If this is itself
+  /// a POINTER-kind Hybrid object, the upload and download functions for this CoordinateFrame
+  /// will act on only a subset of the data in the target PhaseSpace object.  Modifications of the
+  /// coordinates or box dimensions are possible, and would be reflected in any target PhaseSpace
+  /// object, so uploading and downloading is permitted.
+  Hybrid<double> storage;
+
+  /// \brief Allocate memory and set POINTER-kind Hybrid object member variables for this
+  ///        coordinate frame.  Follows the PhaseSpace object's eponymous member function.
+  void allocate();
+};
+
+/// \brief Create a coordinate frame reader or writer based on a const or non-const PhaseSpace
+///        object.  This is not a constructor, but gets around the problem of const constructor
+///        overloading (more precisely, lacking the ability to create an object and have it be
+///        const or non-const based on the constructor arguments).
+///
+/// Overloaded:
+///   - Make a const CoordinateFrame pointing into a const PhaseSpace object
+///   - Make a non-const CoordinateFrame pointing into a non-const PhaseSpace object (supply a
+///     pointer to the PhaseSpace object rather than a const reference)
+///
+/// \param ps  The PhaseSpace object of interest
+/// \{
+const CoordinateFrameReader getCoordinateFrameReader(const PhaseSpace &ps);
+CoordinateFrameWriter getCoordinateFrameWriter(PhaseSpace* ps);
+/// \}
+  
+} // namespace trajectory
+} // namespace omni
+
+#endif
+

@@ -1,0 +1,201 @@
+#include "Chemistry/atommask.h"
+#include "bounded_restraint.h"
+
+namespace omni {
+namespace restraints {
+
+using chemistry::AtomMask;
+using chemistry::MaskInputMode;
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
+                                   const std::string &mask_k_in, const std::string &mask_l_in,
+                                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                                   const CoordinateFrameReader &cfr, const int init_step_in,
+                                   const int final_step_in, const double init_k2_in,
+                                   const double init_k3_in, const double init_r1_in,
+                                   const double init_r2_in, const double init_r3_in,
+                                   const double init_r4_in, const double final_k2_in,
+                                   const double final_k3_in, const double final_r1_in,
+                                   const double final_r2_in, const double final_r3_in,
+                                   const double final_r4_in) :
+    mask_i{mask_i_in}, mask_j{mask_j_in}, mask_k{mask_k_in}, mask_l{mask_l_in}, atom_i{-1},
+    atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0}, initial_step{init_step_in},
+    final_step{final_step_in}, initial_keq{init_k2_in, init_k3_in},
+    initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in}, final_keq{final_k2_in, final_k3_in},
+    final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in}, ag_pointer{ag_in}
+{
+  // At least one atom is required
+  if (mask_i.size() == 0LLU) {
+    rtErr("At least one atom must be be specified in order to create a bounded restraint.",
+          "BoundedRestraint");
+  }
+
+  // Obtain the atoms to which this restraint applies based on the input atom masks.
+  std::vector<AtomMask> all_masks = {
+    AtomMask(mask_i, ag_pointer, chemfe, cfr, MaskInputMode::AMBMASK,
+             "Bounded restraint atom I mask"),
+    AtomMask(mask_j, ag_pointer, chemfe, cfr, MaskInputMode::AMBMASK,
+             "Bounded restraint atom J mask"),
+    AtomMask(mask_k, ag_pointer, chemfe, cfr, MaskInputMode::AMBMASK,
+             "Bounded restraint atom K mask"),
+    AtomMask(mask_l, ag_pointer, chemfe, cfr, MaskInputMode::AMBMASK,
+             "Bounded restraint atom : mask") };
+  std::vector<int> n_mask_atom(4);
+  bool running = true;
+  for (int i = 0; i < 4; i++) {
+    n_mask_atom[i] = all_masks[i].getMaskedAtomCount();
+    if (n_mask_atom[i] > 1) {
+      rtErr("Atom mask \"" + all_masks[i].getInputText() + "\" specifies " +
+            std::to_string(n_mask_atom[i]) + " atoms in topology " + ag_pointer->getFileName() +
+            ".  The mask must specify one and only one atom.", "BoundedRestraint");
+    }
+    running = (running && (n_mask_atom[i] == 1));
+    order += running;
+  }
+
+  // Report if the first atom mask is invalid
+  if (n_mask_atom[0] == 1) {
+    atom_i = all_masks[0].getMaskedAtomList()[0];
+  }
+  else {
+    rtErr("Atom mask \"" + mask_i + "\" specifies " + std::to_string(n_mask_atom[0]) + " atoms in "
+          "topology " + ag_pointer->getFileName() + ".  The mask must specify one and only one "
+          "atom.", "BoundedRestraint");
+  }
+
+  // Set other atoms
+  if (order > 1) {
+    atom_j = n_mask_atom[1];
+  }
+  if (order > 2) {
+    atom_k = n_mask_atom[2];
+  }
+  if (order > 3) {
+    atom_l = n_mask_atom[3];
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, const int atom_k_in,
+                                   const int atom_l_in, const AtomGraph *ag_in,
+                                   const int init_step_in, const int final_step_in,
+                                   const double init_k2_in, const double init_k3_in,
+                                   const double init_r1_in, const double init_r2_in,
+                                   const double init_r3_in, const double init_r4_in,
+                                   const double final_k2_in, const double final_k3_in,
+                                   const double final_r1_in, const double final_r2_in,
+                                   const double final_r3_in, const double final_r4_in) :
+    mask_i{std::string("")}, mask_j{std::string("")}, mask_k{std::string("")},
+    mask_l{std::string("")}, atom_i{atom_i_in}, atom_j{atom_j_in}, atom_k{atom_k_in},
+    atom_l{atom_l_in}, order{0}, initial_step{init_step_in}, final_step{final_step_in},
+    initial_keq{init_k2_in, init_k3_in}, initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
+    final_keq{final_k2_in, final_k3_in},
+    final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in}, ag_pointer{ag_in}
+{
+  // At least one atom is required
+  if (atom_i < 0) {
+    rtErr("At least one atom must be be specified in order to create a bounded restraint.",
+          "BoundedRestraint");
+  }
+
+  // Get the order of the restraint
+  order = (atom_i >= 0) + (atom_j >= 0) + (atom_k >= 0) + (atom_l >= 0);
+
+  // Confirm that all atom selections are valid
+  const int natom = ag_pointer->getAtomCount();
+  if (atom_i >= natom || (order > 1 && atom_j >= natom) || (order > 2 && atom_k >= natom) ||
+      (order > 3 && atom_l >= natom)) {
+    std::string atom_number_list = std::to_string(atom_i);
+    if (order > 1) {
+      atom_number_list += ", " + std::to_string(atom_j);
+    }
+    if (order > 2) {
+      atom_number_list += ", " + std::to_string(atom_k);
+    }
+    if (order > 3) {
+      atom_number_list += ", " + std::to_string(atom_l);
+    }
+    rtErr("The atom selection " + atom_number_list + " does not fall within the atom indexing of "
+          "topology " + ag_pointer->getFileName() + ".", "BoundedRestraint");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string BoundedRestraint::getAtomMask(const int restrained_atom_number) const {
+  switch (restrained_atom_number) {
+  case 1:
+    return mask_i;
+  case 2:
+    return mask_j;
+  case 3:
+    return mask_k;
+  case 4:
+    return mask_l;
+  default:
+    rtErr("Valid atoms include 1, 2, 3, and 4, not " + std::to_string(restrained_atom_number) +
+          ".", "BoundedRestraint", "getAtomMask");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int BoundedRestraint::getAtomIndex(const int restrained_atom_number) const {
+  switch (restrained_atom_number) {
+  case 1:
+    return atom_i;
+  case 2:
+    return atom_j;
+  case 3:
+    return atom_k;
+  case 4:
+    return atom_l;
+  default:
+    rtErr("Valid atoms include 1, 2, 3, and 4, not " + std::to_string(restrained_atom_number) +
+          ".", "BoundedRestraint", "getAtomIndex");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int BoundedRestraint::getOrder() const {
+  return order;
+}
+
+//-------------------------------------------------------------------------------------------------
+int BoundedRestraint::getInitialStep() const {
+  return initial_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+int BoundedRestraint::getFinalStep() const {
+  return final_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 BoundedRestraint::getInitialStiffness() const {
+  return initial_keq;
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 BoundedRestraint::getFinalStiffness() const {
+  return final_keq;
+}
+
+//-------------------------------------------------------------------------------------------------
+double4 BoundedRestraint::getInitialDisplacements() const {
+  return initial_r;
+}
+
+//-------------------------------------------------------------------------------------------------
+double4 BoundedRestraint::getFinalDisplacements() const {
+  return final_r;
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* BoundedRestraint::getTopologyPointer() const {
+  return ag_pointer;
+}
+
+} // namespace restraints
+} // namespace omni

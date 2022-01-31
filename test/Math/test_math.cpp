@@ -1,0 +1,374 @@
+#include <algorithm>
+#include "../../src/Constants/symbol_values.h"
+#include "../../src/Cuda/hybrid.h"
+#include "../../src/DataTypes/common_types.h"
+#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/matrix.h"
+#include "../../src/Math/matrix_ops.h"
+#include "../../src/Math/rounding.h"
+#include "../../src/Math/sorting.h"
+#include "../../src/Math/summation.h"
+#include "../../src/Parsing/polynumeric.h"
+#include "../../src/Random/random.h"
+#include "../../src/Reporting/error_format.h"
+#include "../../src/UnitTesting/unit_test.h"
+#include "../../src/UnitTesting/file_snapshot.h"
+
+using omni::ulint;
+using omni::double3;
+using omni::constants::tiny;
+using omni::cuda::Hybrid;
+using omni::cuda::HybridTargetLevel;
+using omni::diskutil::DrivePathType;
+using omni::diskutil::getDrivePathType;
+using omni::diskutil::osSeparator;
+using omni::errors::rtWarn;
+using omni::parse::TextFile;
+using omni::parse::polyNumericVector;
+using omni::random::Ran2Generator;
+using omni::random::Xoroshiro128pGenerator;
+using omni::random::Xoshiro256ppGenerator;
+using omni::symbols::pi;
+using namespace omni::math;
+using namespace omni::testing;
+
+int main(int argc, char* argv[]) {
+
+  // Some baseline initialization
+  TestEnvironment oe(argc, argv);
+
+  // Section 1
+  section("Vector processing capabilities");
+
+  // Section 2
+  section("Random number generation");
+
+  // Section 3
+  section("Rounding and prime factorization");
+
+  // Section 4
+  section("Lightweight matrix math from the hand-coded routines");
+
+  // Check vector processing capabilities
+  section(1);
+  const std::vector<double> dv_i = { 0.1, 0.5, 0.9, 0.7, 0.8 };
+  check(mean(dv_i), RelationalOperator::EQUAL, Approx(0.6).margin(1.0e-12), "The mean value of a "
+        "simple real number vector is incorrect.");
+  const std::vector<int> iv_i = { 1, 5, 9, 7, 38 };
+  check(mean(iv_i), RelationalOperator::EQUAL, 12, "The mean value of a "
+        "simple integer vector is incorrect.");
+  const std::vector<double> dv_i_long = { -0.3, -0.6, 0.1, 0.5, 0.9, 0.7, 0.8 };
+  CHECK_THROWS(maxAbsoluteDifference(dv_i_long, dv_i), "Vectors of different lengths were "
+               "compared to obtain a maximum difference.");
+  const std::vector<double> dv_ii = { 2.1, 3.5, -9.9, 4.7, 7.8 };
+  check(maxAbsoluteDifference(dv_i, dv_ii), RelationalOperator::EQUAL, Approx(10.8).margin(1.0e-8),
+        "Incorrect evaluation of the maximum absolute difference between two short vectors.");
+  const std::vector<int> iv_ii = { -1, 15, -9, 72, -3 };
+  check(maxAbsoluteDifference(iv_i, iv_ii), RelationalOperator::EQUAL, Approx(65).margin(1.0e-10),
+        "Incorrect evaluation of the maximum absolute difference between two short vectors.");
+  const std::vector<int> uv_i = { 92, 47, 81, 36, 29 };
+  const std::vector<int> uv_ii = { 82, 37, 101, 19, 147 };
+  check(maxAbsoluteDifference(uv_i, uv_ii), RelationalOperator::EQUAL,
+        maxAbsoluteDifference(uv_ii, uv_i), "Non-reflexive evaluation of the maximum absolute "
+        "difference between two vectors of unsigned integers.");
+  check(maxRelativeDifference(dv_ii, dv_i), RelationalOperator::EQUAL, Approx(20.0).margin(1.0e-8),
+        "Incorrect evaluation of maximum relative error between two short vectors.");
+  check(maxRelativeDifference(uv_ii, uv_i), RelationalOperator::EQUAL,
+        Approx(4.06896552).margin(1.0e-7), "Incorrect evaluation of maximum relative error "
+        "between two short unsigned integer vectors.");
+  check(mean(uv_i), RelationalOperator::EQUAL, 57.0, "Incorrect evaluation of the mean of a "
+        "vector of unsigned integers.");
+  const std::vector<double> cp_a = {  1.4, 5.8, -8.5 };
+  const std::vector<double> cp_b = { -3.4, 2.7, 10.1 };
+  std::vector<double> cp_c(3);
+  crossProduct(cp_a, cp_b, &cp_c);
+  const std::vector<double> cp_ab = { 81.53, 14.76, 23.50 };
+  check(cp_c, RelationalOperator::EQUAL, cp_ab, "Vector cross product does not function as "
+        "expected when provided Standard Template Library vectors.");
+  const std::vector<float> cp_af = {  1.4, 5.8, -8.5 };
+  const std::vector<float> cp_bf = { -3.4, 2.7, 10.1 };
+  std::vector<float> cp_cf(3);
+  crossProduct(cp_af.data(), cp_bf.data(), cp_cf.data());
+  check(cp_cf, RelationalOperator::EQUAL, Approx(cp_ab).margin(1.0e-5), "Vector cross product "
+        "does not function as expected when provided C-style pointers.");
+  const double3 d3_a = { cp_a[0],  cp_a[1],  cp_a[2] };
+  const double3 d3_b = { cp_b[0],  cp_b[1],  cp_b[2] };
+  const double3 d3_c = crossProduct(d3_a, d3_b);
+  check(d3_c.x == Approx(cp_ab[0]).margin(tiny) && d3_c.y == Approx(cp_ab[1]).margin(tiny) &&
+        d3_c.z == Approx(cp_ab[2]).margin(tiny), "Vector cross product does not function as "
+        "expected when provided double-precision HPC tuples.");
+
+  // Verify that the internal random number generation is consistent with expectations.  Create
+  // three generators, the first two initialized in the same way (which thus should track one
+  // another precisely) and the third initialized to a different value (which should decorrelate
+  // from the first two immediately thanks to some priming that is done in the initialization).
+  section(2);
+  check(oe.getRandomSeed(), RelationalOperator::EQUAL, 827493, "Pseudo-random number seed is not "
+        "set to the expected value.  While permitted as part of the baseline test environment "
+        "initialization, changing the random seed will, in this case, result in several bad "
+        "results in later tests.");
+  const int n_pts = 2000;
+  Ran2Generator prng_a(oe.getRandomSeed());
+  Ran2Generator prng_b(oe.getRandomSeed());
+  Ran2Generator prng_c(71277);
+  std::vector<double> result_a(n_pts, 0.0);
+  std::vector<double> result_b(n_pts, 0.0);
+  std::vector<double> result_c(n_pts, 0.0);
+  for (int i = 0; i < n_pts; i++) {
+    result_a[i] = prng_a.uniformRandomNumber();
+    result_b[i] = prng_b.uniformRandomNumber();
+    result_c[i] = prng_c.gaussianRandomNumber();
+  }
+  check(result_a, RelationalOperator::EQUAL,
+        Approx(result_b, ComparisonType::MEAN_UNSIGNED_ERROR).margin(1.0e-12), "Differences were "
+        "detected between random number series created starting from the same seed.");
+  check(mean(result_a), RelationalOperator::EQUAL, Approx(0.49674889).margin(1.0e-7), "The mean "
+	"of a set of " + std::to_string(n_pts) + " random numbers is incorrect.");
+  check(mean(result_c), RelationalOperator::EQUAL, Approx(-0.01931485).margin(1.0e-7), "The mean "
+        "value of a normal distribution of random numbers is incorrect.");
+
+  // Additional checks, using the file reference system
+  const std::string randoms_snp = oe.getOmniHomePath() + osSeparator() + "test" + osSeparator() +
+                                  "Math" + osSeparator() + "randoms.m";
+  TestPriority snp_found = (getDrivePathType(randoms_snp) == DrivePathType::FILE) ?
+                           TestPriority::CRITICAL : TestPriority::ABORT;
+  if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
+    rtWarn("Snapshot file " + randoms_snp + " was not found.  Check the $OMNI_SOURCE environment "
+           "variable and make sure it indicates the root source directory where src/ and test/ "
+           "can be found.  Some subsequent tests will be skipped.", "test_math");
+  }
+  snapshot(oe.getOmniHomePath() + osSeparator() + "test" + osSeparator() + "Math" + osSeparator() +
+           "randoms.m", polyNumericVector(result_c), "rngvec", 1.0e-4, "Series of random numbers "
+           "created by the ran2 method does not conform to expectations.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE, snp_found);
+  
+  // Check scrambled linear random number generators
+  Xoroshiro128pGenerator xrs128p(798031);
+  Xoshiro256ppGenerator xrs256pp(901835);
+  Xoroshiro128pGenerator xrs128pj(798031);
+  Xoshiro256ppGenerator xrs256ppj(901835);
+  xrs128pj.jump();
+  xrs256ppj.jump();
+  const int nrand_trial = 16;
+  std::vector<double> xrs128p_result(nrand_trial);
+  std::vector<double> xrs128p_jump_result(nrand_trial);
+  std::vector<double> xrs256pp_result(nrand_trial);
+  std::vector<double> xrs256pp_jump_result(nrand_trial);
+  for (int i = 0; i < nrand_trial; i++) {
+    xrs128p_result[i] = xrs128p.uniformRandomNumber();
+    xrs256pp_result[i] = xrs256pp.uniformRandomNumber();
+    xrs128pj.uniformRandomNumber();
+    xrs256ppj.uniformRandomNumber();
+  }
+  xrs128p.jump();
+  xrs256pp.jump();
+  const std::vector<double> ans_128p = { 0.7453648164, 0.4049923254, 0.8584963726, 0.9833355535,
+                                         0.0066062865, 0.6311114017, 0.9820136114, 0.2413733841,
+                                         0.2753459418, 0.4993040685, 0.0806123499, 0.3691566725,
+                                         0.4001401073, 0.0590209187, 0.5804605659, 0.5293153466 };
+  const std::vector<double> ans_256pp = { 0.9570185700, 0.9443435021, 0.5241518529, 0.1428242166,
+                                          0.5687186981, 0.9839369524, 0.9751010737, 0.8695307120,
+                                          0.4293373290, 0.1555431764, 0.0005355056, 0.0820197480,
+                                          0.8509827801, 0.7310430980, 0.7770864125, 0.9021266541 };
+  check(xrs128p_result, RelationalOperator::EQUAL, Approx(ans_128p).margin(1.0e-8),
+        "Random numbers generated by the xoroshift128+ method do not meet expectations.");
+  check(xrs256pp_result, RelationalOperator::EQUAL, Approx(ans_256pp).margin(1.0e-8),
+        "Random numbers generated by the xoshift256++ method do not meet expectations.");
+  for (int i = 0; i < nrand_trial; i++) {
+    xrs128p_result[i] = xrs128p.uniformRandomNumber();
+    xrs128p_jump_result[i] = xrs128pj.uniformRandomNumber();
+    xrs256pp_result[i] = xrs256pp.uniformRandomNumber();
+    xrs256pp_jump_result[i] = xrs256ppj.uniformRandomNumber();
+  }
+  check(xrs128p_result, RelationalOperator::EQUAL, xrs128p_jump_result, "Two xoroshiro128+ "
+        "generators do not re-synchronize after different combinations of random bit string "
+        "generation and a jump.");
+  check(xrs256pp_result, RelationalOperator::EQUAL, xrs256pp_jump_result, "Two xoroshiro256++ "
+        "generators do not re-synchronize after different combinations of random bit string "
+        "generation and a jump.");
+
+  // Verify rounding results
+  section(3);
+  const size_t szt_a = 159283;
+  const size_t szt_a_round = roundUp<size_t>(szt_a, 32);
+  check(szt_a_round, RelationalOperator::EQUAL, Approx(159296).margin(1.0e-6), "Rounding upwards "
+        "to the nearest increment of 32 failed.");
+  const int szt_b_round = roundUp<size_t>(szt_a, 128);
+  check(szt_b_round, RelationalOperator::EQUAL, Approx(159360).margin(1.0e-6), "Rounding upwards "
+        "to the nearest increment of 128 failed.");
+  const ulint prime_composite = 2 * 2 * 5 * 3 * 7 * 19;
+  const std::vector<ulint> primes = { 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 };
+  const std::vector<ulint> factors_i = primeFactors(prime_composite, primes, 7);
+  const std::vector<ulint> factors_ii = primeFactors(prime_composite, primes, 9);
+  const std::vector<ulint> answer_i = { 2, 1, 1, 1, 0, 0, 0 };
+  const std::vector<ulint> answer_ii = { 2, 1, 1, 1, 0, 0, 0, 1, 0 };
+  check(factors_i, RelationalOperator::EQUAL, Approx(answer_i).margin(1.0e-8), "Prime "
+        "factorization with numbers up to 7 fails.");
+
+  // Check matrix math from the lightweight, onboard library
+  section(4);
+  const int rows_a = 7;
+  const int cols_a = 5;
+  const int rows_b = 5;
+  const int cols_b = 7;
+  Hybrid<double> tr_mat_a(rows_a * cols_a, "random matrix");
+  Hybrid<double> tr_mat_b(rows_b * cols_b, "random matrix");
+  Hybrid<double> tr_mat_c(rows_a * cols_b, "posdef matrix");
+  Hybrid<double> tr_mat_d(cols_a * rows_b, "posdef matrix");
+  double* tr_a_ptr = tr_mat_a.data();
+  double* tr_b_ptr = tr_mat_b.data();
+  for (int i = 0; i < rows_a * cols_a; i++) {
+    tr_a_ptr[i] = prng_c.gaussianRandomNumber();
+  }
+  for (int i = 0; i < rows_b * cols_b; i++) {
+    tr_b_ptr[i] = prng_c.gaussianRandomNumber();
+  }
+
+  // Check that the GEMM matrix multiplication snapshot file exists
+  const std::string matrices_snp = oe.getOmniSourcePath() + osSeparator() + "test" +
+                                   osSeparator() + "Math" + osSeparator() + "matrices.m";
+  snp_found = (getDrivePathType(matrices_snp) == DrivePathType::FILE) ? TestPriority::CRITICAL :
+                                                                        TestPriority::ABORT;
+  if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
+    rtWarn("The snapshot file " + matrices_snp + "was not found.  Make sure that the $OMNI_SOURCE "
+           "environment variable is set to the root soruce directory, where src/ and test/ "
+           "subdirectories can be found.  A number of subsequent tests will be skipped.",
+           "test_math");
+  }
+
+  // Try a direct matrix-matrix multiplication, producing a non-symmetric [7 by 7] matrix result
+  matrixMultiply(tr_mat_a.data(), rows_a, cols_a, tr_mat_b.data(), rows_b, cols_b,
+                 tr_mat_c.data());
+  snapshot(matrices_snp, polyNumericVector(tr_mat_c.readHost()), "tr_ab", 1.0e-5, "Matrix "
+           "multiply result for [7 by 5] x [5 by 7] matrices is incorrect.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE, snp_found);
+
+  // Overwrite the result with a positive definite [7 by 7] matrix result
+  matrixMultiply(tr_mat_a.data(), rows_a, cols_a, tr_mat_a.data(), rows_a, cols_a, tr_mat_c.data(),
+                 1.0, 1.0, 0.0, TransposeState::AS_IS, TransposeState::TRANSPOSE);
+  snapshot(matrices_snp, polyNumericVector(tr_mat_c.readHost()), "tr_aat", 1.0e-5, "Matrix "
+           "multiply result for [7 by 5] x [7 by 5](T) matrices is incorrect.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+
+  // Obtain a new, positive definite [5 by 5] matrix result
+  matrixMultiply(tr_mat_a.data(), rows_a, cols_a, tr_mat_a.data(), rows_a, cols_a, tr_mat_d.data(),
+                 1.0, 1.0, 0.0, TransposeState::TRANSPOSE, TransposeState::AS_IS);
+  snapshot(matrices_snp, polyNumericVector(tr_mat_d.readHost()), "tr_ata", 1.0e-5, "Matrix "
+           "multiply result for [7 by 5](T) x [7 by 5] matrices is incorrect.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+
+  // Try inverting a positive definite matrix
+  Hybrid<double> tr_mat_e(cols_a * rows_b, "inverse matrix");
+  invertSquareMatrix(tr_mat_d.data(), tr_mat_e.data(), cols_a);
+  snapshot(matrices_snp, polyNumericVector(tr_mat_d.readHost()), "inv_ata", 1.0e-5, "Matrix "
+           "inversion result for a [5 by 5] matrix is incorrect.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+
+  // Overwrite the positive definite matrix with a non-symmetric [5 by 5] matrix result
+  matrixMultiply(tr_mat_a.data(), rows_a, cols_a, tr_mat_b.data(), rows_b, cols_b, tr_mat_d.data(),
+                 1.0, 1.0, 0.0, TransposeState::TRANSPOSE, TransposeState::TRANSPOSE);
+  snapshot(matrices_snp, polyNumericVector(tr_mat_d.readHost()), "tr_atbt", 1.0e-5, "Matrix "
+           "multiply result for [7 by 5](T) x [5 by 7](T) matrices is incorrect.",
+           oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND,
+           snp_found);
+
+  // Create a positive-definite matrix, then compute its eigenvalues and eigenvectors (this is
+  // better accomplished by a routine like BLAS dsyevd, as it is more than just real and symmetric,
+  // but the slower jacobi routine is all OMNI has got without real BLAS compiled).
+  const size_t rank = 8;
+  Hybrid<double> base_matrix(rank * rank);
+  Hybrid<double> posdef_matrix(rank * rank);
+  Hybrid<double> eigenvectors(rank * rank);
+  Hybrid<double> eigenvalues(rank);
+  double* dbase = base_matrix.data();
+  double* dposdef = posdef_matrix.data();
+  for (size_t i = 0; i < rank * rank; i++) {
+    dbase[i] = prng_c.gaussianRandomNumber();
+  }
+  matrixMultiply(dbase, rank, rank, dbase, rank, rank, dposdef, 1.0, 1.0, 0.0,
+                 TransposeState::TRANSPOSE, TransposeState::AS_IS);
+  jacobiEigensolver(&posdef_matrix, &eigenvectors, &eigenvalues, rank);
+  snapshot(matrices_snp, polyNumericVector(eigenvectors.readHost()), "eigvec", 1.0e-5,
+           "Eigenvectors for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+  snapshot(matrices_snp, polyNumericVector(eigenvalues.readHost()), "eigval", 1.0e-5,
+           "Eigenvalues for a rank-8 positive definite matrix are incorrect.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
+
+  // Try a much bigger eigenvalue problem and check its results
+  const size_t big_rank = 95;
+  HpcMatrix<double> mtrx_base(big_rank, big_rank, MatrixFillMode::RANDN, &prng_c);
+  HpcMatrix<double> mtrx_posdef(big_rank, big_rank);
+  HpcMatrix<double> mtrx_eigvec(big_rank, big_rank);
+  eigenvalues.resize(big_rank);
+  matrixMultiply(mtrx_base, mtrx_base, &mtrx_posdef, 1.0, 1.0, 0.0, TransposeState::TRANSPOSE,
+                 TransposeState::AS_IS);
+  dposdef = mtrx_posdef.memptr();
+  double bad_value = mtrx_posdef(big_rank / 2, 0) * 1.098;
+  std::swap(bad_value, dposdef[big_rank / 2]);
+  CHECK_THROWS(jacobiEigensolver(&mtrx_posdef, &mtrx_eigvec, &eigenvalues, ExceptionResponse::DIE),
+               "The jacobiEigensolver() routine attempted to work on a non-symmetric matrix.");
+  std::swap(bad_value, dposdef[big_rank / 2]);
+  HpcMatrix<double> copy_posdef = mtrx_posdef;
+  jacobiEigensolver(&mtrx_posdef, &mtrx_eigvec, &eigenvalues, ExceptionResponse::DIE);
+  std::vector<double> eigvsums(big_rank, 0.0);
+  Hybrid<double> mtrx_eigtest(big_rank, "test_eig");
+  for (size_t i = 0; i < big_rank; i++) {
+    Hybrid<double> icol_ptr = mtrx_eigvec.colptr(i);
+    matrixVectorMultiply(copy_posdef, icol_ptr, &mtrx_eigtest, 1.0, 1.0, 0.0,
+                         TransposeState::AS_IS);
+    eigvsums[i] = sum<double>(mtrx_eigtest) - sum<double>(icol_ptr) * eigenvalues.readHost(i);
+  }
+  check(eigvsums, RelationalOperator::EQUAL,
+        Approx(std::vector<double>(big_rank, 0.0)).margin(1.0e-8), "Eigenvalues and eigenvectors "
+        "produced by jacobiEigensolver() are incorrect.");
+
+  // Try computing box transformation matrices
+  const double lx = 64.1;
+  const double ly = 60.3;
+  const double lz = 48.9;
+  const double alpha =  98.7 * pi / 180.0;
+  const double beta  = 103.2 * pi / 180.0;
+  const double gamma =  85.4 * pi / 180.0;
+  HpcMatrix<double> umat(3, 3);
+  HpcMatrix<double> invu(3, 3);
+  HpcMatrix<double> xfrm_prod(3, 3);
+  computeBoxTransform(lx, ly, lz, alpha, beta, gamma, umat.memptr(), invu.memptr());
+  matrixMultiply(umat, invu, &xfrm_prod);
+  HpcMatrix<double> ident(3, 3, MatrixFillMode::EYE);
+  std::vector<double> linear_umat(9, 0.0);
+  std::vector<double> linear_invu(9, 0.0);
+  std::vector<double> linear_xfrm_prod(9, 0.0);
+  std::vector<double> linear_ident(9, 0.0);
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      linear_umat[(j * 3) + i] = umat(i, j);
+      linear_invu[(j * 3) + i] = invu(i, j);
+      linear_xfrm_prod[(j * 3) + i] = xfrm_prod(i, j);
+      linear_ident[(j * 3) + i] = ident(i, j);
+    }
+  }
+
+  // Data entered in column-major format may look like a transpose at first.  Check
+  // the box transformation matrices against results from an external implementation.
+  const std::vector<double> umat_answer = {
+    1.5600624025e-02,  0.0000000000e+00,  0.0000000000e+00,
+   -1.2551964058e-03,  1.6637338818e-02,  0.0000000000e+00,
+    3.5203270719e-03,  2.3009524689e-03,  2.1204798362e-02 };
+  const std::vector<double> invu_answer = {
+    6.4100000000e+01,  0.0000000000e+00,  0.0000000000e+00,
+    4.8359951370e+00,  6.0105766371e+01,  0.0000000000e+00,
+   -1.1166357548e+01, -6.5221328286e+00,  4.7159137423e+01 };
+  check(linear_umat, RelationalOperator::EQUAL, Approx(umat_answer).margin(1.0e-8),
+        "The box transformation matrix is incorrect.");
+  check(linear_invu, RelationalOperator::EQUAL, Approx(invu_answer).margin(1.0e-8),
+        "The inverse transformation matrix is incorrect.");
+  check(linear_xfrm_prod, RelationalOperator::EQUAL, linear_ident, "The product of box "
+        "transformation and inverse transformation matrices is not the identity matrix.");
+
+  // Print results
+  printTestSummary(oe.getVerbosity());
+
+  return 0;
+}

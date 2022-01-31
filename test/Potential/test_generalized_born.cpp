@@ -1,0 +1,398 @@
+#include "../../src/Constants/behavior.h"
+#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/FileManagement/file_listing.h"
+#include "../../src/Parsing/parse.h"
+#include "../../src/Potential/energy_enumerators.h"
+#include "../../src/Potential/scorecard.h"
+#include "../../src/Potential/static_exclusionmask.h"
+#include "../../src/Potential/nonbonded_potential.h"
+#include "../../src/Potential/valence_potential.h"
+#include "../../src/Reporting/error_format.h"
+#include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_enumerators.h"
+#include "../../src/Trajectory/phasespace.h"
+#include "../../src/UnitTesting/unit_test.h"
+
+using omni::double2;
+using omni::int2;
+using omni::int3;
+using omni::constants::ExceptionResponse;
+using omni::diskutil::DrivePathType;
+using omni::diskutil::getDrivePathType;
+using omni::diskutil::osSeparator;
+using omni::energy::StateVariable;
+using omni::energy::StaticExclusionMask;
+using omni::errors::rtWarn;
+using omni::parse::char4ToString;
+using omni::parse::NumberFormat;
+using omni::parse::polyNumericVector;
+using omni::topology::amber_coulomb_constant;
+using omni::topology::AtomGraph;
+using omni::topology::AtomicRadiusSet;
+using omni::topology::ImplicitSolventModel;
+using omni::topology::ImplicitSolventKit;
+using omni::topology::NonbondedKit;
+using omni::trajectory::CoordinateFileKind;
+using omni::trajectory::PhaseSpace;
+using omni::trajectory::PhaseSpaceWriter;
+using omni::trajectory::TrajectoryKind;
+using namespace omni::energy;
+using namespace omni::testing;
+using namespace omni::generalized_born_defaults;
+
+//-------------------------------------------------------------------------------------------------
+// Compute forces on selected atoms using a finite difference scheme.
+//
+// Arguments:
+//   ag:               System topology
+//   ps:               System coordinates and forces
+//   ngb_tab:          Tables of constants for "Neck" GB
+//   sample_interval:  Sampling interval for computing finite-difference forces (the calculation
+//                     scales as 4 * (N / sampling interval) * (1/2) N^2, so for larger systems not
+//                     every atom's forces can be evaluated in a cost-effective test!)
+//-------------------------------------------------------------------------------------------------
+std::vector<double> forceByFiniteDifference(const AtomGraph &ag, PhaseSpace *ps,
+                                            const NeckGeneralizedBornTable &ngb_tab,
+                                            const int sample_interval) {
+  ScoreCard sc(1, 32);
+  PhaseSpaceWriter psw = ps->data();
+  const EvaluateForce evfrc = EvaluateForce::YES;
+
+  // Perturb atomic positions by an amount that the double-precision coordinate arrays will be
+  // able to represent exactly.
+  const double disc = 0.000003814697265625;
+
+  // Get the baseline energy, then do perturbations in X, Y, and Z for selected atoms
+  std::vector<double> result;
+  for (int i = 0; i < psw.natom; i += sample_interval) {
+    const double midpt = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    psw.xcrd[i] += disc;
+    const double plusx = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    psw.xcrd[i] -= disc;
+    psw.ycrd[i] += disc;
+    const double plusy = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    psw.ycrd[i] -= disc;
+    psw.zcrd[i] += disc;
+    const double plusz = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    psw.zcrd[i] -= disc;
+
+    // Gradient is rise over run, but force is the negative of gradient: if the particle moves
+    // positively in X and the energy rises, then the force will be to push the particle backwards,
+    // in the negative X direction, to move back down the energy gradient.
+    result.push_back(-(plusx - midpt) / disc);
+    result.push_back(-(plusy - midpt) / disc);
+    result.push_back(-(plusz - midpt) / disc);
+  }
+
+  // Wipe the force arrays clean before returning the outcome
+  ps->initializeForces();
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int main(int argc, char* argv[]) {
+
+  // Some baseline initialization
+  TestEnvironment oe(argc, argv);
+
+  // Section 1
+  section("Test the ImplicitSolventRecipe abstract");
+
+  // Section 2
+  section("Test HCT GB");
+
+  // Locate topologies and coordinate files
+  const char osc = osSeparator();
+  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_ptl_name = oe.getOmniSourcePath() + osc + "test" + osc + "Potential";
+  const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
+  const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
+  const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
+  const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
+  const std::string alad_top_name = base_top_name + osc + "ala_dipeptide.top";
+  const std::string alad_crd_name = base_crd_name + osc + "ala_dipeptide.inpcrd";
+  const bool systems_exist = (getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(trpi_crd_name) == DrivePathType::FILE &&
+                              getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(dhfr_crd_name) == DrivePathType::FILE &&
+                              getDrivePathType(alad_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(alad_crd_name) == DrivePathType::FILE);
+  const TestPriority do_tests = (systems_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  if (systems_exist == false) {
+    rtWarn("Files for the Trp-cage miniprotein, DHFR globular protein, and alanine dipeptide were "
+           "not found.  These files should be found in the ${OMNI_SOURCE}/test/Topology and "
+           "${OMNI_SOURCE}/test/Trajectory directories.  Check the $OMNI_SOURCE environment "
+           "variable.  A number of tests will be skipped.", "test_generalized_born");
+  }
+  const std::string trpi_snapshot(base_ptl_name + osc + "trpcage_gb_forces.m");
+  const std::string dhfr_snapshot(base_ptl_name + osc + "dhfr_gb_forces.m");
+  const std::string alad_snapshot(base_ptl_name + osc + "ala_dipeptide_gb_forces.m");
+  const bool snaps_exist = (getDrivePathType(trpi_snapshot) == DrivePathType::FILE &&
+                            getDrivePathType(dhfr_snapshot) == DrivePathType::FILE &&
+                            getDrivePathType(alad_snapshot) == DrivePathType::FILE);
+  const TestPriority do_snaps = (snaps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  if (snaps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
+    rtWarn("Snapshot files for the Trp-cage miniprotein, DHFR globular protein, and alanine "
+           "dipeptide were not found.  These should be found in the ${OMNI_SOURCE}/test/Potential "
+           "directory.  Some tests will be skipped.", "test_generalized_born");
+  }
+
+  // Read topologies and coordinates.  Suppress charge discretization and normalization to
+  // maintain the best possible agreement with results from Amber's sander program.
+  AtomGraph trpi_ag, dhfr_ag, alad_ag;
+  PhaseSpace trpi_ps, dhfr_ps, alad_ps;
+  const double charge_discretization_inc = 9.31322574615478515625E-10;
+  const double charge_rounding_tol = 1.0e-10;
+  const double amber_default_qq14 = 1.2;
+  const double amber_default_lj14 = 2.0;
+  const double charmm_default_qq14 = 1.0;
+  const double charmm_default_lj14 = 1.0;
+  const double sander_dielectric = 78.5;
+  if (systems_exist) {
+    trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
+                            amber_default_qq14, amber_default_lj14, charge_rounding_tol,
+                            charge_discretization_inc);
+    trpi_ps.buildFromFile(trpi_crd_name, CoordinateFileKind::AMBER_INPCRD);
+    dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
+                            charmm_default_qq14, charmm_default_lj14, charge_rounding_tol,
+                            charge_discretization_inc);
+    dhfr_ps.buildFromFile(dhfr_crd_name, CoordinateFileKind::AMBER_INPCRD);
+    alad_ag.buildFromPrmtop(alad_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
+                            amber_default_qq14, amber_default_lj14, charge_rounding_tol,
+                            charge_discretization_inc);
+    alad_ps.buildFromFile(alad_crd_name, CoordinateFileKind::AMBER_INPCRD);
+  }
+
+  // Apply an implicit solvent model to each topology and check the result
+  std::vector<AtomGraph*> all_topologies = { &trpi_ag, &dhfr_ag, &alad_ag };
+  std::vector<PhaseSpace*> all_coords = { &trpi_ps, &dhfr_ps, &alad_ps };
+  const size_t system_count = all_topologies.size();
+  for (size_t i = 0; i < system_count; i++) {
+    all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::HCT_GB, sander_dielectric);
+  }
+  ImplicitSolventKit<double> trpi_isk = all_topologies[0]->getDoublePrecisionImplicitSolventKit();
+  ImplicitSolventKit<double> dhfr_isk = all_topologies[1]->getDoublePrecisionImplicitSolventKit();
+  check(trpi_isk.dielectric, RelationalOperator::EQUAL, sander_dielectric,
+        "The implicit solvent dielectric was not properly set.", do_tests);
+  check(trpi_isk.saltcon, RelationalOperator::EQUAL, 0.0, "The implicit solvent salt "
+        "concentration was not properly set.", do_tests);
+  check(dhfr_isk.igb == ImplicitSolventModel::HCT_GB, "The Hawkins / Cramer / Truhlar GB model "
+        "was not imparted to systems as expected.", do_tests);
+  check(sum<double>(trpi_isk.pb_radii, trpi_isk.natom), RelationalOperator::EQUAL,
+        Approx(444.95).margin(1.0e-5), "PB radii for the Trp-cage system were not conveyed to the "
+        "ImplicitSolventKit abstract as expected.", do_tests);
+  check(sum<double>(dhfr_isk.gb_screen, dhfr_isk.natom), RelationalOperator::EQUAL,
+        Approx(1998.81).margin(1.0e-5), "GB screening factors for the DHFR system were not "
+        "conveyed to the ImplicitSolventKit abstract as expected.", do_tests);
+
+  // Compute Generalized Born energy and forces.  The DHFR system departs most significantly (0.05
+  // kcal/mol) from the GB energies of the equivalent calculation in Amber's sander facility, due
+  // to the relatively large number of charge increments (75) that the default topology settings
+  // distribute over its atoms.  Other systems, which distribute 6 (Trp-cage) and 3 (alanine
+  // dipeptide) charge increments of ~1.19e-7 across their most charged atoms, agree to within
+  // 0.0002 kcal/mol of the sander results.  All systems can be brought into near perfect agreement
+  // with the sander calculations by disabling charge discretization and normalization.
+  const NeckGeneralizedBornTable ngb_tab;
+  ScoreCard all_systems_sc(3, 32);
+  const int trpi_idx = 0;
+  const int dhfr_idx = 1;
+  const int alad_idx = 2;
+  const EvaluateForce evfrc = EvaluateForce::YES;
+  const std::vector<double> hct_gb_answer   = { -313.0368696, -2480.8487515, -14.7193347 };
+  const std::vector<double> obc_gb_answer   = { -320.6017219, -2504.3368641, -16.0329696 };
+  const std::vector<double> obc2_gb_answer  = { -298.2900710, -2401.7427251, -14.9957762 };
+  const std::vector<double> neck_gb_answer  = { -311.6397166, -2503.8809649, -14.8329479 };
+  const std::vector<double> neck2_gb_answer = { -328.6694773, -2686.2812806, -14.8989435 };
+
+  // Check energy and force computations for each successive GB model
+  std::vector<double> gb_energy(system_count);
+  std::vector<std::vector<double>> gb_forces(system_count);
+  const TrajectoryKind tkind = TrajectoryKind::FORCES;
+  for (size_t i = 0; i < system_count; i++) {
+    all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::HCT_GB, 78.5);
+    all_coords[i]->initializeForces();
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+                                                 all_coords[i], &all_systems_sc, evfrc, i);
+    gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
+  }
+  check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
+        RelationalOperator::EQUAL, Approx(hct_gb_answer).margin(1.0e-4), "Hawkins / Cramer / "
+        "Truhlar Generalized Born energies do not meet expectations.", do_tests);
+  snapshot(trpi_snapshot, polyNumericVector(gb_forces[0]), "trpcage_hct_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Hawkins / Cramer / Truhlar Generalized "
+           "Born interactions in the Trp-cage system do not meet expectations.", oe.takeSnapshot(),
+           1.0e-6, 1.0e-12, PrintSituation::OVERWRITE, do_snaps);
+  snapshot(dhfr_snapshot, polyNumericVector(gb_forces[1]), "dhfr_hct_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Hawkins / Cramer / Truhlar Generalized "
+           "Born interactions in the DHFR system do not meet expectations.", oe.takeSnapshot(),
+           1.0e-6, 1.0e-12, PrintSituation::OVERWRITE, do_snaps);
+  snapshot(alad_snapshot, polyNumericVector(gb_forces[2]), "ala_hct_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Hawkins / Cramer / Truhlar Generalized "
+           "Born interactions in the alanine dipeptide system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::OVERWRITE, do_snaps);  
+  for (size_t i = 0; i < system_count; i++) {
+    all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB, 78.5);
+    all_coords[i]->initializeForces();
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+                                                 all_coords[i], &all_systems_sc, evfrc, i);
+    gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
+  }
+  check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
+        RelationalOperator::EQUAL, Approx(obc_gb_answer).margin(1.0e-4), "Onufriev / Bashford / "
+        "Case (model I) Generalized Born energies do not meet expectations.", do_tests);
+  snapshot(trpi_snapshot, polyNumericVector(gb_forces[0]), "trpcage_obc_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Onufriev / Bashford / Case (model I) "
+           "Generalized Born interactions in the Trp-cage system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(dhfr_snapshot, polyNumericVector(gb_forces[1]), "dhfr_obc_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Onufriev / Bashford / Case (model I) "
+           "Generalized Born interactions in the DHFR system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(alad_snapshot, polyNumericVector(gb_forces[2]), "ala_obc_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Onufriev / Bashford / Case (model I) "
+           "Generalized Born interactions in the alanine dipeptide system do not meet "
+           "expectations.", oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  for (size_t i = 0; i < system_count; i++) {
+    all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB_II, 78.5);
+    all_coords[i]->initializeForces();
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+                                                 all_coords[i], &all_systems_sc, evfrc, i);
+    gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
+  }
+  check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
+        RelationalOperator::EQUAL, Approx(obc2_gb_answer).margin(1.0e-4), "Onufriev / Bashford / "
+        "Case (model II) Generalized Born energies do not meet expectations.", do_tests);
+  snapshot(trpi_snapshot, polyNumericVector(gb_forces[0]), "trpcage_obc2_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Onufriev / Bashford / Case (model II) "
+           "Generalized Born interactions in the Trp-cage system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(dhfr_snapshot, polyNumericVector(gb_forces[1]), "dhfr_obc2_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Onufriev / Bashford / Case (model II) "
+           "Generalized Born interactions in the DHFR system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(alad_snapshot, polyNumericVector(gb_forces[2]), "ala_obc2_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Onufriev / Bashford / Case (model II) "
+           "Generalized Born interactions in the alanine dipeptide system do not meet "
+           "expectations.", oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+
+  // Some topologies are not acceptable for "neck" GB calculations (they must have Bondi radii).
+  // This is checked in the topology and radii are reassigned (based on bondi PB radii) if
+  // deficiencies are found.  Note that this permanently modifies the PB radii in the topology,
+  // which cannot be undone by simply reverting to a different implicit solvent model that is
+  // agnostic to the radii.  Do this to all topologies except alanine dipeptide, which already has
+  // acceptable (albeit not Bondi) radii for the "neck" GB calculations.
+  for (size_t i = 0; i < system_count; i++) {
+    const AtomicRadiusSet rset_apply = (all_topologies[i]->getFileName() == alad_top_name) ?
+                                       AtomicRadiusSet::NONE : AtomicRadiusSet::BONDI;
+    all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::NECK_GB, 78.5, 0.0,
+                                               rset_apply);
+    all_coords[i]->initializeForces();
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+                                                 all_coords[i], &all_systems_sc, evfrc, i);
+    gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
+  }
+  check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
+        RelationalOperator::EQUAL, Approx(neck_gb_answer).margin(1.0e-4), "Mongan \"Neck\" "
+        "(model I) Generalized Born energies do not meet expectations.", do_tests);
+  snapshot(trpi_snapshot, polyNumericVector(gb_forces[0]), "trpcage_neck_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Mongan \"Neck\" (model I) Generalized Born "
+           "interactions in the Trp-cage system do not meet expectations.", oe.takeSnapshot(),
+           1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(dhfr_snapshot, polyNumericVector(gb_forces[1]), "dhfr_neck_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Mongan \"Neck\" (model I) Generalized Born "
+           "interactions in the DHFR system do not meet expectations.", oe.takeSnapshot(), 1.0e-6,
+           1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(alad_snapshot, polyNumericVector(gb_forces[2]), "ala_neck_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Mongan \"Neck\" (model I) Generalized Born "
+           "interactions in the alanine dipeptide system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  for (size_t i = 0; i < system_count; i++) {
+    const AtomicRadiusSet rset_apply = (all_topologies[i]->getFileName() == alad_top_name) ?
+                                       AtomicRadiusSet::NONE : AtomicRadiusSet::MBONDI3;
+    all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::NECK_GB_II, 78.5, 0.0,
+                                               rset_apply);
+    all_coords[i]->initializeForces();
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+                                                 all_coords[i], &all_systems_sc, evfrc, i);
+    gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
+  }
+  check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
+        RelationalOperator::EQUAL, Approx(neck2_gb_answer).margin(1.0e-4), "Mongan \"Neck\" "
+        "(model II) Generalized Born energies do not meet expectations.", do_tests);
+  snapshot(trpi_snapshot, polyNumericVector(gb_forces[0]), "trpcage_neck2_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Mongan \"Neck\" (model II) Generalized "
+           "Born interactions in the Trp-cage system do not meet expectations.", oe.takeSnapshot(),
+           1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(dhfr_snapshot, polyNumericVector(gb_forces[1]), "dhfr_neck2_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Mongan \"Neck\" (model II) Generalized "
+           "Born interactions in the DHFR system do not meet expectations.", oe.takeSnapshot(),
+           1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+  snapshot(alad_snapshot, polyNumericVector(gb_forces[2]), "ala_neck2_gb_frc",
+           NumberFormat::STANDARD_REAL, "Forces due to Mongan \"Neck\" (model II) Generalized "
+           "Born interactions in the alanine dipeptide system do not meet expectations.",
+           oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, do_snaps);
+
+  // Attempt some finite difference force calculations to check the self-consistency of the
+  // Generalized Born energies and forces.
+  const std::vector<ImplicitSolventModel> conditions = { ImplicitSolventModel::HCT_GB,
+                                                         ImplicitSolventModel::OBC_GB,
+                                                         ImplicitSolventModel::OBC_GB_II,
+                                                         ImplicitSolventModel::NECK_GB,
+                                                         ImplicitSolventModel::NECK_GB_II };
+  const std::vector<AtomicRadiusSet> shapes = { AtomicRadiusSet::MBONDI,
+                                                AtomicRadiusSet::MBONDI2,
+                                                AtomicRadiusSet::AMBER6,
+                                                AtomicRadiusSet::BONDI,
+                                                AtomicRadiusSet::MBONDI3 };
+  for (size_t i = 0; i < shapes.size(); i++) {
+
+    // Set conditions and re-evaluate Generalized Born forces in each system.  Skip DHFR as it
+    // is expensive, less stable for comparing finite difference results, and not telling us much
+    // at this stage.
+    for (size_t j = 0; j < system_count; j++) {
+      if (all_topologies[j]->getFileName() == dhfr_top_name) {
+        continue;
+      }
+      all_topologies[j]->setImplicitSolventModel(conditions[i], 80.0, 0.0, shapes[i]);
+      all_coords[j]->initializeForces();
+      gb_energy[j] = evaluateGeneralizedBornEnergy(*(all_topologies[j]), ngb_tab,
+                                                   all_coords[j], &all_systems_sc, evfrc, j);
+      gb_forces[j] = all_coords[j]->getInterlacedCoordinates(tkind);
+    }
+
+    // Prepare samples of the forces in each system
+    const int trpi_natom = trpi_ag.getAtomCount();
+    const int dhfr_natom = dhfr_ag.getAtomCount();
+    const int alad_natom = alad_ag.getAtomCount();
+    std::vector<double> trpi_fsample;
+    for (int j = 0; j < trpi_natom; j += 60) {
+      trpi_fsample.push_back(gb_forces[0][(3 * j)    ]);
+      trpi_fsample.push_back(gb_forces[0][(3 * j) + 1]);
+      trpi_fsample.push_back(gb_forces[0][(3 * j) + 2]);
+    }
+    std::vector<double> alad_fsample;
+    for (int j = 0; j < alad_natom; j += 1) {
+      alad_fsample.push_back(gb_forces[2][(3 * j)    ]);
+      alad_fsample.push_back(gb_forces[2][(3 * j) + 1]);
+      alad_fsample.push_back(gb_forces[2][(3 * j) + 2]);
+    }
+    const std::vector<double> trpi_fd = forceByFiniteDifference(trpi_ag, &trpi_ps, ngb_tab, 60);
+    const std::vector<double> alad_fd = forceByFiniteDifference(alad_ag, &alad_ps, ngb_tab, 1);
+    check(trpi_fsample, RelationalOperator::EQUAL, Approx(trpi_fd).margin(1.0e-4),
+          "Forces computed in the Trp-cage system with " +
+          getImplicitSolventModelName(conditions[i]) + " and " +
+          getAtomicRadiusSetName(shapes[i]) + " do not agree with their finite-difference "
+          "approximations.", do_tests);
+    check(alad_fsample, RelationalOperator::EQUAL, Approx(alad_fd).margin(1.0e-4),
+          "Forces computed in the alanine dipeptide system with " +
+          getImplicitSolventModelName(conditions[i]) + " and " +
+          getAtomicRadiusSetName(shapes[i]) + " do not agree with their finite-difference "
+          "approximations.", do_tests);
+  }
+
+  // Print results
+  printTestSummary(oe.getVerbosity());
+
+  return 0;
+}
