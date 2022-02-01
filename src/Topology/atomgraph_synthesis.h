@@ -20,12 +20,48 @@ struct AtomGraphSynthesis {
 
 private:
 
-  /// The number of unique topologies represented in this synthesis
-  const int topology_count;
+  // The first member variables pertain to totals across all systems: atoms, potential function
+  // terms, and sizes of composite parameter arrays that span all topologies
+  int topology_count;       ///< The number of unique topologies represented in this synthesis
+  int system_count;         ///< Number of independent coordinate sets present in this synthesis
+  int total_atoms;          ///< The total number of atoms, spanning all topologies
+  int total_virtual_sites;  ///< The total number of atoms, spanning all topologies
+  int total_bond_terms;     ///< The total number of bonds, spanning all topologies
+  int total_angl_terms;     ///< The total number of bond angles, spanning all topologies
+  int total_dihe_terms;     ///< The total number of dihedrals, spanning all topologies
+  int total_ubrd_terms;     ///< The total number of Urey-Bradley angles, spanning all topologies
+  int total_cimp_terms;     ///< The total number of CHARMM impropers, spanning all topologies
+  int total_cmap_terms;     ///< The total number of CMAPs, spanning all topologies
+  int total_atom_types;     ///< Total number of unique atom types, spanning all topologies
+  int total_charge_types;   ///< Total number of unique atomic partial charges, spanning all
+                            ///<   topologies
+  int total_bond_params;    ///< Total number of unique bond parameter sets
+  int total_angl_params;    ///< Total number of unique bond angle parameter sets
+  int total_dihe_params;    ///< Total number of unique dihedral parameter sets
+  int total_ubrd_params;    ///< Total number of unique Urey-Bradley angle parameter sets
+  int total_cimp_params;    ///< Total number of unique CHARMM improper parameter sets
+  int total_cmap_surfaces;  ///< Total number of unique CMAP surfaces
 
-  /// The number of independent coordinate sets represented in this synthesis
-  const int system_count;
-  
+  // The presence of periodic boundaries or an implicit solvent must be common to all systems, as
+  // must the cutoff and other run parameters, although these are contained in out data structres.
+  // If an implicit solvent model is in effect, its parameters are taken as common to all systems.
+  // Other facets of the the system behavior, such as bond constraints, must also be common to
+  // all systems.
+  UnitCellType periodic_box_class;    ///< The type of unit cell; either NONE or any combination of
+                                      ///< ORTHORHOMBIC and TRICLINIC is acceptable
+  ImplicitSolventModel gb_style;      ///< The flavor of Generalized Born (or other implicit
+                                      ///<   solvent) to use, i.e. Hawkins / Cramer / Truhlar.
+  double dielectric_constant;         ///< Dielectric constant to take for implicit solvent
+                                      ///<   calculations
+  double salt_concentration;          ///< Salt concentration affecting implicit solvent models
+  double coulomb_constant;            ///< Coulomb's constant in units of kcal-A/mol-e^2 (Amber
+                                      ///<   differs from other programs in terms of what this is,
+                                      ///<   so it can be set here)
+  std::string pb_radii_set;           ///< The Poisson-Boltzmann radii set, also used in GB
+  ShakeSetting use_bond_constraints;  ///< Toggles use of bond length constraints
+  SettleSetting use_settle;           ///< Toggles analytic constraints on rigid water
+  char4 water_residue_name;           ///< Name of water residue, compared to residue_names
+
   /// An array of pointers to the individual topologies that form the basis of this work plan
   /// (this array is topology_count in length and accessible only on the host as it is used to
   /// organize work units, not process the actual energy calculations)
@@ -47,24 +83,23 @@ private:
   Hybrid<int> residue_counts;          ///< Total number of residues, including solvent molecules
   Hybrid<int> molecule_counts;         ///< Total number of molecules in the system
   Hybrid<int> largest_residue_sizes;   ///< Number of atoms in the largest residue
-  Hybrid<int> last_solute_residues;    ///< Last residue of the solute
+  Hybrid<int> last_solute_residues;    ///< Last residue of the solute, indexed according to the
+                                       ///<   overall order in this synthesis rather than the
+                                       ///<   original topologies
   Hybrid<int> last_solute_atoms;       ///< Last atom of the solute (a typical solute is a
-                                       ///<   biomolecule)
-  Hybrid<int> first_solvent_molecules; ///< First molecule in what is deemed to be solvent
+                                       ///<   biomolecule), indexed according to the overall order
+                                       ///<   in this synthesis rather than the original topologies
+  Hybrid<int> first_solvent_molecules; ///< First molecule in what is deemed to be solvent, indexed
+                                       ///<   according to the overall order in this synthesis
+                                       ///<   rather than the original topologies
 
   // Valence term and off-center particle quantities
   Hybrid<int> urey_bradley_term_counts;      ///< Total number of Urey-Bradley angle stretch terms
   Hybrid<int> charmm_impr_term_counts;       ///< Total number of CHARMM impropers
   Hybrid<int> cmap_term_counts;              ///< Total number of CMAP terms
-  Hybrid<int> urey_bradley_parameter_counts; ///< Number of unique Urey-Bradley parameter pairs
-  Hybrid<int> charmm_impr_parameter_counts;  ///< Number of unique CHARMM improper parameter pairs
-  Hybrid<int> cmap_parameter_counts;         ///< Number of unique CMAP surfaces 
-  Hybrid<int> bond_term_counts;              ///< Total number of bonded interactions
-  Hybrid<int> angl_term_counts;              ///< Total number of bond angle interactions
-  Hybrid<int> dihe_term_counts;              ///< Total number of dihedral cosine terms
-  Hybrid<int> bond_parameter_counts;         ///< The number of unique bond parameter sets
-  Hybrid<int> angl_parameter_counts;         ///< The number of unique angle parameter sets
-  Hybrid<int> dihe_parameter_counts;         ///< Number of unique dihedral Fourier basis functions
+  Hybrid<int> bond_term_counts;              ///< Total numbers of bonded interactions
+  Hybrid<int> angl_term_counts;              ///< Total numbers of bond angle interactions
+  Hybrid<int> dihe_term_counts;              ///< Total numbers of dihedral cosine terms
   Hybrid<int> virtual_site_counts;           ///< Number of v-sites / extra points out of all atoms
 
   // Information relevant to non-bonded calculations
@@ -187,7 +222,9 @@ private:
   Hybrid<float> sp_dihe_phase_angles;    ///< Phase angles of torsion terms (single precision)
 
   // NMR restraint term details: these function exactly like other parameter sets and are indexed
-  // by lists of atoms in the bond work units arrays.
+  // by lists of atoms in the bond work units arrays.  They can be included in the synthesis of
+  // AtomGraphs due to their nature as potential terms, whereas the original topologies had to be
+  // read from files that did not contain such terms.
   Hybrid<int> nmr_initial_steps;          ///< Initial steps at which to begin applying each NMR
                                           ///<   restraint potential
   Hybrid<int> nmr_final_steps;            ///< Final steps at which to apply the NMR restraint

@@ -7,12 +7,12 @@ TESTDIR=test
 LIBDIR=lib
 
 # OMNI C++ source files
-OMNI_CPP_FILES = $(SRCDIR)/Chemistry/atommask.cpp \
+OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
+		 $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Chemistry/chemical_features.cpp \
 		 $(SRCDIR)/Chemistry/indigo.cpp \
 		 $(SRCDIR)/Chemistry/znumber.cpp \
 		 $(SRCDIR)/Constants/generalized_born.cpp \
-		 $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/FileManagement/directory_util.cpp \
 		 $(SRCDIR)/FileManagement/file_listing.cpp \
 		 $(SRCDIR)/FileManagement/file_util.cpp \
@@ -41,11 +41,11 @@ OMNI_CPP_FILES = $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Reporting/error_format.cpp \
 		 $(SRCDIR)/Restraints/bounded_restraint.cpp \
 	         $(SRCDIR)/Topology/amber_prmtop_util.cpp \
+	         $(SRCDIR)/Topology/atomgraph.cpp \
 	         $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
 	         $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 	         $(SRCDIR)/Topology/atomgraph_refinement.cpp \
-	         $(SRCDIR)/Topology/atomgraph.cpp \
 	         $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	         $(SRCDIR)/Trajectory/barostat.cpp \
 	         $(SRCDIR)/Trajectory/coordinateframe.cpp \
@@ -63,7 +63,8 @@ OMNI_CPP_FILES = $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/UnitTesting/vector_report.cpp
 
 # OMNI C++ header files
-OMNI_CPP_HEADERS = $(SRCDIR)/Chemistry/atommask.h \
+OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
+		   $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemical_features.h \
 		   $(SRCDIR)/Chemistry/indigo.h \
 		   $(SRCDIR)/Constants/behavior.h \
@@ -72,7 +73,6 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemistry_enumerators.h \
 		   $(SRCDIR)/Chemistry/periodic_table.h \
 		   $(SRCDIR)/Chemistry/znumber.h \
-		   $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/DataTypes/common_types.h \
 		   $(SRCDIR)/DataTypes/mixed_types.h \
 		   $(SRCDIR)/DataTypes/omni_vector_types.h \
@@ -149,12 +149,12 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/UnitTesting/unit_test.tpp
 
 # OMNI C++ object files
-OMNI_CPP_OBJS = $(SRCDIR)/Chemistry/atommask.o \
+OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
+		$(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/Chemistry/chemical_features.o \
 		$(SRCDIR)/Chemistry/indigo.o \
 		$(SRCDIR)/Chemistry/znumber.o \
 		$(SRCDIR)/Constants/generalized_born.o \
-		$(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/FileManagement/directory_util.o \
 		$(SRCDIR)/FileManagement/file_listing.o \
 		$(SRCDIR)/FileManagement/file_util.o \
@@ -300,9 +300,9 @@ $(TESTDIR)/bin/test_file_management : $(LIBDIR)/libomni.so \
 	  $(TESTDIR)/FileManagement/test_file_management.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: hybrid object features program (CPU-only)
-$(TESTDIR)/bin/test_hybrid : $(LIBDIR)/libomni.so $(TESTDIR)/Cuda/test_hybrid.cpp
+$(TESTDIR)/bin/test_hybrid : $(LIBDIR)/libomni.so $(TESTDIR)/Accelerator/test_hybrid.cpp
 	@echo "[OMNI]  Building test_hybrid..."
-	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_hybrid $(TESTDIR)/Cuda/test_hybrid.cpp \
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_hybrid $(TESTDIR)/Accelerator/test_hybrid.cpp \
 	  -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: text parsing features program
@@ -386,18 +386,20 @@ $(TESTDIR)/bin/test_neighbor_list : $(LIBDIR)/libomni.so \
 	  $(TESTDIR)/Potential/test_neighbor_list.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: HPC detection
-$(TESTDIR)/bin/test_hpc_status : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Cuda/test_hpc_status.cpp
+$(TESTDIR)/bin/test_hpc_status : $(LIBDIR)/libomni_cuda.so \
+				 $(TESTDIR)/Accelerator/test_hpc_status.cpp
 	@echo "[OMNI]  Building test_hpc_status..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
-	  -o $(TESTDIR)/bin/test_hpc_status $(TESTDIR)/Cuda/test_hpc_status.cpp -L$(LIBDIR) \
-	  -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
+	  -o $(TESTDIR)/bin/test_hpc_status $(TESTDIR)/Accelerator/test_hpc_status.cpp \
+	  -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
 
 # Target: HPC memory functionality
-$(TESTDIR)/bin/test_hpc_hybrid : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Cuda/test_hpc_hybrid.cpp
+$(TESTDIR)/bin/test_hpc_hybrid : $(LIBDIR)/libomni_cuda.so \
+				 $(TESTDIR)/Accelerator/test_hpc_hybrid.cpp
 	@echo "[OMNI]  Building test_hpc_hybrid..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
-	  -o $(TESTDIR)/bin/test_hpc_hybrid $(TESTDIR)/Cuda/test_hpc_hybrid.cpp -L$(LIBDIR) \
-	  -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
+	  -o $(TESTDIR)/bin/test_hpc_hybrid $(TESTDIR)/Accelerator/test_hpc_hybrid.cpp \
+	  -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
 
 # Target: HPC basic math kernels
 $(TESTDIR)/bin/test_hpc_math : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Math/test_hpc_math.cu
