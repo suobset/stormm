@@ -205,9 +205,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     const AtomGraph* ag_ptr = topologies[topology_indices_in[i]];
     const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
-    const NonbondedKit<float> nbk_sp = ag_ptr->getSinglePrecisionNonbondedKit();
     const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
-    const ValenceKit<float> vk_sp    = ag_ptr->getSinglePrecisionValenceKit();
     total_atoms += cdk.natom;
     atom_counts.putHost(cdk.natom, i);
     residue_counts.putHost(cdk.nres, i);
@@ -275,7 +273,49 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   residue_names.resize(resi_offset);
 
   // Compute the numbers of unique parameters
-  std::vector<bool> covered(atom_offset, false);
+  int max_unique_atom = 0;
+  int max_unique_bond = 0;
+  int max_unique_angl = 0;
+  int max_unique_dihe = 0;
+  int max_unique_ubrd = 0;
+  int max_unique_cimp = 0;
+  int max_unique_cmap = 0;
+  std::vector<int> topology_atom_offsets(topology_count);
+  std::vector<int> topology_bond_offsets(topology_count);
+  std::vector<int> topology_angl_offsets(topology_count);
+  std::vector<int> topology_dihe_offsets(topology_count);
+  std::vector<int> topology_ubrd_offsets(topology_count);
+  std::vector<int> topology_cimp_offsets(topology_count);
+  std::vector<int> topology_camp_offsets(topology_count);
+  for (int i = 0; i < topology_count; i++) {
+    const AtomGraph* ag_ptr = topologies[i];
+    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
+    topology_atom_offsets[i] = max_unique_atom;
+    topology_bond_offsets[i] = max_unique_bond;
+    topology_angl_offsets[i] = max_unique_angl;
+    topology_dihe_offsets[i] = max_unique_dihe;
+    topology_ubrd_offsets[i] = max_unique_ubrd;
+    topology_cimp_offsets[i] = max_unique_cimp;
+    topology_camp_offsets[i] = max_unique_cmap;    
+    max_unique_atom += cdk.natom;
+    max_unique_bond += cdk.nbond;
+    max_unique_angl += cdk.nangl;
+    max_unique_dihe += cdk.ndihe;
+    max_unique_ubrd += cdk.nubrd;
+    max_unique_cimp += cdk.ncimp;
+    max_unique_cmap += cdk.ncmap;
+  }
+  std::vector<bool> atom_covered(max_unique_atom, false);
+  std::vector<bool> bond_covered(max_unique_bond, false);
+  std::vector<bool> angl_covered(max_unique_angl, false);
+  std::vector<bool> dihe_covered(max_unique_dihe, false);
+  std::vector<bool> ubrd_covered(max_unique_ubrd, false);
+  std::vector<bool> cimp_covered(max_unique_cimp, false);
+  std::vector<bool> cmap_covered(max_unique_cmap, false);
+  for (int i = 0; i < topology_count; i++) {
+  }
   urey_bradley_parameter_indices.resize(ubrd_offset);
   charmm_impr_parameter_indices.resize(cimp_offset);
   cmap_surface_indices.resize(cmap_offset);
