@@ -48,23 +48,23 @@ AtomGraph::AtomGraph() :
     descriptors{HybridKind::POINTER, "tp_desc"},
     residue_limits{HybridKind::POINTER, "tp_res_limits"},
     atom_struc_numbers{HybridKind::POINTER, "tp_atom_struc_nums"},
-    residue_numbers{HybridKind::POINTER, "tp_res_numbers"},
+    residue_numbers{HybridKind::POINTER, "tp_res_struc_nums"},
     molecule_limits{HybridKind::POINTER, "tp_mol_limits"},
 
     // Atom and residue details
     atomic_numbers{HybridKind::POINTER, "tp_znum"},
     mobile_atoms{HybridKind::POINTER, "tp_belly"},
     molecule_membership{HybridKind::POINTER, "tp_molnum"},
-    molecule_contents{HybridKind::POINTER, "tp_molcontents"},
+    molecule_contents{HybridKind::POINTER, "tp_mol_contents"},
     atomic_charges{HybridKind::POINTER, "tp_atomq"},
     atomic_masses{HybridKind::POINTER, "tp_mass"},
     inverse_atomic_masses{HybridKind::POINTER, "tp_invmass"},
     sp_atomic_charges{HybridKind::POINTER, "tp_atomq_sp"},
     sp_atomic_masses{HybridKind::POINTER, "tp_mass_sp"},
     sp_inverse_atomic_masses{HybridKind::POINTER, "tp_invmass_sp"},
-    atom_names{HybridKind::POINTER, "tp_atomnames"},
-    atom_types{HybridKind::POINTER, "tp_atomtypes"},
-    residue_names{HybridKind::POINTER, "tp_resnames"},
+    atom_names{HybridKind::POINTER, "tp_atom_names"},
+    atom_types{HybridKind::POINTER, "tp_atom_types"},
+    residue_names{HybridKind::POINTER, "tp_res_names"},
 
     // CHARMM force field family parameters
     urey_bradley_term_count{0}, charmm_impr_term_count{0}, cmap_term_count{0},
@@ -3102,6 +3102,26 @@ UnitCellType AtomGraph::getUnitCellType() const {
 //-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getPBRadiiSet() const {
   return pb_radii_set;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getRigidWaterCount() const {
+  return rigid_water_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getBondConstraintCount() const {
+  return bond_constraint_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getDegreesOfFreedom() const {
+  return degrees_of_freedom;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getNonrigidParticleCount() const {
+  return nonrigid_particle_count;
 }
 
 //-------------------------------------------------------------------------------------------------

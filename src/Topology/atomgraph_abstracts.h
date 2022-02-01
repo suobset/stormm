@@ -297,7 +297,7 @@ template <typename T> struct NonbondedKit {
 
   // Member variables again store a collection of atomic parameters
   const int natom;          ///< The number of atoms in the system
-  const int n_lj_types;     ///< The number of atoms in the system
+  const int n_lj_types;     ///< The number of atom types in the system
   const T coulomb_constant; ///< Coulomb's constant in units of kcal-A/mol-e^2
   const T* charge;          ///< Partial atomic charges on all atoms
   const int* q_idx;         ///< Bartial charge type indices for all atoms

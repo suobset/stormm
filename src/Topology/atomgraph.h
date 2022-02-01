@@ -564,6 +564,18 @@ struct AtomGraph {
   /// \brief Get the PB Radii set
   std::string getPBRadiiSet() const;
 
+  /// \brief Get the number of rigid waters in the system
+  int getRigidWaterCount() const;
+
+  /// \brief Get the number of bond constraints
+  int getBondConstraintCount() const;
+
+  /// \brief Get the number of degrees of freedom
+  int getDegreesOfFreedom() const;
+  
+  /// \brief Get the number of non-rigid particles in the system
+  int getNonrigidParticleCount() const;
+  
   /// \brief Get the charge type index of atoms in the system.
   ///
   /// Overloaded:

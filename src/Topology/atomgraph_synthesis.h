@@ -69,7 +69,7 @@ private:
 
   /// An array of indices for the source topologies guiding the motion of each system (this array
   /// is system_count in length and accessible only on the host to organize work units)
-  std::vector<int> topology_indices;
+  Hybrid<int> topology_indices;
   
   // The following arrays are POINTER-kind objects, each directed at a segment of a data array
   // for storing critical topology sizes.  There is one of each of these numbers for every
@@ -103,13 +103,15 @@ private:
   Hybrid<int> virtual_site_counts;           ///< Number of v-sites / extra points out of all atoms
 
   // Information relevant to non-bonded calculations
-  Hybrid<int> atom_type_counts;       ///< Number of distinct Lennard-Jones types
-  Hybrid<int> total_exclusion_counts; ///< Total number of non-bonded exclusions, including 1-4
+  Hybrid<int> atom_type_counts;        ///< Number of distinct Lennard-Jones types (this is more
+                                       ///<   for record-keeping, as all systems in this synthesis
+                                       ///<   will work from the same table)
+  Hybrid<int> total_exclusion_counts;  ///< Total number of non-bonded exclusions, including 1-4
 
   // Information relevant to the MD propagation algorithm
   Hybrid<int> rigid_water_counts;       ///< Number of rigid water molecules subject to SETTLE
   Hybrid<int> bond_constraint_counts;   ///< Bonds with lengths constrained by SHAKE or RATTLE
-  Hybrid<int> degrees_of_freedoom;      ///< Total degrees of freedom, 3N - 6 - constraints in
+  Hybrid<int> degrees_of_freedom;       ///< Total degrees of freedom, 3N - 6 - constraints in
                                         ///<   each system
   Hybrid<int> nonrigid_particle_counts; ///< A rigid water is one non-rigid particle.  A protein
                                         ///<   with N atoms and no bond length constraints is N
@@ -127,22 +129,24 @@ private:
   // indices of atoms in unified (but not re-ordered) arrays of atom descriptors and also
   // coordinates.  In this sense, these arrays are intermediates between the valence work units
   // that follow and the original AtomGraph objects used to construct this AtomGraphSynthesis.
-  Hybrid<int> atom_offsets;               ///< Starting indices for each system's various atomic
-                                          ///<   descriptor arrays, which will have eponymous
-                                          ///<   names to their AtomGraph counterparts. 
-  Hybrid<int> urey_bradley_term_offsets;  ///< Starting indices for Urey-Bradley parameter index
-                                          ///<   lists for each system
-  Hybrid<int> charmm_impr_term_offsets;   ///< CHARMM improper parameter index lists
-  Hybrid<int> cmap_term_offsets;          ///< CMAP atom indexing lists
-  Hybrid<int> bond_term_offsets;          ///< Bond stretching term parameter index lists
-  Hybrid<int> angl_term_offsets;          ///< Angle bending term parameter index lists
-  Hybrid<int> dihe_term_offsets;          ///< Dihedral term parameter index lists
-  Hybrid<int> virtual_site_offsets;       ///< Starting indices for each system's virtual site
-                                          ///<   descriptor lists
-  Hybrid<int> nb_exclusion_offsets;       ///< Starting indices for unified nonbonded exclusion
-                                          ///<   lists
-  Hybrid<int> lj_exclusion_offsets;       ///< Starting indices for unified, nonbonded van-der
-                                          ///<   Waals exclusion lists
+  Hybrid<int> atom_offsets;           ///< Starting indices for each system's various atomic
+                                      ///<   descriptor arrays, which will have eponymous
+                                      ///<   names to their AtomGraph counterparts.
+  Hybrid<int> residue_offsets;        ///< Starting indices for each system's residue
+                                      ///<   descriptor arrays
+  Hybrid<int> molecule_offsets;       ///< Starting indices for each system's molecule descriptor
+                                      ///<   arrays
+  Hybrid<int> ubrd_term_offsets;      ///< Starting indices for Urey-Bradley parameter index
+                                      ///<   lists for each system
+  Hybrid<int> cimp_term_offsets;      ///< CHARMM improper parameter index lists
+  Hybrid<int> cmap_term_offsets;      ///< CMAP atom indexing lists
+  Hybrid<int> bond_term_offsets;      ///< Bond stretching term parameter index lists
+  Hybrid<int> angl_term_offsets;      ///< Angle bending term parameter index lists
+  Hybrid<int> dihe_term_offsets;      ///< Dihedral term parameter index lists
+  Hybrid<int> virtual_site_offsets;   ///< Starting indices for each system's virtual site
+                                      ///<   descriptor lists
+  Hybrid<int> nb_exclusion_offsets;   ///< Starting indices for unified nonbonded exclusion
+                                      ///<   lists
   
   /// Data array to hold all system size information, the target of all the above pointers
   Hybrid<int> int_system_data;          
