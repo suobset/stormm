@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_ATOMGRAPH_WORKPAN_H
-#define OMNI_ATOMGRAPH_WORKPAN_H
+#ifndef OMNI_ATOMGRAPH_SYNTHESIS_H
+#define OMNI_ATOMGRAPH_SYNTHESIS_H
 
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing
@@ -15,7 +15,9 @@ struct AtomGraphSynthesis {
   /// The constructor takes a series of topologies and NMR restraints.  The NMR restraints point
   /// to specific topologies and thereby apply to any coordinate sets that also point to those
   /// topologies.
-  
+  AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                     const std::vector<int> topology_indices_in);
+
 private:
 
   /// The number of unique topologies represented in this synthesis

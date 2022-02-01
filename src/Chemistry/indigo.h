@@ -3,7 +3,7 @@
 #define OMNI_INDIGO_H
 
 #include <map>
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/mixed_types.h"

@@ -2,7 +2,7 @@
 #ifndef OMNI_FORWARD_EXCLUSIONMASK_H
 #define OMNI_FORWARD_EXCLUSIONMASK_H
 
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Topology/atomgraph.h"
 

@@ -1,6 +1,6 @@
 // -*-c++-*-
 #include "Constants/hpc_bounds.h"
-#include "Cuda/hpc_config.h"
+#include "Accelerator/hpc_config.h"
 #include "hpc_random.cuh"
 #include "random.h"
 

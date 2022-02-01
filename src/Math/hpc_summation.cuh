@@ -5,9 +5,9 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include "Constants/hpc_bounds.h"
-#include "Cuda/hpc_config.h"
-#include "Cuda/hybrid.h"
-#include "Cuda/ptx_macros.h"
+#include "Accelerator/hpc_config.h"
+#include "Accelerator/hybrid.h"
+#include "Accelerator/ptx_macros.h"
 #include "Math/summation.h"
 #include "Reporting/error_format.h"
 

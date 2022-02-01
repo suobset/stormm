@@ -3,7 +3,7 @@
 #define OMNI_SUMMATION_H
 
 #include <vector>
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
 #include "UnitTesting/approx.h"

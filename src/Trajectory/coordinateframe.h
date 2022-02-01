@@ -2,7 +2,7 @@
 #ifndef OMNI_COORDINATE_FRAME_H
 #define OMNI_COORDINATE_FRAME_H
 
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "phasespace.h"
 

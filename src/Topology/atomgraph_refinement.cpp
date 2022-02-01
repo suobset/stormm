@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <cmath>
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Chemistry/periodic_table.h"
 #include "Chemistry/znumber.h"
 #include "Constants/scaling.h"

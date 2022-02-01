@@ -3,7 +3,7 @@
 #define OMNI_AMBER_ASCII_H
 
 #include "Constants/behavior.h"
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Parsing/textfile.h"
 
 namespace omni {

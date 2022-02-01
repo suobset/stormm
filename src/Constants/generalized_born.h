@@ -2,7 +2,7 @@
 #ifndef OMNI_GENERALIZED_BORN_H
 #define OMNI_GENERALIZED_BORN_H
 
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 
 namespace omni {
 namespace generalized_born_defaults {

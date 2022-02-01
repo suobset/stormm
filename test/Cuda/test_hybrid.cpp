@@ -1,4 +1,4 @@
-#include "../../src/Cuda/hybrid.h"
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Random/random.h"

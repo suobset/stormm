@@ -3,7 +3,7 @@
 #define OMNI_SIMPLE_EXCLUSIONMASK_H
 
 #include <vector>
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "Topology/atomgraph.h"
 

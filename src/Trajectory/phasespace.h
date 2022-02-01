@@ -2,7 +2,7 @@
 #ifndef OMNI_PHASE_SPACE_H
 #define OMNI_PHASE_SPACE_H
 
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/trajectory_enumerators.h"
 

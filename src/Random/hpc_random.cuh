@@ -1,5 +1,5 @@
 // -*-c++-*-
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
 

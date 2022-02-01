@@ -3,7 +3,7 @@
 #include <string.h>
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
-#include "Cuda/hybrid.h"
+#include "hybrid.h"
 #include "DataTypes/omni_vector_types.h"
 #include "DataTypes/common_types.h"
 #include "Reporting/error_format.h"

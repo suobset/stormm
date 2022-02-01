@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"

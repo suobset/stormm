@@ -7,7 +7,7 @@
 #include <vector>
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "FileManagement/file_util.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"

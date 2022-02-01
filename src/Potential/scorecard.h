@@ -3,7 +3,7 @@
 #define OMNI_SCORECARD_H
 
 #include "Constants/fixed_precision.h"
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 
 namespace omni {
 namespace energy {

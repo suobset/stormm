@@ -3,7 +3,7 @@
 #define OMNI_PHASESPACE_SYNTHESIS_H
 
 #include "DataTypes/common_types.h"
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "barostat.h"
 #include "phasespace.h"

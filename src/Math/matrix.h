@@ -2,7 +2,7 @@
 #ifndef OMNI_MATRIX_H
 #define OMNI_MATRIX_H
 
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Random/random.h"
 
 namespace omni {

@@ -1,4 +1,4 @@
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "atommask.h"

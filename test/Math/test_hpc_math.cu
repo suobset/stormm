@@ -1,8 +1,8 @@
 // -*-c++-*-
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/hpc_bounds.h"
-#include "../../src/Cuda/hybrid.h"
-#include "../../src/Cuda/hpc_config.cuh"
+#include "../../src/Accelerator/hybrid.h"
+#include "../../src/Accelerator/hpc_config.cuh"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Math/hpc_summation.cuh"

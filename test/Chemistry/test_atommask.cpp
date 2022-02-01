@@ -1,6 +1,6 @@
 #include "../../src/Chemistry/atommask.h"
 #include "../../src/Chemistry/chemical_features.h"
-#include "../../src/Cuda/hybrid.h"
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"

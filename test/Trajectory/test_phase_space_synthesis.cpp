@@ -1,6 +1,6 @@
 #include <vector>
 #include "../../src/Constants/behavior.h"
-#include "../../src/Cuda/hybrid.h"
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"

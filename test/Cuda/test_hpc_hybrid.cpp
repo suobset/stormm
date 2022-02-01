@@ -2,8 +2,8 @@
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
 #include "../../src/Constants/behavior.h"
-#include "../../src/Cuda/hybrid.h"
-#include "../../src/Cuda/hpc_config.cuh"
+#include "../../src/Accelerator/hybrid.h"
+#include "../../src/Accelerator/hpc_config.cuh"
 #include "../../src/Random/random.h"
 #include "../../src/UnitTesting/unit_test.h"
 

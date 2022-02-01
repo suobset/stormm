@@ -2,7 +2,7 @@
 #ifndef OMNI_CHEMICAL_FEATURES_H
 #define OMNI_CHEMICAL_FEATURES_H
 
-#include "Cuda/hybrid.h"
+#include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"

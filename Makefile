@@ -12,7 +12,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Chemistry/indigo.cpp \
 		 $(SRCDIR)/Chemistry/znumber.cpp \
 		 $(SRCDIR)/Constants/generalized_born.cpp \
-		 $(SRCDIR)/Cuda/hybrid.cpp \
+		 $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/FileManagement/directory_util.cpp \
 		 $(SRCDIR)/FileManagement/file_listing.cpp \
 		 $(SRCDIR)/FileManagement/file_util.cpp \
@@ -72,7 +72,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemistry_enumerators.h \
 		   $(SRCDIR)/Chemistry/periodic_table.h \
 		   $(SRCDIR)/Chemistry/znumber.h \
-		   $(SRCDIR)/Cuda/hybrid.h \
+		   $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/DataTypes/common_types.h \
 		   $(SRCDIR)/DataTypes/mixed_types.h \
 		   $(SRCDIR)/DataTypes/omni_vector_types.h \
@@ -133,7 +133,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/UnitTesting/vector_report.h
 
 # OMNI C++ template source files
-OMNI_TPP_FILES = $(SRCDIR)/Cuda/hybrid.tpp \
+OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Constants/generalized_born.tpp \
 		 $(SRCDIR)/Math/matrix.tpp \
 		 $(SRCDIR)/Math/matrix_ops.tpp \
@@ -154,7 +154,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/Chemistry/indigo.o \
 		$(SRCDIR)/Chemistry/znumber.o \
 		$(SRCDIR)/Constants/generalized_born.o \
-		$(SRCDIR)/Cuda/hybrid.o \
+		$(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/FileManagement/directory_util.o \
 		$(SRCDIR)/FileManagement/file_listing.o \
 		$(SRCDIR)/FileManagement/file_util.o \
@@ -205,19 +205,19 @@ OMNI_CPP_OBJS = $(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/UnitTesting/vector_report.o
 
 # OMNI CUDA source files
-OMNI_CUDA_FILES = $(SRCDIR)/Cuda/hpc_config.cu \
+OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		  $(SRCDIR)/Random/hpc_random.cu
 
 # OMNI CUDA header files
 OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
-		    $(SRCDIR)/Cuda/hpc_config.h \
-		    $(SRCDIR)/Cuda/hpc_config.cuh \
-		    $(SRCDIR)/Cuda/ptx_macros.h \
+		    $(SRCDIR)/Accelerator/hpc_config.h \
+		    $(SRCDIR)/Accelerator/hpc_config.cuh \
+		    $(SRCDIR)/Accelerator/ptx_macros.h \
 		    $(SRCDIR)/Math/hpc_summation.cuh \
 		    $(SRCDIR)/Random/hpc_random.cuh
 
 # OMNI CUDA object files
-OMNI_CUDA_OBJS = $(SRCDIR)/Cuda/hpc_config.o \
+OMNI_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		 $(SRCDIR)/Random/hpc_random.o
 
 # Test programs using omni
@@ -410,14 +410,14 @@ install : $(LIBDIR)/libomni.so
 
 clean :
 	@echo "[OMNI]  Cleaning CPU libraries"
-	$(VB)if [ -e $(SRCDIR)/Cuda/hybrid.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
+	$(VB)if [ -e $(SRCDIR)/Accelerator/hybrid.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
 
 cuda : $(LIBDIR)/libomni_cuda.so
 
 clean.cuda:
 	@echo "[OMNI]  Cleaning GPU libraries"
-	$(VB)if [ -e $(SRCDIR)/Cuda/hybrid.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
-	$(VB)if [ -e $(SRCDIR)/Cuda/hpc_config.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
+	$(VB)if [ -e $(SRCDIR)/Accelerator/hybrid.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
+	$(VB)if [ -e $(SRCDIR)/Accelerator/hpc_config.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
 
 test.exe : $(OMNI_TEST_PROGS)
 
