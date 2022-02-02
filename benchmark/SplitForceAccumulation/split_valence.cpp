@@ -1,4 +1,5 @@
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Potential/energy_enumerators.h"
@@ -13,6 +14,10 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
+using omni::numerics::global_position_scale_lf;
+using omni::numerics::global_position_scale_f;
+using omni::numerics::inverse_global_position_scale_lf;
+using omni::numerics::inverse_global_position_scale_f;
 using omni::data_types::llint;
 using omni::data_types::double3;
 using omni::data_types::float3;
@@ -37,6 +42,19 @@ using namespace omni::testing;
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename T3>
 T3 bond_force(T3 crd1, T3 crd2, T equil, T stiff) {
+  const T dx = crd2.x - crd1.x;
+  const T dy = crd2.y - crd1.y;
+  const T dz = crd2.z - crd1.z;
+  const T r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+
+  // Select a random equilibrium length, based on the target length, and a stiffness constant
+  const T dl = r - equil;
+  const T fmag = 2.0 * stiff * dl / r;
+  T3 result;
+  result.x = fmag * dx;
+  result.y = fmag * dy;
+  result.z = fmag * dz;
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -57,12 +75,11 @@ int main(int argc, char* argv[]) {
   const int npts = nsample * ndistance;
   const double distance_discretization = 0.001;
   Xoshiro256ppGenerator xsr_rng(90384011);
-  std::vector<double3> crd1(npts), crd2(npts), frc1(npts);
-  std::vector<float3> f_crd1(npts), f_crd2(npts), f_frc(npts);
-  std::vector<llint3> lli_crd1(npts), lli_crd2(npts), lli_frc(npts);
+  std::vector<double3> crd1(npts), crd2(npts), frc(npts);
+  std::vector<float3> f_crd1(npts), f_crd2(npts), f_frc(npts), flli_frc(npts), f2lli_frc(npts);
+  std::vector<llint3> lli_crd1(npts), lli_crd2(npts);
   std::vector<double> equil(npts), stiff(npts);
   std::vector<float> f_equil(npts), f_stiff(npts);
-  std::vector<llint> lli_equil(npts), lli_stiff(npts);
   for (int i = 0; i < npts; i++) {
 
     // Select random coordinates
@@ -84,28 +101,11 @@ int main(int argc, char* argv[]) {
     crd2[i].x = crd1[i].x + (factor * pdx);
     crd2[i].y = crd1[i].y + (factor * pdy);
     crd2[i].z = crd1[i].z + (factor * pdz);
-
-    // The locations are now established.  Recompute displacements and total distance to keep
-    // things in familiar nomenclature.
-    const double dx = crd2[i].x - crd1[i].x;
-    const double dy = crd2[i].y - crd1[i].y;
-    const double dz = crd2[i].z - crd1[i].z;
-    const double r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-
-    // Select a random equilibrium length, based on the target length, and a stiffness constant
     stiff[i] = 350.0 + (250.0 * xsr_rng.uniformRandomNumber());
     equil[i] = target_distance + ((60.0 / stiff[i]) * xsr_rng.gaussianRandomNumber());
-    const double dl = target_distance - equil[i];
-    const double fmag = 2.0 * stiff[i] * dl / r;
-    frc1[i].x = fmag * dx;
-    frc1[i].y = fmag * dy;
-    frc1[i].z = fmag * dz;
 
-    // CHECK
-    if (i < 10) {
-      printf("  %12.7lf %12.7lf %12.7lf\n", frc1[i].x, frc1[i].y, frc1[i].z);
-    }
-    // END CHECK
+    // Compute the force in double precision
+    frc[i] = bond_force(crd1[i], crd2[i], equil[i], stiff[i]);
     
     // Perform the computation with all coordinates reduced to floating-point numbers
     f_crd1[i].x = crd1[i].x;
@@ -116,6 +116,47 @@ int main(int argc, char* argv[]) {
     f_crd2[i].z = crd2[i].z;
     f_equil[i] = equil[i];
     f_stiff[i] = stiff[i];    
+    f_frc[i] = bond_force(f_crd1[i], f_crd2[i], f_equil[i], f_stiff[i]);
+    
+    // CHECK
+    if (i < 10) {
+      printf("  %15.8e %15.8e %15.8e\n", f_frc[i].x - frc[i].x, f_frc[i].y - frc[i].y,
+             f_frc[i].z - frc[i].z);
+    }
+    // END CHECK
+
+    // Perform the computation with all coordinates reduced to long long integers
+    lli_crd1[i].x = crd1[i].x * global_position_scale_lf;
+    lli_crd1[i].y = crd1[i].y * global_position_scale_lf;
+    lli_crd1[i].z = crd1[i].z * global_position_scale_lf;
+    lli_crd2[i].x = crd2[i].x * global_position_scale_lf;
+    lli_crd2[i].y = crd2[i].y * global_position_scale_lf;
+    lli_crd2[i].z = crd2[i].z * global_position_scale_lf;
+    {
+      const float dx = static_cast<float>(lli_crd2[i].x - lli_crd1[i].x) *
+                       inverse_global_position_scale_f;
+      const float dy = static_cast<float>(lli_crd2[i].y - lli_crd1[i].y) *
+                       inverse_global_position_scale_f;
+      const float dz = static_cast<float>(lli_crd2[i].z - lli_crd1[i].z) *
+                       inverse_global_position_scale_f;
+      const float r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+
+      // Select a random equilibrium length, based on the target length, and a stiffness constant
+      const float dl = r - f_equil[i];
+      const float fmag = 2.0 * f_stiff[i] * dl / r;
+      flli_frc[i].x = fmag * dx;
+      flli_frc[i].y = fmag * dy;
+      flli_frc[i].z = fmag * dz;
+    }
+    
+    // CHECK
+    if (i < 10) {
+      printf("  %15.8e %15.8e %15.8e\n", flli_frc[i].x - frc[i].x, flli_frc[i].y - frc[i].y,
+             flli_frc[i].z - frc[i].z);
+    }
+    // END CHECK
+
+    
   }
 
   // Read topology
