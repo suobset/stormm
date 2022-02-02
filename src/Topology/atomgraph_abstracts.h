@@ -133,12 +133,11 @@ template <typename T> struct ValenceKit {
                       const int* cmap_asgn_atoms_in, const int* cmap_asgn_index_in,
                       const int* cmap_asgn_terms_in, const int* cmap_asgn_bounds_in);
 
-  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
   /// \{
   ValenceKit(const ValenceKit &original) = default;
   ValenceKit(ValenceKit &&original) = default;
-  //ValenceKit& operator=(const ValenceKit &other) = default;
-  //ValenceKit& operator=(ValenceKit &&other) = default;
   /// \}
   
   // The purpose of this struct is to store a collection of pointers for HPC kernels.  As such, it
@@ -278,26 +277,26 @@ template <typename T> struct NonbondedKit {
 
   /// \brief As with most other astracts, the constructor is the only member function of
   ///        significance.  It takes a long list of arguments one for each of its member variables.
-  explicit NonbondedKit(int natom_in, int n_lj_types_in, const T coulomb_constant_in,
-                        const T* charge_in, const int* q_idx_in, const int* lj_idx_in,
-                        const T* q_parameter_in, const T* lja_coeff_in, const T* ljb_coeff_in,
-                        const T* ljc_coeff_in, const T* lja_14_coeff_in, const T* ljb_14_coeff_in,
-                        const T* ljc_14_coeff_in, const int* nb11x_in, const int* nb11_bounds_in,
-                        const int* nb12x_in, const int* nb12_bounds_in, const int* nb13x_in,
-                        const int* nb13_bounds_in, const int* nb14x_in, const int* nb14_bounds_in,
-                        const T* lj_type_corr_in);
+  explicit NonbondedKit(int natom_in, int n_q_types_in, int n_lj_types_in,
+                        const T coulomb_constant_in, const T* charge_in, const int* q_idx_in,
+                        const int* lj_idx_in, const T* q_parameter_in, const T* lja_coeff_in,
+                        const T* ljb_coeff_in, const T* ljc_coeff_in, const T* lja_14_coeff_in,
+                        const T* ljb_14_coeff_in, const T* ljc_14_coeff_in, const int* nb11x_in,
+                        const int* nb11_bounds_in, const int* nb12x_in, const int* nb12_bounds_in,
+                        const int* nb13x_in, const int* nb13_bounds_in, const int* nb14x_in,
+                        const int* nb14_bounds_in, const T* lj_type_corr_in);
 
-  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
   /// \{
   NonbondedKit(const NonbondedKit &original) = default;
   NonbondedKit(NonbondedKit &&original) = default;
-  //NonbondedKit& operator=(const NonbondedKit &other) = default;
-  //NonbondedKit& operator=(NonbondedKit &&other) = default;
   /// \}
 
   // Member variables again store a collection of atomic parameters
   const int natom;          ///< The number of atoms in the system
-  const int n_lj_types;     ///< The number of atom types in the system
+  const int n_q_types;      ///< The number of unique charge types in the system
+  const int n_lj_types;     ///< The number of unique Lennard-Jones atom types in the system
   const T coulomb_constant; ///< Coulomb's constant in units of kcal-A/mol-e^2
   const T* charge;          ///< Partial atomic charges on all atoms
   const int* q_idx;         ///< Bartial charge type indices for all atoms
@@ -378,12 +377,11 @@ struct ChemicalDetailsKit {
                      const int* res_numbers_in, const int* mol_home_in, const int* mol_contents_in,
                      const int* mol_limits_in);
 
-  /// \brief Take the default copy and move constructors as well as assignment operators
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
   /// \{
   ChemicalDetailsKit(const ChemicalDetailsKit &original) = default;
   ChemicalDetailsKit(ChemicalDetailsKit &&original) = default;
-  //ChemicalDetailsKit& operator=(const ChemicalDetailsKit &other) = default;
-  //ChemicalDetailsKit& operator=(ChemicalDetailsKit &&other) = default;
   /// \}
 
   // Member variables store the atom count, residue count, and other ways to quantify the system

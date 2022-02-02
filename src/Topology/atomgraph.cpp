@@ -3372,7 +3372,7 @@ ValenceKit<float> AtomGraph::getSinglePrecisionValenceKit(HybridTargetLevel tier
 //-------------------------------------------------------------------------------------------------
 NonbondedKit<double>
 AtomGraph::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return NonbondedKit<double>(atom_count, atom_type_count, coulomb_constant,
+  return NonbondedKit<double>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
                               atomic_charges.data(tier), charge_indices.data(tier),
                               lennard_jones_indices.data(tier), charge_parameters.data(tier),
                               lj_a_values.data(tier), lj_b_values.data(tier),
@@ -3387,7 +3387,7 @@ AtomGraph::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
 
 //-------------------------------------------------------------------------------------------------
 NonbondedKit<float> AtomGraph::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return NonbondedKit<float>(atom_count, atom_type_count, coulomb_constant,
+  return NonbondedKit<float>(atom_count, charge_type_count, atom_type_count, coulomb_constant,
                              sp_atomic_charges.data(tier), charge_indices.data(tier),
                              lennard_jones_indices.data(tier), sp_charge_parameters.data(tier),
                              sp_lj_a_values.data(tier), sp_lj_b_values.data(tier),

@@ -4,6 +4,7 @@ VB=@
 # Source and test directories
 SRCDIR=src
 TESTDIR=test
+BENCHDIR=benchmark
 LIBDIR=lib
 
 # OMNI C++ source files
@@ -242,13 +243,16 @@ OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 		       $(TESTDIR)/bin/test_hpc_hybrid \
 		       $(TESTDIR)/bin/test_hpc_math
 
+# Benchmark programs using omni
+OMNI_BENCH_PROGS = $(BENCHDIR)/bin/split_valence
+
 # Compilation variables
 CC=g++
 CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++11 -fPIC -O3
+CPP_FLAGS = -std=c++11 -fPIC -O0 -g
 CUDA_FLAGS = -std=c++11 --compiler-options=-fPIC -O0 -g
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
@@ -408,6 +412,13 @@ $(TESTDIR)/bin/test_hpc_math : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Math/test_hp
 	  -o $(TESTDIR)/bin/test_hpc_math $(TESTDIR)/Math/test_hpc_math.cu -L$(LIBDIR) \
 	  -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
 
+# Target: Benchmarking split accumulation of valence bond and angle forces 
+$(BENCHDIR)/bin/split_valence : $(LIBDIR)/libomni.so \
+				$(BENCHDIR)/SplitForceAccumulation/split_valence.cpp
+	@echo "[OMNI]  Building split_valence benchmark..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(BENCHDIR)/bin/split_valence \
+	  $(BENCHDIR)/SplitForceAccumulation/split_valence.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
 install : $(LIBDIR)/libomni.so
 
 clean :
@@ -423,9 +434,17 @@ clean.cuda:
 
 test.exe : $(OMNI_TEST_PROGS)
 
+bench.exe : $(OMNI_BENCH_PROGS)
+
 test : $(OMNI_TEST_PROGS)
 	for PROG in $(OMNI_TEST_PROGS) ; do \
 		echo "[OMNI] Execute $$PROG" ; \
+		$$PROG ; \
+	done
+
+bench : $(OMNI_BENCH_PROGS)
+	for PROG in $(OMNI_BENCH_PROGS) ; do \
+		echo "[OMNI} Run benchmark $$PROG" ; \
 		$$PROG ; \
 	done
 

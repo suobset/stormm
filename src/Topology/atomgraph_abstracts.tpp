@@ -88,7 +88,7 @@ ValenceKit<T>::ValenceKit(const int nbond_in, const int nangl_in, const int ndih
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-NonbondedKit<T>::NonbondedKit(const int natom_in, const int n_lj_types_in,
+NonbondedKit<T>::NonbondedKit(const int natom_in, const int n_q_types_in, const int n_lj_types_in,
                               const T coulomb_constant_in, const T* charge_in, const int* q_idx_in,
                               const int* lj_idx_in, const T* q_parameter_in, const T* lja_coeff_in,
                               const T* ljb_coeff_in, const T* ljc_coeff_in,
@@ -98,13 +98,13 @@ NonbondedKit<T>::NonbondedKit(const int natom_in, const int n_lj_types_in,
                               const int* nb12_bounds_in, const int* nb13x_in,
                               const int* nb13_bounds_in, const int* nb14x_in,
                               const int* nb14_bounds_in, const T* lj_type_corr_in) :
-    natom{natom_in}, n_lj_types{n_lj_types_in}, coulomb_constant{coulomb_constant_in},
-    charge{charge_in}, q_idx{q_idx_in}, lj_idx{lj_idx_in}, q_parameter{q_parameter_in},
-    lja_coeff{lja_coeff_in}, ljb_coeff{ljb_coeff_in}, ljc_coeff{ljc_coeff_in},
-    lja_14_coeff{lja_14_coeff_in}, ljb_14_coeff{ljb_14_coeff_in}, ljc_14_coeff{ljc_14_coeff_in},
-    nb11x{nb11x_in}, nb11_bounds{nb11_bounds_in}, nb12x{nb12x_in}, nb12_bounds{nb12_bounds_in},
-    nb13x{nb13x_in}, nb13_bounds{nb13_bounds_in}, nb14x{nb14x_in}, nb14_bounds{nb14_bounds_in},
-    lj_type_corr{lj_type_corr_in}
+    natom{natom_in}, n_q_types{n_q_types_in}, n_lj_types{n_lj_types_in},
+    coulomb_constant{coulomb_constant_in}, charge{charge_in}, q_idx{q_idx_in}, lj_idx{lj_idx_in},
+    q_parameter{q_parameter_in}, lja_coeff{lja_coeff_in}, ljb_coeff{ljb_coeff_in},
+    ljc_coeff{ljc_coeff_in}, lja_14_coeff{lja_14_coeff_in}, ljb_14_coeff{ljb_14_coeff_in},
+    ljc_14_coeff{ljc_14_coeff_in}, nb11x{nb11x_in}, nb11_bounds{nb11_bounds_in}, nb12x{nb12x_in},
+    nb12_bounds{nb12_bounds_in}, nb13x{nb13x_in}, nb13_bounds{nb13_bounds_in}, nb14x{nb14x_in},
+    nb14_bounds{nb14_bounds_in}, lj_type_corr{lj_type_corr_in}
 {}
 
 //-------------------------------------------------------------------------------------------------

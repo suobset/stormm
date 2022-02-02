@@ -1,4 +1,5 @@
 #include "Math/rounding.h"
+#include "UnitTesting/approx.h"
 #include "atomgraph_synthesis.h"
 #include "atomgraph_abstracts.h"
 
@@ -6,6 +7,7 @@ namespace omni {
 namespace topology {
 
 using math::roundUp;
+using testing::Approx;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
@@ -272,7 +274,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   atom_types.resize(atom_offset);
   residue_names.resize(resi_offset);
 
-  // Compute the numbers of unique parameters
+  // Compute the numbers of unique parameters.  Take the opportunity to compute offsets (starting
+  // bounds) for various sets of terms.
   int max_unique_atom = 0;
   int max_unique_bond = 0;
   int max_unique_angl = 0;
@@ -280,6 +283,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   int max_unique_ubrd = 0;
   int max_unique_cimp = 0;
   int max_unique_cmap = 0;
+  int max_unique_chrg = 0;
+  int max_unique_atyp = 0;
   std::vector<int> topology_atom_offsets(topology_count);
   std::vector<int> topology_bond_offsets(topology_count);
   std::vector<int> topology_angl_offsets(topology_count);
@@ -287,11 +292,13 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   std::vector<int> topology_ubrd_offsets(topology_count);
   std::vector<int> topology_cimp_offsets(topology_count);
   std::vector<int> topology_camp_offsets(topology_count);
+  std::vector<int> topology_chrg_offsets(topology_count);
+  std::vector<int> topology_atyp_offsets(topology_count);
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* ag_ptr = topologies[i];
-    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
+    const ChemicalDetailsKit cdk   = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk = ag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> vk    = ag_ptr->getDoublePrecisionValenceKit();
     topology_atom_offsets[i] = max_unique_atom;
     topology_bond_offsets[i] = max_unique_bond;
     topology_angl_offsets[i] = max_unique_angl;
@@ -299,6 +306,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     topology_ubrd_offsets[i] = max_unique_ubrd;
     topology_cimp_offsets[i] = max_unique_cimp;
     topology_camp_offsets[i] = max_unique_cmap;    
+    topology_chrg_offsets[i] = max_unique_chrg;
+    topology_atyp_offsets[i] = max_unique_atyp;
     max_unique_atom += cdk.natom;
     max_unique_bond += cdk.nbond;
     max_unique_angl += cdk.nangl;
@@ -306,15 +315,88 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     max_unique_ubrd += cdk.nubrd;
     max_unique_cimp += cdk.ncimp;
     max_unique_cmap += cdk.ncmap;
+    max_unique_chrg += nbk.n_q_types;
+    max_unique_atyp += nbk.n_lj_types;
   }
-  std::vector<bool> atom_covered(max_unique_atom, false);
-  std::vector<bool> bond_covered(max_unique_bond, false);
-  std::vector<bool> angl_covered(max_unique_angl, false);
-  std::vector<bool> dihe_covered(max_unique_dihe, false);
-  std::vector<bool> ubrd_covered(max_unique_ubrd, false);
-  std::vector<bool> cimp_covered(max_unique_cimp, false);
-  std::vector<bool> cmap_covered(max_unique_cmap, false);
+  std::vector<int> bond_synthesis_index(max_unique_bond, false);
+  std::vector<int> angl_synthesis_index(max_unique_angl, false);
+  std::vector<int> dihe_synthesis_index(max_unique_dihe, false);
+  std::vector<int> ubrd_synthesis_index(max_unique_ubrd, false);
+  std::vector<int> cimp_synthesis_index(max_unique_cimp, false);
+  std::vector<int> cmap_synthesis_index(max_unique_cmap, false);
+  std::vector<int> chrg_synthesis_index(max_unique_chrg, false);
+  std::vector<int> atyp_synthesis_index(max_unique_atyp, false);
+  std::vector<double>filtered_chrg;
+  std::vector<float>sp_filtered_chrg;
+  std::vector<double>filtered_bond_keq;
+  std::vector<double>filtered_bond_l0;
+  std::vector<float>sp_filtered_bond_keq;
+  std::vector<float>sp_filtered_bond_l0;
+  std::vector<double>filtered_angl_keq;
+  std::vector<double>filtered_angl_theta;
+  std::vector<float>sp_filtered_angl_keq;
+  std::vector<float>sp_filtered_angl_theta;
+  std::vector<double>filtered_dihe_amplitude;
+  std::vector<double>filtered_dihe_periodicity;
+  std::vector<double>filtered_dihe_phase;
+  std::vector<float>sp_filtered_dihe_amplitude;
+  std::vector<float>sp_filtered_dihe_periodicity;
+  std::vector<float>sp_filtered_dihe_phase;
+  std::vector<double>filtered_ubrd_keq;
+  std::vector<double>filtered_ubrd_l0;
+  std::vector<float>sp_filtered_ubrd_keq;
+  std::vector<float>sp_filtered_ubrd_l0;
+  std::vector<double>filtered_cimp_keq;
+  std::vector<double>filtered_cimp_phase;
+  std::vector<float>sp_filtered_cimp_keq;
+  std::vector<float>sp_filtered_cimp_phase;
+  int n_unique_bond = 0;
+  int n_unique_angl = 0;
+  int n_unique_dihe = 0;
+  int n_unique_ubrd = 0;
+  int n_unique_cimp = 0;
+  int n_unique_cmap = 0;
+  int n_unique_chrg = 0;
+  int n_unique_atyp = 0;
   for (int i = 0; i < topology_count; i++) {
+    const AtomGraph* iag_ptr = topologies[i];
+    const ChemicalDetailsKit i_cdk     = iag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
+    const NonbondedKit<float> i_nbk_sp = iag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<float> i_vk_sp    = iag_ptr->getDoublePrecisionValenceKit();
+
+    // Seek out unique bond parameters
+    for (int j = 0; j < i_vk.nbond; j++) {
+      if (bond_synthesis_index[topology_bond_offsets[i] + j] >= 0) {
+        continue;
+      }
+      Approx ij_bond_keq(i_vk.bond_keq[j]
+    }
+
+    // Seek out unique charges
+    for (int j = 0; j < i_nbk.n_q_type; j++) {
+      if (chrg_synthesis_index[topology_chrg_offsets[i] + j] >= 0) {
+        continue;
+      }
+      Approx ij_chrg(i_nbk.q_parameter[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[i];
+        const NonbondedKit<double> k_nbk   = kag_ptr->getDoublePrecisionNonbondedKit();
+        const NonbondedKit<float> k_nbk_sp = kag_ptr->getDoublePrecisionNonbondedKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_nbk.n_q_type; m++) {
+          if (ij_chrg.test(k_nbk.q_parameter[m])) {
+            chrg_synthesis_index[opology_chrg_offsets[k] + m] = n_unique_chrg;
+          }
+        }
+      }
+
+      // Catalog this unique charge and increment the counter
+      filtered_chrg.push_back(i_nbk.q_parameter[j]);
+      sp_filtered_chrg.push_back(i_nbk_sp.q_parameter[j]);
+      n_unique_chrg++;
+    }
   }
   urey_bradley_parameter_indices.resize(ubrd_offset);
   charmm_impr_parameter_indices.resize(cimp_offset);

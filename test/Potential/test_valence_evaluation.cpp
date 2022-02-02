@@ -14,7 +14,6 @@ using omni::constants::ExceptionResponse;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
-using omni::energy::StateVariable;
 using omni::errors::rtWarn;
 using omni::parse::NumberFormat;
 using omni::parse::polyNumericVector;
@@ -75,7 +74,7 @@ int main(int argc, char* argv[]) {
   const int trpcage_idx = 0;
   const int dhfr_idx = 1;
   const int alad_idx = 2;
-  TrajectoryKind tkind = TrajectoryKind::FORCES;
+  const TrajectoryKind tkind = TrajectoryKind::FORCES;
   trpcage_ps.initializeForces();
   const double trpcage_bond_e = evaluateBondTerms(trpcage_ag, &trpcage_ps, &all_systems_sc,
                                                   EvaluateForce::YES, trpcage_idx);
