@@ -244,7 +244,7 @@ OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 		       $(TESTDIR)/bin/test_hpc_math
 
 # Benchmark programs using omni
-OMNI_BENCH_PROGS = $(BENCHDIR)/bin/split_valence
+OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
 
 # Compilation variables
 CC=g++
@@ -413,11 +413,11 @@ $(TESTDIR)/bin/test_hpc_math : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Math/test_hp
 	  -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
 
 # Target: Benchmarking split accumulation of valence bond and angle forces 
-$(BENCHDIR)/bin/split_valence : $(LIBDIR)/libomni.so \
-				$(BENCHDIR)/SplitForceAccumulation/split_valence.cpp
-	@echo "[OMNI]  Building split_valence benchmark..."
-	$(VB)$(CC) $(CPP_FLAGS) -o $(BENCHDIR)/bin/split_valence \
-	  $(BENCHDIR)/SplitForceAccumulation/split_valence.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+$(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
+			  $(BENCHDIR)/ForceAccumulation/valence.cpp
+	@echo "[OMNI]  Building valence benchmark..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(BENCHDIR)/bin/valence \
+	  $(BENCHDIR)/ForceAccumulation/valence.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 install : $(LIBDIR)/libomni.so
 

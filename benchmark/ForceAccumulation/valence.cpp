@@ -1,7 +1,10 @@
+#include <cmath>
+#include <cstdlib>
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Parsing/polynumeric.h"
 #include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/valence_potential.h"
@@ -18,15 +21,23 @@ using omni::numerics::global_position_scale_lf;
 using omni::numerics::global_position_scale_f;
 using omni::numerics::inverse_global_position_scale_lf;
 using omni::numerics::inverse_global_position_scale_f;
-using omni::data_types::llint;
+using omni::numerics::global_force_scale_lf;
+using omni::numerics::global_force_scale_f;
+using omni::numerics::inverse_global_force_scale_lf;
+using omni::numerics::inverse_global_force_scale_f;
+using omni::data_types::double_type_index;
 using omni::data_types::double3;
+using omni::data_types::float2;
 using omni::data_types::float3;
+using omni::data_types::llint;
 using omni::data_types::llint3;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::energy::EvaluateForce;
 using omni::energy::ScoreCard;
+using omni::errors::terminalFormat;
+using omni::parse::PolyNumeric;
 using omni::random::Xoshiro256ppGenerator;
 using omni::topology::AtomGraph;
 using omni::topology::ValenceKit;
@@ -38,14 +49,20 @@ using namespace omni::testing;
 //-------------------------------------------------------------------------------------------------
 // Compute the force between two particles given a set of harmonic bond parameters.
 //
-//
+// Arguments:
+//   crd1:   Coordinates of the first particle
+//   crd2:   Coordinates of the second particle
+//   equil:  Bond equilibrium length 
+//   stiff:  Bond stiffness constant
 //-------------------------------------------------------------------------------------------------
 template <typename T, typename T3>
 T3 bond_force(T3 crd1, T3 crd2, T equil, T stiff) {
+  const size_t ct = std::type_index(typeid(T)).hash_code();
   const T dx = crd2.x - crd1.x;
   const T dy = crd2.y - crd1.y;
   const T dz = crd2.z - crd1.z;
-  const T r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+  const T r = (ct == double_type_index) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                          sqrtf((dx * dx) + (dy * dy) + (dz * dz));
 
   // Select a random equilibrium length, based on the target length, and a stiffness constant
   const T dl = r - equil;
@@ -75,11 +92,12 @@ int main(int argc, char* argv[]) {
   const int npts = nsample * ndistance;
   const double distance_discretization = 0.001;
   Xoshiro256ppGenerator xsr_rng(90384011);
-  std::vector<double3> crd1(npts), crd2(npts), frc(npts);
+  std::vector<double3> crd1(npts), crd2(npts), frc(npts), frc_with_fequil(npts);
   std::vector<float3> f_crd1(npts), f_crd2(npts), f_frc(npts), flli_frc(npts), f2lli_frc(npts);
   std::vector<llint3> lli_crd1(npts), lli_crd2(npts);
   std::vector<double> equil(npts), stiff(npts);
   std::vector<float> f_equil(npts), f_stiff(npts);
+  std::vector<float2> f2_equil(npts), f2_stiff(npts);
   for (int i = 0; i < npts; i++) {
 
     // Select random coordinates
@@ -102,8 +120,8 @@ int main(int argc, char* argv[]) {
     crd2[i].y = crd1[i].y + (factor * pdy);
     crd2[i].z = crd1[i].z + (factor * pdz);
     stiff[i] = 350.0 + (250.0 * xsr_rng.uniformRandomNumber());
-    equil[i] = target_distance + ((60.0 / stiff[i]) * xsr_rng.gaussianRandomNumber());
-
+    equil[i] = target_distance + ((50.0 / stiff[i]) * xsr_rng.gaussianRandomNumber());
+    
     // Compute the force in double precision
     frc[i] = bond_force(crd1[i], crd2[i], equil[i], stiff[i]);
     
@@ -117,13 +135,7 @@ int main(int argc, char* argv[]) {
     f_equil[i] = equil[i];
     f_stiff[i] = stiff[i];    
     f_frc[i] = bond_force(f_crd1[i], f_crd2[i], f_equil[i], f_stiff[i]);
-    
-    // CHECK
-    if (i < 10) {
-      printf("  %15.8e %15.8e %15.8e\n", f_frc[i].x - frc[i].x, f_frc[i].y - frc[i].y,
-             f_frc[i].z - frc[i].z);
-    }
-    // END CHECK
+    frc_with_fequil[i] = bond_force(crd1[i], crd2[i], static_cast<double>(f_equil[i]), stiff[i]);
 
     // Perform the computation with all coordinates reduced to long long integers
     lli_crd1[i].x = crd1[i].x * global_position_scale_lf;
@@ -139,26 +151,78 @@ int main(int argc, char* argv[]) {
                        inverse_global_position_scale_f;
       const float dz = static_cast<float>(lli_crd2[i].z - lli_crd1[i].z) *
                        inverse_global_position_scale_f;
-      const float r = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-
-      // Select a random equilibrium length, based on the target length, and a stiffness constant
+      const float r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
       const float dl = r - f_equil[i];
       const float fmag = 2.0 * f_stiff[i] * dl / r;
       flli_frc[i].x = fmag * dx;
       flli_frc[i].y = fmag * dy;
       flli_frc[i].z = fmag * dz;
     }
-    
-    // CHECK
-    if (i < 10) {
-      printf("  %15.8e %15.8e %15.8e\n", flli_frc[i].x - frc[i].x, flli_frc[i].y - frc[i].y,
-             flli_frc[i].z - frc[i].z);
-    }
-    // END CHECK
-
-    
   }
-
+  
+  // Compute and report statistics from the initial experiment
+  double mue_f            = 0.0;
+  double mue_f_mag        = 0.0;
+  double mue_flli         = 0.0;
+  double mue_flli_mag     = 0.0;
+  double mue_f2lli        = 0.0;
+  double mue_f2lli_mag    = 0.0;
+  for (int i = 0; i < npts; i++) {
+    const double dx = static_cast<double>(f_frc[i].x) - frc[i].x;
+    const double dy = static_cast<double>(f_frc[i].y) - frc[i].y;
+    const double dz = static_cast<double>(f_frc[i].z) - frc[i].z;
+    mue_f_mag += sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    mue_f += fabs(static_cast<double>(f_frc[i].x) - frc[i].x);
+    mue_f += fabs(static_cast<double>(f_frc[i].y) - frc[i].y);
+    mue_f += fabs(static_cast<double>(f_frc[i].z) - frc[i].z);
+  }
+  for (int i = 0; i < npts; i++) {
+    const double dx = static_cast<double>(flli_frc[i].x) - frc[i].x;
+    const double dy = static_cast<double>(flli_frc[i].y) - frc[i].y;
+    const double dz = static_cast<double>(flli_frc[i].z) - frc[i].z;
+    mue_flli_mag += sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    mue_flli += fabs(static_cast<double>(flli_frc[i].x) - frc[i].x);
+    mue_flli += fabs(static_cast<double>(flli_frc[i].y) - frc[i].y);
+    mue_flli += fabs(static_cast<double>(flli_frc[i].z) - frc[i].z);
+  }
+  for (int i = 0; i < npts; i++) {
+    const double dx = static_cast<double>(f2lli_frc[i].x) - frc[i].x;
+    const double dy = static_cast<double>(f2lli_frc[i].y) - frc[i].y;
+    const double dz = static_cast<double>(f2lli_frc[i].z) - frc[i].z;
+    mue_f2lli_mag += sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    mue_f2lli += fabs(static_cast<double>(f2lli_frc[i].x) - frc[i].x);
+    mue_f2lli += fabs(static_cast<double>(f2lli_frc[i].y) - frc[i].y);
+    mue_f2lli += fabs(static_cast<double>(f2lli_frc[i].z) - frc[i].z);
+  }
+  const double dnpts = static_cast<double>(npts);
+  mue_f            /= 3.0 * dnpts;
+  mue_flli         /= 3.0 * dnpts;
+  mue_f2lli        /= 3.0 * dnpts;
+  mue_f_mag        /= dnpts;
+  mue_flli_mag     /= dnpts;
+  mue_f2lli_mag    /= dnpts;
+  std::string output;
+  output = terminalFormat("Bond parameters and coordinates represented in pure 32-bit floating "
+                          "point numbers, all calculations done in 32-bit floating point "
+                          "arithmetic:", nullptr, nullptr, 0, 1, 1);
+  printf("%s\n", output.c_str());
+  printf(" - Mean unsigned error in all components: %14.7e\n", mue_f);
+  printf(" - Mean unsigned error in the magnitude:  %14.7e\n", mue_f_mag);
+  output = terminalFormat("Bond parameters represented in 32-bit floating point numbers, "
+                          "coordinates represented in 64-bit signed integers, atomic "
+                          "displacements computed as signed integers, all other calculations done "
+                          "in 32-bit floating point arithmetic:", nullptr, nullptr, 0, 1, 1);
+  printf("%s\n", output.c_str());
+  printf(" - Mean unsigned error in all components: %14.7e\n", mue_flli);
+  printf(" - Mean unsigned error in the magnitude:  %14.7e\n", mue_flli_mag);
+  output = terminalFormat("Bond parameters represented in 32-bit floating point numbers, "
+                          "coordinates represented in 64-bit signed integers, atomic "
+                          "displacements computed as signed integers, all other calculations done "
+                          "in 32-bit floating point arithmetic:", nullptr, nullptr, 0, 1, 1);
+  printf("%s\n", output.c_str());
+  printf(" - Mean unsigned error in all components: %14.7e\n", mue_f2lli);
+  printf(" - Mean unsigned error in the magnitude:  %14.7e\n", mue_f2lli_mag);
+  
   // Read topology
   const char osc = osSeparator();
   const std::string topology_home = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -199,7 +263,6 @@ int main(int argc, char* argv[]) {
   // Compute the forces in single precision.  Accumulate in fixed precision.
   
   // CHECK
-  
   printf("BondAngle = [\n");
   for (int i = 0; i < trpcage_ag.getAtomCount(); i += 25) {
     printf("  %12.7lf %12.7lf %12.7lf %12.7lf %12.7lf %12.7lf\n", trpcage_bond_frc[3 * i],
