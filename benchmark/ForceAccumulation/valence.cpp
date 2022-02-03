@@ -261,6 +261,8 @@ int main(int argc, char* argv[]) {
   trpcage_ps.initializeForces();
 
   // Compute the forces in single precision.  Accumulate in fixed precision.
+  ValenceKit<float> vk = trpcage_ag.getSinglePrecisionValenceKit  
+  for (int i = 0; i < 
   
   // CHECK
   printf("BondAngle = [\n");

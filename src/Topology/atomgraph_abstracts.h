@@ -95,9 +95,9 @@ template <typename T> struct ValenceKit {
   explicit ValenceKit(int nbond_in, int nangl_in, int ndihe_in, int nbond_param_in,
                       int nangl_param_in, int ndihe_param_in, int ninfr14_in, int nattn14_param_in,
                       int nubrd_in, int ncimp_in, int ncmap_in, int nubrd_param_in,
-                      int ncimp_param_in, int ncmap_surf_in, const double* bond_keq_in,
-                      const double* bond_leq_in, const double* angl_keq_in,
-                      const double* angl_leq_in, const T* dihe_amp_in, const T* dihe_freq_in,
+                      int ncimp_param_in, int ncmap_surf_in, const T* bond_keq_in,
+                      const T* bond_leq_in, const T* angl_keq_in,
+                      const T* angl_leq_in, const T* dihe_amp_in, const T* dihe_freq_in,
                       const T* dihe_phi_in, const T* attn14_elec_in, const T* attn14_vdw_in,
                       const int* bond_i_atoms_in, const int* bond_j_atoms_in,
                       const int* bond_param_idx_in, const char4* bond_modifiers_in,
@@ -117,7 +117,7 @@ template <typename T> struct ValenceKit {
                       const int* cmap_l_atoms_in, const int* cmap_m_atoms_in,
                       const int* cmap_dim_in, const int* cmap_surf_bounds_in,
                       const int* cmap_patch_bounds_in, const int* cmap_surf_idx_in,
-                      const double* ubrd_keq_in, const double* ubrd_leq_in, const T* cimp_keq_in,
+                      const T* ubrd_keq_in, const T* ubrd_leq_in, const T* cimp_keq_in,
                       const T* cimp_phi_in, const T* cmap_surf_in, const T* cmap_dphi_in,
                       const T* cmap_dpsi_in, const T* cmap_dphi_dpsi_in, const T* cmap_patches_in,
                       const int* bond_asgn_atoms_in, const int* bond_asgn_index_in,
@@ -158,10 +158,10 @@ template <typename T> struct ValenceKit {
   const int nubrd_param;        ///< Number of unique Urey-Bradley parameters
   const int ncimp_param;        ///< Number of unique CHARMM harmonic improper parameters
   const int ncmap_surf;         ///< Number of unique CMAP surfaces
-  const double* bond_keq;       ///< Equilibrium stiffness constants for all unique bonds
-  const double* bond_leq;       ///< Equilibrium lengths for all unique bonds
-  const double* angl_keq;       ///< Equilibrium stiffness constants for all unique bond angles
-  const double* angl_leq;       ///< Equilibrium lengths for all unique bond angles
+  const T* bond_keq;            ///< Equilibrium stiffness constants for all unique bonds
+  const T* bond_leq;            ///< Equilibrium lengths for all unique bonds
+  const T* angl_keq;            ///< Equilibrium stiffness constants for all unique bond angles
+  const T* angl_leq;            ///< Equilibrium lengths for all unique bond angles
   const T* dihe_amp;            ///< Amplitudes for all unique cosine-based dihedrals
   const T* dihe_freq;           ///< Periodicities for cosine-based dihedral / torsion terms
   const T* dihe_phi;            ///< Phase angles for cosine-based dihedral / torsion terms
@@ -219,8 +219,8 @@ template <typename T> struct ValenceKit {
   const int* cmap_patch_bounds; ///< Bounds array for individual CMAP surfaces composed of patch
                                 ///<   matrices (this array is basically 16 times cmap_surf_bounds)
   const int* cmap_surf_idx;     ///< Parameter (surface) indices for CHARMM CMAP interactions
-  const double* ubrd_keq;       ///< Array of unique Urey-Bradley 1:3 harmonic stiffnesses
-  const double* ubrd_leq;       ///< Array of unique Urey-Bradley 1:3 harmonic equilibrium lengths
+  const T* ubrd_keq;            ///< Array of unique Urey-Bradley 1:3 harmonic stiffnesses
+  const T* ubrd_leq;            ///< Array of unique Urey-Bradley 1:3 harmonic equilibrium lengths
   const T* cimp_keq;            ///< Array of unique CHARMM harmonic improper dihedral stiffnesses
   const T* cimp_phi;            ///< Array of unique CHARMM harmonic improper dihedral phase angles
   const T* cmap_surf;           ///< Array of CHARMM CMAP surface values

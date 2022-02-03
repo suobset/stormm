@@ -9,9 +9,9 @@ ValenceKit<T>::ValenceKit(const int nbond_in, const int nangl_in, const int ndih
                           const int ndihe_param_in, const int ninfr14_in,
                           const int nattn14_param_in, const int nubrd_in, const int ncimp_in,
                           const int ncmap_in, const int nubrd_param_in, const int ncimp_param_in,
-                          const int ncmap_surf_in, const double* bond_keq_in,
-                          const double* bond_leq_in, const double* angl_keq_in,
-                          const double* angl_leq_in, const T* dihe_amp_in, const T* dihe_freq_in,
+                          const int ncmap_surf_in, const T* bond_keq_in,
+                          const T* bond_leq_in, const T* angl_keq_in,
+                          const T* angl_leq_in, const T* dihe_amp_in, const T* dihe_freq_in,
                           const T* dihe_phi_in, const T* attn14_elec_in, const T* attn14_vdw_in,
                           const int* bond_i_atoms_in, const int* bond_j_atoms_in,
                           const int* bond_param_idx_in, const char4* bond_modifiers_in,
@@ -31,7 +31,7 @@ ValenceKit<T>::ValenceKit(const int nbond_in, const int nangl_in, const int ndih
                           const int* cmap_l_atoms_in, const int* cmap_m_atoms_in,
                           const int* cmap_dim_in, const int* cmap_surf_bounds_in,
                           const int* cmap_patch_bounds_in, const int* cmap_surf_idx_in,
-                          const double* ubrd_keq_in, const double* ubrd_leq_in,
+                          const T* ubrd_keq_in, const T* ubrd_leq_in,
                           const T* cimp_keq_in, const T* cimp_phi_in, const T* cmap_surf_in,
                           const T* cmap_dphi_in, const T* cmap_dpsi_in, const T* cmap_dphi_dpsi_in,
                           const T* cmap_patches_in, const int* bond_asgn_atoms_in,
@@ -104,7 +104,7 @@ NonbondedKit<T>::NonbondedKit(const int natom_in, const int n_q_types_in, const 
     ljc_coeff{ljc_coeff_in}, lja_14_coeff{lja_14_coeff_in}, ljb_14_coeff{ljb_14_coeff_in},
     ljc_14_coeff{ljc_14_coeff_in}, nb11x{nb11x_in}, nb11_bounds{nb11_bounds_in}, nb12x{nb12x_in},
     nb12_bounds{nb12_bounds_in}, nb13x{nb13x_in}, nb13_bounds{nb13_bounds_in}, nb14x{nb14x_in},
-    nb14_bounds{nb14_bounds_in}, lj_type_corr{lj_type_corr_in}
+     nb14_bounds{nb14_bounds_in}, lj_type_corr{lj_type_corr_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
