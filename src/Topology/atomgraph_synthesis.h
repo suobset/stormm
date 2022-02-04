@@ -2,6 +2,14 @@
 #ifndef OMNI_ATOMGRAPH_SYNTHESIS_H
 #define OMNI_ATOMGRAPH_SYNTHESIS_H
 
+#include "Accelerator/hybrid.h"
+#include "atomgraph.h"
+
+namespace omni {
+namespace topology {
+
+using cuda::Hybrid;
+  
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing
 ///        into another).  Work units covering all systems are laid out in additional, contiguous
@@ -94,13 +102,13 @@ private:
                                        ///<   rather than the original topologies
 
   // Valence term and off-center particle quantities
-  Hybrid<int> urey_bradley_term_counts;      ///< Total number of Urey-Bradley angle stretch terms
-  Hybrid<int> charmm_impr_term_counts;       ///< Total number of CHARMM impropers
-  Hybrid<int> cmap_term_counts;              ///< Total number of CMAP terms
-  Hybrid<int> bond_term_counts;              ///< Total numbers of bonded interactions
-  Hybrid<int> angl_term_counts;              ///< Total numbers of bond angle interactions
-  Hybrid<int> dihe_term_counts;              ///< Total numbers of dihedral cosine terms
-  Hybrid<int> virtual_site_counts;           ///< Number of v-sites / extra points out of all atoms
+  Hybrid<int> ubrd_term_counts;     ///< Total number of Urey-Bradley angle stretch terms
+  Hybrid<int> cimp_term_counts;     ///< Total number of CHARMM impropers
+  Hybrid<int> cmap_term_counts;     ///< Total number of CMAP terms
+  Hybrid<int> bond_term_counts;     ///< Total numbers of bonded interactions
+  Hybrid<int> angl_term_counts;     ///< Total numbers of bond angle interactions
+  Hybrid<int> dihe_term_counts;     ///< Total numbers of dihedral cosine terms
+  Hybrid<int> virtual_site_counts;  ///< Number of v-sites / extra points out of all atoms
 
   // Information relevant to non-bonded calculations
   Hybrid<int> atom_type_counts;        ///< Number of distinct Lennard-Jones types (this is more
@@ -247,7 +255,7 @@ private:
                                           ///<   restraint stiffnesses
   Hybrid<float4> sp_nmr_r_initial_values; ///< Single precision form of initial NMR displacement
                                           ///<   demarcations
-  Hybrid<float2> sp_nmr_r_final_values;   ///< Single precision form of the final NMR parabolic
+  Hybrid<float2> sp_nmr_k_final_values;   ///< Single precision form of the final NMR parabolic
                                           ///<   restraint stiffnesses
   Hybrid<float4> sp_nmr_r_final_values;   ///< Single precision form of final NMR displacement
                                           ///<   demarcations
@@ -314,5 +322,8 @@ private:
   /// and finally the index of the slope / intercept series (bits 11-32).
   Hybrid<uint2> nmr4_instructions;
 };
+
+} // namespace topology
+} // namespace omni
 
 #endif

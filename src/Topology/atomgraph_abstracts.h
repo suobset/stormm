@@ -97,7 +97,7 @@ template <typename T> struct ValenceKit {
                       int nubrd_in, int ncimp_in, int ncmap_in, int nubrd_param_in,
                       int ncimp_param_in, int ncmap_surf_in, const T* bond_keq_in,
                       const T* bond_leq_in, const T* angl_keq_in,
-                      const T* angl_leq_in, const T* dihe_amp_in, const T* dihe_freq_in,
+                      const T* angl_theta_in, const T* dihe_amp_in, const T* dihe_freq_in,
                       const T* dihe_phi_in, const T* attn14_elec_in, const T* attn14_vdw_in,
                       const int* bond_i_atoms_in, const int* bond_j_atoms_in,
                       const int* bond_param_idx_in, const char4* bond_modifiers_in,
@@ -161,7 +161,7 @@ template <typename T> struct ValenceKit {
   const T* bond_keq;            ///< Equilibrium stiffness constants for all unique bonds
   const T* bond_leq;            ///< Equilibrium lengths for all unique bonds
   const T* angl_keq;            ///< Equilibrium stiffness constants for all unique bond angles
-  const T* angl_leq;            ///< Equilibrium lengths for all unique bond angles
+  const T* angl_theta;          ///< Equilibrium lengths for all unique bond angles
   const T* dihe_amp;            ///< Amplitudes for all unique cosine-based dihedrals
   const T* dihe_freq;           ///< Periodicities for cosine-based dihedral / torsion terms
   const T* dihe_phi;            ///< Phase angles for cosine-based dihedral / torsion terms

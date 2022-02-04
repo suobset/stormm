@@ -261,16 +261,14 @@ int main(int argc, char* argv[]) {
   trpcage_ps.initializeForces();
 
   // Compute the forces in single precision.  Accumulate in fixed precision.
-  ValenceKit<float> vk = trpcage_ag.getSinglePrecisionValenceKit  
-  for (int i = 0; i < 
-  
-  // CHECK
-  printf("BondAngle = [\n");
-  for (int i = 0; i < trpcage_ag.getAtomCount(); i += 25) {
-    printf("  %12.7lf %12.7lf %12.7lf %12.7lf %12.7lf %12.7lf\n", trpcage_bond_frc[3 * i],
-           trpcage_bond_frc[(3 * i) + 1], trpcage_bond_frc[(3 * i) + 2], trpcage_angl_frc[3 * i],
-           trpcage_angl_frc[(3 * i) + 1], trpcage_angl_frc[(3 * i) + 2]);
+  ValenceKit<float> vk = trpcage_ag.getSinglePrecisionValenceKit();
+  std::vector<llint> xfrc_bond(trpcage_ag.getAtomCount(), 0LLU);
+  std::vector<llint> yfrc_bond(trpcage_ag.getAtomCount(), 0LLU);
+  std::vector<llint> zfrc_bond(trpcage_ag.getAtomCount(), 0LLU);
+  std::vector<llint> xfrc_angl(trpcage_ag.getAtomCount(), 0LLU);
+  std::vector<llint> yfrc_angl(trpcage_ag.getAtomCount(), 0LLU);
+  std::vector<llint> zfrc_angl(trpcage_ag.getAtomCount(), 0LLU);
+  for (int i = 0; i < vk.nbond; i++) {
+
   }
-  printf("];\n");
-  // END CHECK
 }

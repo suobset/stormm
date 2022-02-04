@@ -100,7 +100,7 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
     const int k_atom = vk.angl_k_atoms[pos];
     const int param_idx = vk.angl_param_idx[pos];
     const double keq = vk.angl_keq[param_idx];
-    const double leq = vk.angl_leq[param_idx];
+    const double theta0 = vk.angl_theta[param_idx];
 
     // Compute displacements
     ba[0] = psw.xcrd[i_atom] - psw.xcrd[j_atom];
@@ -120,7 +120,7 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
     double costheta = (ba[0]*bc[0] + ba[1]*bc[1] + ba[2]*bc[2]) * invbabc;
     costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
     const double theta = acos(costheta);
-    const double dtheta = theta - leq;
+    const double dtheta = theta - theta0;
     const double du = keq * dtheta * dtheta;
     angl_energy += du;
     angl_acc += static_cast<llint>(round(du * nrg_scale_factor));
