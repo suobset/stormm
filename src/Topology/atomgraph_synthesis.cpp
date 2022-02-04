@@ -10,6 +10,7 @@ namespace topology {
 
 using cuda::HybridKind;
 using math::roundUp;
+using math::maxAbsoluteDifference;
 using math::maxValue;
 using math::minValue;
 using testing::Approx;
@@ -356,7 +357,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   std::vector<int> topology_dihe_table_offsets(topology_count);
   std::vector<int> topology_ubrd_table_offsets(topology_count);
   std::vector<int> topology_cimp_table_offsets(topology_count);
-  std::vector<int> topology_camp_table_offsets(topology_count);
+  std::vector<int> topology_cmap_table_offsets(topology_count);
   std::vector<int> topology_chrg_table_offsets(topology_count);
   std::vector<int> topology_atyp_table_offsets(topology_count);
   for (int i = 0; i < topology_count; i++) {
@@ -370,7 +371,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     topology_dihe_table_offsets[i] = max_unique_dihe;
     topology_ubrd_table_offsets[i] = max_unique_ubrd;
     topology_cimp_table_offsets[i] = max_unique_cimp;
-    topology_camp_table_offsets[i] = max_unique_cmap;    
+    topology_cmap_table_offsets[i] = max_unique_cmap;    
     topology_chrg_table_offsets[i] = max_unique_chrg;
     topology_atyp_table_offsets[i] = max_unique_atyp;
     max_unique_atom += cdk.natom;
@@ -386,9 +387,19 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 
   // Pre-compute some quantities relating to CMAPs that will help distinguish these gargantuan
   // "parameters" in the inner loops that follow.
-  std::vector<double> cmap_parameter_sums(max_unique_cmap, 0.0);
+  std::vector<double> cmap_parameter_sums(max_unique_cmap);
   for (int i = 0; i < topology_count; i++) {
-
+    const AtomGraph* iag_ptr = topologies[i];
+    const ValenceKit<double> i_vk = iag_ptr->getDoublePrecisionValenceKit();
+    for (int j = 0; j < i_vk.ncmap_surf; j++) {
+      double cm_sum = 0.0;
+      const int cmj_llim = i_vk.cmap_surf_bounds[j];
+      const int cmj_hlim = cmj_llim + (i_vk.cmap_dim[j] * i_vk.cmap_dim[j]);
+      for (int k = cmj_llim; k < cmj_hlim; k++) {
+        cm_sum += i_vk.cmap_surf[k];
+      }
+      cmap_parameter_sums[topology_cmap_table_offsets[i] + j] = cm_sum;
+    }
   }
   
   // Create lists of unique parameters for the valence and non-bonded calculations.
@@ -400,30 +411,34 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   std::vector<int> cmap_synthesis_index(max_unique_cmap, false);
   std::vector<int> chrg_synthesis_index(max_unique_chrg, false);
   std::vector<int> atyp_synthesis_index(max_unique_atyp, false);
-  std::vector<double>filtered_chrg;
-  std::vector<float>sp_filtered_chrg;
-  std::vector<double>filtered_bond_keq;
-  std::vector<double>filtered_bond_leq;
-  std::vector<float>sp_filtered_bond_keq;
-  std::vector<float>sp_filtered_bond_leq;
-  std::vector<double>filtered_angl_keq;
-  std::vector<double>filtered_angl_theta;
-  std::vector<float>sp_filtered_angl_keq;
-  std::vector<float>sp_filtered_angl_theta;
-  std::vector<double>filtered_dihe_amp;
-  std::vector<double>filtered_dihe_freq;
-  std::vector<double>filtered_dihe_phi;
-  std::vector<float>sp_filtered_dihe_amp;
-  std::vector<float>sp_filtered_dihe_freq;
-  std::vector<float>sp_filtered_dihe_phi;
-  std::vector<double>filtered_ubrd_keq;
-  std::vector<double>filtered_ubrd_leq;
-  std::vector<float>sp_filtered_ubrd_keq;
-  std::vector<float>sp_filtered_ubrd_leq;
-  std::vector<double>filtered_cimp_keq;
-  std::vector<double>filtered_cimp_phi;
-  std::vector<float>sp_filtered_cimp_keq;
-  std::vector<float>sp_filtered_cimp_phi;
+  std::vector<double> filtered_chrg;
+  std::vector<float> sp_filtered_chrg;
+  std::vector<double> filtered_bond_keq;
+  std::vector<double> filtered_bond_leq;
+  std::vector<float> sp_filtered_bond_keq;
+  std::vector<float> sp_filtered_bond_leq;
+  std::vector<double> filtered_angl_keq;
+  std::vector<double> filtered_angl_theta;
+  std::vector<float> sp_filtered_angl_keq;
+  std::vector<float> sp_filtered_angl_theta;
+  std::vector<double> filtered_dihe_amp;
+  std::vector<double> filtered_dihe_freq;
+  std::vector<double> filtered_dihe_phi;
+  std::vector<float> sp_filtered_dihe_amp;
+  std::vector<float> sp_filtered_dihe_freq;
+  std::vector<float> sp_filtered_dihe_phi;
+  std::vector<double> filtered_ubrd_keq;
+  std::vector<double> filtered_ubrd_leq;
+  std::vector<float> sp_filtered_ubrd_keq;
+  std::vector<float> sp_filtered_ubrd_leq;
+  std::vector<double> filtered_cimp_keq;
+  std::vector<double> filtered_cimp_phi;
+  std::vector<float> sp_filtered_cimp_keq;
+  std::vector<float> sp_filtered_cimp_phi;
+  std::vector<int> filtered_cmap_dim;
+  std::vector<int> filtered_cmap_surf_bounds(1, 0);
+  std::vector<double> filtered_cmap_surf;
+  std::vector<float> sp_filtered_cmap_surf;
   int n_unique_bond = 0;
   int n_unique_angl = 0;
   int n_unique_dihe = 0;
@@ -445,8 +460,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
       if (bond_synthesis_index[topology_bond_table_offsets[i] + j] >= 0) {
         continue;
       }
-      Approx ij_bond_keq(i_vk.bond_keq[j], constants::verytiny);
-      Approx ij_bond_leq(i_vk.bond_leq[j], constants::verytiny);
+      const Approx ij_bond_keq(i_vk.bond_keq[j], constants::verytiny);
+      const Approx ij_bond_leq(i_vk.bond_leq[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
@@ -454,7 +469,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.nbond_param; m++) {
           if (bond_synthesis_index[topology_bond_table_offsets[k] + m] < 0 &&
-              ij_bond_keq.test(k_vk.bond_keq[m]) && ij_bond_leq.test(k_vk.bond_leq[m])) {
+              ij_bond_keq.test(k_vk.bond_keq[m]) == false &&
+              ij_bond_leq.test(k_vk.bond_leq[m]) == false) {
             bond_synthesis_index[topology_bond_table_offsets[k] + m] = n_unique_bond;
           }
         }
@@ -473,8 +489,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
       if (angl_synthesis_index[topology_angl_table_offsets[i] + j] >= 0) {
         continue;
       }
-      Approx ij_angl_keq(i_vk.angl_keq[j], constants::verytiny);
-      Approx ij_angl_theta(i_vk.angl_theta[j], constants::verytiny);
+      const Approx ij_angl_keq(i_vk.angl_keq[j], constants::verytiny);
+      const Approx ij_angl_theta(i_vk.angl_theta[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
@@ -482,13 +498,14 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.nangl_param; m++) {
           if (angl_synthesis_index[topology_angl_table_offsets[k] + m] < 0 &&
-              ij_angl_keq.test(k_vk.angl_keq[m]) && ij_angl_theta.test(k_vk.angl_theta[m])) {
+              ij_angl_keq.test(k_vk.angl_keq[m]) == false &&
+              ij_angl_theta.test(k_vk.angl_theta[m]) == false) {
             angl_synthesis_index[topology_angl_table_offsets[k] + m] = n_unique_angl;
           }
         }
       }
 
-      // Catalog this unique bond and increment the counter
+      // Catalog this unique angle and increment the counter
       filtered_angl_keq.push_back(i_vk.angl_keq[j]);
       filtered_angl_theta.push_back(i_vk.angl_theta[j]);
       sp_filtered_angl_keq.push_back(i_vk_sp.angl_keq[j]);
@@ -501,9 +518,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
       if (dihe_synthesis_index[topology_dihe_table_offsets[i] + j] >= 0) {
         continue;
       }
-      Approx ij_dihe_amp(i_vk.dihe_amp[j], constants::verytiny);
-      Approx ij_dihe_freq(i_vk.dihe_freq[j], constants::verytiny);
-      Approx ij_dihe_phi(i_vk.dihe_phi[j], constants::verytiny);
+      const Approx ij_dihe_amp(i_vk.dihe_amp[j], constants::verytiny);
+      const Approx ij_dihe_freq(i_vk.dihe_freq[j], constants::verytiny);
+      const Approx ij_dihe_phi(i_vk.dihe_phi[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
@@ -511,14 +528,15 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.ndihe_param; m++) {
           if (dihe_synthesis_index[topology_dihe_table_offsets[k] + m] < 0 &&
-              ij_dihe_amp.test(k_vk.dihe_amp[m]) && ij_dihe_freq.test(k_vk.dihe_freq[m]) &&
-              ij_dihe_phi.test(k_vk.dihe_phi[m])) {
+              ij_dihe_amp.test(k_vk.dihe_amp[m]) == false &&
+              ij_dihe_freq.test(k_vk.dihe_freq[m]) == false &&
+              ij_dihe_phi.test(k_vk.dihe_phi[m]) == false) {
             dihe_synthesis_index[topology_dihe_table_offsets[k] + m] = n_unique_dihe;
           }
         }
       }
 
-      // Catalog this unique bond and increment the counter
+      // Catalog this unique dihedral and increment the counter
       filtered_dihe_amp.push_back(i_vk.dihe_amp[j]);
       filtered_dihe_freq.push_back(i_vk.dihe_freq[j]);
       filtered_dihe_phi.push_back(i_vk.dihe_phi[j]);
@@ -533,8 +551,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
       if (ubrd_synthesis_index[topology_ubrd_table_offsets[i] + j] >= 0) {
         continue;
       }
-      Approx ij_ubrd_keq(i_vk.ubrd_keq[j], constants::verytiny);
-      Approx ij_ubrd_leq(i_vk.ubrd_leq[j], constants::verytiny);
+      const Approx ij_ubrd_keq(i_vk.ubrd_keq[j], constants::verytiny);
+      const Approx ij_ubrd_leq(i_vk.ubrd_leq[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
@@ -542,13 +560,14 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.nubrd_param; m++) {
           if (ubrd_synthesis_index[topology_ubrd_table_offsets[k] + m] < 0 &&
-              ij_ubrd_keq.test(k_vk.ubrd_keq[m]) && ij_ubrd_leq.test(k_vk.ubrd_leq[m])) {
+              ij_ubrd_keq.test(k_vk.ubrd_keq[m]) == false &&
+              ij_ubrd_leq.test(k_vk.ubrd_leq[m]) == false) {
             ubrd_synthesis_index[topology_ubrd_table_offsets[k] + m] = n_unique_ubrd;
           }
         }
       }
 
-      // Catalog this unique bond and increment the counter
+      // Catalog this unique Urey-Bradley parameter set and increment the counter
       filtered_ubrd_keq.push_back(i_vk.ubrd_keq[j]);
       filtered_ubrd_leq.push_back(i_vk.ubrd_leq[j]);
       sp_filtered_ubrd_keq.push_back(i_vk_sp.ubrd_keq[j]);
@@ -561,8 +580,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
       if (cimp_synthesis_index[topology_cimp_table_offsets[i] + j] >= 0) {
         continue;
       }
-      Approx ij_cimp_keq(i_vk.cimp_keq[j], constants::verytiny);
-      Approx ij_cimp_phi(i_vk.cimp_phi[j], constants::verytiny);
+      const Approx ij_cimp_keq(i_vk.cimp_keq[j], constants::verytiny);
+      const Approx ij_cimp_phi(i_vk.cimp_phi[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
@@ -570,13 +589,14 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.ncimp_param; m++) {
           if (cimp_synthesis_index[topology_cimp_table_offsets[k] + m] < 0 &&
-              ij_cimp_keq.test(k_vk.cimp_keq[m]) && ij_cimp_phi.test(k_vk.cimp_phi[m])) {
+              ij_cimp_keq.test(k_vk.cimp_keq[m]) == false &&
+              ij_cimp_phi.test(k_vk.cimp_phi[m]) == false) {
             cimp_synthesis_index[topology_cimp_table_offsets[k] + m] = n_unique_cimp;
           }
         }
       }
 
-      // Catalog this unique bond and increment the counter
+      // Catalog this unique CHARMM improper dihedral and increment the counter
       filtered_cimp_keq.push_back(i_vk.cimp_keq[j]);
       filtered_cimp_phi.push_back(i_vk.cimp_phi[j]);
       sp_filtered_cimp_keq.push_back(i_vk_sp.cimp_keq[j]);
@@ -585,43 +605,48 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     }
 
     // Seek out unique CMAP surfaces
-#if 0
-    for (int j = 0; j < i_vk.ncmap_param; j++) {
+    for (int j = 0; j < i_vk.ncmap_surf; j++) {
       if (cmap_synthesis_index[topology_cmap_table_offsets[i] + j] >= 0) {
         continue;
       }
 
       // Comparing CMAP surfaces is a much more involved process than comparing other parameters.
       // Use a pre-arranged table of surface sums to expedite the process.
-      Approx ij_cmap_keq(i_vk.cmap_keq[j], constants::verytiny);
-      Approx ij_cimp_phi(i_vk.cmap_phi[j], constants::verytiny);
+      const Approx ij_cmap_sum(cmap_parameter_sums[topology_cmap_table_offsets[i] + j],
+                               constants::verytiny);
+      const int ij_cmap_dim = i_vk.cmap_dim[j];
+      const double* ij_surf_ptr = &i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]];
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
-        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const ValenceKit<double> k_vk = kag_ptr->getDoublePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.ncimp_param; m++) {
-          if (cimp_synthesis_index[topology_cimp_table_offsets[k] + m] < 0 &&
-              ij_cimp_keq.test(k_vk.cimp_keq[m]) && ij_cimp_phi.test(k_vk.cimp_phi[m])) {
-            cimp_synthesis_index[topology_cimp_table_offsets[k] + m] = n_unique_cimp;
+        for (int m = mstart; m < k_vk.ncmap_surf; m++) {
+          if (cmap_synthesis_index[topology_cmap_table_offsets[k] + m] < 0 &&
+              ij_cmap_dim != k_vk.cmap_dim[m] &&
+              ij_cmap_sum.test(cmap_parameter_sums[topology_cmap_table_offsets[k] + m]) == false &&
+              maxAbsoluteDifference(ij_surf_ptr, &k_vk.cmap_surf[k_vk.cmap_surf_bounds[m]],
+                                    ij_cmap_dim * ij_cmap_dim) < constants::verytiny) {
+            cmap_synthesis_index[topology_cmap_table_offsets[k] + m] = n_unique_cmap;
           }
         }
       }
 
-      // Catalog this unique bond and increment the counter
-      filtered_cimp_keq.push_back(i_vk.cimp_keq[j]);
-      filtered_cimp_leq.push_back(i_vk.cimp_theta[j]);
-      sp_filtered_cimp_keq.push_back(i_vk_sp.cimp_keq[j]);
-      sp_filtered_cimp_leq.push_back(i_vk_sp.cimp_leq[j]);
-      n_unique_cimp++;
+      // Catalog this unique CMAP and increment the counter
+      for (int k = 0; k < ij_cmap_dim * ij_cmap_dim; k++) {
+        filtered_cmap_surf.push_back(i_vk.cmap_surf[k]);
+        sp_filtered_cmap_surf.push_back(i_vk_sp.cmap_surf[k]);
+      }
+      filtered_cmap_dim.push_back(ij_cmap_dim);
+      filtered_cmap_surf_bounds.push_back(filtered_cmap_surf.size());
+      n_unique_cmap++;
     }
-#endif
+
     // Seek out unique charges
     for (int j = 0; j < i_nbk.n_q_types; j++) {
       if (chrg_synthesis_index[topology_chrg_table_offsets[i] + j] >= 0) {
         continue;
       }
-      Approx ij_chrg(i_nbk.q_parameter[j], constants::verytiny);
+      const Approx ij_chrg(i_nbk.q_parameter[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const NonbondedKit<double> k_nbk   = kag_ptr->getDoublePrecisionNonbondedKit();
