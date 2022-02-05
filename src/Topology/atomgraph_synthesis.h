@@ -321,6 +321,21 @@ private:
   /// the x member (bits 1-10, 11-20, and 21-30) followed by a fourth in the y member (bits 1-10)
   /// and finally the index of the slope / intercept series (bits 11-32).
   Hybrid<uint2> nmr4_instructions;
+
+  /// \brief Extend the Lennard-Jones tables with a specific Lennard-Jones atom type, including
+  ///        pair-specific cross-terms (i.e. CHARMM NB-fix details).  All cross terms involving the
+  ///        parameter with other known parameters must be accounted for.  This can be an involved
+  ///        process, but if the current topology's tables completely subsume the former topology's
+  ///        tables or are completely covered by the current topology's tables it is tractable.
+  ///
+  /// \param nbk              Non-bonded details of a molecular system topology
+  /// \param matrix_size      Size of the current, compiled Lennard-Jones tables (each is square)
+  /// \param lj_a             Compiled Lennard-Jones A coefficients for the synthesis
+  /// \param lj_b             Compiled Lennard-Jones B coefficients for the synthesis
+  /// \param lj_c             Compiled Lennard-Jones C coefficients for the synthesis
+  /// \param significance     Matrix indicating whether each interaction is significant, meaning
+  ///                         that its values must be satisfied in future searches
+  void extendLJMatrices();
 };
 
 } // namespace topology

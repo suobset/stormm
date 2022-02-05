@@ -1,4 +1,5 @@
 #include "Math/rounding.h"
+#include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
@@ -13,6 +14,9 @@ using math::roundUp;
 using math::maxAbsoluteDifference;
 using math::maxValue;
 using math::minValue;
+using math::prefixSumInPlace;
+using math::PrefixSumType;
+using math::sum;
 using testing::Approx;
 using topology::ChemicalDetailsKit;
 using topology::NonbondedKit;
@@ -392,25 +396,20 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     const AtomGraph* iag_ptr = topologies[i];
     const ValenceKit<double> i_vk = iag_ptr->getDoublePrecisionValenceKit();
     for (int j = 0; j < i_vk.ncmap_surf; j++) {
-      double cm_sum = 0.0;
-      const int cmj_llim = i_vk.cmap_surf_bounds[j];
-      const int cmj_hlim = cmj_llim + (i_vk.cmap_dim[j] * i_vk.cmap_dim[j]);
-      for (int k = cmj_llim; k < cmj_hlim; k++) {
-        cm_sum += i_vk.cmap_surf[k];
-      }
-      cmap_parameter_sums[topology_cmap_table_offsets[i] + j] = cm_sum;
+      cmap_parameter_sums[topology_cmap_table_offsets[i] + j] =
+        sum<double>(&i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]],
+                    i_vk.cmap_dim[j] * i_vk.cmap_dim[j]);
     }
   }
   
   // Create lists of unique parameters for the valence and non-bonded calculations.
-  std::vector<int> bond_synthesis_index(max_unique_bond, false);
-  std::vector<int> angl_synthesis_index(max_unique_angl, false);
-  std::vector<int> dihe_synthesis_index(max_unique_dihe, false);
-  std::vector<int> ubrd_synthesis_index(max_unique_ubrd, false);
-  std::vector<int> cimp_synthesis_index(max_unique_cimp, false);
-  std::vector<int> cmap_synthesis_index(max_unique_cmap, false);
-  std::vector<int> chrg_synthesis_index(max_unique_chrg, false);
-  std::vector<int> atyp_synthesis_index(max_unique_atyp, false);
+  std::vector<int> bond_synthesis_index(max_unique_bond, -1);
+  std::vector<int> angl_synthesis_index(max_unique_angl, -1);
+  std::vector<int> dihe_synthesis_index(max_unique_dihe, -1);
+  std::vector<int> ubrd_synthesis_index(max_unique_ubrd, -1);
+  std::vector<int> cimp_synthesis_index(max_unique_cimp, -1);
+  std::vector<int> cmap_synthesis_index(max_unique_cmap, -1);
+  std::vector<int> chrg_synthesis_index(max_unique_chrg, -1);
   std::vector<double> filtered_chrg;
   std::vector<float> sp_filtered_chrg;
   std::vector<double> filtered_bond_keq;
@@ -446,7 +445,6 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   int n_unique_cimp = 0;
   int n_unique_cmap = 0;
   int n_unique_chrg = 0;
-  int n_unique_atyp = 0;
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* iag_ptr = topologies[i];
     const ChemicalDetailsKit i_cdk     = iag_ptr->getChemicalDetailsKit();
@@ -667,10 +665,137 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     }
   }
 
+  // The unique Lennard-Jones parameters are hard to map out.  To the degree that there are
+  // unique parameters in each system, the Lennard-Jones tables might as well be block matrices.
+  // Keep a list of the A, B, and possibly C coefficients of each Lennard-Jones type interacting
+  // with all other types.
+  std::vector<int> atyp_synthesis_index(max_unique_atyp, -1);
+  std::vector<double> lj_a_synthesis;
+  std::vector<double> lj_b_synthesis;
+  std::vector<double> lj_c_synthesis;
+  std::vector<bool> lj_significance;
+  extendLJMatrices();
+
   // With the unique parameters enumerated and maps leading from parameters in any individual
   // system into the unified arrays within the synthesis, make collated arrays for each atom and
   // energy term.
   
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::extendLJMatrices() {
+
+  // Search the diagonal entries first.  Use approximate comparisons with tolerances of 1.0e-5 in
+  // an effort to accommodate very large Lennard-Jones A coefficients (~10^7).  Make a vector of
+  // all unique diagonal entries.
+  std::vector<double3> diag_entries;
+  std::vector<int> lj_type_bounds(topology_count + 1, 0);
+  for (int i = 0; i < topology_count; i++) {
+    lj_type_bounds[i + 1] = topologies[i]->getAtomTypeCount();
+  }
+  const int total_types = lj_type_bounds[topology_count];
+  std::vector<bool> lj_coverage(total_types, false);
+  std::vector<int> lj_diagtypes(total_types);
+  int n_unique_diags = 0;
+  for (int i = 0; i < topology_count; i++) {
+    const NonbondedKit<double> i_nbk = topologies[i]->getDoublePrecisionNonbondedKit();
+    for (int j = lj_type_bounds[i]; j < lj_type_bounds[i + 1]; j++) {
+      if (lj_coverage[j]) {
+        continue;
+      }
+      const size_t matpos = (j - lj_type_bounds[i]) * (i_nbk.n_lj_types + 1);
+      const Approx ent_a(i_nbk.lja_coeff[j], 1.0e-5);
+      const Approx ent_b(i_nbk.ljb_coeff[j], 1.0e-5);
+      const Approx ent_c(i_nbk.ljc_coeff[j], 1.0e-5);
+      for (int k = i; k < topology_count; i++) {
+        const int mstart = (k == i) ? j : lj_type_bounds[k];
+        const NonbondedKit<double> k_nbk = topologies[k]->getDoublePrecisionNonbondedKit();
+        for (int m = mstart; m < lj_type_bounds[i + 1]; m++) {
+          const size_t testpos = (m - lj_type_bounds[k]) * (k_nbk.n_lj_types + 1);
+          if (lj_coverage[m] == false && ent_a.test(k_nbk.lja_coeff[k]) &&
+              ent_b.test(k_nbk.ljb_coeff[k]) && ent_c.test(k_nbk.ljc_coeff[k])) {
+            lj_coverage[m] = true;
+            lj_diagtypes[m] = n_unique_diags;
+          }
+        }
+      }
+      diag_entries.push_back({i_nbk.lja_coeff[j], i_nbk.ljb_coeff[j], i_nbk.ljc_coeff[j]});
+      n_unique_diags;
+    }
+  }
+
+  // Loop back over each topology and find all cross-terms involving the various diagonals.
+  // Fill out a map of the numbers of unique cross-terms.
+  std::vector<double3> lj_entries;
+  std::vector<int> lj_entry_bounds(1, 0);
+  std::vector<int2> lj_entry_map;
+  int pos = 0;
+  int n_lj_entry = 0;
+  for (int i = 0; i < n_unique_diags; i++) {
+    for (int j = i; j < n_unique_diags; j++) {
+
+      // Each element p of the map stores the row and column for the Lennard-Jones table entries
+      // catalogged between entries p and (p + 1) of the bounds array.
+      lj_entry_map.push_back({i, j});
+      for (int k = 0; k < topology_count; k++) {
+        const NonbondedKit<double> k_nbk = topologies[k]->getDoublePrecisionNonbondedKit();
+        for (int m = lj_type_bounds[k]; m < lj_type_bounds[k + 1]; m++) {
+          if (lj_diagtypes[m] == i) {
+            for (int n = lj_type_bounds[k]; n < lj_type_bounds[k + 1]; n++) {
+              if (lj_diagtypes[n] == j) {
+                const int matpos = (m - lj_type_bounds[k]) +
+                                   ((n - lj_type_bounds[k]) * k_nbk.n_lj_types);
+                const Approx ent_a(k_nbk.lja_coeff[matpos], 1.0e-5);
+                const Approx ent_b(k_nbk.ljb_coeff[matpos], 1.0e-5);
+                const Approx ent_c(k_nbk.ljc_coeff[matpos], 1.0e-5);
+                bool found = false;
+                for (int p = lj_entry_bounds[pos]; p < n_lj_entry; p++) {
+                  found = (found || (ent_a.test(lj_entries[p].x) && ent_b.test(lj_entries[p].y) &&
+                                     ent_c.test(lj_entries[p].z)));
+                }
+                if (found == false) {
+                  lj_entries.push_back({k_nbk.lja_coeff[matpos], k_nbk.ljb_coeff[matpos],
+                                        k_nbk.ljc_coeff[matpos]});
+                  n_lj_entry++;
+                }
+              }
+            }
+          }
+        }
+      }
+      lj_entry_bounds.push_back(n_lj_entry);
+      pos++;
+    }
+  }
+
+  // Loop back over the compiled matrix and find cases where a single type pair interaction
+  // can have more than a single set of Lennard-Jones A, B, and C coefficients.  Split those
+  // N unique sets of values across ceil(sqrt(N)) different sub-types of each atom.
+  pos = 0;
+  std::vector<int> n_type_copy(n_unique_diags + 1, 0);
+  for (int i = 0; i < n_unique_diags; i++) {
+    for (int j = i; j < n_unique_diags; j++) {
+      const int n_takes = lj_entry_bounds[pos + 1] - lj_entry_bounds[pos];
+      switch (n_takes) {
+      case 1:
+        n_type_copy[i] = std::max(n_type_copy[i], 1);
+      case 4:
+        n_type_copy[i] = std::max(n_type_copy[i], 2);
+      case 9:
+        n_type_copy[i] = std::max(n_type_copy[i], 3);
+      default:
+        n_type_copy[i] = std::max(n_type_copy[i], ceil(sqrt(n_takes)));
+      }
+    }
+  }
+  prefixSumInPlace(n_type_copy, PrefixSumType::EXCLUSIVE, "ExtendLJMatrices");
+
+  // Expand the matrices of Lennard-Jones atom types
+  for (int i = 0; i < n_unique_diags; i++) {
+    for (int j = n_type_copy[i]; j < n_type_copy[i + 1]; j++) {
+
+    }
+  }
 }
 
 } // namespace topology

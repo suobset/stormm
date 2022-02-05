@@ -346,8 +346,6 @@ template <typename T> struct ImplicitSolventKit {
   /// \{
   ImplicitSolventKit(const ImplicitSolventKit &original) = default;
   ImplicitSolventKit(ImplicitSolventKit &&original) = default;
-  //ImplicitSolventKit& operator=(const ImplicitSolventKit &other) = default;
-  //ImplicitSolventKit& operator=(ImplicitSolventKit &&other) = default;
   /// \}
 
   // Member variables again store a collection of atomic parameters
