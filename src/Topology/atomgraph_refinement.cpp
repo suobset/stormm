@@ -444,9 +444,9 @@ BasicValenceTable basicValenceIndexing(const int atom_count,
     bvt.dihe_assigned_bounds[bvt.dihe_k_atoms[pos]] += 1;
   }
   const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
-  prefixSumInPlace<llint>(bvt.bond_assigned_bounds, pfx_excl, "basicValenceIndexing");
-  prefixSumInPlace<llint>(bvt.angl_assigned_bounds, pfx_excl, "basicValenceIndexing");
-  prefixSumInPlace<llint>(bvt.dihe_assigned_bounds, pfx_excl, "basicValenceIndexing");
+  prefixSumInPlace<llint>(&bvt.bond_assigned_bounds, pfx_excl, "basicValenceIndexing");
+  prefixSumInPlace<llint>(&bvt.angl_assigned_bounds, pfx_excl, "basicValenceIndexing");
+  prefixSumInPlace<llint>(&bvt.dihe_assigned_bounds, pfx_excl, "basicValenceIndexing");
 
   // Populate the bond, angle, and dihedral assignements.  Dihedrals are assigned to the third
   // atom in the quartet.  In Amber-format topologies this is the central atom of an improper.
@@ -570,9 +570,9 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
     mvt.cmap_assigned_bounds[mvt.cmap_k_atoms[pos]] += 1;
   }
   const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
-  prefixSumInPlace<llint>(mvt.ub_assigned_bounds, pfx_excl, "charmmValenceIndexing");
-  prefixSumInPlace<llint>(mvt.impr_assigned_bounds, pfx_excl, "charmmValenceIndexing");
-  prefixSumInPlace<llint>(mvt.cmap_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+  prefixSumInPlace<llint>(&mvt.ub_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+  prefixSumInPlace<llint>(&mvt.impr_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+  prefixSumInPlace<llint>(&mvt.cmap_assigned_bounds, pfx_excl, "charmmValenceIndexing");
 
   // Populate the CHARMM valence assignments.
   for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
@@ -1129,7 +1129,7 @@ void cullDuplicateExclusions(std::vector<int> *excl_list, std::vector<int> *excl
       total_excl_count++;
     }
   }
-  prefixSumInPlace<llint>(new_counts, PrefixSumType::EXCLUSIVE, "cullDuplicateExclusions");
+  prefixSumInPlace<llint>(&new_counts, PrefixSumType::EXCLUSIVE, "cullDuplicateExclusions");
   for (int i = 0; i < natom + 1; i++) {
     bounds_data[i] = new_counts[i];
   }
@@ -1192,7 +1192,7 @@ void cullPriorExclusions(std::vector<int> *excl_list, std::vector<int> *excl_bou
       total_excl_count++;
     }
   }
-  prefixSumInPlace<llint>(new_counts, PrefixSumType::EXCLUSIVE, "cullPriorExclusions");
+  prefixSumInPlace<llint>(&new_counts, PrefixSumType::EXCLUSIVE, "cullPriorExclusions");
   for (int i = 0; i < natom + 1; i++) {
     bounds_data[i] = new_counts[i];
   }
@@ -1219,7 +1219,7 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
   for (int i = 0; i < vst.vs_count; i++) {
     vsite_child_bounds[vst.frame1_atoms[i]] += 1;
   }
-  prefixSumInPlace<llint>(vsite_child_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
+  prefixSumInPlace<llint>(&vsite_child_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
   std::vector<int> vsite_child_list(vsite_child_bounds[atom_count], -1);
   for (int i = 0; i < vst.vs_count; i++) {
     const int parent = vst.frame1_atoms[i];
@@ -1238,7 +1238,7 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
   }
 
   // Compute the capped prefix sum over all atoms, then resize the 1:1 exclusion list as needed
-  prefixSumInPlace<llint>(result.nb11_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
+  prefixSumInPlace<llint>(&result.nb11_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
   result.nb11_excl_list.resize(result.nb11_excl_bounds[atom_count], -1);
 
   // Loop over all atoms, composing the list of 1:1 exclusions
@@ -1265,7 +1265,7 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
     accumulateExclusionBounds(&result.nb12_excl_bounds, bvt.bond_i_atoms[i], bvt.bond_j_atoms[i],
                               vsite_child_bounds, vsite_child_list);
   }
-  prefixSumInPlace<llint>(result.nb12_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
+  prefixSumInPlace<llint>(&result.nb12_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
   result.nb12_excl_list.resize(result.nb12_excl_bounds[atom_count], -1);
   for (int i = 0; i < atom_count; i++) {
     atom_counters[i] = 0;
@@ -1297,7 +1297,7 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
       }
     }
   }
-  prefixSumInPlace<llint>(result.nb13_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
+  prefixSumInPlace<llint>(&result.nb13_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
   result.nb13_excl_list.resize(result.nb13_excl_bounds[atom_count], -1);
   for (int i = 0; i < atom_count; i++) {
     atom_counters[i] = 0;
@@ -1346,7 +1346,7 @@ Map1234 mapExclusions(const int atom_count, const BasicValenceTable &bvt,
       }
     }
   }
-  prefixSumInPlace<llint>(result.nb14_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
+  prefixSumInPlace<llint>(&result.nb14_excl_bounds, PrefixSumType::EXCLUSIVE, "mapExclusions");
   result.nb14_excl_list.resize(result.nb14_excl_bounds[atom_count], -1);
   for (int i = 0; i < atom_count; i++) {
     atom_counters[i] = 0;
@@ -1657,7 +1657,7 @@ void mapMolecules(const int atom_count, int *molecule_count, const Map1234 &all_
   for (int i = 0; i < atom_count; i++) {
     tml_data[tmm_data[i]] += 1;
   }
-  prefixSumInPlace<llint>(*molecule_limits, PrefixSumType::EXCLUSIVE, "mapMolecules");
+  prefixSumInPlace<llint>(molecule_limits, PrefixSumType::EXCLUSIVE, "mapMolecules");
   for (int i = 0; i < atom_count; i++) {
     const int mol_idx = tmm_data[i];
     tmc_data[tml_data[mol_idx]] = i;
@@ -1982,7 +1982,7 @@ std::vector<int3> checkDihedral14Coverage(const int atom_count,
     dihe_participation_bounds[bvt.dihe_i_atoms[pos]] += 1;
     dihe_participation_bounds[bvt.dihe_l_atoms[pos]] += 1;
   }
-  prefixSumInPlace<llint>(dihe_participation_bounds, PrefixSumType::EXCLUSIVE,
+  prefixSumInPlace<llint>(&dihe_participation_bounds, PrefixSumType::EXCLUSIVE,
                           "checkDihedral14Coverage");
   for (int pos = 0; pos < bvt.total_dihes; pos++) {
     const int i_atom = bvt.dihe_i_atoms[pos];

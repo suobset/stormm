@@ -234,6 +234,7 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_numerics \
 	          $(TESTDIR)/bin/test_amber_prmtop \
 	          $(TESTDIR)/bin/test_amber_coordinates \
+	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_atommask \
 	          $(TESTDIR)/bin/test_phase_space_synthesis \
 	          $(TESTDIR)/bin/test_valence_evaluation \
@@ -337,6 +338,13 @@ $(TESTDIR)/bin/test_amber_prmtop : $(LIBDIR)/libomni.so $(TESTDIR)/Topology/test
 	@echo "[OMNI]  Building test_amber_prmtop..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_amber_prmtop \
 	  $(TESTDIR)/Topology/test_amber_prmtop.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: prmtop collating object test program
+$(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libomni.so \
+					  $(TESTDIR)/Topology/test_atomgraph_synthesis.cpp
+	@echo "[OMNI]  Building test_atomgraph_synthesis..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_atomgraph_synthesis \
+	  $(TESTDIR)/Topology/test_atomgraph_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: trajectory and restart reading program
 $(TESTDIR)/bin/test_amber_coordinates : $(LIBDIR)/libomni.so \

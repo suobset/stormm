@@ -4,7 +4,8 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
-#include "../../src/Trajectory/phasespace.h"
+#include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_synthesis.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
@@ -13,8 +14,7 @@ using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
-using namespace omni::cuda;
-using namespace omni::trajectory;
+using namespace omni::topology;
 using namespace omni::testing;
 
 int main(int argc, char* argv[]) {
@@ -56,6 +56,12 @@ int main(int argc, char* argv[]) {
            "be skipped.", "test_atomgraph_synthesis");
   }
 
+  // Create the synthesis
+  const std::vector<AtomGraph*> all_tops = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &nbfix_ag,
+                                             &ubiquitin_ag };
+  const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 4, 2, 1, 1, 3 };
+  AtomGraphSynthesis synth(all_tops, system_ids);
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

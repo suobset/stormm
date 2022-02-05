@@ -619,7 +619,7 @@ void ChemicalFeatures::findAromaticGroups(const ChemicalDetailsKit &cdk,
       ring_participation_bounds[tmp_ring_atoms[j]] += 1;
     }
   }
-  prefixSumInPlace<int>(ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
+  prefixSumInPlace<int>(&ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
   std::vector<int> ring_participation(ring_participation_bounds[atom_count]);
   for (int i = 0; i < ring_count; i++) {
     for (int j = tmp_ring_atom_bounds[i]; j < tmp_ring_atom_bounds[i+1]; j++) {

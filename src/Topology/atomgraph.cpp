@@ -17,8 +17,6 @@ using constants::PrecisionModel;
 using cuda::HybridTargetLevel;
 using cuda::HybridKind;
 using math::addScalarToVector;
-using math::prefixSumInPlace;
-using math::PrefixSumType;
 using math::roundUp;
 using parse::CaseSensitivity;
 using parse::char4ToString;

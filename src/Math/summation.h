@@ -32,7 +32,7 @@ enum class PrefixSumType {
 /// \param caller  Name of the calling function (optional)
 /// \{
 template <typename TSum, typename TBase>
-void prefixSumInPlace(std::vector<TBase> &v, const PrefixSumType style,
+void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style,
                       const char* caller = nullptr);
 /// \}
 

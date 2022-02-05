@@ -1049,7 +1049,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   }
 
   // Compute the prefix sum over atom 1:2 neighbors to get the bounds array
-  prefixSumInPlace<int>(atom_connect_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");  
+  prefixSumInPlace<int>(&atom_connect_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");  
 
   // Make lists of all bond partners for each atom
   atom_relevant_bonds.resize(atom_connect_bounds[atom_count]);
@@ -1217,7 +1217,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       baseline_charge += fmin[0].x;
     }
   }
-  prefixSumInPlace<int>(fragment_minima_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");
+  prefixSumInPlace<int>(&fragment_minima_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");
   for (int i = 0; i < fragment_count; i++) {
     for (int j = fragment_minima_bounds[i]; j < fragment_minima_bounds[i + 1]; j++) {
       mutable_fragments[i].cullHigherEnergyStatesByCharge(fragment_minima[j].x);
@@ -1314,7 +1314,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     q_options.insert(q_options.end(), fragi_q.begin(), fragi_q.end());
   }
   const std::vector<int> max_frag_settings(options_bounds.begin(), options_bounds.end() - 1); 
-  prefixSumInPlace<int>(options_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");
+  prefixSumInPlace<int>(&options_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");
   
   // Begin to form the state based on atom centers that are not part of any mutable fragment.
   ground_state_formal_charges.resize(atom_count, 0.0);

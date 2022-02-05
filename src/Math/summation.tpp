@@ -7,24 +7,25 @@ using data_types::getOmniScalarTypeName;
 
 //-------------------------------------------------------------------------------------------------
 template <typename TSum, typename TBase>
-void prefixSumInPlace(std::vector<TBase> &v, const PrefixSumType style, const char* caller) {
-  const size_t n_elements = v.size();
+void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style, const char* caller) {
+  const size_t n_elements = v->size();
+  TBase* vdata = v->data();
   TBase sum = 0;
   TSum llsum = 0;
   switch (style) {
   case PrefixSumType::EXCLUSIVE:
     for (size_t i = 0; i < n_elements; i++) {
-      const TBase tmp_sum = v[i];
-      v[i] = sum;
+      const TBase tmp_sum = vdata[i];
+      vdata[i] = sum;
       sum += tmp_sum;
       llsum += static_cast<llint>(tmp_sum);
     }
     break;
   case PrefixSumType::INCLUSIVE:
     for (size_t i = 0; i < n_elements; i++) {
-      sum += v[i];
-      llsum += v[i];
-      v[i] = sum;
+      sum += vdata[i];
+      llsum += vdata[i];
+      vdata[i] = sum;
     }
     break;
   }

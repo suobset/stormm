@@ -137,7 +137,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nmr4_instructions{HybridKind::ARRAY, "tpsyn_"}
 {
   // Check that no system indexes a topology outside of the given list
-  if (maxValue(topology_indices) >= topology_count || minValue(topology_indices) < 0) {
+  if (maxValue(topology_indices_in) >= topology_count || minValue(topology_indices_in) < 0) {
     rtErr("One or more systems references a topology index outside of the list supplied.",
           "AtomGraphSynthesis");
   }
@@ -784,11 +784,11 @@ void AtomGraphSynthesis::extendLJMatrices() {
       case 9:
         n_type_copy[i] = std::max(n_type_copy[i], 3);
       default:
-        n_type_copy[i] = std::max(n_type_copy[i], ceil(sqrt(n_takes)));
+        n_type_copy[i] = std::max(n_type_copy[i], static_cast<int>(ceil(sqrt(n_takes))));
       }
     }
   }
-  prefixSumInPlace(n_type_copy, PrefixSumType::EXCLUSIVE, "ExtendLJMatrices");
+  prefixSumInPlace<int>(&n_type_copy, PrefixSumType::EXCLUSIVE, "ExtendLJMatrices");
 
   // Expand the matrices of Lennard-Jones atom types
   for (int i = 0; i < n_unique_diags; i++) {
