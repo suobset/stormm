@@ -20,12 +20,101 @@ using cuda::Hybrid;
 ///        in a series of ARRAY-kind objects, one for each member variable.
 struct AtomGraphSynthesis {
 
-  /// The constructor takes a series of topologies and NMR restraints.  The NMR restraints point
-  /// to specific topologies and thereby apply to any coordinate sets that also point to those
-  /// topologies.
+  /// \brief The constructor takes a series of topologies and NMR restraints.  The NMR restraints
+  ///        point to specific topologies and thereby apply to any coordinate sets that also point
+  ///        to those topologies.
+  ///
+  /// \param topologies_in        List of input topology pointers
+  /// \param topology_indices_in  List of topologies which describe each system that this synthesis
+  ///                             will describe.  This allows a synthesis to describe many copies
+  ///                             of each system in its work units while storing relatively small
+  ///                             amounts of data.
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<int> topology_indices_in);
 
+  /// \brief Get the number of unique topologies described by the synthesis
+  int getTopologyCount() const;
+
+  /// \brief Get the number of systems that this synthesis describes
+  int getSystemCount() const;
+
+  /// \brief Get the total number of atoms, summed over all systems, including replicas
+  int getAtomCount() const;
+
+  /// \brief Get the total number of virtual sites across all systems, including replicas
+  int getVirtualSiteCount() const;
+
+  /// \brief Get the total number of bond terms across all systems, including replicas
+  int getBondTermCount() const;
+
+  /// \brief Get the total number of bond angle terms across all systems, including replicas
+  int getAngleTermCount() const;
+  
+  /// \brief Get the total number of cosine-based dihedral terms across all systems and replicas
+  int getDihedralTermCount() const;
+  
+  /// \brief Get the total number of Urey-Bradley terms across all systems and replicas
+  int getUreyBradleyTermCount() const;
+  
+  /// \brief Get the total number of CHARMM improper terms across all systems and replicas
+  int getCharmmImproperTermCount() const;
+  
+  /// \brief Get the total number of CMAP terms across all systems and replicas
+  int getCmapTermCount() const;
+
+  /// \brief Get the number of unique atom types (a parameter, not an extensive quantity dependent
+  ///        on the number of systems)
+  int getAtomTypeCount() const;
+
+  /// \brief Get the number of unique charge parameters
+  int getChargeTypeCount() const;
+
+  /// \brief Get the number of unique harmonic bond parameter sets
+  int getBondParameterCount() const;
+  
+  /// \brief Get the number of unique harmonic bond angle parameter sets
+  int getAngleParameterCount() const;
+  
+  /// \brief Get the number of unique cosine-based dihedral parameter sets
+  int getDihedralParameterCount() const;
+
+  /// \brief Get the number of unique Urey-Bradley harmonic angle parameter sets
+  int getUreyBradleyParameterCount() const;
+
+  /// \brief Get the number of unique CHARMM improper parameter sets
+  int getCharmmImproperParameterCount() const;
+
+  /// \brief Get the number of unique CMAP surfaces
+  int getCmapSurfaceCount() const;
+
+  /// \brief Get the unit cell type that will be taken for all systems (TRICLINIC subsumes
+  ///        ORTHORHOMBIC in a sort of type promotion)
+  UnitCellType getUnitCellType() const;
+
+  /// \brief Get the implicit solvent model in use across all systems
+  ImplicitSolventModel getImplicitSolventModel() const;
+
+  /// \brief Get the dielectric constant (supporting the implicit solvent model) for all systems
+  double getDielectricConstant() const;
+
+  /// \brief Get the salt concentration (supporting the implicit solvent model) for all systems
+  double getSaltConcentration() const;
+
+  /// \brief Get the fundamental Coulomb constant defining the electrostatics of all systems
+  double getCoulombConstant() const;
+
+  /// \brief Get the name of the PB radii set for one or more systems.
+  ///
+  /// Overloaded:
+  /// - Get the PB radii set for all systems
+  /// - Get the PB radii set for a series of systems between low and high limits
+  /// - Get the PB radii set for a specific system
+  /// \{
+  std::vector<std::string> getPBRadiiSet() const;
+  std::vector<std::string> getPBRadiiSet(int low_limit, int high_limit) const;
+  std::string getPBRadiiSet(int index) const;
+  /// \}
+  
 private:
 
   // The first member variables pertain to totals across all systems: atoms, potential function
@@ -51,24 +140,34 @@ private:
   int total_cmap_surfaces;  ///< Total number of unique CMAP surfaces
 
   // The presence of periodic boundaries or an implicit solvent must be common to all systems, as
-  // must the cutoff and other run parameters, although these are contained in out data structres.
-  // If an implicit solvent model is in effect, its parameters are taken as common to all systems.
-  // Other facets of the the system behavior, such as bond constraints, must also be common to
-  // all systems.
-  UnitCellType periodic_box_class;    ///< The type of unit cell; either NONE or any combination of
-                                      ///< ORTHORHOMBIC and TRICLINIC is acceptable
+  // must the cutoff and other run parameters, although these are contained in other data
+  // structres.  If an implicit solvent model is in effect, its parameters are taken as common to
+  // all systems.  Other facets of the the system behavior, such as bond constraints, must also
+  // be common to all systems.
+  UnitCellType periodic_box_class;    ///< The type of unit cell.  The type can be NONE, but all
+                                      ///<   systems must then have no unit cell boundaries.  If
+                                      ///<   all but one system is ORTHORHOMBIC and the final
+                                      ///<   system is TRICLINIC, the cell type will be TRICLINIC.
   ImplicitSolventModel gb_style;      ///< The flavor of Generalized Born (or other implicit
-                                      ///<   solvent) to use, i.e. Hawkins / Cramer / Truhlar.
+                                      ///<   solvent) to use, i.e. Hawkins / Cramer / Truhlar.  All
+                                      ///<   systems must share the same implicit solvent model
+                                      ///<   type, and the unit cell type must be NONE if any
+                                      ///<   implicit solvent model is in effect.
   double dielectric_constant;         ///< Dielectric constant to take for implicit solvent
                                       ///<   calculations
   double salt_concentration;          ///< Salt concentration affecting implicit solvent models
   double coulomb_constant;            ///< Coulomb's constant in units of kcal-A/mol-e^2 (Amber
                                       ///<   differs from other programs in terms of what this is,
                                       ///<   so it can be set here)
-  std::string pb_radii_set;           ///< The Poisson-Boltzmann radii set, also used in GB
   ShakeSetting use_bond_constraints;  ///< Toggles use of bond length constraints
   SettleSetting use_settle;           ///< Toggles analytic constraints on rigid water
   char4 water_residue_name;           ///< Name of water residue, compared to residue_names
+
+  /// Names of the Poisson-Boltzmann radii sets for each system, also used in GB.  While it is
+  /// typical to use a prescribed radii set with a particular GB model, the choice is not limited.
+  /// Therefore, each system may operate with a different set of radii, provided that they pass
+  /// any particular requirements of the common GB model in use.
+  std::vector<std::string> pb_radii_sets;
 
   /// An array of pointers to the individual topologies that form the basis of this work plan
   /// (this array is topology_count in length and accessible only on the host as it is used to

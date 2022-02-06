@@ -561,6 +561,19 @@ struct AtomGraph {
   /// \brief Get the simulation cell type (isolated boundary conditions, rectilinear, triclinic)
   UnitCellType getUnitCellType() const;
 
+  /// \brief Get the implicit solvent model type, i.e. some flavor of GB or NONE.
+  ImplicitSolventModel getImplicitSolventModel() const;
+
+  /// \brief Get the dielectric constant (part of the implicit solvent setup)
+  double getDielectricConstant() const;
+
+  /// \brief Get the salt concentration (part of the implicit solvent setup)
+  double getSaltConcentration() const;
+
+  /// \brief Get the fundamental coulomb constant that this system uses in electrostatic
+  ///        calculations.
+  double getCoulombConstant() const;
+  
   /// \brief Get the PB Radii set
   std::string getPBRadiiSet() const;
 
@@ -764,6 +777,20 @@ struct AtomGraph {
   ChemicalDetailsKit
   getChemicalDetailsKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a double-precision abstract for placing virtual sites and transmitting their
+  ///        forces to frame atoms with mass.
+  ///
+  /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
+  VirtualSiteKit<double>
+  getDoublePrecisionVirtualSiteKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get a single-precision abstract for placing virtual sites and transmitting their
+  ///        forces to frame atoms with mass.
+  ///
+  /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
+  VirtualSiteKit<float>
+  getSinglePrecisionVirtualSiteKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
 #ifdef OMNI_USE_HPC
   /// \brief Push all data to the device
   void upload();
@@ -772,6 +799,11 @@ struct AtomGraph {
   void download();
 #endif
 
+  /// \brief Set the source file for the topology.  Primary use is to impart a destination file
+  ///        for a topology to be written to disk, but can also be used to "disguise" one topology
+  ///        from another even if both are from the same original file.
+  void setSource(const std::string &new_source);
+  
   /// \brief Set the implicit solvent model.  This will leverage a lot of hard-coded constants
   ///        to fill out some allocated but otherwise blank arrays and impart one particular
   ///        Generalized Born or other implicit solvent method.
@@ -786,7 +818,7 @@ struct AtomGraph {
                                double saltcon_in = 0.0,
                                AtomicRadiusSet radii_set = AtomicRadiusSet::NONE,
                                ExceptionResponse policy = ExceptionResponse::WARN);
-
+  
 private:
 
   // Title, version, and date stamps found in this topology

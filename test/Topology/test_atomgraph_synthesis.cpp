@@ -40,11 +40,13 @@ int main(int argc, char* argv[]) {
                             getDrivePathType(trpcage_nbfix_top_name) == DrivePathType::FILE &&
                             getDrivePathType(ubiquitin_top_name) == DrivePathType::FILE);
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  AtomGraph tip3p_ag, tip4p_ag, trpcage_ag, nbfix_ag, ubiquitin_ag;
+  AtomGraph tip3p_ag, tip4p_ag, trpcage_ag, trpcage2_ag, trpcage3_ag, nbfix_ag, ubiquitin_ag;
   if (files_exist) {
     tip3p_ag.buildFromPrmtop(tip3p_top_name);
     tip4p_ag.buildFromPrmtop(tip4p_top_name);
     trpcage_ag.buildFromPrmtop(trpcage_top_name);
+    trpcage2_ag.buildFromPrmtop(trpcage_top_name);
+    trpcage3_ag.buildFromPrmtop(trpcage_top_name);
     nbfix_ag.buildFromPrmtop(trpcage_nbfix_top_name);
     ubiquitin_ag.buildFromPrmtop(ubiquitin_top_name);
   }
@@ -56,10 +58,15 @@ int main(int argc, char* argv[]) {
            "be skipped.", "test_atomgraph_synthesis");
   }
 
+  // Set one of the Trp-cage systems to have a different topology source name.  This will trick
+  // the synthesis generator into thinking that this is a unique system, whereas the third copy
+  // is not, leaving six (not seven) total topologies in the synthesis.
+  trpcage2_ag.setSource(trpcage_top_name + "_2");
+
   // Create the synthesis
-  const std::vector<AtomGraph*> all_tops = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &nbfix_ag,
-                                             &ubiquitin_ag };
-  const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 4, 2, 1, 1, 3 };
+  const std::vector<AtomGraph*> all_tops = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &trpcage2_ag,
+                                             &trpcage3_ag, &nbfix_ag, &ubiquitin_ag };
+  const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6 };
   AtomGraphSynthesis synth(all_tops, system_ids);
   
   // Summary evaluation

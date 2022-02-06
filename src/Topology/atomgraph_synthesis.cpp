@@ -1,6 +1,7 @@
 #include "Math/rounding.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
 #include "atomgraph_synthesis.h"
@@ -17,6 +18,7 @@ using math::minValue;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::sum;
+using parse::realToString;
 using testing::Approx;
 using topology::ChemicalDetailsKit;
 using topology::NonbondedKit;
@@ -33,8 +35,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     total_dihe_params{0}, total_ubrd_params{0}, total_cimp_params{0}, total_cmap_surfaces{0},
     periodic_box_class{UnitCellType::NONE}, gb_style{ImplicitSolventModel::NONE},
     dielectric_constant{1.0}, salt_concentration{0.0}, coulomb_constant{accepted_coulomb_constant},
-    pb_radii_set{""}, use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
-    water_residue_name{' ', ' ', ' ', ' '},
+    use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
+    water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
     topologies{topologies_in},
     topology_indices{HybridKind::POINTER, "tpsyn_indices"},
     atom_counts{HybridKind::POINTER, "typsyn_atom_counts"},
@@ -58,6 +60,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     degrees_of_freedom{HybridKind::POINTER, "typsyn_deg_freedom"},
     nonrigid_particle_counts{HybridKind::POINTER, "typsyn_n_nonrigid"},
     atom_offsets{HybridKind::POINTER, "typsyn_atom_offsets"},
+    residue_offsets{HybridKind::POINTER, "typsyn_res_offsets"},
+    molecule_offsets{HybridKind::POINTER, "typsyn_res_offsets"},
     ubrd_term_offsets{HybridKind::POINTER, "typsyn_ubrd_offset"},
     cimp_term_offsets{HybridKind::POINTER, "typsyn_cimp_offset"},
     cmap_term_offsets{HybridKind::POINTER, "typsyn_cmap_offset"},
@@ -87,54 +91,54 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     urey_bradley_parameter_indices{HybridKind::ARRAY, "tpsyn_urey_parm"},
     charmm_impr_parameter_indices{HybridKind::ARRAY, "tpsyn_cimp_parm"},
     cmap_surface_indices{HybridKind::ARRAY, "tpsyn_cmap_parm"},
-    cmap_surface_dimensions{HybridKind::ARRAY, "tpsyn_"},
-    urey_bradley_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    urey_bradley_equilibria{HybridKind::ARRAY, "tpsyn_"},
-    charmm_impr_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    charmm_impr_phase_angles{HybridKind::ARRAY, "tpsyn_"},
-    cmap_surfaces{HybridKind::ARRAY, "tpsyn_"},
-    sp_urey_bradley_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    sp_urey_bradley_equilibria{HybridKind::ARRAY, "tpsyn_"},
-    sp_charmm_impr_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    sp_charmm_impr_phase_angles{HybridKind::ARRAY, "tpsyn_"},
-    sp_cmap_surfaces{HybridKind::ARRAY, "tpsyn_"},
-    bond_parameter_indices{HybridKind::ARRAY, "tpsyn_"},
-    angl_parameter_indices{HybridKind::ARRAY, "tpsyn_"},
-    dihe_parameter_indices{HybridKind::ARRAY, "tpsyn_"},
-    bond_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    bond_equilibria{HybridKind::ARRAY, "tpsyn_"},
-    angl_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    angl_equilibria{HybridKind::ARRAY, "tpsyn_"},
-    dihe_amplitudes{HybridKind::ARRAY, "tpsyn_"},
-    dihe_periodicities{HybridKind::ARRAY, "tpsyn_"},
-    dihe_phase_angles{HybridKind::ARRAY, "tpsyn_"},
-    sp_bond_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    sp_bond_equilibria{HybridKind::ARRAY, "tpsyn_"},
-    sp_angl_stiffnesses{HybridKind::ARRAY, "tpsyn_"},
-    sp_angl_equilibria{HybridKind::ARRAY, "tpsyn_"},
-    sp_dihe_amplitudes{HybridKind::ARRAY, "tpsyn_"},
-    sp_dihe_periodicities{HybridKind::ARRAY, "tpsyn_"},
-    sp_dihe_phase_angles{HybridKind::ARRAY, "tpsyn_"},
-    nmr_initial_steps{HybridKind::ARRAY, "tpsyn_"},
-    nmr_final_steps{HybridKind::ARRAY, "tpsyn_"},
-    nmr_increments{HybridKind::ARRAY, "tpsyn_"},
-    nmr_k_initial_values{HybridKind::ARRAY, "tpsyn_"},
-    nmr_r_initial_values{HybridKind::ARRAY, "tpsyn_"},
-    nmr_k_final_values{HybridKind::ARRAY, "tpsyn_"},
-    nmr_r_final_values{HybridKind::ARRAY, "tpsyn_"},
-    sp_nmr_k_initial_values{HybridKind::ARRAY, "tpsyn_"},
-    sp_nmr_r_initial_values{HybridKind::ARRAY, "tpsyn_"},
-    sp_nmr_k_final_values{HybridKind::ARRAY, "tpsyn_"},
-    sp_nmr_r_final_values{HybridKind::ARRAY, "tpsyn_"},
-    atom_imports{HybridKind::ARRAY, "tpsyn_"},
-    vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_"},
-    bond_instructions{HybridKind::ARRAY, "tpsyn_"},
-    angl_instructions{HybridKind::ARRAY, "tpsyn_"},
-    dihe_instructions{HybridKind::ARRAY, "tpsyn_"},
-    cmap_instructions{HybridKind::ARRAY, "tpsyn_"},
-    nmr2_instructions{HybridKind::ARRAY, "tpsyn_"},
-    nmr3_instructions{HybridKind::ARRAY, "tpsyn_"},
-    nmr4_instructions{HybridKind::ARRAY, "tpsyn_"}
+    cmap_surface_dimensions{HybridKind::ARRAY, "tpsyn_cmap_surface"},
+    urey_bradley_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff"},
+    urey_bradley_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil"},
+    charmm_impr_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff"},
+    charmm_impr_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil"},
+    cmap_surfaces{HybridKind::ARRAY, "tpsyn_cmap_surf"},
+    sp_urey_bradley_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff_sp"},
+    sp_urey_bradley_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil_sp"},
+    sp_charmm_impr_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff_sp"},
+    sp_charmm_impr_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil_sp"},
+    sp_cmap_surfaces{HybridKind::ARRAY, "tpsyn_cmap_surf_sp"},
+    bond_parameter_indices{HybridKind::ARRAY, "tpsyn_bond_parm"},
+    angl_parameter_indices{HybridKind::ARRAY, "tpsyn_angl_parm"},
+    dihe_parameter_indices{HybridKind::ARRAY, "tpsyn_dihe_parm"},
+    bond_stiffnesses{HybridKind::ARRAY, "tpsyn_bondk"},
+    bond_equilibria{HybridKind::ARRAY, "tpsyn_bondl0"},
+    angl_stiffnesses{HybridKind::ARRAY, "tpsyn_anglk"},
+    angl_equilibria{HybridKind::ARRAY, "tpsyn_anglt0"},
+    dihe_amplitudes{HybridKind::ARRAY, "tpsyn_dihek"},
+    dihe_periodicities{HybridKind::ARRAY, "tpsyn_dihen"},
+    dihe_phase_angles{HybridKind::ARRAY, "tpsyn_dihepsi"},
+    sp_bond_stiffnesses{HybridKind::ARRAY, "tpsyn_bondk_sp"},
+    sp_bond_equilibria{HybridKind::ARRAY, "tpsyn_bondl0_sp"},
+    sp_angl_stiffnesses{HybridKind::ARRAY, "tpsyn_anglk_sp"},
+    sp_angl_equilibria{HybridKind::ARRAY, "tpsyn_anglt0_sp"},
+    sp_dihe_amplitudes{HybridKind::ARRAY, "tpsyn_dihek_sp"},
+    sp_dihe_periodicities{HybridKind::ARRAY, "tpsyn_dihen_sp"},
+    sp_dihe_phase_angles{HybridKind::ARRAY, "tpsyn_dihepsi_sp"},
+    nmr_initial_steps{HybridKind::ARRAY, "tpsyn_nmr_init_step"},
+    nmr_final_steps{HybridKind::ARRAY, "tpsyn_nmr_final_step"},
+    nmr_increments{HybridKind::ARRAY, "tpsyn_nmr_inc"},
+    nmr_k_initial_values{HybridKind::ARRAY, "tpsyn_k_init"},
+    nmr_r_initial_values{HybridKind::ARRAY, "tpsyn_r_init"},
+    nmr_k_final_values{HybridKind::ARRAY, "tpsyn_k_final"},
+    nmr_r_final_values{HybridKind::ARRAY, "tpsyn_r_final"},
+    sp_nmr_k_initial_values{HybridKind::ARRAY, "tpsyn_k_init_sp"},
+    sp_nmr_r_initial_values{HybridKind::ARRAY, "tpsyn_r_init_sp"},
+    sp_nmr_k_final_values{HybridKind::ARRAY, "tpsyn_k_final_sp"},
+    sp_nmr_r_final_values{HybridKind::ARRAY, "tpsyn_r_final_sp"},
+    atom_imports{HybridKind::ARRAY, "tpsyn_atom_imports"},
+    vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
+    bond_instructions{HybridKind::ARRAY, "tpsyn_bond_insr"},
+    angl_instructions{HybridKind::ARRAY, "tpsyn_angl_insr"},
+    dihe_instructions{HybridKind::ARRAY, "tpsyn_dihe_insr"},
+    cmap_instructions{HybridKind::ARRAY, "tpsyn_cmap_insr"},
+    nmr2_instructions{HybridKind::ARRAY, "tpsyn_nmr2_insr"},
+    nmr3_instructions{HybridKind::ARRAY, "tpsyn_nmr3_insr"},
+    nmr4_instructions{HybridKind::ARRAY, "tpsyn_nmr4_insr"}
 {
   // Check that no system indexes a topology outside of the given list
   if (maxValue(topology_indices_in) >= topology_count || minValue(topology_indices_in) < 0) {
@@ -146,7 +150,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   // analysis of the uniqueness of each topology.
   std::vector<bool> topology_unique(topology_count, false);
   for (int i = 0; i < system_count; i++) {
-    topology_unique[topology_indices.readHost(i)] = true;
+    topology_unique[topology_indices_in[i]] = true;
   }
   int n_unused_topology = 0;
   for (int i = 0; i < topology_count; i++) {
@@ -157,7 +161,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
            std::to_string(n_unused_topology) + " are not referenced by any systems in this "
            "synthesis.", "AtomGraphSynthesis");
   }
-
+  
   // Check that all topologies are, in fact, unique.  Compact the list if necessary and update
   // the system topology indexing.
   for (int i = 0; i < topology_count; i++) {
@@ -174,13 +178,58 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   std::vector<int> topology_index_rebase(topology_count, -1);
   int n_unique_top = 0;
   for (int i = 0; i < topology_count; i++) {
+    topology_index_rebase[i] = n_unique_top;
+    topologies[n_unique_top] = topologies[i];
     if (topology_unique[i]) {
-      topology_index_rebase[i] = n_unique_top;
-      topologies[n_unique_top] = topologies[i];
       n_unique_top++;
     }
   }
   topology_count = n_unique_top;
+  if (topology_count == 0) {
+    rtErr("No topologies were detected to describe " + std::to_string(system_count) + " systems.",
+          "AtomGraphSynthesis");
+  }
+  if (system_count == 0) {
+    rtErr("No systems making use of any of the " + std::to_string(topology_count) +
+          " topologies were detected.", "AtomGraphSynthesis");
+  }
+  
+  // Check that all topologies contain compatible boundary conditions and solvent models
+  periodic_box_class = topologies[0]->getUnitCellType();
+  gb_style = topologies[0]->getImplicitSolventModel();
+  dielectric_constant = topologies[0]->getDielectricConstant();
+  salt_concentration = topologies[0]->getSaltConcentration();
+  coulomb_constant = topologies[0]->getCoulombConstant();
+  const Approx appr_dielcon(dielectric_constant, constants::tiny);
+  const Approx appr_saltcon(salt_concentration, constants::tiny);
+  const Approx appr_coulomb(coulomb_constant, constants::tiny);
+  for (int i = 1; i < topology_count; i++) {
+    if (topologies[i]->getImplicitSolventModel() != gb_style) {
+      rtErr("All topologies must have a consistent implicit solvent model setting.  The first, "
+            "set to " + getImplicitSolventModelName(gb_style) + ", does not agree with topology " +
+            std::to_string(i + 1) + ", using " +
+            getImplicitSolventModelName(topologies[i]->getImplicitSolventModel()) + ".",
+            "AtomGraphSynthesis");
+    }
+    if (appr_dielcon.test(topologies[i]->getDielectricConstant()) == false) {
+      rtErr("All topologies must have a consistent dielectric constant, but values of " +
+            realToString(dielectric_constant) + " and " +
+            realToString(topologies[i]->getDielectricConstant()) + " were found."
+            "AtomGraphSynthesis");
+    }
+    if (appr_saltcon.test(topologies[i]->getSaltConcentration()) == false) {
+      rtErr("All systems must use the same salt concentration.  Values of " +
+            realToString(salt_concentration) + " and " +
+            realToString(topologies[i]->getSaltConcentration()) + " were found.",
+            "AtomGraphSynthesis");
+    }
+    if (appr_coulomb.test(topologies[i]->getCoulombConstant()) == false) {
+      rtErr("All topologies must make use of the same definitions of physical constants.  "
+            "Coulomb's constant is defined as " + realToString(coulomb_constant, 6) +
+            " in the first topology and " + realToString(topologies[i]->getCoulombConstant()) +
+            " in topology " + std::to_string(i + 1) + ".", "AtomGraphSynthesis");
+    }
+  }
   
   // Allocate memory and set POINTER-kind arrays for the small packets of data
   const int padded_system_count = roundUp(system_count, warp_size_int);
@@ -249,7 +298,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   virtual_site_offsets.setPointer(&int_system_data, 0, system_count);
   pivot += padded_system_count;
   nb_exclusion_offsets.setPointer(&int_system_data, 0, system_count);
-
+  
   // Load the topology indexing first
   for (int i = 0; i < system_count; i++) {
     topology_indices.putHost(topology_index_rebase[topology_indices_in[i]], i);
@@ -347,6 +396,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   // Compute the numbers of unique parameters.  Take the opportunity to compute offsets (starting
   // bounds) for various sets of terms.
   int max_unique_atom = 0;
+  int max_unique_vste = 0;
   int max_unique_bond = 0;
   int max_unique_angl = 0;
   int max_unique_dihe = 0;
@@ -356,6 +406,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   int max_unique_chrg = 0;
   int max_unique_atyp = 0;
   std::vector<int> topology_atom_offsets(topology_count);
+  std::vector<int> topology_virtual_site_offsets(topology_count);
   std::vector<int> topology_bond_table_offsets(topology_count);
   std::vector<int> topology_angl_table_offsets(topology_count);
   std::vector<int> topology_dihe_table_offsets(topology_count);
@@ -366,10 +417,12 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   std::vector<int> topology_atyp_table_offsets(topology_count);
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* ag_ptr = topologies[i];
-    const ChemicalDetailsKit cdk   = ag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> nbk = ag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> vk    = ag_ptr->getDoublePrecisionValenceKit();
+    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
     topology_atom_offsets[i] = max_unique_atom;
+    topology_virtual_site_offsets[i] = max_unique_vste;
     topology_bond_table_offsets[i] = max_unique_bond;
     topology_angl_table_offsets[i] = max_unique_angl;
     topology_dihe_table_offsets[i] = max_unique_dihe;
@@ -379,6 +432,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     topology_chrg_table_offsets[i] = max_unique_chrg;
     topology_atyp_table_offsets[i] = max_unique_atyp;
     max_unique_atom += cdk.natom;
+    max_unique_vste += vsk.nsite;
     max_unique_bond += vk.nbond_param;
     max_unique_angl += vk.nangl_param;
     max_unique_dihe += vk.ndihe_param;
@@ -665,6 +719,10 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     }
   }
 
+  // Record synthesis parameters found thus far
+  total_atoms = max_unique_atom;
+  total_virtual_sites = max_unique_vste;
+  
   // The unique Lennard-Jones parameters are hard to map out.  To the degree that there are
   // unique parameters in each system, the Lennard-Jones tables might as well be block matrices.
   // Keep a list of the A, B, and possibly C coefficients of each Lennard-Jones type interacting
@@ -691,7 +749,7 @@ void AtomGraphSynthesis::extendLJMatrices() {
   std::vector<double3> diag_entries;
   std::vector<int> lj_type_bounds(topology_count + 1, 0);
   for (int i = 0; i < topology_count; i++) {
-    lj_type_bounds[i + 1] = topologies[i]->getAtomTypeCount();
+    lj_type_bounds[i + 1] = lj_type_bounds[i] + topologies[i]->getAtomTypeCount();
   }
   const int total_types = lj_type_bounds[topology_count];
   std::vector<bool> lj_coverage(total_types, false);
@@ -704,26 +762,50 @@ void AtomGraphSynthesis::extendLJMatrices() {
         continue;
       }
       const size_t matpos = (j - lj_type_bounds[i]) * (i_nbk.n_lj_types + 1);
-      const Approx ent_a(i_nbk.lja_coeff[j], 1.0e-5);
-      const Approx ent_b(i_nbk.ljb_coeff[j], 1.0e-5);
-      const Approx ent_c(i_nbk.ljc_coeff[j], 1.0e-5);
-      for (int k = i; k < topology_count; i++) {
+      const Approx ent_a(i_nbk.lja_coeff[matpos], 1.0e-5);
+      const Approx ent_b(i_nbk.ljb_coeff[matpos], 1.0e-5);
+      const Approx ent_c(i_nbk.ljc_coeff[matpos], 1.0e-5);
+      for (int k = i; k < topology_count; k++) {
         const int mstart = (k == i) ? j : lj_type_bounds[k];
         const NonbondedKit<double> k_nbk = topologies[k]->getDoublePrecisionNonbondedKit();
-        for (int m = mstart; m < lj_type_bounds[i + 1]; m++) {
+        for (int m = mstart; m < lj_type_bounds[k + 1]; m++) {
           const size_t testpos = (m - lj_type_bounds[k]) * (k_nbk.n_lj_types + 1);
-          if (lj_coverage[m] == false && ent_a.test(k_nbk.lja_coeff[k]) &&
-              ent_b.test(k_nbk.ljb_coeff[k]) && ent_c.test(k_nbk.ljc_coeff[k])) {
+          if (lj_coverage[m] == false && ent_a.test(k_nbk.lja_coeff[testpos]) &&
+              ent_b.test(k_nbk.ljb_coeff[testpos]) && ent_c.test(k_nbk.ljc_coeff[testpos])) {
             lj_coverage[m] = true;
             lj_diagtypes[m] = n_unique_diags;
           }
         }
       }
-      diag_entries.push_back({i_nbk.lja_coeff[j], i_nbk.ljb_coeff[j], i_nbk.ljc_coeff[j]});
-      n_unique_diags;
+      diag_entries.push_back({i_nbk.lja_coeff[matpos], i_nbk.ljb_coeff[matpos],
+                              i_nbk.ljc_coeff[matpos]});
+      n_unique_diags++;
     }
   }
 
+  // CHECK
+#if 0
+  printf("Global LJ IDs (%d topologies) = [\n", topology_count);
+  for (int i = 0; i < topology_count; i++) {
+    printf("%4d -> %4d    ", topologies[i]->getAtomTypeCount(),
+           lj_type_bounds[i + 1] - lj_type_bounds[i]);
+  }
+  printf("\n];\n");
+  for (int i = 0; i < n_unique_diags; i++) {
+    for (int j = 0; j < topology_count; j++) {
+      if (lj_type_bounds[j + 1] - lj_type_bounds[j] > i) {
+        printf("%4d ", lj_diagtypes[lj_type_bounds[j] + i]);
+      }
+      else {
+        printf("     ");
+      }
+    }
+    printf("\n");
+  }
+  printf("];\n");
+#endif
+  // END CHECK
+  
   // Loop back over each topology and find all cross-terms involving the various diagonals.
   // Fill out a map of the numbers of unique cross-terms.
   std::vector<double3> lj_entries;
@@ -768,6 +850,21 @@ void AtomGraphSynthesis::extendLJMatrices() {
     }
   }
 
+  // CHECK
+#if 0
+  printf("matrix_ideas = [\n");
+  int jj = 0;
+  for (int i = 0; i < n_unique_diags; i++) {
+    for (int j = i; j < n_unique_diags; j++) {
+      printf(" %d", lj_entry_bounds[jj + 1] - lj_entry_bounds[jj]);
+      jj++;
+    }
+    printf("\n");
+  }
+  printf("];\n");
+#endif
+  // END CHECK
+  
   // Loop back over the compiled matrix and find cases where a single type pair interaction
   // can have more than a single set of Lennard-Jones A, B, and C coefficients.  Split those
   // N unique sets of values across ceil(sqrt(N)) different sub-types of each atom.
@@ -779,17 +876,33 @@ void AtomGraphSynthesis::extendLJMatrices() {
       switch (n_takes) {
       case 1:
         n_type_copy[i] = std::max(n_type_copy[i], 1);
+        break;
       case 4:
         n_type_copy[i] = std::max(n_type_copy[i], 2);
+        break;
       case 9:
         n_type_copy[i] = std::max(n_type_copy[i], 3);
+        break;
       default:
         n_type_copy[i] = std::max(n_type_copy[i], static_cast<int>(ceil(sqrt(n_takes))));
+        break;
       }
+      pos++;
     }
   }
   prefixSumInPlace<int>(&n_type_copy, PrefixSumType::EXCLUSIVE, "ExtendLJMatrices");
 
+  // CHECK
+#if 0
+  printf("LJ types = [\n");
+  for (int i = 0; i < n_unique_diags; i++) {
+    printf("  %12.4lf %12.4lf %12.4lf  %2d\n", diag_entries[i].x, diag_entries[i].y,
+           diag_entries[i].z, n_type_copy[i]);
+  }
+  printf("];\n");
+#endif
+  // END CHECK
+  
   // Expand the matrices of Lennard-Jones atom types
   for (int i = 0; i < n_unique_diags; i++) {
     for (int j = n_type_copy[i]; j < n_type_copy[i + 1]; j++) {
@@ -798,5 +911,150 @@ void AtomGraphSynthesis::extendLJMatrices() {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getTopologyCount() const {
+  return topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getSystemCount() const {
+  return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getAtomCount() const {
+  return total_atoms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getVirtualSiteCount() const {
+  return total_virtual_sites;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getBondTermCount() const {
+  return total_bond_terms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getAngleTermCount() const {
+  return total_angl_terms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getDihedralTermCount() const {
+  return total_dihe_terms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getUreyBradleyTermCount() const {
+  return total_ubrd_terms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getCharmmImproperTermCount() const {
+  return total_cimp_terms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getCmapTermCount() const {
+  return total_cmap_terms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getAtomTypeCount() const {
+  return total_atom_types;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getChargeTypeCount() const {
+  return total_charge_types;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getBondParameterCount() const {
+  return total_bond_params;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getAngleParameterCount() const {
+  return total_angl_params;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getDihedralParameterCount() const {
+  return total_dihe_params;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getUreyBradleyParameterCount() const {
+  return total_ubrd_params;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getCharmmImproperParameterCount() const {
+  return total_cimp_params;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getCmapSurfaceCount() const {
+  return total_cmap_surfaces;
+}
+
+//-------------------------------------------------------------------------------------------------
+UnitCellType AtomGraphSynthesis::getUnitCellType() const {
+  return periodic_box_class;
+}
+
+//-------------------------------------------------------------------------------------------------
+ImplicitSolventModel AtomGraphSynthesis::getImplicitSolventModel() const {
+  return gb_style;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraphSynthesis::getDielectricConstant() const {
+  return dielectric_constant;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraphSynthesis::getSaltConcentration() const {
+  return salt_concentration;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraphSynthesis::getCoulombConstant() const {
+  return coulomb_constant;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<std::string> AtomGraphSynthesis::getPBRadiiSet() const {
+  return pb_radii_sets;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<std::string> AtomGraphSynthesis::getPBRadiiSet(const int low_limit,
+                                                           const int high_limit) const {
+  if (high_limit < low_limit || high_limit < 0 || low_limit < 0 || high_limit > system_count ||
+      low_limit > system_count) {
+    rtErr("The requested range " + std::to_string(low_limit) + " - " + std::to_string(high_limit) +
+          " is invalid for a collection of " + std::to_string(system_count) + " systems.",
+          "AtomGraphSynthesis", "getPBRadiiSet");
+  }
+  std::vector<std::string> result(high_limit - low_limit);
+  for (int i = low_limit; i < high_limit; i++) {
+    result[i - low_limit] = pb_radii_sets[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
+  if (index < 0 || index > system_count) {
+    rtErr("The index " + std::to_string(index) + " is invalid for a collection of " +
+          std::to_string(system_count) + " systems.", "AtomGraphSynthesis", "getPBRadiiSet");
+  }
+  return pb_radii_sets[index];
+}
+  
 } // namespace topology
 } // namespace omni

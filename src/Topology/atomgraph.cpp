@@ -101,8 +101,8 @@ AtomGraph::AtomGraph() :
     cmap_assigned_bounds{HybridKind::POINTER, "tp_cmap_asbounds"},
     urey_bradley_stiffnesses{HybridKind::POINTER, "tp_ub_stiffness"},
     urey_bradley_equilibria{HybridKind::POINTER, "tp_ub_equilibria"},
-    charmm_impr_stiffnesses{HybridKind::POINTER, "tp_ub_stiffness"},
-    charmm_impr_phase_angles{HybridKind::POINTER, "tp_ub_equilibria"},
+    charmm_impr_stiffnesses{HybridKind::POINTER, "tp_cimp_stiffness"},
+    charmm_impr_phase_angles{HybridKind::POINTER, "tp_cimp_equilibria"},
     cmap_surfaces{HybridKind::POINTER, "tp_cmap_surface"},
     cmap_phi_derivatives{HybridKind::POINTER, "tp_cmap_dphi"},
     cmap_psi_derivatives{HybridKind::POINTER, "tp_cmap_dphi"},
@@ -3098,6 +3098,26 @@ UnitCellType AtomGraph::getUnitCellType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+ImplicitSolventModel AtomGraph::getImplicitSolventModel() const {
+  return gb_style;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraph::getDielectricConstant() const {
+  return dielectric_constant;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraph::getSaltConcentration() const {
+  return salt_concentration;
+}
+
+//-------------------------------------------------------------------------------------------------
+double AtomGraph::getCoulombConstant() const {
+  return coulomb_constant;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getPBRadiiSet() const {
   return pb_radii_set;
 }
@@ -3430,6 +3450,34 @@ ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(HybridTargetLevel tier) cons
                             molecule_limits.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+VirtualSiteKit<double>
+AtomGraph::getDoublePrecisionVirtualSiteKit(const HybridTargetLevel tier) const {
+  return VirtualSiteKit<double>(virtual_site_count, virtual_site_atoms.data(tier),
+                                virtual_site_frame_types.data(tier),
+                                virtual_site_frame1_atoms.data(tier),
+                                virtual_site_frame2_atoms.data(tier),
+                                virtual_site_frame3_atoms.data(tier),
+                                virtual_site_frame4_atoms.data(tier),
+                                virtual_site_frame_dim1.data(tier),
+                                virtual_site_frame_dim2.data(tier),
+                                virtual_site_frame_dim3.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+VirtualSiteKit<float>
+AtomGraph::getSinglePrecisionVirtualSiteKit(const HybridTargetLevel tier) const {
+  return VirtualSiteKit<float>(virtual_site_count, virtual_site_atoms.data(tier),
+                               virtual_site_frame_types.data(tier),
+                               virtual_site_frame1_atoms.data(tier),
+                               virtual_site_frame2_atoms.data(tier),
+                               virtual_site_frame3_atoms.data(tier),
+                               virtual_site_frame4_atoms.data(tier),
+                               sp_virtual_site_frame_dim1.data(tier),
+                               sp_virtual_site_frame_dim2.data(tier),
+                               sp_virtual_site_frame_dim3.data(tier));
+}
+
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void AtomGraph::upload() {
@@ -3447,6 +3495,11 @@ void AtomGraph::download() {
   char4_data.download();
 }
 #endif
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setSource(const std::string &new_source) {
+  source = new_source;
+}
 
 //-------------------------------------------------------------------------------------------------
 void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,

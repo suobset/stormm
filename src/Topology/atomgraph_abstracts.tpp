@@ -119,5 +119,17 @@ ImplicitSolventKit<T>::ImplicitSolventKit(int natom_in, ImplicitSolventModel igb
     gb_alpha{gb_alpha_in}, gb_beta{gb_beta_in}, gb_gamma{gb_gamma_in}
 {}
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+VirtualSiteKit<T>::VirtualSiteKit(const int nsite_in, const int* vs_atoms_in,
+                                  const int* vs_types_in, const int* frame1_idx_in,
+                                  const int* frame2_idx_in, const int* frame3_idx_in,
+                                  const int* frame4_idx_in, const T* dim1_in, const T* dim2_in,
+                                  const T* dim3_in) :
+    nsite{nsite_in}, vs_atoms{vs_atoms_in}, vs_types{vs_types_in}, frame1_idx{frame1_idx_in},
+    frame2_idx{frame2_idx_in}, frame3_idx{frame3_idx_in}, frame4_idx{frame4_idx_in},
+    dim1{dim1_in}, dim2{dim2_in}, dim3{dim3_in}
+{}
+
 } // namespace topology
 } // namespace omni
