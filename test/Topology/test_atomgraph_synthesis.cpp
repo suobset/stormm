@@ -25,6 +25,12 @@ int main(int argc, char* argv[]) {
   // Section 1
   section("Test AtomGraphSynthesis layout");
 
+  // Section 2
+  section("Test molecular mechanics potential calculations");
+
+  // Section 3
+  section("Traps for bad input");
+  
   // Create some vectors of random numbers, then upload them and test what happens when perturbing
   // atomic coordinates by these numbers.
   const char osc = osSeparator();
@@ -34,13 +40,16 @@ int main(int argc, char* argv[]) {
   const std::string trpcage_top_name = base_top_name + osc + "trpcage_in_water.top";
   const std::string trpcage_nbfix_top_name = base_top_name + osc + "trpcage_in_water_nbfix.top";
   const std::string ubiquitin_top_name = base_top_name + osc + "ubiquitin.top";
+  const std::string brbz_vs_top_name = base_top_name + osc + "bromobenzene_vs.top";
   const bool files_exist = (getDrivePathType(tip3p_top_name) == DrivePathType::FILE &&
                             getDrivePathType(tip4p_top_name) == DrivePathType::FILE &&
                             getDrivePathType(trpcage_top_name) == DrivePathType::FILE &&
                             getDrivePathType(trpcage_nbfix_top_name) == DrivePathType::FILE &&
-                            getDrivePathType(ubiquitin_top_name) == DrivePathType::FILE);
+                            getDrivePathType(ubiquitin_top_name) == DrivePathType::FILE &&
+                            getDrivePathType(brbz_vs_top_name) == DrivePathType::FILE);
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  AtomGraph tip3p_ag, tip4p_ag, trpcage_ag, trpcage2_ag, trpcage3_ag, nbfix_ag, ubiquitin_ag;
+  AtomGraph tip3p_ag, tip4p_ag, trpcage_ag, trpcage2_ag, trpcage3_ag, nbfix_ag, ubiquitin_ag,
+            brbz_vs_ag;
   if (files_exist) {
     tip3p_ag.buildFromPrmtop(tip3p_top_name);
     tip4p_ag.buildFromPrmtop(tip4p_top_name);
@@ -49,6 +58,7 @@ int main(int argc, char* argv[]) {
     trpcage3_ag.buildFromPrmtop(trpcage_top_name);
     nbfix_ag.buildFromPrmtop(trpcage_nbfix_top_name);
     ubiquitin_ag.buildFromPrmtop(ubiquitin_top_name);
+    brbz_vs_ag.buildFromPrmtop(brbz_vs_top_name);
   }
   else {
     rtWarn("The topology files for the TIP3P and TIP4P water boxes as well as two versions of the "
@@ -65,9 +75,28 @@ int main(int argc, char* argv[]) {
 
   // Create the synthesis
   const std::vector<AtomGraph*> all_tops = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &trpcage2_ag,
-                                             &trpcage3_ag, &nbfix_ag, &ubiquitin_ag };
-  const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6 };
+                                             &trpcage3_ag, &nbfix_ag, &ubiquitin_ag, &brbz_vs_ag };
+  const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 7, 7 };
   AtomGraphSynthesis synth(all_tops, system_ids);
+
+  // Check various descriptors
+  section(1);
+  check(synth.getAtomCount(), RelationalOperator::EQUAL, 46892, "The topology synthesis does not "
+        "contain the expected number of atoms.", do_tests);
+  check(synth.getVirtualSiteCount(), RelationalOperator::EQUAL, 1287, "The topology synthesis "
+        "does not contain the expected number of virtual sites.", do_tests);
+  std::vector<int> valence_term_counts;
+  if (files_exist) {
+    valence_term_counts = { synth.getBondTermCount(), synth.getAngleTermCount(),
+                            synth.getDihedralTermCount(), synth.getUreyBradleyTermCount(),
+                            synth.getCharmmImproperTermCount(), synth.getCmapTermCount() };
+  }
+  else {
+    valence_term_counts = { 0, 0, 0, 0, 0, 0 };
+  }
+  const std::vector<int> valence_term_answer = { 46906, 6759, 16640, 0, 0, 71 };
+  check(valence_term_counts, RelationalOperator::EQUAL, valence_term_answer, "The topology "
+        "synthesis contains incorrect numbers of some valence terms.", do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

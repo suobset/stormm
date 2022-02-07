@@ -352,7 +352,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
           }
         }
         for (int j = 0; j < n_this_line; j++) {
-          sprintf(&line[j * width], "%*lu", width, values[llim + j].ui);
+          sprintf(&line[j * width], "%*u", width, values[llim + j].ui);
         }
         line[n_this_line * width] = '\n';
         line[n_this_line * width + 1] = '\0';

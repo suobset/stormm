@@ -76,7 +76,7 @@ std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &lab
               }
               else if (snapshot_info[i + 1] == "UNSIGNED_INTEGER") {
                 data_format = NumberFormat::UNSIGNED_INTEGER;
-                tname = getOmniScalarTypeName<ulint>();
+                tname = getOmniScalarTypeName<uint>();
               }
               else if (snapshot_info[i + 1] == "LONG_LONG_INTEGER") {
                 data_format = NumberFormat::LONG_LONG_INTEGER;
@@ -170,7 +170,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
 
   // Vectors that can hold a proper interpretation of the content
   std::vector<int> icontent;
-  std::vector<ulint> uicontent;
+  std::vector<uint> uicontent;
   std::vector<llint> llicontent;
   std::vector<ullint> ullicontent;
   std::vector<double> dcontent;
@@ -226,12 +226,12 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
     break;
   case NumberFormat::UNSIGNED_INTEGER:
     {
-      uicontent = ulintFromPolyNumeric(content);
+      uicontent = uintFromPolyNumeric(content);
       const llint maxv = maxAbsValue(uicontent);
       const int n_digits = ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01;
       width = n_digits + 1;
       digits_after_decimal = 0;
-      name_of_the_type = getOmniScalarTypeName<ulint>();
+      name_of_the_type = getOmniScalarTypeName<uint>();
     }
     break;
   case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:

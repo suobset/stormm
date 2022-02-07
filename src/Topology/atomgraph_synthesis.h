@@ -239,6 +239,7 @@ private:
   Hybrid<int> atom_offsets;           ///< Starting indices for each system's various atomic
                                       ///<   descriptor arrays, which will have eponymous
                                       ///<   names to their AtomGraph counterparts.
+  Hybrid<int> atom_bit_offsets;       ///< Starting indices for each system's bit masks.
   Hybrid<int> residue_offsets;        ///< Starting indices for each system's residue
                                       ///<   descriptor arrays
   Hybrid<int> molecule_offsets;       ///< Starting indices for each system's molecule descriptor
@@ -277,7 +278,7 @@ private:
   Hybrid<int> molecule_limits;            ///< Atomic indices marking the boundaries of molecules
                                           ///<   in the molecule_contents array
   Hybrid<int> atomic_numbers;             ///< Atomic numbers for atoms in all systems
-  Hybrid<int> mobile_atoms;               ///< Atom mobility masks for each system
+  Hybrid<uint> mobile_atoms;              ///< Atom mobility masks for each system
   Hybrid<int> molecule_membership;        ///< Distinct molecules, indexed from 0 for each system,
                                           ///<   indicating molecules to which each atom belongs
   Hybrid<int> molecule_contents;          ///< Indices of atoms making up each molecule, starting
@@ -332,6 +333,29 @@ private:
   Hybrid<float> sp_dihe_periodicities;   ///< Periodicities of torsion terms (single precision)
   Hybrid<float> sp_dihe_phase_angles;    ///< Phase angles of torsion terms (single precision)
 
+  // Valence term indexing arrays, all of them indexing atoms in the synthesis list, updated from
+  // the indexing in their original topologies
+  Hybrid<int> ubrd_i_atoms;  ///< Urey-Bradley I atoms
+  Hybrid<int> ubrd_k_atoms;  ///< Urey-Bradley K atoms
+  Hybrid<int> cimp_i_atoms;  ///< CHARMM improper I atoms
+  Hybrid<int> cimp_j_atoms;  ///< CHARMM improper J atoms
+  Hybrid<int> cimp_k_atoms;  ///< CHARMM improper K atoms (the center atom of the quartet)
+  Hybrid<int> cimp_l_atoms;  ///< CHARMM improper L atoms
+  Hybrid<int> cmap_i_atoms;  ///< Correction map I atoms
+  Hybrid<int> cmap_j_atoms;  ///< Correction map J atoms
+  Hybrid<int> cmap_k_atoms;  ///< Correction map K atoms
+  Hybrid<int> cmap_l_atoms;  ///< Correction map L atoms
+  Hybrid<int> cmap_m_atoms;  ///< Correction map M atoms
+  Hybrid<int> bond_i_atoms;  ///< Harmonic bond I atoms
+  Hybrid<int> bond_j_atoms;  ///< Harmonic bond J atoms
+  Hybrid<int> angl_i_atoms;  ///< Harmonic angle I atoms
+  Hybrid<int> angl_j_atoms;  ///< Harmonic angle J atoms
+  Hybrid<int> angl_k_atoms;  ///< Harmonic angle K atoms
+  Hybrid<int> dihe_i_atoms;  ///< Cosine-based dihedral (proper or improper) I atoms
+  Hybrid<int> dihe_j_atoms;  ///< Cosine-based dihedral (proper or improper) J atoms
+  Hybrid<int> dihe_k_atoms;  ///< Cosine-based dihedral (proper or improper) K atoms
+  Hybrid<int> dihe_l_atoms;  ///< Cosine-based dihedral (proper or improper) L atoms
+  
   // NMR restraint term details: these function exactly like other parameter sets and are indexed
   // by lists of atoms in the bond work units arrays.  They can be included in the synthesis of
   // AtomGraphs due to their nature as potential terms, whereas the original topologies had to be
@@ -421,6 +445,31 @@ private:
   /// and finally the index of the slope / intercept series (bits 11-32).
   Hybrid<uint2> nmr4_instructions;
 
+  /// \brief Check the central lists of topologies and system indices to ensure that the requested
+  ///        synthesis is sane.  Condense the list of topologies by weeding out duplicates.
+  ///        Re-align the list of systems to work with the condensed list of topologies and return
+  ///        that result.
+  ///
+  /// \param topology_indices_in  List of topologies which describe each system that this synthesis
+  ///                             will describe.
+  std::vector<int> checkTopologyList(const std::vector<int> &topology_indices_in);
+
+  /// \brief Check settings that must be consistent between all topologies in the synthesis.
+  void checkCommonSettings();
+
+  /// \brief Lay down arrays that will hold each system's atoms and terms: particles and
+  ///        interactions, with updated indexing into the synthesis as opposed to any of the
+  ///        original topologies, but as of yet without parameter indices.
+  ///
+  /// \param topology_indices_in    Original list of system topology indices, oriented towards
+  ///                               the input list of AtomGraph pointers
+  /// \param topology_index_rebase  Re-arrangement of system topology indices meeting the condensed
+  ///                               list of unique topologies created by checkTopologyList()
+  void buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
+                              const std::vector<int> &topology_index_rebase);
+
+  /// \brief 
+  
   /// \brief Extend the Lennard-Jones tables with a specific Lennard-Jones atom type, including
   ///        pair-specific cross-terms (i.e. CHARMM NB-fix details).  All cross terms involving the
   ///        parameter with other known parameters must be accounted for.  This can be an involved

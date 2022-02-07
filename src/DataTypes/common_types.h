@@ -70,6 +70,7 @@ template <typename T> bool isFloatingPointScalarType() {
 template <typename T> std::string getOmniScalarTypeName() {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == int_type_index) return "int";
+  else if (ct == uint_type_index) return "unsigned_int";
   else if (ct == ulint_type_index) return "unsigned_long_int";
   else if (ct == double_type_index) return "double";
   else if (ct == float_type_index) return "float";

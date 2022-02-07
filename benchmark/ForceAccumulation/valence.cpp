@@ -109,9 +109,9 @@ int main(int argc, char* argv[]) {
     crd2[i].z = xsr_rng.gaussianRandomNumber();
 
     // Extend or contract the distance along the same direction to meet a particular value
-    const double target_distance = 0.8 +
-                                   ((static_cast<double>(i) + xsr_rng.uniformRandomNumber()) *
-                                    distance_discretization);
+    const double target_distance = 0.8 + ((static_cast<double>(i / nsample) +
+                                           xsr_rng.uniformRandomNumber()) *
+                                          distance_discretization);
     const double pdx = crd2[i].x - crd1[i].x;
     const double pdy = crd2[i].y - crd1[i].y;
     const double pdz = crd2[i].z - crd1[i].z;
@@ -157,6 +157,39 @@ int main(int argc, char* argv[]) {
       flli_frc[i].x = fmag * dx;
       flli_frc[i].y = fmag * dy;
       flli_frc[i].z = fmag * dz;
+    }
+
+    // Perform the calculation with long long integer arithmetic up to the sqrt
+    {
+      const llint idx = lli_crd2[i].x - lli_crd1[i].x;
+      const llint idy = lli_crd2[i].y - lli_crd1[i].y;
+      const llint idz = lli_crd2[i].z - lli_crd1[i].z;
+      if (llabs(idx) < 1600000000LL && llabs(idy) < 1600000000LL && llabs(idz) < 1600000000LL) {
+        const llint ir2 = (idx * idx) + (idy * idy) + (idz * idz);
+        const double r = sqrt(static_cast<double>(ir2)) * inverse_global_position_scale_lf;
+        const float dl = static_cast<float>(r - equil[i]);
+        const float fmag = 2.0 * f_stiff[i] * dl / r;
+        const float dx = static_cast<float>(idx) * inverse_global_position_scale_f;
+        const float dy = static_cast<float>(idy) * inverse_global_position_scale_f;
+        const float dz = static_cast<float>(idz) * inverse_global_position_scale_f;
+        f2lli_frc[i].x = fmag * dx;
+        f2lli_frc[i].y = fmag * dy;
+        f2lli_frc[i].z = fmag * dz;
+      }
+      else {
+        const float dx = static_cast<float>(lli_crd2[i].x - lli_crd1[i].x) *
+                         inverse_global_position_scale_f;
+        const float dy = static_cast<float>(lli_crd2[i].y - lli_crd1[i].y) *
+                         inverse_global_position_scale_f;
+        const float dz = static_cast<float>(lli_crd2[i].z - lli_crd1[i].z) *
+                         inverse_global_position_scale_f;
+        const float r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+        const float dl = r - f_equil[i];
+        const float fmag = 2.0 * f_stiff[i] * dl / r;
+        f2lli_frc[i].x = fmag * dx;
+        f2lli_frc[i].y = fmag * dy;
+        f2lli_frc[i].z = fmag * dz;
+      }
     }
   }
   
@@ -215,10 +248,11 @@ int main(int argc, char* argv[]) {
   printf("%s\n", output.c_str());
   printf(" - Mean unsigned error in all components: %14.7e\n", mue_flli);
   printf(" - Mean unsigned error in the magnitude:  %14.7e\n", mue_flli_mag);
-  output = terminalFormat("Bond parameters represented in 32-bit floating point numbers, "
+  output = terminalFormat("Bond equilibrium represented as a 64-bit floating point number, "
                           "coordinates represented in 64-bit signed integers, atomic "
-                          "displacements computed as signed integers, all other calculations done "
-                          "in 32-bit floating point arithmetic:", nullptr, nullptr, 0, 1, 1);
+                          "displacements and computed as signed integers, bond stretch computed "
+                          "in 64-bit arithmetic, all other calculations done in 32-bit floating "
+                          "point arithmetic:", nullptr, nullptr, 0, 1, 1);
   printf("%s\n", output.c_str());
   printf(" - Mean unsigned error in all components: %14.7e\n", mue_f2lli);
   printf(" - Mean unsigned error in the magnitude:  %14.7e\n", mue_f2lli_mag);

@@ -1,4 +1,5 @@
 #include <cmath>
+#include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "vector_report.h"
@@ -23,7 +24,7 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
 
   // Initialize the output
   std::string result;
-
+  
   // Different numerical formats (plus char4)
   switch (data_format) {
   case NumberFormat::SCIENTIFIC:
@@ -34,12 +35,50 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
   case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
     {
       // Convert both vectors to double precision real for analysis
-      const std::vector<double> dva = doubleFromPolyNumeric(va);
-      const std::vector<double> dvb = doubleFromPolyNumeric(vb);
+      std::vector<double> dva, dvb;
+      switch (data_format) {
+      case NumberFormat::SCIENTIFIC:
+      case NumberFormat::STANDARD_REAL:
+        dva = doubleFromPolyNumeric(va);
+        dvb = doubleFromPolyNumeric(vb);
+        break;
+      case NumberFormat::INTEGER:
+        {
+          const std::vector<int> iva = intFromPolyNumeric(va);
+          const std::vector<int> ivb = intFromPolyNumeric(vb);
+          dva = std::vector<double>(iva.begin(), iva.end());
+          dvb = std::vector<double>(ivb.begin(), ivb.end());
+        }
+        break;
+      case NumberFormat::LONG_LONG_INTEGER:
+        {
+          const std::vector<llint> lliva = llintFromPolyNumeric(va);
+          const std::vector<llint> llivb = llintFromPolyNumeric(vb);
+          dva = std::vector<double>(lliva.begin(), lliva.end());
+          dvb = std::vector<double>(llivb.begin(), llivb.end());
+        }
+        break;
+      case NumberFormat::UNSIGNED_INTEGER:
+        {
+          const std::vector<uint> uiva = uintFromPolyNumeric(va);
+          const std::vector<uint> uivb = uintFromPolyNumeric(vb);
+          dva = std::vector<double>(uiva.begin(), uiva.end());
+          dvb = std::vector<double>(uivb.begin(), uivb.end());
+        }
+        break;
+      case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
+        {
+          const std::vector<ullint> ulliva = ullintFromPolyNumeric(va);
+          const std::vector<ullint> ullivb = ullintFromPolyNumeric(vb);
+          dva = std::vector<double>(ulliva.begin(), ulliva.end());
+          dvb = std::vector<double>(ullivb.begin(), ullivb.end());
+        }
+        break;
+      }      
       std::vector<double> work(std::max(va.size(), vb.size()), 0.0);
       const int n_va = va.size();
       const int n_vb = vb.size();
-
+      
       // Look for a common multiple if the vectors are of the same size
       if (n_va == n_vb) {
         for (int i = 0; i < n_va; i++) {
@@ -77,10 +116,10 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
           result += "Pearson correlation between the vectors is " +
                     realToString(pearson(dva, dvb), 4) + ".";
           if (n_mismatch < 5) {
-            result += "Mismatched entries:\n";
+            result += "  Mismatched entries:\n";
             const int ndec = realDecimalPlaces(tol);
             for (int i = 0; i < n_va; i++) {
-              if (dva[i] != Approx(dvb, ComparisonType::ABSOLUTE, tol)) {
+              if (dva[i] != Approx(dvb[i], ComparisonType::ABSOLUTE, tol)) {
                 result += "    " + realToString(dva[i], ndec + 7, ndec, scifm) +
                           " != " + realToString(dvb[i], ndec + 7, ndec, scifm) +
                           " (error " + realToString(fabs(dvb[i] - dva[i]), ndec + 7, ndec, scifm) +

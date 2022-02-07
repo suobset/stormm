@@ -487,8 +487,8 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
                       Approx(llintFromPolyNumeric(ref_content)).margin(comparison_tolerance));
           break;
         case NumberFormat::UNSIGNED_INTEGER:
-          mismatch = (ulintFromPolyNumeric(content) !=
-                      Approx(ulintFromPolyNumeric(ref_content)).margin(comparison_tolerance));
+          mismatch = (uintFromPolyNumeric(content) !=
+                      Approx(uintFromPolyNumeric(ref_content)).margin(comparison_tolerance));
           break;
         case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
           mismatch = (ullintFromPolyNumeric(content) !=

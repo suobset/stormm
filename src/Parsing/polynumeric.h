@@ -28,7 +28,7 @@ enum class NumberFormat {
 union PolyNumeric {
   double d;
   int i;
-  unsigned long int ui;
+  unsigned int ui;
   long long int lli;
   unsigned long long int ulli;
   char4 c4;
@@ -52,7 +52,7 @@ std::vector<llint> llintFromPolyNumeric(const std::vector<PolyNumeric> &values);
 /// \brief Pull an unsigned integer vector out of a PolyNumeric vector.
 ///
 /// \param values  The STL vector of PolyNumeric data
-std::vector<ulint> ulintFromPolyNumeric(const std::vector<PolyNumeric> &values);
+std::vector<uint> uintFromPolyNumeric(const std::vector<PolyNumeric> &values);
 
 /// \brief Pull an unsigned long long integer vector out of a PolyNumeric vector.
 ///

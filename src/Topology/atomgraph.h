@@ -292,6 +292,19 @@ struct AtomGraph {
   bool getAtomMobility(int index) const;
   /// \}
 
+  /// \brief Get the raw mobility bitmask over a particular range.
+  ///
+  /// Overloaded:
+  ///   - Get the mobility of all atoms in the system, as a std::vector<uint>
+  ///   - Get the mobility of a stretch of atoms in the system
+  ///
+  /// \param low_index   Index of the first atom for which to read the mobility
+  /// \param high_index  Index of the last atom for which to read the mobility
+  /// \{
+  std::vector<uint> getAtomMobilityMask() const;
+  std::vector<uint> getAtomMobilityMask(int low_index, int high_index) const;
+  /// \}
+  
   /// \brief Change an atom's mobility in the topology.
   ///
   /// Overloaded:

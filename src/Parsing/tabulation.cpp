@@ -365,7 +365,7 @@ void printTable(const std::vector<std::string> &headings,
 	printf("%*lld", column_widths[j], column_data[data_idx][i].lli);
 	break;
       case NumberFormat::UNSIGNED_INTEGER:
-	printf("%*lu", column_widths[j], column_data[data_idx][i].ui);
+	printf("%*u", column_widths[j], column_data[data_idx][i].ui);
 	break;
       case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
 	printf("%*llu", column_widths[j], column_data[data_idx][i].ulli);

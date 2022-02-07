@@ -428,7 +428,7 @@ template <typename T> struct VirtualSiteKit {
   const T* dim2;          ///< Frame dimension 2
   const T* dim3;          ///< Frame dimension 3
 };
-  
+
 } // namespace topology
 } // namespace omni
 

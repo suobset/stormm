@@ -14,7 +14,7 @@ CheckResult check(const std::vector<T> &lhs, const RelationalOperator relationsh
   if (urgency == TestPriority::ABORT) {
     return check(false, error_message, urgency);
   }
-
+  
   // Inequality vector comparisons are only valid for absolute relationships
   switch (relationship) {
   case RelationalOperator::EQUAL:
@@ -87,7 +87,7 @@ CheckResult check(const std::vector<T> &lhs, const RelationalOperator relationsh
     }
     break;
   }
-
+  
   // If this point is reached, the check must have failed.  Investigate why and report based on
   // the type of input vector and approximate comparison being performed.  The right hand side
   // vector WILL be of a scalar type and the same length as the left hand side vector, as the
@@ -314,9 +314,11 @@ CheckResult check(const std::vector<T> &lhs, const RelationalOperator relationsh
                   realToString(rel_deviation, free_number_format, digits, nfmt) + ").  ";
     break;
   }
-  error_edit += vectorAlignmentReport(polyNumericVector(lhs), polyNumericVector(rhs.getValues()),
-                                      analysis_fmt, rhs.getMargin());
 
+  // The alignment report must deal with the vectors in their double-precision representation, as
+  // the Approx object has already converted the right hand side to that format.
+  error_edit += vectorAlignmentReport(polyNumericVector(dlhs), polyNumericVector(rhs.getValues()),
+                                      NumberFormat::STANDARD_REAL, rhs.getMargin());
   return check(false, error_message + error_edit, urgency);
 }
 

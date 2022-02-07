@@ -6,7 +6,7 @@ Topology produced by mdgx
 %FORMAT(10I8)                                                                   
       25       4       5       7      10       8      21       9       0       0
      268       1       7       8       9       3       3       2       3       0
-       0       0       0       0       0       0       0       1      12       0
+       0       0       0       0       0       0       0       1      25       0
       13
 %FLAG ATOM_NAME                                                                 
 %FORMAT(20a4)                                                                   

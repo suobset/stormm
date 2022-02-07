@@ -40,9 +40,9 @@ std::vector<llint> llintFromPolyNumeric(const std::vector<PolyNumeric> &values) 
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<ulint> ulintFromPolyNumeric(const std::vector<PolyNumeric> &values) {
+std::vector<uint> uintFromPolyNumeric(const std::vector<PolyNumeric> &values) {
   const size_t vsize = values.size();
-  std::vector<ulint> result(vsize, 0);
+  std::vector<uint> result(vsize, 0);
   for (size_t i = 0; i < vsize; i++) {
     result[i] = values[i].ui;
   }

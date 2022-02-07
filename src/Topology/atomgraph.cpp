@@ -2809,7 +2809,8 @@ std::vector<bool> AtomGraph::getAtomMobility(const int low_index, const int high
   const int int_bits = sizeof(int) * 8;
   for (int i = low_index; i < high_index; i++) {
     const int access_index = i / int_bits;
-    mobiles[i - low_index] = ((m_ptr[i / int_bits] << (i - (access_index * int_bits))) & 0x1);
+    mobiles[i - low_index] = ((static_cast<uint>(m_ptr[access_index]) <<
+                               (i - (access_index * int_bits))) & 0x1);
   }
   return mobiles;
 }
@@ -2818,8 +2819,39 @@ std::vector<bool> AtomGraph::getAtomMobility(const int low_index, const int high
 bool AtomGraph::getAtomMobility(const int index) const {
   const int int_bits = sizeof(int) * 8;
   const int access_index = index / int_bits;
-  const int m_val = mobile_atoms.readHost(access_index);
+  const uint m_val = static_cast<uint>(mobile_atoms.readHost(access_index));
   return ((m_val << (index - (access_index * int_bits))) & 0x1);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint> AtomGraph::getAtomMobilityMask() const {
+  return getAtomMobilityMask(0, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint> AtomGraph::getAtomMobilityMask(const int low_index, const int high_index) const {
+  const int uint_bits = sizeof(uint) * 8;
+  std::vector<uint> result((high_index - low_index + uint_bits - 1) / uint_bits, 0U);
+  int result_pos = 0;
+  int result_bit = 0;
+  const int* mobility_ptr = mobile_atoms.data();
+  int mask_pos = low_index / uint_bits;
+  int mask_bit = low_index - mask_pos * uint_bits;
+  for (int i = low_index; i < high_index; i++) {
+    result[result_pos] |= (((static_cast<uint>(mobility_ptr[mask_pos]) >> mask_bit) & 0x1) <<
+                           result_bit);
+    result_bit++;
+    if (result_bit == uint_bits) {
+      result_bit = 0;
+      result_pos++;
+    }
+    mask_bit++;
+    if (mask_bit == uint_bits) {
+      mask_bit = 0;
+      mask_pos++;
+    }
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2845,15 +2877,16 @@ void AtomGraph::modifyAtomMobility(const int low_index, const int high_index,
   for (int i = low_index; i < high_index; i++) {
     const int access_index = i / int_bits;
     const int bshift = i - (access_index * int_bits);
+    const uint orig_mask = static_cast<uint>(m_ptr[access_index]);
     switch (movement) {
     case MobilitySetting::OFF:
-      m_ptr[access_index] &= (~(0x1 << bshift));
+      m_ptr[access_index] = (orig_mask & (~(0x1 << bshift)));
       break;
     case MobilitySetting::ON:
-      m_ptr[access_index] |= (0x1 << bshift);
+      m_ptr[access_index] = (orig_mask | (0x1 << bshift));
       break;
     case MobilitySetting::TOGGLE:
-      m_ptr[access_index] ^= (0x1 << bshift);
+      m_ptr[access_index] = (orig_mask ^ (0x1 << bshift));
       break;
     }
   }
