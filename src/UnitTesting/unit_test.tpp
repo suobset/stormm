@@ -247,21 +247,18 @@ CheckResult check(const std::vector<T> &lhs, const RelationalOperator relationsh
 
   // Adjust settings based on the type of input
   int digits;
-  NumberFormat nfmt, analysis_fmt;
+  NumberFormat nfmt;
   if (isSignedIntegralScalarType<T>()) {
     digits = 0;
     nfmt = NumberFormat::STANDARD_REAL;
-    analysis_fmt = NumberFormat::LONG_LONG_INTEGER;
   }
   else if (isUnsignedIntegralScalarType<T>()) {
     digits = 0;
     nfmt = NumberFormat::STANDARD_REAL;
-    analysis_fmt = NumberFormat::UNSIGNED_LONG_LONG_INTEGER;
   }
   else if (isFloatingPointScalarType<T>()) {
     digits = 4;
     nfmt = NumberFormat::SCIENTIFIC;
-    analysis_fmt = NumberFormat::STANDARD_REAL;
   }
   else {
     rtErr("Unknown input vector data type " + std::string(typeid(T).name()) + ".", "check");
