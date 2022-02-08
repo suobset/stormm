@@ -16,13 +16,13 @@ namespace topology {
 ///        once valence work units that evaluate it are responsible for moving all atoms that the
 ///        valence term contains.  In order for a work unit to move any aotm, it must evaluate all
 ///        valence terms that include that atom.
-struct ValenceDelegation {
+struct ValenceDelegator {
 
   /// \brief The object is constructed based on a single topology and oversees the construction of
   ///        an array of valence work units.
   ///
   /// \param ag  The topology containing valence terms to delegate among work units
-  ValenceDelegation(const AtomGraph &ag);
+  ValenceDelegator(const AtomGraph &ag);
   
 private:
   int atom_count;                 ///< The number of atoms in the system overall (taken from the
@@ -96,7 +96,7 @@ struct ValenceWorkUnit {
   ///                   indices whereby previous work units left some atoms behind, or jumping
   ///                   forward to the next new molecule.
   /// \param max_atoms  The maximum number of atoms to accumulate in the work unit
-  ValenceWorkUnit(const AtomGraph &ag, ValenceDelegation *vdel, int seed_atom,
+  ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, int seed_atom,
                   int max_atoms = 768);
 
   /// \brief Test whether this object contains a particular atom
