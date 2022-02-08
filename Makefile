@@ -41,6 +41,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Reporting/display.cpp \
 		 $(SRCDIR)/Reporting/error_format.cpp \
 		 $(SRCDIR)/Restraints/bounded_restraint.cpp \
+		 $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 	         $(SRCDIR)/Topology/amber_prmtop_util.cpp \
 	         $(SRCDIR)/Topology/atomgraph.cpp \
 	         $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
@@ -112,6 +113,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Reporting/display.h \
 	           $(SRCDIR)/Reporting/error_format.h \
 	           $(SRCDIR)/Restraints/bounded_restraint.h \
+	           $(SRCDIR)/Restraints/restraint_apparatus.h \
 		   $(SRCDIR)/Topology/amber_prmtop_util.h \
 		   $(SRCDIR)/Topology/atomgraph.h \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.h \
@@ -187,6 +189,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Reporting/display.o \
 	        $(SRCDIR)/Reporting/error_format.o \
 	        $(SRCDIR)/Restraints/bounded_restraint.o \
+	        $(SRCDIR)/Restraints/restraint_apparatus.o \
 		$(SRCDIR)/Topology/amber_prmtop_util.o \
 		$(SRCDIR)/Topology/atomgraph.o \
 		$(SRCDIR)/Topology/atomgraph_abstracts.o \

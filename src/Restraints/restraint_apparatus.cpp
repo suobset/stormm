@@ -9,7 +9,7 @@ using math::roundUp;
   
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbasis) :
-  restraint_count{rbasis.size()},
+  restraint_count{static_cast<int>(rbasis.size())},
   position_count{0}, distance_count{0}, angle_count{0}, dihedral_count{0},
   rposn_i_atoms{HybridKind::POINTER, "rst_position_i"},
   rbond_i_atoms{HybridKind::POINTER, "rst_bond_i"},
