@@ -11,7 +11,7 @@
 omni::cuda::GpuDetails null_gpu;
 
 namespace omni {
-namespace cuda {
+namespace card {
 
 //-------------------------------------------------------------------------------------------------
 GpuDetails::GpuDetails() :
@@ -356,5 +356,5 @@ cusolverDnHandle_t HpcConfig::getCuSolverHandle() const {
   return cusolver_handle;
 }
   
-} // namespace cuda
+} // namespace card
 } // namespace omni

@@ -13,7 +13,7 @@ using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
-using namespace omni::cuda;
+using namespace omni::card;
 using namespace omni::trajectory;
 using namespace omni::testing;
 

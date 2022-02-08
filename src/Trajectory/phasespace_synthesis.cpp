@@ -6,7 +6,7 @@
 namespace omni {
 namespace trajectory {
 
-using cuda::HybridKind;
+using card::HybridKind;
 using math::roundUp;
 using math::invertSquareMatrix;
 using numerics::global_position_scale_lf;

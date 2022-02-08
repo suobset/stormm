@@ -11,8 +11,8 @@
 namespace omni {
 namespace math {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using errors::rtErr;
 using testing::Approx;
 using testing::ComparisonType;

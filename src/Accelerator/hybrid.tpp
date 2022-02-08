@@ -1,6 +1,6 @@
 // -*-c++-*-
 namespace omni {
-namespace cuda {
+namespace card {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> Hybrid<T>::Hybrid(const size_t length_in, const char* tag_in,
@@ -1227,5 +1227,5 @@ template <typename T> HybridLabel Hybrid<T>::assignLabel(const char* tag) {
   return hlbl;
 }
 
-} // namespace cuda
+} // namespace card
 } // namespace omni

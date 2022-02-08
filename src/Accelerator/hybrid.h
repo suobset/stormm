@@ -10,7 +10,9 @@
 #include <typeindex>
 #include <vector>
 #ifdef OMNI_USE_HPC
+#ifdef OMNI_USE_CUDA
 #include <cuda_runtime.h>
+#endif
 #endif
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
@@ -20,7 +22,7 @@
 #include "Reporting/error_format.h"
 
 namespace omni {
-namespace cuda {
+namespace card {
 
 using constants::mega;
 using errors::rtErr;
@@ -73,7 +75,8 @@ constexpr HybridFormat default_hpc_format = HybridFormat::EXPEDITED;
 constexpr HybridFormat default_hpc_format = HybridFormat::HOST_ONLY;
 #endif
 
-/// \brief Two levels to which the pointers might go, depending on whether CUDA is compiled
+/// \brief Two levels to which the pointers might go, depending on whether an HPC language is
+///        compiled
 enum class HybridTargetLevel {
 #ifdef OMNI_USE_HPC
   HOST, DEVICE
@@ -536,13 +539,13 @@ private:
   HybridLabel assignLabel(const char* tag);
 };
 
-} // namespace cuda
+} // namespace card
 } // namespace omni
 
 /// \brief ***Global*** memory Ledger instance that Hybrid allocate / deallocate functions will
 ///        reference.  While this should be the only instance a programmer needs, it is feasible
 ///        to create additional Ledger objects for some other purpose. 
-extern omni::cuda::Ledger gbl_mem_balance_sheet;
+extern omni::card::Ledger gbl_mem_balance_sheet;
 
 #include "hybrid.tpp"
 

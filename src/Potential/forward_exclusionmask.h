@@ -9,8 +9,8 @@
 namespace omni {
 namespace energy {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using topology::AtomGraph;
 
 /// \brief The abstract for the forward exclusion mask turns out to be shorter than that for the

@@ -8,7 +8,7 @@
 namespace omni {
 namespace trajectory {
 
-using cuda::HybridKind;
+using card::HybridKind;
 using math::roundUp;
 using parse::TextFile;
 

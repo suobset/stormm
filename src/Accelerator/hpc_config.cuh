@@ -8,7 +8,7 @@
 #include "hpc_config.h"
 
 namespace omni {
-namespace cuda {
+namespace card {
 
 using constants::ExceptionResponse;
 
@@ -65,7 +65,7 @@ private:
 /// \param policy  The behavior to take if no viable GPUs are found
 const std::vector<GpuDetails> queryGpuStats(ExceptionResponse policy = ExceptionResponse::DIE);
 
-} // namespace cuda
+} // namespace card
 } // namespace omni
 
 #endif

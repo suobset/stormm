@@ -18,8 +18,8 @@ namespace omni {
 namespace math {
 
 using constants::ExceptionResponse;
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using diskutil::PrintSituation;
 using parse::NumberFormat;
 using parse::PolyNumeric;

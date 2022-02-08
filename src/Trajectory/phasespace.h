@@ -9,8 +9,8 @@
 namespace omni {
 namespace trajectory {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::CoordinateFileKind;

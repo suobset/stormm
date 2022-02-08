@@ -7,8 +7,8 @@
 namespace omni {
 namespace generalized_born_defaults {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 
 /// \brief Scaling factors to be used in computing fixed-precision Generalized Born effective radii
 /// \{

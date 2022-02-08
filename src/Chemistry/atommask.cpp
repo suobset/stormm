@@ -7,8 +7,8 @@
 namespace omni {
 namespace chemistry {
 
-using cuda::HybridKind;
-using cuda::HybridTargetLevel;
+using card::HybridKind;
+using card::HybridTargetLevel;
 using parse::char4ToString;
 using parse::NumberFormat;
 using parse::TextGuard;

@@ -16,7 +16,7 @@
 namespace omni {
 namespace chemistry {
 
-using cuda::HybridKind;
+using card::HybridKind;
 using math::minValue;
 using math::maxValue;
 using math::prefixSumInPlace;

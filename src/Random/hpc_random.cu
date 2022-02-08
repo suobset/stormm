@@ -7,8 +7,8 @@
 namespace omni {
 namespace hpc_random {
 
-using cuda::HybridFormat;
-using cuda::HybridTargetLevel;
+using card::HybridFormat;
+using card::HybridTargetLevel;
 using random::Xoroshiro128pGenerator;
 using random::Xoshiro256ppGenerator;
 using random::xrs128p_jump_i;

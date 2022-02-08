@@ -17,7 +17,7 @@ namespace omni {
 namespace topology {
 
 using chemistry::massToZNumber;
-using cuda::HybridTargetLevel;
+using card::HybridTargetLevel;
 using math::matrixMultiply;
 using math::maxValue;
 using math::minValue;

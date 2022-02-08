@@ -10,7 +10,7 @@
 namespace omni {
 namespace chemistry {
 
-using cuda::HybridKind;
+using card::HybridKind;
 using topology::TorsionKind;
 using math::crossProduct;
 using math::dot;

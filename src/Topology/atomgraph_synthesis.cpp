@@ -11,7 +11,7 @@
 namespace omni {
 namespace topology {
 
-using cuda::HybridKind;
+using card::HybridKind;
 using math::roundUp;
 using math::maxAbsoluteDifference;
 using math::maxValue;

@@ -14,8 +14,8 @@ namespace omni {
 namespace topology {
 
 using constants::PrecisionModel;
-using cuda::HybridTargetLevel;
-using cuda::HybridKind;
+using card::HybridTargetLevel;
+using card::HybridKind;
 using math::addScalarToVector;
 using math::roundUp;
 using parse::CaseSensitivity;

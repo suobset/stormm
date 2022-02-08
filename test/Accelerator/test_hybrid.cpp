@@ -8,7 +8,7 @@ using omni::data_types::int4;
 using omni::data_types::ushort2;
 using omni::math::sum;
 using omni::random::Ran2Generator;
-using namespace omni::cuda;
+using namespace omni::card;
 using namespace omni::testing;
 
 //-------------------------------------------------------------------------------------------------

@@ -6,8 +6,8 @@
 namespace omni {
 namespace hpc_random {
 
-using cuda::GpuDetails;
-using cuda::Hybrid;
+using card::GpuDetails;
+using card::Hybrid;
 
 /// \brief The maximum number of long jumps to take with any of the scrambled linear pseudo-random
 ///        number generators.  The CPU will take the long jumps, while individual GPU threads make

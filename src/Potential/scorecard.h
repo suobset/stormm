@@ -8,8 +8,8 @@
 namespace omni {
 namespace energy {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using numerics::global_energy_scale_bits;
 
 /// \brief Enumerate all state variables that OMNI will track

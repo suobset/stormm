@@ -9,10 +9,10 @@
 #include "Reporting/error_format.h"
 #include "hybrid.h"
 
-omni::cuda::Ledger gbl_mem_balance_sheet;
+omni::card::Ledger gbl_mem_balance_sheet;
 
 namespace omni {
-namespace cuda {
+namespace card {
 
 using errors::rtErr;
 using errors::terminalFormat;
@@ -297,5 +297,5 @@ void Ledger::printMemoryProfile(const int n_display, const llint display_thresho
   }
 }
 
-} // namespace cuda
+} // namespace card
 } // namespace omni

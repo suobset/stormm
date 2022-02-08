@@ -15,7 +15,7 @@
 using omni::testing::StopWatch;
 // END CHECK
 
-using omni::cuda::HybridTargetLevel;
+using omni::card::HybridTargetLevel;
 using omni::data_types::uint;
 using omni::data_types::char4;
 using omni::diskutil::DrivePathType;

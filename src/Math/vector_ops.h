@@ -15,7 +15,7 @@
 namespace omni {
 namespace math {
 
-using cuda::Hybrid;
+using card::Hybrid;
 using data_types::getHpcVectorTypeSize;
 using data_types::isHpcVectorType;
 using data_types::isFloatingPointScalarType;

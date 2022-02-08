@@ -12,8 +12,8 @@
 namespace omni {
 namespace chemistry {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using topology::AtomGraph;
 
 /// \brief The range of formal charges that OMNI will handle.  This is well beyond the range of 

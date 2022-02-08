@@ -10,7 +10,7 @@ namespace omni {
 namespace trajectory {
 
 using constants::ExceptionResponse;
-using cuda::Hybrid;
+using card::Hybrid;
 using parse::TextFile;
 
 /// \brief Obtain just the atom count from an Amber ASCII-format restart (or inpcrd) file.

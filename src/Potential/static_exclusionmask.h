@@ -10,8 +10,8 @@
 namespace omni {
 namespace energy {
 
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using topology::AtomGraph;
 
 /// \brief The maxmimum number of supertiles, obtained from the limit imposed by the maximum value

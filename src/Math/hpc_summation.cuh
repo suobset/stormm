@@ -14,10 +14,10 @@
 namespace omni {
 namespace hpc_math {
 
-using cuda::Hybrid;
-using cuda::HybridFormat;
-using cuda::HybridTargetLevel;
-using cuda::GpuDetails;
+using card::Hybrid;
+using card::HybridFormat;
+using card::HybridTargetLevel;
+using card::GpuDetails;
   
 /// \brief Kernel for summing a vector of scalar elements (i.e. double, float, short unsigned int)
 ///

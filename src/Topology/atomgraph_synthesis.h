@@ -8,7 +8,7 @@
 namespace omni {
 namespace topology {
 
-using cuda::Hybrid;
+using card::Hybrid;
   
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing

@@ -20,8 +20,8 @@ namespace topology {
 
 using constants::ExceptionResponse;
 using constants::PrecisionModel;
-using cuda::Hybrid;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridTargetLevel;
 using parse::Citation;
 
 /// \brief Use the lowest bit of a 32-bit float representing the range [1.0, 2.0) as the default

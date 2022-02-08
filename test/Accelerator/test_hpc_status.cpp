@@ -10,7 +10,7 @@
 using omni::constants::tiny;
 using omni::constants::ExceptionResponse;
 using omni::random::Ran2Generator;
-using namespace omni::cuda;
+using namespace omni::card;
 using namespace omni::testing;
 
 int main(int argc, char* argv[]) {

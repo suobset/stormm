@@ -8,12 +8,12 @@
 namespace omni {
 namespace math {
 
-using cuda::default_hpc_format;
-using cuda::Hybrid;
-using cuda::HybridFormat;
-using cuda::HybridKind;
-using cuda::HybridLabel;
-using cuda::HybridTargetLevel;
+using card::default_hpc_format;
+using card::Hybrid;
+using card::HybridFormat;
+using card::HybridKind;
+using card::HybridLabel;
+using card::HybridTargetLevel;
 using random::Ran2Generator;
 
 enum class MatrixFillMode {

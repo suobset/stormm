@@ -9,9 +9,9 @@
 namespace omni {
 namespace trajectory {
 
-using cuda::Hybrid;
-using cuda::HybridKind;
-using cuda::HybridTargetLevel;
+using card::Hybrid;
+using card::HybridKind;
+using card::HybridTargetLevel;
 using topology::AtomGraph;
 
 /// \brief Collect C-style pointers for the elements of a read-only CoordinateFrame object.

@@ -18,8 +18,8 @@
 using omni::ulint;
 using omni::double3;
 using omni::constants::tiny;
-using omni::cuda::Hybrid;
-using omni::cuda::HybridTargetLevel;
+using omni::card::Hybrid;
+using omni::card::HybridTargetLevel;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
