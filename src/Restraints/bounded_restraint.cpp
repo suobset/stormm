@@ -18,12 +18,17 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
                                    const double init_r4_in, const double final_k2_in,
                                    const double final_k3_in, const double final_r1_in,
                                    const double final_r2_in, const double final_r3_in,
-                                   const double final_r4_in) :
+                                   const double final_r4_in, const double ref_x_coordinate,
+                                   const double ref_y_coordinate, const double ref_z_coordinate) :
     mask_i{mask_i_in}, mask_j{mask_j_in}, mask_k{mask_k_in}, mask_l{mask_l_in}, atom_i{-1},
     atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0}, initial_step{init_step_in},
-    final_step{final_step_in}, initial_keq{init_k2_in, init_k3_in},
-    initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in}, final_keq{final_k2_in, final_k3_in},
-    final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in}, ag_pointer{ag_in}
+    final_step{final_step_in},
+    initial_keq{init_k2_in, init_k3_in},
+    initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
+    final_keq{final_k2_in, final_k3_in},
+    final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in},
+    target_site{ref_x_coordinate, ref_y_coordinate, ref_z_coordinate},
+    ag_pointer{ag_in}
 {
   // At least one atom is required
   if (mask_i.size() == 0LLU) {
@@ -85,13 +90,18 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
                                    const double init_r3_in, const double init_r4_in,
                                    const double final_k2_in, const double final_k3_in,
                                    const double final_r1_in, const double final_r2_in,
-                                   const double final_r3_in, const double final_r4_in) :
+                                   const double final_r3_in, const double final_r4_in,
+                                   const double ref_x_coordinate, const double ref_y_coordinate,
+                                   const double ref_z_coordinate) :
     mask_i{std::string("")}, mask_j{std::string("")}, mask_k{std::string("")},
     mask_l{std::string("")}, atom_i{atom_i_in}, atom_j{atom_j_in}, atom_k{atom_k_in},
     atom_l{atom_l_in}, order{0}, initial_step{init_step_in}, final_step{final_step_in},
-    initial_keq{init_k2_in, init_k3_in}, initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
+    initial_keq{init_k2_in, init_k3_in},
+    initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
     final_keq{final_k2_in, final_k3_in},
-    final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in}, ag_pointer{ag_in}
+    final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in},
+    target_site{ref_x_coordinate, ref_y_coordinate, ref_z_coordinate},
+    ag_pointer{ag_in}
 {
   // At least one atom is required
   if (atom_i < 0) {
@@ -118,6 +128,34 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
     }
     rtErr("The atom selection " + atom_number_list + " does not fall within the atom indexing of "
           "topology " + ag_pointer->getFileName() + ".", "BoundedRestraint");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint::BoundedRestraint(const int atom_index, const int refr_index,
+                                   const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
+                                   const int init_step_in, const int final_step_in,
+                                   const double init_k2_in, const double init_k3_in,
+                                   const double init_r1_in, const double init_r2_in,
+                                   const double init_r3_in, const double init_r4_in,
+                                   const double final_k2_in, const double final_k3_in,
+                                   const double final_r1_in, const double final_r2_in,
+                                   const double final_r3_in, const double final_r4_in) :
+  BoundedRestraint(atom_index, -1, -1, -1, ag_in, init_step_in, final_step_in, init_k2_in,
+                   init_k3_in, init_r1_in, init_r2_in, init_r3_in, init_r4_in, final_k2_in,
+                   final_k3_in, final_r1_in, final_r2_in, final_r3_in, final_r4_in,
+                   cfr.natom > 0 ?
+                   cfr.xcrd[(refr_index >= 0 && refr_index < cfr.natom) * refr_index] : 0.0,
+                   cfr.natom > 0 ?
+                   cfr.ycrd[(refr_index >= 0 && refr_index < cfr.natom) * refr_index] : 0.0,
+                   cfr.natom > 0 ?
+                   cfr.zcrd[(refr_index >= 0 && refr_index < cfr.natom) * refr_index] : 0.0)
+{
+  // The initialization makes an impromptu bounds check on the input to ensure that a legitimate
+  // atom is being requested.  Take action here if that check failed.
+  if (refr_index < 0 || refr_index >= cfr.natom) {
+    rtErr("The requested atom index " + std::to_string(refr_index) + " was invalid for a "
+          "coordinate frame with " + std::to_string(cfr.natom) + " atoms.", "BoundedRestraint");
   }
 }
 
@@ -190,6 +228,11 @@ double4 BoundedRestraint::getInitialDisplacements() const {
 //-------------------------------------------------------------------------------------------------
 double4 BoundedRestraint::getFinalDisplacements() const {
   return final_r;
+}
+
+//-------------------------------------------------------------------------------------------------
+double3 BoundedRestraint::getTargetSite() const {
+  return target_site;
 }
 
 //-------------------------------------------------------------------------------------------------

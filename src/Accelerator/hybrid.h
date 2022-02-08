@@ -10,9 +10,9 @@
 #include <typeindex>
 #include <vector>
 #ifdef OMNI_USE_HPC
-#ifdef OMNI_USE_CUDA
+#  ifdef OMNI_USE_CUDA
 #include <cuda_runtime.h>
-#endif
+#  endif
 #endif
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"

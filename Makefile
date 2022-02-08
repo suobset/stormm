@@ -290,7 +290,7 @@ $(LIBDIR)/libomni.so : $(OMNI_CPP_OBJS)
 	$(VB)$(CC) $(CPP_FLAGS) $(CPP_DEFINES) -shared -o $@ $(OMNI_CPP_OBJS) $(CPP_LINKS)
 
 # Target: the OMNI C++ / CUDA library (CPU / GPU Hybrid executables)
-$(LIBDIR)/libomni_cuda.so : CPP_DEFINES = -DOMNI_USE_HPC
+$(LIBDIR)/libomni_cuda.so : CPP_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 $(LIBDIR)/libomni_cuda.so : CPP_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 $(LIBDIR)/libomni_cuda.so : CPP_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 \
 					-L${CUDA_HOME}/lib64/stubs -lcurand -lcublas -lcusolver \

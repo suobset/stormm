@@ -2,8 +2,10 @@
 #ifndef OMNI_HPC_STATUS_HPC_H
 #define OMNI_HPC_STATUS_HPC_H
 
+#ifdef OMNI_USE_CUDA
 #include <cusolverDn.h>
 #include "cublas_v2.h"
+#endif
 #include "Constants/behavior.h"
 #include "hpc_config.h"
 

@@ -4,11 +4,13 @@
 
 #include <vector>
 #include <string>
+#ifdef OMNI_USE_CUDA
 #include <cuda_runtime.h>
+#endif
 #include "Constants/scaling.h"
 
 namespace omni {
-namespace cuda {
+namespace card {
 
 /// \brief Detect the amount of GPU memory occupied by a given process to determine whether it is
 ///        a significant process.  Occupying a megabyte of GPU RAM is one way for a process to
@@ -91,12 +93,12 @@ private:
   std::string card_name;     ///< Name of the card according to the server
 };
 
-} // namespace cuda
+} // namespace card
 } // namespace omni
 
 /// \brief ***Global*** GPU descriptor that describes no valid GPU.  This is the equivalent of
 ///        nullptr for the GpuDetails object, and if passed to various functions that might launch
 ///        a CUDA kernel will trigger the corresponding CPU process instead.
-extern omni::cuda::GpuDetails null_gpu;
+extern omni::card::GpuDetails null_gpu;
 
 #endif

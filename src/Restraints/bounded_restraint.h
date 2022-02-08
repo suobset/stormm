@@ -4,6 +4,7 @@
 
 #include <string>
 #include "Chemistry/chemical_features.h"
+#include "DataTypes/omni_vector_types.h"
 #include "Trajectory/coordinateframe.h"
 #include "Topology/atomgraph.h"
 
@@ -26,13 +27,22 @@ struct BoundedRestraint {
                    const CoordinateFrameReader &cfr, int init_step_in, int final_step_in,
                    double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
                    double init_r3_in, double init_r4_in, double final_k2_in, double final_k3_in,
-                   double final_r1_in, double final_r2_in, double final_r3_in, double final_r4_in);
+                   double final_r1_in, double final_r2_in, double final_r3_in, double final_r4_in,
+                   double ref_x_coordinate, double ref_y_coordinate, double ref_z_coordinate);
 
   BoundedRestraint(int atom_i_in, int atom_j_in, int atom_k_in, int atom_l_in,
                    const AtomGraph *ag_in, int init_step_in, int final_step_in, double init_k2_in,
                    double init_k3_in, double init_r1_in, double init_r2_in, double init_r3_in,
                    double init_r4_in, double final_k2_in, double final_k3_in, double final_r1_in,
-                   double final_r2_in, double final_r3_in, double final_r4_in);
+                   double final_r2_in, double final_r3_in, double final_r4_in,
+                   double ref_x_coordinate, double ref_y_coordinate, double ref_z_coordinate);
+
+  BoundedRestraint(int atom_index, int refr_index, const AtomGraph *ag_in,
+                   const CoordinateFrameReader &cfr, int init_step_in, int final_step_in,
+                   double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
+                   double init_r3_in, double init_r4_in, double final_k2_in, double final_k3_in,
+                   double final_r1_in, double final_r2_in, double final_r3_in,
+                   double final_r4_in);
   /// \}
 
   /// Obtain one of the masks used to specify an atom in this restraint
@@ -45,27 +55,30 @@ struct BoundedRestraint {
   /// \param restrained_atom_number  The 1st, 2nd, 3rd, or 4th atom (specify 1, 2, 3, or 4)
   int getAtomIndex(int restrained_atom_number) const;
 
-  /// Get the order of this restraint
+  /// \brief Get the order of this restraint
   int getOrder() const;
 
-  /// Get the initial step at which to begin applying this restraint
+  /// \brief Get the initial step at which to begin applying this restraint
   int getInitialStep() const;
 
-  /// Get the simulation step at which to finish applying this restraint
+  /// \brief Get the simulation step at which to finish applying this restraint
   int getFinalStep() const;
 
-  /// Get the initial stiffnesses to use when applying this restraint
+  /// \brief Get the initial stiffnesses to use when applying this restraint
   double2 getInitialStiffness() const;
 
-  /// Get the final stiffnesses of the restraint in its complete form
+  /// \brief Get the final stiffnesses of the restraint in its complete form
   double2 getFinalStiffness() const;
 
-  /// Get the initial displacement parameters to use in applying this restraint
+  /// \brief Get the initial displacement parameters to use in applying this restraint
   double4 getInitialDisplacements() const;
 
-  /// Get the final displacement parameters of the restraint in its complete form
+  /// \brief Get the final displacement parameters of the restraint in its complete form
   double4 getFinalDisplacements() const;
 
+  /// \brief Get the target of a positional restraint
+  double3 getTargetSite() const;
+  
   /// Get the topology pointer
   const AtomGraph* getTopologyPointer() const;
 
@@ -92,7 +105,8 @@ private:
   double4 initial_r;    ///< Initial displacement parameters r1 (x), r2 (y), r3 (z), and r4 (w)
   double2 final_keq;    ///< Final stiffness constants
   double4 final_r;      ///< Final displacement parameters
-
+  double3 target_site;  ///< Center of the restraint potential (positional restraints only)
+  
   /// Pointer to the topology for which this restraint applies
   const AtomGraph *ag_pointer;  
 };

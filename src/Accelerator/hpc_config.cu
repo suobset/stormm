@@ -2,13 +2,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#ifdef OMNI_USE_CUDA
 #include <cuda.h>
 #include <curand_kernel.h>
 #include <nvml.h>
+#endif
 #include "Reporting/error_format.h"
 #include "hpc_config.cuh"
 
-omni::cuda::GpuDetails null_gpu;
+omni::card::GpuDetails null_gpu;
 
 namespace omni {
 namespace card {
