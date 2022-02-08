@@ -126,7 +126,6 @@ private:
   int atom_count;
   int max_atom_index;
   int min_atom_index;
-  std::vector<uint> content_mask
   std::vector<int> atom_import_list;
   
 };

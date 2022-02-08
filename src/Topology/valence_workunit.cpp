@@ -215,11 +215,13 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
 }
 
 //-------------------------------------------------------------------------------------------------
-ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
+#if 0
+  ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
                             const ConstraintKit<double> &cnsk, const RestraintKit<double> &rstk) {
 
 }
-
+#endif
+  
 //-------------------------------------------------------------------------------------------------
 ValenceWorkUnit::ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, const int seed_atom,
                                  const int max_atoms) :
