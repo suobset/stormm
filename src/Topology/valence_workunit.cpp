@@ -10,27 +10,27 @@ using math::PrefixSumType;
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
     atom_count{ag.getAtomCount()},
-    bond_i_atoms{ag.getBondTermCount()},
-    bond_j_atoms{ag.getBondTermCount()},
-    angl_i_atoms{ag.getAngleTermCount()},
-    angl_j_atoms{ag.getAngleTermCount()},
-    angl_k_atoms{ag.getAngleTermCount()},
-    dihe_i_atoms{ag.getDihedralTermCount()},
-    dihe_j_atoms{ag.getDihedralTermCount()},
-    dihe_k_atoms{ag.getDihedralTermCount()},
-    dihe_l_atoms{ag.getDihedralTermCount()},
-    ubrd_i_atoms{ag.getUreyBradleyTermCount()},
-    ubrd_k_atoms{ag.getUreyBradleyTermCount()},
-    cimp_i_atoms{ag.getCharmmImprTermCount()},
-    cimp_j_atoms{ag.getCharmmImprTermCount()},
-    cimp_k_atoms{ag.getCharmmImprTermCount()},
-    cimp_l_atoms{ag.getCharmmImprTermCount()},
-    cmap_i_atoms{ag.getCmapTermCount()},
-    cmap_j_atoms{ag.getCmapTermCount()},
-    cmap_k_atoms{ag.getCmapTermCount()},
-    cmap_l_atoms{ag.getCmapTermCount()},
-    cmap_m_atoms{ag.getCmapTermCount()},
-    virtual_site_placement{ag.getVirtualSiteCount()},
+    bond_i_atoms{ag.getBondTermCount(), -1},
+    bond_j_atoms{ag.getBondTermCount(), -1},
+    angl_i_atoms{ag.getAngleTermCount(), -1},
+    angl_j_atoms{ag.getAngleTermCount(), -1},
+    angl_k_atoms{ag.getAngleTermCount(), -1},
+    dihe_i_atoms{ag.getDihedralTermCount(), -1},
+    dihe_j_atoms{ag.getDihedralTermCount(), -1},
+    dihe_k_atoms{ag.getDihedralTermCount(), -1},
+    dihe_l_atoms{ag.getDihedralTermCount(), -1},
+    ubrd_i_atoms{ag.getUreyBradleyTermCount(), -1},
+    ubrd_k_atoms{ag.getUreyBradleyTermCount(), -1},
+    cimp_i_atoms{ag.getCharmmImprTermCount(), -1},
+    cimp_j_atoms{ag.getCharmmImprTermCount(), -1},
+    cimp_k_atoms{ag.getCharmmImprTermCount(), -1},
+    cimp_l_atoms{ag.getCharmmImprTermCount(), -1},
+    cmap_i_atoms{ag.getCmapTermCount(), -1},
+    cmap_j_atoms{ag.getCmapTermCount(), -1},
+    cmap_k_atoms{ag.getCmapTermCount(), -1},
+    cmap_l_atoms{ag.getCmapTermCount(), -1},
+    cmap_m_atoms{ag.getCmapTermCount(), -1},
+    virtual_site_placement{ag.getVirtualSiteCount(), -1},
     bond_affector_list{ag.getBondTermCount() * 2},
     bond_affector_bounds{atom_count + 1, 0},
     angl_affector_list{ag.getAngleTermCount() * 3},
@@ -44,7 +44,9 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
     cmap_affector_list{ag.getCmapTermCount() * 5},
     cmap_affector_bounds{atom_count + 1, 0},
     vste_affector_list{ag.getVirtualSiteCount() * 4},
-    vste_affector_bounds{atom_count + 1, 0}
+    vste_affector_bounds{atom_count + 1, 0},
+    work_unit_assignments{atom_count, 0},
+    work_unit_presence{atom_count * 4}
 {
   // Pass through the topology, filling out the valence term affector arrays and the virtual site
   // frame atom arrays.
@@ -210,6 +212,12 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
   cimp_affector_bounds[0] = 0;
   cmap_affector_bounds[0] = 0;
   vste_affector_bounds[0] = 0;
+}
+
+//-------------------------------------------------------------------------------------------------
+ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
+                            const ConstraintKit<double> &cnsk, const RestraintKit<double> &rstk) {
+
 }
 
 //-------------------------------------------------------------------------------------------------

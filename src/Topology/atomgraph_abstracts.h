@@ -429,6 +429,36 @@ template <typename T> struct VirtualSiteKit {
   const T* dim3;          ///< Frame dimension 3
 };
 
+/// \brief Information needed to manage constraint groups.  This additional abstract is needed
+///        due to the way that some collections of rigid bonds all connect to the same atom, and
+///        because analytic SETTLE constraints are a thing.
+template <typename T> struct ConstraintKit {
+
+  /// \brief The constructor follows other abstracts and is produced based on pointers from an
+  ///        AtomGraph object.
+  ConstraintKit(int ngroup_in, int nsettle_in);
+
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
+  /// \{
+  ConstraintKit(const ConstraintKit &original) = default;
+  ConstraintKit(ConstraintKit &&original) = default;
+  /// \}
+  
+  const int nspoke;          ///< The number of "hub and spoke" constrained groups of bonds.
+  const int nsettle;         ///< The number of SETTLE (analytic) constrained groups of bonds.  
+  const int* group_list;     ///< List of all atoms involved in "hub and spoke" constraint groups.
+                             ///<   In each group, the central atom, to which all others bind, is
+                             ///<   listed first.  It is the first atom of any of the constrained
+                             ///<   bond.  All other atoms are the distal termini of those
+                             ///<   constrained bonds.
+  const int* group_bounds;   ///< Bounds array for group_list above.  Every segment of group_list
+                             ///<   will be at least two atoms, and generally two to five atoms.
+  const int* settle_ox;      ///< Central 'oxygen' atoms for analytic SETTLE constraint groups
+  const int* settle_h1;      ///< First 'hydrogen' atoms for analytic SETTLE constraint groups
+  const int* settle_h2;      ///< Second 'hydrogen' atoms for analytic SETTLE constraint groups
+};
+
 } // namespace topology
 } // namespace omni
 

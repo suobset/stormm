@@ -97,7 +97,7 @@ private:
   const AtomGraph *ag_pointer;  
 };
 
-}
-}
+} // namespace restraints
+} // namespace omni
 
 #endif

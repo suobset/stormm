@@ -23,7 +23,9 @@ struct ValenceDelegator {
   ///
   /// \param ag  The topology containing valence terms to delegate among work units
   ValenceDelegator(const AtomGraph &ag);
-  
+
+  /// \brief Test whether a valence work unit contains a particular atom
+
 private:
   int atom_count;                 ///< The number of atoms in the system overall (taken from the
                                   ///<   topology)
@@ -75,6 +77,24 @@ private:
   std::vector<int> vste_affector_list;    ///< List of all virtual sites that name a given atom as
                                           ///<   one of their frame atoms
   std::vector<int> vste_affector_bounds;  ///< Bounds array for vste_affector_list
+
+  // SHAKE and RATTLE groups likewise must have all atoms present in a work group in order to
+  // evaluate bond constraints.
+  std::vector<int> shake_affector_list;   ///< List of all SHAKE groups that affect any atom (these
+                                          ///<   must be detected through a special search so that
+                                          ///<   only a work unit with all affected atoms present
+                                          ///<   will be tasked with evaluating the constraints).
+  std::vector<int> shake_affector_bounds; ///< Bounds array for shake_affector_list
+  
+  // Individual atoms must leave a record of their whereabouts in the valence work units for rapid
+  // retrieval of their locations
+  std::vector<int> work_unit_assignments; ///< The numbers of work units in which each atom can
+                                          ///<   be found
+  std::vector<int> work_unit_presence;    ///< Lists of the work units in which each atom is
+                                          ///<   found.  This is a column-format matrix with
+                                          ///<   atom_count rows and a number of columns expanded
+                                          ///<   as needed to accommodate the largest entry in
+                                          ///<   work_unit_assignments.
 };
   
 /// \brief An object to collect the components of a valence work unit (which will also track frozen
@@ -98,11 +118,15 @@ struct ValenceWorkUnit {
   /// \param max_atoms  The maximum number of atoms to accumulate in the work unit
   ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, int seed_atom,
                   int max_atoms = 768);
-
-  /// \brief Test whether this object contains a particular atom
+  
+  /// \brief Add a new atom to a work unit
+  
   
 private:
   int atom_count;
+  int max_atom_index;
+  int min_atom_index;
+  std::vector<uint> content_mask
   std::vector<int> atom_import_list;
   
 };
