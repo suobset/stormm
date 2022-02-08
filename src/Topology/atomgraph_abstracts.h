@@ -299,7 +299,7 @@ template <typename T> struct NonbondedKit {
   const int n_lj_types;     ///< The number of unique Lennard-Jones atom types in the system
   const T coulomb_constant; ///< Coulomb's constant in units of kcal-A/mol-e^2
   const T* charge;          ///< Partial atomic charges on all atoms
-  const int* q_idx;         ///< Bartial charge type indices for all atoms
+  const int* q_idx;         ///< Partial charge type indices for all atoms
   const int* lj_idx;        ///< Lennard-Jones type indices of all atoms
   const T* q_parameter;     ///< Partial atomic charges for each charge type (this will almost
                             ///<   certainly be smaller than the array of charges for every atom,

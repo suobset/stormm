@@ -48,6 +48,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 	         $(SRCDIR)/Topology/atomgraph_refinement.cpp \
 	         $(SRCDIR)/Topology/atomgraph_synthesis.cpp \
+	         $(SRCDIR)/Topology/valence_workunit.cpp \
 	         $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	         $(SRCDIR)/Trajectory/barostat.cpp \
 	         $(SRCDIR)/Trajectory/coordinateframe.cpp \
@@ -118,6 +119,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Topology/atomgraph_enumerators.h \
 		   $(SRCDIR)/Topology/atomgraph_refinement.h \
 		   $(SRCDIR)/Topology/atomgraph_synthesis.h \
+		   $(SRCDIR)/Topology/valence_workunit.h \
 		   $(SRCDIR)/Trajectory/amber_ascii.h \
 		   $(SRCDIR)/Trajectory/barostat.h \
 		   $(SRCDIR)/Trajectory/coordinateframe.h \
@@ -192,6 +194,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Topology/atomgraph_enumerators.o \
 		$(SRCDIR)/Topology/atomgraph_refinement.o \
 		$(SRCDIR)/Topology/atomgraph_synthesis.o \
+		$(SRCDIR)/Topology/valence_workunit.o \
 		$(SRCDIR)/Trajectory/amber_ascii.o \
 		$(SRCDIR)/Trajectory/barostat.o \
 		$(SRCDIR)/Trajectory/coordinateframe.o \

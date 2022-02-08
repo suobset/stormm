@@ -295,29 +295,24 @@ private:
   Hybrid<char4> residue_names;            ///< Four letter names of all residues, i.e. PDB names
 
   // CHARMM valence term details
-  Hybrid<int> urey_bradley_parameter_indices; ///< Index of Urey-Bradley parameters for each term
-  Hybrid<int> charmm_impr_parameter_indices;  ///< Index of each CHARMM improper's parameter pair
-  Hybrid<int> cmap_surface_indices;           ///< Surface indices for each CMAP term
-  Hybrid<int> cmap_surface_dimensions;        ///< Dimensions for every unique CMAP surface
-  Hybrid<double> urey_bradley_stiffnesses;    ///< Stiffness constant of each Urey-Bradley stretch
-  Hybrid<double> urey_bradley_equilibria;     ///< Equilibrium length of each Urey-Bradley stretch
-  Hybrid<double> charmm_impr_stiffnesses;     ///< CHARMM impropers are harmonic, too!
-  Hybrid<double> charmm_impr_phase_angles;    ///< The "equilibria" for CHARMM impropers
-  Hybrid<double> cmap_surfaces;               ///< Concatenated, column-major format matrices for
-                                              ///<   every CMAP surface term
-  Hybrid<float> sp_urey_bradley_stiffnesses;  ///< Stiffness constant of each Urey-Bradley stretch,
-                                              ///<   in single precision
-  Hybrid<float> sp_urey_bradley_equilibria;   ///< Equilibrium length of each Urey-Bradley stretch,
-                                              ///<   in single precision
-  Hybrid<float> sp_charmm_impr_stiffnesses;   ///< CHARMM impropers are harmonic, too!
-  Hybrid<float> sp_charmm_impr_phase_angles;  ///< The "equilibria" for CHARMM impropers
-  Hybrid<float> sp_cmap_surfaces;             ///< Concatenated, column-major format matrices for
-                                              ///<   every CMAP surface term, in single precision
+  Hybrid<double> ubrd_stiffnesses;        ///< Stiffness constant of each Urey-Bradley stretch
+  Hybrid<double> ubrd_equilibria;         ///< Equilibrium length of each Urey-Bradley stretch
+  Hybrid<double> cimp_stiffnesses;        ///< CHARMM impropers are harmonic, too!
+  Hybrid<double> cimp_phase_angles;       ///< The "equilibria" for CHARMM impropers
+  Hybrid<int> cmap_surface_dimensions;    ///< Dimensions for every unique CMAP surface
+  Hybrid<int> cmap_surface_bounds;        ///< Bounds array for every unique CMAP surface
+  Hybrid<double> cmap_surfaces;           ///< Concatenated, column-major format matrices for
+                                          ///<   every CMAP surface term
+  Hybrid<float> sp_ubrd_stiffnesses;      ///< Stiffness constant of each Urey-Bradley stretch,
+                                          ///<   in single precision
+  Hybrid<float> sp_ubrd_equilibria;       ///< Equilibrium length of each Urey-Bradley stretch,
+                                          ///<   in single precision
+  Hybrid<float> sp_cimp_stiffnesses;      ///< CHARMM impropers are harmonic, too!
+  Hybrid<float> sp_cimp_phase_angles;     ///< The "equilibria" for CHARMM impropers
+  Hybrid<float> sp_cmap_surfaces;         ///< Concatenated, column-major format matrices for
+                                          ///<   every CMAP surface term, in single precision
 
   // Basic force field valence term details
-  Hybrid<int> bond_parameter_indices;    ///< Parameter index of each bond stretching term
-  Hybrid<int> angl_parameter_indices;    ///< Parameter index of each angle bending term
-  Hybrid<int> dihe_parameter_indices;    ///< Parameter index of each angle bending term
   Hybrid<double> bond_stiffnesses;       ///< Stiffness of each bond stretch, kcal/mol-A^2
   Hybrid<double> bond_equilibria;        ///< Equilibrium lengths of all bonds, A
   Hybrid<double> angl_stiffnesses;       ///< Stiffness of each angle bend, kcal/mol-rad^2
@@ -332,29 +327,40 @@ private:
   Hybrid<float> sp_dihe_amplitudes;      ///< Amplitudes of torsion cosine terms (single precision)
   Hybrid<float> sp_dihe_periodicities;   ///< Periodicities of torsion terms (single precision)
   Hybrid<float> sp_dihe_phase_angles;    ///< Phase angles of torsion terms (single precision)
-
+  
   // Valence term indexing arrays, all of them indexing atoms in the synthesis list, updated from
-  // the indexing in their original topologies
-  Hybrid<int> ubrd_i_atoms;  ///< Urey-Bradley I atoms
-  Hybrid<int> ubrd_k_atoms;  ///< Urey-Bradley K atoms
-  Hybrid<int> cimp_i_atoms;  ///< CHARMM improper I atoms
-  Hybrid<int> cimp_j_atoms;  ///< CHARMM improper J atoms
-  Hybrid<int> cimp_k_atoms;  ///< CHARMM improper K atoms (the center atom of the quartet)
-  Hybrid<int> cimp_l_atoms;  ///< CHARMM improper L atoms
-  Hybrid<int> cmap_i_atoms;  ///< Correction map I atoms
-  Hybrid<int> cmap_j_atoms;  ///< Correction map J atoms
-  Hybrid<int> cmap_k_atoms;  ///< Correction map K atoms
-  Hybrid<int> cmap_l_atoms;  ///< Correction map L atoms
-  Hybrid<int> cmap_m_atoms;  ///< Correction map M atoms
-  Hybrid<int> bond_i_atoms;  ///< Harmonic bond I atoms
-  Hybrid<int> bond_j_atoms;  ///< Harmonic bond J atoms
-  Hybrid<int> angl_i_atoms;  ///< Harmonic angle I atoms
-  Hybrid<int> angl_j_atoms;  ///< Harmonic angle J atoms
-  Hybrid<int> angl_k_atoms;  ///< Harmonic angle K atoms
-  Hybrid<int> dihe_i_atoms;  ///< Cosine-based dihedral (proper or improper) I atoms
-  Hybrid<int> dihe_j_atoms;  ///< Cosine-based dihedral (proper or improper) J atoms
-  Hybrid<int> dihe_k_atoms;  ///< Cosine-based dihedral (proper or improper) K atoms
-  Hybrid<int> dihe_l_atoms;  ///< Cosine-based dihedral (proper or improper) L atoms
+  // the indexing in their original topologies and parameters in the condensed tables of the
+  // synthesis.
+  Hybrid<int> ubrd_i_atoms;    ///< Urey-Bradley I atoms
+  Hybrid<int> ubrd_k_atoms;    ///< Urey-Bradley K atoms
+  Hybrid<int> ubrd_param_idx;  ///< Urey-Bradley parameter indices
+  Hybrid<int> cimp_i_atoms;    ///< CHARMM improper I atoms
+  Hybrid<int> cimp_j_atoms;    ///< CHARMM improper J atoms
+  Hybrid<int> cimp_k_atoms;    ///< CHARMM improper K atoms (the center atom of the quartet)
+  Hybrid<int> cimp_l_atoms;    ///< CHARMM improper L atoms
+  Hybrid<int> cimp_param_idx;  ///< CHARMM improper parameter indices
+  Hybrid<int> cmap_i_atoms;    ///< Correction map I atoms
+  Hybrid<int> cmap_j_atoms;    ///< Correction map J atoms
+  Hybrid<int> cmap_k_atoms;    ///< Correction map K atoms
+  Hybrid<int> cmap_l_atoms;    ///< Correction map L atoms
+  Hybrid<int> cmap_m_atoms;    ///< Correction map M atoms
+  Hybrid<int> cmap_param_idx;  ///< CMAP surface indices
+  Hybrid<int> bond_i_atoms;    ///< Harmonic bond I atoms
+  Hybrid<int> bond_j_atoms;    ///< Harmonic bond J atoms
+  Hybrid<int> bond_param_idx;  ///< Bond parameter indices
+  Hybrid<int> angl_i_atoms;    ///< Harmonic angle I atoms
+  Hybrid<int> angl_j_atoms;    ///< Harmonic angle J atoms
+  Hybrid<int> angl_k_atoms;    ///< Harmonic angle K atoms
+  Hybrid<int> angl_param_idx;  ///< Bond angle parameter indices
+  Hybrid<int> dihe_i_atoms;    ///< Cosine-based dihedral (proper or improper) I atoms
+  Hybrid<int> dihe_j_atoms;    ///< Cosine-based dihedral (proper or improper) J atoms
+  Hybrid<int> dihe_k_atoms;    ///< Cosine-based dihedral (proper or improper) K atoms
+  Hybrid<int> dihe_l_atoms;    ///< Cosine-based dihedral (proper or improper) L atoms
+  Hybrid<int> dihe_param_idx;  ///< Cosine-based dihedral parameter indices
+
+  // Non-bonded parameter indexing
+  Hybrid<int> charge_indices;            ///< Atomic charge indices, 0 to charge_type_count - 1
+  Hybrid<int> lennard_jones_indices;     ///< Lennard-Jones indices, 0 to atom_type_count - 1
   
   // NMR restraint term details: these function exactly like other parameter sets and are indexed
   // by lists of atoms in the bond work units arrays.  They can be included in the synthesis of
@@ -468,21 +474,16 @@ private:
   void buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
                               const std::vector<int> &topology_index_rebase);
 
-  /// \brief 
+  /// \brief Find unique parameters for each of the valence and charge energy components, then
+  ///        assign terms indexing atoms in the order of the synthesis to use parameters from
+  ///        consensus tables.
+  void condenseParameterTables();
   
   /// \brief Extend the Lennard-Jones tables with a specific Lennard-Jones atom type, including
   ///        pair-specific cross-terms (i.e. CHARMM NB-fix details).  All cross terms involving the
   ///        parameter with other known parameters must be accounted for.  This can be an involved
   ///        process, but if the current topology's tables completely subsume the former topology's
   ///        tables or are completely covered by the current topology's tables it is tractable.
-  ///
-  /// \param nbk              Non-bonded details of a molecular system topology
-  /// \param matrix_size      Size of the current, compiled Lennard-Jones tables (each is square)
-  /// \param lj_a             Compiled Lennard-Jones A coefficients for the synthesis
-  /// \param lj_b             Compiled Lennard-Jones B coefficients for the synthesis
-  /// \param lj_c             Compiled Lennard-Jones C coefficients for the synthesis
-  /// \param significance     Matrix indicating whether each interaction is significant, meaning
-  ///                         that its values must be satisfied in future searches
   void extendLJMatrices();
 };
 

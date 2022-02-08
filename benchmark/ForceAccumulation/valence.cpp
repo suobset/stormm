@@ -116,6 +116,9 @@ int main(int argc, char* argv[]) {
     const double pdy = crd2[i].y - crd1[i].y;
     const double pdz = crd2[i].z - crd1[i].z;
     const double factor = target_distance / sqrt((pdx * pdx) + (pdy * pdy) + (pdz * pdz));
+    crd1[i].x += (xsr_rng.uniformRandomNumber() - 0.5) * 80.0;
+    crd1[i].y += (xsr_rng.uniformRandomNumber() - 0.5) * 80.0;
+    crd1[i].z += (xsr_rng.uniformRandomNumber() - 0.5) * 80.0;
     crd2[i].x = crd1[i].x + (factor * pdx);
     crd2[i].y = crd1[i].y + (factor * pdy);
     crd2[i].z = crd1[i].z + (factor * pdz);

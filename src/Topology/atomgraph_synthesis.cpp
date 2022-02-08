@@ -90,23 +90,18 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     atom_names{HybridKind::ARRAY, "tpsyn_atom_names"},
     atom_types{HybridKind::ARRAY, "tpsyn_atom_types"},
     residue_names{HybridKind::ARRAY, "tpsyn_res_names"},
-    urey_bradley_parameter_indices{HybridKind::ARRAY, "tpsyn_urey_parm"},
-    charmm_impr_parameter_indices{HybridKind::ARRAY, "tpsyn_cimp_parm"},
-    cmap_surface_indices{HybridKind::ARRAY, "tpsyn_cmap_parm"},
-    cmap_surface_dimensions{HybridKind::ARRAY, "tpsyn_cmap_surface"},
-    urey_bradley_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff"},
-    urey_bradley_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil"},
-    charmm_impr_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff"},
-    charmm_impr_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil"},
+    ubrd_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff"},
+    ubrd_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil"},
+    cimp_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff"},
+    cimp_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil"},
+    cmap_surface_dimensions{HybridKind::ARRAY, "tpsyn_cmap_dims"},
+    cmap_surface_bounds{HybridKind::ARRAY, "tpsyn_cmap_bounds"},
     cmap_surfaces{HybridKind::ARRAY, "tpsyn_cmap_surf"},
-    sp_urey_bradley_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff_sp"},
-    sp_urey_bradley_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil_sp"},
-    sp_charmm_impr_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff_sp"},
-    sp_charmm_impr_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil_sp"},
+    sp_ubrd_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff_sp"},
+    sp_ubrd_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil_sp"},
+    sp_cimp_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff_sp"},
+    sp_cimp_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil_sp"},
     sp_cmap_surfaces{HybridKind::ARRAY, "tpsyn_cmap_surf_sp"},
-    bond_parameter_indices{HybridKind::ARRAY, "tpsyn_bond_parm"},
-    angl_parameter_indices{HybridKind::ARRAY, "tpsyn_angl_parm"},
-    dihe_parameter_indices{HybridKind::ARRAY, "tpsyn_dihe_parm"},
     bond_stiffnesses{HybridKind::ARRAY, "tpsyn_bondk"},
     bond_equilibria{HybridKind::ARRAY, "tpsyn_bondl0"},
     angl_stiffnesses{HybridKind::ARRAY, "tpsyn_anglk"},
@@ -123,24 +118,32 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_dihe_phase_angles{HybridKind::ARRAY, "tpsyn_dihepsi_sp"},
     ubrd_i_atoms{HybridKind::ARRAY, "tpsyn_ubrd_i"},
     ubrd_k_atoms{HybridKind::ARRAY, "tpsyn_ubrd_k"},
+    ubrd_param_idx{HybridKind::ARRAY, "tpsyn_ubrd_idx"},
     cimp_i_atoms{HybridKind::ARRAY, "tpsyn_cimp_i"},
     cimp_j_atoms{HybridKind::ARRAY, "tpsyn_cimp_j"},
     cimp_k_atoms{HybridKind::ARRAY, "tpsyn_cimp_k"},
     cimp_l_atoms{HybridKind::ARRAY, "tpsyn_cimp_l"},
+    cimp_param_idx{HybridKind::ARRAY, "tpsyn_cimp_idx"},
     cmap_i_atoms{HybridKind::ARRAY, "tpsyn_cmap_i"},
     cmap_j_atoms{HybridKind::ARRAY, "tpsyn_cmap_j"},
     cmap_k_atoms{HybridKind::ARRAY, "tpsyn_cmap_k"},
     cmap_l_atoms{HybridKind::ARRAY, "tpsyn_cmap_l"},
     cmap_m_atoms{HybridKind::ARRAY, "tpsyn_cmap_m"},
+    cmap_param_idx{HybridKind::ARRAY, "tpsyn_cmap_idx"},
     bond_i_atoms{HybridKind::ARRAY, "tpsyn_bond_i"},
     bond_j_atoms{HybridKind::ARRAY, "tpsyn_bond_j"},
+    bond_param_idx{HybridKind::ARRAY, "tpsyn_bond_idx"},
     angl_i_atoms{HybridKind::ARRAY, "tpsyn_angl_i"},
     angl_j_atoms{HybridKind::ARRAY, "tpsyn_angl_j"},
     angl_k_atoms{HybridKind::ARRAY, "tpsyn_angl_k"},
+    angl_param_idx{HybridKind::ARRAY, "tpsyn_angl_idx"},
     dihe_i_atoms{HybridKind::ARRAY, "tpsyn_dihe_i"},
     dihe_j_atoms{HybridKind::ARRAY, "tpsyn_dihe_j"},
     dihe_k_atoms{HybridKind::ARRAY, "tpsyn_dihe_k"},
     dihe_l_atoms{HybridKind::ARRAY, "tpsyn_dihe_l"},
+    dihe_param_idx{HybridKind::ARRAY, "tpsyn_dihe_idx"},
+    charge_indices{HybridKind::ARRAY, "tpsyn_q_idx"},
+    lennard_jones_indices{HybridKind::ARRAY, "tpsyn_lj_idx"},
     nmr_initial_steps{HybridKind::ARRAY, "tpsyn_nmr_init_step"},
     nmr_final_steps{HybridKind::ARRAY, "tpsyn_nmr_final_step"},
     nmr_increments{HybridKind::ARRAY, "tpsyn_nmr_inc"},
@@ -166,348 +169,15 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
   checkCommonSettings();
   buildAtomAndTermArrays(topology_indices_in, topology_index_rebase);
-  
-  // Compute the numbers of unique parameters.  Take the opportunity to compute offsets (starting
-  // bounds) for various sets of terms.
-  int max_unique_bond = 0;
-  int max_unique_angl = 0;
-  int max_unique_dihe = 0;
-  int max_unique_ubrd = 0;
-  int max_unique_cimp = 0;
-  int max_unique_cmap = 0;
-  int max_unique_chrg = 0;
-  int max_unique_atyp = 0;
-  std::vector<int> topology_atom_offsets(topology_count);
-  std::vector<int> topology_virtual_site_offsets(topology_count);
-  std::vector<int> topology_bond_table_offsets(topology_count);
-  std::vector<int> topology_angl_table_offsets(topology_count);
-  std::vector<int> topology_dihe_table_offsets(topology_count);
-  std::vector<int> topology_ubrd_table_offsets(topology_count);
-  std::vector<int> topology_cimp_table_offsets(topology_count);
-  std::vector<int> topology_cmap_table_offsets(topology_count);
-  std::vector<int> topology_chrg_table_offsets(topology_count);
-  std::vector<int> topology_atyp_table_offsets(topology_count);
-  for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* ag_ptr = topologies[i];
-    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
-    const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
-    topology_bond_table_offsets[i] = max_unique_bond;
-    topology_angl_table_offsets[i] = max_unique_angl;
-    topology_dihe_table_offsets[i] = max_unique_dihe;
-    topology_ubrd_table_offsets[i] = max_unique_ubrd;
-    topology_cimp_table_offsets[i] = max_unique_cimp;
-    topology_cmap_table_offsets[i] = max_unique_cmap;    
-    topology_chrg_table_offsets[i] = max_unique_chrg;
-    topology_atyp_table_offsets[i] = max_unique_atyp;
-    max_unique_bond += vk.nbond_param;
-    max_unique_angl += vk.nangl_param;
-    max_unique_dihe += vk.ndihe_param;
-    max_unique_ubrd += vk.nubrd_param;
-    max_unique_cimp += vk.ncimp_param;
-    max_unique_cmap += vk.ncmap_surf;
-    max_unique_chrg += nbk.n_q_types;
-    max_unique_atyp += nbk.n_lj_types;
-  }
 
-  // Pre-compute some quantities relating to CMAPs that will help distinguish these gargantuan
-  // "parameters" in the inner loops that follow.
-  std::vector<double> cmap_parameter_sums(max_unique_cmap);
-  for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* iag_ptr = topologies[i];
-    const ValenceKit<double> i_vk = iag_ptr->getDoublePrecisionValenceKit();
-    for (int j = 0; j < i_vk.ncmap_surf; j++) {
-      cmap_parameter_sums[topology_cmap_table_offsets[i] + j] =
-        sum<double>(&i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]],
-                    i_vk.cmap_dim[j] * i_vk.cmap_dim[j]);
-    }
-  }
-  
-  // Create lists of unique parameters for the valence and non-bonded calculations.
-  std::vector<int> bond_synthesis_index(max_unique_bond, -1);
-  std::vector<int> angl_synthesis_index(max_unique_angl, -1);
-  std::vector<int> dihe_synthesis_index(max_unique_dihe, -1);
-  std::vector<int> ubrd_synthesis_index(max_unique_ubrd, -1);
-  std::vector<int> cimp_synthesis_index(max_unique_cimp, -1);
-  std::vector<int> cmap_synthesis_index(max_unique_cmap, -1);
-  std::vector<int> chrg_synthesis_index(max_unique_chrg, -1);
-  std::vector<double> filtered_chrg;
-  std::vector<float> sp_filtered_chrg;
-  std::vector<double> filtered_bond_keq;
-  std::vector<double> filtered_bond_leq;
-  std::vector<float> sp_filtered_bond_keq;
-  std::vector<float> sp_filtered_bond_leq;
-  std::vector<double> filtered_angl_keq;
-  std::vector<double> filtered_angl_theta;
-  std::vector<float> sp_filtered_angl_keq;
-  std::vector<float> sp_filtered_angl_theta;
-  std::vector<double> filtered_dihe_amp;
-  std::vector<double> filtered_dihe_freq;
-  std::vector<double> filtered_dihe_phi;
-  std::vector<float> sp_filtered_dihe_amp;
-  std::vector<float> sp_filtered_dihe_freq;
-  std::vector<float> sp_filtered_dihe_phi;
-  std::vector<double> filtered_ubrd_keq;
-  std::vector<double> filtered_ubrd_leq;
-  std::vector<float> sp_filtered_ubrd_keq;
-  std::vector<float> sp_filtered_ubrd_leq;
-  std::vector<double> filtered_cimp_keq;
-  std::vector<double> filtered_cimp_phi;
-  std::vector<float> sp_filtered_cimp_keq;
-  std::vector<float> sp_filtered_cimp_phi;
-  std::vector<int> filtered_cmap_dim;
-  std::vector<int> filtered_cmap_surf_bounds(1, 0);
-  std::vector<double> filtered_cmap_surf;
-  std::vector<float> sp_filtered_cmap_surf;
-  int n_unique_bond = 0;
-  int n_unique_angl = 0;
-  int n_unique_dihe = 0;
-  int n_unique_ubrd = 0;
-  int n_unique_cimp = 0;
-  int n_unique_cmap = 0;
-  int n_unique_chrg = 0;
-  for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* iag_ptr = topologies[i];
-    const ChemicalDetailsKit i_cdk     = iag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
-    const NonbondedKit<float> i_nbk_sp = iag_ptr->getSinglePrecisionNonbondedKit();
-    const ValenceKit<float> i_vk_sp    = iag_ptr->getSinglePrecisionValenceKit();
-
-    // Seek out unique bond parameters
-    for (int j = 0; j < i_vk.nbond_param; j++) {
-      if (bond_synthesis_index[topology_bond_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-      const Approx ij_bond_keq(i_vk.bond_keq[j], constants::verytiny);
-      const Approx ij_bond_leq(i_vk.bond_leq[j], constants::verytiny);
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
-        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.nbond_param; m++) {
-          if (bond_synthesis_index[topology_bond_table_offsets[k] + m] < 0 &&
-              ij_bond_keq.test(k_vk.bond_keq[m]) && ij_bond_leq.test(k_vk.bond_leq[m])) {
-            bond_synthesis_index[topology_bond_table_offsets[k] + m] = n_unique_bond;
-          }
-        }
-      }
-
-      // Catalog this unique bond and increment the counter
-      filtered_bond_keq.push_back(i_vk.bond_keq[j]);
-      filtered_bond_leq.push_back(i_vk.bond_leq[j]);
-      sp_filtered_bond_keq.push_back(i_vk_sp.bond_keq[j]);
-      sp_filtered_bond_leq.push_back(i_vk_sp.bond_leq[j]);
-      n_unique_bond++;
-    }
-
-    // Seek out unique angle parameters
-    for (int j = 0; j < i_vk.nangl_param; j++) {
-      if (angl_synthesis_index[topology_angl_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-      const Approx ij_angl_keq(i_vk.angl_keq[j], constants::verytiny);
-      const Approx ij_angl_theta(i_vk.angl_theta[j], constants::verytiny);
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
-        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.nangl_param; m++) {
-          if (angl_synthesis_index[topology_angl_table_offsets[k] + m] < 0 &&
-              ij_angl_keq.test(k_vk.angl_keq[m]) && ij_angl_theta.test(k_vk.angl_theta[m])) {
-            angl_synthesis_index[topology_angl_table_offsets[k] + m] = n_unique_angl;
-          }
-        }
-      }
-
-      // Catalog this unique angle and increment the counter
-      filtered_angl_keq.push_back(i_vk.angl_keq[j]);
-      filtered_angl_theta.push_back(i_vk.angl_theta[j]);
-      sp_filtered_angl_keq.push_back(i_vk_sp.angl_keq[j]);
-      sp_filtered_angl_theta.push_back(i_vk_sp.angl_theta[j]);
-      n_unique_angl++;
-    }
-
-    // Seek out unique angle parameters
-    for (int j = 0; j < i_vk.ndihe_param; j++) {
-      if (dihe_synthesis_index[topology_dihe_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-      const Approx ij_dihe_amp(i_vk.dihe_amp[j], constants::verytiny);
-      const Approx ij_dihe_freq(i_vk.dihe_freq[j], constants::verytiny);
-      const Approx ij_dihe_phi(i_vk.dihe_phi[j], constants::verytiny);
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
-        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.ndihe_param; m++) {
-          if (dihe_synthesis_index[topology_dihe_table_offsets[k] + m] < 0 &&
-              ij_dihe_amp.test(k_vk.dihe_amp[m]) && ij_dihe_freq.test(k_vk.dihe_freq[m]) &&
-              ij_dihe_phi.test(k_vk.dihe_phi[m])) {
-            dihe_synthesis_index[topology_dihe_table_offsets[k] + m] = n_unique_dihe;
-          }
-        }
-      }
-
-      // Catalog this unique dihedral and increment the counter
-      filtered_dihe_amp.push_back(i_vk.dihe_amp[j]);
-      filtered_dihe_freq.push_back(i_vk.dihe_freq[j]);
-      filtered_dihe_phi.push_back(i_vk.dihe_phi[j]);
-      sp_filtered_dihe_amp.push_back(i_vk_sp.dihe_amp[j]);
-      sp_filtered_dihe_freq.push_back(i_vk_sp.dihe_freq[j]);
-      sp_filtered_dihe_phi.push_back(i_vk_sp.dihe_phi[j]);
-      n_unique_dihe++;
-    }
-    
-    // Seek out unique Urey-Bradley parameters
-    for (int j = 0; j < i_vk.nubrd_param; j++) {
-      if (ubrd_synthesis_index[topology_ubrd_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-      const Approx ij_ubrd_keq(i_vk.ubrd_keq[j], constants::verytiny);
-      const Approx ij_ubrd_leq(i_vk.ubrd_leq[j], constants::verytiny);
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
-        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.nubrd_param; m++) {
-          if (ubrd_synthesis_index[topology_ubrd_table_offsets[k] + m] < 0 &&
-              ij_ubrd_keq.test(k_vk.ubrd_keq[m]) && ij_ubrd_leq.test(k_vk.ubrd_leq[m])) {
-            ubrd_synthesis_index[topology_ubrd_table_offsets[k] + m] = n_unique_ubrd;
-          }
-        }
-      }
-
-      // Catalog this unique Urey-Bradley parameter set and increment the counter
-      filtered_ubrd_keq.push_back(i_vk.ubrd_keq[j]);
-      filtered_ubrd_leq.push_back(i_vk.ubrd_leq[j]);
-      sp_filtered_ubrd_keq.push_back(i_vk_sp.ubrd_keq[j]);
-      sp_filtered_ubrd_leq.push_back(i_vk_sp.ubrd_leq[j]);
-      n_unique_ubrd++;
-    }
-
-    // Seek out unique CHARMM improper dihedral parameters
-    for (int j = 0; j < i_vk.ncimp_param; j++) {
-      if (cimp_synthesis_index[topology_cimp_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-      const Approx ij_cimp_keq(i_vk.cimp_keq[j], constants::verytiny);
-      const Approx ij_cimp_phi(i_vk.cimp_phi[j], constants::verytiny);
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
-        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.ncimp_param; m++) {
-          if (cimp_synthesis_index[topology_cimp_table_offsets[k] + m] < 0 &&
-              ij_cimp_keq.test(k_vk.cimp_keq[m]) && ij_cimp_phi.test(k_vk.cimp_phi[m])) {
-            cimp_synthesis_index[topology_cimp_table_offsets[k] + m] = n_unique_cimp;
-          }
-        }
-      }
-
-      // Catalog this unique CHARMM improper dihedral and increment the counter
-      filtered_cimp_keq.push_back(i_vk.cimp_keq[j]);
-      filtered_cimp_phi.push_back(i_vk.cimp_phi[j]);
-      sp_filtered_cimp_keq.push_back(i_vk_sp.cimp_keq[j]);
-      sp_filtered_cimp_phi.push_back(i_vk_sp.cimp_phi[j]);
-      n_unique_cimp++;
-    }
-
-    // Seek out unique CMAP surfaces
-    for (int j = 0; j < i_vk.ncmap_surf; j++) {
-      if (cmap_synthesis_index[topology_cmap_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-
-      // Comparing CMAP surfaces is a much more involved process than comparing other parameters.
-      // Use a pre-arranged table of surface sums to expedite the process.
-      const Approx ij_cmap_sum(cmap_parameter_sums[topology_cmap_table_offsets[i] + j],
-                               constants::verytiny);
-      const int ij_cmap_dim = i_vk.cmap_dim[j];
-      const double* ij_surf_ptr = &i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]];
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const ValenceKit<double> k_vk = kag_ptr->getDoublePrecisionValenceKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_vk.ncmap_surf; m++) {
-          if (cmap_synthesis_index[topology_cmap_table_offsets[k] + m] < 0 &&
-              ij_cmap_dim != k_vk.cmap_dim[m] &&
-              ij_cmap_sum.test(cmap_parameter_sums[topology_cmap_table_offsets[k] + m]) &&
-              maxAbsoluteDifference(ij_surf_ptr, &k_vk.cmap_surf[k_vk.cmap_surf_bounds[m]],
-                                    ij_cmap_dim * ij_cmap_dim) < constants::verytiny) {
-            cmap_synthesis_index[topology_cmap_table_offsets[k] + m] = n_unique_cmap;
-          }
-        }
-      }
-
-      // Catalog this unique CMAP and increment the counter
-      for (int k = 0; k < ij_cmap_dim * ij_cmap_dim; k++) {
-        filtered_cmap_surf.push_back(i_vk.cmap_surf[k]);
-        sp_filtered_cmap_surf.push_back(i_vk_sp.cmap_surf[k]);
-      }
-      filtered_cmap_dim.push_back(ij_cmap_dim);
-      filtered_cmap_surf_bounds.push_back(filtered_cmap_surf.size());
-      n_unique_cmap++;
-    }
-
-    // Seek out unique charges
-    for (int j = 0; j < i_nbk.n_q_types; j++) {
-      if (chrg_synthesis_index[topology_chrg_table_offsets[i] + j] >= 0) {
-        continue;
-      }
-      const Approx ij_chrg(i_nbk.q_parameter[j], constants::verytiny);
-      for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
-        const NonbondedKit<double> k_nbk   = kag_ptr->getDoublePrecisionNonbondedKit();
-        const NonbondedKit<float> k_nbk_sp = kag_ptr->getSinglePrecisionNonbondedKit();
-        const int mstart = (k == i) ? j : 0;
-        for (int m = mstart; m < k_nbk.n_q_types; m++) {
-          if (chrg_synthesis_index[topology_chrg_table_offsets[k] + m] < 0 &&
-              ij_chrg.test(k_nbk.q_parameter[m])) {
-            chrg_synthesis_index[topology_chrg_table_offsets[k] + m] = n_unique_chrg;
-          }
-        }
-      }
-
-      // Catalog this unique charge and increment the counter
-      filtered_chrg.push_back(i_nbk.q_parameter[j]);
-      sp_filtered_chrg.push_back(i_nbk_sp.q_parameter[j]);
-      n_unique_chrg++;
-    }
-  }
-
-  // Record synthesis parameters found thus far
-  total_bond_params   = n_unique_bond;
-  total_angl_params   = n_unique_angl;
-  total_dihe_params   = n_unique_dihe;
-  total_ubrd_params   = n_unique_ubrd;
-  total_cimp_params   = n_unique_cimp;
-  total_cmap_surfaces = n_unique_cmap;
-  total_charge_types  = n_unique_chrg;  
+  // Condense valence and charge parameters into compact tables of unique values
+  condenseParameterTables();
   
   // The unique Lennard-Jones parameters are hard to map out.  To the degree that there are
   // unique parameters in each system, the Lennard-Jones tables might as well be block matrices.
   // Keep a list of the A, B, and possibly C coefficients of each Lennard-Jones type interacting
   // with all other types.
-  std::vector<int> atyp_synthesis_index(max_unique_atyp, -1);
-  std::vector<double> lj_a_synthesis;
-  std::vector<double> lj_b_synthesis;
-  std::vector<double> lj_c_synthesis;
-  std::vector<bool> lj_significance;
   extendLJMatrices();
-
-  // With the unique parameters enumerated and maps leading from parameters in any individual
-  // system into the unified arrays within the synthesis, make collated arrays for each atom and
-  // energy term.
-  for (int i = 0; i < system_count; i++) {
-
-  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -850,7 +520,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     atom_types.putHost(ag_ptr->getAtomType(), synth_atom_base, cdk.natom);
   }
 
-  // Fill in the valence term atom indexing arrays
+  // Fill in the valence term atom indexing arrays.
   ubrd_i_atoms.resize(ubrd_offset);
   ubrd_k_atoms.resize(ubrd_offset);
   cimp_i_atoms.resize(cimp_offset);
@@ -912,6 +582,442 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       dihe_j_atoms.putHost(vk.dihe_j_atoms[pos] + synth_atom_base, synth_dihe_offset + pos);
       dihe_k_atoms.putHost(vk.dihe_k_atoms[pos] + synth_atom_base, synth_dihe_offset + pos);
       dihe_l_atoms.putHost(vk.dihe_l_atoms[pos] + synth_atom_base, synth_dihe_offset + pos);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::condenseParameterTables() {
+
+  // Compute the numbers of unique parameters.  Take the opportunity to compute offsets (starting
+  // bounds) for various sets of terms.
+  int bond_offset = 0;
+  int angl_offset = 0;
+  int dihe_offset = 0;
+  int ubrd_offset = 0;
+  int cimp_offset = 0;
+  int cmap_offset = 0;
+  int chrg_offset = 0;
+  std::vector<int> topology_bond_table_offsets(topology_count);
+  std::vector<int> topology_angl_table_offsets(topology_count);
+  std::vector<int> topology_dihe_table_offsets(topology_count);
+  std::vector<int> topology_ubrd_table_offsets(topology_count);
+  std::vector<int> topology_cimp_table_offsets(topology_count);
+  std::vector<int> topology_cmap_table_offsets(topology_count);
+  std::vector<int> topology_chrg_table_offsets(topology_count);
+  for (int i = 0; i < topology_count; i++) {
+    const AtomGraph* ag_ptr = topologies[i];
+    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
+    topology_bond_table_offsets[i] = bond_offset;
+    topology_angl_table_offsets[i] = angl_offset;
+    topology_dihe_table_offsets[i] = dihe_offset;
+    topology_ubrd_table_offsets[i] = ubrd_offset;
+    topology_cimp_table_offsets[i] = cimp_offset;
+    topology_cmap_table_offsets[i] = cmap_offset;
+    topology_chrg_table_offsets[i] = chrg_offset;
+    bond_offset += vk.nbond;
+    angl_offset += vk.nangl;
+    dihe_offset += vk.ndihe;
+    ubrd_offset += vk.nubrd;
+    cimp_offset += vk.ncimp;
+    cmap_offset += vk.ncmap;
+    chrg_offset += nbk.natom;
+  }
+
+  // Pre-compute some quantities relating to CMAPs that will help distinguish these gargantuan
+  // "parameters" in the inner loops that follow.
+  std::vector<double> cmap_parameter_sums(cmap_offset);
+  for (int i = 0; i < topology_count; i++) {
+    const AtomGraph* iag_ptr = topologies[i];
+    const ValenceKit<double> i_vk = iag_ptr->getDoublePrecisionValenceKit();
+    for (int j = 0; j < i_vk.ncmap_surf; j++) {
+      cmap_parameter_sums[topology_cmap_table_offsets[i] + j] =
+        sum<double>(&i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]],
+                    i_vk.cmap_dim[j] * i_vk.cmap_dim[j]);
+    }
+  }
+  
+  // Create lists of unique parameters for the valence and non-bonded calculations.
+  std::vector<int> bond_synthesis_index(bond_offset, -1);
+  std::vector<int> angl_synthesis_index(angl_offset, -1);
+  std::vector<int> dihe_synthesis_index(dihe_offset, -1);
+  std::vector<int> ubrd_synthesis_index(ubrd_offset, -1);
+  std::vector<int> cimp_synthesis_index(cimp_offset, -1);
+  std::vector<int> cmap_synthesis_index(cmap_offset, -1);
+  std::vector<int> chrg_synthesis_index(chrg_offset, -1);
+  std::vector<double> filtered_chrg;
+  std::vector<float> sp_filtered_chrg;
+  std::vector<double> filtered_bond_keq;
+  std::vector<double> filtered_bond_leq;
+  std::vector<float> sp_filtered_bond_keq;
+  std::vector<float> sp_filtered_bond_leq;
+  std::vector<double> filtered_angl_keq;
+  std::vector<double> filtered_angl_theta;
+  std::vector<float> sp_filtered_angl_keq;
+  std::vector<float> sp_filtered_angl_theta;
+  std::vector<double> filtered_dihe_amp;
+  std::vector<double> filtered_dihe_freq;
+  std::vector<double> filtered_dihe_phi;
+  std::vector<float> sp_filtered_dihe_amp;
+  std::vector<float> sp_filtered_dihe_freq;
+  std::vector<float> sp_filtered_dihe_phi;
+  std::vector<double> filtered_ubrd_keq;
+  std::vector<double> filtered_ubrd_leq;
+  std::vector<float> sp_filtered_ubrd_keq;
+  std::vector<float> sp_filtered_ubrd_leq;
+  std::vector<double> filtered_cimp_keq;
+  std::vector<double> filtered_cimp_phi;
+  std::vector<float> sp_filtered_cimp_keq;
+  std::vector<float> sp_filtered_cimp_phi;
+  std::vector<int> filtered_cmap_dim;
+  std::vector<int> filtered_cmap_surf_bounds(1, 0);
+  std::vector<double> filtered_cmap_surf;
+  std::vector<float> sp_filtered_cmap_surf;
+  int n_unique_bond = 0;
+  int n_unique_angl = 0;
+  int n_unique_dihe = 0;
+  int n_unique_ubrd = 0;
+  int n_unique_cimp = 0;
+  int n_unique_cmap = 0;
+  int n_unique_chrg = 0;
+  for (int i = 0; i < topology_count; i++) {
+    const AtomGraph* iag_ptr = topologies[i];
+    const ChemicalDetailsKit i_cdk     = iag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
+    const NonbondedKit<float> i_nbk_sp = iag_ptr->getSinglePrecisionNonbondedKit();
+    const ValenceKit<float> i_vk_sp    = iag_ptr->getSinglePrecisionValenceKit();
+
+    // Seek out unique bond parameters
+    for (int j = 0; j < i_vk.nbond_param; j++) {
+      if (bond_synthesis_index[topology_bond_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_bond_keq(i_vk.bond_keq[j], constants::verytiny);
+      const Approx ij_bond_leq(i_vk.bond_leq[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
+        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.nbond_param; m++) {
+          if (bond_synthesis_index[topology_bond_table_offsets[k] + m] < 0 &&
+              ij_bond_keq.test(k_vk.bond_keq[m]) && ij_bond_leq.test(k_vk.bond_leq[m])) {
+            bond_synthesis_index[topology_bond_table_offsets[k] + m] = n_unique_bond;
+          }
+        }
+      }
+
+      // Catalog this unique bond and increment the counter
+      filtered_bond_keq.push_back(i_vk.bond_keq[j]);
+      filtered_bond_leq.push_back(i_vk.bond_leq[j]);
+      sp_filtered_bond_keq.push_back(i_vk_sp.bond_keq[j]);
+      sp_filtered_bond_leq.push_back(i_vk_sp.bond_leq[j]);
+      n_unique_bond++;
+    }
+
+    // Seek out unique angle parameters
+    for (int j = 0; j < i_vk.nangl_param; j++) {
+      if (angl_synthesis_index[topology_angl_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_angl_keq(i_vk.angl_keq[j], constants::verytiny);
+      const Approx ij_angl_theta(i_vk.angl_theta[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
+        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.nangl_param; m++) {
+          if (angl_synthesis_index[topology_angl_table_offsets[k] + m] < 0 &&
+              ij_angl_keq.test(k_vk.angl_keq[m]) && ij_angl_theta.test(k_vk.angl_theta[m])) {
+            angl_synthesis_index[topology_angl_table_offsets[k] + m] = n_unique_angl;
+          }
+        }
+      }
+
+      // Catalog this unique angle and increment the counter
+      filtered_angl_keq.push_back(i_vk.angl_keq[j]);
+      filtered_angl_theta.push_back(i_vk.angl_theta[j]);
+      sp_filtered_angl_keq.push_back(i_vk_sp.angl_keq[j]);
+      sp_filtered_angl_theta.push_back(i_vk_sp.angl_theta[j]);
+      n_unique_angl++;
+    }
+
+    // Seek out unique angle parameters
+    for (int j = 0; j < i_vk.ndihe_param; j++) {
+      if (dihe_synthesis_index[topology_dihe_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_dihe_amp(i_vk.dihe_amp[j], constants::verytiny);
+      const Approx ij_dihe_freq(i_vk.dihe_freq[j], constants::verytiny);
+      const Approx ij_dihe_phi(i_vk.dihe_phi[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
+        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.ndihe_param; m++) {
+          if (dihe_synthesis_index[topology_dihe_table_offsets[k] + m] < 0 &&
+              ij_dihe_amp.test(k_vk.dihe_amp[m]) && ij_dihe_freq.test(k_vk.dihe_freq[m]) &&
+              ij_dihe_phi.test(k_vk.dihe_phi[m])) {
+            dihe_synthesis_index[topology_dihe_table_offsets[k] + m] = n_unique_dihe;
+          }
+        }
+      }
+
+      // Catalog this unique dihedral and increment the counter
+      filtered_dihe_amp.push_back(i_vk.dihe_amp[j]);
+      filtered_dihe_freq.push_back(i_vk.dihe_freq[j]);
+      filtered_dihe_phi.push_back(i_vk.dihe_phi[j]);
+      sp_filtered_dihe_amp.push_back(i_vk_sp.dihe_amp[j]);
+      sp_filtered_dihe_freq.push_back(i_vk_sp.dihe_freq[j]);
+      sp_filtered_dihe_phi.push_back(i_vk_sp.dihe_phi[j]);
+      n_unique_dihe++;
+    }
+    
+    // Seek out unique Urey-Bradley parameters
+    for (int j = 0; j < i_vk.nubrd_param; j++) {
+      if (ubrd_synthesis_index[topology_ubrd_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_ubrd_keq(i_vk.ubrd_keq[j], constants::verytiny);
+      const Approx ij_ubrd_leq(i_vk.ubrd_leq[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
+        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.nubrd_param; m++) {
+          if (ubrd_synthesis_index[topology_ubrd_table_offsets[k] + m] < 0 &&
+              ij_ubrd_keq.test(k_vk.ubrd_keq[m]) && ij_ubrd_leq.test(k_vk.ubrd_leq[m])) {
+            ubrd_synthesis_index[topology_ubrd_table_offsets[k] + m] = n_unique_ubrd;
+          }
+        }
+      }
+
+      // Catalog this unique Urey-Bradley parameter set and increment the counter
+      filtered_ubrd_keq.push_back(i_vk.ubrd_keq[j]);
+      filtered_ubrd_leq.push_back(i_vk.ubrd_leq[j]);
+      sp_filtered_ubrd_keq.push_back(i_vk_sp.ubrd_keq[j]);
+      sp_filtered_ubrd_leq.push_back(i_vk_sp.ubrd_leq[j]);
+      n_unique_ubrd++;
+    }
+
+    // Seek out unique CHARMM improper dihedral parameters
+    for (int j = 0; j < i_vk.ncimp_param; j++) {
+      if (cimp_synthesis_index[topology_cimp_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_cimp_keq(i_vk.cimp_keq[j], constants::verytiny);
+      const Approx ij_cimp_phi(i_vk.cimp_phi[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
+        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.ncimp_param; m++) {
+          if (cimp_synthesis_index[topology_cimp_table_offsets[k] + m] < 0 &&
+              ij_cimp_keq.test(k_vk.cimp_keq[m]) && ij_cimp_phi.test(k_vk.cimp_phi[m])) {
+            cimp_synthesis_index[topology_cimp_table_offsets[k] + m] = n_unique_cimp;
+          }
+        }
+      }
+
+      // Catalog this unique CHARMM improper dihedral and increment the counter
+      filtered_cimp_keq.push_back(i_vk.cimp_keq[j]);
+      filtered_cimp_phi.push_back(i_vk.cimp_phi[j]);
+      sp_filtered_cimp_keq.push_back(i_vk_sp.cimp_keq[j]);
+      sp_filtered_cimp_phi.push_back(i_vk_sp.cimp_phi[j]);
+      n_unique_cimp++;
+    }
+
+    // Seek out unique CMAP surfaces
+    for (int j = 0; j < i_vk.ncmap_surf; j++) {
+      if (cmap_synthesis_index[topology_cmap_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+
+      // Comparing CMAP surfaces is a much more involved process than comparing other parameters.
+      // Use a pre-arranged table of surface sums to expedite the process.
+      const Approx ij_cmap_sum(cmap_parameter_sums[topology_cmap_table_offsets[i] + j],
+                               constants::verytiny);
+      const int ij_cmap_dim = i_vk.cmap_dim[j];
+      const double* ij_surf_ptr = &i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]];
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk = kag_ptr->getDoublePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.ncmap_surf; m++) {
+          if (cmap_synthesis_index[topology_cmap_table_offsets[k] + m] < 0 &&
+              ij_cmap_dim != k_vk.cmap_dim[m] &&
+              ij_cmap_sum.test(cmap_parameter_sums[topology_cmap_table_offsets[k] + m]) &&
+              maxAbsoluteDifference(ij_surf_ptr, &k_vk.cmap_surf[k_vk.cmap_surf_bounds[m]],
+                                    ij_cmap_dim * ij_cmap_dim) < constants::verytiny) {
+            cmap_synthesis_index[topology_cmap_table_offsets[k] + m] = n_unique_cmap;
+          }
+        }
+      }
+
+      // Catalog this unique CMAP and increment the counter
+      for (int k = 0; k < ij_cmap_dim * ij_cmap_dim; k++) {
+        filtered_cmap_surf.push_back(i_vk.cmap_surf[k]);
+        sp_filtered_cmap_surf.push_back(i_vk_sp.cmap_surf[k]);
+      }
+      filtered_cmap_dim.push_back(ij_cmap_dim);
+      filtered_cmap_surf_bounds.push_back(filtered_cmap_surf.size());
+      n_unique_cmap++;
+    }
+
+    // Seek out unique charges
+    for (int j = 0; j < i_nbk.n_q_types; j++) {
+      if (chrg_synthesis_index[topology_chrg_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_chrg(i_nbk.q_parameter[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const NonbondedKit<double> k_nbk   = kag_ptr->getDoublePrecisionNonbondedKit();
+        const NonbondedKit<float> k_nbk_sp = kag_ptr->getSinglePrecisionNonbondedKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_nbk.n_q_types; m++) {
+          if (chrg_synthesis_index[topology_chrg_table_offsets[k] + m] < 0 &&
+              ij_chrg.test(k_nbk.q_parameter[m])) {
+            chrg_synthesis_index[topology_chrg_table_offsets[k] + m] = n_unique_chrg;
+          }
+        }
+      }
+
+      // Catalog this unique charge and increment the counter
+      filtered_chrg.push_back(i_nbk.q_parameter[j]);
+      sp_filtered_chrg.push_back(i_nbk_sp.q_parameter[j]);
+      n_unique_chrg++;
+    }
+  }
+
+  // Record synthesis parameters found thus far.  Pad the relevant ARRAY-kind Hybrid objects in
+  // case some developer tries to have all lanes of a warp access an element.
+  total_bond_params   = n_unique_bond;
+  total_angl_params   = n_unique_angl;
+  total_dihe_params   = n_unique_dihe;
+  total_ubrd_params   = n_unique_ubrd;
+  total_cimp_params   = n_unique_cimp;
+  total_cmap_surfaces = n_unique_cmap;
+  total_charge_types  = n_unique_chrg;
+  bond_stiffnesses.resize(roundUp(total_bond_params, warp_size_int));
+  bond_equilibria.resize(roundUp(total_bond_params, warp_size_int));
+  angl_stiffnesses.resize(roundUp(total_angl_params, warp_size_int));
+  angl_equilibria.resize(roundUp(total_angl_params, warp_size_int));
+  dihe_amplitudes.resize(roundUp(total_dihe_params, warp_size_int));
+  dihe_periodicities.resize(roundUp(total_dihe_params, warp_size_int));
+  dihe_phase_angles.resize(roundUp(total_dihe_params, warp_size_int));
+  sp_bond_stiffnesses.resize(roundUp(total_bond_params, warp_size_int));
+  sp_bond_equilibria.resize(roundUp(total_bond_params, warp_size_int));
+  sp_angl_stiffnesses.resize(roundUp(total_angl_params, warp_size_int));
+  sp_angl_equilibria.resize(roundUp(total_angl_params, warp_size_int));
+  sp_dihe_amplitudes.resize(roundUp(total_dihe_params, warp_size_int));
+  sp_dihe_periodicities.resize(roundUp(total_dihe_params, warp_size_int));
+  sp_dihe_phase_angles.resize(roundUp(total_dihe_params, warp_size_int));
+  ubrd_stiffnesses.resize(roundUp(total_ubrd_params, warp_size_int));
+  ubrd_equilibria.resize(roundUp(total_ubrd_params, warp_size_int));
+  cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
+  cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
+  cmap_surface_dimensions.resize(roundUp(total_cmap_surfaces, warp_size_int));
+  cmap_surface_bounds.resize(roundUp(total_cmap_surfaces + 1, warp_size_int));
+  cmap_surfaces.resize(roundUp(filtered_cmap_surf.size(), warp_size_zu));
+  sp_ubrd_stiffnesses.resize(roundUp(total_ubrd_params, warp_size_int));
+  sp_ubrd_equilibria.resize(roundUp(total_ubrd_params, warp_size_int));
+  sp_cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
+  sp_cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
+  sp_cmap_surfaces.resize(roundUp(sp_filtered_cmap_surf.size(), warp_size_zu));
+  bond_stiffnesses.putHost(filtered_bond_keq);
+  bond_equilibria.putHost(filtered_bond_leq);
+  angl_stiffnesses.putHost(filtered_angl_keq);
+  angl_equilibria.putHost(filtered_angl_theta);
+  dihe_amplitudes.putHost(filtered_dihe_amp);
+  dihe_periodicities.putHost(filtered_dihe_freq);
+  dihe_phase_angles.putHost(filtered_dihe_phi);
+  sp_bond_stiffnesses.putHost(sp_filtered_bond_keq);
+  sp_bond_equilibria.putHost(sp_filtered_bond_leq);
+  sp_angl_stiffnesses.putHost(sp_filtered_angl_keq);
+  sp_angl_equilibria.putHost(sp_filtered_angl_theta);
+  sp_dihe_amplitudes.putHost(sp_filtered_dihe_amp);
+  sp_dihe_periodicities.putHost(sp_filtered_dihe_freq);
+  sp_dihe_phase_angles.putHost(sp_filtered_dihe_phi);
+  ubrd_stiffnesses.putHost(filtered_ubrd_keq);
+  ubrd_equilibria.putHost(filtered_ubrd_leq);
+  cimp_stiffnesses.putHost(filtered_cimp_keq);
+  cimp_phase_angles.putHost(filtered_cimp_phi);
+  cmap_surface_dimensions.putHost(filtered_cmap_dim);
+  cmap_surface_bounds.putHost(filtered_cmap_surf_bounds);
+  cmap_surfaces.putHost(filtered_cmap_surf);
+  sp_ubrd_stiffnesses.putHost(sp_filtered_ubrd_keq);
+  sp_ubrd_equilibria.putHost(sp_filtered_ubrd_leq);
+  sp_cimp_stiffnesses.putHost(sp_filtered_cimp_keq);
+  sp_cimp_phase_angles.putHost(sp_filtered_cimp_phi);
+  sp_cmap_surfaces.putHost(sp_filtered_cmap_surf);
+
+  // Lay out the tables for valence and charge parameter indexing within the synthesis
+  const int scm1 = system_count - 1;
+  ubrd_param_idx.resize(ubrd_term_offsets.readHost(scm1) + ubrd_term_counts.readHost(scm1));
+  cimp_param_idx.resize(cimp_term_offsets.readHost(scm1) + cimp_term_counts.readHost(scm1));
+  cmap_param_idx.resize(cmap_term_offsets.readHost(scm1) + cmap_term_counts.readHost(scm1));
+  bond_param_idx.resize(bond_term_offsets.readHost(scm1) + bond_term_counts.readHost(scm1));
+  angl_param_idx.resize(angl_term_offsets.readHost(scm1) + angl_term_counts.readHost(scm1));
+  dihe_param_idx.resize(dihe_term_offsets.readHost(scm1) + dihe_term_counts.readHost(scm1));
+  charge_indices.resize(atom_offsets.readHost(scm1) + atom_counts.readHost(scm1));
+                        
+  // Loop back over all systems and copy the known mapping of individual topologies to the
+  // synthesis as a whole
+  for (int i = 0; i < system_count; i++) {
+    const AtomGraph* iag_ptr = topologies[topology_indices.readHost(i)];
+    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
+    const int tp_index = topology_indices.readHost(i);
+    const int ag_bond_table_offset = topology_bond_table_offsets[tp_index];
+    const int ag_angl_table_offset = topology_angl_table_offsets[tp_index];
+    const int ag_dihe_table_offset = topology_dihe_table_offsets[tp_index];
+    const int ag_ubrd_table_offset = topology_ubrd_table_offsets[tp_index];
+    const int ag_cimp_table_offset = topology_cimp_table_offsets[tp_index];
+    const int ag_cmap_table_offset = topology_cmap_table_offsets[tp_index];
+    const int ag_chrg_table_offset = topology_chrg_table_offsets[tp_index];
+    const int synth_bond_table_offset = bond_term_offsets.readHost(i);
+    const int synth_angl_table_offset = angl_term_offsets.readHost(i);
+    const int synth_dihe_table_offset = dihe_term_offsets.readHost(i);
+    const int synth_ubrd_table_offset = ubrd_term_offsets.readHost(i);
+    const int synth_cimp_table_offset = cimp_term_offsets.readHost(i);
+    const int synth_cmap_table_offset = cmap_term_offsets.readHost(i);
+    const int synth_atom_offset = atom_offsets.readHost(i);
+    for (int j = 0; j < i_vk.nbond; j++) {
+      bond_param_idx.putHost(bond_synthesis_index[ag_bond_table_offset + j],
+                             synth_bond_table_offset + j);
+    }
+    for (int j = 0; j < i_vk.nangl; j++) {
+      angl_param_idx.putHost(angl_synthesis_index[ag_angl_table_offset + j],
+                             synth_angl_table_offset + j);
+    }
+    for (int j = 0; j < i_vk.ndihe; j++) {
+      dihe_param_idx.putHost(dihe_synthesis_index[ag_dihe_table_offset + j],
+                             synth_dihe_table_offset + j);
+    }
+    for (int j = 0; j < i_vk.nubrd; j++) {
+      ubrd_param_idx.putHost(ubrd_synthesis_index[ag_ubrd_table_offset + j],
+                             synth_ubrd_table_offset + j);
+    }
+    for (int j = 0; j < i_vk.ncimp; j++) {
+      cimp_param_idx.putHost(cimp_synthesis_index[ag_cimp_table_offset + j],
+                             synth_cimp_table_offset + j);
+    }
+    for (int j = 0; j < i_vk.ncmap; j++) {
+      cmap_param_idx.putHost(cmap_synthesis_index[ag_cmap_table_offset + j],
+                             synth_cmap_table_offset + j);
+    }
+    for (int j = 0; j < i_nbk.natom; j++) {
+      charge_indices.putHost(chrg_synthesis_index[ag_chrg_table_offset + j],
+                             synth_atom_offset + j);
     }
   }
 }
