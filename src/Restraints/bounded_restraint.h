@@ -135,6 +135,14 @@ struct BoundedRestraint {
                    double r4_in, int refr_index);
   /// \}
 
+  /// \brief Take the default copy, copy assignment, move, and move assignment constructors.
+  /// \{
+  BoundedRestraint(const BoundedRestraint &original) = default;
+  BoundedRestraint(BoundedRestraint &&original) = default;
+  BoundedRestraint& operator=(const BoundedRestraint &original) = default;
+  BoundedRestraint& operator=(BoundedRestraint &&original) = default;
+  /// \}
+  
   /// Obtain the topology index of an atom in this restraint
   ///
   /// \param restrained_atom_number  The 1st, 2nd, 3rd, or 4th atom (specify 1, 2, 3, or 4)

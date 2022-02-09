@@ -3,6 +3,7 @@
 #define OMNI_RESTRAINT_APPARATUS_H
 
 #include "Accelerator/hybrid.h"
+#include "Topology/atomgraph.h"
 #include "bounded_restraint.h"
 
 namespace omni {
@@ -17,6 +18,13 @@ struct RestraintApparatus {
   /// \brief The constructor takes a vector of individual restraints
   RestraintApparatus(const std::vector<BoundedRestraint> &rbasis);
 
+  /// \brief The copy constructor works like any other object containing POINTER-kind Hybrids.
+  RestraintApparatus(const RestraintApparatus &original);
+
+  /// \brief The move constructor also works like other objects containining POINTER-kind Hybrids.
+  RestraintApparatus(RestraintApparatus &&original);
+  
+  
 private:
 
   // Overall counts and items of interest
@@ -161,6 +169,14 @@ private:
   Hybrid<float2> float2_data;        ///< Storage space for single-precision stiffness constants
                                      ///<   and X/Y target coordinates
   Hybrid<float4> float4_data;        ///< Storage space for single-precision displacement values
+
+  /// Pointer to the original topology (taken from one of the individual restraints, then used to
+  /// check that all individual restraints point to the same topology)
+  const AtomGraph *ag_pointer;
+
+  /// \brief Allocate memory and set POINTER-kind Hybrid objects as appropriate.  This function
+  ///        encapsulates actions needed by the base constructor as well as copy constructors.
+  void allocate();
 };
 
 } // namespace restraints
