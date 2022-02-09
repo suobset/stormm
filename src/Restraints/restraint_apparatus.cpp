@@ -220,6 +220,7 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   dc = rposn_final_z.putHost(&double_data, tmp_rposn_final_z, ic, warp_size_zu);
   const int ndbl2_elem = (4 * padded_posn_count) + (2 * padded_bond_count) +
                          (2 * padded_angl_count) + (2 * padded_dihe_count);
+  double2_data.resize(ndbl2_elem);
   size_t d2c = 0LLU;
   d2c = rposn_init_keq.putHost(&double2_data, tmp_rposn_init_keq, d2c, warp_size_zu);
   d2c = rposn_final_keq.putHost(&double2_data, tmp_rposn_final_keq, d2c, warp_size_zu);
@@ -233,6 +234,7 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   d2c = rdihe_final_keq.putHost(&double2_data, tmp_rdihe_final_keq, d2c, warp_size_zu);
   const int ndbl4_elem = (2 * padded_posn_count) + (2 * padded_bond_count) +
                          (2 * padded_angl_count) + (2 * padded_dihe_count);
+  double4_data.resize(ndbl2_elem);
   size_t d4c = 0LLU;
   d4c = rposn_init_r.putHost(&double4_data, tmp_rposn_init_r, d4c, warp_size_zu);
   d4c = rposn_final_r.putHost(&double4_data, tmp_rposn_final_r, d4c, warp_size_zu);
@@ -243,13 +245,79 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   d4c = rdihe_init_r.putHost(&double4_data, tmp_rdihe_init_r, d4c, warp_size_zu);
   d4c = rdihe_final_r.putHost(&double4_data, tmp_rdihe_final_r, d4c, warp_size_zu);
 
-  // CHECK
-  double2 t = { 0.5, 0.7 };
-  double2 u = t;
-  float2 fu = vtConv2f(t);
-  printf("u =  [ %9.4lf %9.4lf ];\n", u.x, u.y);
-  printf("fu = [ %9.4f %9.4f ];\n", fu.x, fu.y);
-  // END CHECK
+  float_data.resize(ndbl_elem);
+  std::vector<float> sp_tmp_rposn_init_z(tmp_rposn_init_z.begin(), tmp_rposn_init_z.end());
+  std::vector<float> sp_tmp_rposn_final_z(tmp_rposn_final_z.begin(), tmp_rposn_final_z.end());
+  std::vector<float2> sp_tmp_rposn_init_keq(position_count);
+  std::vector<float2> sp_tmp_rposn_final_keq(position_count);
+  std::vector<float2> sp_tmp_rposn_init_xy(position_count);
+  std::vector<float2> sp_tmp_rposn_final_xy(position_count);
+  std::vector<float2> sp_tmp_rbond_init_keq(distance_count);
+  std::vector<float2> sp_tmp_rbond_final_keq(distance_count);
+  std::vector<float2> sp_tmp_rangl_init_keq(angle_count);
+  std::vector<float2> sp_tmp_rangl_final_keq(angle_count);
+  std::vector<float2> sp_tmp_rdihe_init_keq(dihedral_count);
+  std::vector<float2> sp_tmp_rdihe_final_keq(dihedral_count);
+  std::vector<float4> sp_tmp_rposn_init_r(position_count);
+  std::vector<float4> sp_tmp_rposn_final_r(position_count);
+  std::vector<float4> sp_tmp_rbond_init_r(distance_count);
+  std::vector<float4> sp_tmp_rbond_final_r(distance_count);
+  std::vector<float4> sp_tmp_rangl_init_r(angle_count);
+  std::vector<float4> sp_tmp_rangl_final_r(angle_count);
+  std::vector<float4> sp_tmp_rdihe_init_r(dihedral_count);
+  std::vector<float4> sp_tmp_rdihe_final_r(dihedral_count);
+  for (int i = 0; i < position_count; i++) {
+    sp_tmp_rposn_init_keq[i]  = vtConv2f(tmp_rposn_init_keq[i]);
+    sp_tmp_rposn_final_keq[i] = vtConv2f(tmp_rposn_final_keq[i]);
+    sp_tmp_rposn_init_xy[i]   = vtConv2f(tmp_rposn_init_xy[i]);
+    sp_tmp_rposn_final_xy[i]  = vtConv2f(tmp_rposn_final_xy[i]);
+    sp_tmp_rposn_init_r[i]    = vtConv4f(tmp_rposn_init_r[i]);
+    sp_tmp_rposn_final_r[i]   = vtConv4f(tmp_rposn_final_r[i]);
+  }
+  for (int i = 0; i < distance_count; i++) {
+    sp_tmp_rbond_init_keq[i]  = vtConv2f(tmp_rbond_init_keq[i]);
+    sp_tmp_rbond_final_keq[i] = vtConv2f(tmp_rbond_final_keq[i]);
+    sp_tmp_rbond_init_r[i]    = vtConv4f(tmp_rbond_init_r[i]);
+    sp_tmp_rbond_final_r[i]   = vtConv4f(tmp_rbond_final_r[i]);    
+  }
+  for (int i = 0; i < angle_count; i++) {
+    sp_tmp_rangl_init_keq[i]  = vtConv2f(tmp_rangl_init_keq[i]);
+    sp_tmp_rangl_final_keq[i] = vtConv2f(tmp_rangl_final_keq[i]);
+    sp_tmp_rangl_init_r[i]    = vtConv4f(tmp_rangl_init_r[i]);
+    sp_tmp_rangl_final_r[i]   = vtConv4f(tmp_rangl_final_r[i]);    
+  }
+  for (int i = 0; i < dihedral_count; i++) {
+    sp_tmp_rdihe_init_keq[i]  = vtConv2f(tmp_rdihe_init_keq[i]);
+    sp_tmp_rdihe_final_keq[i] = vtConv2f(tmp_rdihe_final_keq[i]);
+    sp_tmp_rdihe_init_r[i]    = vtConv4f(tmp_rdihe_init_r[i]);
+    sp_tmp_rdihe_final_r[i]   = vtConv4f(tmp_rdihe_final_r[i]);    
+  }
+  float_data.resize(ndbl_elem);
+  size_t fc = 0LLU;
+  fc = sp_rposn_init_z.putHost(&float_data, sp_tmp_rposn_init_z, ic, warp_size_zu);
+  fc = sp_rposn_final_z.putHost(&float_data, sp_tmp_rposn_final_z, ic, warp_size_zu);
+  float2_data.resize(ndbl2_elem);
+  size_t f2c = 0LLU;
+  f2c = sp_rposn_init_keq.putHost(&float2_data, sp_tmp_rposn_init_keq, f2c, warp_size_zu);
+  f2c = sp_rposn_final_keq.putHost(&float2_data, sp_tmp_rposn_final_keq, f2c, warp_size_zu);
+  f2c = sp_rposn_init_xy.putHost(&float2_data, sp_tmp_rposn_init_xy, f2c, warp_size_zu);
+  f2c = sp_rposn_final_xy.putHost(&float2_data, sp_tmp_rposn_final_xy, f2c, warp_size_zu);
+  f2c = sp_rbond_init_keq.putHost(&float2_data, sp_tmp_rbond_init_keq, f2c, warp_size_zu);
+  f2c = sp_rbond_final_keq.putHost(&float2_data, sp_tmp_rbond_final_keq, f2c, warp_size_zu);
+  f2c = sp_rangl_init_keq.putHost(&float2_data, sp_tmp_rangl_init_keq, f2c, warp_size_zu);
+  f2c = sp_rangl_final_keq.putHost(&float2_data, sp_tmp_rangl_final_keq, f2c, warp_size_zu);
+  f2c = sp_rdihe_init_keq.putHost(&float2_data, sp_tmp_rdihe_init_keq, f2c, warp_size_zu);
+  f2c = sp_rdihe_final_keq.putHost(&float2_data, sp_tmp_rdihe_final_keq, f2c, warp_size_zu);
+  float4_data.resize(ndbl2_elem);
+  size_t f4c = 0LLU;
+  f4c = sp_rposn_init_r.putHost(&float4_data, sp_tmp_rposn_init_r, f4c, warp_size_zu);
+  f4c = sp_rposn_final_r.putHost(&float4_data, sp_tmp_rposn_final_r, f4c, warp_size_zu);
+  f4c = sp_rbond_init_r.putHost(&float4_data, sp_tmp_rbond_init_r, f4c, warp_size_zu);
+  f4c = sp_rbond_final_r.putHost(&float4_data, sp_tmp_rbond_final_r, f4c, warp_size_zu);
+  f4c = sp_rangl_init_r.putHost(&float4_data, sp_tmp_rangl_init_r, f4c, warp_size_zu);
+  f4c = sp_rangl_final_r.putHost(&float4_data, sp_tmp_rangl_final_r, f4c, warp_size_zu);
+  f4c = sp_rdihe_init_r.putHost(&float4_data, sp_tmp_rdihe_init_r, f4c, warp_size_zu);
+  f4c = sp_rdihe_final_r.putHost(&float4_data, sp_tmp_rdihe_final_r, f4c, warp_size_zu);
 }
 
 } // namespace restraints
