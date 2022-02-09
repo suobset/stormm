@@ -18,8 +18,11 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
                                    const double init_r4_in, const double final_k2_in,
                                    const double final_k3_in, const double final_r1_in,
                                    const double final_r2_in, const double final_r3_in,
-                                   const double final_r4_in, const double ref_x_coordinate,
-                                   const double ref_y_coordinate, const double ref_z_coordinate) :
+                                   const double final_r4_in, const double init_ref_x_crd_in,
+                                   const double init_ref_y_crd_in, const double init_ref_z_crd_in,
+                                   const double final_ref_x_crd_in,
+                                   const double final_ref_y_crd_in,
+                                   const double final_ref_z_crd_in) :
     mask_i{mask_i_in}, mask_j{mask_j_in}, mask_k{mask_k_in}, mask_l{mask_l_in}, atom_i{-1},
     atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0}, initial_step{init_step_in},
     final_step{final_step_in},
@@ -27,7 +30,8 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
     initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
     final_keq{final_k2_in, final_k3_in},
     final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in},
-    target_site{ref_x_coordinate, ref_y_coordinate, ref_z_coordinate},
+    init_center{init_ref_x_crd_in, init_ref_y_crd_in, init_ref_z_crd_in},
+    final_center{init_ref_x_crd_in, init_ref_y_crd_in, init_ref_z_crd_in},
     ag_pointer{ag_in}
 {
   // At least one atom is required
@@ -91,8 +95,10 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
                                    const double final_k2_in, const double final_k3_in,
                                    const double final_r1_in, const double final_r2_in,
                                    const double final_r3_in, const double final_r4_in,
-                                   const double ref_x_coordinate, const double ref_y_coordinate,
-                                   const double ref_z_coordinate) :
+                                   const double init_ref_x_crd_in, const double init_ref_y_crd_in,
+                                   const double init_ref_z_crd_in, const double final_ref_x_crd_in,
+                                   const double final_ref_y_crd_in,
+                                   const double final_ref_z_crd_in) :
     mask_i{std::string("")}, mask_j{std::string("")}, mask_k{std::string("")},
     mask_l{std::string("")}, atom_i{atom_i_in}, atom_j{atom_j_in}, atom_k{atom_k_in},
     atom_l{atom_l_in}, order{0}, initial_step{init_step_in}, final_step{final_step_in},
@@ -100,7 +106,8 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
     initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
     final_keq{final_k2_in, final_k3_in},
     final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in},
-    target_site{ref_x_coordinate, ref_y_coordinate, ref_z_coordinate},
+    init_center{init_ref_x_crd_in, init_ref_y_crd_in, init_ref_z_crd_in},
+    final_center{final_ref_x_crd_in, final_ref_y_crd_in, final_ref_z_crd_in},
     ag_pointer{ag_in}
 {
   // At least one atom is required
@@ -134,22 +141,16 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const int atom_index, const int refr_index,
                                    const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
-                                   const int init_step_in, const int final_step_in,
-                                   const double init_k2_in, const double init_k3_in,
-                                   const double init_r1_in, const double init_r2_in,
-                                   const double init_r3_in, const double init_r4_in,
-                                   const double final_k2_in, const double final_k3_in,
-                                   const double final_r1_in, const double final_r2_in,
-                                   const double final_r3_in, const double final_r4_in) :
-  BoundedRestraint(atom_index, -1, -1, -1, ag_in, init_step_in, final_step_in, init_k2_in,
-                   init_k3_in, init_r1_in, init_r2_in, init_r3_in, init_r4_in, final_k2_in,
-                   final_k3_in, final_r1_in, final_r2_in, final_r3_in, final_r4_in,
-                   cfr.natom > 0 ?
-                   cfr.xcrd[(refr_index >= 0 && refr_index < cfr.natom) * refr_index] : 0.0,
-                   cfr.natom > 0 ?
-                   cfr.ycrd[(refr_index >= 0 && refr_index < cfr.natom) * refr_index] : 0.0,
-                   cfr.natom > 0 ?
-                   cfr.zcrd[(refr_index >= 0 && refr_index < cfr.natom) * refr_index] : 0.0)
+                                   const double k2_in, const double k3_in, const double r1_in,
+                                   const double r2_in, const double r3_in, const double r4_in) :
+  BoundedRestraint(atom_index, -1, -1, -1, ag_in, 0, 0, k2_in, k3_in, r1_in, r2_in, r3_in, r4_in,
+                   k2_in, k3_in, r1_in, r2_in, r3_in, r4_in,
+                   (refr_index >= 0 && refr_index < cfr.natom) ? cfr.xcrd[refr_index] : 0.0,
+                   (refr_index >= 0 && refr_index < cfr.natom) ? cfr.ycrd[refr_index] : 0.0,
+                   (refr_index >= 0 && refr_index < cfr.natom) ? cfr.zcrd[refr_index] : 0.0,
+                   (refr_index >= 0 && refr_index < cfr.natom) ? cfr.xcrd[refr_index] : 0.0,
+                   (refr_index >= 0 && refr_index < cfr.natom) ? cfr.ycrd[refr_index] : 0.0,
+                   (refr_index >= 0 && refr_index < cfr.natom) ? cfr.zcrd[refr_index] : 0.0)
 {
   // The initialization makes an impromptu bounds check on the input to ensure that a legitimate
   // atom is being requested.  Take action here if that check failed.
@@ -231,8 +232,25 @@ double4 BoundedRestraint::getFinalDisplacements() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-double3 BoundedRestraint::getTargetSite() const {
-  return target_site;
+double3 BoundedRestraint::getInitialTargetSite() const {
+
+  // Check the order of the restraint 
+  if (order != 1) {
+    rtErr("The target site is meaningless outside of positional restraints on individual atoms.",
+          "BoundedRestraint", "getInitialTargetSite");
+  }
+  return init_center;
+}
+
+//-------------------------------------------------------------------------------------------------
+double3 BoundedRestraint::getFinalTargetSite() const {
+
+  // Check the order of the restraint 
+  if (order != 1) {
+    rtErr("The target site is meaningless outside of positional restraints on individual atoms.",
+          "BoundedRestraint", "getFinalTargetSite");
+  }
+  return final_center;
 }
 
 //-------------------------------------------------------------------------------------------------

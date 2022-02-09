@@ -142,6 +142,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 # OMNI C++ template source files
 OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Constants/generalized_born.tpp \
+		 $(SRCDIR)/DataTypes/omni_vector_types.tpp \
 		 $(SRCDIR)/Math/matrix.tpp \
 		 $(SRCDIR)/Math/matrix_ops.tpp \
 		 $(SRCDIR)/Math/rounding.tpp \

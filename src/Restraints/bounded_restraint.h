@@ -28,21 +28,22 @@ struct BoundedRestraint {
                    double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
                    double init_r3_in, double init_r4_in, double final_k2_in, double final_k3_in,
                    double final_r1_in, double final_r2_in, double final_r3_in, double final_r4_in,
-                   double ref_x_coordinate, double ref_y_coordinate, double ref_z_coordinate);
+                   double init_ref_x_crd_in, double init_ref_y_crd_in, double init_ref_z_crd_in,
+                   double final_ref_x_crd_in, double final_ref_y_crd_in,
+                   double final_ref_z_crd_in);
 
   BoundedRestraint(int atom_i_in, int atom_j_in, int atom_k_in, int atom_l_in,
                    const AtomGraph *ag_in, int init_step_in, int final_step_in, double init_k2_in,
                    double init_k3_in, double init_r1_in, double init_r2_in, double init_r3_in,
                    double init_r4_in, double final_k2_in, double final_k3_in, double final_r1_in,
                    double final_r2_in, double final_r3_in, double final_r4_in,
-                   double ref_x_coordinate, double ref_y_coordinate, double ref_z_coordinate);
+                   double init_ref_x_crd_in, double init_ref_y_crd_in, double init_ref_z_crd_in,
+                   double final_ref_x_crd_in, double final_ref_y_crd_in,
+                   double final_ref_z_crd_in);
 
   BoundedRestraint(int atom_index, int refr_index, const AtomGraph *ag_in,
-                   const CoordinateFrameReader &cfr, int init_step_in, int final_step_in,
-                   double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
-                   double init_r3_in, double init_r4_in, double final_k2_in, double final_k3_in,
-                   double final_r1_in, double final_r2_in, double final_r3_in,
-                   double final_r4_in);
+                   const CoordinateFrameReader &cfr, double k2_in, double k3_in, double r1_in,
+                   double r2_in, double r3_in, double r4_in);
   /// \}
 
   /// Obtain one of the masks used to specify an atom in this restraint
@@ -76,9 +77,12 @@ struct BoundedRestraint {
   /// \brief Get the final displacement parameters of the restraint in its complete form
   double4 getFinalDisplacements() const;
 
-  /// \brief Get the target of a positional restraint
-  double3 getTargetSite() const;
-  
+  /// \brief Get the initial target of a positional restraint
+  double3 getInitialTargetSite() const;
+
+  /// \brief Get the final target of a positional restraint
+  double3 getFinalTargetSite() const;
+
   /// Get the topology pointer
   const AtomGraph* getTopologyPointer() const;
 
@@ -105,7 +109,8 @@ private:
   double4 initial_r;    ///< Initial displacement parameters r1 (x), r2 (y), r3 (z), and r4 (w)
   double2 final_keq;    ///< Final stiffness constants
   double4 final_r;      ///< Final displacement parameters
-  double3 target_site;  ///< Center of the restraint potential (positional restraints only)
+  double3 init_center;  ///< Initial center of the restraint potential (positional restraints only)
+  double3 final_center; ///< Final center of the restraint potential (positional restraints only)
   
   /// Pointer to the topology for which this restraint applies
   const AtomGraph *ag_pointer;  

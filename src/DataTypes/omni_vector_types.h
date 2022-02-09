@@ -240,117 +240,46 @@ static const size_t ushort3_type_index = std::type_index(typeid(ushort3)).hash_c
 static const size_t ushort4_type_index = std::type_index(typeid(ushort4)).hash_code();
 
 /// \brief Test whether some data type is a recognized HPC (CUDA or HIP) vector type.
-template <typename T> bool isHpcVectorType() {
-  const size_t ct = std::type_index(typeid(T)).hash_code();
-  return (ct == int2_type_index || ct == int3_type_index || ct == int4_type_index ||
-          ct == double2_type_index || ct == double3_type_index || ct == double4_type_index ||
-          ct == float2_type_index || ct == float3_type_index || ct == float4_type_index ||
-          ct == char2_type_index || ct == char3_type_index || ct == char4_type_index ||
-          ct == uchar2_type_index || ct == uchar3_type_index || ct == uchar4_type_index ||
-          ct == uint2_type_index || ct == uint3_type_index || ct == uint4_type_index ||
-          ct == longlong2_type_index || ct == longlong3_type_index || ct == longlong4_type_index ||
-          ct == ulonglong2_type_index || ct == ulonglong3_type_index ||
-          ct == ulonglong4_type_index || ct == short2_type_index || ct == short3_type_index ||
-          ct == short4_type_index || ct == ushort2_type_index || ct == ushort3_type_index ||
-          ct == ushort4_type_index);
-}
+template <typename T> bool isHpcVectorType();
 
 /// \brief Test whether some data types is a signed integral HPC vector type
-template <typename T> bool isSignedIntegralHpcVectorType() {
-  const size_t ct = std::type_index(typeid(T)).hash_code();
-  return (ct == int2_type_index || ct == int3_type_index || ct == int4_type_index ||
-          ct == char2_type_index || ct == char3_type_index || ct == char4_type_index ||
-          ct == longlong2_type_index || ct == longlong3_type_index || ct == longlong4_type_index ||
-          ct == short2_type_index || ct == short3_type_index || ct == short4_type_index);
-}
+template <typename T> bool isSignedIntegralHpcVectorType();
 
 /// \brief Test whether some data types is an unsigned integral HPC vector type
-template <typename T> bool isUnsignedIntegralHpcVectorType() {
-  const size_t ct = std::type_index(typeid(T)).hash_code();
-  return (ct == uint2_type_index || ct == uint3_type_index || ct == uint4_type_index ||
-          ct == uchar2_type_index || ct == uchar3_type_index || ct == uchar4_type_index ||
-          ct == ulonglong2_type_index || ct == ulonglong3_type_index ||
-          ct == ulonglong4_type_index || ct == ushort2_type_index || ct == ushort3_type_index ||
-          ct == ushort4_type_index);
-}
+template <typename T> bool isUnsignedIntegralHpcVectorType();
 
 /// \brief Test whether some data types is a real number HPC vector type
-template <typename T> bool isFloatingPointHpcVectorType() {
-  const size_t ct = std::type_index(typeid(T)).hash_code();
-  return (ct == double2_type_index || ct == double3_type_index || ct == double4_type_index ||
-          ct == float2_type_index || ct == float3_type_index || ct == float4_type_index);
-}
+template <typename T> bool isFloatingPointHpcVectorType();
 
 /// \brief Get the size of an HPC vector, in terms of the number of member variables
-template <typename T> int getHpcVectorTypeSize() {
-  const size_t ct = std::type_index(typeid(T)).hash_code();
-  if (ct == int2_type_index || ct == uint2_type_index || ct == double2_type_index ||
-      ct == float2_type_index || ct == char2_type_index || ct == uchar2_type_index ||
-      ct == longlong2_type_index || ct == ulonglong2_type_index || ct == short2_type_index ||
-      ct == ushort2_type_index) {
-    return 2;
-  }
-  else if (ct == int3_type_index || ct == uint3_type_index || ct == double3_type_index ||
-           ct == float3_type_index || ct == char3_type_index || ct == uchar3_type_index ||
-           ct == longlong3_type_index || ct == ulonglong3_type_index || ct == short3_type_index ||
-           ct == ushort3_type_index) {
-    return 3;
-  }
-  else if (ct == int4_type_index || ct == uint4_type_index || ct == double4_type_index ||
-           ct == float4_type_index || ct == char4_type_index || ct == uchar4_type_index ||
-           ct == longlong4_type_index || ct == ulonglong4_type_index || ct == short4_type_index ||
-           ct == ushort4_type_index) {
-    return 4;
-  }
-  else {
-    rtErr("Unknown data type " + std::string(std::type_index(typeid(T)).name()) + " encountered.",
-          "getHpcVectorTypeSize");
-  }
-  __builtin_unreachable();
-}
+template <typename T> int getHpcVectorTypeSize();
 
 /// \brief Produce a platform-independent name by which to identify one of the scalar data types.
-template <typename T> std::string getOmniHpcVectorTypeName() {
-  const size_t ct = std::type_index(typeid(T)).hash_code();
-  if (ct == int2_type_index) return "int2";
-  else if (ct == int3_type_index) return "int3";
-  else if (ct == int4_type_index) return "int4";
-  else if (ct == uint2_type_index) return "unsigned_int2";
-  else if (ct == uint3_type_index) return "unsigned_int3";
-  else if (ct == uint4_type_index) return "unsigned_int4";
-  else if (ct == double2_type_index) return "double2";
-  else if (ct == double3_type_index) return "double3";
-  else if (ct == double4_type_index) return "double4";
-  else if (ct == float2_type_index) return "float2";
-  else if (ct == float3_type_index) return "float3";
-  else if (ct == float4_type_index) return "float4";
-  else if (ct == char2_type_index) return "char2";
-  else if (ct == char3_type_index) return "char3";
-  else if (ct == char4_type_index) return "char4";
-  else if (ct == uchar2_type_index) return "unsigned_char2";
-  else if (ct == uchar3_type_index) return "unsigned_char3";
-  else if (ct == uchar4_type_index) return "unsigned_char4";
-  else if (ct == longlong2_type_index) return "long_long_int2";
-  else if (ct == longlong3_type_index) return "long_long_int3";
-  else if (ct == longlong4_type_index) return "long_long_int4";
-  else if (ct == ulonglong2_type_index) return "unsigned_long_long_int2";
-  else if (ct == ulonglong3_type_index) return "unsigned_long_long_int3";
-  else if (ct == ulonglong4_type_index) return "unsigned_long_long_int4";
-  else if (ct == short2_type_index) return "short_int2";
-  else if (ct == short3_type_index) return "short_int3";
-  else if (ct == short4_type_index) return "short_int4";
-  else if (ct == ushort2_type_index) return "unsigned_short_int2";
-  else if (ct == ushort3_type_index) return "unsigned_short_int3";
-  else if (ct == ushort4_type_index) return "unsigned_short_int4";
-  else {
-    rtErr("Data type " + std::string(std::type_index(typeid(T)).name()) + " is not a recognized "
-          "HPC vector type.", "getOmniHpcVectorTypeName");
-  }
-  __builtin_unreachable();
-}
+template <typename T> std::string getOmniHpcVectorTypeName();
 
+/// \brief Provide options for selected vector type conversions:
+///        double(2,3,4) <--> float(2,3,4), double(2,3,4) <-- int(2,3,4),
+///        double(2,3,4) <-- uint(2,3,4), double(2,3,4) <-- llint(2,3,4),
+///        double(2,3,4) <-- ullint(2,3,4), float(2,3,4) <-- int(2,3,4),
+///        float(2,3,4) <-- uint(2,3,4), float(2,3,4) <-- llint(2,3,4),
+///        float(2,3,4) <-- ullint(2,3,4), double(2,3,4) <-- short(2,3,4),
+///        double(2,3,4) <-- ushort(2,3,4), float(2,3,4) <-- short(2,3,4),
+///        float(2,3,4) <-- ushort(2,3,4)
+///
+/// \param rhs  Right-hand argument, basis for the assignment
+/// \{
+template <typename T> double2 vtConv2(const T rhs);
+template <typename T> double3 vtConv3(const T rhs);
+template <typename T> double4 vtConv4(const T rhs);
+template <typename T> float2 vtConv2f(const T rhs);
+template <typename T> float3 vtConv3f(const T rhs);
+template <typename T> float4 vtConv4f(const T rhs);
+/// \}
+  
 } // namespace data_types
 } // namespace omni
+
+#include "omni_vector_types.tpp"
 
 namespace omni {
 
@@ -429,6 +358,15 @@ using data_types::ushort2_type_index;
 using data_types::ushort3_type_index;
 using data_types::ushort4_type_index;
 
+// Templated conversion functions for getting anything of the right tuple complexity into a float
+// or double tuple
+using data_types::vtConv2;
+using data_types::vtConv3;
+using data_types::vtConv4;
+using data_types::vtConv2f;
+using data_types::vtConv3f;
+using data_types::vtConv4f;
+  
 } // namespace omni
 
 #endif

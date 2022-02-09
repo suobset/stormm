@@ -22,6 +22,14 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   rdihe_j_atoms{HybridKind::POINTER, "rst_dihe_j"},
   rdihe_k_atoms{HybridKind::POINTER, "rst_dihe_k"},
   rdihe_l_atoms{HybridKind::POINTER, "rst_dihe_l"},
+  rposn_init_step{HybridKind::POINTER, "rst_posn_step0"},
+  rposn_final_step{HybridKind::POINTER, "rst_posn_stepF"},
+  rbond_init_step{HybridKind::POINTER, "rst_bond_step0"},
+  rbond_final_step{HybridKind::POINTER, "rst_bond_stepF"},
+  rangl_init_step{HybridKind::POINTER, "rst_angl_step0"},
+  rangl_final_step{HybridKind::POINTER, "rst_angl_stepF"},
+  rdihe_init_step{HybridKind::POINTER, "rst_dihe_step0"},
+  rdihe_final_step{HybridKind::POINTER, "rst_dihe_stepF"},
   int_data{HybridKind::ARRAY, "rst_int_data"},
   rposn_init_keq{HybridKind::POINTER, "rposn_init_keq"},
   rposn_final_keq{HybridKind::POINTER, "rposn_final_keq"},
@@ -110,6 +118,14 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   std::vector<double2> tmp_rangl_final_keq(angle_count);
   std::vector<double2> tmp_rdihe_init_keq(dihedral_count);
   std::vector<double2> tmp_rdihe_final_keq(dihedral_count);
+  std::vector<double4> tmp_rposn_init_r(position_count);
+  std::vector<double4> tmp_rposn_final_r(position_count);
+  std::vector<double4> tmp_rbond_init_r(distance_count);
+  std::vector<double4> tmp_rbond_final_r(distance_count);
+  std::vector<double4> tmp_rangl_init_r(angle_count);
+  std::vector<double4> tmp_rangl_final_r(angle_count);
+  std::vector<double4> tmp_rdihe_init_r(dihedral_count);
+  std::vector<double4> tmp_rdihe_final_r(dihedral_count);
   int nposnr = 0;
   int nbondr = 0;
   int nanglr = 0;
@@ -122,6 +138,14 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
       tmp_rposn_final_step[nposnr] = rbasis[i].getFinalStep();
       tmp_rposn_init_keq[nposnr]   = rbasis[i].getInitialStiffness();
       tmp_rposn_final_keq[nposnr]  = rbasis[i].getFinalStiffness();
+      double3 refcrd               = rbasis[i].getInitialTargetSite();
+      tmp_rposn_init_xy[nposnr]    = {refcrd.x, refcrd.y};
+      tmp_rposn_init_z[nposnr]     = refcrd.z;
+      refcrd                       = rbasis[i].getFinalTargetSite();
+      tmp_rposn_final_xy[nposnr]   = {refcrd.x, refcrd.y};
+      tmp_rposn_final_z[nposnr]    = refcrd.z;
+      tmp_rposn_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rposn_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
       nposnr++;
     }
     else if (rord == 2) {
@@ -131,6 +155,8 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
       tmp_rbond_final_step[nanglr] = rbasis[i].getFinalStep();
       tmp_rbond_init_keq[nbondr]   = rbasis[i].getInitialStiffness();
       tmp_rbond_final_keq[nbondr]  = rbasis[i].getFinalStiffness();
+      tmp_rbond_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rbond_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
       nbondr++;
     }
     else if (rord == 3) {
@@ -141,6 +167,8 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
       tmp_rangl_final_step[nanglr] = rbasis[i].getFinalStep();
       tmp_rangl_init_keq[nanglr]   = rbasis[i].getInitialStiffness();
       tmp_rangl_final_keq[nanglr]  = rbasis[i].getFinalStiffness();
+      tmp_rangl_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rangl_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
       nanglr++;
     }
     else if (rord == 4) {
@@ -152,6 +180,8 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
       tmp_rdihe_final_step[ndiher] = rbasis[i].getFinalStep();
       tmp_rdihe_init_keq[ndiher]   = rbasis[i].getInitialStiffness();
       tmp_rdihe_final_keq[ndiher]  = rbasis[i].getFinalStiffness();
+      tmp_rdihe_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rdihe_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
       ndiher++;
     }
   }
@@ -189,7 +219,7 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   dc = rposn_init_z.putHost(&double_data, tmp_rposn_init_z, ic, warp_size_zu);
   dc = rposn_final_z.putHost(&double_data, tmp_rposn_final_z, ic, warp_size_zu);
   const int ndbl2_elem = (4 * padded_posn_count) + (2 * padded_bond_count) +
-                         (2 * padded_angl_count) + (4 * padded_dihe_count);
+                         (2 * padded_angl_count) + (2 * padded_dihe_count);
   size_t d2c = 0LLU;
   d2c = rposn_init_keq.putHost(&double2_data, tmp_rposn_init_keq, d2c, warp_size_zu);
   d2c = rposn_final_keq.putHost(&double2_data, tmp_rposn_final_keq, d2c, warp_size_zu);
@@ -201,6 +231,25 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   d2c = rangl_final_keq.putHost(&double2_data, tmp_rangl_final_keq, d2c, warp_size_zu);
   d2c = rdihe_init_keq.putHost(&double2_data, tmp_rdihe_init_keq, d2c, warp_size_zu);
   d2c = rdihe_final_keq.putHost(&double2_data, tmp_rdihe_final_keq, d2c, warp_size_zu);
+  const int ndbl4_elem = (2 * padded_posn_count) + (2 * padded_bond_count) +
+                         (2 * padded_angl_count) + (2 * padded_dihe_count);
+  size_t d4c = 0LLU;
+  d4c = rposn_init_r.putHost(&double4_data, tmp_rposn_init_r, d4c, warp_size_zu);
+  d4c = rposn_final_r.putHost(&double4_data, tmp_rposn_final_r, d4c, warp_size_zu);
+  d4c = rbond_init_r.putHost(&double4_data, tmp_rbond_init_r, d4c, warp_size_zu);
+  d4c = rbond_final_r.putHost(&double4_data, tmp_rbond_final_r, d4c, warp_size_zu);
+  d4c = rangl_init_r.putHost(&double4_data, tmp_rangl_init_r, d4c, warp_size_zu);
+  d4c = rangl_final_r.putHost(&double4_data, tmp_rangl_final_r, d4c, warp_size_zu);
+  d4c = rdihe_init_r.putHost(&double4_data, tmp_rdihe_init_r, d4c, warp_size_zu);
+  d4c = rdihe_final_r.putHost(&double4_data, tmp_rdihe_final_r, d4c, warp_size_zu);
+
+  // CHECK
+  double2 t = { 0.5, 0.7 };
+  double2 u = t;
+  float2 fu = vtConv2f(t);
+  printf("u =  [ %9.4lf %9.4lf ];\n", u.x, u.y);
+  printf("fu = [ %9.4f %9.4f ];\n", fu.x, fu.y);
+  // END CHECK
 }
 
 } // namespace restraints
