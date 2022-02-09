@@ -20,36 +20,120 @@ struct BoundedRestraint {
   /// Constructors take either four atom masks (each of whcih must evaluate to exactly one atom)
   /// or four atom numbers (numbers are given for a series 1... atom_count in the topology pointer,
   /// decremented when constructing the mask to index into the actual memory)
+  ///
+  /// Overloaded:
+  ///   - Accept up to four atom masks and all other inputs
+  ///   - Accept up to four atom numbers and all other inputs
+  ///   - Accept up to four atom masks and basic inputs
+  ///   - Accept up to four atom numbers and basic inputs
+  ///   - If only a single atom is specified by mask or by number, reference coordinates should
+  ///     also be supplied
   /// \{
   BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in, 
                    const std::string &mask_k_in, const std::string &mask_l_in,
                    const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
                    const CoordinateFrameReader &cfr, int init_step_in, int final_step_in,
                    double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
-                   double init_r3_in, double init_r4_in, double final_k2_in, double final_k3_in,
-                   double final_r1_in, double final_r2_in, double final_r3_in, double final_r4_in,
-                   double init_ref_x_crd_in, double init_ref_y_crd_in, double init_ref_z_crd_in,
-                   double final_ref_x_crd_in, double final_ref_y_crd_in,
-                   double final_ref_z_crd_in);
+                   double init_r3_in, double init_r4_in, double final_k2_in,
+                   double final_k3_in, double final_r1_in, double final_r2_in,
+                   double final_r3_in, double final_r4_in,
+                   const double3 init_ref_crd_in = { 0.0, 0.0, 0.0 },
+                   const double3 final_ref_crd_in = { 0.0, 0.0, 0.0 });
+
+  BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in, 
+                   const std::string &mask_k_in, const AtomGraph *ag_in,
+                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr,
+                   int init_step_in, int final_step_in, double init_k2_in, double init_k3_in,
+                   double init_r1_in, double init_r2_in, double init_r3_in, double init_r4_in,
+                   double final_k2_in, double final_k3_in, double final_r1_in,
+                   double final_r2_in, double final_r3_in, double final_r4_in);
+
+  BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in, 
+                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                   const CoordinateFrameReader &cfr, int init_step_in, int final_step_in,
+                   double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
+                   double init_r3_in, double init_r4_in, double final_k2_in,
+                   double final_k3_in, double final_r1_in, double final_r2_in,
+                   double final_r3_in, double final_r4_in);
+
+  BoundedRestraint(const std::string &mask_i_in, const AtomGraph *ag_in,
+                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr,
+                   int init_step_in, int final_step_in, double init_k2_in, double init_k3_in,
+                   double init_r1_in, double init_r2_in, double init_r3_in, double init_r4_in,
+                   double final_k2_in, double final_k3_in, double final_r1_in, double final_r2_in,
+                   double final_r3_in, double final_r4_in, const double3 init_ref_crd_in,
+                   const double3 final_ref_crd_in);
+  
+  BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in, 
+                   const std::string &mask_k_in, const std::string &mask_l_in,
+                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                   const CoordinateFrameReader &cfr, double k2_in, double k3_in,
+                   double r1_in, double r2_in, double r3_in, double r4_in);
+
+  BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
+                   const std::string &mask_k_in, const AtomGraph *ag_in,
+                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr, double k2_in,
+                   double k3_in, double r1_in, double r2_in, double r3_in, double r4_in);
+
+  BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
+                   const AtomGraph *ag_in, const ChemicalFeatures *chemfe,
+                   const CoordinateFrameReader &cfr, double k2_in, double k3_in,
+                   double r1_in, double r2_in, double r3_in, double r4_in);
+
+  BoundedRestraint(const std::string &mask_i_in, const AtomGraph *ag_in,
+                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr, double k2_in,
+                   double k3_in, double r1_in, double r2_in, double r3_in, double r4_in,
+                   const double3 ref_crd_in);
+
+  BoundedRestraint(const std::string &mask_i_in, const AtomGraph *ag_in,
+                   const ChemicalFeatures *chemfe, const CoordinateFrameReader &cfr, double k2_in,
+                   double k3_in, double r1_in, double r2_in, double r3_in, double r4_in,
+                   const std::string & mask_ref_in);
 
   BoundedRestraint(int atom_i_in, int atom_j_in, int atom_k_in, int atom_l_in,
                    const AtomGraph *ag_in, int init_step_in, int final_step_in, double init_k2_in,
                    double init_k3_in, double init_r1_in, double init_r2_in, double init_r3_in,
-                   double init_r4_in, double final_k2_in, double final_k3_in, double final_r1_in,
-                   double final_r2_in, double final_r3_in, double final_r4_in,
-                   double init_ref_x_crd_in, double init_ref_y_crd_in, double init_ref_z_crd_in,
-                   double final_ref_x_crd_in, double final_ref_y_crd_in,
-                   double final_ref_z_crd_in);
+                   double init_r4_in, double final_k2_in, double final_k3_in,
+                   double final_r1_in, double final_r2_in, double final_r3_in,
+                   double final_r4_in, const double3 init_ref_crd_in = { 0.0, 0.0, 0.0},
+                   const double3 final_ref_crd_in = { 0.0, 0.0, 0.0 });
 
-  BoundedRestraint(int atom_index, int refr_index, const AtomGraph *ag_in,
-                   const CoordinateFrameReader &cfr, double k2_in, double k3_in, double r1_in,
+  BoundedRestraint(int atom_i_in, int atom_j_in, int atom_k_in, const AtomGraph *ag_in,
+                   int init_step_in, int final_step_in, double init_k2_in, double init_k3_in,
+                   double init_r1_in, double init_r2_in, double init_r3_in, double init_r4_in,
+                   double final_k2_in, double final_k3_in, double final_r1_in, double final_r2_in,
+                   double final_r3_in, double final_r4_in);
+
+  BoundedRestraint(int atom_i_in, int atom_j_in, const AtomGraph *ag_in, int init_step_in,
+                   int final_step_in, double init_k2_in, double init_k3_in, double init_r1_in,
+                   double init_r2_in, double init_r3_in, double init_r4_in, double final_k2_in,
+                   double final_k3_in, double final_r1_in, double final_r2_in, double final_r3_in,
+                   double final_r4_in);
+
+  BoundedRestraint(int atom_i_in, const AtomGraph *ag_in, int init_step_in, int final_step_in,
+                   double init_k2_in, double init_k3_in, double init_r1_in, double init_r2_in,
+                   double init_r3_in, double init_r4_in, double final_k2_in, double final_k3_in,
+                   double final_r1_in, double final_r2_in, double final_r3_in, double final_r4_in,
+                   const double3 init_ref_crd_in, const double3 final_ref_crd_in);
+
+  BoundedRestraint(int atom_i_in, int atom_j_in, int atom_k_in, int atom_l_in,
+                   const AtomGraph *ag_in, double k2_in, double k3_in, double r1_in,
                    double r2_in, double r3_in, double r4_in);
-  /// \}
 
-  /// Obtain one of the masks used to specify an atom in this restraint
-  ///
-  /// \param restrained_atom_number  The 1st, 2nd, 3rd, or 4th atom (specify 1, 2, 3, or 4)
-  std::string getAtomMask(int restrained_atom_number) const;
+  BoundedRestraint(int atom_i_in, int atom_j_in, int atom_k_in, const AtomGraph *ag_in,
+                   double k2_in, double k3_in, double r1_in, double r2_in, double r3_in,
+                   double r4_in);
+
+  BoundedRestraint(int atom_i_in, int atom_j_in, const AtomGraph *ag_in, double k2_in,
+                   double k3_in, double r1_in, double r2_in, double r3_in, double r4_in);
+  
+  BoundedRestraint(int atom_i_in, const AtomGraph *ag_in, double k2_in, double k3_in, double r1_in,
+                   double r2_in, double r3_in, double r4_in, const double3 ref_crd_in);
+
+  BoundedRestraint(int atom_index, const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
+                   double k2_in, double k3_in, double r1_in, double r2_in, double r3_in,
+                   double r4_in, int refr_index);
+  /// \}
 
   /// Obtain the topology index of an atom in this restraint
   ///
@@ -87,10 +171,6 @@ struct BoundedRestraint {
   const AtomGraph* getTopologyPointer() const;
 
 private:
-  std::string mask_i;   ///< Atom mask specifying atom I (must determine exactly one atom)
-  std::string mask_j;   ///< Atom mask specifying atom J (must determine exactly one atom)
-  std::string mask_k;   ///< Atom mask specifying atom K (must determine exactly one atom)
-  std::string mask_l;   ///< Atom mask specifying atom L (must determine exactly one atom)
   int atom_i;           ///< Index of atom I in the corresponding topology
   int atom_j;           ///< Index of atom J in the corresponding topology
   int atom_k;           ///< Index of atom K in the corresponding topology
