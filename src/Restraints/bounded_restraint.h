@@ -28,6 +28,34 @@ struct BoundedRestraint {
   ///   - Accept up to four atom numbers and basic inputs
   ///   - If only a single atom is specified by mask or by number, reference coordinates should
   ///     also be supplied
+  ///
+  /// \param mask_i_in         Atom mask identifying the first atom
+  /// \param mask_j_in         Atom mask identifying the second atom (empty string for no atom)
+  /// \param mask_k_in         Atom mask identifying the third atom (empty string for no atom)
+  /// \param mask_l_in         Atom mask identifying the fourth atom (empty string for no atom)
+  /// \param atom_i_in         Topological index of the first atom (starts from 0, skip atom mask)
+  /// \param atom_i_in         Topological index of the second atom (starts from 0, skip atom mask)
+  /// \param atom_i_in         Topological index of the third atom (starts from 0, skip atom mask)
+  /// \param atom_i_in         Topological index of the fourth atom (starts from 0, skip atom mask)
+  /// \param ag_in             Topology of the system in question
+  /// \param chemfe            Chemical perception output for the system in question 
+  /// \param cfr               Coordinates of the system in question (for positional restraints)
+  /// \param init_step_in      Step at which to begin to apply the restraints
+  /// \param final_step_in     Step at which the retraint is to take on its mature values
+  /// \param init_k2_in        Start value of the stiffness of the left-hand parabola
+  /// \param init_k3_in        Start value of the stiffness of the right-hand parabola
+  /// \param init_r1_in        Start value of the leftmost point of the left-hand half parabola
+  /// \param init_r2_in        Start value of the rightmost point of the left-hand half parabola
+  /// \param init_r3_in        Start value of the leftmost point of the right-hand half parabola
+  /// \param init_r4_in        Start value of the rightmost point of the right-hand half parabola
+  /// \param final_k2_in       Mature value of the stiffness of the left-hand parabola
+  /// \param final_k3_in       Mature value of the stiffness of the right-hand parabola
+  /// \param final_r1_in       Mature value of the leftmost point of the left-hand half parabola
+  /// \param final_r2_in       Mature value of the rightmost point of the left-hand half parabola
+  /// \param final_r3_in       Mature value of the leftmost point of the right-hand half parabola
+  /// \param final_r4_in       Mature value of the rightmost point of the right-hand half parabola
+  /// \param init_ref_crd_in   The initial target location for an atomic positional restraint
+  /// \param final_ref_crd_in  The final target location for an atomic positional restraint
   /// \{
   BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in, 
                    const std::string &mask_k_in, const std::string &mask_l_in,
