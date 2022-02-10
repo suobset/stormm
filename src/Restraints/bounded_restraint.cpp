@@ -27,7 +27,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
     initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
     final_keq{final_k2_in, final_k3_in},
     final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in},
-    init_center{init_ref_crd_in},
+    initial_center{init_ref_crd_in},
     final_center{final_ref_crd_in},
     ag_pointer{ag_in}
 {
@@ -200,7 +200,7 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
     initial_r{init_r1_in, init_r2_in, init_r3_in, init_r4_in},
     final_keq{final_k2_in, final_k3_in},
     final_r{final_r1_in, final_r2_in, final_r3_in, final_r4_in},
-    init_center{init_ref_crd_in},
+    initial_center{init_ref_crd_in},
     final_center{final_ref_crd_in},
     ag_pointer{ag_in}
 {
@@ -326,8 +326,8 @@ BoundedRestraint::BoundedRestraint(const int atom_index, const AtomGraph *ag_in,
     rtErr("The requested atom index " + std::to_string(refr_index) + " was invalid for a "
           "coordinate frame with " + std::to_string(cfr.natom) + " atoms.", "BoundedRestraint");
   }
-  init_center = { cfr.xcrd[refr_index], cfr.ycrd[refr_index], cfr.zcrd[refr_index] };
-  final_center = init_center;
+  initial_center = { cfr.xcrd[refr_index], cfr.ycrd[refr_index], cfr.zcrd[refr_index] };
+  final_center = initial_center;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -391,7 +391,7 @@ double3 BoundedRestraint::getInitialTargetSite() const {
     rtErr("The target site is meaningless outside of positional restraints on individual atoms.",
           "BoundedRestraint", "getInitialTargetSite");
   }
-  return init_center;
+  return initial_center;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -408,6 +408,181 @@ double3 BoundedRestraint::getFinalTargetSite() const {
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* BoundedRestraint::getTopologyPointer() const {
   return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setInitialStep(const int new_init_step) {
+  initial_step = new_init_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setFinalStep(const int new_final_step) {
+  final_step = new_final_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setStiffness(const double new_keq) {
+  if (initial_step != final_step && initial_step != 0) {
+    rtErr("The time-dependence of the restraint forbids use of static parameter setters.  Use "
+          "set(Initial,Final)Stiffness() instead.", "BoundedRestraint", "setStiffness");
+  }
+  initial_keq = { new_keq, new_keq };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setStiffnesses(const double new_k2, const double new_k3) {
+  if (initial_step != final_step && initial_step != 0) {
+    rtErr("The time-dependence of the restraint forbids use of static parameter setters.  Use "
+          "set(Initial,Final)Stiffnesses() instead.", "BoundedRestraint", "setStiffnesses");
+  }
+  initial_keq = { new_k2, new_k3 };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setInitialStiffness(const double new_init_keq) {
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of the dynamic parameter setter.  "
+          "Use setStiffness() instead.", "BoundedRestraint", "setInitialStiffness");
+  }
+  initial_keq = { new_init_keq, new_init_keq };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setInitialStiffnesses(const double new_init_k2, const double new_init_k3) {
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of the dynamic parameter setter.  "
+          "Use setStiffnesses() instead.", "BoundedRestraint", "setInitialStiffnesses");
+  }
+  initial_keq = { new_init_k2, new_init_k3 };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setFinalStiffness(const double new_final_keq) {
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of the dynamic parameter setter.  "
+          "Use setStiffness() instead.", "BoundedRestraint", "setFinalStiffness");
+  }
+  final_keq = { new_final_keq, new_final_keq };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setFinalStiffnesses(const double new_final_k2, const double new_final_k3) {
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of the dynamic parameter setter.  "
+          "Use setStiffnesses() instead.", "BoundedRestraint", "setFinalStiffnesses");
+  }
+  final_keq = { new_final_k2, new_final_k3 };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setDisplacements(const double new_r1, const double new_r2,
+                                        const double new_r3, const double new_r4) {
+  if (initial_step != final_step && initial_step != 0) {
+    rtErr("The time-dependence of the restraint forbids use of static parameter setters.  Use "
+          "set(Initial,Final)Displacements() instead.", "BoundedRestraint", "setDisplacments");
+  }
+  initial_r = { new_r1, new_r2, new_r3, new_r4 };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setInitialDisplacements(const double new_r1, const double new_r2,
+                                               const double new_r3, const double new_r4) {
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
+          "setDisplacements() instead.", "BoundedRestraint", "setInitialDisplacments");
+  }
+  initial_r = { new_r1, new_r2, new_r3, new_r4 };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setFinalDisplacements(const double new_r1, const double new_r2,
+                                             const double new_r3, const double new_r4) {
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
+          "setDisplacements() instead.", "BoundedRestraint", "setFinalDisplacments");
+  }
+  final_r = { new_r1, new_r2, new_r3, new_r4 };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setTargetSite(const double new_ref_x, const double new_ref_y,
+                                     const double new_ref_z) {
+  if (order != 1) {
+    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
+          std::to_string(order) + ".", "BoundedRestraint", "setTargetSite");
+  }
+  if (initial_step != final_step && initial_step != 0) {
+    rtErr("The time-dependence of the restraint forbids use of static parameter setters.  Use "
+          "set(Initial,Final)TargetSite() instead.", "BoundedRestraint", "setTargetSite");
+  }
+  initial_center = { new_ref_x, new_ref_y, new_ref_z };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setTargetSite(const double3 new_ref_crd) {
+  if (order != 1) {
+    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
+          std::to_string(order) + ".", "BoundedRestraint", "setTargetSite");
+  }
+  if (initial_step != final_step && initial_step != 0) {
+    rtErr("The time-dependence of the restraint forbids use of static parameter setters.  Use "
+          "set(Initial,Final)TargetSite() instead.", "BoundedRestraint", "setTargetSite");
+  }
+  initial_center = { new_ref_crd.x, new_ref_crd.y, new_ref_crd.z };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setInitialTargetSite(const double new_ref_x, const double new_ref_y,
+                                            const double new_ref_z) {
+  if (order != 1) {
+    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
+          std::to_string(order) + ".", "BoundedRestraint", "setInitialTargetSite");
+  }
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
+          "setTargetSite() instead.", "BoundedRestraint", "setInitialTargetSite");
+  }
+  initial_center = { new_ref_x, new_ref_y, new_ref_z };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setInitialTargetSite(const double3 new_ref_crd) {
+  if (order != 1) {
+    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
+          std::to_string(order) + ".", "BoundedRestraint", "setInitialTargetSite");
+  }
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
+          "setTargetSite() instead.", "BoundedRestraint", "setInitialTargetSite");
+  }
+  initial_center = { new_ref_crd.x, new_ref_crd.y, new_ref_crd.z };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setFinalTargetSite(const double new_ref_x, const double new_ref_y,
+                                          const double new_ref_z) {
+  if (order != 1) {
+    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
+          std::to_string(order) + ".", "BoundedRestraint", "setFinalTargetSite");
+  }
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
+          "setTargetSite() instead.", "BoundedRestraint", "setFinalTargetSite");
+  }
+  final_center = { new_ref_x, new_ref_y, new_ref_z };
+}
+
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::setFinalTargetSite(const double3 new_ref_crd) {
+  if (order != 1) {
+    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
+          std::to_string(order) + ".", "BoundedRestraint", "setFinalTargetSite");
+  }
+  if (initial_step == final_step && initial_step == 0) {
+    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
+          "setTargetSite() instead.", "BoundedRestraint", "setFinalTargetSite");
+  }
+  final_center = { new_ref_crd.x, new_ref_crd.y, new_ref_crd.z };
 }
 
 } // namespace restraints

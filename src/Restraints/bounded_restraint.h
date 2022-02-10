@@ -175,30 +175,157 @@ struct BoundedRestraint {
   /// \brief Get the final target of a positional restraint
   double3 getFinalTargetSite() const;
 
-  /// Get the topology pointer
+  /// \brief Get the topology pointer
   const AtomGraph* getTopologyPointer() const;
 
+  /// \brief Modify the initial step at which the restraint is applied.
+  ///
+  /// \param new_init_step  The new value for the initial application step
+  void setInitialStep(int new_init_step);
+
+  /// \brief Modify the final step at which the restraint application reaches its final value.
+  ///
+  /// \param new_final_step  The new value for the final application step
+  void setFinalStep(int new_final_step);
+
+  /// \brief Modify the stiffness parameters, set with a single value.  This member function is
+  ///        only applicable if there is no time dependence in the restraint and will throw an
+  ///        error otherwise.
+  ///
+  /// \param new_keq  New value of both k2 and k3.  Both values of the initial stiffness tuple
+  ///                 will be set to these values.
+  void setStiffness(double new_keq);
+
+  /// \brief Modify the stiffness parameters.  This member function is only applicable if there is
+  ///        no time dependence in the restraint and will throw an error otherwise.
+  ///
+  /// \param new_k2  New value of k2
+  /// \param new_k3  New value of k3
+  void setStiffnesses(double new_k2, double new_k3);
+
+  /// \brief Modify the initial stiffness parameters, setting both to a single value.  This member
+  ///        function is only applicable if there is time dependence in the restraint.
+  ///
+  /// \param new_init_keq  New initial value of both k2 and k3
+  void setInitialStiffness(double new_init_keq);
+
+  /// \brief Modify the initial stiffness parameters.  This member function is only applicable if
+  ///        there is time dependence in the restraint.
+  ///
+  /// \param new_init_k2  New initial value of k2
+  /// \param new_init_k3  New initial value of k3
+  void setInitialStiffnesses(double new_init_k2, double new_init_k3);
+
+  /// \brief Modify the final stiffness parameters, setting both to a single value.  This member
+  ///        function is only applicable if there is time dependence in the restraint.
+  ///
+  /// \param new_init_keq  New final value of both k2 and k3
+  void setFinalStiffness(double new_init_keq);
+
+  /// \brief Modify the final stiffness parameters.  This member function is only applicable if
+  ///        there is time dependence in the restraint.
+  ///
+  /// \param new_init_k2  New final value of k2
+  /// \param new_init_k3  New final value of k3
+  void setFinalStiffnesses(double new_init_k2, double new_init_k3);
+
+  /// \brief Modify the displacements over which each segment of the flat-bottom restraint applies.
+  ///        This member function requires that the restraint be time-independent.
+  ///
+  /// \param new_r1  New value of r1, the leftmost point of a harmonic potential scaled by k2
+  /// \param new_r2  New value of r2, the rightmost point of a harmonic potential scaled by k2
+  /// \param new_r3  New value of r3, the leftmost point of a harmonic potential scaled by k3
+  /// \param new_r4  New value of r4, the rightmost point of a harmonic potential scaled by k3
+  void setDisplacements(double new_r1, double new_r2, double new_r3, double new_r4);
+
+  /// \brief Modify the initial displacements over which each segment of the flat-bottom restraint
+  ///        applies.  This member function requires that the restraint be time-dependent.
+  ///
+  /// \param new_r1  New initial r1, the leftmost point of a harmonic potential scaled by k2
+  /// \param new_r2  New initial r2, the rightmost point of a harmonic potential scaled by k2
+  /// \param new_r3  New initial r3, the leftmost point of a harmonic potential scaled by k3
+  /// \param new_r4  New initial r4, the rightmost point of a harmonic potential scaled by k3
+  void setInitialDisplacements(double new_r1, double new_r2, double new_r3, double new_r4);
+
+  /// \brief Modify the final displacements over which each segment of the flat-bottom restraint
+  ///        applies.  This member function requires that the restraint be time-dependent.
+  ///
+  /// \param new_r1  New final r1, the leftmost point of a harmonic potential scaled by k2
+  /// \param new_r2  New final r2, the rightmost point of a harmonic potential scaled by k2
+  /// \param new_r3  New final r3, the leftmost point of a harmonic potential scaled by k3
+  /// \param new_r4  New final r4, the rightmost point of a harmonic potential scaled by k3
+  void setFinalDisplacements(double new_r1, double new_r2, double new_r3, double new_r4);
+
+  /// \brief Set the target site.  This function can only apply to a time-independent positional
+  ///        restraint with only one active atom.
+  ///
+  /// Overloaded:
+  ///   - Take separate x, y, and z coordinate arguments
+  ///   - Take a 3-tuple of real numbers for x, y, and z coordinates
+  ///
+  /// \param new_ref_x    New reference Cartesian x coordinate
+  /// \param new_ref_y    New reference Cartesian y coordinate
+  /// \param new_ref_z    New reference Cartesian z coordinate
+  /// \param new_ref_crd  New reference Cartesian coordinate tuple
+  /// \{
+  void setTargetSite(double new_ref_x, double new_ref_y, double new_ref_z);
+  void setTargetSite(double3 new_ref_crd);
+  /// \}
+
+  /// \brief Set the initial target site.  This function can only apply to a time-dependent
+  ///        positional restraint with only one active atom.
+  ///
+  /// Overloaded:
+  ///   - Take separate x, y, and z coordinate arguments
+  ///   - Take a 3-tuple of real numbers for x, y, and z coordinates
+  ///
+  /// \param new_ref_x    New initial reference Cartesian x coordinate
+  /// \param new_ref_y    New initial reference Cartesian y coordinate
+  /// \param new_ref_z    New initial reference Cartesian z coordinate
+  /// \param new_ref_crd  New initial reference Cartesian coordinate tuple
+  /// \{
+  void setInitialTargetSite(double new_ref_x, double new_ref_y, double new_ref_z);
+  void setInitialTargetSite(double3 new_ref_crd);
+  /// \}
+
+  /// \brief Set the final target site.  This function can only apply to a time-dependent
+  ///        positional restraint with only one active atom.
+  ///
+  /// Overloaded:
+  ///   - Take separate x, y, and z coordinate arguments
+  ///   - Take a 3-tuple of real numbers for x, y, and z coordinates
+  ///
+  /// \param new_ref_x    New final reference Cartesian x coordinate
+  /// \param new_ref_y    New final reference Cartesian y coordinate
+  /// \param new_ref_z    New final reference Cartesian z coordinate
+  /// \param new_ref_crd  New final reference Cartesian coordinate tuple
+  /// \{
+  void setFinalTargetSite(double new_ref_x, double new_ref_y, double new_ref_z);
+  void setFinalTargetSite(double3 new_ref_crd);
+  /// \}
+
 private:
-  int atom_i;           ///< Index of atom I in the corresponding topology
-  int atom_j;           ///< Index of atom J in the corresponding topology
-  int atom_k;           ///< Index of atom K in the corresponding topology
-  int atom_l;           ///< Index of atom L in the corresponding topology
-  int order;            ///< Order of the NMR restraint: 2 = distance restraint between atoms I and
-                        ///<   J (implied if K and L are unspecified), 3 = angle restraint between
-                        ///<   atoms I, J, and K (implied if L is unspecified), 4 = dihedral
-                        ///<   restraint between atoms I, J, K, and L
-  int initial_step;     ///< Initial step of the simulation at which to begin applying the
-                        ///<   restraint with initial keq and r parameters
-  int final_step;       ///< Step of the simulation at which to finish applying the full restraint,
-                        ///<   with final kew and r parameters
-  double2 initial_keq;  ///< Initial stiffness constants for parabolic restraints between points
-                        ///<   r1 and r2 (x member of the tuple) and points r3 and r4 (y member of
-                        ///<   the tuple)
-  double4 initial_r;    ///< Initial displacement parameters r1 (x), r2 (y), r3 (z), and r4 (w)
-  double2 final_keq;    ///< Final stiffness constants
-  double4 final_r;      ///< Final displacement parameters
-  double3 init_center;  ///< Initial center of the restraint potential (positional restraints only)
-  double3 final_center; ///< Final center of the restraint potential (positional restraints only)
+  int atom_i;             ///< Index of atom I in the corresponding topology
+  int atom_j;             ///< Index of atom J in the corresponding topology
+  int atom_k;             ///< Index of atom K in the corresponding topology
+  int atom_l;             ///< Index of atom L in the corresponding topology
+  int order;              ///< Order of the NMR restraint: 2 = distance restraint between atoms I
+                          ///<   and J (implied if K and L are unspecified), 3 = angle restraint
+                          ///<   between atoms I, J, and K (implied if L is unspecified),
+                          ///<   4 = dihedral restraint between atoms I, J, K, and L
+  int initial_step;       ///< Initial step of the simulation at which to begin applying the
+                          ///<   restraint with initial keq and r parameters
+  int final_step;         ///< Step of the simulation at which to finish applying the full
+                          ///<   restraint, with final kew and r parameters
+  double2 initial_keq;    ///< Initial stiffness constants for parabolic restraints between points
+                          ///<   r1 and r2 (x member of the tuple) and points r3 and r4 (y member
+                          ///<   of the tuple)
+  double4 initial_r;      ///< Initial displacement parameters r1 (x), r2 (y), r3 (z), and r4 (w)
+  double2 final_keq;      ///< Final stiffness constants
+  double4 final_r;        ///< Final displacement parameters
+  double3 initial_center; ///< Initial center of the restraint potential (positional restraints
+                          ///<   only)
+  double3 final_center;   ///< Final center of the restraint potential (positional restraints only)
   
   /// Pointer to the topology for which this restraint applies
   const AtomGraph *ag_pointer;  
