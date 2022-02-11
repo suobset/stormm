@@ -91,7 +91,7 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
 
   // Accumulate results by looping over all angle bending terms.
-  double ac[3], ba[3], bc[3];
+  double ba[3], bc[3];
   for (int pos = 0; pos < vk.nangl; pos++) {
 
     // Get parameters for an angle between atoms i, j, and k
@@ -109,9 +109,6 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
     bc[0] = psw.xcrd[k_atom] - psw.xcrd[j_atom];
     bc[1] = psw.ycrd[k_atom] - psw.ycrd[j_atom];
     bc[2] = psw.zcrd[k_atom] - psw.zcrd[j_atom];
-    ac[0] = psw.xcrd[k_atom] - psw.xcrd[i_atom];
-    ac[1] = psw.ycrd[k_atom] - psw.ycrd[i_atom];
-    ac[2] = psw.zcrd[k_atom] - psw.zcrd[i_atom];
 
     // On to the angle force computation
     const double mgba = ba[0]*ba[0] + ba[1]*ba[1] + ba[2]*ba[2];

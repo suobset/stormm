@@ -265,6 +265,7 @@ struct AtomMask {
 private:
   MaskTraversalMode recommended_scan;      ///< Indicates the most efficient way to read this mask
   MaskInputMode style;                     ///< Mask syntax (default AMBMASK, see above)
+  int masked_atom_count;                   ///< Number of atoms included in the mask
   std::vector<uint> raw_mask;              ///< Compact bitmask for the topology
   std::vector<int2> segments;              ///< Segments over which the mask has nonzero elements
   std::string input_text;                  ///< Input text for the mask-generating string, i.e.

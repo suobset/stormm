@@ -92,7 +92,7 @@ template <typename T> struct ValenceKit {
   ///
   ///        See the descriptions of eponymous member variables (minus _in) within the ValenceKit
   ///        object for descriptions of each parameter.
-  explicit ValenceKit(int nbond_in, int nangl_in, int ndihe_in, int nbond_param_in,
+  explicit ValenceKit(int natom_in, int nbond_in, int nangl_in, int ndihe_in, int nbond_param_in,
                       int nangl_param_in, int ndihe_param_in, int ninfr14_in, int nattn14_param_in,
                       int nubrd_in, int ncimp_in, int ncmap_in, int nubrd_param_in,
                       int ncimp_param_in, int ncmap_surf_in, const T* bond_keq_in,
@@ -143,6 +143,9 @@ template <typename T> struct ValenceKit {
   // The purpose of this struct is to store a collection of pointers for HPC kernels.  As such, it
   // does not have any private member variables.  As a provider of parameters, it also does not
   // allow modification of the data that it points to.
+  const int natom;              ///< The number of atoms in the system (needed for the overall
+                                ///<   length of bond_asgn_abounds and similar arrays towards the
+                                ///<   end, if not just for general convenience)
   const int nbond;              ///< Number of bonds in the system
   const int nangl;              ///< Number of bond angles in the system
   const int ndihe;              ///< Number of dihedrals or torsions (includes cosine-based

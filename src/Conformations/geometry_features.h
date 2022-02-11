@@ -1,0 +1,91 @@
+// -*-c++-*-
+#ifndef OMNI_GEOMETRY_FEATURES_H
+#define OMNI_GEOMETRY_FEATURES_H
+
+#include "Trajectory/CoordinateFrame.h"
+#include "Trajectory/PhaseSpace.h"
+
+namespace omni {
+namespace geometry {
+
+using trajectory::CoordinateFrame;
+using trajectory::CoordinateFrameReader;
+using trajectory::PhaseSpace;
+using trajectory::PhaseSpaceReader;
+
+/// \brief Image a coordinate (or distance between coordinates) to fit within the interval
+///        [-0.5, 0.5], taking into account box specifications.
+///
+/// Overloaded:
+///   - Operate on a single (x, y, z) tuple
+///   - Operate on three C-style arrays of real numbers x, y, and z
+///   - Operate on three std::vectors of real numbers x, y, and z
+///   - Operate on three Hybrid arrays of real numbers x, y, and z
+///
+/// \param x          Cartesian x coordinate of one or more particles
+/// \param y          Cartesian y coordinate of one or more particles
+/// \param z          Cartesian z coordinate of one or more particles
+/// \param length     Number of particles or coordinate tuples to re-image
+/// \param umat       Transformation matrix to go into fractional coordinates
+/// \param invu       Transformation matrix to go from fraction coordinates back to real space
+/// \param unit_cell  Shape of the unit cell
+/// \{
+void imageCoordinates(double *x, double *y, double *z, const double* umat, const double* invu,
+                      const UnitCellType unit_cell);
+
+void imageCoordinates(double* x, double* y, double* z, const int length, const double* umat,
+                      const double* invu, const UnitCellType unit_cell)
+
+void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vector<double> *z,
+                      const double* umat, const double* invu, const UnitCellType unit_cell)
+
+void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
+                      const double* umat, const double* invu, const UnitCellType unit_cell)
+/// \}
+
+/// \brief Compute the distance between two points in a coordinate set.  All forms of this
+///        function work with double-precision coordinates on the host.
+///
+/// Overloaded:
+///   - Accept two atom indices and a CoordinateFrameReader object
+///   - Accept two atom indices and a CoordinateFrame object
+///   - Accept two atom indices and a PhaseSpace object
+/// \{
+double distance(int atom_i, int atom_j, const CoordinateFrameReader &cfr);
+double distance(int atom_i, int atom_j, const CoordinateFrame &cf);
+double distance(int atom_i, int atom_j, const PhaseSpace &ps);
+/// \}
+
+/// \brief Compute the angle between three points in a coordinate set.  All forms of this
+///        function work with double-precision coordinates on the host.  The result is returned in
+///        radians.
+///
+/// Overloaded:
+///   - Accept three atom indices and a CoordinateFrameReader object
+///   - Accept three atom indices and a CoordinateFrame object
+///   - Accept three atom indices and a PhaseSpace object
+/// \{
+double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrameReader &cfr);
+double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrame &cf);
+double angle(int atom_i, int atom_j, int atom_k, const PhaseSpace &ps);
+/// \}
+
+/// \brief Compute the dihedral angle between three points in a coordinate set.  All forms of this
+///        function work with double-precision coordinates on the host.  The result is returned in
+///        radians.
+///
+/// Overloaded:
+///   - Accept four atom indices and a CoordinateFrameReader object
+///   - Accept four atom indices and a CoordinateFrame object
+///   - Accept four atom indices and a PhaseSpace object
+/// \{
+double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
+                      const CoordinateFrameReader &cfr);
+double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const CoordinateFrame &cf);
+double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const PhaseSpace &ps);
+/// \}
+
+} // namespace geometry
+} // namespace omni
+
+#endif

@@ -3314,7 +3314,7 @@ std::vector<char4> AtomGraph::matchOverflowResidueName(const std::string &query)
 
 //-------------------------------------------------------------------------------------------------
 ValenceKit<double> AtomGraph::getDoublePrecisionValenceKit(HybridTargetLevel tier) const {
-  return ValenceKit<double>(bond_term_count, angl_term_count, dihe_term_count,
+  return ValenceKit<double>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
                             bond_parameter_count, angl_parameter_count, dihe_parameter_count,
                             inferred_14_attenuations, attenuated_14_type_count,
                             urey_bradley_term_count, charmm_impr_term_count, cmap_term_count,
@@ -3368,7 +3368,7 @@ ValenceKit<double> AtomGraph::getDoublePrecisionValenceKit(HybridTargetLevel tie
 
 //-------------------------------------------------------------------------------------------------
 ValenceKit<float> AtomGraph::getSinglePrecisionValenceKit(HybridTargetLevel tier) const {
-  return ValenceKit<float>(bond_term_count, angl_term_count, dihe_term_count,
+  return ValenceKit<float>(atom_count, bond_term_count, angl_term_count, dihe_term_count,
                            bond_parameter_count, angl_parameter_count, dihe_parameter_count,
                            inferred_14_attenuations, attenuated_14_type_count,
                            urey_bradley_term_count, charmm_impr_term_count, cmap_term_count,

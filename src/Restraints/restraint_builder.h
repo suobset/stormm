@@ -8,10 +8,24 @@
 namespace omni {
 namespace restraints {
 
+using chemistry::AtomMask;
+using topology::AtomGraph;
+using trajectory::CoordinateFrameReader;
+
+/// \brief Perform basic checks the validity of the topology and coordinate frame needed by the
+///        following restraint builders.
+///
+/// \param ag                    Pointer to the topology for the system of interest
+/// \param cframe                Coordinates of the system in its current state
+/// \param reference_cframe      Reference coordinates of the system, if different from
+/// \param mask                  Atom mask (must match the topology by some basic checks))
+bool restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
+                             const AtomMask &mask);
+  
 /// \brief Apply positional restraints to a topology based on an AtomMask, with general parameters
 ///        for the permittivity and stiffness.
 ///
-/// \param ag                    Topology for the system of interest
+/// \param ag                    Pointer to the topology for the system of interest
 /// \param cframe                Coordinates of the system in its current state
 /// \param reference_cframe      Reference coordinates of the system, if different from
 /// \param mask                  Atom mask (must match the topology by some basic checks))
@@ -36,33 +50,24 @@ namespace restraints {
 ///                              linearly rather than quadratically and the penalty force
 ///                              flatlines.  This is r1 in the Amber NMR nomeclature.
 std::vector<BoundedRestraint>
-applyPositionalRestraints(const AtomGraph &ag, const CoordinateFrameReader &cframe,
+applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                           const CoordinateFrameReader &reference_cframe, const AtomMask &mask,
                           double displacement_penalty, double displacement_onset,
-                          double displacement_plateau, double proximity_penalty,
-                          double proximity_onset, double proximity_plateau);
+                          double displacement_plateau, double proximity_penalty = 0.0,
+                          double proximity_onset = 0.0, double proximity_plateau = 0.0);
 
-/// \brief Build restraints needed to invert chiral centers in a molecule.  Given a chiral center
-///        detected by the chemical perception code (see chemical_features.h in the src/Chemistry/
-///        directory), the strategy is to construct positional restraints that will keep two of the
-///        arms (R1, R2) and the center (C) itself in place while swapping the position of the
-///        other two arms with a 180-degree rotation about the bisector of R1--C--R2.  The swap
-///        will be made based on what appears easiest to rotate, and will detect whether two of
-///        the bonds connecting to a chiral center are part of some ring system (which would
-///        designate them R1 and R2, not subject to rotation).  In the rare case that a
-///        chiral center is part of two rings, the rotation will be chosen to swap the orientations
-///        of the rings.  In the rare, rare case that a chiral center is an intersection of three
-///        rings, there will be another center, chiral or not, which lies at a second intersection
-///        of the rings, which will undergo a complementary rotation.
+/// \brief Build restraints needed to manage the inversion of chiral centers in a molecule.  The
+///        strategy will be to maintain as many details of the original conformation as possible,
+///        as expressed in the unique dihedral angles not involving a chiral center that is about
+///        to undergo inversion by the function invertChirality() in the conformers.cpp library of
+///        the src/Conformations/ folder.  The 
 ///
-/// \param ag           Topology for the system of interest
-/// \param crd          Coordinates of the system in its current state
-/// \param chiral_mask  Mask of all atoms with detected chirality (it is not critical what the
-///                     value of the chirality is, or the IUPAC priority of each of the chiral
-///                     arms--all that will happen is that two of the arms will be selected and
-///                     their places swapped)
+/// \param ag            Pointer to the topology for the system of interest
+/// \param crd           Coordinates of the system in its current state
+/// \param chiral_atoms  List of all atoms with detected chirality that are to be inverted (these
+///                      atoms will help define what dihedrals to avoid constraining)
 std::vector<BoundedRestraint>
-applyChiralityInversionRestraints(const AtomGraph &ag, const CoordinateFrameReader &cframe,
+applyChiralityInversionRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                                   const AtomMask &chiral_mask);
 
 } // namespace restraints

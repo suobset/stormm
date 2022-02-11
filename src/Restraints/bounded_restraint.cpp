@@ -310,7 +310,8 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const AtomGraph *ag_in, 
                                    const double k3_in, const double r1_in, const double r2_in,
                                    const double r3_in, const double r4_in, double3 ref_crd_in) :
     BoundedRestraint(atom_i_in, -1, -1, -1, ag_in, 0, 0, k2_in, k3_in, r1_in,
-                     r2_in, r3_in, r4_in, k2_in, k3_in, r1_in, r2_in, r3_in, r4_in)
+                     r2_in, r3_in, r4_in, k2_in, k3_in, r1_in, r2_in, r3_in, r4_in,
+                     ref_crd_in, ref_crd_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -322,11 +323,18 @@ BoundedRestraint::BoundedRestraint(const int atom_index, const AtomGraph *ag_in,
                    k2_in, k3_in, r1_in, r2_in, r3_in, r4_in, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 })
 {
   // Make a bounds check on the input before setting the positional restraint center
-  if (refr_index < 0 || refr_index >= cfr.natom) {
+  if (refr_index >= cfr.natom) {
     rtErr("The requested atom index " + std::to_string(refr_index) + " was invalid for a "
           "coordinate frame with " + std::to_string(cfr.natom) + " atoms.", "BoundedRestraint");
   }
-  initial_center = { cfr.xcrd[refr_index], cfr.ycrd[refr_index], cfr.zcrd[refr_index] };
+  if (refr_index < 0) {
+
+    // Default to restraining the atom to its known coordinates
+    initial_center = { cfr.xcrd[atom_index], cfr.ycrd[atom_index], cfr.zcrd[atom_index] };
+  }
+  else {
+    initial_center = { cfr.xcrd[refr_index], cfr.ycrd[refr_index], cfr.zcrd[refr_index] };
+  }
   final_center = initial_center;
 }
 

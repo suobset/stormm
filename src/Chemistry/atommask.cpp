@@ -457,6 +457,7 @@ MaskComponent MaskComponent::applyRangeOperator(const std::vector<uint> &other,
 AtomMask::AtomMask() :
     recommended_scan{MaskTraversalMode::COMPLETE},
     style{MaskInputMode::AMBMASK},
+    masked_atom_count{0},
     raw_mask{},
     segments{},
     input_text{std::string("")},
@@ -497,6 +498,16 @@ AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
   case MaskInputMode::VMD:
     break;
   }
+
+  // Get a count of the atoms that have been masked out
+  const int natom = (ag_pointer == nullptr) ? 0 : ag_pointer->getAtomCount();
+  const int uint_bits = sizeof(uint) * 8;
+  int tmp_ma_count = 0;
+  for (int i = 0; i < natom; i++) {
+    const int pull_index = i / uint_bits;
+    tmp_ma_count += ((raw_mask[pull_index] >> (i - (pull_index * uint_bits))) & 0x1);
+  }
+  masked_atom_count = tmp_ma_count;  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -525,14 +536,7 @@ std::vector<uint> AtomMask::getRawMask() const {
 
 //-------------------------------------------------------------------------------------------------
 int AtomMask::getMaskedAtomCount() const {
-  const int natom = (ag_pointer == nullptr) ? 0 : ag_pointer->getAtomCount();
-  int result = 0;
-  const int uint_bits = sizeof(uint) * 8;
-  for (int i = 0; i < natom; i++) {
-    const int pull_index = i / uint_bits;
-    result += ((raw_mask[pull_index] >> (i - (pull_index * uint_bits))) & 0x1);
-  }
-  return result;
+  return masked_atom_count;
 }
 
 //-------------------------------------------------------------------------------------------------

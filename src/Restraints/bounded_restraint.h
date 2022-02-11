@@ -160,7 +160,7 @@ struct BoundedRestraint {
 
   BoundedRestraint(int atom_index, const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
                    double k2_in, double k3_in, double r1_in, double r2_in, double r3_in,
-                   double r4_in, int refr_index);
+                   double r4_in, int refr_index = -1);
   /// \}
 
   /// \brief Take the default copy, copy assignment, move, and move assignment constructors.
