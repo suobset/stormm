@@ -2,6 +2,12 @@
 #ifndef	OMNI_RESTRAINT_BUILDER_H
 #define	OMNI_RESTRAINT_BUILDER_H
 
+#include <vector>
+#include "bounded_restraint.h"
+
+namespace omni {
+namespace restraints {
+
 /// \brief Apply positional restraints to a topology based on an AtomMask, with general parameters
 ///        for the permittivity and stiffness.
 ///
@@ -29,11 +35,12 @@
 /// \param proximity_plateau     The distance beneath which the proximity penality increases
 ///                              linearly rather than quadratically and the penalty force
 ///                              flatlines.  This is r1 in the Amber NMR nomeclature.
-void applyPositionalRestraints(const AtomGraph &ag, const CoordinateFrameReader &cframe,
-                               const CoordinateFrameReader &reference_cframe, const AtomMask &mask,
-                               double displacement_penalty, double displacement_onset,
-                               double displacement_plateau, double proximity_penalty,
-                               double proximity_onset, double proximity_plateau);
+std::vector<BoundedRestraint>
+applyPositionalRestraints(const AtomGraph &ag, const CoordinateFrameReader &cframe,
+                          const CoordinateFrameReader &reference_cframe, const AtomMask &mask,
+                          double displacement_penalty, double displacement_onset,
+                          double displacement_plateau, double proximity_penalty,
+                          double proximity_onset, double proximity_plateau);
 
 /// \brief Build restraints needed to invert chiral centers in a molecule.  Given a chiral center
 ///        detected by the chemical perception code (see chemical_features.h in the src/Chemistry/
@@ -54,7 +61,11 @@ void applyPositionalRestraints(const AtomGraph &ag, const CoordinateFrameReader 
 ///                     value of the chirality is, or the IUPAC priority of each of the chiral
 ///                     arms--all that will happen is that two of the arms will be selected and
 ///                     their places swapped)
-void applyChiralityInversionRestraints(const AtomGraph &ag, const CoordinateFrameReader &cframe,
-                                       const AtomMask &chiral_mask);
+std::vector<BoundedRestraint>
+applyChiralityInversionRestraints(const AtomGraph &ag, const CoordinateFrameReader &cframe,
+                                  const AtomMask &chiral_mask);
+
+} // namespace restraints
+} // namespace omni
 
 #endif
