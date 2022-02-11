@@ -2,12 +2,15 @@
 #ifndef OMNI_GEOMETRY_FEATURES_H
 #define OMNI_GEOMETRY_FEATURES_H
 
-#include "Trajectory/CoordinateFrame.h"
-#include "Trajectory/PhaseSpace.h"
+#include "Accelerator/hybrid.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/phasespace.h"
 
 namespace omni {
 namespace geometry {
 
+using card::Hybrid;
+using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
@@ -34,13 +37,13 @@ void imageCoordinates(double *x, double *y, double *z, const double* umat, const
                       const UnitCellType unit_cell);
 
 void imageCoordinates(double* x, double* y, double* z, const int length, const double* umat,
-                      const double* invu, const UnitCellType unit_cell)
+                      const double* invu, const UnitCellType unit_cell);
 
 void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vector<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell)
+                      const double* umat, const double* invu, const UnitCellType unit_cell);
 
 void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell)
+                      const double* umat, const double* invu, const UnitCellType unit_cell);
 /// \}
 
 /// \brief Compute the distance between two points in a coordinate set.  All forms of this

@@ -1,4 +1,6 @@
 #include <cmath>
+#include "Math/vector_ops.h"
+#include "Reporting/error_format.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/coordinateframe.h"
 #include "geometry_features.h"
@@ -7,7 +9,6 @@ namespace omni {
 namespace geometry {
 
 using math::crossProduct;
-using topology::UnitCellType;
 using trajectory::getCoordinateFrameReader;
 
 //-------------------------------------------------------------------------------------------------
@@ -89,13 +90,23 @@ void imageCoordinates(double* x, double* y, double* z, const int length, const d
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vector<double> *z,
                       const double* umat, const double* invu, const UnitCellType unit_cell) {
+  const size_t length = x->size();
+  if (length != y->size() || length != z->size()) {
+    rtErr("Vectors for x, y, and z coordinates must be the same length for re-imaging.",
+          "imageCoordinates");
+  }
   imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell);
 }
 
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
-                      const int length, const double* umat, const double* invu,
+                      const double* umat, const double* invu,
                       const UnitCellType unit_cell) {
+  const size_t length = x->size();
+  if (length != y->size() || length != z->size()) {
+    rtErr("Vectors for x, y, and z coordinates must be the same length for re-imaging.",
+          "imageCoordinates");
+  }
   imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell);
 }
 
@@ -171,17 +182,18 @@ double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
 
   // Compute the dihedral angle, in radians
   double ab[3], bc[3], cd[3];
-  ab[0] = psw.xcrd[j_atom] - psw.xcrd[i_atom];
-  ab[1] = psw.ycrd[j_atom] - psw.ycrd[i_atom];
-  ab[2] = psw.zcrd[j_atom] - psw.zcrd[i_atom];
-  bc[0] = psw.xcrd[k_atom] - psw.xcrd[j_atom];
-  bc[1] = psw.ycrd[k_atom] - psw.ycrd[j_atom];
-  bc[2] = psw.zcrd[k_atom] - psw.zcrd[j_atom];
-  cd[0] = psw.xcrd[l_atom] - psw.xcrd[k_atom];
-  cd[1] = psw.ycrd[l_atom] - psw.ycrd[k_atom];
-  cd[2] = psw.zcrd[l_atom] - psw.zcrd[k_atom];
+  ab[0] = rjx - rix;
+  ab[1] = rjy - riy;
+  ab[2] = rjz - riz;
+  bc[0] = -rjx;
+  bc[1] = -rjy;
+  bc[2] = -rjz;
+  cd[0] = rlx;
+  cd[1] = rly;
+  cd[2] = rlz;
 
   // Compute cross products and then the angle between the planes
+  double crabbc[3], crbccd[3], scr[3];
   crossProduct(ab, bc, crabbc);
   crossProduct(bc, cd, crbccd);
   double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
@@ -203,7 +215,7 @@ double dihedral_angle(const int atom_i, const int atom_j, const int atom_k, cons
 //-------------------------------------------------------------------------------------------------
 double dihedral_angle(const int atom_i, const int atom_j, const int atom_k, const int atom_l,
                       const PhaseSpace &ps) {
-  return diihedral_angle(atom_i, atom_j, atom_k, atom_l, getCoordinateFrameReader(ps));
+  return dihedral_angle(atom_i, atom_j, atom_k, atom_l, getCoordinateFrameReader(ps));
 }
 
 } // namespace geometry
