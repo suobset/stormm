@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_GEOMETRY_FEATURES_H
-#define OMNI_GEOMETRY_FEATURES_H
+#ifndef OMNI_LOCAL_ARRANGEMENT_H
+#define OMNI_LOCAL_ARRANGEMENT_H
 
 #include "Accelerator/hybrid.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 
 namespace omni {
-namespace geometry {
+namespace structure {
 
 using card::Hybrid;
 using topology::UnitCellType;

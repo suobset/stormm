@@ -3,10 +3,10 @@
 #include "Reporting/error_format.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/coordinateframe.h"
-#include "geometry_features.h"
+#include "local_arrangement.h"
 
 namespace omni {
-namespace geometry {
+namespace structure {
 
 using math::crossProduct;
 using trajectory::getCoordinateFrameReader;
