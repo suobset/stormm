@@ -75,6 +75,8 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Constants/behavior.h \
 		   $(SRCDIR)/Constants/fixed_precision.h \
 		   $(SRCDIR)/Constants/generalized_born.h \
+		   $(SRCDIR)/Constants/scaling.h \
+		   $(SRCDIR)/Constants/symbol_values.h \
 		   $(SRCDIR)/Chemistry/chemistry_enumerators.h \
 		   $(SRCDIR)/Chemistry/periodic_table.h \
 		   $(SRCDIR)/Chemistry/znumber.h \
@@ -116,6 +118,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Restraints/bounded_restraint.h \
 	           $(SRCDIR)/Restraints/restraint_apparatus.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
+		   $(SRCDIR)/Structure/structure_enumerators.h \
 		   $(SRCDIR)/Topology/amber_prmtop_util.h \
 		   $(SRCDIR)/Topology/atomgraph.h \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.h \
@@ -246,7 +249,8 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_amber_coordinates \
 	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_atommask \
-	          $(TESTDIR)/bin/test_phase_space_synthesis \
+	          $(TESTDIR)/bin/test_local_arrangement \
+		  $(TESTDIR)/bin/test_phase_space_synthesis \
 	          $(TESTDIR)/bin/test_valence_evaluation \
 	          $(TESTDIR)/bin/test_nonbonded_evaluation \
 	          $(TESTDIR)/bin/test_generalized_born \
@@ -369,7 +373,14 @@ $(TESTDIR)/bin/test_atommask : $(LIBDIR)/libomni.so $(TESTDIR)/Chemistry/test_at
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_atommask \
 	  $(TESTDIR)/Chemistry/test_atommask.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
-# Target: atom mask parsing
+# Target: coordinate reimaging and local structure
+$(TESTDIR)/bin/test_local_arrangement : $(LIBDIR)/libomni.so \
+				       $(TESTDIR)/Structure/test_local_arrangement.cpp
+	@echo "[OMNI]  Building test_local_arrangement..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_local_arrangement \
+	  $(TESTDIR)/Structure/test_local_arrangement.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: numerical precision model
 $(TESTDIR)/bin/test_numerics : $(LIBDIR)/libomni.so $(TESTDIR)/Math/test_numerics.cpp
 	@echo "[OMNI]  Building test_numerics..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_numerics \

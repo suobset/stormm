@@ -5,6 +5,7 @@
 #include "Accelerator/hybrid.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
+#include "structure_enumerators.h"
 
 namespace omni {
 namespace structure {
@@ -34,16 +35,18 @@ using trajectory::PhaseSpaceReader;
 /// \param unit_cell  Shape of the unit cell
 /// \{
 void imageCoordinates(double *x, double *y, double *z, const double* umat, const double* invu,
-                      const UnitCellType unit_cell);
+                      const UnitCellType unit_cell, ImagingMethod style);
 
 void imageCoordinates(double* x, double* y, double* z, const int length, const double* umat,
-                      const double* invu, const UnitCellType unit_cell);
+                      const double* invu, const UnitCellType unit_cell, ImagingMethod style);
 
 void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vector<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell);
+                      const double* umat, const double* invu, const UnitCellType unit_cell,
+                      ImagingMethod style);
 
 void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell);
+                      const double* umat, const double* invu, const UnitCellType unit_cell,
+                      ImagingMethod style);
 /// \}
 
 /// \brief Compute the distance between two points in a coordinate set.  All forms of this

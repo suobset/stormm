@@ -13,7 +13,7 @@ using trajectory::getCoordinateFrameReader;
 
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(double *x, double *y, double *z, const double* umat, const double* invu,
-                      const UnitCellType unit_cell) {
+                      const UnitCellType unit_cell, const ImagingMethod style) {
   switch (unit_cell) {
   case UnitCellType::NONE:
     break;
@@ -22,9 +22,21 @@ void imageCoordinates(double *x, double *y, double *z, const double* umat, const
       double local_x = (*x) * umat[0];
       double local_y = (*y) * umat[4];
       double local_z = (*z) * umat[8];
-      local_x = (local_x > 0.0) ? local_x - ceil(local_x) : local_x - floor(local_x);
-      local_y = (local_y > 0.0) ? local_y - ceil(local_y) : local_y - floor(local_y);
-      local_z = (local_z > 0.0) ? local_z - ceil(local_z) : local_z - floor(local_z);
+      switch (style) {
+      case ImagingMethod::PRIMARY_UNIT_CELL:
+        local_x -= floor(local_x);
+        local_y -= floor(local_y);
+        local_z -= floor(local_z);
+        break;
+      case ImagingMethod::MINIMUM_IMAGE:
+        local_x -= ((local_x >= 0.5) *  ceil(local_x - 0.5)) +
+                   ((local_x < -0.5) * floor(local_x + 0.5));
+        local_y -= ((local_y >= 0.5) *  ceil(local_y - 0.5)) +
+                   ((local_y < -0.5) * floor(local_y + 0.5));
+        local_z -= ((local_z >= 0.5) *  ceil(local_z - 0.5)) +
+                   ((local_z < -0.5) * floor(local_z + 0.5));
+        break;
+      }
       *x = local_x * invu[0];
       *y = local_y * invu[4];
       *z = local_z * invu[8];
@@ -38,9 +50,18 @@ void imageCoordinates(double *x, double *y, double *z, const double* umat, const
       double ndx = (umat[0] * local_x) + (umat[3] * local_y) + (umat[6] * local_z);
       double ndy = (umat[1] * local_x) + (umat[4] * local_y) + (umat[7] * local_z);
       double ndz = (umat[2] * local_x) + (umat[5] * local_y) + (umat[8] * local_z);
-      ndx = (ndx > 0.0) ? ndx - ceil(ndx) : ndx - floor(ndx);
-      ndy = (ndy > 0.0) ? ndy - ceil(ndy) : ndy - floor(ndy);
-      ndz = (ndz > 0.0) ? ndz - ceil(ndz) : ndz - floor(ndz);
+      switch (style) {
+      case ImagingMethod::PRIMARY_UNIT_CELL:
+        ndx -= floor(ndx);
+        ndy -= floor(ndy);
+        ndz -= floor(ndz);
+        break;
+      case ImagingMethod::MINIMUM_IMAGE:
+        ndx -= ((ndx >= 0.5) * ceil(ndx - 0.5)) + ((ndx < -0.5) * floor(ndx + 0.5));
+        ndy -= ((ndy >= 0.5) * ceil(ndy - 0.5)) + ((ndy < -0.5) * floor(ndy + 0.5));
+        ndz -= ((ndz >= 0.5) * ceil(ndz - 0.5)) + ((ndz < -0.5) * floor(ndz + 0.5));
+        break;
+      }
       *x = (invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz);
       *y = (invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz);
       *z = (invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz);
@@ -51,7 +72,8 @@ void imageCoordinates(double *x, double *y, double *z, const double* umat, const
 
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(double* x, double* y, double* z, const int length, const double* umat,
-                      const double* invu, const UnitCellType unit_cell) {
+                      const double* invu, const UnitCellType unit_cell,
+                      const ImagingMethod style) {
   switch (unit_cell) {
   case UnitCellType::NONE:
     break;
@@ -60,9 +82,21 @@ void imageCoordinates(double* x, double* y, double* z, const int length, const d
       double local_x = x[i] * umat[0];
       double local_y = y[i] * umat[4];
       double local_z = z[i] * umat[8];
-      local_x = (local_x > 0.0) ? local_x - ceil(local_x) : local_x - floor(local_x);
-      local_y = (local_y > 0.0) ? local_y - ceil(local_y) : local_y - floor(local_y);
-      local_z = (local_z > 0.0) ? local_z - ceil(local_z) : local_z - floor(local_z);
+      switch (style) {
+      case ImagingMethod::PRIMARY_UNIT_CELL:
+        local_x -= floor(local_x);
+        local_y -= floor(local_y);
+        local_z -= floor(local_z);
+        break;
+      case ImagingMethod::MINIMUM_IMAGE:
+        local_x -= ((local_x >= 0.5) *  ceil(local_x - 0.5)) +
+                   ((local_x < -0.5) * floor(local_x + 0.5));
+        local_y -= ((local_y >= 0.5) *  ceil(local_y - 0.5)) +
+                   ((local_y < -0.5) * floor(local_y + 0.5));
+        local_z -= ((local_z >= 0.5) *  ceil(local_z - 0.5)) +
+                   ((local_z < -0.5) * floor(local_z + 0.5));
+        break;
+      }
       x[i] = local_x * invu[0];
       y[i] = local_y * invu[4];
       z[i] = local_z * invu[8];
@@ -76,9 +110,18 @@ void imageCoordinates(double* x, double* y, double* z, const int length, const d
       double ndx = (umat[0] * local_x) + (umat[3] * local_y) + (umat[6] * local_z);
       double ndy = (umat[1] * local_x) + (umat[4] * local_y) + (umat[7] * local_z);
       double ndz = (umat[2] * local_x) + (umat[5] * local_y) + (umat[8] * local_z);
-      ndx = (ndx > 0.0) ? ndx - ceil(ndx) : ndx - floor(ndx);
-      ndy = (ndy > 0.0) ? ndy - ceil(ndy) : ndy - floor(ndy);
-      ndz = (ndz > 0.0) ? ndz - ceil(ndz) : ndz - floor(ndz);
+      switch (style) {
+      case ImagingMethod::PRIMARY_UNIT_CELL:
+        ndx -= floor(ndx);
+        ndy -= floor(ndy);
+        ndz -= floor(ndz);
+        break;
+      case ImagingMethod::MINIMUM_IMAGE:
+        ndx -= ((ndx >= 0.5) * ceil(ndx - 0.5)) + ((ndx < -0.5) * floor(ndx + 0.5));
+        ndy -= ((ndy >= 0.5) * ceil(ndy - 0.5)) + ((ndy < -0.5) * floor(ndy + 0.5));
+        ndz -= ((ndz >= 0.5) * ceil(ndz - 0.5)) + ((ndz < -0.5) * floor(ndz + 0.5));
+        break;
+      }
       x[i] = (invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz);
       y[i] = (invu[1] * ndx) + (invu[4] * ndy) + (invu[7] * ndz);
       z[i] = (invu[2] * ndx) + (invu[5] * ndy) + (invu[8] * ndz);
@@ -89,25 +132,26 @@ void imageCoordinates(double* x, double* y, double* z, const int length, const d
 
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vector<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell) {
+                      const double* umat, const double* invu, const UnitCellType unit_cell,
+                      const ImagingMethod style) {
   const size_t length = x->size();
   if (length != y->size() || length != z->size()) {
     rtErr("Vectors for x, y, and z coordinates must be the same length for re-imaging.",
           "imageCoordinates");
   }
-  imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell);
+  imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell, style);
 }
 
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
-                      const double* umat, const double* invu,
-                      const UnitCellType unit_cell) {
+                      const double* umat, const double* invu, const UnitCellType unit_cell,
+                      const ImagingMethod style) {
   const size_t length = x->size();
   if (length != y->size() || length != z->size()) {
     rtErr("Vectors for x, y, and z coordinates must be the same length for re-imaging.",
           "imageCoordinates");
   }
-  imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell);
+  imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell, style);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -115,7 +159,7 @@ double distance(const int atom_i, const int atom_j, const CoordinateFrameReader 
   double dx = cfr.xcrd[atom_j] - cfr.xcrd[atom_i];
   double dy = cfr.ycrd[atom_j] - cfr.ycrd[atom_i];
   double dz = cfr.zcrd[atom_j] - cfr.zcrd[atom_i];
-  imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell);
+  imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell, ImagingMethod::MINIMUM_IMAGE);
   return sqrt((dx * dx) + (dy * dy) + (dz * dz));
 }
 
@@ -140,8 +184,9 @@ double angle(const int atom_i, const int atom_j, const int atom_k,
   double rkx = cfr.xcrd[atom_k] - cfr.xcrd[atom_j];
   double rky = cfr.ycrd[atom_k] - cfr.ycrd[atom_j];
   double rkz = cfr.zcrd[atom_k] - cfr.zcrd[atom_j];
-  imageCoordinates(&rix, &riy, &riz, cfr.umat, cfr.invu, cfr.unit_cell);
-  imageCoordinates(&rkx, &rky, &rkz, cfr.umat, cfr.invu, cfr.unit_cell);
+  const ImagingMethod imeth = ImagingMethod::MINIMUM_IMAGE;
+  imageCoordinates(&rix, &riy, &riz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
+  imageCoordinates(&rkx, &rky, &rkz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
 
   // Compute the angle, in radians
   const double mgba = (rix * rix) + (riy * riy) + (riz * riz);
@@ -176,9 +221,10 @@ double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
   double rlx = cfr.xcrd[atom_l] - cfr.xcrd[atom_k];
   double rly = cfr.ycrd[atom_l] - cfr.ycrd[atom_k];
   double rlz = cfr.zcrd[atom_l] - cfr.zcrd[atom_k];
-  imageCoordinates(&rix, &riy, &riz, cfr.umat, cfr.invu, cfr.unit_cell);
-  imageCoordinates(&rjx, &rjy, &rjz, cfr.umat, cfr.invu, cfr.unit_cell);
-  imageCoordinates(&rlx, &rly, &rlz, cfr.umat, cfr.invu, cfr.unit_cell);
+  const ImagingMethod imeth = ImagingMethod::MINIMUM_IMAGE;
+  imageCoordinates(&rix, &riy, &riz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
+  imageCoordinates(&rjx, &rjy, &rjz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
+  imageCoordinates(&rlx, &rly, &rlz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
 
   // Compute the dihedral angle, in radians
   double ab[3], bc[3], cd[3];
