@@ -98,7 +98,8 @@ int main(int argc, char* argv[]) {
   check(d3_c.x == Approx(cp_ab[0]).margin(tiny) && d3_c.y == Approx(cp_ab[1]).margin(tiny) &&
         d3_c.z == Approx(cp_ab[2]).margin(tiny), "Vector cross product does not function as "
         "expected when provided double-precision HPC tuples.");
-
+  
+  
   // Verify that the internal random number generation is consistent with expectations.  Create
   // three generators, the first two initialized in the same way (which thus should track one
   // another precisely) and the third initialized to a different value (which should decorrelate
@@ -366,6 +367,48 @@ int main(int argc, char* argv[]) {
         "The inverse transformation matrix is incorrect.");
   check(linear_xfrm_prod, RelationalOperator::EQUAL, linear_ident, "The product of box "
         "transformation and inverse transformation matrices is not the identity matrix.");
+
+  // Further checks on the mean, standard deviation, variance, correlation, dot product,
+  // magnitude, and projection operations
+  section(1);
+  check(mean(invu_answer), RelationalOperator::EQUAL, Approx(17.6124898394).margin(tiny),
+        "The mean value of a double-precision vector is not correct.");
+  check(variance(invu_answer, VarianceMethod::VARIANCE), RelationalOperator::EQUAL,
+        Approx(816.0346461040).margin(tiny), "The variance of a double-precision vector is not "
+        "correct.");
+  check(variance(invu_answer, VarianceMethod::STANDARD_DEVIATION), RelationalOperator::EQUAL,
+        Approx(30.2991580224).margin(tiny), "The standard deviation of a double-precision vector "
+        "is not correct.");
+  check(variance(invu_answer, VarianceMethod::ROOT_MEAN_SQUARED_DEVIATION),
+        RelationalOperator::EQUAL, Approx(28.5663201359).margin(tiny), "The root mean squared "
+        "deviation of a double-precision vector is not correct.");
+  check(variance(invu_answer, VarianceMethod::COEFFICIENT_OF_VARIATION),
+        RelationalOperator::EQUAL, Approx(1.7203222428).margin(tiny), "The coefficient of "
+        "variation for a double-precision vector is not correct.");
+  check(variance(invu_answer, VarianceMethod::NORMALIZED_RMSD),
+        RelationalOperator::EQUAL, Approx(1.6219353650).margin(tiny), "The normalized root mean "
+        "squared deviation for a double-precision vector is not correct.");
+  check(magnitude(umat_answer), RelationalOperator::EQUAL, Approx(3.1449747049e-02).margin(tiny),
+        "The magnitude of a double-precision vector is not computed correctly.");
+  check(dot(invu_answer, umat_answer), RelationalOperator::EQUAL,
+        Approx(2.9396135279).margin(tiny), "The dot product of two double-precision vectors is "
+        "not computed correctly.");
+  std::vector<double> invu_perturb(invu_answer);
+  std::vector<double> invu_partial(invu_answer);
+  for (size_t i = 6; i < invu_partial.size(); i++) {
+    invu_partial[i] = 0.0;
+  }
+  for (size_t i = 0; i < invu_perturb.size(); i++) {
+    invu_perturb[i] += xrs256pp.uniformRandomNumber() - 0.5;
+    invu_partial[i] += xrs256pp.uniformRandomNumber() - 0.5;
+  }
+  std::vector<double> invu_project(invu_answer.size());
+  project(invu_answer, invu_partial, &invu_project);
+  const std::vector<double> invu_project_answer = { 63.5808430141, -0.2998731521,  0.4369816989,
+                                                     5.2640142928, 60.3620556749,  0.0677375859,
+                                                    -0.2593021730, -0.1475558457, -0.3946802908 };
+  check(invu_project, RelationalOperator::EQUAL, Approx(invu_project_answer).margin(tiny),
+        "The projection of one vector onto another does not meet expectations.");
 
   // Print results
   printTestSummary(oe.getVerbosity());

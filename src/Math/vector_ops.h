@@ -121,7 +121,7 @@ template <typename T> double mean(const std::vector<T> &va);
 template <typename T> double mean(const Hybrid<T> &va);
 /// \}
 
-/// \brief Compute the mean value of a vector of familiar data types.
+/// \brief Compute the variance of a vector of familiar data types.
 ///
 /// Overloaded:
 ///   - Operate on a C-style vectors of a stated (and trusted) length

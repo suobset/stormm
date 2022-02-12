@@ -230,7 +230,7 @@ template <typename T> double variance(const T* va, const size_t length,
   }
   double s1 = 0.0;
   double s2 = 0.0;
-  double abs_mvalue = 0.0;
+  double mvalue = 0.0;
   const double dlength = static_cast<double>(length);
   switch (method) {
   case VarianceMethod::VARIANCE:
@@ -248,9 +248,9 @@ template <typename T> double variance(const T* va, const size_t length,
       double tval = static_cast<double>(va[i]);
       s1 += tval;
       s2 += tval * tval;
-      abs_mvalue += fabs(tval);
+      mvalue += tval;
     }
-    abs_mvalue /= dlength;
+    mvalue /= dlength;
     break;
   }
   switch (method) {
@@ -264,9 +264,9 @@ template <typename T> double variance(const T* va, const size_t length,
   case VarianceMethod::ROOT_MEAN_SQUARED_DEVIATION:
     return sqrt(((dlength * s2) - (s1 * s1))) / dlength;
   case VarianceMethod::COEFFICIENT_OF_VARIATION:
-    return sqrt(((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0))) / abs_mvalue;
+    return sqrt(((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0))) / fabs(mvalue);
   case VarianceMethod::NORMALIZED_RMSD:
-    return sqrt(((dlength * s2) - (s1 * s1))) / (dlength * abs_mvalue);
+    return sqrt(((dlength * s2) - (s1 * s1))) / (dlength * fabs(mvalue));
   }
   __builtin_unreachable();
 }
