@@ -47,7 +47,7 @@ constexpr unsigned long int warp_bits_mask_lu = warp_size_lu - 1LU;
 constexpr long long int warp_bits_mask_lld = warp_size_lld - 1LL;
 constexpr long long int warp_bits_mask_llu = warp_size_llu - 1LLU;
 /// \}
-
+  
 } // namespace constants
 } // namespace omni
 

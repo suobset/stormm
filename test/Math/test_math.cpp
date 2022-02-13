@@ -409,7 +409,11 @@ int main(int argc, char* argv[]) {
                                                     -0.2593021730, -0.1475558457, -0.3946802908 };
   check(invu_project, RelationalOperator::EQUAL, Approx(invu_project_answer).margin(tiny),
         "The projection of one vector onto another does not meet expectations.");
-
+  const std::vector<double> corr_x1 = {  0.5, -1.0, -5.4,  6.7,  7.2,  3.8, -4.1, 9.3 };
+  const std::vector<double> corr_x2 = {  0.7, -0.8, -4.9,  9.2,  5.3,  4.0, -5.9, 7.9 };
+  check(pearson(corr_x1, corr_x2), RelationalOperator::EQUAL, Approx(0.9651506029).margin(tiny),
+        "The correlation coefficient computed for two vectors is incorrect.");
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

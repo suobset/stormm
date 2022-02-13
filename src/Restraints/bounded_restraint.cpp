@@ -8,6 +8,20 @@ using chemistry::AtomMask;
 using chemistry::MaskInputMode;
 
 //-------------------------------------------------------------------------------------------------
+BoundedRestraint::BoundedRestraint(const AtomGraph *ag_in) :
+    atom_i{-1}, atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0},
+    initial_step{0},
+    final_step{0},
+    initial_keq{0.0, 0.0},
+    initial_r{0.0, 0.0, 0.0, 0.0},
+    final_keq{0.0, 0.0},
+    final_r{0.0, 0.0, 0.0, 0.0},
+    initial_center{0.0, 0.0, 0.0},
+    final_center{0.0, 0.0, 0.0},
+    ag_pointer{ag_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in,
                                    const std::string &mask_k_in, const std::string &mask_l_in,
                                    const AtomGraph *ag_in, const ChemicalFeatures *chemfe,

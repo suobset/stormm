@@ -3,6 +3,7 @@
 #define	OMNI_RESTRAINT_BUILDER_H
 
 #include <vector>
+#include "Chemistry/atommask.h"
 #include "bounded_restraint.h"
 
 namespace omni {
@@ -56,19 +57,31 @@ applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfra
                           double displacement_plateau, double proximity_penalty = 0.0,
                           double proximity_onset = 0.0, double proximity_plateau = 0.0);
 
-/// \brief Build restraints needed to manage the inversion of chiral centers in a molecule.  The
-///        strategy will be to maintain as many details of the original conformation as possible,
-///        as expressed in the unique dihedral angles not involving a chiral center that is about
-///        to undergo inversion by the function invertChirality() in the conformers.cpp library of
-///        the src/Conformations/ folder.  The 
+/// \brief Build restraints needed to maintain elements of the conformation not intended to change
+///        their shape.  This will be accomplished by distance, angle, and dihedral restraints
+///        between heavy atoms not intended to move.  
 ///
-/// \param ag            Pointer to the topology for the system of interest
-/// \param crd           Coordinates of the system in its current state
-/// \param chiral_atoms  List of all atoms with detected chirality that are to be inverted (these
-///                      atoms will help define what dihedrals to avoid constraining)
+/// \param ag                      Pointer to the topology for the system of interest
+/// \param crd                     Coordinates of the system in its current state
+/// \param mask                    Mask of atoms to be held in place, relative to one another
+/// \param penalty                 The stiffness of the harmonic penalty to apply.  This is
+///                                identical for distance, angle, and dihedral restraints.
+/// \param flat_bottom_half_width  The flat bottom of the restraint well extends this amount in
+///                                either direction from the current, observed value of the
+///                                distance, angle, or dihedral coordinate, in the appropriate
+///                                unit system.
+/// \param harmonic_maximum        The maximum value of the restraint in its harmonic range,
+///                                defining the point at which the penalty goes linear.
 std::vector<BoundedRestraint>
-applyChiralityInversionRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
-                                  const AtomMask &chiral_mask);
+applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
+                       const AtomMask &mask, double penalty, double flat_bottom_half_width,
+                       double harmonic_maximum);
+
+/// \brief Build a series of restraints to rotate about a particular bond.
+///  
+/// \param ag      System topology (this will be used to branch out from the rotatable bond
+/// \param atom_i  The first atom of the bond about which to rotate
+/// \param atom_j  The second atom of the bond about which to rotate
 
 } // namespace restraints
 } // namespace omni

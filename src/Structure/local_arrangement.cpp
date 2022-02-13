@@ -10,6 +10,19 @@ namespace structure {
 
 using math::crossProduct;
 using trajectory::getCoordinateFrameReader;
+  
+//-------------------------------------------------------------------------------------------------
+double imageValue(const double x, const double range, const ImagingMethod style) {
+  double x_frac = x / range;
+  switch (style) {
+  case ImagingMethod::PRIMARY_UNIT_CELL:
+    return ((x_frac - floor(x_frac)) * range);
+  case ImagingMethod::MINIMUM_IMAGE:
+    x_frac -= ((x_frac >= 0.5) * ceil(x_frac - 0.0)) + ((x_frac < -0.5) * floor(x_frac + 0.5));
+    return (x_frac - (x_frac >= 0.5)) * range;
+  }
+  __builtin_unreachable();
+}
 
 //-------------------------------------------------------------------------------------------------
 void imageCoordinates(double *x, double *y, double *z, const double* umat, const double* invu,
@@ -35,6 +48,9 @@ void imageCoordinates(double *x, double *y, double *z, const double* umat, const
                    ((local_y < -0.5) * floor(local_y + 0.5));
         local_z -= ((local_z >= 0.5) *  ceil(local_z - 0.5)) +
                    ((local_z < -0.5) * floor(local_z + 0.5));
+        local_x -= (local_x >= 0.5);
+        local_y -= (local_y >= 0.5);
+        local_z -= (local_z >= 0.5);
         break;
       }
       *x = local_x * invu[0];
@@ -60,6 +76,9 @@ void imageCoordinates(double *x, double *y, double *z, const double* umat, const
         ndx -= ((ndx >= 0.5) * ceil(ndx - 0.5)) + ((ndx < -0.5) * floor(ndx + 0.5));
         ndy -= ((ndy >= 0.5) * ceil(ndy - 0.5)) + ((ndy < -0.5) * floor(ndy + 0.5));
         ndz -= ((ndz >= 0.5) * ceil(ndz - 0.5)) + ((ndz < -0.5) * floor(ndz + 0.5));
+        ndx -= (ndx >= 0.5);
+        ndy -= (ndy >= 0.5);
+        ndz -= (ndz >= 0.5);
         break;
       }
       *x = (invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz);
@@ -95,6 +114,9 @@ void imageCoordinates(double* x, double* y, double* z, const int length, const d
                    ((local_y < -0.5) * floor(local_y + 0.5));
         local_z -= ((local_z >= 0.5) *  ceil(local_z - 0.5)) +
                    ((local_z < -0.5) * floor(local_z + 0.5));
+        local_x -= (local_x >= 0.5);
+        local_y -= (local_y >= 0.5);
+        local_z -= (local_z >= 0.5);
         break;
       }
       x[i] = local_x * invu[0];
@@ -120,6 +142,9 @@ void imageCoordinates(double* x, double* y, double* z, const int length, const d
         ndx -= ((ndx >= 0.5) * ceil(ndx - 0.5)) + ((ndx < -0.5) * floor(ndx + 0.5));
         ndy -= ((ndy >= 0.5) * ceil(ndy - 0.5)) + ((ndy < -0.5) * floor(ndy + 0.5));
         ndz -= ((ndz >= 0.5) * ceil(ndz - 0.5)) + ((ndz < -0.5) * floor(ndz + 0.5));
+        ndx -= (ndx >= 0.5);
+        ndy -= (ndy >= 0.5);
+        ndz -= (ndz >= 0.5);
         break;
       }
       x[i] = (invu[0] * ndx) + (invu[3] * ndy) + (invu[6] * ndz);

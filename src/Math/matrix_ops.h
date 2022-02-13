@@ -239,7 +239,6 @@ template <typename T>
 void printMatrix(const HpcMatrix<T> &matrix, const std::string &varname,
                  const std::string &file_name = std::string(""),
                  const PrintSituation expectation = PrintSituation::APPEND);
-
 /// \}
 
 } // namespace math

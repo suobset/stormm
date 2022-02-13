@@ -26,8 +26,9 @@ using omni::math::sum;
 using omni::symbols::pi;
 using omni::topology::AtomGraph;
 using omni::topology::UnitCellType;
-using omni::trajectory::CoordinateFrame;
 using omni::trajectory::CoordinateFileKind;
+using omni::trajectory::CoordinateFrame;
+using omni::trajectory::CoordinateFrameWriter;
 using namespace omni::structure;
 using namespace omni::testing;
 
@@ -37,8 +38,11 @@ int main(int argc, char* argv[]) {
   TestEnvironment oe(argc, argv);
 
   // Section 1
-  section("Basic checks on re-imaging and distance calculations");
+  section("Basic checks on re-imaging calculations");
 
+  // Section 2
+  section("Check distance, angle, and dihedral calculations");
+  
   // Get a realistic system
   const char osc = osSeparator();
   const std::string base_top_path = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -59,6 +63,22 @@ int main(int argc, char* argv[]) {
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
 
+  // Image a single number (needed for NMR restraints with periodicity, for example)
+  section(1);
+  const std::vector<double> point_samples = {  0.75,  0.25,  0.35, -0.65, -1.87,  2.33 };
+  const double trial_range = 0.5;
+  const std::vector<double> primu_answer  = {  0.25,  0.25,  0.35,  0.35,  0.13,  0.33 };
+  const std::vector<double> minim_answer  = { -0.25, -0.25, -0.15, -0.15,  0.13, -0.17 };
+  std::vector<double> primu_result(point_samples.size()), minim_result(point_samples.size());
+  for (size_t i = 0; i < point_samples.size(); i++) {
+    primu_result[i] = imageValue(point_samples[i], trial_range, ImagingMethod::PRIMARY_UNIT_CELL);
+    minim_result[i] = imageValue(point_samples[i], trial_range, ImagingMethod::MINIMUM_IMAGE);
+  }
+  check(primu_result, RelationalOperator::EQUAL, Approx(primu_answer).margin(tiny), "Value "
+        "imaging into a [0, range) interval does not work as expected.");
+  check(minim_result, RelationalOperator::EQUAL, Approx(minim_answer).margin(tiny), "Value "
+        "imaging into a [-0.5 * range, 0.5 * range) interval does not work as expected.");
+  
   // Create a fake rectilinear system
   const std::vector<double> rectilinear_box = { 15.0, 24.0, 18.0, 0.5 * pi, 0.5  * pi, 0.5 * pi };
   const std::vector<double> rectilinear_x_crd = {  5.1,  0.7,  7.9, 27.9 };
@@ -262,7 +282,32 @@ int main(int argc, char* argv[]) {
   check(max_tric_frac, RelationalOperator::LT, std::vector<double>({ 1.0, 1.0, 1.0 }),
         "Re-imaging in a triclinic unit cell by the minimum image convention puts some particles "
         "outside of the expected range.");  
-  
+
+  // Check internal coordinate computations
+  section(2);
+  check(distance(0, 1, drug_cf), RelationalOperator::EQUAL, Approx(1.3656697990).margin(tiny),
+        "The distance between two atoms is not computed correctly.");
+  CoordinateFrameWriter cfw = drug_cf.data();
+  cfw.xcrd[9] +=       cfw.boxdim[0];
+  cfw.ycrd[9] += 2.0 * cfw.boxdim[1];
+  cfw.zcrd[9] -= 3.0 * cfw.boxdim[2];
+  check(distance(9, 10, drug_cf), RelationalOperator::EQUAL, Approx(1.5113186295).margin(tiny),
+        "The distance between two atoms is not computed correctly after one of them has been "
+        "pushed into another unit cell image.");
+  check(angle(13, 46, 47, drug_cf), RelationalOperator::EQUAL, Approx(1.9124059543).margin(tiny),
+        "The angle made by three atoms in a drug molecule is not computed correctly.");
+  cfw.xcrd[22] -= 4.0 * cfw.boxdim[0];
+  cfw.ycrd[22] +=       cfw.boxdim[1];
+  cfw.zcrd[22] -= 2.0 * cfw.boxdim[2];
+  check(angle(40, 22, 50, drug_cf), RelationalOperator::EQUAL, Approx(1.8791980388).margin(tiny),
+        "The angle made by three atoms in a drug molecule is not computed correctly.");
+  check(dihedral_angle(9, 10, 11, 12, drug_cf), RelationalOperator::EQUAL,
+        Approx(-3.1069347104).margin(tiny), "The dihedral made by four atoms in a drug molecule "
+        "is not computed correctly.");
+  check(dihedral_angle(20, 9, 10, 11, drug_cf), RelationalOperator::EQUAL,
+        Approx(-1.6233704738).margin(tiny), "The dihedral made by four atoms in a drug molecule "
+        "is not computed correctly.");
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }

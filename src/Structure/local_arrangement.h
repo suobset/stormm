@@ -17,6 +17,14 @@ using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceReader;
 
+/// \brief Image a single value to a range.
+///        
+/// \param x      The value to re-image
+/// \param range  Defines the interval over which to image the value
+/// \param style  Determines whether to image the value to the interval [ 0, range ) or
+///               [ -0.5 * range, 0.5 * range ).
+double imageValue(double x, double range, ImagingMethod style);
+
 /// \brief Image a coordinate (or distance between coordinates) to fit within the interval
 ///        [-0.5, 0.5], taking into account box specifications.
 ///
@@ -35,17 +43,17 @@ using trajectory::PhaseSpaceReader;
 /// \param unit_cell  Shape of the unit cell
 /// \{
 void imageCoordinates(double *x, double *y, double *z, const double* umat, const double* invu,
-                      const UnitCellType unit_cell, ImagingMethod style);
+                      UnitCellType unit_cell, ImagingMethod style);
 
 void imageCoordinates(double* x, double* y, double* z, const int length, const double* umat,
-                      const double* invu, const UnitCellType unit_cell, ImagingMethod style);
+                      const double* invu, UnitCellType unit_cell, ImagingMethod style);
 
 void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vector<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell,
+                      const double* umat, const double* invu, UnitCellType unit_cell,
                       ImagingMethod style);
 
 void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
-                      const double* umat, const double* invu, const UnitCellType unit_cell,
+                      const double* umat, const double* invu, UnitCellType unit_cell,
                       ImagingMethod style);
 /// \}
 

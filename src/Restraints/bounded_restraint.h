@@ -22,6 +22,7 @@ struct BoundedRestraint {
   /// decremented when constructing the mask to index into the actual memory)
   ///
   /// Overloaded:
+  ///   - Empty constructor (creates a restraint of order zero but for a particular topology)
   ///   - Accept up to four atom masks and all other inputs
   ///   - Accept up to four atom numbers and all other inputs
   ///   - Accept up to four atom masks and basic inputs
@@ -57,6 +58,8 @@ struct BoundedRestraint {
   /// \param init_ref_crd_in   The initial target location for an atomic positional restraint
   /// \param final_ref_crd_in  The final target location for an atomic positional restraint
   /// \{
+  BoundedRestraint(const AtomGraph *ag_in);
+  
   BoundedRestraint(const std::string &mask_i_in, const std::string &mask_j_in, 
                    const std::string &mask_k_in, const std::string &mask_l_in,
                    const AtomGraph *ag_in, const ChemicalFeatures *chemfe,

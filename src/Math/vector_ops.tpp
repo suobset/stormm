@@ -575,23 +575,14 @@ template <typename T> double dot(const T* va, const T* vb, const size_t length) 
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> double dot(const std::vector<T> &va, const std::vector<T> &vb) {
-  const size_t va_len = va.size();
-  if (vb.size() != va_len) {
-    rtErr("Vectors of length " + std::to_string(va_len) + " and " +
-          std::to_string(vb.size()) + " are invalid for computing a dot product.", "dot");    
-  }
-  return dot(va.data(), vb.data(), va_len);
+  vectorComparisonCheck(va, vb, "dot");
+  return dot(va.data(), vb.data(), va.size());
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> double dot(const Hybrid<T> &va, const Hybrid<T> &vb) {
-  const size_t va_len = va.size();
-  if (vb.size() != va_len) {
-    rtErr("Vectors of length " + std::to_string(va_len) + " (" + std::string(va.getLabel().name) +
-          ") and " + std::to_string(vb.size()) + " (" + std::string(vb.getLabel().name) +
-          ") are invalid for computing a dot product.", "dot");    
-  }
-  return dot(va.data(), vb.data(), va_len);
+  vectorComparisonCheck(va, vb, "dot");
+  return dot(va.data(), vb.data(), va.size());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -605,7 +596,7 @@ template <typename T> void project(const T* va, const T* vb, T* vc, const size_t
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> void project(const std::vector<T> &va, const std::vector<T> &vb,
-                                     std::vector<T> *vc) {
+                                   std::vector<T> *vc) {
   const size_t va_len = va.size();
   if (vb.size() != va_len || vc->size() != va_len) {
     rtErr("Vectors of length " + std::to_string(va_len) + " (vA), " + std::to_string(vb.size()) +
@@ -630,12 +621,8 @@ template <typename T> void project(const Hybrid<T> &va, const Hybrid<T> &vb, Hyb
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T> project(const std::vector<T> &va, const std::vector<T> &vb) {
+  vectorComparisonCheck(va, vb, "project");
   const size_t va_len = va.size();
-  if (vb.size() != va_len) {
-    rtErr("Vectors of length " + std::to_string(va_len) + " and " +
-          std::to_string(vb.size()) + " are invalid for computing the projection of vA onto vB.",
-          "project");    
-  }
   const double mag_vb = magnitude(vb.data(), va_len);
   const double dp_val = dot(va.data(), vb.data(), va_len) / (mag_vb * mag_vb);
   std::vector<T> result(va_len);
@@ -647,12 +634,8 @@ template <typename T> std::vector<T> project(const std::vector<T> &va, const std
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb) {
+  vectorComparisonCheck(va, vb, "project");
   const size_t va_len = va.size();
-  if (vb.size() != va_len) {
-    rtErr("Vectors of length " + std::to_string(va_len) + " (" + std::string(va.getLabel().name) +
-          ") and " + std::to_string(vb.size()) + " (" + std::to_string(va.getLabel().name) +
-          ") are invalid for computing the projection of vA onto vB.", "project");    
-  }
   const T* vb_data = vb.data();
   const double mag_vb = magnitude(vb_data, va_len);
   const double dp_val = dot(va.data(), vb_data, va_len) / (mag_vb * mag_vb);
