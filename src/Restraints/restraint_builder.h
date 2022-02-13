@@ -20,7 +20,7 @@ using trajectory::CoordinateFrameReader;
 /// \param cframe                Coordinates of the system in its current state
 /// \param reference_cframe      Reference coordinates of the system, if different from
 /// \param mask                  Atom mask (must match the topology by some basic checks))
-bool restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
+void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                              const AtomMask &mask);
   
 /// \brief Apply positional restraints to a topology based on an AtomMask, with general parameters

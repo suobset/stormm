@@ -74,6 +74,8 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
           dvb = std::vector<double>(ullivb.begin(), ullivb.end());
         }
         break;
+      case NumberFormat::CHAR4:
+        break;
       }      
       std::vector<double> work(std::max(va.size(), vb.size()), 0.0);
       const int n_va = va.size();

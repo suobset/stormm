@@ -20,7 +20,7 @@ using topology::TorsionKind;
 using topology::ValenceKit;
 
 //-------------------------------------------------------------------------------------------------
-bool restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
+void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                              const AtomMask &mask) {
   const int natom_expected = ag->getAtomCount();
   if (cframe.natom != natom_expected) {
