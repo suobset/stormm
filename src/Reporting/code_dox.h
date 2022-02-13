@@ -8,7 +8,7 @@
 namespace omni {
 namespace docs {
 
-using parse::TextFile;
+using parse::TextFileReader;
 
 /// \brief Stores data on instances of an object (i.e. a function or struct found in a given file.
 struct ObjectIdentifier {
@@ -109,12 +109,12 @@ PreProcessorScopeModifier testScopeModifier(const char* line, int nchar);
 /// \brief Find all #if / #elif / #else / #endif pre-processor scopes within a given file.
 ///
 /// \param tfr  An abstract of pointers into a TextFile object, the test of the file read into RAM
-std::vector<int3> findPreProcessorScopes(const TextFile::Reader &tfr);
+std::vector<int3> findPreProcessorScopes(const TextFileReader &tfr);
 
 /// \brief Find all C++ scopes within { } braces in a given file.
 ///
 /// \param tfr  Pointers an line limits for the text file now stored in RAM
-std::vector<CppScope> findCppScopes(const TextFile::Reader &tfr);
+std::vector<CppScope> findCppScopes(const TextFileReader &tfr);
 
 /// \brief Search a particular file for instances of a given object.
 ///

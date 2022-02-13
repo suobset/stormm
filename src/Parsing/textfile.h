@@ -20,20 +20,32 @@ enum class TextOrigin {
   DISK, RAM
 };
 
+/// \brief Abstract for the TextFile object, providing read-only access
+struct TextFileReader {
+
+  /// \brief The constructor takes length constants and constant pointers.
+  TextFileReader(int line_count_in, const int* line_limits_in, const char* text_in,
+                 const std::string file_name_in);
+
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
+  /// \{
+  TextFileReader(const TextFileReader &original) = default;
+  TextFileReader(TextFileReader &&original) = default;
+  /// \}
+
+  const int line_count;
+  const int* line_limits;
+  const char* text;
+  const std::string file_name;
+};
+  
 /// \brief Structure for translating a text file into a compact, rapidly parsable vector of
 ///        characters in CPU RAM.  The struct contains two nested struct definitions, for a Reader
 ///        and a Writer.  Private objects of these structs can then be accessed with eponymous
 ///        data() getter functions, returning the appropriate kind of access depending on the
 ///        const-ness of the TextFile object itself.
 struct TextFile {
-
-  /// Abstract for read-only access
-  struct Reader {
-    int line_count;
-    const int* line_limits;
-    const char* text;
-    const std::string file_name;
-  };
 
   /// \brief Constructor for taking an ascii file or a very long, formatted string and transforming
   ///        it into a std::vector of characters with line limits recorded.
@@ -80,7 +92,7 @@ struct TextFile {
   /// \brief Get an abstract of a text file's CPU-RAM representation, for ease of use.
   ///
   /// \param tf   The text file, as read into memory
-  const Reader& data() const;
+  const TextFileReader data() const;
 
 private:
 
@@ -95,12 +107,6 @@ private:
 
   /// The text, sans carriage returns (see line limits to determine their locations)
   std::vector<char> text;
-
-  /// Read-only access; write access to a struct like this, via a convenient pointer struct,
-  /// could be very problematic.  Will the line limits stay the same?  What if the file needs
-  /// to grow?  Editing and growth of a TextFile will need to be done by public member functions
-  /// of the actual object, not an abstract.
-  Reader readable;
 
   /// \brief Set the name of the corresponding file based on the characteristics of several
   ///        constructor input variables.

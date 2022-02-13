@@ -25,6 +25,7 @@ using parse::NumberFormat;
 using parse::PolyNumeric;
 using parse::strncmpCased;
 using parse::TextFile;
+using parse::TextFileReader;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
 using parse::operator==;
@@ -324,7 +325,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
                       "Prmtop-based AtomGraph constructor");
 
   // Begin parsing, starting with the version stamp and date
-  const TextFile::Reader tfr = fmem.data();
+  const TextFileReader tfr = fmem.data();
   if (tfr.line_count > 0 && strncmp(tfr.text, "%VERSION", 8) == 0) {
     if (tfr.line_limits[1] >= 34) {
       for (int i = 26; i < 35; i++) {

@@ -7,15 +7,18 @@ namespace omni {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
+TextFileReader::TextFileReader(const int line_count_in, const int* line_limits_in,
+                               const char* text_in, const std::string file_name_in) :
+  line_count{line_count_in}, line_limits{line_limits_in}, text{text_in}, file_name{file_name_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 TextFile::TextFile() :
     orig_file{std::string("")},
     line_count{0},
     line_limits{std::vector<int>(1, 0)},
-    text{std::vector<char>()},
-    readable{0, line_limits.data(), text.data(), orig_file}
-{
-
-}
+    text{std::vector<char>()}
+{}
 
 //-------------------------------------------------------------------------------------------------
 TextFile::TextFile(const std::string &file_name, const TextOrigin source,
@@ -23,8 +26,7 @@ TextFile::TextFile(const std::string &file_name, const TextOrigin source,
   orig_file{setFileName(file_name, source, content)},
   line_count{0},
   line_limits{},
-  text{},
-  readable{0, line_limits.data(), text.data(), orig_file}
+  text{}
 {
   switch (source) {
   case TextOrigin::DISK:
@@ -75,11 +77,6 @@ TextFile::TextFile(const std::string &file_name, const TextOrigin source,
     }
     break;
   }
-
-  // Fill out the reader and writer
-  readable.line_count = line_count;
-  readable.line_limits = line_limits.data();
-  readable.text = text.data();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -108,8 +105,8 @@ const char* TextFile::getTextPointer(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-const TextFile::Reader& TextFile::data() const {
-  return readable;
+const TextFileReader TextFile::data() const {
+  return TextFileReader(line_count, line_limits.data(), text.data(), orig_file);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -139,13 +136,15 @@ void TextFile::linesFromString(const std::string &text_in) {
   for (int i = 0; i < n_char; i++) {
     text[n_tx] = text_in[i];
     if (text_in[i] == '\n') {
-      line_limits[n_br] = n_tx;
       n_br++;
+      line_limits[n_br] = n_tx;
     }
     else {
       n_tx++;
     }
   }
+
+  // Ensure that the final line limit is catalogged
   line_limits[line_count] = n_char - n_br;
 }
 

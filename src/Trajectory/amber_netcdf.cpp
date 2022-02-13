@@ -59,6 +59,8 @@ void AmberNetcdf::AmberNetcdf(const std::string &filename_in, const CoordinateFi
   case CoordinateFileKind::AMBER_ASCII_RST:
     rtErr("The Amber NetCDF writer should not be called to output an " +
           getCoordinateFileKindName(output_kind) + " file " + file_name + ".", "AmberNetcdf");
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The file type of " + file_name + " is unknown.", "AmberNetcdf");
   }
   time_variable_id = ncdfDefineVariable(netcdf_id, AncdfVariable::NCTIME, iprec, ndim, dims,
                                         "defining the time variable");

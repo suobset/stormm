@@ -106,9 +106,9 @@ struct AtomGraphSynthesis {
   /// \brief Get the name of the PB radii set for one or more systems.
   ///
   /// Overloaded:
-  /// - Get the PB radii set for all systems
-  /// - Get the PB radii set for a series of systems between low and high limits
-  /// - Get the PB radii set for a specific system
+  ///   - Get the PB radii set for all systems
+  ///   - Get the PB radii set for a series of systems between low and high limits
+  ///   - Get the PB radii set for a specific system
   /// \{
   std::vector<std::string> getPBRadiiSet() const;
   std::vector<std::string> getPBRadiiSet(int low_limit, int high_limit) const;

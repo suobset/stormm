@@ -35,6 +35,8 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The coordinate file type of " + filename + " could not be understood.", "writeFrame");
   }
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
@@ -49,6 +51,10 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
       pn_allvel[3*i + 1].d = y_vel[i];
       pn_allvel[3*i + 2].d = z_vel[i];
     }
+    break;
+  case CoordinateFileKind::UNKNOWN:
+
+    // The case of an unknown format is handled in the switch above
     break;
   }
   switch (kind) {
@@ -71,8 +77,8 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
                       ".");
     break;
   case CoordinateFileKind::AMBER_NETCDF:
-    break;
   case CoordinateFileKind::AMBER_NETCDF_RST:
+  case CoordinateFileKind::UNKNOWN:
     break;
   }
 }

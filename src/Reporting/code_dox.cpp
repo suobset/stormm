@@ -13,8 +13,9 @@ using diskutil::osSeparator;
 using diskutil::DrivePathType;
 using diskutil::SearchStyle;
 using diskutil::listFilesInPath;
-using parse::TextGuard;
 using parse::LineSpan;
+using parse::TextGuard;
+using parse::TextFile;
 
 //-------------------------------------------------------------------------------------------------
 ObjectIdentifier::ObjectIdentifier(const std::string &filename_in) :
@@ -112,7 +113,7 @@ PreProcessorScopeModifier testScopeModifier(const char* line, const int nchar) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int3> findPreProcessorScopes(const TextFile::Reader &tfr) {
+std::vector<int3> findPreProcessorScopes(const TextFileReader &tfr) {
 
   // Make a list of lines with pre-processor directives
   std::vector<int> pp_lines;
@@ -173,7 +174,7 @@ std::vector<int3> findPreProcessorScopes(const TextFile::Reader &tfr) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<CppScope> findCppScopes(const TextFile::Reader &tfr) {
+std::vector<CppScope> findCppScopes(const TextFileReader &tfr) {
 
   // Get text that is in a quote or a comment
   std::vector<TextGuard> quote_guards = { TextGuard("\"", "\"") };
@@ -193,7 +194,7 @@ ObjectIdentifier searchFileForObject(const std::string &object_name, const std::
 
   // Read the text file
   const TextFile tf(filename);
-  const TextFile::Reader tfr = tf.data();
+  const TextFileReader tfr = tf.data();
 
   // Get text that is in a quote or a comment
   std::vector<TextGuard> quote_guards = { TextGuard("\"", "\"") };

@@ -10,6 +10,7 @@ namespace namelist {
 
 using parse::strncmpCased;
 using parse::LineSpan;
+using parse::TextFileReader;
   
 //-------------------------------------------------------------------------------------------------
 std::string padNamelistTuples(const char* text, const std::vector<bool> &quoted,
@@ -55,7 +56,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
           "readNamelist");
   }
   int namelist_start = -1;
-  const TextFile::Reader tfr = tf.data();
+  const TextFileReader tfr = tf.data();
   const std::vector<TextGuard> comment_marks = { TextGuard("#"), TextGuard("!"), TextGuard("%"),
                                                  TextGuard("//"),
                                                  TextGuard("/*", "*/", LineSpan::MULTIPLE) };

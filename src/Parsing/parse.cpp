@@ -497,7 +497,7 @@ const std::vector<TextGuard> operator+(const std::vector<TextGuard> &lhs,
 }
 
 //-------------------------------------------------------------------------------------------------
-bool detectGuard(const TextFile::Reader &tfr, const int line_idx, const int pos_idx,
+bool detectGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
                  const std::string &guard_seq) {
   const int gsq_length = guard_seq.size();
   if (gsq_length == 0) {
@@ -528,7 +528,7 @@ bool detectGuard(const char* line, const int pos_idx, const std::string &guard_s
 }
 
 //-------------------------------------------------------------------------------------------------
-int applyGuard(const TextFile::Reader &tfr, const int line_idx, const int pos_idx,
+int applyGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
                const std::vector<TextGuard> &markers) {
   const int n_markers = markers.size();
   for (int i = 0; i < n_markers; i++) {
@@ -540,7 +540,7 @@ int applyGuard(const TextFile::Reader &tfr, const int line_idx, const int pos_id
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<bool> markEscapedCharacters(const TextFile::Reader &tfr,
+std::vector<bool> markEscapedCharacters(const TextFileReader &tfr,
                                         const std::vector<TextGuard> &escapes) {
   std::vector<bool> result(tfr.line_limits[tfr.line_count], false);
   for (int i = 0; i < tfr.line_count; i++) {
@@ -572,7 +572,7 @@ std::vector<bool> markEscapedCharacters(const char* textstr, const int n_char,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<bool> markGuardedText(const TextFile::Reader &tfr,
+std::vector<bool> markGuardedText(const TextFileReader &tfr,
                                   const std::vector<TextGuard> &markers,
                                   const std::vector<TextGuard> &alternatives,
                                   const std::vector<TextGuard> &escapes) {
@@ -1031,7 +1031,7 @@ std::vector<std::string> separateText(const TextFile &tf,
                                       const std::vector<TextGuard> &quote_marks,
                                       const std::vector<std::string> &delimiters,
                                       const std::vector<TextGuard> &escapes) {
-  TextFile::Reader tfr = tf.data();
+  TextFileReader tfr = tf.data();
   return separateText(tfr.text, tfr.line_limits[tfr.line_count], comment_mask, quotation_mask,
                       quote_marks, delimiters, escapes);
 }

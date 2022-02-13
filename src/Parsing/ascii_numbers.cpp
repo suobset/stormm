@@ -438,7 +438,7 @@ std::vector<PolyNumeric> readNumberSeries(const TextFile &tf, const int start_li
   const int dot_index = '.';
 
   // Prepare to store the result
-  const TextFile::Reader tfr = tf.data();
+  const TextFileReader tfr = tf.data();
   std::vector<PolyNumeric> result;
   result.resize(n_values);
   std::vector<int> line_integral(values_per_line, 0);

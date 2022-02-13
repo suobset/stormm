@@ -24,6 +24,8 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
 	         $(SRCDIR)/Namelists/namelist_element.cpp \
 	         $(SRCDIR)/Namelists/namelist_emulator.cpp \
+	         $(SRCDIR)/Namelists/nml_files.cpp \
+	         $(SRCDIR)/Namelists/nml_rst.cpp \
 	         $(SRCDIR)/Parsing/ascii_numbers.cpp \
 	         $(SRCDIR)/Parsing/citation.cpp \
 		 $(SRCDIR)/Parsing/parse.cpp \
@@ -98,6 +100,8 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/input.h \
 		   $(SRCDIR)/Namelists/namelist_element.h \
 		   $(SRCDIR)/Namelists/namelist_emulator.h \
+		   $(SRCDIR)/Namelists/nml_files.h \
+		   $(SRCDIR)/Namelists/nml_rst.h \
 		   $(SRCDIR)/Parsing/ascii_numbers.h \
 		   $(SRCDIR)/Parsing/citation.h \
 	           $(SRCDIR)/Parsing/parse.h \
@@ -180,6 +184,8 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Namelists/input.o \
 	        $(SRCDIR)/Namelists/namelist_element.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
+	        $(SRCDIR)/Namelists/nml_files.o \
+	        $(SRCDIR)/Namelists/nml_rst.o \
 		$(SRCDIR)/Parsing/ascii_numbers.o \
 	        $(SRCDIR)/Parsing/citation.o \
 	        $(SRCDIR)/Parsing/parse.o \

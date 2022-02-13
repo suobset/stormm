@@ -196,7 +196,7 @@ const std::vector<TextGuard> operator+(const std::vector<TextGuard> &lhs,
 /// \param pos_idx    Index at which to seek the putative termination sequence
 /// \param guard_seq  Text guard containing the termination sequence
 /// \{
-bool detectGuard(const TextFile::Reader &tfr, const int line_idx, const int pos_idx,
+bool detectGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
                  const std::string &guard_seq);
 bool detectGuard(const char* line, const int pos_idx, const std::string &guard_seq);
 /// \}
@@ -208,7 +208,7 @@ bool detectGuard(const char* line, const int pos_idx, const std::string &guard_s
 /// \param line_idx  Index at which to seek the putative termination sequence
 /// \param pos_idx   Index at which to seek the putative termination sequence
 /// \param markers   List of all text guards
-int applyGuard(const TextFile::Reader &tfr, const int line_idx, const int pos_idx,
+int applyGuard(const TextFileReader &tfr, const int line_idx, const int pos_idx,
                const std::vector<TextGuard> &markers);
 
 /// \brief Apply escape sequences to the text.  Escape sequences bind before any other guards such
@@ -221,7 +221,7 @@ int applyGuard(const TextFile::Reader &tfr, const int line_idx, const int pos_id
 /// \param tfr      Text file reading abstract
 /// \param escapes  Vector of escape sequences
 /// \{
-std::vector<bool> markEscapedCharacters(const TextFile::Reader &tfr,
+std::vector<bool> markEscapedCharacters(const TextFileReader &tfr,
                                         const std::vector<TextGuard> &escapes);
 
 std::vector<bool> markEscapedCharacters(const char* textstr, const int n_char,
@@ -234,7 +234,7 @@ std::vector<bool> markEscapedCharacters(const char* textstr, const int n_char,
 /// \param markers       List of markers denoting guards for the text of interest
 /// \param alternatives  List of markers denoting guards for other text, binding at the same level
 ///                      as markers
-std::vector<bool> markGuardedText(const TextFile::Reader &tfr,
+std::vector<bool> markGuardedText(const TextFileReader &tfr,
                                   const std::vector<TextGuard> &markers,
                                   const std::vector<TextGuard> &alternatives,
                                   const std::vector<TextGuard> &escapes = { TextGuard("\\") });

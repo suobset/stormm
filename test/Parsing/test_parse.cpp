@@ -62,12 +62,12 @@ int main(int argc, char* argv[]) {
   const char gt54 = (sfile_exists) ? tf.getText(54) : ' ';
   const char gt56 = (sfile_exists) ? tf.getText(56) : ' ';
   check(gt54 == 'e' && gt56 == 't', "TextFile contains incorrect text.", sfile_check);
-  const TextFile::Reader tfr = tf.data();
-  check(tfr.line_count, RelationalOperator::EQUAL, tf.getLineCount(), "TextFile::Reader nested "
+  const TextFileReader tfr = tf.data();
+  check(tfr.line_count, RelationalOperator::EQUAL, tf.getLineCount(), "TextFileReader nested "
         "struct does not produce a line count in agreement with the original struct.",
         sfile_check);
   const bool comp15 = (sfile_exists) ? (tfr.line_limits[15] == tf.getLineLimits(15)) : false;
-  check(comp15, "TextFile::Reader does not report line limits in agreement with the original "
+  check(comp15, "TextFileReader does not report line limits in agreement with the original "
         "struct.", sfile_check);
 
   // Test the comment and quotation masking

@@ -7,9 +7,7 @@
 #include "Parsing/textfile.h"
 
 namespace omni {
-namespace namelists {
-
-using parse::NamelistEmulator;
+namespace namelist {
 
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place
 ///        of a great deal of command line input in the Amber pmemd and sander programs.
@@ -20,7 +18,7 @@ using parse::NamelistEmulator;
 ///                    namelist)
 NamelistEmulator filesInput(const TextFile &tf, int *start_line);
 
-} // namespace namelists
+} // namespace namelist
 } // namespace omni
 
 #endif

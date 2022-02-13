@@ -243,7 +243,14 @@ CoordinateFrame& CoordinateFrame::operator=(CoordinateFrame &&other) {
 void CoordinateFrame::buildFromFile(const std::string &file_name_in,
                                     const CoordinateFileKind file_kind, const int frame_number) {
   file_name = file_name_in;
-  switch (file_kind) {
+
+  // Try to detect the file format if it is not already specified.  If it remains UNKNOWN, that
+  // will ultimately lead to an error.
+  CoordinateFileKind actual_kind = file_kind;
+  if (file_kind == CoordinateFileKind::UNKNOWN) {
+    actual_kind = detectCoordinateFileKind(file_name);
+  }  
+  switch (actual_kind) {
   case CoordinateFileKind::AMBER_CRD:
     {
       // The number of atoms must be known a-priori in order to read from a .crd trajectory file.
@@ -279,6 +286,9 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
     break;
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The file type of " + file_name + " could not be understood.", "CoordinateFrame",
+          "buildFromFile");
   }
 
   // Interpret the box transformation

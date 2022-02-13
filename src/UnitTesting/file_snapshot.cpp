@@ -19,6 +19,7 @@ using data_types::getOmniHpcVectorTypeName;
 using parse::printNumberSeries;
 using parse::readNumberSeries;
 using parse::separateText;
+using parse::TextFileReader;
 using parse::TextOrigin;
 using math::maxAbsValue;
 
@@ -26,7 +27,7 @@ using math::maxAbsValue;
 std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &label) {
 
   // Seek the formatting comment
-  TextFile::Reader tfr = tf.data();
+  TextFileReader tfr = tf.data();
   bool label_found = false;
   bool format_found = false;
   bool bad_type_name = false;

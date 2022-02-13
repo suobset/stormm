@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
   const TestPriority do_tip3p = (tip3p_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   PhaseSpace tip3p;
   if (tip3p_exists) {
-    tip3p.buildFromFile(tip3p_crd_name, CoordinateFileKind::AMBER_INPCRD);
+    tip3p.buildFromFile(tip3p_crd_name, CoordinateFileKind::AMBER_INPCRD);    
   }
   else {
     missing_files = true;
@@ -92,6 +92,10 @@ int main(int argc, char* argv[]) {
   PhaseSpaceWriter tip3pwr = tip3p.data();
   check(tip3pwr.natom, RelationalOperator::EQUAL, 768, "The TIP3P Amber input coordinates "
         "file " + tip3p.getFileName() + " contains the wrong number of atoms.", do_tip3p);
+  const CoordinateFileKind t3p_kind = (tip3p_exists) ? detectCoordinateFileKind(tip3p_crd_name) :
+                                                       CoordinateFileKind::UNKNOWN;
+  check(t3p_kind == CoordinateFileKind::AMBER_INPCRD, "Coordinate file type detection did not "
+        "succeed for an Amber ASCII input coordinate file.", do_tip3p);
   double oh_mean = 0.0;
   if (tip3p_exists) {
     for (int i = 0; i < tip3pwr.natom; i += 3) {
@@ -225,6 +229,10 @@ int main(int argc, char* argv[]) {
   }
   check(tip5p.getAtomCount(), RelationalOperator::EQUAL, 1080, "The number of atoms in the TIP5P "
         "system is incorrect.", do_tip5p);
+  const CoordinateFileKind t5p_kind = (tip5p_exists) ? detectCoordinateFileKind(tip5p_crd_name) :
+                                                       CoordinateFileKind::UNKNOWN;
+  check(t5p_kind == CoordinateFileKind::AMBER_ASCII_RST, "Coordinate file type detection did not "
+        "succeed for an Amber ASCII restart file.", do_tip5p);
   PhaseSpaceWriter tip5pwr = tip5p.data();
   check(tip5pwr.unit_cell == UnitCellType::ORTHORHOMBIC, "An orthorhombic unit cell is not "
         "correctly interpreted in the TIP5P system.", do_tip5p);

@@ -1,14 +1,13 @@
+#include "namelist_element.h"
 #include "nml_rst.h"
 
 namespace omni {
-namespace namelists {
-
-using parse::NamelistElement;
+namespace namelist {
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator rstInput(const TextFile &tf, int *start_line) {
-  NamelistEmulator t_nml("rst", CaseSensitivity::AUTO, ExceptionResponse::DIE, "Replicates the "
-                         "Amber NMR restraint namelist within OMNI.");
+  NamelistEmulator t_nml("rst", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
+                         "Replicates the Amber NMR restraint namelist within OMNI.");
   t_nml.addKeyword(NamelistElement("iat1", NamelistType::INTEGER, "0"));
   t_nml.addKeyword(NamelistElement("iat2", NamelistType::INTEGER, "0"));
   t_nml.addKeyword(NamelistElement("iat3", NamelistType::INTEGER, "0"));
@@ -69,7 +68,6 @@ NamelistEmulator rstInput(const TextFile &tf, int *start_line) {
                 "given ifvari > 0 and appropriate nstep values.");
   t_nml.addHelp("r4a", "Final value of the right-most limit of the right-hand harmonic restraint "
                 "(beyond which it linearizes), given ifvari > 0 and appropriate nstep values.");
-                "the final value of the left-most restraint distance parameter.");
   t_nml.addHelp("rk2a", "Final value of the left-hand harmonic restraint stiffness, given ifvari "
                 "> 0 and appropriate nstep values.");
   t_nml.addHelp("rk3a", "Final value of the right-hand harmonic restraint stiffness, given ifvari "
@@ -96,5 +94,5 @@ NamelistEmulator rstInput(const TextFile &tf, int *start_line) {
   return t_nml;
 }
 
-} // namespace namelists
+} // namespace namelist
 } // namespace omni

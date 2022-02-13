@@ -7,9 +7,7 @@
 #include "Parsing/textfile.h"
 
 namespace omni {
-namespace namelists {
-
-using parse::NamelistEmulator;
+namespace namelist {
 
 /// \brief Produce a namelist for specifying an NMR restraint, equivalent to the eponymous namelist
 ///        in sander of pmemd.
@@ -20,7 +18,7 @@ using parse::NamelistEmulator;
 ///                    &rst namelist is intended to be repeatable)
 NamelistEmulator rstInput(const TextFile &tf, int *start_line);
 
-} // namespace namelists
+} // namespace namelist
 } // namespace omni
 
 #endif

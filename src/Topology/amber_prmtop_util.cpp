@@ -11,6 +11,7 @@ using parse::CaseSensitivity;
 using parse::extractFormattedNumber;
 using parse::separateText;
 using parse::strncmpCased;
+using parse::TextFileReader;
 using parse::uppercase;
 using parse::verifyNumberFormat;
 
@@ -94,7 +95,7 @@ int4 parseLineFormat(const std::string &fmt_in, const std::string &file_name, co
 //-------------------------------------------------------------------------------------------------
 int scanToFlag(const TextFile &tf, const char* flag, std::vector<int4> *detected_format,
                const TopologyRequirement needed, const int start_line) {
-  TextFile::Reader tfr = tf.data();
+  TextFileReader tfr = tf.data();
   const int flag_len = strlen(flag);
 
   // Validate the given limits
@@ -190,7 +191,7 @@ int scanToFlag(const TextFile &tf, const char* flag, std::vector<int4> *detected
 //-------------------------------------------------------------------------------------------------
 std::vector<Citation> readForceFieldReferences(const TextFile &tf, const int lstart) {
   std::vector<Citation> fflds;
-  TextFile::Reader tfr = tf.data();
+  TextFileReader tfr = tf.data();
   int i = lstart;
   while (i < tfr.line_count && verifyNumberFormat(tfr.text, NumberFormat::INTEGER,
                                                   tfr.line_limits[i], 2)) {
@@ -211,7 +212,7 @@ std::vector<PolyNumeric> amberPrmtopData(const TextFile &tf, const int start_lin
                                          const NumberFormat cform, const int count_per_line,
                                          const int width, const int required_count,
                                          const int possible_count) {
-  TextFile::Reader tfr = tf.data();
+  TextFileReader tfr = tf.data();
   int current_line = start_line;
   std::vector<char> buffer(width + 1, '\0');
   std::string tmp_line((count_per_line * width) + 1, '\0');

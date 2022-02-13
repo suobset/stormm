@@ -18,6 +18,7 @@ enum class CoordinateFileKind {
                      ///<   restart file with no velocities is an INPUT_COORDINATES file)
   AMBER_NETCDF,      ///< The binary Amber NetCDF trajectory format
   AMBER_NETCDF_RST,  ///< The binary Amber NetCDF restart format
+  UNKNOWN            ///< The coordinate file kind is not (yet) understood
 };
 
 /// \brief An enumerator to track different Amber NetCDF variable identifiers.  The associated
@@ -50,6 +51,13 @@ enum class TrajectoryKind {
 /// \param cfkind  The enumerator instance of interest
 std::string getCoordinateFileKindName(CoordinateFileKind cfkind);
 
+/// \brief Detect various coordinate file types.
+///
+/// \param file_name  Name of the file to test
+/// \param caller     Name of the calling function (optional)
+CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
+                                            const std::string &caller = std::string(""));
+  
 /// \brief Translate the AncdfVariable enumeration.  This provides keywords to serve as landmarks
 ///        in an Amber binary trajectory or restart file.
 ///

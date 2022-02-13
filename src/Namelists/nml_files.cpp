@@ -1,42 +1,41 @@
-#include "nml_rst.h"
+#include "nml_files.h"
 
 namespace omni {
-namespace namelists {
+namespace namelist {
 
-using parse::NamelistElement;
+using parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator filesInput(const TextFile &tf, int *start_line) {
-  NamelistEmulator t_nml("files", CaseSensitivity::AUTO, ExceptionResponse::DIE, "Collects file "
-                         "names for OMNI programs, offloading work that would otherwise require "
-                         "command-line arguments.");
+  NamelistEmulator t_nml("files", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
+                         "Collects file names for OMNI programs, offloading work that would "
+                         "otherwise require command-line arguments.");
   t_nml.addKeyword(NamelistElement("-p", NamelistType::STRING, "prmtop", DefaultIsObligatory::NO,
                                    InputRepeats::YES));
   t_nml.addKeyword(NamelistElement("-c", NamelistType::STRING, "inpcrd", DefaultIsObligatory::NO,
                                    InputRepeats::YES));
-  const std::string sys_help;
-  sys_help = "Expression for a complete system, linking a topology file explicitly to a starting "
-             "coordinates file, with the option of that coordinates file being a trajectory with "
-             "more than one frame.  This keyword provides a means to read more than one frame "    
-             "from a trajectory starting coordinates file, if the frame_end subkey is given and "
-             "greater than frame_start.  All starting coordinates will be paired to the same "
-             "topology object.  Like several other specifiers in this namelist, this keyword is "
-             "repeatable.";
-  const std::vector<std::string> sys_keys_help = { "Topology file", "Starting coordinates file"
+  const std::string sys_help("Expression for a complete system, linking a topology file "
+                             "explicitly to a starting coordinates file, with the option of that "
+                             "coordinates file being a trajectory with more than one frame.  This "
+                             "keyword provides a means to read more than one frame from a "
+                             "trajectory starting coordinates file, if the frame_end subkey is "
+                             "given and greater than frame_start.  All starting coordinates will "
+                             "be paired to the same topology object.  Like several other "
+                             "specifiers in this namelist, this keyword is repeatable.");
+  const std::vector<std::string> sys_keys_help = {
+    "Topology file", "Starting coordinates file", "Starting frame (if the coordinates are a "
+    "trajectory)", "Ending frame (if the coordinates are a trajectory).  If unspecified, only the "
+    "starting frame will be read.  Otherwise, distinct systems will be made for the given "
+    "topology and every frame between frame_start and frame_end.", "Type of coordinates file (if "
+    "unspecified, the type will be detected automatically."
+  };
   t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "frame_start", "frame_end", "kind" },
                                    { NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::INTEGER, NamelistType::INTEGER,
                                      NamelistType::STRING },
                                    { "prmtop", "inpcrd", "0", "AMBER_ASCII_RST" },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sys_help,
-                                   { "Topology file", "Starting coordinates file",
-                                     "Starting frame (if the coordinates are a trajectory)",
-                                     "Ending frame (if the coordinates are a trajectory).  If "
-                                     "unspecified, only the starting frame will be read.  "
-                                     "Otherwise, distinct systems will be made for the given "
-                                     "topology and every frame between frame_start and frame_end.",
-                                     "Type of coordinates file (if unspecified, the type will be "
-                                     "detected automatically." }));
+                                   sys_keys_help));
   t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING, "mdout"));
   t_nml.addKeyword(NamelistElement("-x", NamelistType::STRING, "mdcrd"));
   t_nml.addKeyword(NamelistElement("-warn", NamelistType::STRING, "warnings"));
@@ -63,8 +62,10 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line) {
 
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTestSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
   
   return t_nml;
 }
   
+} // namespace namelist
+} // namespace omni

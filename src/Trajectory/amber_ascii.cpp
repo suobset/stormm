@@ -18,6 +18,7 @@ using parse::NumberFormat;
 using parse::PolyNumeric;
 using parse::readNumberSeries;
 using parse::separateText;
+using parse::TextFileReader;
 using parse::verifyNumberFormat;
 
 //-------------------------------------------------------------------------------------------------
@@ -130,7 +131,7 @@ void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
   double* box_ptr = box_space_transform->data();
   double* inv_ptr = inverse_transform->data();
   double* dim_ptr = box_dimensions->data();
-  const TextFile::Reader tfr = tf.data();
+  const TextFileReader tfr = tf.data();
   if (tfr.line_count > box_line) {
 
     // Test this line carefully.  It may contain nothing.
@@ -195,7 +196,7 @@ void readAmberCrdFormat(const TextFile &tf, Hybrid<double> *x_coordinates,
                                        z_coordinates->size(), "readAmberCrdFormat");
 
   // Check for a frame dimension line
-  const TextFile::Reader tfr = tf.data();
+  const TextFileReader tfr = tf.data();
   const int lines_per_frame = ((3 * natom) + 9) / 10;
   if (tfr.line_count < lines_per_frame + 1) {
     rtErr("File " + tf.getFileName() + " has only " + std::to_string(tfr.line_count) + " lines, "
