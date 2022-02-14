@@ -7,7 +7,7 @@
 namespace omni {
 namespace namelist {
 
-using omni::data_types::uint;
+using data_types::uint;
   
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator randomInput(const TextFile &tf, int *start_line) {

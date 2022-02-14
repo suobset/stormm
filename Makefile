@@ -195,6 +195,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
 	        $(SRCDIR)/Namelists/nml_files.o \
 	        $(SRCDIR)/Namelists/nml_minimize.o \
+	        $(SRCDIR)/Namelists/nml_random.o \
 	        $(SRCDIR)/Namelists/nml_restraint.o \
 	        $(SRCDIR)/Namelists/nml_solvent.o \
 		$(SRCDIR)/Parsing/ascii_numbers.o \

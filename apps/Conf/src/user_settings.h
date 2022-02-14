@@ -87,6 +87,17 @@ private:
   /// spans all systems.
   std::string report_file;
 
+  /// Conformation output base name.  Each molecule will become a set of conformers, expressed in
+  /// a trajectory file with this as the base name.  The typical process will then be to use the
+  /// system topology's root name (the file path base name, with any subdirectories clipped from
+  /// the front and any extensions after a dot [.] clipped form the back) as the next part, and
+  /// finally an extension set with the next control variable.
+  std::string conf_file_base;
+
+  /// Conformation output extension.  Each molecule's set of conformations will get a separate
+  /// file, the name determined from a variety of user-specified factors, with this extension.
+  std::string conf_file_ext;
+  
   // Scalars and user-specified run settings
   bool all_free_trajectory_frames;  ///< Flag to have all frames, rather than just the first, read
                                     ///<   from free trajectories

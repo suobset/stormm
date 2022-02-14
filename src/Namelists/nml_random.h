@@ -11,10 +11,10 @@ namespace namelist {
 
 /// \brief Default values for molecular dynamics
 /// \{
-constexpr int default_random_seed = 30965871;
+constexpr int default_random_seed    = 30965871;
 constexpr int default_random_streams = 1048576;
-constexpr int default_random_stride = 64;
-constexpr int default_random_warmup = 96;
+constexpr int default_random_stride  = 64;
+constexpr int default_random_warmup  = 96;
 /// \}
   
 /// \brief Produce a namelist for specifying random number generation protocols.  This subsumes the
@@ -29,8 +29,10 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line);
 
 /// \brief Check the random number seed to ensure that it is not too small.
 ///
-/// \param igseed  The provided random seed
-bool validateRandomSeed(int igseed);
+/// \param igseed         The provided random seed
+/// \param warmup_cycles  Number of warmup cycles slated to process when creating the first
+///                       random number stream generator (modified if necessary and returned)
+void validateRandomSeed(int igseed, int *warmup_cycles);
 
 } // namespace namelist
 } // namespace omni
