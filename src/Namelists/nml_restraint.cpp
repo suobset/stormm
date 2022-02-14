@@ -1,12 +1,12 @@
 #include "namelist_element.h"
-#include "nml_rst.h"
+#include "nml_restraint.h"
 
 namespace omni {
 namespace namelist {
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator rstInput(const TextFile &tf, int *start_line) {
-  NamelistEmulator t_nml("rst", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
+NamelistEmulator restraintInput(const TextFile &tf, int *start_line) {
+  NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
                          "Replicates the Amber NMR restraint namelist within OMNI.");
   t_nml.addKeyword(NamelistElement("iat1", NamelistType::INTEGER, "0"));
   t_nml.addKeyword(NamelistElement("iat2", NamelistType::INTEGER, "0"));

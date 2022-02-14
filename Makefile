@@ -5,6 +5,7 @@ VB=@
 SRCDIR=src
 TESTDIR=test
 BENCHDIR=benchmark
+APPDIR=apps
 LIBDIR=lib
 
 # OMNI C++ source files
@@ -24,8 +25,12 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
 	         $(SRCDIR)/Namelists/namelist_element.cpp \
 	         $(SRCDIR)/Namelists/namelist_emulator.cpp \
+	         $(SRCDIR)/Namelists/nml_dynamics.cpp \
 	         $(SRCDIR)/Namelists/nml_files.cpp \
-	         $(SRCDIR)/Namelists/nml_rst.cpp \
+	         $(SRCDIR)/Namelists/nml_minimize.cpp \
+	         $(SRCDIR)/Namelists/nml_random.cpp \
+	         $(SRCDIR)/Namelists/nml_restraint.cpp \
+	         $(SRCDIR)/Namelists/nml_solvent.cpp \
 	         $(SRCDIR)/Parsing/ascii_numbers.cpp \
 	         $(SRCDIR)/Parsing/citation.cpp \
 		 $(SRCDIR)/Parsing/parse.cpp \
@@ -100,8 +105,12 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/input.h \
 		   $(SRCDIR)/Namelists/namelist_element.h \
 		   $(SRCDIR)/Namelists/namelist_emulator.h \
+		   $(SRCDIR)/Namelists/nml_dynamics.h \
 		   $(SRCDIR)/Namelists/nml_files.h \
-		   $(SRCDIR)/Namelists/nml_rst.h \
+		   $(SRCDIR)/Namelists/nml_minimize.h \
+		   $(SRCDIR)/Namelists/nml_random.h \
+		   $(SRCDIR)/Namelists/nml_restraint.h \
+		   $(SRCDIR)/Namelists/nml_solvent.h \
 		   $(SRCDIR)/Parsing/ascii_numbers.h \
 		   $(SRCDIR)/Parsing/citation.h \
 	           $(SRCDIR)/Parsing/parse.h \
@@ -185,7 +194,9 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Namelists/namelist_element.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
 	        $(SRCDIR)/Namelists/nml_files.o \
-	        $(SRCDIR)/Namelists/nml_rst.o \
+	        $(SRCDIR)/Namelists/nml_minimize.o \
+	        $(SRCDIR)/Namelists/nml_restraint.o \
+	        $(SRCDIR)/Namelists/nml_solvent.o \
 		$(SRCDIR)/Parsing/ascii_numbers.o \
 	        $(SRCDIR)/Parsing/citation.o \
 	        $(SRCDIR)/Parsing/parse.o \
@@ -273,6 +284,9 @@ OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 # Benchmark programs using omni
 OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
 
+# Applications using omni
+OMNI_APPS = $(APPDIR)/bin/conformer.omni
+
 # Compilation variables
 CC=g++
 CUCC=nvcc
@@ -333,8 +347,8 @@ $(TESTDIR)/bin/test_file_management : $(LIBDIR)/libomni.so \
 # Target: hybrid object features program (CPU-only)
 $(TESTDIR)/bin/test_hybrid : $(LIBDIR)/libomni.so $(TESTDIR)/Accelerator/test_hybrid.cpp
 	@echo "[OMNI]  Building test_hybrid..."
-	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_hybrid $(TESTDIR)/Accelerator/test_hybrid.cpp \
-	  -L$(LIBDIR) -I$(SRCDIR) -lomni
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_hybrid \
+	  $(TESTDIR)/Accelerator/test_hybrid.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: text parsing features program
 $(TESTDIR)/bin/test_parse : $(LIBDIR)/libomni.so $(TESTDIR)/Parsing/test_parse.cpp
@@ -460,6 +474,15 @@ $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
 	$(VB)$(CC) $(CPP_FLAGS) -o $(BENCHDIR)/bin/valence \
 	  $(BENCHDIR)/ForceAccumulation/valence.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
+# Target: Benchmarking split accumulation of valence bond and angle forces 
+$(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so \
+			       $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/command.cpp \
+			       $(APPDIR)/Conf/src/user_settings.cpp
+	@echo "[OMNI]  Building conformer.omni..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.omni \
+	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/command.cpp \
+	  $(APPDIR)/Conf/src/user_settings.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
 install : $(LIBDIR)/libomni.so
 
 clean :
@@ -472,6 +495,14 @@ clean.cuda:
 	@echo "[OMNI]  Cleaning GPU libraries"
 	$(VB)if [ -e $(SRCDIR)/Accelerator/hybrid.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
 	$(VB)if [ -e $(SRCDIR)/Accelerator/hpc_config.o ] ; then /bin/rm $(SRCDIR)/*/*.o ; fi
+
+clean.bench:
+	@echo "[OMNI]  Cleaning benchmark programs"
+	$(VB)if [ -e $(BENCHDIR)/bin/valence ] ; then /bin/rm $(BENCHDIR)/bin/* ; fi
+
+clean.apps:
+	@echo "[OMNI]  Cleaning application programs"
+	$(VB)if [ -e $(APPDIR)/bin/conformer.omni ] ; then /bin/rm $(APPDIR)/bin/* ; fi
 
 test.exe : $(OMNI_TEST_PROGS)
 
@@ -489,6 +520,8 @@ bench : $(OMNI_BENCH_PROGS)
 		$$PROG ; \
 	done
 
+apps : $(OMNI_APPS)
+
 test.cuda.exe : $(OMNI_TEST_CUDA_PROGS)
 
 test.cuda : $(OMNI_TEST_CUDA_PROGS)
@@ -496,4 +529,5 @@ test.cuda : $(OMNI_TEST_CUDA_PROGS)
 		echo "[OMNI] Execute $$PROG" ; \
 		$$PROG ; \
 	done
+
 yes:  install
