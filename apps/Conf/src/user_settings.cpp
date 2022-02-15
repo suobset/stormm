@@ -16,7 +16,7 @@ using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::errors::rtErr;
 using omni::errors::rtWarn;
-using omni::namelist::extractImplicitSolventModel;
+using omni::namelist::translateImplicitSolventModel;
 using omni::namelist::NamelistEmulator;
 using omni::namelist::minimizeInput;
 using omni::namelist::randomInput;
@@ -47,29 +47,29 @@ MoleculeSystem::MoleculeSystem(const std::string &topology_file_in,
 
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[]) :
-  input_file{std::string("cgen.in")},
-  topology_file_names{},
-  coordinate_file_names{},
-  systems{},
-  common_core_mask{std::string("")},
-  report_file{std::string("cgen.out")},
-  conf_file_base{std::string("conf_")},
-  conf_file_ext{std::string(".crd")},
-  all_free_trajectory_frames{false},
-  system_count{0},
-  igseed{omni::namelist::default_random_seed},
-  random_stream_count{omni::namelist::default_random_streams},
-  minimization_steps{omni::namelist::default_minimize_maxcyc},
-  steepest_descent_steps{omni::namelist::default_minimize_ncyc},
-  initial_move_length{omni::namelist::default_minimize_dx0},
-  convergence_criterion{omni::namelist::default_minimize_drms},
-  igb{extractImplicitSolventModel(omni::namelist::default_solvent_igb)},
-  born_radii_cutoff{omni::namelist::default_solvent_rgbmax},
-  dielectric{omni::namelist::default_solvent_extdiel},
-  salt_concentration{omni::namelist::default_solvent_saltcon},
-  topology_cache{},
-  initial_coordinates_cache{},
-  topology_indices{}
+    input_file{std::string("cgen.in")},
+    topology_file_names{},
+    coordinate_file_names{},
+    systems{},
+    common_core_mask{std::string("")},
+    report_file{std::string("cgen.out")},
+    conf_file_base{std::string("conf_")},
+    conf_file_ext{std::string(".crd")},
+    all_free_trajectory_frames{false},
+    system_count{0},
+    igseed{omni::namelist::default_random_seed},
+    random_stream_count{omni::namelist::default_random_streams},
+    minimization_steps{omni::namelist::default_minimize_maxcyc},
+    steepest_descent_steps{omni::namelist::default_minimize_ncyc},
+    initial_move_length{omni::namelist::default_minimize_dx0},
+    convergence_target{omni::namelist::default_minimize_drms},
+    igb{translateImplicitSolventModel(omni::namelist::default_solvent_igb)},
+    born_radii_cutoff{omni::namelist::default_solvent_rgbmax},
+    dielectric{omni::namelist::default_solvent_extdiel},
+    salt_concentration{omni::namelist::default_solvent_saltcon},
+    topology_cache{},
+    initial_coordinates_cache{},
+    topology_indices{}
 {
   // Detect command line arguments, and note that their presence overrides similar directives
   // in the input deck.

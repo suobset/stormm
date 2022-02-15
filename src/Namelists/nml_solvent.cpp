@@ -1,3 +1,5 @@
+#include "Parsing/parse.h"
+#include "Reporting/error_format.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "namelist_element.h"
 #include "nml_solvent.h"
@@ -5,10 +7,244 @@
 namespace omni {
 namespace namelist {
 
-using topology::ImplicitSolventModel;
+using constants::CaseSensitivity;
+using parse::strncmpCased;
   
 //-------------------------------------------------------------------------------------------------
-ImplicitSolventModel extractImplicitSolventModel(const int igb_val) {
+SolventControls::SolventControls(const ExceptionResponse policy_in) :
+    policy{policy_in},
+    gb_style{translateImplicitSolventModel(default_solvent_igb)},
+    born_radii_cutoff{default_solvent_rgbmax},
+    internal_dielectric{default_solvent_intdiel},
+    external_dielectric{default_solvent_extdiel},
+    salt_concentration{default_solvent_saltcon},
+    pb_radii{translatePBRadiiSet(std::string(default_solvent_pbradii))}
+{}
+
+//-------------------------------------------------------------------------------------------------
+SolventControls::SolventControls(const TextFile &tf, int *start_line,
+                                 const ExceptionResponse policy_in) :
+  SolventControls(policy_in)
+{
+  NamelistEmulator t_nml = solventInput(tf, start_line);
+  gb_style            = translateImplicitSolventModel(t_nml.getIntValue("igb"));
+  born_radii_cutoff   = t_nml.getRealValue("rgbmax");
+  internal_dielectric = t_nml.getRealValue("intdiel");
+  external_dielectric = t_nml.getRealValue("extdiel");
+  salt_concentration  = t_nml.getRealValue("saltcon");
+  pb_radii            = translatePBRadiiSet(t_nml.getStringValue("pbradii"));
+
+  // Checks on the input
+  validateBornRadiiCutoff();
+  validateInternalDielectric();
+  validateExternalDielectric();
+  validateSaltConcentration();
+}
+
+//-------------------------------------------------------------------------------------------------
+ImplicitSolventModel SolventControls::getImplicitSolventModel() const {
+  return gb_style;
+}
+
+//-------------------------------------------------------------------------------------------------
+double SolventControls::getBornRadiiCutoff() const {
+  return born_radii_cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
+double SolventControls::getInternalDielectric() const {
+  return internal_dielectric;
+}
+
+//-------------------------------------------------------------------------------------------------
+double SolventControls::getExternalDielectric() const {
+  return external_dielectric;
+}
+
+//-------------------------------------------------------------------------------------------------
+double SolventControls::getSaltConcentration() const {
+  return salt_concentration;
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomicRadiusSet SolventControls::getPBRadiiSet() const {
+  return pb_radii;
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setImplicitSolventModel(const int ism_in) {
+  gb_style = translateImplicitSolventModel(ism_in, policy);
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setImplicitSolventModel(const ImplicitSolventModel ism_in) {
+  gb_style = ism_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setBornRadiiCutoff(const double rgbmax_in) {
+  born_radii_cutoff = rgbmax_in;
+  validateBornRadiiCutoff();
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setInternalDielectric(const double idiel_in) {
+  internal_dielectric = idiel_in;
+  validateInternalDielectric();
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setExternalDielectric(const double ediel_in) {
+  external_dielectric = ediel_in;
+  validateExternalDielectric();
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::setSaltConcentration(double saltcon_in) {
+  salt_concentration = saltcon_in;
+  validateSaltConcentration();
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::choosePBRadiiSet(const std::string &pbrad_in) {
+  pb_radii = translatePBRadiiSet(pbrad_in, policy);
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::choosePBRadiiSet(const AtomicRadiusSet pbrad_in) {
+  pb_radii = pbrad_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::validateBornRadiiCutoff() {
+  if (born_radii_cutoff < 0.0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Generalized Born radii computation cannot proceed with a cutoff of " +
+            std::to_string(born_radii_cutoff) + ".", "SolventControls", "validateBornRadii");
+    case ExceptionResponse::WARN:
+      rtWarn("Generalized Born radii computation cannot proceed with a cutoff of " +
+             std::to_string(born_radii_cutoff) + ".  The default value of " +
+             std::to_string(default_solvent_rgbmax) + " (no cutoff on Born radius contributions) "
+             "will be restored.", "SolventControls", "validateBornRadii");
+      born_radii_cutoff = default_solvent_rgbmax;
+      break;
+    case ExceptionResponse::SILENT:
+      born_radii_cutoff = default_solvent_rgbmax;
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::validateInternalDielectric() {
+  if (internal_dielectric < 0.01) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The dielectric constant cannot be so small as to amplify electrostatics to huge "
+            "proportions.  A value of " + std::to_string(internal_dielectric) + " will likely "
+            "break calculations.", "SolventControls", "validateInternalDielectric");
+    case ExceptionResponse::WARN:
+      rtWarn("The dielectric constant cannot be so small as to amplify electrostatics to huge "
+             "proportions.  A value of " + std::to_string(internal_dielectric) + " will likely "
+             "break calculations and will therefore be replaced by the default value of " +
+             std::to_string(default_solvent_intdiel) + ".", "SolventControls",
+             "validateInternalDielectric");
+      internal_dielectric = default_solvent_intdiel;
+      break;
+    case ExceptionResponse::SILENT:
+      internal_dielectric = default_solvent_intdiel;
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::validateExternalDielectric() {
+  if (external_dielectric < 0.01) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The dielectric constant cannot be so small as to amplify electrostatics to huge "
+            "proportions.  A value of " + std::to_string(external_dielectric) + " will likely "
+            "break calculations.", "SolventControls", "validateExternalDielectric");
+    case ExceptionResponse::WARN:
+      rtWarn("The dielectric constant cannot be so small as to amplify electrostatics to huge "
+             "proportions.  A value of " + std::to_string(external_dielectric) + " will likely "
+             "break calculations and will therefore be replaced by the default value of " +
+             std::to_string(default_solvent_extdiel) + ".", "SolventControls",
+             "validateExternalDielectric");
+      external_dielectric = default_solvent_extdiel;
+      break;
+    case ExceptionResponse::SILENT:
+      external_dielectric = default_solvent_extdiel;
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void SolventControls::validateSaltConcentration() {
+  if (salt_concentration < 0.0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A negative salt concentration of " + std::to_string(salt_concentration) +
+            " is nonsensical.", "SolventControls", "validateSaltConcentration");
+    case ExceptionResponse::WARN:
+      rtErr("A negative salt concentration of " + std::to_string(salt_concentration) +
+            " is nonsensical and will be replaced by the default value of " +
+            std::to_string(default_solvent_saltcon) + ".", "SolventControls",
+            "validateSaltConcentration");
+      salt_concentration = default_solvent_saltcon;
+      break;
+    case ExceptionResponse::SILENT:
+      salt_concentration = default_solvent_saltcon;
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomicRadiusSet translatePBRadiiSet(const std::string &pb_radii_in,
+                                    const ExceptionResponse policy) {
+  if (strncmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::BONDI;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::AMBER6;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI2;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI3;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::PARSE;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::NONE;
+  }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Unrecognized atomic radius set " + pb_radii_in + ".", "translatePBRadiiSet");
+    case ExceptionResponse::WARN:
+      rtWarn("Unrecognized atomic radius set " + pb_radii_in + ".  The radius set will be NONE.",
+             "translatePBRadiiSet");
+      return AtomicRadiusSet::NONE;
+    case ExceptionResponse::SILENT:
+      return AtomicRadiusSet::NONE;
+    }      
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+ImplicitSolventModel translateImplicitSolventModel(const int igb_val,
+                                                   const ExceptionResponse policy) {
   switch (igb_val) {
   case 0:
   case 6:
@@ -24,8 +260,17 @@ ImplicitSolventModel extractImplicitSolventModel(const int igb_val) {
   case 8:
     return ImplicitSolventModel::NECK_GB_II;
   default:
-    rtErr("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".",
-          "extractImplicitSolventModel");
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".",
+            "translateImplicitSolventModel");
+    case ExceptionResponse::WARN:
+      rtWarn("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".  The "
+             "model will be set to NONE instead.", "translateImplicitSolventModel");
+      return ImplicitSolventModel::NONE;
+    case ExceptionResponse::SILENT:
+      return ImplicitSolventModel::NONE;
+    }
   }
   __builtin_unreachable();
 }
@@ -46,6 +291,8 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line) {
                                    std::to_string(default_solvent_saltcon)));
   t_nml.addKeyword(NamelistElement("rgbmax", NamelistType::REAL,
                                    std::to_string(default_solvent_rgbmax)));
+  t_nml.addKeyword(NamelistElement("pbradii", NamelistType::STRING,
+                                   std::string(default_solvent_pbradii)));
   t_nml.addHelp("igb", "Definition of the Generalized Born model to use.  Numerical settings "
                 "follow those found in the eponymous keyword of Amber sander's &cntrl namelist: "
                 "0 or 6 (no Generalized Born model is used), 1 (Hawkins, Cramer, Truhlar), 2 or 5 "
@@ -58,7 +305,10 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line) {
   t_nml.addHelp("rgbmax", "Maximum distance at which two particles can contribute to each other's "
                 "effective Born radii.  Not to be confused with the non-bonded cutoff, which is "
                 "the distance past which actual interactions between particles are discarded.");
-  
+  t_nml.addHelp("pbradii", "Poisson-Boltzmann radius set (this defines the baseline Generalized "
+                "Born radii as well).  Acceptable values include \"Bondi\", \"Amber6\", "
+                "\"mBondi\", \"mBond2\", \"mBondi3\", or \"none\".");
+
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.  All calls to this function should
   // proceed in consecutive calls, to make use of the updates to start_line and avoid reading any
@@ -66,9 +316,6 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line) {
   // namelist.  An alternative is to keep an independent counter to track progress through the
   // input file in search for &rst namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::NO, tf.getLineCount());
-
-  // Checks on the input
-  extractImplicitSolventModel(t_nml.getIntValue("igb"));
   
   return t_nml;
 }

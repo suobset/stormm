@@ -118,7 +118,8 @@ private:
                                     ///<   vector.  The size of subsequent moves will grow or
                                     ///<   shrink based on the history of success in previous
                                     ///<   optimizations.
-  double convergence_criterion;     ///< Convergence criterion for the minimization, in kcal/mol.
+  double convergence_target;        ///< Convergence target for root mean squared value of all
+                                    ///<   gradients obtained after the minimization, in kcal/mol.
 
   // Implicit solvent model
   ImplicitSolventModel igb;         ///< The type of Generalized Born or other implicit solvent

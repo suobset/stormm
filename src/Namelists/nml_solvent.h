@@ -2,30 +2,161 @@
 #ifndef OMNI_NML_SOLVENT_H
 #define OMNI_NML_SOLVENT_H
 
-#include "input.h"
-#include "namelist_emulator.h"
+#include "Constants/behavior.h"
 #include "Parsing/textfile.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "input.h"
+#include "namelist_emulator.h"
 
 namespace omni {
 namespace namelist {
 
+using constants::ExceptionResponse;
 using topology::ImplicitSolventModel;
+using topology::AtomicRadiusSet;
 
 /// \brief Default values for the implicit solvent model
 /// \{
 constexpr int default_solvent_igb = 0;
-constexpr double default_solvent_rgbmax = 0.0;
+constexpr double default_solvent_rgbmax = 1000.0;
 constexpr double default_solvent_intdiel = 1.0;
 constexpr double default_solvent_extdiel = 78.5;
 constexpr double default_solvent_saltcon = 0.0;
+constexpr char default_solvent_pbradii[] = "none";
 /// \}
 
+/// \brief Object to encapsulate the data that can be extracted from a &solvent namelist.  Typical
+///        C++ construction.  Having this object, like others accompanying their respective
+///        namelists, makes the transition between namelists and custom-formatted control objects
+///        much simpler.
+struct SolventControls {
+
+  /// \brief The constructor can prepare an object with default settings or read the corresponding
+  ///        namelist to accept user input.
+  ///
+  /// \param policy_in   Requested error handling behavior
+  /// \param tf          Input file translated into RAM 
+  /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \{
+  SolventControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
+  SolventControls(const TextFile &tf, int *start_line,
+                  ExceptionResponse policy_in = ExceptionResponse::DIE);
+  /// \}
+
+  /// \brief Get the type of implicit solvent (some flavor of Generalized Born)
+  ImplicitSolventModel getImplicitSolventModel() const;
+
+  /// \brief Get the Born radius calculation cutoff
+  double getBornRadiiCutoff() const;
+
+  /// \brief Get the internal dielectric constant
+  double getInternalDielectric() const;
+
+  /// \brief Get the external dielectric constant
+  double getExternalDielectric() const;
+
+  /// \brief Get the salt concentration
+  double getSaltConcentration() const;
+
+  /// \brief Get the Poisson-Boltzmann radii set
+  AtomicRadiusSet getPBRadiiSet() const;
+
+  /// \brief Set the implicit solvent model
+  ///
+  /// Overloaded:
+  ///   - Take the integer code for the implicit solvent model (and apply validation)
+  ///   - Take the enumeration for the implicit solvent model
+  ///
+  /// \param ism_in  Implicit solvent model of choice
+  /// \{
+  void setImplicitSolventModel(int ism_in);
+  void setImplicitSolventModel(ImplicitSolventModel ism_in);
+  /// \}
+
+  /// \brief Set the Born radius calculation cutoff
+  ///
+  /// \param rgbmax_in  The Born radius calculation cutoff of choice
+  void setBornRadiiCutoff(double rgbmax_in);
+
+  /// \brief Set the internal dielectric
+  ///
+  /// \param idiel_in  The internal dielectric to apply
+  void setInternalDielectric(double idiel_in);
+  
+  /// \brief Set the external dielectric
+  ///
+  /// \param ediel_in  The external dielectric to apply
+  void setExternalDielectric(double ediel_in);
+
+  /// \brief Set the salt concentration, the concentration of 1:1 monovalent ion pairs in the
+  ///        implicit solvent.
+  ///
+  /// \param saltcon_in  The concentration to set
+  void setSaltConcentration(double saltcon_in);
+
+  /// \brief Choose the Poisson-Boltzmann radii set
+  ///
+  /// Overloaded:
+  ///   - Use string input (and translate the string, checking for validity)
+  ///   - Use enumeration input
+  ///
+  /// \param pbrad_in  The radii set to select (will be checked for validity)
+  /// \{
+  void choosePBRadiiSet(const std::string &pbrad_in);
+  void choosePBRadiiSet(AtomicRadiusSet pbrad_in);
+  /// \}
+  
+private:
+  ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
+                                  ///<   abort program, WARN = warn the user, and likely reset to
+                                  ///<   the default value if one is available, SILENT = do not
+                                  ///<   warn the user, but also likely reset to the default value
+                                  ///<   if one is available.
+  ImplicitSolventModel gb_style;  ///< The type of Generalized Born or other implicit solvent
+                                  ///<   model to use
+  double born_radii_cutoff;       ///< Cutoff for pairs of atoms to participate in Generalized
+                                  ///<   Born radii (equivalent to rgbmax in sander)
+  double internal_dielectric;     ///< Set the internal dielectric constant for all molecules (in
+                                  ///<   implicit solvent situations), or the dielectric constant
+                                  ///<   for all electrostatic interactions in an explicit
+                                  ///<   solvent simulation.
+  double external_dielectric;     ///< Set the external diectric for continuum solvent (implicit
+                                  ///<   solvent applications only)
+  double salt_concentration;      ///< Sets the salt concentration for all molecules (applicable
+                                  ///<   to implicit solvent situations only)
+  AtomicRadiusSet pb_radii;       ///< Defines the Poisson-Boltzmann radii set (and baseline GB
+                                  ///<   radii).  Acceptable values in the input include "Bondi",
+                                  ///<   "Amber6", "mBondi", "mBond2", "mBondi3", or "none".
+
+  /// \brief Validate the Born radii cutoff.
+  void validateBornRadiiCutoff();
+
+  /// \brief Validate the internal dielectric constant.
+  void validateInternalDielectric();
+
+  /// \brief Validate the external dielectric constant.
+  void validateExternalDielectric();
+
+  /// \brief Validate the salt concentration.
+  void validateSaltConcentration();
+};
+
+/// \brief Translate string input into one of the enumerated AtomicRadiusSet values.  This serves
+///        as the validator to the radius set in the SolventControls object.
+///
+/// \param pb_radii_in  Input string describing the PB radii (case-insensitive)
+/// \param policy       Set the response to bad inputs
+AtomicRadiusSet translatePBRadiiSet(const std::string &pb_radii_in,
+                                    ExceptionResponse policy = ExceptionResponse::DIE);
+
 /// \brief Translate the numerical input for the implicit solvent model into one of the recognized
-///        models available in OMNI.
+///        models available in OMNI.  This serves as the validator to the implicit solvent model
+///        in the SolventControls object.
 ///
 /// \param igb_val  Numerical value of the implicit solvent model, as read from the parent namelist
-ImplicitSolventModel extractImplicitSolventModel(int igb_val);
+/// \param policy   Set the response to bad inputs
+ImplicitSolventModel
+translateImplicitSolventModel(int igb_val, ExceptionResponse policy = ExceptionResponse::DIE);
 
 /// \brief Produce a namelist for defining the implicit solvent model, replicating various inputs
 ///        in the &cntrl namelist of sander or pmemd.  This is a separate namelist from the

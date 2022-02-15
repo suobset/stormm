@@ -8,7 +8,163 @@ namespace omni {
 namespace namelist {
 
 using data_types::uint;
-  
+
+//-------------------------------------------------------------------------------------------------
+RandomControls::RandomControls(const ExceptionResponse policy_in) :
+    policy{policy_in},
+    igseed{default_random_seed},
+    stream_count{default_random_streams},
+    production_stride{default_random_stride},
+    warmup_cycles{default_random_warmup}
+{}
+
+//-------------------------------------------------------------------------------------------------
+RandomControls::RandomControls(const TextFile &tf, int *start_line,
+                               const ExceptionResponse policy_in) :
+    RandomControls(policy_in)
+{
+  NamelistEmulator t_nml = randomInput(tf, start_line);
+  igseed = t_nml.getIntValue("igseed");
+  stream_count = t_nml.getIntValue("igstreams");
+  production_stride = t_nml.getIntValue("igstride");
+  warmup_cycles = t_nml.getIntValue("igwarmup");
+
+  // Validate user input
+  validateRandomSeed();
+  validateStreamCount();
+  validateProductionStride();
+}
+
+//-------------------------------------------------------------------------------------------------
+int RandomControls::getRandomSeed() const {
+  return igseed;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RandomControls::getStreamCount() const {
+  return stream_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RandomControls::getProductionStride() const {
+  return production_stride;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RandomControls::getWarmupCycleCount() const {
+  return warmup_cycles;
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::setRandomSeed(const int igseed_in) {
+  igseed = igseed_in;
+  validateRandomSeed();
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::setStreamCount(const int streams_in) {
+  stream_count = streams_in;
+  validateStreamCount();
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::setProductionStride(const int stride_in) {
+  production_stride = stride_in;
+  validateProductionStride();
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::setWarmupCycles(const int cycles_in) {
+  warmup_cycles = cycles_in;
+
+  // The seed and the number of warmup cycles are largely interdependent
+  validateRandomSeed();  
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::validateRandomSeed() {
+  if (igseed == 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The random seed cannot be zero.  This will yield no bits set to 1 in the initial "
+            "state, a condition from which the generator cannot evolve.", "RandomControls",
+            "validateRandomSeed");
+    case ExceptionResponse::WARN:
+      rtWarn("The random seed cannot be zero.  This will yield no bits set to 1 in the initial "
+             "state, a condition from which the generator cannot evolve.  The seed will be set to "
+             "the default value of " + std::to_string(default_random_seed) + " instead.",
+             "RandomControls", "validateRandomSeed");
+      igseed = default_random_seed;
+      break;
+    case ExceptionResponse::SILENT:
+      igseed = default_random_seed;
+      break;
+    }
+  }
+  const int nbits = sizeof(int) * 8;
+  const uint useed = igseed;
+  int nactive = 0;
+  for (int i = 0; i < nbits; i++) {
+    nactive += ((useed >> i) & 0x1);
+  }
+  if (warmup_cycles < ((32 - nactive) * 4)) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+
+      // Don't die just to complain about the number of warmup cycles.
+      rtWarn("The random seed " + std::to_string(igseed) + " contains " + std::to_string(nactive) +
+             " bits set to 1, for which a warmup of at least " +
+             std::to_string((32 - nactive) * 4) + " cycles is recommended.  The warmup period "
+             "will be extended to accommodate the seed.", "RandomControls", "validateRandomSeed");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    warmup_cycles = (32 - nactive) * 4;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::validateStreamCount() {
+  if (stream_count < 1) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("An invalid number of random number streams " + std::to_string(stream_count) +
+            "was requested.", "RandomControls", "validateStreamCount");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid number of random number streams " + std::to_string(stream_count) +
+             "was requested.  The default of " + std::to_string(default_random_streams) +
+             "will be restored.", "RandomControls", "validateStreamCount");
+      stream_count = default_random_streams;
+      break;
+    case ExceptionResponse::SILENT:
+      stream_count = default_random_streams;
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void RandomControls::validateProductionStride() {
+  if (production_stride < 1) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("An invalid random number batch size " + std::to_string(stream_count) +
+            "was requested.", "RandomControls", "validateStreamCount");
+    case ExceptionResponse::WARN:
+      rtWarn("An invalid random number batch size " + std::to_string(stream_count) +
+             "was requested.  The default of " + std::to_string(default_random_stride) +
+             "will be restored.", "RandomControls", "validateStreamCount");
+      production_stride = default_random_stride;
+      break;
+    case ExceptionResponse::SILENT:
+      production_stride = default_random_stride;
+      break;
+    }
+  }
+}
+
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator randomInput(const TextFile &tf, int *start_line) {
   NamelistEmulator t_nml("random", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
@@ -62,22 +218,6 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line) {
 
 //-------------------------------------------------------------------------------------------------
 void validateRandomSeed(const int igseed, int *warmup_cycles) {
-  if (igseed == 0) {
-    rtErr("The random seed cannot be zero.", "validateRandomSeed");
-  }
-  const int nbits = sizeof(int) * 8;
-  const uint useed = igseed;
-  int nactive = 0;
-  for (int i = 0; i < nbits; i++) {
-    nactive += ((useed >> i) & 0x1);
-  }
-  if (*warmup_cycles < ((32 - nactive) * 4)) {
-    *warmup_cycles = (32 - nactive) * 4;
-    rtWarn("The random seed " + std::to_string(igseed) + " contains " + std::to_string(nactive) +
-           " bits set to 1, for which a warmup of at least " + std::to_string((32 - nactive) * 4) +
-           " cycles is recommended.  The warmup period has been extended to accommodate the seed.",
-           "validateRandomSeed");
-  }
 }
 
 } // namespace namelist
