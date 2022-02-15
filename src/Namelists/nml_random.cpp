@@ -23,7 +23,7 @@ RandomControls::RandomControls(const TextFile &tf, int *start_line,
                                const ExceptionResponse policy_in) :
     RandomControls(policy_in)
 {
-  NamelistEmulator t_nml = randomInput(tf, start_line);
+  NamelistEmulator t_nml = randomInput(tf, start_line, policy);
   igseed = t_nml.getIntValue("igseed");
   stream_count = t_nml.getIntValue("igstreams");
   production_stride = t_nml.getIntValue("igstride");
@@ -166,10 +166,10 @@ void RandomControls::validateProductionStride() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator randomInput(const TextFile &tf, int *start_line) {
-  NamelistEmulator t_nml("random", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
-                         "Namelist containing parameters for the random number generator and its "
-                         "updates throughout a simulation.");
+NamelistEmulator randomInput(const TextFile &tf, int *start_line, const ExceptionResponse policy) {
+  NamelistEmulator t_nml("random", CaseSensitivity::AUTOMATIC, policy, "Namelist containing "
+                         "parameters for the random number generator and its updates throughout "
+                         "a simulation.");
   t_nml.addKeyword(NamelistElement("igseed", NamelistType::INTEGER,
                                    std::to_string(default_random_seed)));
   t_nml.addKeyword(NamelistElement("igstreams", NamelistType::INTEGER,
@@ -209,15 +209,12 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line) {
   // input file in search for &rst namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::NO, tf.getLineCount());
 
-  // Check input
-  int warmup_cycles = t_nml.getIntValue("igwarmup");
-  validateRandomSeed(t_nml.getIntValue("igseed"), &warmup_cycles);
-  
   return t_nml;
 }
 
 //-------------------------------------------------------------------------------------------------
 void validateRandomSeed(const int igseed, int *warmup_cycles) {
+
 }
 
 } // namespace namelist

@@ -166,7 +166,9 @@ translateImplicitSolventModel(int igb_val, ExceptionResponse policy = ExceptionR
 /// \param start_line  Line at which to begin scanning the input file for the namelist (this
 ///                    function will not wrap back to the beginning of the TextFile object, as the
 ///                    &rst namelist is intended to be repeatable)
-NamelistEmulator solventInput(const TextFile &tf, int *start_line);
+/// \param policy      Reaction to exceptions encountered during namelist reading
+NamelistEmulator solventInput(const TextFile &tf, int *start_line,
+                              ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
 } // namespace omni

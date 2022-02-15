@@ -25,7 +25,7 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line,
                                    const ExceptionResponse policy_in) :
     MinimizeControls(policy_in)
 {
-  NamelistEmulator t_nml = minimizeInput(tf, start_line);
+  NamelistEmulator t_nml = minimizeInput(tf, start_line, policy);
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   initial_step = t_nml.getRealValue("dx0");
@@ -167,10 +167,11 @@ void MinimizeControls::validateConvergenceTarget() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator minimizeInput(const TextFile &tf, int *start_line) {
-  NamelistEmulator t_nml("minimize", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
-                         "Wraps directives needed to carry out energy minimization of a molecular "
-                         "system guided by an energy surface based on a force field.");
+NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
+                               const ExceptionResponse policy) {
+  NamelistEmulator t_nml("minimize", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
+                         "to carry out energy minimization of a molecular system guided by an "
+                         "energy surface based on a force field.");
   t_nml.addKeyword(NamelistElement("maxcyc", NamelistType::INTEGER,
                                    std::to_string(default_minimize_maxcyc)));
   t_nml.addKeyword(NamelistElement("ncyc", NamelistType::INTEGER,

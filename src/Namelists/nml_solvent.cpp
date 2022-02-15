@@ -26,7 +26,7 @@ SolventControls::SolventControls(const TextFile &tf, int *start_line,
                                  const ExceptionResponse policy_in) :
   SolventControls(policy_in)
 {
-  NamelistEmulator t_nml = solventInput(tf, start_line);
+  NamelistEmulator t_nml = solventInput(tf, start_line, policy);
   gb_style            = translateImplicitSolventModel(t_nml.getIntValue("igb"));
   born_radii_cutoff   = t_nml.getRealValue("rgbmax");
   internal_dielectric = t_nml.getRealValue("intdiel");
@@ -276,11 +276,12 @@ ImplicitSolventModel translateImplicitSolventModel(const int igb_val,
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator solventInput(const TextFile &tf, int *start_line) {
-  NamelistEmulator t_nml("solvent", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
-                         "Wraps directives needed to define the solvent model of a molecular "
-                         "mechanical system.  This is not the same as the explicit water model in "
-                         "use, and generally refers to implicit solvent methods.");
+NamelistEmulator solventInput(const TextFile &tf, int *start_line,
+                              const ExceptionResponse policy) {
+  NamelistEmulator t_nml("solvent", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
+                         "to define the solvent model of a molecular mechanical system.  This is "
+                         "not the same as the explicit water model in use, and generally refers "
+                         "to implicit solvent methods.");
   t_nml.addKeyword(NamelistElement("igb", NamelistType::INTEGER,
                                    std::to_string(default_solvent_igb)));
   t_nml.addKeyword(NamelistElement("intdiel", NamelistType::REAL,
