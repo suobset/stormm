@@ -292,6 +292,16 @@ int main(int argc, char* argv[]) {
         "string comparison still differentiates \"" + tw_a + "\" and \"" + tw_b + "\".");
   check(strncmpCased(tw_c, tw_d, CaseSensitivity::NO), "Case-insensitive "
         "string comparison still differentiates \"" + tw_c + "\" and \"" + tw_d + "\".");
+  check(strcmpCased(tw_a, tw_b, CaseSensitivity::YES) == false, "Case-sensitive "
+        "string comparison fails to differentiate \"" + tw_a + "\" and \"" + tw_b + "\".");
+  check(strcmpCased(tw_a, tw_b, CaseSensitivity::NO), "Case-insensitive "
+        "string comparison still differentiates \"" + tw_a + "\" and \"" + tw_b + "\".");
+  check(strcmpCased(tw_c, tw_d, CaseSensitivity::NO), "Case-insensitive "
+        "string comparison still differentiates \"" + tw_c + "\" and \"" + tw_d + "\".");
+  check(strcmpCased(tw_a, tw_c, CaseSensitivity::YES) == false, "Case-sensitive unsized "
+        "string comparison fails to differentiate \"" + tw_a + "\" and \"" + tw_d + "\".");
+  check(strcmpCased(tw_a, tw_d, CaseSensitivity::NO) == false, "Case-insensitive unsized "
+        "string comparison fails to differentiate \"" + tw_a + "\" and \"" + tw_d + "\".");
   const std::string tw_regexp_a("Th*W*?d");
   const std::vector<WildCardKind> wildcards_a = { WildCardKind::NONE, WildCardKind::NONE,
                                                   WildCardKind::FREE_STRETCH, WildCardKind::NONE,
@@ -312,7 +322,7 @@ int main(int argc, char* argv[]) {
   const std::string tw_regexp_d("T*k");
   check(strcmpWildCard(tw_e, tw_regexp_d, wildcards_b) == false, "Case-sensitive string matching "
         "with wildcards incorrectly equates \"" + tw_e + "\" with \"" + tw_regexp_d + "\".");
-
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }
