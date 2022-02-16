@@ -14,6 +14,8 @@ namespace namelist {
 /// \{
 constexpr int default_minimize_maxcyc  = 200;
 constexpr int default_minimize_ncyc    = 50;
+constexpr int default_minimize_ntpr    = 50;
+constexpr double default_minimize_cut  = 8.0;
 constexpr double default_minimize_dx0  = 0.01;
 constexpr double default_minimize_drms = 0.0001;
 /// \}
@@ -43,6 +45,16 @@ struct MinimizeControls {
   /// \brief Get the number of steepest descent cycles.
   int getSteepestDescentCycles() const;
 
+  /// \brief Get the diagnostic output printing frequency, akin to the major contribution to pmemd
+  ///        and sander mdout files.
+  int getDiagnosticPrintFrequency() const;
+
+  /// \brief Get the electrostatic cutoff.
+  double getElectrostaticCutoff() const;
+  
+  /// \brief Get the Lennard-Jones cutoff.
+  double getLennardJonesCutoff() const;
+  
   /// \brief Get the initial step length.
   double getInitialStep() const;
 
@@ -58,6 +70,17 @@ struct MinimizeControls {
   ///
   /// \param cycles_in  The requested number of steepest descent cycles
   void setSteepestDescentCycles(int cycles_in);
+
+  /// \brief Set the diagnostic printing frequency.
+  ///
+  /// \param frequency_in  The chosen printing interval
+  void setDiagnosticPrintFrequency(int frequency_in);
+
+  /// \brief Set the electrostatic cutoff
+  void setElectrostaticCutoff(double cutoff_in);
+  
+  /// \brief Set the Lennard-Jones cutoff
+  void setLennardJonesCutoff(double cutoff_in);
   
   /// \brief Set the initial step length.
   ///
@@ -80,12 +103,20 @@ private:
                                 ///<   to maxcyc in sander)
   int steepest_descent_cycles;  ///< Number of steepest descent steps to perform prior to beginning
                                 ///<   conjugate gradient moves (equivalent to ncyc in sander)
+  int print_frequency;          ///< Print results at step 0 and, thereafter, after each interval
+                                ///<   of this many line minimizations.  The default of 0
+                                ///<   suppresses output except at the outset of the run.
+  double electrostatic_cutoff;  ///< Cutoff for (short-ranged) electrostatic interactions, or for
+                                ///<   all gas-phase Coulombic electrostatics in a non-periodic
+                                ///<   system.  Units of Angstroms (A).
+  double lennard_jones_cutoff;  ///< Cutoff for van-der Waals interactions, in Angstroms (A).
   double initial_step;          ///< Magnitude of the initial displacement along the gradient
                                 ///<   vector.  The size of subsequent moves will grow or shrink
                                 ///<   based on the history of success in previous optimizations.
+                                ///<   Units of Angstroms (A).
   double convergence_target;    ///< Convergence target for root mean squared value of all
-                                ///<   gradients obtained after the minimization, in kcal/mol.
-
+                                ///<   gradients obtained after the minimization, in kcal/mol-A.
+  
   /// \brief Validate the total number of minimization cycles
   void validateTotalCycles();
 
@@ -95,6 +126,15 @@ private:
   ///        number is less than the appropriate threshold.
   void validateSteepestDescentCycles();
 
+  /// \brief Validate the diagnostic printing frequency
+  void validatePrintFrequency();
+  
+  /// \brief Validate the electrostatic cutoff.
+  void validateElectrostaticCutoff();
+
+  /// \brief Validate the Lennard-Jones cutoff.
+  void validateLennardJonesCutoff();
+  
   /// \brief Validate the initial step size.
   void validateInitialStep();
 

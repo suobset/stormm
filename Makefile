@@ -105,6 +105,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/input.h \
 		   $(SRCDIR)/Namelists/namelist_element.h \
 		   $(SRCDIR)/Namelists/namelist_emulator.h \
+		   $(SRCDIR)/Namelists/namelist_enumerations.h \
 		   $(SRCDIR)/Namelists/nml_dynamics.h \
 		   $(SRCDIR)/Namelists/nml_files.h \
 		   $(SRCDIR)/Namelists/nml_minimize.h \

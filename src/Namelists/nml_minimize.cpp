@@ -16,6 +16,9 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
     policy{policy_in},
     total_cycles{default_minimize_maxcyc},
     steepest_descent_cycles{default_minimize_maxcyc},
+    print_frequency{default_minimize_ntpr},
+    electrostatic_cutoff{default_minimize_cut},
+    lennard_jones_cutoff{default_minimize_cut},
     initial_step{default_minimize_dx0},
     convergence_target{default_minimize_drms}
 {}
@@ -28,12 +31,18 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line,
   NamelistEmulator t_nml = minimizeInput(tf, start_line, policy);
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
+  print_frequency = t_nml.getIntValue("ntpr");
+  electrostatic_cutoff = t_nml.getRealValue("es_cutoff");
+  lennard_jones_cutoff = t_nml.getRealValue("lj_cutoff");
   initial_step = t_nml.getRealValue("dx0");
   convergence_target = t_nml.getRealValue("drms");
 
   // Validate input
   validateTotalCycles();
   validateSteepestDescentCycles();
+  validatePrintFrequency();
+  validateElectrostaticCutoff();
+  validateLennardJonesCutoff();
   validateInitialStep();
   validateConvergenceTarget();
 }
@@ -49,6 +58,21 @@ int MinimizeControls::getSteepestDescentCycles() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int MinimizeControls::getDiagnosticPrintFrequency() const {
+  return print_frequency;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MinimizeControls::getElectrostaticCutoff() const {
+  return electrostatic_cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MinimizeControls::getLennardJonesCutoff() const {
+  return lennard_jones_cutoff;
+}
+
+//-------------------------------------------------------------------------------------------------
 double MinimizeControls::getInitialStep() const {
   return initial_step;
 }
@@ -61,21 +85,43 @@ double MinimizeControls::getConvergenceTarget() const {
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setTotalCycles(const int cycles_in) {
   total_cycles = cycles_in;
+  validateTotalCycles();
 }
 
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setSteepestDescentCycles(const int cycles_in) {
   steepest_descent_cycles = cycles_in;
+  validateSteepestDescentCycles();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setDiagnosticPrintFrequency(const int frequency_in) {
+  print_frequency = frequency_in;
+  validatePrintFrequency();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setElectrostaticCutoff(const double cutoff_in) {
+  electrostatic_cutoff = cutoff_in;
+  validateElectrostaticCutoff();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setLennardJonesCutoff(const double cutoff_in) {
+  lennard_jones_cutoff = cutoff_in;
+  validateLennardJonesCutoff();
 }
 
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setInitialStep(const double step_size_in) {
   initial_step = step_size_in;
+  validateInitialStep();
 }
 
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setConvergenceTarget(const double target_in) {
   convergence_target = target_in;
+  validateConvergenceTarget();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -121,19 +167,70 @@ void MinimizeControls::validateSteepestDescentCycles() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void MinimizeControls::validatePrintFrequency() {
+  if (print_frequency < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      rtWarn("Diagnostics must be printed with a non-negative frequency, not " +
+             std::to_string(print_frequency) + ".  The default of " +
+             std::to_string(default_minimize_ntpr) + " will be restored, which suppresses most "
+             "output.", "MinimizeControls", "validatePrintFrequency");
+      print_frequency = default_minimize_ntpr;
+      break;
+    case ExceptionResponse::SILENT:
+      print_frequency = default_minimize_ntpr;
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::validateElectrostaticCutoff() {
+  if (electrostatic_cutoff < 0.0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      rtWarn("No electrostatic interaction will be computed with a cutoff of " +
+             std::to_string(electrostatic_cutoff) + ".", "MinimizeControls",
+             "validateElectrostaticCutoff");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::validateLennardJonesCutoff() {
+  if (electrostatic_cutoff < 0.0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      rtWarn("No van-der Waals interaction will be computed with a cutoff of " +
+             std::to_string(lennard_jones_cutoff) + ".", "MinimizeControls",
+             "validateLennardJonesCutoff");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void MinimizeControls::validateInitialStep() {
   if (initial_step < constants::verytiny) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The initial step size must be nontrivial in order for the algorithm to begin moving "
             "particles.  " + realToString(initial_step, 11, 4, NumberFormat::SCIENTIFIC) +
-            " is not a valid initial step.", "MinimizeControls", "validateConvergenceTarget");
+            " is not a valid initial step.", "MinimizeControls", "validateInitialStep");
     case ExceptionResponse::WARN:
       rtWarn("The initial step size must be nontrivial in order for the algorithm to begin moving "
              "particles.  " + realToString(initial_step, 11, 4, NumberFormat::SCIENTIFIC) +
              " is not a valid initial step and will be replaced by the default of " +
              realToString(default_minimize_dx0, 11, 4, NumberFormat::SCIENTIFIC) + ".",
-             "MinimizeControls", "validateConvergenceTarget");
+             "MinimizeControls", "validateInitialStep");
       initial_step = default_minimize_dx0;
       break;
     case ExceptionResponse::SILENT:

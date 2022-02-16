@@ -5,7 +5,81 @@ namespace omni {
 namespace namelist {
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator restraintInput(const TextFile &tf, int *start_line) {
+RestraintControls::RestraintControls(const ExceptionResponse policy_in) :
+    policy{policy_in}, input_file{std::string("")}, starting_line{0}, mask_i{std::string("")},
+    mask_j{std::string("")}, mask_k{std::string("")}, mask_l{std::string("")}, atom_i{-1},
+    atom_j{-1}, atom_k{-1}, atom_l{-1}, order{0}, initiation_step{0}, maturation_step{0},
+    initial_k2{0.0}, initial_k3{0.0}, initial_r1{0.0}, initial_r2{0.0}, initial_r3{0.0},
+    initial_r4{0.0}, mature_k2{0.0}, mature_k3{0.0}, mature_r1{0.0}, mature_r2{0.0},
+    mature_r3{0.0}, mature_r4{0.0}, initial_crd{0.0, 0.0, 0.0}, mature_crd{0.0, 0.0, 0.0}
+{}
+
+//-------------------------------------------------------------------------------------------------
+RestraintControls::RestraintControls(const TextFile &tf, int *start_line,
+                                     const ExceptionResponse policy_in) :
+    RestraintControls()
+{
+  input_file = tf.getFileName();
+  starting_line = *start_line + 1;
+  NamelistEmulator t_nml = restraintInput(tf, start_line, policy);
+
+  // Compute the order of the restraint based on the number of atom specifications.  This will not
+  // validate the atom specifications (in particular, that at least the first atom must be
+  // specified in some way), leaving that work for the validation private member function.  The
+  // actual identities of the atoms are not discernible at this point.  Rather, the order will be
+  // inferred based on attempts to specify them. 
+  order = (atom_i >= 0 || mask_i.size() >= 0LLU) + (atom_j >= 0 || mask_j.size() >= 0LLU) +
+          (atom_k >= 0 || mask_k.size() >= 0LLU) + (atom_l >= 0 || mask_l.size() >= 0LLU);
+  
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintAnchoring RestraintControls::getAtomSpecification() const {
+  const int indexed_order = (atom_i >= 0) + (atom_j >= 0) + (atom_k >= 0) + (atom_l >= 0);
+  const int masked_order = (mask_i.size() >= 0LLU) + (mask_j.size() >= 0LLU) +
+                           (mask_k.size() >= 0LLU) + (mask_l.size() >= 0LLU);
+  const int mixed_order = (atom_i >= 0 || mask_i.size() >= 0LLU) +
+                          (atom_j >= 0 || mask_j.size() >= 0LLU) +
+                          (atom_k >= 0 || mask_k.size() >= 0LLU) +
+                          (atom_l >= 0 || mask_l.size() >= 0LLU);
+    
+  if (indexed_order == order) {
+    return RestraintAnchoring::INDICES;
+  }
+  else if (masked_order == order) {
+    return RestraintAnchoring::ATOMMASK;
+  }
+  else if (mixed_order == order) {
+    return RestraintAnchoring::MIXED;
+  }
+  else {
+
+  }
+  return RestraintAnchoring::UNKNOWN;
+}
+  
+//-------------------------------------------------------------------------------------------------
+void RestraintControls::validateRestraint() const {
+  if (mask_i.size() == 0LLU && atom_i < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A restraint must have at least a valid first atom, but no such atom was specified.",
+            "RestraintControls", "validateRestraint");
+    case ExceptionResponse::WARN:
+      rtWarn("A restraint must have at least a valid first atom, but no such atom was specified.  "
+             "This may create problems downstream, or the restraint input beginning on line " +
+             std::to_string(starting_line) + " of " + input_file + " will be ignored.",
+             "RestraintControls", "validateRestraint");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
+                                const ExceptionResponse policy) {
   NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, ExceptionResponse::DIE,
                          "Replicates the Amber NMR restraint namelist within OMNI.");
   t_nml.addKeyword(NamelistElement("iat1", NamelistType::INTEGER, "0"));
