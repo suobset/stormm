@@ -57,6 +57,7 @@ CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
   else if (strncmpCased(name_in, "UNKNOWN")) {
     return CoordinateFileKind::UNKNOWN;
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -239,17 +239,17 @@ bool strcmpCased(const char* sa, const char* sb, const CaseSensitivity csen) {
 
 //-------------------------------------------------------------------------------------------------
 bool strcmpCased(const std::string &sa, const char* sb, const CaseSensitivity csen) {
-  strcmpCased(sa.c_str(), sb, csen);
+  return strcmpCased(sa.c_str(), sb, csen);
 }
 
 //-------------------------------------------------------------------------------------------------
 bool strcmpCased(const char* sa, const std::string &sb, const CaseSensitivity csen) {
-  strcmpCased(sa, sb.c_str(), csen);
+  return strcmpCased(sa, sb.c_str(), csen);
 }
 
 //-------------------------------------------------------------------------------------------------
 bool strcmpCased(const std::string &sa, const std::string &sb, const CaseSensitivity csen) {
-  strcmpCased(sa.c_str(), sb.c_str(), csen);
+  return strcmpCased(sa.c_str(), sb.c_str(), csen);
 }
 
 //-------------------------------------------------------------------------------------------------
