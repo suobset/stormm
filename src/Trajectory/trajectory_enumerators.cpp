@@ -12,6 +12,7 @@ namespace trajectory {
 
 using parse::NumberFormat;
 using parse::separateText;
+using parse::strncmpCased;
 using parse::TextFile;
 using parse::TextFileReader;
 using parse::TextOrigin;
@@ -34,6 +35,28 @@ std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
     return std::string("Unknown coordinate file format");
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
+  if (strncmpCased(name_in, "AMBER_CRD")) {
+    return CoordinateFileKind::AMBER_CRD;
+  }
+  else if (strncmpCased(name_in, "AMBER_INPCRD")) {
+    return CoordinateFileKind::AMBER_INPCRD;
+  }
+  else if (strncmpCased(name_in, "AMBER_ASCII_RST")) {
+    return CoordinateFileKind::AMBER_ASCII_RST;
+  }
+  else if (strncmpCased(name_in, "AMBER_NETCDF")) {
+    return CoordinateFileKind::AMBER_NETCDF;
+  }
+  else if (strncmpCased(name_in, "AMBER_NETCDF_RST")) {
+    return CoordinateFileKind::AMBER_NETCDF_RST;
+  }
+  else if (strncmpCased(name_in, "UNKNOWN")) {
+    return CoordinateFileKind::UNKNOWN;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

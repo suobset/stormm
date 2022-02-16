@@ -9,6 +9,8 @@ namespace namelist {
 
 using constants::CaseSensitivity;
 using parse::strncmpCased;
+using topology::translateAtomicRadiusSet;
+using topology::translateImplicitSolventModel;
   
 //-------------------------------------------------------------------------------------------------
 SolventControls::SolventControls(const ExceptionResponse policy_in) :
@@ -18,7 +20,7 @@ SolventControls::SolventControls(const ExceptionResponse policy_in) :
     internal_dielectric{default_solvent_intdiel},
     external_dielectric{default_solvent_extdiel},
     salt_concentration{default_solvent_saltcon},
-    pb_radii{translatePBRadiiSet(std::string(default_solvent_pbradii))}
+    pb_radii{translateAtomicRadiusSet(std::string(default_solvent_pbradii))}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -32,7 +34,7 @@ SolventControls::SolventControls(const TextFile &tf, int *start_line,
   internal_dielectric = t_nml.getRealValue("intdiel");
   external_dielectric = t_nml.getRealValue("extdiel");
   salt_concentration  = t_nml.getRealValue("saltcon");
-  pb_radii            = translatePBRadiiSet(t_nml.getStringValue("pbradii"));
+  pb_radii            = translateAtomicRadiusSet(t_nml.getStringValue("pbradii"));
 
   // Checks on the input
   validateBornRadiiCutoff();
@@ -107,7 +109,7 @@ void SolventControls::setSaltConcentration(double saltcon_in) {
 
 //-------------------------------------------------------------------------------------------------
 void SolventControls::choosePBRadiiSet(const std::string &pbrad_in) {
-  pb_radii = translatePBRadiiSet(pbrad_in, policy);
+  pb_radii = translateAtomicRadiusSet(pbrad_in, policy);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -201,78 +203,6 @@ void SolventControls::validateSaltConcentration() {
       break;
     }
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-AtomicRadiusSet translatePBRadiiSet(const std::string &pb_radii_in,
-                                    const ExceptionResponse policy) {
-  if (strncmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::BONDI;
-  }
-  else if (strncmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::AMBER6;
-  }
-  else if (strncmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::MBONDI;
-  }
-  else if (strncmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::MBONDI2;
-  }
-  else if (strncmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::MBONDI3;
-  }
-  else if (strncmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::PARSE;
-  }
-  else if (strncmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
-    return AtomicRadiusSet::NONE;
-  }
-  else {
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("Unrecognized atomic radius set " + pb_radii_in + ".", "translatePBRadiiSet");
-    case ExceptionResponse::WARN:
-      rtWarn("Unrecognized atomic radius set " + pb_radii_in + ".  The radius set will be NONE.",
-             "translatePBRadiiSet");
-      return AtomicRadiusSet::NONE;
-    case ExceptionResponse::SILENT:
-      return AtomicRadiusSet::NONE;
-    }      
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-ImplicitSolventModel translateImplicitSolventModel(const int igb_val,
-                                                   const ExceptionResponse policy) {
-  switch (igb_val) {
-  case 0:
-  case 6:
-    return ImplicitSolventModel::NONE;
-  case 1:
-    return ImplicitSolventModel::HCT_GB;
-  case 2:
-    return ImplicitSolventModel::OBC_GB;
-  case 5:
-    return ImplicitSolventModel::OBC_GB_II;
-  case 7:
-    return ImplicitSolventModel::NECK_GB;
-  case 8:
-    return ImplicitSolventModel::NECK_GB_II;
-  default:
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".",
-            "translateImplicitSolventModel");
-    case ExceptionResponse::WARN:
-      rtWarn("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".  The "
-             "model will be set to NONE instead.", "translateImplicitSolventModel");
-      return ImplicitSolventModel::NONE;
-    case ExceptionResponse::SILENT:
-      return ImplicitSolventModel::NONE;
-    }
-  }
-  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

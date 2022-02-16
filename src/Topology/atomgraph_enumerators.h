@@ -2,11 +2,14 @@
 #ifndef OMNI_ATOMGRAPH_ENUMERATORS_H
 #define OMNI_ATOMGRAPH_ENUMERATORS_H
 
+#include "Constants/behavior.h"
 #include "Parsing/citation.h"
 
 namespace omni {
 namespace topology {
 
+using constants::CaseSensitivity;
+using constants::ExceptionResponse;
 using parse::Citation;
 
 /// \brief Enumerate different kinds of topologies that OMNI will read.  Each comes with its own
@@ -184,10 +187,27 @@ std::string getUnitCellTypeName(UnitCellType uc);
 /// \param ism  The implicit solvent model enumeration
 std::string getImplicitSolventModelName(ImplicitSolventModel ism);
 
+/// \brief Translate the numerical input for the implicit solvent model into one of the recognized
+///        models available in OMNI.  This serves as the validator to the implicit solvent model
+///        in the SolventControls object.
+///
+/// \param igb_val  Numerical value of the implicit solvent model, as read from the parent namelist
+/// \param policy   Set the response to bad inputs
+ImplicitSolventModel
+translateImplicitSolventModel(int igb_val, ExceptionResponse policy = ExceptionResponse::DIE);
+
 /// \brief Produce a string with the name of an atomic radius set.
 ///
 /// \param rs  The radius set enumeration
 std::string getAtomicRadiusSetName(AtomicRadiusSet rs);
+
+/// \brief Translate string input into one of the enumerated AtomicRadiusSet values.  This serves
+///        as the validator to the radius set in the SolventControls object.
+///
+/// \param pb_radii_in  Input string describing the PB radii (case-insensitive)
+/// \param policy       Set the response to bad inputs
+AtomicRadiusSet translateAtomicRadiusSet(const std::string &pb_radii_in,
+                                         ExceptionResponse policy = ExceptionResponse::DIE);
 
 /// \brief Produce the name of a water model based on its enumeration.
 ///

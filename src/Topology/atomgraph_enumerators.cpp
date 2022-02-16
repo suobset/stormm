@@ -1,8 +1,11 @@
 #include <string>
+#include "Parsing/parse.h"
 #include "atomgraph_enumerators.h"
 
 namespace omni {
 namespace topology {
+
+using parse::strncmpCased;
 
 //-------------------------------------------------------------------------------------------------
 std::string getUnitCellTypeName(const UnitCellType uc) {
@@ -37,6 +40,39 @@ std::string getImplicitSolventModelName(const ImplicitSolventModel ism) {
 }
 
 //-------------------------------------------------------------------------------------------------
+ImplicitSolventModel translateImplicitSolventModel(const int igb_val,
+                                                   const ExceptionResponse policy) {
+  switch (igb_val) {
+  case 0:
+  case 6:
+    return ImplicitSolventModel::NONE;
+  case 1:
+    return ImplicitSolventModel::HCT_GB;
+  case 2:
+    return ImplicitSolventModel::OBC_GB;
+  case 5:
+    return ImplicitSolventModel::OBC_GB_II;
+  case 7:
+    return ImplicitSolventModel::NECK_GB;
+  case 8:
+    return ImplicitSolventModel::NECK_GB_II;
+  default:
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".",
+            "translateImplicitSolventModel");
+    case ExceptionResponse::WARN:
+      rtWarn("Unrecognized implicit solvent model, igb = " + std::to_string(igb_val) + ".  The "
+             "model will be set to NONE instead.", "translateImplicitSolventModel");
+      return ImplicitSolventModel::NONE;
+    case ExceptionResponse::SILENT:
+      return ImplicitSolventModel::NONE;
+    }
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getAtomicRadiusSetName(const AtomicRadiusSet rs) {
   switch (rs) {
   case AtomicRadiusSet::NONE:
@@ -53,6 +89,45 @@ std::string getAtomicRadiusSetName(const AtomicRadiusSet rs) {
     return std::string("Arg hydrogen and Asp / Glu oxygen modified mBondi2 (mBondi3) radii");
   case AtomicRadiusSet::PARSE:
     return std::string("Parse Poisson-Boltzmann radii");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomicRadiusSet translateAtomicRadiusSet(const std::string &pb_radii_in,
+                                         const ExceptionResponse policy) {
+  if (strncmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::BONDI;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::AMBER6;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI2;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::MBONDI3;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::PARSE;
+  }
+  else if (strncmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
+    return AtomicRadiusSet::NONE;
+  }
+  else {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Unrecognized atomic radius set " + pb_radii_in + ".", "translatePBRadiiSet");
+    case ExceptionResponse::WARN:
+      rtWarn("Unrecognized atomic radius set " + pb_radii_in + ".  The radius set will be NONE.",
+             "translatePBRadiiSet");
+      return AtomicRadiusSet::NONE;
+    case ExceptionResponse::SILENT:
+      return AtomicRadiusSet::NONE;
+    }
   }
   __builtin_unreachable();
 }

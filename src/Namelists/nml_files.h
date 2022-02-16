@@ -19,11 +19,14 @@ using trajectory::CoordinateFileKind;
 /// \{
 constexpr char default_filecon_topology_name[] = "prmtop";
 constexpr char default_filecon_coordinate_name[] = "inpcrd";
-constexpr char default_filecon_report_name[] = "mdout";
-constexpr char default_filecon_trajectory_base[] = "mdcrd";
-constexpr char default_filecon_trajectory_ext[] = ".crd";
-constexpr char default_filecon_checkpoint_base[] = "mdrst";
-constexpr char default_filecon_checkpoint_ext[] = ".rst";
+constexpr char default_filecon_report_name[] = "md.out";
+constexpr char default_filecon_trajectory_name[] = "md.crd";
+constexpr char default_filecon_checkpoint_name[] = "md.rst";
+constexpr char default_filecon_warnings_name[] = "warn.out";
+constexpr char default_filecon_errors_name[] = "err.out";
+constexpr char default_filecon_inpcrd_type[] = "UNKNOWN";
+constexpr char default_filecon_outcrd_type[] = "AMBER_CRD";
+constexpr char default_filecon_chkcrd_type[] = "AMBER_ASCII_RST";
 /// \}
 
 /// \brief Object to encapsulate a system, a coupled set of coordinates and a single topology.
@@ -39,19 +42,143 @@ struct MoleculeSystem {
   /// \{
   MoleculeSystem();
   MoleculeSystem(const std::string &topology_file_in, const std::string &coordinate_file_in,
+                 const std::string &trajectory_file_in, const std::string &checkpoint_file_in,
                  int frame_start_in, int frame_end_in, int replica_count_in,
-                 CoordinateFileKind coordinate_kind_in);
+                 CoordinateFileKind coordinate_kind_in, CoordinateFileKind trajectory_kind_in,
+                 CoordinateFileKind checkpoint_kind_in);
   /// \}
 
+  /// \brief Get the name of the topology file in this system.
+  std::string getTopologyFileName() const;
+
+  /// \brief Get the name of the input coordinates file.
+  std::string getInputCoordinateFileName() const;
+
+  /// \brief Get the name of the trajectory file.
+  std::string getTrajectoryFileName() const;
+
+  /// \brief Get the name of the checkpoint file to write for this system.
+  std::string getCheckpointFileName() const;
+
+  /// \brief Get the starting frame that this system will read for initial coordinate states.
+  int getStartingFrame() const;
+
+  /// \brief Get the last frame that this system will read for initial coordinate states.
+  int getFinalFrame() const;
+
+  /// \brief Get the total number of frames, thus initial states, that this system expects.
+  int getTotalFrames() const;
+
+  /// \brief Get the replica count for this system, the number of copies of each initial
+  ///        coordinate frame that it will spawn.
+  int getReplicaCount() const;
+
+  /// \brief Get the type of input coordinate file.
+  CoordinateFileKind getInputCoordinateFileKind() const;
+
+  /// \brief Get the type of trajectory file.
+  CoordinateFileKind getTrajectoryFileKind() const;
+
+  /// \brief Get the type of checkpoint file.
+  CoordinateFileKind getCheckpointFileKind() const;
+
+  /// \brief Set the topology file name.  This is useful if pre-allocating an array of
+  ///        MoleculeSystems and then filling it up later.
+  void setTopologyFileName(const std::string &file_name);
+
+  /// \brief Set the input coordinates file name.
+  ///
+  /// \param file_name  The chosen file name
+  void setInputCoordinateFileName(const std::string &file_name);
+
+  /// \brief Set the trajectory file name.
+  ///
+  /// \param file_name  The chosen file name
+  void setTrajectoryFileName(const std::string &file_name);
+
+  /// \brief Set the checkpoint file name.
+  ///
+  /// \param file_name  The chosen file name
+  void setCheckpointFileName(const std::string &file_name);
+
+  /// \brief Set the starting frame.  This can be necessary if the input coordinates file does not
+  ///        contain the requested numbers of frames.
+  ///
+  /// \param frame_number  The selected frame number
+  void setStartingFrame(int frame_number);
+
+  /// \brief Set the final frame.  This can be necessary if the input coordinates file does not
+  ///        contain the requested numbers of frames.
+  ///
+  /// \param frame_number  The selected frame number
+  void setFinalFrame(int frame_number);
+
+  /// \brief Set the number of replicas.
+  ///
+  /// \param count  The number of system replicas to spawn
+  void setReplicaCount(int count);
+
+  /// \brief Set the input coordinates file type.
+  ///
+  /// Overloaded:
+  ///   - Get the file type from a string (will be validated)
+  ///   - Get the file type from a direct enumeration
+  ///
+  /// \param kind  The type of input coordinates file to expect (or that was detected)
+  /// \{
+  void setInputCoordinateFileKind(const std::string &kind);
+  void setInputCoordinateFileKind(CoordinateFileKind kind);
+  /// \}
+
+  /// \brief Set the trajectory file type.
+  ///
+  /// Overloaded:
+  ///   - Get the file type from a string (will be validated)
+  ///   - Get the file type from a direct enumeration
+  ///
+  /// \param kind  The type of trajectory file to write
+  /// \{
+  void setTrajectoryFileKind(const std::string &kind);
+  void setTrajectoryFileKind(CoordinateFileKind kind);
+  /// \}
+
+  /// \brief Set the checkpoint file type.
+  ///
+  /// Overloaded:
+  ///   - Get the file type from a string (will be validated)
+  ///   - Get the file type from a direct enumeration
+  ///
+  /// \param kind  The type of checkpoint file to write
+  /// \{
+  void setCheckpointFileKind(const std::string &kind);
+  void setCheckpointFileKind(CoordinateFileKind kind);
+  /// \}
+
+  /// \brief Report whether the topology file named in this system is a valid file.  This validator
+  ///        is public so that it can be called by a wholistic validation strategy employed in the
+  ///        containing FilesControls object.
+  bool validateTopologyFile() const;
+
+  /// \brief Report whether the input coordinate file named in this system is a valid file.
+  bool validateInputCoordinateFile() const;
+  
 private:
   std::string topology_file_name;      ///< Topology file describing the molecular system
   std::string coordinate_file_name;    ///< Coordinate file (may be a whole trajectory)
+  std::string coordinate_output_name;  ///< Coordinate output file for this system (if not
+                                       ///<   supplied, the name will be inferred based on
+                                       ///<   directives in the containing FileControls object)
+  std::string checkpoint_name;         ///< Checkpoint file for this system (if not supplied, the
+                                       ///<   name will be inferred based on directives in the
+                                       ///<   containing FileControls object)
   int frame_start;                     ///< Strating frame of the coordinates file to read
   int frame_end;                       ///< Final frame of the coordinates file to read (the
                                        ///<   program will read frames over the range
                                        ///<   [ start, end ], so [ 0, 0 ] gets the first frame)
   int replica_count;                   ///< Number of times to replicate this system
   CoordinateFileKind coordinate_kind;  ///< Kind of coordinate file to be expected
+  CoordinateFileKind trajectory_kind;  ///< Kind of trajectory file to write
+  CoordinateFileKind checkpoint_kind;  ///< Kind of checkpoint file to write
 };
 
 /// \brief Distill the results of file identification, producing clean lists of free topologies,
@@ -75,11 +202,7 @@ struct FilesControls {
   FilesControls();
   FilesControls(const TextFile &tf, int *start_line,
                 ExceptionResponse policy = ExceptionResponse::DIE,
-                const std::string &report_name_in = std::string(default_filecon_report_name),
-                const std::string &coord_base_in = std::string(default_filecon_trajectory_base),
-                const std::string &coord_ext_in = std::string(default_filecon_trajectory_ext),
-                const std::string &chk_base_in = std::string(default_filecon_checkpoint_base),
-                const std::string &chk_ext_in = std::string(default_filecon_checkpoint_ext));
+                const std::vector<std::string> &alternatives = {});
   /// \}
 
   /// \brief Get the structure count, based on the number of free coordinate files as well as the
@@ -101,7 +224,7 @@ struct FilesControls {
   CoordinateFileKind getOutputCoordinateFormat() const;
   
   /// \brief Get the coordinate (checkpoint) file output format
-  CoordinateFileKind getOutputCheckpointFormat() const;
+  CoordinateFileKind getCheckpointFormat() const;
   
   /// \brief Get one or more free topology names.
   ///
@@ -136,17 +259,73 @@ struct FilesControls {
   std::string getReportFile() const;
 
   /// \brief Get the base name of trajectory files to write
-  std::string getTrajectoryFileBase() const;
-
-  /// \brief Get the file extension of trajectory files to write
-  std::string getTrajectoryFileExtension() const;
+  std::string getTrajectoryFileName() const;
 
   /// \brief Get the base name of (coordinate) checkpoint files to write
-  std::string getCheckpointFileBase() const;
+  std::string getCheckpointFileName() const;
 
-  /// \brief Get the file extension of (coordinate) checkpoint files to write
-  std::string getCheckpointFileExtension() const;
+  /// \brief Get the name of the file containing warnings printed by the program
+  std::string getWarningFileName() const;
 
+  /// \brief Set the coordinate (trajectory) file output format
+  ///
+  /// Overloaded:
+  /// - Take a string value specifying the coordinate file kind
+  /// - Take the literal, enumerated type
+  ///
+  /// \param traj_kind  The selected trajectory format
+  /// \{
+  void setOutputCoordinateFormat(const std::string &traj_kind);
+  void setOutputCoordinateFormat(CoordinateFileKind traj_kind);
+  /// \}
+  
+  /// \brief Set the checkpoint (coordinate) file output format
+  ///
+  /// Overloaded:
+  /// - Take a string value specifying the coordinate file kind
+  /// - Take the literal, enumerated type
+  ///
+  /// \param chk_kind  The selected checkpoint format
+  /// \{
+  void setCheckpointFormat(const std::string &chk_kind);
+  void setCheckpointFormat(CoordinateFileKind chk_kind);
+  /// \}
+
+  /// \brief Add a free topology to the list, after checking for its prior existence in the list.
+  ///
+  /// \param file_name  Name of the topology file to add
+  void addFreeTopologyName(const std::string &file_name);
+
+  /// \brief Add a free coordinate file to the list, after checking for its prior existence.
+  ///
+  /// \param file_name  Name of the coordinate file to add
+  void addFreeCoordinateName(const std::string &file_name);
+
+  /// \brief Add a system to the list.
+  ///
+  /// \param new_mol  The new molecule system to push to the back of the list
+  void addSystem(const MoleculeSystem &new_mol);
+
+  /// \brief Set the report file name.
+  ///
+  /// \param file_name  New name for the calculation report file
+  void setReportFileName(const std::string &file_name);
+
+  /// \brief Set the general (fallback) coordinate output file name.
+  ///
+  /// \param proto_name  New generic name for unspecified trajectory files
+  void setGeneralTrajectoryFileName(const std::string &proto_name);
+
+  /// \brief Set the general (fallback) checkpoint file name.
+  ///
+  /// \param proto_name  New generic name for unspecified checkpoint files
+  void setGeneralCheckpointFileName(const std::string &proto_name);
+
+  /// \brief Set the warning file name.
+  ///
+  /// \param file_name  New name for the warnings file
+  void setWarningFileName(const std::string &file_name);
+  
 private:
 
   // Counts of critical data
@@ -189,22 +368,22 @@ private:
   /// spans all systems.
   std::string report_file;
 
-  /// Conformation output base name.  Each molecule will become a set of conformers, expressed in
-  /// a trajectory file with this as the base name.  The typical process will then be to use the
-  /// system topology's root name (the file path base name, with any subdirectories clipped from
-  /// the front and any extensions after a dot [.] clipped form the back) as the next part, and
-  /// finally an extension set with the next control variable.
-  std::string coordinate_output_base;
+  /// Conformation output base name.  Each set of initial coordinates will lead to a trajectory,
+  /// whether an evolving series of dynamics snapshots through MD, a set of conformers created by
+  /// a series of guided minimizations, or some other protocol.  The coordinate files are
+  /// therefore the keys to unique systems--topologies to guide the evolution of the coordinates
+  /// are either specified by the user or matched by some automated search for the most reasonable
+  /// descriptions.  If the output coordinates for a system are specified, that name will be
+  /// honored, but if not then the name below will be used to assemble a reasonable name for the
+  /// result based on the name of the initial coordinates file.
+  std::string coordinate_output_name;
 
-  /// Conformation output extension.  Each molecule's set of conformations will get a separate
-  /// file, the name determined from a variety of user-specified factors, with this extension.
-  std::string coordinate_output_ext;
+  /// Checkpoint file base name, i.e. the restart file in Amber's sander or pmemd.  The naming
+  /// conventions follow those of coordinate_output_name.
+  std::string checkpoint_name;
 
-  /// Checkpoint file base name, i.e. the restart file in Amber's sander or pmemd
-  std::string checkpoint_base;
-
-  /// Checkpoint file extension, i.e. the restart file in Amber's sander or pmemd
-  std::string checkpoint_ext;
+  /// Warnings output file name
+  std::string warning_file_name;
 };
   
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place

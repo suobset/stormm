@@ -1,61 +1,222 @@
+#include "FileManagement/file_listing.h"
+#include "Parsing/parse.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "nml_files.h"
 
 namespace omni {
 namespace namelist {
 
+using diskutil::DrivePathType;
+using diskutil::getDrivePathType;
+using parse::findStringInVector;
 using parse::WrapTextSearch;
+using trajectory::translateCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
 MoleculeSystem::MoleculeSystem() :
-    topology_file_name{}, coordinate_file_name{}, frame_start{0}, frame_end{0}, replica_count{0},
-    coordinate_kind{CoordinateFileKind::UNKNOWN}
+    topology_file_name{}, coordinate_file_name{}, coordinate_output_name{}, checkpoint_name{},
+    frame_start{0}, frame_end{0}, replica_count{0}, coordinate_kind{CoordinateFileKind::UNKNOWN},
+    trajectory_kind{CoordinateFileKind::AMBER_CRD},
+    checkpoint_kind{CoordinateFileKind::AMBER_ASCII_RST}
 {}
 
 //-------------------------------------------------------------------------------------------------
 MoleculeSystem::MoleculeSystem(const std::string &topology_file_in,
-                               const std::string &coordinate_file_in, const int frame_start_in,
+                               const std::string &coordinate_file_in,
+                               const std::string &trajectory_file_in,
+                               const std::string &checkpoint_file_in, const int frame_start_in,
                                const int frame_end_in, const int replica_count_in,
-                               const CoordinateFileKind coordinate_kind_in) :
+                               const CoordinateFileKind coordinate_kind_in,
+                               const CoordinateFileKind trajectory_kind_in,
+                               const CoordinateFileKind checkpoint_kind_in) :
     topology_file_name{topology_file_in},
     coordinate_file_name{coordinate_file_in},
+    coordinate_output_name{trajectory_file_in},
+    checkpoint_name{checkpoint_file_in},
     frame_start{frame_start_in},
     frame_end{(replica_count_in > 1) ? frame_start : frame_end_in},
     replica_count{replica_count_in},
-    coordinate_kind{coordinate_kind_in}
+    coordinate_kind{coordinate_kind_in},
+    trajectory_kind{trajectory_kind_in},
+    checkpoint_kind{checkpoint_kind_in}
 {}
-  
-//-------------------------------------------------------------------------------------------------
-FilesControls::FilesControls() :
-    structure_count{0}, free_topology_count{0}, free_coordinate_count{0}, system_count{0},
-    coordinate_output_format{CoordinateFileKind::AMBER_CRD},
-    coordinate_checkpoint_format{CoordinateFileKind::AMBER_ASCII_RST},
-    topology_file_names{}, coordinate_file_names{}, systems{},
-    report_file{std::string(default_filecon_report_name)},
-    coordinate_output_base{std::string(default_filecon_trajectory_base)},
-    coordinate_output_ext{std::string(default_filecon_trajectory_ext)},
-    checkpoint_base{std::string(default_filecon_checkpoint_base)},
-    checkpoint_ext{std::string(default_filecon_checkpoint_ext)}
-{
 
+//-------------------------------------------------------------------------------------------------
+std::string MoleculeSystem::getTopologyFileName() const {
+  return topology_file_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-FilesControls::FilesControls(const TextFile &tf, int *start_line, const ExceptionResponse policy,
-                             const std::string &report_name_in, const std::string &coord_base_in,
-                             const std::string &coord_ext_in, const std::string &chk_base_in,
-                             const std::string &chk_ext_in) :
-    structure_count{0}, free_topology_count{0}, free_coordinate_count{0}, system_count{0},
-    coordinate_output_format{CoordinateFileKind::AMBER_CRD},
-    coordinate_checkpoint_format{CoordinateFileKind::AMBER_ASCII_RST},
-    topology_file_names{}, coordinate_file_names{}, systems{},
-    report_file{report_name_in},
-    coordinate_output_base{coord_base_in},
-    coordinate_output_ext{coord_ext_in},
-    checkpoint_base{chk_base_in},
-    checkpoint_ext{chk_ext_in}
-{
-  NamelistEmulator t_nml = filesInput(tf, start_line, policy);
+std::string MoleculeSystem::getInputCoordinateFileName() const {
+  return coordinate_file_name;
+}
 
+//-------------------------------------------------------------------------------------------------
+std::string MoleculeSystem::getTrajectoryFileName() const {
+  return coordinate_output_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MoleculeSystem::getCheckpointFileName() const {
+  return checkpoint_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MoleculeSystem::getStartingFrame() const {
+  return frame_start;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MoleculeSystem::getFinalFrame() const {
+  return frame_end;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MoleculeSystem::getTotalFrames() const {
+  return frame_end - frame_start + 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MoleculeSystem::getReplicaCount() const {
+  return replica_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind MoleculeSystem::getInputCoordinateFileKind() const {
+  return coordinate_kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind MoleculeSystem::getTrajectoryFileKind() const {
+  return trajectory_kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind MoleculeSystem::getCheckpointFileKind() const {
+  return checkpoint_kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setTopologyFileName(const std::string &file_name) {
+  topology_file_name = file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setInputCoordinateFileName(const std::string &file_name) {
+  coordinate_file_name = file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setTrajectoryFileName(const std::string &file_name) {
+  coordinate_output_name = file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setCheckpointFileName(const std::string &file_name) {
+  checkpoint_name = file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setStartingFrame(const int frame_number) {
+  frame_start = frame_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setFinalFrame(const int frame_number) {
+  frame_end = frame_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setReplicaCount(const int count) {
+  replica_count = count;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setInputCoordinateFileKind(const std::string &kind) {
+  coordinate_kind = translateCoordinateFileKind(kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setInputCoordinateFileKind(const CoordinateFileKind kind) {
+  coordinate_kind = kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setTrajectoryFileKind(const std::string &kind) {
+  trajectory_kind = translateCoordinateFileKind(kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setTrajectoryFileKind(const CoordinateFileKind kind) {
+  trajectory_kind = kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setCheckpointFileKind(const std::string &kind) {
+  checkpoint_kind = translateCoordinateFileKind(kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+void MoleculeSystem::setCheckpointFileKind(const CoordinateFileKind kind) {
+  checkpoint_kind = kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MoleculeSystem::validateTopologyFile() const {
+  return (getDrivePathType(topology_file_name) == DrivePathType::FILE);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool MoleculeSystem::validateInputCoordinateFile() const {
+  return (getDrivePathType(topology_file_name) == DrivePathType::FILE);
+}
+
+//-------------------------------------------------------------------------------------------------
+FilesControls::FilesControls() :
+    structure_count{0}, free_topology_count{0}, free_coordinate_count{0}, system_count{0},
+    coordinate_output_format{translateCoordinateFileKind(default_filecon_outcrd_type)},
+    coordinate_checkpoint_format{translateCoordinateFileKind(default_filecon_chkcrd_type)},
+    topology_file_names{}, coordinate_file_names{}, systems{},
+    report_file{std::string(default_filecon_report_name)},
+    coordinate_output_name{std::string(default_filecon_trajectory_name)},
+    checkpoint_name{std::string(default_filecon_checkpoint_name)}
+{}
+
+//-------------------------------------------------------------------------------------------------
+FilesControls::FilesControls(const TextFile &tf, int *start_line, const ExceptionResponse policy,
+                             const std::vector<std::string> &alternatives) :
+    FilesControls()
+{
+  // Set some alternative defaults.  This takes a vector of strings, the even-numbered strings
+  // being names of actual member variables and the odd-numbered strings being the new defaults to
+  // apply.  Different applications will then be able to call the constructor with different
+  // default settings.
+  const int n_alt = alternatives.size();
+  for (int i = 0; i < n_alt; i++) {
+    if (i < n_alt - 1) {
+      if (alternatives[i] == std::string("coordinate_output_format")) {
+        coordinate_output_format = translateCoordinateFileKind(alternatives[i + 1]);
+        i++;
+      }
+      else if (alternatives[i] == std::string("coordinate_checkpoint_format")) {
+        coordinate_checkpoint_format = translateCoordinateFileKind(alternatives[i + 1]);
+        i++;
+      }
+      else if (alternatives[i] == std::string("report_file")) {
+        report_file = alternatives[i + 1];
+        i++;
+      }
+      else if (alternatives[i] == std::string("coordinate_output_name")) {
+        coordinate_output_name = alternatives[i + 1];
+        i++;
+      }
+      else if (alternatives[i] == std::string("checkpoint_name")) {
+        checkpoint_name = alternatives[i + 1];
+        i++;
+      }
+    }
+  }
+  NamelistEmulator t_nml = filesInput(tf, start_line, policy);
   
 }
 
@@ -85,7 +246,7 @@ CoordinateFileKind FilesControls::getOutputCoordinateFormat() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFileKind FilesControls::getOutputCheckpointFormat() const {
+CoordinateFileKind FilesControls::getCheckpointFormat() const {
   return coordinate_checkpoint_format;
 }
 
@@ -121,23 +282,82 @@ std::string FilesControls::getReportFile() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string FilesControls::getTrajectoryFileBase() const {
-  return coordinate_output_base;
+std::string FilesControls::getTrajectoryFileName() const {
+  return coordinate_output_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string FilesControls::getTrajectoryFileExtension() const {
-  return coordinate_output_ext;
+std::string FilesControls::getCheckpointFileName() const {
+  return checkpoint_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string FilesControls::getCheckpointFileBase() const {
-  return checkpoint_base;
+std::string FilesControls::getWarningFileName() const {
+  return warning_file_name;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string FilesControls::getCheckpointFileExtension() const {
-  return checkpoint_ext;
+void FilesControls::setOutputCoordinateFormat(const std::string &traj_kind) {
+  coordinate_output_format = translateCoordinateFileKind(traj_kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setOutputCoordinateFormat(const CoordinateFileKind traj_kind) {
+  coordinate_output_format = traj_kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setCheckpointFormat(const std::string &chk_kind) {
+  coordinate_checkpoint_format = translateCoordinateFileKind(chk_kind);
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setCheckpointFormat(const CoordinateFileKind chk_kind) {
+  coordinate_checkpoint_format = chk_kind;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::addFreeTopologyName(const std::string &file_name) {
+  if (findStringInVector(topology_file_names, file_name) == topology_file_names.size()) {
+    topology_file_names.push_back(file_name);
+    free_topology_count++;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::addFreeCoordinateName(const std::string &file_name) {
+  if (findStringInVector(coordinate_file_names, file_name) == coordinate_file_names.size()) {
+    coordinate_file_names.push_back(file_name);
+    free_coordinate_count++;
+    structure_count++;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::addSystem(const MoleculeSystem &new_mol) {
+  systems.push_back(new_mol);
+  system_count++;
+  structure_count += new_mol.getTotalFrames();
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setReportFileName(const std::string &file_name) {
+  report_file = file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setGeneralTrajectoryFileName(const std::string &proto_name) {
+  coordinate_output_name = proto_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setGeneralCheckpointFileName(const std::string &proto_name) {
+  checkpoint_name = proto_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setWarningFileName(const std::string &file_name) {
+  warning_file_name = file_name;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -158,24 +378,35 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
                              "be paired to the same topology object.  Like several other "
                              "specifiers in this namelist, this keyword is repeatable.");
   const std::vector<std::string> sys_keys_help = {
-    "Topology file", "Starting coordinates file", "Starting frame (if the coordinates are a "
-    "trajectory)", "Ending frame (if the coordinates are a trajectory).  If unspecified, only the "
-    "starting frame will be read.  Otherwise, distinct systems will be made for the given "
-    "topology and every frame between frame_start and frame_end.", "Type of coordinates file (if "
-    "unspecified, the type will be detected automatically."
+    "Topology file", "Starting coordinates file", "Output trajectory file", "Checkpoint file",
+    "Starting frame (if the coordinates are a trajectory)", "Ending frame (if the coordinates are "
+    "a trajectory).  If unspecified, only the starting frame will be read.  Otherwise, distinct "
+    "systems will be made for the given topology and every frame between frame_start and "
+    "frame_end.", "Type of coordinates file to expect (if unspecified, the type will be detected "
+    "automatically)", "Type of trajectory file to write", "Type of checkpoint (restart) "
+    "coordinates file to write"
   };
-  t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "frame_start", "frame_end", "-n",
-                                             "kind" },
+  t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "-x", "-r", "frame_start", "frame_end",
+                                             "-n", "c_kind", "x_kind", "r_kind" },
                                    { NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::INTEGER, NamelistType::INTEGER,
                                      NamelistType::STRING },
-                                   { "prmtop", "inpcrd", "0", "0", "1", "AMBER_ASCII_RST" },
+                                   { std::string(default_filecon_topology_name),
+                                     std::string(default_filecon_coordinate_name),
+                                     std::string(""), std::string(""), "0", "0", "1",
+                                     std::string(default_filecon_inpcrd_type),
+                                     std::string(default_filecon_outcrd_type),
+                                     std::string(default_filecon_chkcrd_type) },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sys_help,
                                    sys_keys_help));
-  t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING, "mdout"));
-  t_nml.addKeyword(NamelistElement("-x", NamelistType::STRING, "mdcrd"));
-  t_nml.addKeyword(NamelistElement("-warn", NamelistType::STRING, "warnings"));
-  t_nml.addKeyword(NamelistElement("-error", NamelistType::STRING, "errors"));
+  t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING,
+                                   std::string(default_filecon_report_name)));
+  t_nml.addKeyword(NamelistElement("-x", NamelistType::STRING,
+                                   std::string(default_filecon_trajectory_name)));
+  t_nml.addKeyword(NamelistElement("-r", NamelistType::STRING,
+                                   std::string(default_filecon_checkpoint_name)));
+  t_nml.addKeyword(NamelistElement("-wrn", NamelistType::STRING,
+                                   std::string(default_filecon_warnings_name)));
   t_nml.addHelp("-p", "System topology file.  Repeatable for multiple systems.  Also accepts "
                 "regular expressions.");
   t_nml.addHelp("-c", "Input coordinates file.  Repeatable for multiple systems.  Also accepts "
@@ -191,14 +422,15 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
                 "run.");
   t_nml.addHelp("-x", "Trajectory output file (base name) for each system.  The actual name of "
                 "each output file will be \"yyy_(sysID).zzz\", where \"yyy\" is any part of the "
-                "-x string value preceding the final dot [.]. \"_(sysID)\" is the number of the "
-                "system in some internal list (key printed in the master output file) for free "
-                "coordinate inputs matched to free topologies, or an identifier of the system "
-                "for couple coordinate and topology pairs specified with the -sys command.  In "
-                "both cases \"zzz\" is an extension obtained from all content of the -x string "
-                "following the final dot [.], or nothing if there is no dot.");
+                "-x string value preceding the final dot [.], \"_(sysID)\" is based on the name "
+                "of the initial coordinates file, perhaps with a frame number appended, and "
+                "\"zzz\" is an extension obtained from all content of the -x string following the "
+                "final dot [.], or nothing if there is no dot.");
+  t_nml.addHelp("-r", "Checkpoint (coordinate and velocity restart) file (base name) for each "
+                "system.  As in the case of the trajectory output file specification, this is a "
+                "fallback for free topology / coordinate pairs or systems with no specified "
+                "restart file name.");
   t_nml.addHelp("-warn", "Warnings reported for the run, collecting results from all systems.");
-  t_nml.addHelp("-error", "Errors reported for the run, collecting results from all systems.");
 
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.

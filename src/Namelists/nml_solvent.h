@@ -141,23 +141,6 @@ private:
   void validateSaltConcentration();
 };
 
-/// \brief Translate string input into one of the enumerated AtomicRadiusSet values.  This serves
-///        as the validator to the radius set in the SolventControls object.
-///
-/// \param pb_radii_in  Input string describing the PB radii (case-insensitive)
-/// \param policy       Set the response to bad inputs
-AtomicRadiusSet translatePBRadiiSet(const std::string &pb_radii_in,
-                                    ExceptionResponse policy = ExceptionResponse::DIE);
-
-/// \brief Translate the numerical input for the implicit solvent model into one of the recognized
-///        models available in OMNI.  This serves as the validator to the implicit solvent model
-///        in the SolventControls object.
-///
-/// \param igb_val  Numerical value of the implicit solvent model, as read from the parent namelist
-/// \param policy   Set the response to bad inputs
-ImplicitSolventModel
-translateImplicitSolventModel(int igb_val, ExceptionResponse policy = ExceptionResponse::DIE);
-
 /// \brief Produce a namelist for defining the implicit solvent model, replicating various inputs
 ///        in the &cntrl namelist of sander or pmemd.  This is a separate namelist from the
 ///        molecular dynamics input as well as the Particle-Mesh Ewald namelist.

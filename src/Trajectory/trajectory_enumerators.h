@@ -51,6 +51,11 @@ enum class TrajectoryKind {
 /// \param cfkind  The enumerator instance of interest
 std::string getCoordinateFileKindName(CoordinateFileKind cfkind);
 
+/// \brief Translate a string into one of the CoordinateFileKind enumerations.
+///
+/// \param name_in  The string to translate
+CoordinateFileKind translateCoordinateFileKind(const std::string &name_in);
+
 /// \brief Detect various coordinate file types.
 ///
 /// \param file_name  Name of the file to test
