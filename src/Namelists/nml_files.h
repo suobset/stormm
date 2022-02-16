@@ -17,6 +17,7 @@ using trajectory::CoordinateFileKind;
 /// \brief Default file names and extensions.  The default input file name varies according to the
 ///        particular application and is therefore not defined within these libraries.
 /// \{
+constexpr bool default_filecon_read_all_free = false;
 constexpr char default_filecon_topology_name[] = "prmtop";
 constexpr char default_filecon_coordinate_name[] = "inpcrd";
 constexpr char default_filecon_report_name[] = "md.out";
@@ -199,9 +200,9 @@ struct FilesControls {
   /// \param coord_ext_in    New default extension of trajectory or other coordinate files (for
   ///                        application-specific naming conventions)
   /// \{
-  FilesControls();
+  FilesControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
   FilesControls(const TextFile &tf, int *start_line,
-                ExceptionResponse policy = ExceptionResponse::DIE,
+                ExceptionResponse policy_in = ExceptionResponse::DIE,
                 const std::vector<std::string> &alternatives = {});
   /// \}
 
@@ -220,6 +221,9 @@ struct FilesControls {
   /// \brief Get the number of system specifications made with the -sys keyword.
   int getSystemDefinitionCount() const;
 
+  /// \brief Get the indicator of whether to read all free coordinate files' frames
+  bool readAllFreeFrames() const;
+  
   /// \brief Get the coordinate (trajectory) file output format
   CoordinateFileKind getOutputCoordinateFormat() const;
   
@@ -267,6 +271,12 @@ struct FilesControls {
   /// \brief Get the name of the file containing warnings printed by the program
   std::string getWarningFileName() const;
 
+  /// \brief Set whether to read all frames from each free trajectory (true), or just the first
+  ///        (false).
+  ///
+  /// \param active  Indicator of whether to have all free frames read (true), or not (false)
+  void setAllFreeFrameReading(const bool active);
+  
   /// \brief Set the coordinate (trajectory) file output format
   ///
   /// Overloaded:
@@ -328,6 +338,9 @@ struct FilesControls {
   
 private:
 
+  /// Action to take when receiving bad input
+  ExceptionResponse policy;
+  
   // Counts of critical data
   int structure_count;        ///< Total number of initial structures, the sum of all free
                               ///<   coordinate files (for which only the first frame will be read,
@@ -339,7 +352,9 @@ private:
   int free_coordinate_count;  ///< The number of free coordinate files, which will be paired to
                               ///<   free trajectories
   int system_count;           ///< The number of system keyword specifications
-
+  bool all_free_frames;       ///< Flag to have all free coordinate files' frames read (if true),
+                              ///<   or just the first (if false, default)
+  
   /// Format of the coordinate output files
   CoordinateFileKind coordinate_output_format;
 

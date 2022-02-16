@@ -113,7 +113,31 @@ void lowercase(char* tcs, size_t n_char = 0);
 std::string lowercase(const char* tcs);
 /// \}
 
-/// \brief Match two strings based on a particular case sensitivity setting
+/// \brief Match two strings based on a particular case sensitivity setting.
+///
+/// Overloaded:
+///   - Take two C-strings (the fundamental case)
+///   - Take a C-string and a C++ string (in either order)
+///   - Take two C++ strings
+///
+/// \param sa      The first string
+/// \param sb      The second string
+/// \param csen    Case sensitivity setting
+/// \{
+bool strcmpCased(const char* sa, const char* sb,
+                 const CaseSensitivity csen = CaseSensitivity::YES);
+  
+bool strcmpCased(const std::string &sa, const char* sb,
+                 const CaseSensitivity csen = CaseSensitivity::YES);
+
+bool strcmpCased(const char* sa, const std::string &sb,
+                 const CaseSensitivity csen = CaseSensitivity::YES);
+
+bool strcmpCased(const std::string &sa, const std::string &sb,
+                 const CaseSensitivity csen = CaseSensitivity::YES);
+/// \}
+
+/// \brief Match two strings, up to a given length, based on a particular case sensitivity setting.
 ///
 /// Overloaded:
 ///   - Take two C-strings (the fundamental case)

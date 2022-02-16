@@ -209,17 +209,67 @@ std::string lowercase(const char* tcs) {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool strcmpCased(const char* sa, const char* sb, const CaseSensitivity csen) {
+  int i = 0;
+  switch (csen) {
+  case CaseSensitivity::YES:
+    while (sa[i] == sb[i]) {
+      if (sa[i] == '\0') {
+        return true;
+      }
+      i++;
+    }
+    return false;
+  case CaseSensitivity::NO:
+    while (uppercase(sa[i]) == uppercase(sb[i])) {
+      if (sa[i] == '\0') {
+        return true;
+      }
+      i++;
+    }
+    return false;
+  case CaseSensitivity::AUTOMATIC:
+    rtErr("No AUTOMATIC behavior is defined for case-based string comparison.  AUTOMATIC "
+          "settings for case sensitivity are defined at higher levels for specific situations, "
+          "not the low-level implementation.", "strcmpCased");
+    break;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool strcmpCased(const std::string &sa, const char* sb, const CaseSensitivity csen) {
+  strcmpCased(sa.c_str(), sb, csen);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool strcmpCased(const char* sa, const std::string &sb, const CaseSensitivity csen) {
+  strcmpCased(sa, sb.c_str(), csen);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool strcmpCased(const std::string &sa, const std::string &sb, const CaseSensitivity csen) {
+  strcmpCased(sa.c_str(), sb.c_str(), csen);
+}
+
+//-------------------------------------------------------------------------------------------------
 bool strncmpCased(const char* sa, const char* sb, const int length, const CaseSensitivity csen) {
   bool match = true;
   switch (csen) {
   case CaseSensitivity::YES:
     for (int i = 0; i < length; i++) {
       match = (match && (sa[i] == sb[i]));
+      if (sa[i] == '\0' && match) {
+        return true;
+      }
     }
     break;
   case CaseSensitivity::NO:
     for (int i = 0; i < length; i++) {
       match = (match && (uppercase(sa[i]) == uppercase(sb[i])));
+      if (sa[i] == '\0' && match) {
+        return true;
+      }
     }
     break;
   case CaseSensitivity::AUTOMATIC:

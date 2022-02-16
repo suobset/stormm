@@ -32,7 +32,7 @@ struct MinimizeControls {
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \{
-  MinimizeControls(ExceptionResponse policy_in);
+  MinimizeControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
   MinimizeControls(const TextFile &tf, int *start_line,
                    ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}

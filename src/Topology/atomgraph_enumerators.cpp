@@ -5,7 +5,7 @@
 namespace omni {
 namespace topology {
 
-using parse::strncmpCased;
+using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 std::string getUnitCellTypeName(const UnitCellType uc) {
@@ -96,25 +96,25 @@ std::string getAtomicRadiusSetName(const AtomicRadiusSet rs) {
 //-------------------------------------------------------------------------------------------------
 AtomicRadiusSet translateAtomicRadiusSet(const std::string &pb_radii_in,
                                          const ExceptionResponse policy) {
-  if (strncmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
+  if (strcmpCased(pb_radii_in, std::string("bondi"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::BONDI;
   }
-  else if (strncmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
+  else if (strcmpCased(pb_radii_in, std::string("amber6"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::AMBER6;
   }
-  else if (strncmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
+  else if (strcmpCased(pb_radii_in, std::string("mbondi"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::MBONDI;
   }
-  else if (strncmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
+  else if (strcmpCased(pb_radii_in, std::string("mbondi2"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::MBONDI2;
   }
-  else if (strncmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
+  else if (strcmpCased(pb_radii_in, std::string("mbondi3"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::MBONDI3;
   }
-  else if (strncmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
+  else if (strcmpCased(pb_radii_in, std::string("parse"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::PARSE;
   }
-  else if (strncmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
+  else if (strcmpCased(pb_radii_in, std::string("none"), CaseSensitivity::NO)) {
     return AtomicRadiusSet::NONE;
   }
   else {

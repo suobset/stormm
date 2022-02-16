@@ -122,17 +122,17 @@ void MinimizeControls::validateSteepestDescentCycles() {
 
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::validateInitialStep() {
-  if (convergence_target < constants::verytiny || convergence_target) {
+  if (initial_step < constants::verytiny) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The initial step size must be nontrivial in order for the algorithm to begin moving "
-            "particles.  " + realToString(initial_step, 4, 11, NumberFormat::SCIENTIFIC) +
+            "particles.  " + realToString(initial_step, 11, 4, NumberFormat::SCIENTIFIC) +
             " is not a valid initial step.", "MinimizeControls", "validateConvergenceTarget");
     case ExceptionResponse::WARN:
       rtWarn("The initial step size must be nontrivial in order for the algorithm to begin moving "
-             "particles.  " + realToString(initial_step, 4, 11, NumberFormat::SCIENTIFIC) +
+             "particles.  " + realToString(initial_step, 11, 4, NumberFormat::SCIENTIFIC) +
              " is not a valid initial step and will be replaced by the default of " +
-             realToString(default_minimize_dx0, 4, 11, NumberFormat::SCIENTIFIC) + ".",
+             realToString(default_minimize_dx0, 11, 4, NumberFormat::SCIENTIFIC) + ".",
              "MinimizeControls", "validateConvergenceTarget");
       initial_step = default_minimize_dx0;
       break;
@@ -149,13 +149,13 @@ void MinimizeControls::validateConvergenceTarget() {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("A convergence target of " +
-            realToString(convergence_target, 4, 11, NumberFormat::SCIENTIFIC) +
+            realToString(convergence_target, 11, 4, NumberFormat::SCIENTIFIC) +
             " is not realistic.", "MinimizeControls", "validateConvergenceTarget");
     case ExceptionResponse::WARN:
       rtErr("A convergence target of " +
-            realToString(convergence_target, 4, 11, NumberFormat::SCIENTIFIC) +
+            realToString(convergence_target, 11, 4, NumberFormat::SCIENTIFIC) +
             " is not realistic and will be replaced by the default value of " +
-            realToString(default_minimize_drms, 4, 11, NumberFormat::SCIENTIFIC) + ".",
+            realToString(default_minimize_drms, 11, 4, NumberFormat::SCIENTIFIC) + ".",
             "MinimizeControls", "validateConvergenceTarget");
       convergence_target = default_minimize_drms;
       break;

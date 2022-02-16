@@ -19,7 +19,4 @@ int main(int argc, const char* argv[]) {
   UserSettings ui(argc, argv);
 
   // Read topologies and coordinate files
-  for (int i = 0; i < ui.getSystemCount(); i++) {
-    
-  }
 }

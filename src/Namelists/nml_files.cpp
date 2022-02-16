@@ -172,8 +172,10 @@ bool MoleculeSystem::validateInputCoordinateFile() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-FilesControls::FilesControls() :
-    structure_count{0}, free_topology_count{0}, free_coordinate_count{0}, system_count{0},
+FilesControls::FilesControls(const ExceptionResponse policy_in) :
+    policy{policy_in}, structure_count{0}, free_topology_count{0}, free_coordinate_count{0},
+    system_count{0},
+    all_free_frames{default_filecon_read_all_free},
     coordinate_output_format{translateCoordinateFileKind(default_filecon_outcrd_type)},
     coordinate_checkpoint_format{translateCoordinateFileKind(default_filecon_chkcrd_type)},
     topology_file_names{}, coordinate_file_names{}, systems{},
@@ -183,9 +185,10 @@ FilesControls::FilesControls() :
 {}
 
 //-------------------------------------------------------------------------------------------------
-FilesControls::FilesControls(const TextFile &tf, int *start_line, const ExceptionResponse policy,
+FilesControls::FilesControls(const TextFile &tf, int *start_line,
+                             const ExceptionResponse policy_in,
                              const std::vector<std::string> &alternatives) :
-    FilesControls()
+    FilesControls(policy_in)
 {
   // Set some alternative defaults.  This takes a vector of strings, the even-numbered strings
   // being names of actual member variables and the odd-numbered strings being the new defaults to
@@ -214,6 +217,10 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line, const Exceptio
         checkpoint_name = alternatives[i + 1];
         i++;
       }
+      else if (alternatives[i] == std::string("all_free_frames")) {
+        all_free_frames = (alternatives[i + 1] == std::string("true"));
+        i++;
+      }
     }
   }
   NamelistEmulator t_nml = filesInput(tf, start_line, policy);
@@ -238,6 +245,11 @@ int FilesControls::getFreeCoordinatesCount() const {
 //-------------------------------------------------------------------------------------------------
 int FilesControls::getSystemDefinitionCount() const {
   return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool FilesControls::readAllFreeFrames() const {
+  return all_free_frames;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -294,6 +306,11 @@ std::string FilesControls::getCheckpointFileName() const {
 //-------------------------------------------------------------------------------------------------
 std::string FilesControls::getWarningFileName() const {
   return warning_file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::setAllFreeFrameReading(const bool active) {
+  all_free_frames = active;
 }
 
 //-------------------------------------------------------------------------------------------------

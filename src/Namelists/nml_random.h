@@ -35,7 +35,7 @@ struct RandomControls {
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \{
-  RandomControls(ExceptionResponse policy_in);
+  RandomControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
   RandomControls(const TextFile &tf, int *start_line,
                  ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
