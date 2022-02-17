@@ -28,7 +28,7 @@ RandomControls::RandomControls(const TextFile &tf, int *start_line,
   stream_count = t_nml.getIntValue("igstreams");
   production_stride = t_nml.getIntValue("igstride");
   warmup_cycles = t_nml.getIntValue("igwarmup");
-
+  
   // Validate user input
   validateRandomSeed();
   validateStreamCount();
@@ -208,7 +208,6 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line, const Exceptio
   // namelist.  An alternative is to keep an independent counter to track progress through the
   // input file in search for &rst namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::NO, tf.getLineCount());
-
   return t_nml;
 }
 

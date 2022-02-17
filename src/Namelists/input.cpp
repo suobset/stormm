@@ -53,7 +53,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
   const int n_title_char = title_key.size();
   if (n_title_char == 1) {
     rtErr("Cannot search for a namelist with no title in " + tf.getFileName() + ".",
-          "readNamelist");
+          "pullNamelist");
   }
   int namelist_start = -1;
   const TextFileReader tfr = tf.data();
@@ -108,7 +108,8 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
                                (tfr.text[k] == '[' || tfr.text[k] == '(' || tfr.text[k] == '{' ||
                                 tfr.text[k] == ']' || tfr.text[k] == ')' || tfr.text[k] == '}'));
             }
-            const int n_pad_char = tfr.line_limits[next_line] - start_char + (2 * n_enclosures);
+            const int n_pad_char = tfr.line_limits[next_line] - start_char + (2 * n_enclosures) +
+                                   1;
             std::vector<bool> line_quoted(n_pad_char, false);
             std::vector<bool> line_commented(n_pad_char, false);
             std::string tweaked_line(n_pad_char, ' ');
@@ -138,6 +139,23 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
                 line_commented[m] = commented[k];
                 m++;
               }
+            }
+
+            // Extend the line accumulant by one character of white space.
+            tweaked_line[m] = ' ';
+
+            // Determine what to add to the quotation and comment masks.
+            if (next_line < tfr.line_count) {
+              line_quoted[m] = quoted[tfr.line_limits[next_line]];
+              line_commented[m] = commented[tfr.line_limits[next_line]];
+            }
+            else {
+
+              // If the file ends in an open quotation, it won't be part of a namelist, so this
+              // editing will not interfere with normal operations of the comment and quotation
+              // parsers.
+              line_quoted[m] = false;
+              line_commented[m] = false;
             }
 
             // Scan the refined line for a namelist terminating card.  This must be done manually
@@ -177,9 +195,11 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
                 }
               }
             }
-
+            
             // Add this string, with visual aids removed and enclosures separated, to a
-            // growing string containing the entire namelist
+            // growing string containing the entire namelist.  The line itself gets one character
+            // of added white space, and the comment / quotation masks are extended with the
+            // status of the final character on the original line.
             accumulated_nml += tweaked_line;
             const int n_added_char = tweaked_line.size();
             for (int k = 0; k < n_added_char; k++) {
@@ -252,7 +272,7 @@ int readNamelist(const TextFile &tf, NamelistEmulator *nml, const int start_line
   int nc_end_line = end_line;
   std::vector<std::string> nml_words = pullNamelist(tf, nml->getTitle(), start_line, wrap,
                                                     &nc_end_line);
-
+  
   // Scan through the list, trying to identify keywords followed by values.  The first word of
   // any namelist's word vector will be the title card of the namelist itself, and the last word
   // will be "&end" or "/".  Neither needs interpretation.
