@@ -81,13 +81,13 @@ std::string getBaseName(const std::string &path);
 /// \param path  The path to analyze
 std::vector<std::string> separatePath(const std::string &path);
 
-/// \brief Given a path that has been established to be a directory, list all files it could
-///        describe, recursively descend into subdirectories if requested.  The recursion only
-///        kicks in once the regular expression has been interpreted into a path that is, itself,
-///        a directory.  Otherwise, "A/*/B/[a-z]*" will find all subdirectories of A/ such that
-///        they contain their own subdirectory B/ and within each such B/ all files beginning with
-///        a lowercase letter or, if recursion is activated, descend recursively into any and all
-///        subdirectories of B/ whose name begins with a lowercase letter listing all files.
+/// \brief Given a path that has been established to be a regular expression, list all files it
+///        could describe, recursively descend into subdirectories if requested.  The recursion
+///        only kicks in once the regular expression has been interpreted into a path that is,
+///        itself, a directory.  Otherwise, "A/*/B/[a-z]*" will find all subdirectories of A/ such
+///        that they contain their own subdirectory B/ and within each such B/ all files beginning
+///        with a lowercase letter or, if recursion is activated, descend recursively into any and
+///        all subdirectories of B/ whose name begins with a lowercase letter listing all files.
 ///        The search string "A/*/B/[a-z]*" would not find a file A/foo.txt, but it would find
 ///        A/bar/B/foo.txt, and if recursion were activated it would find A/bar/B/C/D/E/foo.txt.
 ///

@@ -212,10 +212,5 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line, const Exceptio
   return t_nml;
 }
 
-//-------------------------------------------------------------------------------------------------
-void validateRandomSeed(const int igseed, int *warmup_cycles) {
-
-}
-
 } // namespace namelist
 } // namespace omni

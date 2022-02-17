@@ -264,7 +264,7 @@ void CheckList::printSummary(const TestVerbosity verbosity) {
              n_succ, n_fail, n_ignr, n_skip);
     }
     else if (n_fail > 0 || n_ignr > 0) {
-      printf("Total failure (%4d failures can be ignored, %4d tests were skipped)\n",
+      printf("Total failure (%4d failures can be ignored, %4d tests were skipped)",
              n_ignr, n_skip);
       if (n_filled_sections > 1) {
         printf(" in %2d sections:\n", n_filled_sections);

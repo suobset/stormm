@@ -32,8 +32,14 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line,
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   print_frequency = t_nml.getIntValue("ntpr");
-  electrostatic_cutoff = t_nml.getRealValue("es_cutoff");
-  lennard_jones_cutoff = t_nml.getRealValue("lj_cutoff");
+  if (t_nml.getKeywordStatus("cut") != InputStatus::MISSING) {
+    electrostatic_cutoff = t_nml.getRealValue("cut");
+    lennard_jones_cutoff = t_nml.getRealValue("cut");
+  }
+  else {
+    electrostatic_cutoff = t_nml.getRealValue("es_cutoff");
+    lennard_jones_cutoff = t_nml.getRealValue("vdw_cutoff");
+  }
   initial_step = t_nml.getRealValue("dx0");
   convergence_target = t_nml.getRealValue("drms");
 
@@ -275,9 +281,10 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
                                    std::to_string(default_minimize_ncyc)));
   t_nml.addKeyword(NamelistElement("ntpr", NamelistType::INTEGER,
                                    std::to_string(default_minimize_ntpr)));
+  t_nml.addKeyword(NamelistElement("cut", NamelistType::REAL, std::string("MISSING")));
   t_nml.addKeyword(NamelistElement("es_cutoff", NamelistType::REAL,
                                    std::to_string(default_minimize_cut)));
-  t_nml.addKeyword(NamelistElement("lj_cutoff", NamelistType::REAL,
+  t_nml.addKeyword(NamelistElement("vdw_cutoff", NamelistType::REAL,
                                    std::to_string(default_minimize_cut)));
   t_nml.addKeyword(NamelistElement("dx0", NamelistType::REAL,
                                    std::to_string(default_minimize_dx0)));
@@ -290,8 +297,9 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
                 "akin to the mdout results in Amber's sander and pmemd programs.  The default "
                 "of " + std::to_string(default_minimize_ntpr) + " suppresses output except at the "
                 "outset of the run.");
+  t_nml.addHelp("cut", "Cutoff to apply to all short-ranged interactions.");
   t_nml.addHelp("es_cutoff", "Cutoff to apply to electrostatic (short-ranged) interactions.");
-  t_nml.addHelp("lj_cutoff", "Cutoff to apply to Lennard-Jones interactions.");
+  t_nml.addHelp("vdw_cutoff", "Cutoff to apply to Lennard-Jones interactions.");
   t_nml.addHelp("dx0", "Magnitude of the initial displacement along the gradient vector.  The "
                 "size of subsequent moves will grow or shrink based on the history of success in "
                 "previous optimizations.");

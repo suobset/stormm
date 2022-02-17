@@ -173,7 +173,7 @@ void rtErr(const std::string &message, const char* class_caller, const char* met
 void rtWarn(const std::string &message, const char* class_caller, const char* method_caller) {
   std::string ccall(" Warning: ");
   if (class_caller != nullptr) {
-    ccall += std::string(class_caller) + " :: ";
+    ccall += std::string(class_caller);
   }
   std::string parsed_msg = terminalFormat(message, ccall.c_str(), method_caller, 0, 0, 10);
   printf("%s\n", parsed_msg.c_str());
@@ -183,7 +183,7 @@ void rtWarn(const std::string &message, const char* class_caller, const char* me
 void rtAlert(const std::string &message, const char* class_caller, const char* method_caller) {
   std::string ccall(" Alert: ");
   if (class_caller != nullptr) {
-    ccall += std::string(class_caller) + " :: ";
+    ccall += std::string(class_caller);
   }
   std::string parsed_msg = terminalFormat(message, ccall.c_str(), method_caller, 0, 0, 8);
   printf("%s\n", parsed_msg.c_str());

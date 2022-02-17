@@ -8,6 +8,9 @@ namespace namelist {
 
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
+using diskutil::listDirectory;
+using diskutil::listFilesInPath;
+using diskutil::SearchStyle;
 using parse::findStringInVector;
 using parse::WrapTextSearch;
 using trajectory::translateCoordinateFileKind;
@@ -226,6 +229,8 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
   NamelistEmulator t_nml = filesInput(tf, start_line, policy);
   const int nsys = t_nml.getKeywordEntries("-sys") *
                    (t_nml.getKeywordStatus("-sys") != InputStatus::MISSING);
+
+  // Get the systems in order
   for (int i = 0; i < nsys; i++) {
     bool complete = true;
     const std::string top_name = t_nml.getStringValue("-sys", "-p", i);
@@ -235,40 +240,130 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     std::string missing_elements("");
     if (top_name.size() == 0LLU) {
       missing_elements += "-p";
+      complete = false;
     }
     if (crd_name.size() == 0LLU) {
       missing_elements += (missing_elements.size() > 0LLU) ? ", -c" : "-c";
+      complete = false;
     }
     if (trj_name.size() == 0LLU) {
       missing_elements += (missing_elements.size() > 0LLU) ? ", -x" : "-x";
+      complete = false;
     }
     if (rst_name.size() == 0LLU) {
       missing_elements += (missing_elements.size() > 0LLU) ? ", -r" : "-r";
+      complete = false;
     }
-    switch (policy) {
-    case ExceptionResponse::DIE:
-      rtErr("Instance " + std::to_string(i) + " of the \"-sys\" keyword is missing elements: " +
-            missing_elements + ".", "FilesControls");
-    case ExceptionResponse::WARN:
-      rtWarn("Instance " + std::to_string(i) + " of the \"-sys\" keyword is missing elements: " +
-             missing_elements + ".  These must be supplied in order for this system to be "
-             "considered.", "FilesControls");
-      break;
-    case ExceptionResponse::SILENT:
-      break;
+    if (complete == false) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Instance " + std::to_string(i) + " of the \"-sys\" keyword is missing elements: " +
+              missing_elements + ".", "FilesControls");
+      case ExceptionResponse::WARN:
+        rtWarn("Instance " + std::to_string(i) + " of the \"-sys\" keyword is missing elements: " +
+               missing_elements + ".  These must be supplied in order for this system to be "
+               "considered.", "FilesControls");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
     }
     CoordinateFileKind c_kind, x_kind, r_kind;
-    c_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "-c_kind", i));
-    x_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "-x_kind", i));
-    r_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "-r_kind", i));
-    systems.push_back(MoleculeSystem(t_nml.getStringValue("-sys", "-p", i),
-                                     t_nml.getStringValue("-sys", "-c", i),
-                                     t_nml.getStringValue("-sys", "-x", i),
-                                     t_nml.getStringValue("-sys", "-r", i),
-                                     t_nml.getIntValue("-sys", "frame_start", i),
-                                     t_nml.getIntValue("-sys", "frame_end", i),
-                                     t_nml.getIntValue("-sys", "-n", i), c_kind, x_kind, r_kind));
+    c_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "c_kind", i));
+    x_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "x_kind", i));
+    r_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "r_kind", i));
+
+    // Check for the existence of critical files
+    if (getDrivePathType(t_nml.getStringValue("-sys", "-p", i)) != DrivePathType::FILE) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("System " + std::to_string(i + 1) + " names an invalid topology file " +
+              t_nml.getStringValue("-sys", "-p", i) + ".", "FilesControls");
+      case ExceptionResponse::WARN:
+        rtWarn("System " + std::to_string(i + 1) + " names an invalid topology file " +
+               t_nml.getStringValue("-sys", "-p", i) + " and will be omitted.", "FilesControls");
+        complete = false;
+        break;
+      case ExceptionResponse::SILENT:
+        complete = false;
+        break;
+      }
+    }
+    if (getDrivePathType(t_nml.getStringValue("-sys", "-c", i)) != DrivePathType::FILE) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("System " + std::to_string(i + 1) + " names an invalid starting coordinates file " +
+              t_nml.getStringValue("-sys", "-c", i) + ".", "FilesControls");
+      case ExceptionResponse::WARN:
+        rtWarn("System " + std::to_string(i + 1) + " names an invalid starting coordinates file " +
+               t_nml.getStringValue("-sys", "-c", i) + " and will be omitted.", "FilesControls");
+        complete = false;
+        break;
+      case ExceptionResponse::SILENT:
+        complete = false;
+        break;
+      }
+    }
+    if (complete) {
+      systems.push_back(MoleculeSystem(t_nml.getStringValue("-sys", "-p", i),
+                                       t_nml.getStringValue("-sys", "-c", i),
+                                       t_nml.getStringValue("-sys", "-x", i),
+                                       t_nml.getStringValue("-sys", "-r", i),
+                                       t_nml.getIntValue("-sys", "frame_start", i),
+                                       t_nml.getIntValue("-sys", "frame_end", i),
+                                       t_nml.getIntValue("-sys", "-n", i),
+                                       c_kind, x_kind, r_kind));
+    }
   }
+  system_count = systems.size();
+  
+  // Get free topologies
+  const int n_free_top = t_nml.getKeywordEntries("-p") *
+                         (t_nml.getKeywordStatus("-p") != InputStatus::MISSING);
+  for (int i = 0; i < n_free_top; i++) {
+    const std::string fipath = t_nml.getStringValue("-p", i);
+    const DrivePathType fitype = getDrivePathType(fipath);
+    switch (fitype) {
+    case DrivePathType::FILE:
+      topology_file_names.push_back(fipath);
+      break;
+    case DrivePathType::DIRECTORY:
+      {
+        const std::vector<std::string> allfi = listDirectory(fipath);
+        topology_file_names.insert(topology_file_names.end(), allfi.begin(), allfi.end());
+      }
+    case DrivePathType::REGEXP:
+      {
+        const std::vector<std::string> allfi = listFilesInPath(fipath, SearchStyle::RECURSIVE);
+        topology_file_names.insert(topology_file_names.end(), allfi.begin(), allfi.end());        
+      }
+    }
+  }
+  free_topology_count = topology_file_names.size();
+
+  // Get free coordinates
+  const int n_free_crd = t_nml.getKeywordEntries("-c") *
+                         (t_nml.getKeywordStatus("-c") != InputStatus::MISSING);
+  for (int i = 0; i < n_free_crd; i++) {
+    const std::string fipath = t_nml.getStringValue("-c", i);
+    const DrivePathType fitype = getDrivePathType(fipath);
+    switch (fitype) {
+    case DrivePathType::FILE:
+      coordinate_file_names.push_back(fipath);
+      break;
+    case DrivePathType::DIRECTORY:
+      {
+        const std::vector<std::string> allfi = listDirectory(fipath);
+        coordinate_file_names.insert(coordinate_file_names.end(), allfi.begin(), allfi.end());
+      }
+    case DrivePathType::REGEXP:
+      {
+        const std::vector<std::string> allfi = listFilesInPath(fipath, SearchStyle::RECURSIVE);
+        coordinate_file_names.insert(coordinate_file_names.end(), allfi.begin(), allfi.end());
+      }
+    }
+  }
+  free_coordinate_count = coordinate_file_names.size();  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -457,7 +552,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
                                      NamelistType::INTEGER, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING },
                                    { std::string(""), std::string(""), std::string(""),
-                                     std::string(""), "0", "0", "1",
+                                     std::string(default_filecon_checkpoint_name), "0", "0", "1",
                                      std::string(default_filecon_inpcrd_type),
                                      std::string(default_filecon_outcrd_type),
                                      std::string(default_filecon_chkcrd_type) },
@@ -495,7 +590,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
                 "fallback for free topology / coordinate pairs or systems with no specified "
                 "restart file name.");
   t_nml.addHelp("-wrn", "Warnings reported for the run, collecting results from all systems.");
-
+  
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.
   *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());

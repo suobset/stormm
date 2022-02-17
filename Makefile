@@ -265,6 +265,7 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_hybrid \
 	          $(TESTDIR)/bin/test_parse \
 	          $(TESTDIR)/bin/test_input \
+	          $(TESTDIR)/bin/test_namelists \
 	          $(TESTDIR)/bin/test_math \
 	          $(TESTDIR)/bin/test_numerics \
 	          $(TESTDIR)/bin/test_amber_prmtop \
@@ -363,6 +364,12 @@ $(TESTDIR)/bin/test_input : $(LIBDIR)/libomni.so $(TESTDIR)/Parsing/test_input.c
 	@echo "[OMNI]  Building test_input..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_input $(TESTDIR)/Parsing/test_input.cpp \
 	  -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: namelist input features program
+$(TESTDIR)/bin/test_namelists : $(LIBDIR)/libomni.so $(TESTDIR)/Namelists/test_namelists.cpp
+	@echo "[OMNI]  Building test_namelists..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_namelists \
+	  $(TESTDIR)/Namelists/test_namelists.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: math operations program
 $(TESTDIR)/bin/test_math : $(LIBDIR)/libomni.so $(TESTDIR)/Math/test_math.cpp

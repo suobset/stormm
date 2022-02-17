@@ -599,9 +599,9 @@ void NamelistElement::setStringValue(const std::string &sub_key_query, const std
 //-------------------------------------------------------------------------------------------------
 bool NamelistElement::defaultIsMissing(const std::string &default_input) const {
 
-  // A zero-length string means missing data, as do three reserved words
+  // A zero-length string means missing data, as do two reserved words
   return (default_input.size() == 0 || strncmpCased(default_input, "MISSING") ||
-          strncmpCased(default_input, "UNKNOWN") || strncmpCased(default_input, "BLANK"));
+          strncmpCased(default_input, "BLANK"));
 }
 
 //-------------------------------------------------------------------------------------------------
