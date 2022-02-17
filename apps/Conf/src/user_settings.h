@@ -53,7 +53,7 @@ private:
   std::string common_core_mask;
 
   // Control parameters: these structs each encapsulate their own namelist from the input file.
-  FilesControls file_input;         ///< All input and output file names, save for the command file
+  FilesControls file_io_input;      ///< All input and output file names, save for the command file
   MinimizeControls line_min_input;  ///< Line minimization directives
   SolventControls solvent_input;    ///< Implicit solvent specifications
   RandomControls prng_input;        ///< Random number generator specifications

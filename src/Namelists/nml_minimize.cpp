@@ -273,6 +273,12 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
                                    std::to_string(default_minimize_maxcyc)));
   t_nml.addKeyword(NamelistElement("ncyc", NamelistType::INTEGER,
                                    std::to_string(default_minimize_ncyc)));
+  t_nml.addKeyword(NamelistElement("ntpr", NamelistType::INTEGER,
+                                   std::to_string(default_minimize_ntpr)));
+  t_nml.addKeyword(NamelistElement("es_cutoff", NamelistType::REAL,
+                                   std::to_string(default_minimize_cut)));
+  t_nml.addKeyword(NamelistElement("lj_cutoff", NamelistType::REAL,
+                                   std::to_string(default_minimize_cut)));
   t_nml.addKeyword(NamelistElement("dx0", NamelistType::REAL,
                                    std::to_string(default_minimize_dx0)));
   t_nml.addKeyword(NamelistElement("drms", NamelistType::REAL,
@@ -280,6 +286,12 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
   t_nml.addHelp("maxcyc", "Maximum number of line minimization cycles to pursue.");
   t_nml.addHelp("ncyc", "Number of steepest-descent optimization steps to perform, prior to the "
                 "onset of conjugate gradient optimization for the remaining maxcyc - ncyc steps.");
+  t_nml.addHelp("ntpr", "Interval at which to report energy diagnostics for the minimization run, "
+                "akin to the mdout results in Amber's sander and pmemd programs.  The default "
+                "of " + std::to_string(default_minimize_ntpr) + " suppresses output except at the "
+                "outset of the run.");
+  t_nml.addHelp("es_cutoff", "Cutoff to apply to electrostatic (short-ranged) interactions.");
+  t_nml.addHelp("lj_cutoff", "Cutoff to apply to Lennard-Jones interactions.");
   t_nml.addHelp("dx0", "Magnitude of the initial displacement along the gradient vector.  The "
                 "size of subsequent moves will grow or shrink based on the history of success in "
                 "previous optimizations.");

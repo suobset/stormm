@@ -33,33 +33,61 @@ struct NamelistEmulator {
   /// \brief Obtain the number of parameters catalogged within this namelist emulator.
   int getKeywordCount() const;
 
-  /// \brief Obtain the case sensitivity setting for this namelist
+  /// \brief Obtain the case sensitivity setting for this namelist.
   CaseSensitivity getCaseSensitivity() const;
 
-  /// \brief Relay the exception handling policy for this namelist
+  /// \brief Relay the exception handling policy for this namelist.
   ExceptionResponse getPolicy() const;
 
-  /// \brief Get a keyword from this namelist based on an index
+  /// \brief Get a keyword from this namelist based on an index.  This is for retrieving the
+  ///        keyword itself, not a value associated with a keyword.
+  ///
+  /// \param index  Index of the keyword in the list held by this namelist.  In fact, this is
+  ///               best used to step through the list of keywords in the order they were added,
+  ///               not much more.
   std::string getKeyword(size_t index) const;
 
-  /// \brief Get the type of a specific keyword within this namelist
-  NamelistType getKeywordKind(const std::string &label) const;
+  /// \brief Get the type of a specific keyword within this namelist.
+  ///
+  /// \param keyword_query  The keyword of interest
+  NamelistType getKeywordKind(const std::string &keyword_query) const;
 
-  /// \brief Get the number of entries associated with a specific keyword
-  int getKeywordEntries(const std::string &label) const;
+  /// \brief Get the number of entries associated with a specific keyword.
+  ///
+  /// \param keyword_query  The keyword of interest
+  int getKeywordEntries(const std::string &keyword_query) const;
 
+  /// \brief Get the template size of a keyword, the number of sub-keys it contains.  For
+  ///        non-struct keywords the template size is reported as 0.
+  int getSubKeyCount(const std::string &keyword_query) const;
+  
+  /// \brief Test whether a keyword has been set, be that by default or user input.
+  ///
+  /// Overloaded:
+  ///   - Get the status of the first instance of a keyword
+  ///   - Get the status of a sub-key within a keyword
+  ///   - Get the status of a specific, repeated specification of a keyword
+  ///
+  /// \param keyword_query  The keyword of interest
+  /// \param sub_key        The keyword of interest
+  /// \{
+  InputStatus getKeywordStatus(const std::string &keyword_query) const;
+  InputStatus getKeywordStatus(const std::string &keyword_query, const std::string &sub_key) const;
+  /// \}
+  
   /// \brief Get a labeled integer value from within the namelist.
   ///
   /// Overloaded:
   ///   - Get an INTEGER value for a non-STRUCT keyword
   ///   - Get an INTEGER value from within a STRUCT keyword
   ///
-  /// \param label      Identifier of the keyword of interest
-  /// \param sub_label  Identifier for the member variable within the STRUCT of interest
-  /// \param index      For keywords that store multiple values, retrieve this value
+  /// \param keyword_query  Identifier of the keyword of interest
+  /// \param sub_key        Identifier for the member variable within the STRUCT of interest
+  /// \param index          For keywords that store multiple values, retrieve this value
   /// \{
-  int getIntValue(const std::string &label, int index = 0) const;
-  int getIntValue(const std::string &label, const std::string &sub_label, int index) const;
+  int getIntValue(const std::string &keyword_query, int index = 0) const;
+  int getIntValue(const std::string &keyword_query, const std::string &sub_key,
+                  int index = 0) const;
   /// \}
 
   /// \brief Get a labeled real number value from within the namelist.
@@ -68,12 +96,13 @@ struct NamelistEmulator {
   ///   - Get a REAL value associated with a non-STRUCT keyword
   ///   - Get a REAL value from within a STRUCT keyword
   ///
-  /// \param label      Identifier of the keyword of interest
-  /// \param sub_label  Identifier for the member variable within the STRUCT of interest
-  /// \param index      For keywords that store multiple values, retrieve this value
+  /// \param keyword_query  Identifier of the keyword of interest
+  /// \param sub_key        Identifier for the member variable within the STRUCT of interest
+  /// \param index          For keywords that store multiple values, retrieve this value
   /// \{
-  double getRealValue(const std::string &label, int index = 0) const;
-  double getRealValue(const std::string &label, const std::string &sub_label, int index) const;
+  double getRealValue(const std::string &keyword_query, int index = 0) const;
+  double getRealValue(const std::string &keyword_query, const std::string &sub_key,
+                      int index = 0) const;
   /// \}
 
   /// \brief Get a labeled string value from within the namelist.
@@ -82,33 +111,33 @@ struct NamelistEmulator {
   ///   - Get a STRING value associated with a non-STRUCT keyword
   ///   - Get a STRING value from within a STRUCT keyword
   ///
-  /// \param label      Identifier of the keyword of interest
-  /// \param sub_label  Identifier for the member variable within the STRUCT of interest
-  /// \param index      For keywords that store multiple values, retrieve this value
+  /// \param keyword_query  Identifier of the keyword of interest
+  /// \param sub_key        Identifier for the member variable within the STRUCT of interest
+  /// \param index          For keywords that store multiple values, retrieve this value
   /// \{
-  std::string getStringValue(const std::string &label, int index = 0) const;
-  std::string getStringValue(const std::string &label, const std::string &sub_label,
+  std::string getStringValue(const std::string &keyword_query, int index = 0) const;
+  std::string getStringValue(const std::string &keyword_query, const std::string &sub_key,
                              int index = 0) const;
   /// \}
 
   /// \brief Get all integer values assigned to a particular keyword
   ///
-  /// \param label  Identifier of the keyword of interest
-  std::vector<int> getAllIntValues(const std::string &label,
-                                   const std::string &sub_label = std::string("")) const;
+  /// \param keyword_query  Identifier of the keyword of interest
+  std::vector<int> getAllIntValues(const std::string &keyword_query,
+                                   const std::string &sub_key = std::string("")) const;
 
   /// \brief Get all real values assigned to a particular keyword
   ///
-  /// \param label  Identifier of the keyword of interest
-  std::vector<double> getAllRealValues(const std::string &label,
-                                       const std::string &sub_label = std::string("")) const;
+  /// \param keyword_query  Identifier of the keyword of interest
+  std::vector<double> getAllRealValues(const std::string &keyword_query,
+                                       const std::string &sub_key = std::string("")) const;
 
   /// \brief Get all string values assigned to a particular keyword
   ///
-  /// \param label  Identifier of the keyword of interest
+  /// \param keyword_query  Identifier of the keyword of interest
   std::vector<std::string>
-  getAllStringValues(const std::string &label,
-                     const std::string &sub_label = std::string("")) const;
+  getAllStringValues(const std::string &keyword_query,
+                     const std::string &sub_key = std::string("")) const;
 
   /// \brief Report the help message associated with a keyword or sub-key.  This can be useful for
   ///        developers who wish to alert users to erroneous input.
@@ -117,9 +146,12 @@ struct NamelistEmulator {
   ///   - Report user documentation for the namelist as a whole
   ///   - Report user documentation for any keyword (including STRUCTs) within the namelist
   ///   - Report user documentation for a sub-key within a STRUCT keyword in the namelist
+  ///
+  /// \param keyword_query  Identifier of the keyword of interest
+  /// \param sub_key        Identifier for the member variable within the STRUCT of interest
   std::string getHelp() const;
-  std::string getHelp(const std::string &label) const;
-  std::string getHelp(const std::string &label, const std::string &sub_label) const;
+  std::string getHelp(const std::string &keyword_query) const;
+  std::string getHelp(const std::string &keyword_query, const std::string &sub_key) const;
   /// \}
 
   /// \brief Add a keyword to the namelist.
@@ -127,10 +159,13 @@ struct NamelistEmulator {
   /// Overloaded:
   ///   - Add a single keyword (be it a INTEGER, REAL, STRING, or STRUCT namelist element)
   ///   - Add multiple keywords
+  ///
+  /// \param new_key   The keyword to add
+  /// \param new_keys  The keywords to add
   /// \{
-  void addKeyword(const NamelistElement &param);
-  void addKeyword(const std::vector<NamelistElement> &param);
-  void addKeywords(const std::vector<NamelistElement> &params);
+  void addKeyword(const std::vector<NamelistElement> &new_keys);
+  void addKeywords(const std::vector<NamelistElement> &new_keys);
+  void addKeyword(const NamelistElement &new_key);
   /// \}
 
   /// \brief Assign values to elements of each particular NamelistType.  These overloaded functions
@@ -146,9 +181,8 @@ struct NamelistEmulator {
   ///   - Assign a single integer, real, or string value to the INTEGER, REAL, or STRING member of
   ///     a STRUCT namelist element
   /// \{
-  int assignElement(const std::string &label, const std::string &value);
-  int assignElement(const std::string &label, const std::string &sub_label,
-                    const std::string &value);
+  int assignElement(const std::string &key, const std::string &value);
+  int assignElement(const std::string &key, const std::string &sub_key, const std::string &value);
   /// \}
 
   /// \brief When loading data for STRUCT-type keywords, the decision to increment the number of
@@ -159,9 +193,9 @@ struct NamelistEmulator {
   ///        STRUCT, that function must go through the NamelistEmulator in order to increment
   ///        the keyword's entry count.
   ///
-  /// \param label  The STRUCT-type keyword of interest (its membership in the namelist will be
-  ///               verified)
-  void triggerResizeBuffer(const std::string &label);
+  /// \param key  The STRUCT-type keyword of interest (its membership in the namelist will be
+  ///             verified)
+  void triggerResizeBuffer(const std::string &key);
 
   /// \brief Attach a help message to the namelist itself, to a keyword within the namelist, or
   ///        even to a member variable of a STRUCT-associated keyword in the namelist.  This is
@@ -174,13 +208,13 @@ struct NamelistEmulator {
   ///   - Attach a help message to a sub-key within a STRUCT keyword in the namelist
   ///
   /// \param blurb      The help message to attach
-  /// \param label      Label of the namelist keyword to which the help message gets attached
-  /// \param sub_label  Label of the member variable of the STRUCT namelist keyword to which the
+  /// \param key        Label of the namelist keyword to which the help message gets attached
+  /// \param sub_key    Label of the member variable of the STRUCT namelist keyword to which the
   ///                   help message gets attached
   /// \{
   void addHelp(const std::string &blurb);
-  void addHelp(const std::string &label, const std::string &blurb);
-  void addHelp(const std::string &label, const std::string &sub_label, const std::string &blurb);
+  void addHelp(const std::string &key, const std::string &blurb);
+  void addHelp(const std::string &key, const std::string &sub_key, const std::string &blurb);
   /// \}
 
   /// \brief Add a category to a namelist to group its keywords for user documentation
@@ -191,9 +225,9 @@ struct NamelistEmulator {
   /// \brief Place a namelist keyword into one of a list of arbitrary categories defined by the
   ///        developer.  This is for organizing the user documentation.
   ///
-  /// \param label           The namelist keyword to find and catagorize
+  /// \param key             The namelist keyword to find and catagorize
   /// \param category_label  The category to put it in
-  void categorizeKeyword(const std::string &label, const std::string &category_label);
+  void categorizeKeyword(const std::string &key, const std::string &category_label);
 
   /// \brief Print the documentation for a specific keyword.  The format is fixed in the sense
   ///        that it will have a set indentation, a dash for a bullet point, and the keyword
@@ -209,7 +243,6 @@ struct NamelistEmulator {
   /// \brief Print a complete table of the values for all parameters in this namelist, starting
   ///        including their sources (input statuses, i.e. DEFAULT, MISSING, or USER-SPECIFIED).
   void printContents() const;
-
   
 private:
   std::string title;                       ///< Title of this namelist, i.e. &cntrl
@@ -233,6 +266,17 @@ private:
   ///
   /// \param query   The label to seek inside the namelist
   int findIndexByKeyword(const std::string &query) const;
+
+  /// \brief Verify the establishment of a keyword, either by user specification or default.
+  ///        This is called before returning any information collected from a namelist and will
+  ///        trigger an error if the requested information does not exist.
+  ///
+  /// \param keyword_query  The label that was sought inside the namelist
+  /// \param p_index        The keyword (parameter) index within the larger namelist emulator
+  /// \param caller         Calling function that is seeking some keyword's information, i.e.
+  ///                       getIntValue()
+  void verifyEstablishment(const std::string &keyword_query, const size_t p_index,
+                           const char* caller) const;
 };
 
 } // namespace namelist

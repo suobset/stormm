@@ -78,12 +78,44 @@ int NamelistEmulator::getKeywordEntries(const std::string &keyword_query) const 
 }
 
 //-------------------------------------------------------------------------------------------------
+int NamelistEmulator::getSubKeyCount(const std::string &keyword_query) const {
+  const size_t p_index = findIndexByKeyword(keyword_query);
+  if (p_index >= keywords.size()) {
+    rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
+          "NamelistEmulator", "getSubKeyCount");
+  }
+  return keywords[p_index].getTemplateSize();
+}
+
+//-------------------------------------------------------------------------------------------------
+InputStatus NamelistEmulator::getKeywordStatus(const std::string &keyword_query) const {
+  const size_t p_index = findIndexByKeyword(keyword_query);
+  if (p_index >= keywords.size()) {
+    rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
+          "NamelistEmulator", "getKeywordEntries");
+  }
+  return keywords[p_index].getEstablishment();
+}
+
+//-------------------------------------------------------------------------------------------------
+InputStatus NamelistEmulator::getKeywordStatus(const std::string &keyword_query,
+                                               const std::string &sub_key) const {
+  const size_t p_index = findIndexByKeyword(keyword_query);
+  if (p_index >= keywords.size()) {
+    rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
+          "NamelistEmulator", "getKeywordEntries");
+  }
+  return keywords[p_index].getEstablishment(sub_key);
+}
+
+//-------------------------------------------------------------------------------------------------
 int NamelistEmulator::getIntValue(const std::string &keyword_query, const int index) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getIntValue");
   }
+  verifyEstablishment(keyword_query, p_index, "getIntValue");
   return keywords[p_index].getIntValue(index);
 }
 
@@ -95,6 +127,7 @@ int NamelistEmulator::getIntValue(const std::string &keyword_query, const std::s
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getIntValue");
   }
+  verifyEstablishment(keyword_query, p_index, "getIntValue");
   return keywords[p_index].getIntValue(sub_key, index);
 }
 
@@ -105,6 +138,7 @@ double NamelistEmulator::getRealValue(const std::string &keyword_query, const in
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getRealValue");
   }
+  verifyEstablishment(keyword_query, p_index, "getRealValue");
   return keywords[p_index].getRealValue(index);
 }
 
@@ -116,6 +150,7 @@ double NamelistEmulator::getRealValue(const std::string &keyword_query, const st
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getRealValue");
   }
+  verifyEstablishment(keyword_query, p_index, "getRealValue");
   return keywords[p_index].getRealValue(sub_key, index);
 }
 
@@ -126,6 +161,7 @@ std::string NamelistEmulator::getStringValue(const std::string &keyword_query, c
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getStringValue");
   }
+  verifyEstablishment(keyword_query, p_index, "getStringValue");
   return keywords[p_index].getStringValue(index);
 }
 
@@ -137,6 +173,7 @@ std::string NamelistEmulator::getStringValue(const std::string &keyword_query,
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getStringValue");
   }
+  verifyEstablishment(keyword_query, p_index, "getStringValue");
   return keywords[p_index].getStringValue(sub_key, index);
 }
 
@@ -148,6 +185,7 @@ std::vector<int> NamelistEmulator::getAllIntValues(const std::string &keyword_qu
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getAllIntValues");
   }
+  verifyEstablishment(keyword_query, p_index, "getAllIntValues");
   return keywords[p_index].getIntValue(sub_key);
 }
 
@@ -159,6 +197,7 @@ std::vector<double> NamelistEmulator::getAllRealValues(const std::string &keywor
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getAllRealValues");
   }
+  verifyEstablishment(keyword_query, p_index, "getAllRealValues");
   return keywords[p_index].getRealValue(sub_key);
 }
 
@@ -170,6 +209,7 @@ std::vector<std::string> NamelistEmulator::getAllStringValues(const std::string 
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getAllStringValues");
   }
+  verifyEstablishment(keyword_query, p_index, "getAllStringValues");
   return keywords[p_index].getStringValue(sub_key);
 }
 
@@ -210,35 +250,35 @@ std::string NamelistEmulator::getHelp(const std::string &keyword_query,
 }
 
 //-------------------------------------------------------------------------------------------------
-void NamelistEmulator::addKeyword(const std::vector<NamelistElement> &params) {
-  const int n_param = params.size();
-  for (int i = 0; i < n_param; i++) {
+void NamelistEmulator::addKeyword(const std::vector<NamelistElement> &new_keys) {
+  const int n_new_key = new_keys.size();
+  for (int i = 0; i < n_new_key; i++) {
 
     // Check that the namelist does not already contain this keyword.  Such would be an outright
     // error, as no developer should be doing this when making an actual program.
     const int n_stored = keywords.size();
     for (int j = 0; j < n_stored; j++) {
-      if (params[i].label == keywords[j].label) {
+      if (new_keys[i].label == keywords[j].label) {
         rtErr("Namelist \"" + title + "\" already has a " +
               getNamelistTypeName(keywords[j].kind) + " keyword " + keywords[j].label +
-              ".  A " + getNamelistTypeName(params[i].kind) + " keyword of the same name cannot "
+              ".  A " + getNamelistTypeName(new_keys[i].kind) + " keyword of the same name cannot "
               "be added.", "NamelistEmulator", "addKeyword");
       }
     }
-    keywords.push_back(params[i]);
+    keywords.push_back(new_keys[i]);
     keywords.back().setPolicy(policy);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void NamelistEmulator::addKeywords(const std::vector<NamelistElement> &params) {
-  addKeyword(params);
+void NamelistEmulator::addKeywords(const std::vector<NamelistElement> &new_keys) {
+  addKeyword(new_keys);
 }
 
 //-------------------------------------------------------------------------------------------------
-void NamelistEmulator::addKeyword(const NamelistElement &param) {
-  std::vector<NamelistElement> params(1, param);
-  addKeyword(params);
+void NamelistEmulator::addKeyword(const NamelistElement &new_key) {
+  std::vector<NamelistElement> new_keys(1, new_key);
+  addKeyword(new_keys);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -390,6 +430,46 @@ int NamelistEmulator::assignElement(const std::string &key, const std::string &s
           "\" should never be handled in this context.", "NamelistEmulator", "assignElement");
   }
   return 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+void NamelistEmulator::triggerResizeBuffer(const std::string &key) {
+  const size_t param_index = findIndexByKeyword(key);
+
+  // No exception handling is needed here.  Problems will be caught earlier by assignElement().
+  // Check that the keyword is part of the namelist, however.  If the keyword is associated with
+  // a STRUCT, which is the purpose of providing this function for NamelistEmulators to control
+  // advancement of their unerlying NamelistElement entry counts, ensure that all sub-keys in the
+  // STRUCT either have default values or have been specified by the user.
+  if (param_index < keywords.size()) {
+    if (keywords[param_index].kind == NamelistType::STRUCT) {
+      bool advance = false;
+      bool problem = false;
+      for (int i = 0; i < keywords[param_index].template_size; i++) {
+        if (keywords[param_index].sub_key_found[i] == false &&
+            keywords[param_index].template_establishment[i] == InputStatus::MISSING) {
+
+          // Issue alerts until the entire STRUCT has been examined, then trigger a runtime error
+          rtAlert("Incomplete STRUCT entry for keyword \"" + key + "\" of namelist \"" + title +
+                  "\": sub-key \"" + keywords[param_index].sub_keys[i] + "\" does not have a "
+                  "user specification or a default value.", "NamelistEmulator",
+                  "triggerResizeBuffer");
+          problem = true;
+        }
+        else if (keywords[param_index].sub_key_found[i]) {
+          keywords[param_index].establishment = InputStatus::USER_SPECIFIED;
+          advance = true;
+        }
+      }
+      if (problem) {
+        rtErr("Incomplete specification of data associated with a STRUCT keyword.",
+              "NamelistEmulator", "triggerResizeBuffer");
+      }
+      else if (advance) {
+        keywords[param_index].resizeBuffer();
+      }
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -702,44 +782,13 @@ int NamelistEmulator::findIndexByKeyword(const std::string &query) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-void NamelistEmulator::triggerResizeBuffer(const std::string &key) {
-  const size_t param_index = findIndexByKeyword(key);
-
-  // No exception handling is needed here.  Problems will be caught earlier by assignElement().
-  // Check that the keyword is part of the namelist, however.  If the keyword is associated with
-  // a STRUCT, which is the purpose of providing this function for NamelistEmulators to control
-  // advancement of their unerlying NamelistElement entry counts, ensure that all sub-keys in the
-  // STRUCT either have default values or have been specified by the user.
-  if (param_index < keywords.size()) {
-    if (keywords[param_index].kind == NamelistType::STRUCT) {
-      bool advance = false;
-      bool problem = false;
-      for (int i = 0; i < keywords[param_index].template_size; i++) {
-        if (keywords[param_index].sub_key_found[i] == false &&
-            keywords[param_index].template_establishment[i] == InputStatus::MISSING) {
-
-          // Issue alerts until the entire STRUCT has been examined, then trigger a runtime error
-          rtAlert("Incomplete STRUCT entry for keyword \"" + key + "\" of namelist \"" + title +
-                  "\": sub-key \"" + keywords[param_index].sub_keys[i] + "\" does not have a "
-                  "user specification or a default value.", "NamelistEmulator",
-                  "triggerResizeBuffer");
-          problem = true;
-        }
-        else if (keywords[param_index].sub_key_found[i]) {
-          keywords[param_index].establishment = InputStatus::USER_SPECIFIED;
-          advance = true;
-        }
-      }
-      if (problem) {
-        rtErr("Incomplete specification of data associated with a STRUCT keyword.",
-              "NamelistEmulator", "triggerResizeBuffer");
-      }
-      else if (advance) {
-        keywords[param_index].resizeBuffer();
-      }
-    }
+void NamelistEmulator::verifyEstablishment(const std::string &keyword_query, const size_t p_index,
+                                           const char* caller) const {
+  if (keywords[p_index].getEstablishment() == InputStatus::MISSING) {
+    rtErr("Namelist \"" + title + "\" keyword \"" + keyword_query + "\" has not been set by "
+          "default or by the user.", "NamelistEmulator", caller);
   }
 }
-
+  
 } // namespace namelist
 } // namespace omni

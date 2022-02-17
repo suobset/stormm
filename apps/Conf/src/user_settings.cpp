@@ -24,7 +24,7 @@ using omni::parse::verifyNumberFormat;
 UserSettings::UserSettings(const int argc, const char* argv[]) :
     input_file{std::string(default_conformer_input_file)},
     common_core_mask{std::string("")},
-    file_input{}, line_min_input{}, solvent_input{}, prng_input{},
+    file_io_input{}, line_min_input{}, solvent_input{}, prng_input{},
     topology_cache{},
     initial_coordinates_cache{},
     topology_indices{}
@@ -96,6 +96,8 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
   }
   TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for conformer.omni", "UserSettings");
   int start_line = 0;
+  file_io_input = FilesControls(inp_tf, &start_line, ExceptionResponse::WARN);
+  start_line = 0;
   line_min_input = MinimizeControls(inp_tf, &start_line, ExceptionResponse::WARN);
   start_line = 0;
   solvent_input = SolventControls(inp_tf, &start_line, ExceptionResponse::WARN);

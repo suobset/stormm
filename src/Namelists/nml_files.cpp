@@ -224,7 +224,51 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     }
   }
   NamelistEmulator t_nml = filesInput(tf, start_line, policy);
-  
+  const int nsys = t_nml.getKeywordEntries("-sys") *
+                   (t_nml.getKeywordStatus("-sys") != InputStatus::MISSING);
+  for (int i = 0; i < nsys; i++) {
+    bool complete = true;
+    const std::string top_name = t_nml.getStringValue("-sys", "-p", i);
+    const std::string crd_name = t_nml.getStringValue("-sys", "-c", i);
+    const std::string trj_name = t_nml.getStringValue("-sys", "-x", i);
+    const std::string rst_name = t_nml.getStringValue("-sys", "-r", i);
+    std::string missing_elements("");
+    if (top_name.size() == 0LLU) {
+      missing_elements += "-p";
+    }
+    if (crd_name.size() == 0LLU) {
+      missing_elements += (missing_elements.size() > 0LLU) ? ", -c" : "-c";
+    }
+    if (trj_name.size() == 0LLU) {
+      missing_elements += (missing_elements.size() > 0LLU) ? ", -x" : "-x";
+    }
+    if (rst_name.size() == 0LLU) {
+      missing_elements += (missing_elements.size() > 0LLU) ? ", -r" : "-r";
+    }
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Instance " + std::to_string(i) + " of the \"-sys\" keyword is missing elements: " +
+            missing_elements + ".", "FilesControls");
+    case ExceptionResponse::WARN:
+      rtWarn("Instance " + std::to_string(i) + " of the \"-sys\" keyword is missing elements: " +
+             missing_elements + ".  These must be supplied in order for this system to be "
+             "considered.", "FilesControls");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+    CoordinateFileKind c_kind, x_kind, r_kind;
+    c_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "-c_kind", i));
+    x_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "-x_kind", i));
+    r_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "-r_kind", i));
+    systems.push_back(MoleculeSystem(t_nml.getStringValue("-sys", "-p", i),
+                                     t_nml.getStringValue("-sys", "-c", i),
+                                     t_nml.getStringValue("-sys", "-x", i),
+                                     t_nml.getStringValue("-sys", "-r", i),
+                                     t_nml.getIntValue("-sys", "frame_start", i),
+                                     t_nml.getIntValue("-sys", "frame_end", i),
+                                     t_nml.getIntValue("-sys", "-n", i), c_kind, x_kind, r_kind));
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -382,10 +426,12 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
   NamelistEmulator t_nml("files", CaseSensitivity::AUTOMATIC, policy, "Collects file names for "
                          "OMNI programs, offloading work that would otherwise require "
                          "command-line arguments.");
-  t_nml.addKeyword(NamelistElement("-p", NamelistType::STRING, "prmtop", DefaultIsObligatory::NO,
-                                   InputRepeats::YES));
-  t_nml.addKeyword(NamelistElement("-c", NamelistType::STRING, "inpcrd", DefaultIsObligatory::NO,
-                                   InputRepeats::YES));
+  t_nml.addKeyword(NamelistElement("-p", NamelistType::STRING,
+                                   std::string(default_filecon_topology_name),
+                                   DefaultIsObligatory::NO, InputRepeats::YES));
+  t_nml.addKeyword(NamelistElement("-c", NamelistType::STRING,
+                                   std::string(default_filecon_coordinate_name),
+                                   DefaultIsObligatory::NO, InputRepeats::YES));
   const std::string sys_help("Expression for a complete system, linking a topology file "
                              "explicitly to a starting coordinates file, with the option of that "
                              "coordinates file being a trajectory with more than one frame.  This "
@@ -406,11 +452,12 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
   t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "-x", "-r", "frame_start", "frame_end",
                                              "-n", "c_kind", "x_kind", "r_kind" },
                                    { NamelistType::STRING, NamelistType::STRING,
+                                     NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::INTEGER, NamelistType::INTEGER,
-                                     NamelistType::STRING },
-                                   { std::string(default_filecon_topology_name),
-                                     std::string(default_filecon_coordinate_name),
-                                     std::string(""), std::string(""), "0", "0", "1",
+                                     NamelistType::INTEGER, NamelistType::STRING,
+                                     NamelistType::STRING, NamelistType::STRING },
+                                   { std::string(""), std::string(""), std::string(""),
+                                     std::string(""), "0", "0", "1",
                                      std::string(default_filecon_inpcrd_type),
                                      std::string(default_filecon_outcrd_type),
                                      std::string(default_filecon_chkcrd_type) },
@@ -447,7 +494,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
                 "system.  As in the case of the trajectory output file specification, this is a "
                 "fallback for free topology / coordinate pairs or systems with no specified "
                 "restart file name.");
-  t_nml.addHelp("-warn", "Warnings reported for the run, collecting results from all systems.");
+  t_nml.addHelp("-wrn", "Warnings reported for the run, collecting results from all systems.");
 
   // There is expected to be one unique &files namelist in a given input file.  Seek it out by
   // wrapping back to the beginning of the input file if necessary.
