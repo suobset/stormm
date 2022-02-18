@@ -29,20 +29,15 @@ struct RestraintControls {
                     ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
-  /// \brief Get a verdict on whether this object specifies atoms by masks or by indices.
-  RestraintAnchoring getAtomSpecification() const;
-
   /// \brief Get the restraint specified by this namelist.  There are no other getter functions
   ///        for individual details, nor setters to manually edit the result.  Restraints can be
   ///        built by many means, namelists being only one, and editing should be done on the
   ///        more tractable BoundedRestraint form.
   BoundedRestraint getRestraint() const;
-
+  
 private:
   ExceptionResponse policy;  ///< Protocol to follow in the event of bad input data
-  std::string input_file;    ///< Name of the input file containing the &restraint namelist
-  int starting_line;         ///< Starting line for the &restraint namelist in the input file
-                             ///<   (numbering starts at line 1)
+  bool restraint_is_valid;   ///< Indicator that the restraints passes various quality checks
   std::string mask_i;        ///< Atom I (first atom) mask
   std::string mask_j;        ///< Atom J (second atom) mask
   std::string mask_k;        ///< Atom K (third atom) mask
@@ -71,8 +66,31 @@ private:
   double3 initial_crd;       ///< Initial (or static) Cartesian tether for a positional restraint
   double3 mature_crd;        ///< Long-term Cartesian tether for a positional restraint
 
-  /// \brief Validate the information in this namelist--can it make a valid restraint?
-  void validateRestraint() const;  
+  /// \brief Get a verdict on whether this object specifies atoms by masks or by indices.
+  RestraintAnchoring getAtomSpecification() const;
+
+  /// \brief Enforce that all atoms of a restraint be specified either with topological indices or
+  ///        atom masks.  If there are mixed specifications, the indices can be converted to atom
+  ///        masks without any need to see the actual topology, so do that.
+  void enforceSpecification();
+
+  /// \brief Check critical stiffness and equilibrium constants for time-dependent restraints.
+  ///        Exit with error if requested, otherwise try to fix the values based on initial
+  ///        settings.
+  ///
+  /// \param nstep1_found   Indicator of whether there is time dependency.  Any differences between
+  ///                       the fact that nstep1 and nstep2 (the initiation and maturation time
+  ///                       steps) have been set will have already been addressed.
+  /// \param r2a_found      Indicator of whether the final r2 parameter has been specified
+  /// \param r3a_found      Indicator of whether the final r3 parameter has been specified
+  /// \param k2a_found      Indicator of whether the final k2 parameter has been specified
+  /// \param k3a_found      Indicator of whether the final k3 parameter has been specified
+  /// \param starting_line  Line of the input file at which the &restraint namelist begins
+  /// \param filename       Name of the input file where a problematic &restraint namelist may have
+  ///                       been found
+  void checkFinalRestraintSettings(bool nstep1_found, bool r2a_found, bool r3a_found,
+                                   bool k2a_found, bool k3a_found, int starting_line,
+                                   const std::string &filename);
 };
  
 /// \brief Produce a namelist for specifying an NMR restraint, equivalent to the eponymous namelist
