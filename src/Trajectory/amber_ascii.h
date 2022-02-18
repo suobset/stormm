@@ -4,13 +4,16 @@
 
 #include "Constants/behavior.h"
 #include "Accelerator/hybrid.h"
+#include "Parsing/polynumeric.h"
 #include "Parsing/textfile.h"
+#include "coordinateframe.h"
 
 namespace omni {
 namespace trajectory {
 
 using constants::ExceptionResponse;
 using card::Hybrid;
+using parse::PolyNumeric;
 using parse::TextFile;
 
 /// \brief Obtain just the atom count from an Amber ASCII-format restart (or inpcrd) file.
@@ -29,6 +32,21 @@ int getAmberRestartAtomCount(const TextFile &tf);
 /// \param start_time  The initial time (returned)
 void getAmberRestartAtomCountAndTime(const TextFile &tf, int *atom_count, double *start_time,
                                      ExceptionResponse policy = ExceptionResponse::WARN);
+
+/// \brief Split the interlaced stream of XYZ coordinates from an Amber file into three arrays of
+///        contiguous X, Y, and Z coordinates.
+///
+/// Overloaded:
+///   - Take three Hybrid objects for each coordinate dimension
+///   - Take a CoordinateFrameWriter object
+///
+/// \param allcrd  Stream of numbers read from some ASCII-format trajectory
+/// \param x_ptr   Array to hold X coordinates (returned)
+/// \param y_ptr   Array to hold Y coordinates (returned)
+/// \param z_ptr   Array to hold Z coordinates (returned)
+/// \param natom   Number of atoms in the system
+void splitInterlacedCoordinates(const std::vector<PolyNumeric> &allcrd, double* x, double* y,
+                                double* z, int natom);
 
 /// \brief Read coordinates from an Amber inpcrd or ASCII-format restart file.
 ///
@@ -55,18 +73,33 @@ void getAmberRestartVelocities(const TextFile &tf, Hybrid<double> *x_velocities,
 
 /// \brief Read coordinates from an Amber ASCII-format .crd trajectory.
 ///
+/// Overloaded:
+///   - Read into C-style arrays for X, Y, Z, and box transformations
+///   - Read into Hybrid objects, i.e. components of CoordinateFrame or PhaseSpace objects
+///   - Build coordinates into a CoordinateFrameWriter
+///
 /// \param tf             The text file to read from
 /// \param x_coordinates  Cartesian X coordinates of all particles (returned)
 /// \param y_coordinates  Cartesian Y coordinates of all particles (returned)
 /// \param z_coordinates  Cartesian Z coordinates of all particles (returned)
+/// \param natom          Number of atoms
 /// \param box_lengths    Box lengths (excluding angles).  Left unchanged if there is no box
 ///                       information.
 /// \param frame_number   The frame number to seek in the file.  Raises an exception if the end of
 ///                       the file is reached before finding this frame.
+/// \param cfw            Host-side coordinate frame writer object with pointers
+/// \{
+void readAmberCrdFormat(const TextFile &tf, double *x_coordinates, double *y_coordinates,
+                        double *z_coordinates, int natom, double *box_space_transform,
+                        double *inverse_transform, int frame_number = 0);
+
 void readAmberCrdFormat(const TextFile &tf, Hybrid<double> *x_coordinates,
                         Hybrid<double> *y_coordinates,  Hybrid<double> *z_coordinates,
                         Hybrid<double> *box_space_transform, Hybrid<double> *inverse_transform,
                         int frame_number = 0);
+
+void readAmberCrdFormat(const TextFile &tf, CoordinateFrameWriter *cfw, int frame_number = 0);
+/// \}
 
 } // namespace trajectory
 } // namespace omni

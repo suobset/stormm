@@ -3,7 +3,6 @@
 #include <string>
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
-#include "Parsing/textfile.h"
 #include "Reporting/error_format.h"
 #include "trajectory_enumerators.h"
 
@@ -13,7 +12,6 @@ namespace trajectory {
 using parse::NumberFormat;
 using parse::separateText;
 using parse::strncmpCased;
-using parse::TextFile;
 using parse::TextFileReader;
 using parse::TextOrigin;
 using parse::verifyNumberFormat;
@@ -61,45 +59,7 @@ CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
-                                            const std::string &caller) {
-
-  // Read the first 2kB of the file, if that much exists.  Look for chracters that might indicate
-  // it is a binary file.  If no such characters are found, try to parse it as one of the known
-  // ASCII formats.
-  std::ifstream finp;
-  finp.open(file_name.c_str());
-  if (finp.is_open() == false) {
-    if (caller.size() == 0) {
-      rtErr(file_name + " was not found.", "detectCoordinateFileKind");
-    }
-    else {
-      rtErr(file_name + " was not found when called from " + caller + ".",
-            "detectCoordinateFileKind");
-    }
-  }
-  const int maxchar = 2048;
-  std::vector<char> buffer(maxchar);
-  int pos = 0;
-  char c;
-  bool is_binary = false;
-  while (pos < maxchar && finp.get(c) && is_binary == false) {
-    is_binary = (is_binary || static_cast<int>(c) < 0);
-    buffer[pos] = c;
-    pos++;
-  }
-  finp.close();
-  if (is_binary) {
-
-    // TBD: Determine the binary format.
-    return CoordinateFileKind::UNKNOWN;
-  }
-  const size_t nchar = pos;
-  std::string first_part(nchar, ' ');
-  for (size_t i = 0; i < nchar; i++) {
-    first_part[i] = buffer[i];
-  }
-  const TextFile tf(file_name, TextOrigin::RAM, first_part, "detectCoordinateFileKind");
+CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
   const TextFileReader tfr = tf.data();
 
   // Test for an Amber coordinate file
@@ -151,6 +111,49 @@ CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
     }
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
+                                            const std::string &caller) {
+
+  // Read the first 2kB of the file, if that much exists.  Look for chracters that might indicate
+  // it is a binary file.  If no such characters are found, try to parse it as one of the known
+  // ASCII formats.
+  std::ifstream finp;
+  finp.open(file_name.c_str());
+  if (finp.is_open() == false) {
+    if (caller.size() == 0) {
+      rtErr(file_name + " was not found.", "detectCoordinateFileKind");
+    }
+    else {
+      rtErr(file_name + " was not found when called from " + caller + ".",
+            "detectCoordinateFileKind");
+    }
+  }
+  const int maxchar = 2048;
+  std::vector<char> buffer(maxchar);
+  int pos = 0;
+  char c;
+  bool is_binary = false;
+  while (pos < maxchar && finp.get(c) && is_binary == false) {
+    is_binary = (is_binary || static_cast<int>(c) < 0);
+    buffer[pos] = c;
+    pos++;
+  }
+  finp.close();
+  if (is_binary) {
+
+    // TBD: Determine the binary format.
+    return CoordinateFileKind::UNKNOWN;
+  }
+  const size_t nchar = pos;
+  std::string first_part(nchar, ' ');
+  for (size_t i = 0; i < nchar; i++) {
+    first_part[i] = buffer[i];
+  }
+  const TextFile tf(file_name, TextOrigin::RAM, first_part, "detectCoordinateFileKind");
+  return detectCoordinateFileKind(tf);
 }
   
 //-------------------------------------------------------------------------------------------------

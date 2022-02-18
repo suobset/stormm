@@ -3,6 +3,7 @@
 #define OMNI_COORDINATE_FRAME_H
 
 #include "Accelerator/hybrid.h"
+#include "Parsing/textfile.h"
 #include "Topology/atomgraph.h"
 #include "phasespace.h"
 
@@ -12,6 +13,7 @@ namespace trajectory {
 using card::Hybrid;
 using card::HybridKind;
 using card::HybridTargetLevel;
+using parse::TextFile;
 using topology::AtomGraph;
 
 /// \brief Collect C-style pointers for the elements of a read-only CoordinateFrame object.
@@ -87,6 +89,7 @@ struct CoordinateFrame {
                   const double* invu_in = nullptr, const double* boxdim_in = nullptr);
   CoordinateFrame(const std::string &file_name_in, CoordinateFileKind file_kind,
                   int frame_number_in = 0);
+  CoordinateFrame(const TextFile &tf, CoordinateFileKind file_kind, int frame_number_in = 0);
   CoordinateFrame(PhaseSpace *ps);
   CoordinateFrame(const PhaseSpace &ps);
   /// \}
@@ -116,13 +119,22 @@ struct CoordinateFrame {
 
   /// \brief Fill the object from information some coordinate, restart, or trajectory file.
   ///
+  /// Overloaded:
+  ///   - Take a file name
+  ///   - Take an ASCII-format text file already processed into RAM
+  ///
   /// \param file_name     Name of the file from which to obtain coordinates
   /// \param file_kind     The type of coordinate-containing input file
   /// \param frame_number  The frame number to read (if the file is a trajectory, not a single
   ///                      point from the system's phase space)
+  /// \param tf            Text file data already processed into RAM
+  /// \{
   void buildFromFile(const std::string &file_name_in, const CoordinateFileKind file_kind,
                      int frame_number = 0);
-
+  void buildFromFile(const TextFile &tf, const CoordinateFileKind file_kind,
+                     int frame_number = 0);
+  /// \}
+  
   /// \brief Get the number of atoms in the frame
   int getAtomCount() const;
 
@@ -233,6 +245,28 @@ private:
 /// \{
 const CoordinateFrameReader getCoordinateFrameReader(const PhaseSpace &ps);
 CoordinateFrameWriter getCoordinateFrameWriter(PhaseSpace* ps);
+/// \}
+
+/// \brief Read a series of frames from a trajectory file.
+///
+/// Overloaded:
+///   - Read multiple frames from an ASCII-format trajectory (Amber .crd, or a more efficient way
+///     to read multiple copies of a single Amber inpcrd or restart file)
+///   - Read multiple frames from a binary trajectory file
+///
+/// \param tf             ASCII text file pre-loaded into memory
+/// \param kind           Type of coordinate or restart file
+/// \param atom_count     Expected atom count (will be checked against the file, if possible)
+/// \param unit_cell      Expected unit cell type (will be written to each frame)
+/// \param frame_numbers  Indices of frames to read from the file
+/// \{
+std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, CoordinateFileKind kind,
+                                               int atom_count, UnitCellType unit_cell,
+                                               const std::vector<int> &frame_numbers);
+
+std::vector<CoordinateFrame> getSelectedFrames(const std::string &file_name, int atom_count,
+                                               UnitCellType unit_cell,
+                                               const std::vector<int> &frame_numbers);
 /// \}
   
 } // namespace trajectory

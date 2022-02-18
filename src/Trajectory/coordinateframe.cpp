@@ -11,7 +11,6 @@ namespace trajectory {
 
 using math::extractBoxDimensions;
 using math::roundUp;
-using parse::TextFile;
   
 //-------------------------------------------------------------------------------------------------
 CoordinateFrameReader::CoordinateFrameReader(const int natom_in, const UnitCellType unit_cell_in,
@@ -103,6 +102,14 @@ CoordinateFrame::CoordinateFrame(const std::string &file_name_in,
     CoordinateFrame()
 {
   buildFromFile(file_name_in, file_kind, frame_number_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrame::CoordinateFrame(const TextFile &tf, const CoordinateFileKind file_kind,
+                                 const int frame_number_in) :
+    CoordinateFrame()
+{
+  buildFromFile(tf, file_kind, frame_number_in);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -265,14 +272,6 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
     }
     break;
   case CoordinateFileKind::AMBER_INPCRD:
-    {
-      TextFile tf(file_name);
-      atom_count = getAmberRestartAtomCount(tf);
-      allocate();
-      getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
-                               &box_space_transform, &inverse_transform, &box_dimensions);
-    }
-    break;
   case CoordinateFileKind::AMBER_ASCII_RST:
     {
       TextFile tf(file_name);
@@ -283,7 +282,51 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
     }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The file type of " + file_name + " could not be understood.", "CoordinateFrame",
+          "buildFromFile");
+  }
+
+  // Interpret the box transformation
+  unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind file_kind,
+                                    const int frame_number) {
+  file_name = tf.getFileName();
+
+  // Try to detect the file format if it is not already specified.  If it remains UNKNOWN, that
+  // will ultimately lead to an error.
+  CoordinateFileKind actual_kind = file_kind;
+  if (file_kind == CoordinateFileKind::UNKNOWN) {
+    actual_kind = detectCoordinateFileKind(tf);
+  }  
+  switch (actual_kind) {
+  case CoordinateFileKind::AMBER_CRD:
+    {
+      // The number of atoms must be known a-priori in order to read from a .crd trajectory file.
+      if (atom_count == 0) {
+        rtErr("A number of atoms matching the trajectory must be known prior to reading a .crd "
+              "file.", "CoordinateFrame", "buildFromFile");
+      }
+      allocate();
+      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, &box_space_transform,
+                         &inverse_transform, frame_number);
+    }
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    {
+      atom_count = getAmberRestartAtomCount(tf);
+      allocate();
+      getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
+                               &box_space_transform, &inverse_transform, &box_dimensions);
+    }
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
   case CoordinateFileKind::UNKNOWN:
@@ -450,6 +493,70 @@ CoordinateFrameWriter getCoordinateFrameWriter(PhaseSpace *ps) {
   PhaseSpaceWriter psw = ps->data();
   return CoordinateFrameWriter(psw.natom, psw.unit_cell, psw.xcrd, psw.ycrd, psw.zcrd,
                                psw.umat, psw.invu, psw.boxdim);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const CoordinateFileKind kind,
+                                               const int atom_count, const UnitCellType unit_cell,
+                                               const std::vector<int> &frame_numbers) {
+  CoordinateFileKind actual_kind = kind;
+  if (kind == CoordinateFileKind::UNKNOWN) {
+    actual_kind = detectCoordinateFileKind(tf);
+  }
+  const int frame_count = frame_numbers.size();
+  std::vector<CoordinateFrame> result(frame_count, CoordinateFrame(atom_count, unit_cell));
+  switch (actual_kind) {
+  case CoordinateFileKind::AMBER_CRD:
+    for (int i = 0; i < frame_count; i++) {
+      CoordinateFrameWriter cfw = result[i].data();
+      readAmberCrdFormat(tf, &cfw);
+    }
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    {
+      // Check that the series of frames is one, the first frame
+      for (int i = 0; i < frame_count; i++) {
+        if (frame_numbers[i] != 0) {
+          rtErr("An Amber inpcrd or restart file has only one frame.  Request for frame index " +
+                std::to_string(frame_numbers[i]) + " (indexing starts from zero) is invalid.",
+                "getSelectedFrames");
+        }
+      }
+
+      // Since the atom count is available (and this is an unusual application of this function),
+      // check that it matches the expected system size.
+      int test_atom_count = getAmberRestartAtomCount(tf);
+      if (test_atom_count != atom_count) {
+        rtErr("When reading multiple frames from a trajectory, the atom count must be known in "
+              "advance.  Reading a single frame from an input coordinates file is best done with "
+              "one of the CoordinateFrame constructors.  The requested atom count of " +
+              std::to_string(atom_count) + " does not agree with the detected atom count of " +
+              std::to_string(test_atom_count) + ".", "getSelectedFrames");
+      }
+      const CoordinateFrame cftmp(tf, kind);
+      for (int i = 0; i < frame_count; i++) {
+        result[i] = cftmp;
+      }
+    }
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The file type of " + tf.getFileName() + " could not be understood.",
+          "getSelectedFrames");
+  }
+  return result;
+}
+                                               
+//-------------------------------------------------------------------------------------------------
+std::vector<CoordinateFrame> getSelectedFrames(const std::string &file_name,
+                                               const CoordinateFileKind kind, const int atom_count,
+                                               const UnitCellType unit_cell,
+                                               const std::vector<int> &frame_numbers) {
+  const TextFile tf(file_name); 
+  return getSelectedFrames(tf, kind, atom_count, unit_cell, frame_numbers);
 }
 
 } // namespace trajectory

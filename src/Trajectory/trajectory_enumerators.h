@@ -3,9 +3,12 @@
 #define OMNI_TRAJECTORY_ENUMERATORS_H
 
 #include <string>
+#include "Parsing/textfile.h"
 
 namespace omni {
 namespace trajectory {
+
+using parse::TextFile;
 
 /// \brief Options for the type of coordinate file to write
 enum class CoordinateFileKind {
@@ -58,11 +61,19 @@ CoordinateFileKind translateCoordinateFileKind(const std::string &name_in);
 
 /// \brief Detect various coordinate file types.
 ///
+/// Overloaded:
+///   - Work from the file name
+///   - Work from a pre-translated TextFile object
+///
 /// \param file_name  Name of the file to test
 /// \param caller     Name of the calling function (optional)
+/// \param tf         Text of an asci--format file already translated into RAM
+/// \{
 CoordinateFileKind detectCoordinateFileKind(const std::string &file_name,
                                             const std::string &caller = std::string(""));
-  
+CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
+/// \}
+
 /// \brief Translate the AncdfVariable enumeration.  This provides keywords to serve as landmarks
 ///        in an Amber binary trajectory or restart file.
 ///
