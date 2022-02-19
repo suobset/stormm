@@ -2,11 +2,13 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/Math/matrix_ops.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/UnitTesting/unit_test.h"
 
@@ -18,6 +20,7 @@ using omni::diskutil::PrintSituation;
 using omni::errors::rtWarn;
 using omni::math::computeBoxTransform;
 using omni::math::extractBoxDimensions;
+using omni::math::mean;
 using omni::parse::NumberFormat;
 using omni::parse::polyNumericVector;
 using omni::random::Xoroshiro128pGenerator;
@@ -133,6 +136,7 @@ int main(int argc, char* argv[]) {
 
   // Test the copy constructor.  Stretch the original object after copying to ensure independence
   // of the copy.
+  section(2);
   const PhaseSpace tip3p_copy = tip3p;
   const PhaseSpaceReader tip3pcr = tip3p_copy.data();
   oh_mean = 0.0;
@@ -188,6 +192,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Try reading some additional coordinate files: trpcage in isolated boundary conditions
+  section(1);
   const std::string trpcage_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const bool trpcage_exists = (getDrivePathType(trpcage_crd_name) == DrivePathType::FILE);
   const TestPriority do_trpcage = (trpcage_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -291,7 +296,8 @@ int main(int argc, char* argv[]) {
         "CoordinateFrame based on a PhaseSpace object obtains the wrong unit cell type.",
         do_tip5p);
  
-  // Try making a POINTER-kind CoordinateFrame object based on an existing PhaseSpace object
+  // Try making a CoordinateFrameReader object based on an existing PhaseSpace object
+  section(3);
   CoordinateFrameWriter tip5p_access = getCoordinateFrameWriter(&tip5p);
   check(tip5p_access.natom, RelationalOperator::EQUAL, tip5p.getAtomCount(), "Making a "
         "CoordinateFrameWriter based on a PhaseSpace object obtains the wrong number of atoms.",
@@ -325,6 +331,66 @@ int main(int argc, char* argv[]) {
   check(access_dims, RelationalOperator::EQUAL, Approx(box_target).margin(1.0e-7),
         "Box dimensions obtained from a CoordinateFrameWriter object targeting a PhaseSpace "
         "object do not meet expectations.", do_tip5p);
+
+  // Try reading an entire trajectory of Trp-cage
+  const std::vector<int> frames = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+  const std::string trpcage_traj_name = base_crd_name + osc + "trpcage.crd";
+  const bool traj_exists = (getDrivePathType(trpcage_traj_name) == DrivePathType::FILE);
+  if (traj_exists == false) {
+    rtWarn("A trajectory of Trp-cage coordinates was not found.  Check ${OMNI_SOURCE} to ensure "
+           "that " + trpcage_traj_name + " becomes a valid path.", "test_amber_coordinates");
+  }
+  const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  std::vector<CoordinateFrame> multi_trp = getSelectedFrames(trpcage_traj_name,
+                                                             trpcage.getAtomCount(),
+                                                             UnitCellType::NONE, frames);
+  const std::vector<double> p11_x_answer = {  -3.406,   7.255,   8.085,   6.384,  -0.730,
+                                              -1.376,   2.180,  -0.051,   4.558,   4.740 };
+  const std::vector<double> p11_y_answer = {   7.351,   5.837,   0.704,   2.707,  -8.253,
+                                              -2.722,  -8.488,  -8.305,  -3.565,   7.792 };
+  const std::vector<double> p11_z_answer = {   4.455,  -0.182,   1.200,   0.033,  -3.852,
+                                               8.617,   0.455,  -3.302,  -4.791,  -0.505 };
+  std::vector<double> p11_x(10), p11_y(10), p11_z(10);
+  const std::vector<double> mean_x_answer = { -0.2738026316,   0.0413717105,  -0.4480756579,
+                                              -0.9473421053,   0.6269210526,   0.4081710526,
+                                               0.1894046053,  -0.0134210526,   0.7516776316,
+                                               1.3314769737 };
+  const std::vector<double> mean_y_answer = { -0.0609835526,  -0.0383782895,   0.6164375000,
+                                              -0.7236546053,  -0.5499868421,   0.7145296053,
+                                               1.1919638158,   0.2099901316,   0.0292993421,
+                                               0.0207138158 };
+  const std::vector<double> mean_z_answer = { -0.4562664474,   0.1306907895,   0.3557631579,
+                                               0.3126217105,  -0.0445131579,  -0.1440822368,
+                                               0.1110000000,  -0.5185756579,   1.3198717105,
+                                              -0.8598453947 };
+  std::vector<double> mean_x(10), mean_y(10), mean_z(10);
+  for (int i = 0; i < 10; i++) {
+    CoordinateFrameWriter cfw = multi_trp[i].data();
+    p11_x[i] = cfw.xcrd[10];
+    p11_y[i] = cfw.ycrd[10];
+    p11_z[i] = cfw.zcrd[10];
+    mean_x[i] = mean(cfw.xcrd, cfw.natom);
+    mean_y[i] = mean(cfw.ycrd, cfw.natom);
+    mean_z[i] = mean(cfw.zcrd, cfw.natom);
+  }
+  check(p11_x, RelationalOperator::EQUAL, p11_x_answer, "Cartesian X coordinates of a series of "
+        "trajectory frames taken in isolated boundary conditions do not meet expectations.",
+        do_traj_tests);
+  check(p11_y, RelationalOperator::EQUAL, p11_y_answer, "Cartesian Y coordinates of a series of "
+        "trajectory frames taken in isolated boundary conditions do not meet expectations.",
+        do_traj_tests);
+  check(p11_z, RelationalOperator::EQUAL, p11_z_answer, "Cartesian Z coordinates of a series of "
+        "trajectory frames taken in isolated boundary conditions do not meet expectations.",
+        do_traj_tests);
+  check(mean_x, RelationalOperator::EQUAL, mean_x_answer, "Cartesian X centers of geometry for a "
+        "series of trajectory frames taken in isolated boundary conditions do not meet "
+        "expectations.", do_traj_tests);
+  check(mean_y, RelationalOperator::EQUAL, mean_y_answer, "Cartesian Y centers of geometry for a "
+        "series of trajectory frames taken in isolated boundary conditions do not meet "
+        "expectations.", do_traj_tests);
+  check(mean_z, RelationalOperator::EQUAL, mean_z_answer, "Cartesian Z centers of geometry for a "
+        "series of trajectory frames taken in isolated boundary conditions do not meet "
+        "expectations.", do_traj_tests);
   
   // Report missing files
   if (missing_files) {

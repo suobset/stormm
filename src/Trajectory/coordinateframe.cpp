@@ -509,7 +509,7 @@ std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const Coordin
   case CoordinateFileKind::AMBER_CRD:
     for (int i = 0; i < frame_count; i++) {
       CoordinateFrameWriter cfw = result[i].data();
-      readAmberCrdFormat(tf, &cfw);
+      readAmberCrdFormat(tf, &cfw, frame_numbers[i]);
     }
     break;
   case CoordinateFileKind::AMBER_INPCRD:
@@ -551,11 +551,11 @@ std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const Coordin
 }
                                                
 //-------------------------------------------------------------------------------------------------
-std::vector<CoordinateFrame> getSelectedFrames(const std::string &file_name,
-                                               const CoordinateFileKind kind, const int atom_count,
+std::vector<CoordinateFrame> getSelectedFrames(const std::string &file_name, const int atom_count,
                                                const UnitCellType unit_cell,
                                                const std::vector<int> &frame_numbers) {
-  const TextFile tf(file_name); 
+  const TextFile tf(file_name);
+  const CoordinateFileKind kind = detectCoordinateFileKind(tf);
   return getSelectedFrames(tf, kind, atom_count, unit_cell, frame_numbers);
 }
 
