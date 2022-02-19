@@ -765,7 +765,7 @@ void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const size_
   }
 
   // Confirm that the location is within the bounds of the target
-  if (position >= target->max_capacity) {
+  if (position > target->max_capacity || (position == target->max_capacity && new_length > 0)) {
     rtErr("object " + std::string(label.name) + " cannot point to element " +
           std::to_string(position) + " of target " + std::string(tlbl.name) + " (length " +
           std::to_string(target->capacity()) + ").", "Hybrid", "setPointer");

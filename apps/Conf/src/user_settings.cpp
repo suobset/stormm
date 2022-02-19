@@ -1,10 +1,13 @@
 #include <cstdlib>
+#include <string>
+#include <vector>
 #include "../../../src/Constants/behavior.h"
 #include "../../../src/FileManagement/file_listing.h"
 #include "../../../src/Parsing/parse.h"
 #include "../../../src/Parsing/polynumeric.h"
 #include "../../../src/Parsing/textfile.h"
 #include "../../../src/Reporting/error_format.h"
+#include "../../../src/Trajectory/trajectory_enumerators.h"
 #include "user_settings.h"
 
 namespace conf_app {
@@ -19,6 +22,7 @@ using omni::parse::NumberFormat;
 using omni::parse::TextFile;
 using omni::parse::TextOrigin;
 using omni::parse::verifyNumberFormat;
+using omni::trajectory::detectCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[]) :
@@ -35,7 +39,6 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
   std::string cval_conf_file_name;
   std::vector<std::string> cval_topology_file_names;
   std::vector<std::string> cval_coordinate_file_names;
-
   
   // Detect command line arguments, and note that their presence overrides similar directives
   // in the input deck.
@@ -104,11 +107,20 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
   start_line = 0;
   prng_input = RandomControls(inp_tf, &start_line, ExceptionResponse::WARN);
 
-}
-
-//-------------------------------------------------------------------------------------------------
-int UserSettings::getSystemCount() const {
-  return initial_coordinates_cache.size();
+  // Read all free topologies and free coordinate sets, then determine which free topology
+  // matches which free coordinate set.
+  const int n_free_top = file_io_input.getFreeTopologyCount();
+  topology_cache.reserve(n_free_top);
+  for (int i = 0; i < n_free_top; i++) {
+    topology_cache.push_back(AtomGraph(file_io_input.getFreeTopologyName(i)));
+  }
+  const int n_free_crd = file_io_input.getFreeCoordinatesCount();
+  for (int i = 0; i < n_free_crd; i++) {
+    const std::string crd_name = file_io_input.getFreeCoordinateName(i);
+    const CoordinateFileKind kind = detectCoordinateFileKind(crd_name);
+  }
+  
+  // Filter the unique topologies and match them to systems
 }
 
 } // namespace user_input

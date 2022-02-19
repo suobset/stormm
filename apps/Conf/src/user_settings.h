@@ -39,9 +39,6 @@ struct UserSettings {
   /// \param argv  List of command line argument strings
   UserSettings(int argc, const char* argv[]);
 
-  /// \brief Get the number of systems
-  int getSystemCount() const;
-  
 private:
 
   /// Name of the original input file
@@ -70,6 +67,10 @@ private:
   /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
   /// when composing the synthesis objects.
   std::vector<int> topology_indices;
+
+  /// \brief Create vectors of topologies, starting coordinates, and indices of which topology
+  ///        controlsthe motion of each coordinate set.
+  void gatherUniqueTopologies();
 };
 
 } // namespace user_input

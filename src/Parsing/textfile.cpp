@@ -128,9 +128,9 @@ void TextFile::linesFromString(const std::string &text_in) {
   for (int i = 0; i < n_char; i++) {
     n_br += (text_in[i] == '\n');
   }
-  line_count = n_br;
-  line_limits.resize(n_br + 1);
-  text.resize(n_char - n_br);
+  line_count = n_br + (text_in[text_in.size() - 1] != '\n');
+  line_limits.resize(line_count + 1);
+  text.resize(n_char - n_br + 1);
   int n_tx = 0;
   n_br = 0;
   for (int i = 0; i < n_char; i++) {
@@ -145,7 +145,7 @@ void TextFile::linesFromString(const std::string &text_in) {
   }
 
   // Ensure that the final line limit is catalogged
-  line_limits[line_count] = n_char - n_br;
+  line_limits[line_count] = n_tx;
 }
 
 } // namespace parse
