@@ -61,18 +61,31 @@ double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWrit
 /// \}
   
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
-///        topology and a PhaseSpace object to store forces in double precision.  The contribution
-///        to the angle energy in the tracking object can be compared directly to the function
-///        output.
+///        topology and a coordinate set.  These simple routines can serve as a check on much more
+///        complex routines involving streamlined data structures and GPU execution.
+///
+/// Overloaded:
+///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
+///   - Evaluate based on a CoordinateFrame abstract
 ///
 /// \param ag            System topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
+/// \{
 double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+
+double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+                          ScoreCard *ecard, const int system_index);
+
+double evaluateAngleTerms(const ValenceKit<double> &vk, CoordinateFrameWriter &cfw,
+                          ScoreCard *ecard, const int system_index);
+/// \}
 
 /// \brief Evaluate the proper and improper dihedral energy contributions with a simple routine
 ///        based on a topology and a PhaseSpace object to store forces in double precision.  The

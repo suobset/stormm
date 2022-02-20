@@ -4,8 +4,8 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Topology/atomgraph.h"
-#include "../../src/Topology/atomgraph_synthesis.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;

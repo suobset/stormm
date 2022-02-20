@@ -4,8 +4,8 @@
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
-#include "atomgraph_abstracts.h"
-#include "atomgraph_enumerators.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "atomgraph_synthesis.h"
 
 namespace omni {
@@ -21,9 +21,6 @@ using math::PrefixSumType;
 using math::sum;
 using parse::realToString;
 using testing::Approx;
-using topology::ChemicalDetailsKit;
-using topology::NonbondedKit;
-using topology::ValenceKit;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,

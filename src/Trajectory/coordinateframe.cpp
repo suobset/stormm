@@ -371,6 +371,16 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string CoordinateFrame::getFileName() const {
+  return file_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+int CoordinateFrame::getFrameNumber() const {
+  return frame_number;
+}
+
+//-------------------------------------------------------------------------------------------------
 int CoordinateFrame::getAtomCount() const {
   return atom_count;
 }

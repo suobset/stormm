@@ -4,7 +4,7 @@
 
 #include <string>
 #include <vector>
-#include "atomgraph.h"
+#include "Topology/atomgraph.h"
 #include "atomgraph_synthesis.h"
 
 namespace omni {

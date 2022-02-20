@@ -5,9 +5,9 @@
 #include "DataTypes/common_types.h"
 #include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
-#include "barostat.h"
-#include "phasespace.h"
-#include "thermostat.h"
+#include "Trajectory/barostat.h"
+#include "Trajectory/phasespace.h"
+#include "Trajectory/thermostat.h"
 
 namespace omni {
 namespace trajectory {

@@ -3,13 +3,13 @@
 #define OMNI_ATOMGRAPH_SYNTHESIS_H
 
 #include "Accelerator/hybrid.h"
-#include "atomgraph.h"
+#include "Topology/atomgraph.h"
 
 namespace omni {
 namespace topology {
 
 using card::Hybrid;
-  
+
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing
 ///        into another).  Work units covering all systems are laid out in additional, contiguous

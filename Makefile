@@ -51,19 +51,19 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		 $(SRCDIR)/Restraints/restraint_builder.cpp \
 		 $(SRCDIR)/Structure/local_arrangement.cpp \
+		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
+		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
+		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
 	         $(SRCDIR)/Topology/amber_prmtop_util.cpp \
 	         $(SRCDIR)/Topology/atomgraph.cpp \
 	         $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
 	         $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 	         $(SRCDIR)/Topology/atomgraph_refinement.cpp \
-	         $(SRCDIR)/Topology/atomgraph_synthesis.cpp \
-	         $(SRCDIR)/Topology/valence_workunit.cpp \
 	         $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	         $(SRCDIR)/Trajectory/barostat.cpp \
 	         $(SRCDIR)/Trajectory/coordinateframe.cpp \
 	         $(SRCDIR)/Trajectory/phasespace.cpp \
-	         $(SRCDIR)/Trajectory/phasespace_synthesis.cpp \
 	         $(SRCDIR)/Trajectory/thermostat.cpp \
 	         $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
 	         $(SRCDIR)/Trajectory/write_frame.cpp \
@@ -135,19 +135,19 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Restraints/restraint_builder.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
 		   $(SRCDIR)/Structure/structure_enumerators.h \
+		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
+		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
+		   $(SRCDIR)/Synthesis/valence_workunit.h \
 		   $(SRCDIR)/Topology/amber_prmtop_util.h \
 		   $(SRCDIR)/Topology/atomgraph.h \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.h \
 		   $(SRCDIR)/Topology/atomgraph_analysis.h \
 		   $(SRCDIR)/Topology/atomgraph_enumerators.h \
 		   $(SRCDIR)/Topology/atomgraph_refinement.h \
-		   $(SRCDIR)/Topology/atomgraph_synthesis.h \
-		   $(SRCDIR)/Topology/valence_workunit.h \
 		   $(SRCDIR)/Trajectory/amber_ascii.h \
 		   $(SRCDIR)/Trajectory/barostat.h \
 		   $(SRCDIR)/Trajectory/coordinateframe.h \
 		   $(SRCDIR)/Trajectory/phasespace.h \
-		   $(SRCDIR)/Trajectory/phasespace_synthesis.h \
 		   $(SRCDIR)/Trajectory/thermostat.h \
 		   $(SRCDIR)/Trajectory/trajectory_enumerators.h \
 		   $(SRCDIR)/Trajectory/write_frame.h \
@@ -219,19 +219,19 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Restraints/restraint_apparatus.o \
 	        $(SRCDIR)/Restraints/restraint_builder.o \
 		$(SRCDIR)/Structure/local_arrangement.o \
+		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
+		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
+		$(SRCDIR)/Synthesis/valence_workunit.o \
 		$(SRCDIR)/Topology/amber_prmtop_util.o \
 		$(SRCDIR)/Topology/atomgraph.o \
 		$(SRCDIR)/Topology/atomgraph_abstracts.o \
 		$(SRCDIR)/Topology/atomgraph_analysis.o \
 		$(SRCDIR)/Topology/atomgraph_enumerators.o \
 		$(SRCDIR)/Topology/atomgraph_refinement.o \
-		$(SRCDIR)/Topology/atomgraph_synthesis.o \
-		$(SRCDIR)/Topology/valence_workunit.o \
 		$(SRCDIR)/Trajectory/amber_ascii.o \
 		$(SRCDIR)/Trajectory/barostat.o \
 		$(SRCDIR)/Trajectory/coordinateframe.o \
 		$(SRCDIR)/Trajectory/phasespace.o \
-		$(SRCDIR)/Trajectory/phasespace_synthesis.o \
 		$(SRCDIR)/Trajectory/thermostat.o \
 		$(SRCDIR)/Trajectory/trajectory_enumerators.o \
 		$(SRCDIR)/Trajectory/write_frame.o \

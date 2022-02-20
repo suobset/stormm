@@ -78,6 +78,8 @@ double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameRead
   double bond_energy = 0.0;
   llint bond_acc = 0LL;
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+
+  // Accumulate the results (energy in both precision models)
   for (int pos = 0; pos < vk.nbond; pos++) {
     const int i_atom = vk.bond_i_atoms[pos];
     const int j_atom = vk.bond_j_atoms[pos];
@@ -181,6 +183,55 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 
   // Return the double-precision angle energy sum, if of interest
   return angl_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+                          ScoreCard *ecard, const int system_index) {
+  double angl_energy = 0.0;
+  llint angl_acc = 0LL;
+  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+
+  // Accumulate results by looping over all angle bending terms.
+  double ba[3], bc[3];
+  for (int pos = 0; pos < vk.nangl; pos++) {
+
+    // Get parameters for an angle between atoms i, j, and k
+    const int i_atom = vk.angl_i_atoms[pos];
+    const int j_atom = vk.angl_j_atoms[pos];
+    const int k_atom = vk.angl_k_atoms[pos];
+    const int param_idx = vk.angl_param_idx[pos];
+    const double keq = vk.angl_keq[param_idx];
+    const double theta0 = vk.angl_theta[param_idx];
+
+    // Compute displacements
+    ba[0] = cfr.xcrd[i_atom] - cfr.xcrd[j_atom];
+    ba[1] = cfr.ycrd[i_atom] - cfr.ycrd[j_atom];
+    ba[2] = cfr.zcrd[i_atom] - cfr.zcrd[j_atom];
+    bc[0] = cfr.xcrd[k_atom] - cfr.xcrd[j_atom];
+    bc[1] = cfr.ycrd[k_atom] - cfr.ycrd[j_atom];
+    bc[2] = cfr.zcrd[k_atom] - cfr.zcrd[j_atom];
+
+    // On to the angle force computation
+    const double mgba = ba[0]*ba[0] + ba[1]*ba[1] + ba[2]*ba[2];
+    const double mgbc = bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2];
+    const double invbabc = 1.0 / sqrt(mgba * mgbc);
+    double costheta = (ba[0]*bc[0] + ba[1]*bc[1] + ba[2]*bc[2]) * invbabc;
+    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
+    const double theta = acos(costheta);
+    const double dtheta = theta - theta0;
+    const double du = keq * dtheta * dtheta;
+    angl_energy += du;
+    angl_acc += static_cast<llint>(round(du * nrg_scale_factor));
+  }
+  ecard->contribute(StateVariable::ANGLE, angl_acc, system_index);
+  return angl_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const ValenceKit<double> &vk, CoordinateFrameWriter &cfw,
+                          ScoreCard *ecard, const int system_index) {
+  return evaluateAngleTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------

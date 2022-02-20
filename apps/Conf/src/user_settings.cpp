@@ -5,7 +5,10 @@
 #include "../../../src/Namelists/namelist_emulator.h"
 #include "../../../src/Parsing/parse.h"
 #include "../../../src/Parsing/polynumeric.h"
+#include "../../../src/Potential/scorecard.h"
+#include "../../../src/Potential/valence_potential.h"
 #include "../../../src/Reporting/error_format.h"
+#include "../../../src/Topology/atomgraph_abstracts.h"
 #include "user_settings.h"
 
 namespace conf_app {
@@ -13,11 +16,16 @@ namespace user_input {
 
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
+using omni::energy::evaluateBondTerms;
+using omni::energy::evaluateAngleTerms;
 using omni::errors::rtErr;
 using omni::errors::rtWarn;
 using omni::parse::NumberFormat;
 using omni::parse::TextOrigin;
 using omni::parse::verifyNumberFormat;
+using omni::energy::ScoreCard;
+using omni::topology::ValenceKit;
+using omni::trajectory::CoordinateFrameReader;
 using omni::trajectory::detectCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
@@ -158,7 +166,7 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
     }
   }
   
-  // Filter the unique topologies and match them to systems
+  // Filter the unique topologies and match them to systems.  List the atom counts of each.
   printf("There were %d unique, free topologies and %d free coordinate sets read.\n", n_free_top,
          n_free_crd);
   int max_match = 0;
@@ -170,11 +178,18 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
   for (int i = 0; i < n_free_crd; i++) {
     coordinate_atom_counts[i] = initial_coordinates_cache[i].getAtomCount();
   }
+
+  // Make a table of the unique topology atom counts.  Track which coordinate sets might
+  // be tied to each group of topologies.
   std::vector<bool> topology_covered(n_free_top, false);
+  std::vector<bool> coordinates_covered(n_free_crd, false);
   std::vector<int> topology_series(n_free_top);
+  std::vector<int> coordinate_series(n_free_top);
   std::vector<int> unique_topology_sizes;
   std::vector<int> unique_topology_size_bounds(1, 0);
-  int series_counter = 0;
+  std::vector<int> unique_coordinate_size_bounds(1, 0);
+  int top_series_counter = 0;
+  int crd_series_counter = 0;
   for (int i = 0; i < n_free_top; i++) {
     if (topology_covered[i]) {
       continue;
@@ -183,25 +198,111 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
     // First, scan to see if any other topologies share the same number of atoms.
     topology_covered[i] = true;
     int n_samesize_topology = 1;
-    topology_series[series_counter] = i;
-    series_counter++;
-    const int iatom_count = topology_cache[i].getAtomCount();
+    topology_series[top_series_counter] = i;
+    top_series_counter++;
+    const int iatom_count = topology_atom_counts[i];
     for (int j = i + 1; j < n_free_top; j++) {
-      if (topology_cache[j].getAtomCount() == iatom_count) {
+      if (topology_atom_counts[j] == iatom_count) {
         topology_covered[j] = true;
-        topology_series[series_counter] = j;
-        series_counter++;
+        topology_series[top_series_counter] = j;
+        top_series_counter++;
+      }
+    }
+    for (int j = 0; j < n_free_crd; j++) {
+      if (coordinates_covered[j] == false && coordinate_atom_counts[j] == iatom_count) {
+        coordinates_covered[j] = true;
+        coordinate_series[crd_series_counter] = j;
+        crd_series_counter++;
       }
     }
     unique_topology_sizes.push_back(iatom_count);
-    unique_topology_size_bounds.push_back(series_counter);
+    unique_topology_size_bounds.push_back(top_series_counter);
+    unique_coordinate_size_bounds.push_back(crd_series_counter);
   }
 
+  // Check that all coordinates were covered
+  std::vector<std::string> orphan_coordinates;
+  for (int i = 0; i < n_free_crd; i++) {
+    if (coordinates_covered[i] == false) {
+      orphan_coordinates.push_back(initial_coordinates_cache[i].getFileName());
+    }
+  }
+  const int n_orphan = orphan_coordinates.size();
+  if (n_orphan > 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      {
+        std::string orphan_errmsg;
+        if (n_orphan > 6) {
+          for (int i = 0; i < 3; i++) {
+            orphan_errmsg += "  " + orphan_coordinates[i] + '\n';
+          }
+          orphan_errmsg += "  (... more files, list truncated ...)\n";
+          for (int i = n_orphan - 3; i < n_orphan; i++) {
+            orphan_errmsg += "  " + orphan_coordinates[i] + '\n';
+          }
+        }
+        else {
+          for (int i = 0; i < 6; i++) {
+            orphan_errmsg += "  " + orphan_coordinates[i] + '\n';
+          }
+        }
+        rtWarn("A total of " + std::to_string(orphan_coordinates.size()) + " free coordinate sets "
+               "do not correspond to any of the provided topologies, due to atom count "
+               "mismatches.\n\nOrphan topologies:\n" + orphan_errmsg, "UserSettings");
+      }
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  
   // Test each coordinate set with respect to topologies of the appropriate size.  Evaluate
   // bond and angle energy, and take the best scoring result as the indicator of which topology
   // describes which coordinate set.
   const int n_unique_sizes = unique_topology_sizes.size();
+  ScoreCard sc(1);
   for (int i = 0; i < n_unique_sizes; i++) {
+
+    // Loop over all coordinates in this size group.  Try interpreting them with each topology.
+    const int j_llim = unique_coordinate_size_bounds[i];
+    const int j_hlim = unique_coordinate_size_bounds[i + 1];
+    const int k_llim = unique_topology_size_bounds[i];
+    const int k_hlim = unique_topology_size_bounds[i + 1];
+    for (int j = j_llim; j < j_hlim; j++) {
+      const int icrdj = coordinate_series[j];
+      const CoordinateFrameReader cfr(initial_coordinates_cache[icrdj].data());
+      int best_topology;
+      double min_bondang_e, min_bond_e, min_angl_e;
+      for (int k = k_llim; k < k_hlim; k++) {
+        const int tpk = topology_series[k];
+        const ValenceKit<double> vk = topology_cache[tpk].getDoublePrecisionValenceKit();
+        const double bond_e = evaluateBondTerms(vk, cfr, &sc, 0);
+        const double angl_e = evaluateAngleTerms(vk, cfr, &sc, 0);
+        const double bondang_e = bond_e + angl_e;
+        if (k == k_llim || bondang_e < min_bondang_e) {
+          best_topology = tpk;
+          min_bondang_e = bondang_e;
+          min_bond_e = bond_e;
+          min_angl_e = angl_e;
+        }
+      }
+
+      // CHECK
+      printf("- %s ->\n  %s with %9.4lf / %9.4lf\n",
+             initial_coordinates_cache[icrdj].getFileName().c_str(),
+             topology_cache[best_topology].getFileName().c_str(), min_bond_e, min_angl_e);
+      // END CHECK
+    }
+
+    // CHECK
+    printf("Size %4d : ", unique_topology_sizes[i]);
+    for (int j = unique_coordinate_size_bounds[i]; j < unique_coordinate_size_bounds[i + 1]; j++) {
+      printf("%2d ", coordinate_series[j]);
+    }
+    printf("\n");
+    // END CHECK
 
   }
 }

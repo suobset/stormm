@@ -152,6 +152,12 @@ struct CoordinateFrame {
   void buildFromFile(const TextFile &tf, const CoordinateFileKind file_kind,
                      int frame_number = 0);
   /// \}
+
+  /// \brief Get the file name that originated this coordinate set
+  std::string getFileName() const;
+
+  /// \brief Get the frame number, if this coordinate set originated in a trajectory.
+  int getFrameNumber() const;
   
   /// \brief Get the number of atoms in the frame
   int getAtomCount() const;
