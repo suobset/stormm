@@ -277,6 +277,77 @@ UnitCellType PhaseSpace::getUnitCellType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim,
+                                               const TrajectoryKind kind,
+                                               const HybridTargetLevel tier) const {
+  switch (dim) {
+  case CartesianDimension::X:
+    switch (kind) {
+    case TrajectoryKind::POSITIONS:
+      return x_coordinates.data(tier);
+    case TrajectoryKind::VELOCITIES:
+      return x_velocities.data(tier);
+    case TrajectoryKind::FORCES:
+      return x_forces.data(tier);
+    }
+  case CartesianDimension::Y:
+    switch (kind) {
+    case TrajectoryKind::POSITIONS:
+      return y_coordinates.data(tier);
+    case TrajectoryKind::VELOCITIES:
+      return y_velocities.data(tier);
+    case TrajectoryKind::FORCES:
+      return y_forces.data(tier);
+    }
+  case CartesianDimension::Z:
+    switch (kind) {
+    case TrajectoryKind::POSITIONS:
+      return z_coordinates.data(tier);
+    case TrajectoryKind::VELOCITIES:
+      return z_velocities.data(tier);
+    case TrajectoryKind::FORCES:
+      return z_forces.data(tier);
+    }
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim, const TrajectoryKind kind,
+                                         const HybridTargetLevel tier) {
+  switch (dim) {
+  case CartesianDimension::X:
+    switch (kind) {
+    case TrajectoryKind::POSITIONS:
+      return x_coordinates.data(tier);
+    case TrajectoryKind::VELOCITIES:
+      return x_velocities.data(tier);
+    case TrajectoryKind::FORCES:
+      return x_forces.data(tier);
+    }
+  case CartesianDimension::Y:
+    switch (kind) {
+    case TrajectoryKind::POSITIONS:
+      return y_coordinates.data(tier);
+    case TrajectoryKind::VELOCITIES:
+      return y_velocities.data(tier);
+    case TrajectoryKind::FORCES:
+      return y_forces.data(tier);
+    }
+  case CartesianDimension::Z:
+    switch (kind) {
+    case TrajectoryKind::POSITIONS:
+      return z_coordinates.data(tier);
+    case TrajectoryKind::VELOCITIES:
+      return z_velocities.data(tier);
+    case TrajectoryKind::FORCES:
+      return z_forces.data(tier);
+    }
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<double> PhaseSpace::getInterlacedCoordinates(const TrajectoryKind kind,
                                                          const HybridTargetLevel tier) const {
   return getInterlacedCoordinates(0, atom_count, kind, tier);
@@ -377,18 +448,33 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpace::initializeForces() {
-  double* x_ptr = x_forces.data();
-  double* y_ptr = y_forces.data();
-  double* z_ptr = z_forces.data();
-  for (int i = 0; i < atom_count; i++) {
-    x_ptr[i] = 0.0;
-    y_ptr[i] = 0.0;
-    z_ptr[i] = 0.0;
-  }
-#ifdef OMNI_USE_HPC
-  uploadForces();
-#endif
+const double* PhaseSpace::getBoxSpaceTransformPointer(const HybridTargetLevel tier) const {
+  return box_space_transform.data(tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+double* PhaseSpace::getBoxSpaceTransformPointer(const HybridTargetLevel tier) {
+  return box_space_transform.data(tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+const double* PhaseSpace::getInverseTransformPointer(const HybridTargetLevel tier) const {
+  return inverse_transform.data(tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+double* PhaseSpace::getInverseTransformPointer(const HybridTargetLevel tier) {
+  return inverse_transform.data(tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+const double* PhaseSpace::getBoxSizePointer(const HybridTargetLevel tier) const {
+  return box_dimensions.data(tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+double* PhaseSpace::getBoxSizePointer(const HybridTargetLevel tier) {
+  return box_dimensions.data(tier);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -428,26 +514,18 @@ Hybrid<double>* PhaseSpace::getStoragePointer() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpace::allocate() {
-  const int padded_atom_count  = (atom_count > 0) ? roundUp(atom_count, warp_size_int) : 1;
-  const int padded_matrix_size = roundUp(9, warp_size_int);
-  storage.resize((15 * padded_atom_count) + (3 * padded_matrix_size));
-  x_coordinates.setPointer(&storage,                            0, atom_count);
-  y_coordinates.setPointer(&storage,            padded_atom_count, atom_count);
-  z_coordinates.setPointer(&storage,        2 * padded_atom_count, atom_count);
-  box_space_transform.setPointer(&storage,  3 * padded_atom_count, 9);
-  inverse_transform.setPointer(&storage,   (3 * padded_atom_count) +      padded_matrix_size, 9);
-  box_dimensions.setPointer(&storage,      (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
-  const int thus_far = (3 * padded_atom_count) + (3 * padded_matrix_size);
-  x_velocities.setPointer(&storage,        thus_far,                           atom_count);
-  y_velocities.setPointer(&storage,        thus_far +      padded_atom_count,  atom_count);
-  z_velocities.setPointer(&storage,        thus_far + (2 * padded_atom_count), atom_count);
-  x_forces.setPointer(&storage,            thus_far + (3 * padded_atom_count), atom_count);
-  y_forces.setPointer(&storage,            thus_far + (4 * padded_atom_count), atom_count);
-  z_forces.setPointer(&storage,            thus_far + (5 * padded_atom_count), atom_count);
-  x_prior_coordinates.setPointer(&storage, thus_far + (6 * padded_atom_count), atom_count);
-  y_prior_coordinates.setPointer(&storage, thus_far + (7 * padded_atom_count), atom_count);
-  z_prior_coordinates.setPointer(&storage, thus_far + (8 * padded_atom_count), atom_count);
+void PhaseSpace::initializeForces() {
+  double* x_ptr = x_forces.data();
+  double* y_ptr = y_forces.data();
+  double* z_ptr = z_forces.data();
+  for (int i = 0; i < atom_count; i++) {
+    x_ptr[i] = 0.0;
+    y_ptr[i] = 0.0;
+    z_ptr[i] = 0.0;
+  }
+#ifdef OMNI_USE_HPC
+  uploadForces();
+#endif
 }
 
 #ifdef OMNI_USE_HPC
@@ -548,6 +626,29 @@ PhaseSpaceWriter PhaseSpace::data(const HybridTargetLevel tier) {
                           y_forces.data(tier), z_forces.data(tier),
                           x_prior_coordinates.data(tier), y_prior_coordinates.data(tier),
                           z_prior_coordinates.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpace::allocate() {
+  const int padded_atom_count  = roundUp(atom_count, warp_size_int);
+  const int padded_matrix_size = roundUp(9, warp_size_int);
+  storage.resize((15 * padded_atom_count) + (3 * padded_matrix_size));
+  x_coordinates.setPointer(&storage,                            0, atom_count);
+  y_coordinates.setPointer(&storage,            padded_atom_count, atom_count);
+  z_coordinates.setPointer(&storage,        2 * padded_atom_count, atom_count);
+  box_space_transform.setPointer(&storage,  3 * padded_atom_count, 9);
+  inverse_transform.setPointer(&storage,   (3 * padded_atom_count) +      padded_matrix_size, 9);
+  box_dimensions.setPointer(&storage,      (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
+  const int thus_far = (3 * padded_atom_count) + (3 * padded_matrix_size);
+  x_velocities.setPointer(&storage,        thus_far,                           atom_count);
+  y_velocities.setPointer(&storage,        thus_far +      padded_atom_count,  atom_count);
+  z_velocities.setPointer(&storage,        thus_far + (2 * padded_atom_count), atom_count);
+  x_forces.setPointer(&storage,            thus_far + (3 * padded_atom_count), atom_count);
+  y_forces.setPointer(&storage,            thus_far + (4 * padded_atom_count), atom_count);
+  z_forces.setPointer(&storage,            thus_far + (5 * padded_atom_count), atom_count);
+  x_prior_coordinates.setPointer(&storage, thus_far + (6 * padded_atom_count), atom_count);
+  y_prior_coordinates.setPointer(&storage, thus_far + (7 * padded_atom_count), atom_count);
+  z_prior_coordinates.setPointer(&storage, thus_far + (8 * padded_atom_count), atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -508,12 +508,8 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                 "positional restraint, given appropriate nstep values.");
 
   // Search the input file, read the namelist if it can be found, and update the current line
-  // for subsequent calls to this function or other namelists.  All calls to this function should
-  // proceed in consecutive calls, to make use of the updates to start_line and avoid reading any
-  // instance of this namelist twice or skipping instances of it in the search for some other
-  // namelist.  An alternative is to keep an independent counter to track progress through the
-  // input file in search for &rst namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::NO, tf.getLineCount());
+  // for subsequent calls to this function or other namelists.
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
 
   return t_nml;
 }

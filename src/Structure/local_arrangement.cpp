@@ -9,7 +9,7 @@ namespace omni {
 namespace structure {
 
 using math::crossProduct;
-using trajectory::getCoordinateFrameReader;
+using trajectory::CoordinateFrameReader;
   
 //-------------------------------------------------------------------------------------------------
 double imageValue(const double x, const double range, const ImagingMethod style) {
@@ -195,7 +195,7 @@ double distance(const int atom_i, const int atom_j, const CoordinateFrame &cf) {
 
 //-------------------------------------------------------------------------------------------------
 double distance(const int atom_i, const int atom_j, const PhaseSpace &ps) {
-  return distance(atom_i, atom_j, getCoordinateFrameReader(ps));
+  return distance(atom_i, atom_j, CoordinateFrameReader(ps));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -229,7 +229,7 @@ double angle(const int atom_i, const int atom_j, const int atom_k, const Coordin
 
 //-------------------------------------------------------------------------------------------------
 double angle(const int atom_i, const int atom_j, const int atom_k, const PhaseSpace &ps) {
-  return angle(atom_i, atom_j, atom_k, getCoordinateFrameReader(ps));
+  return angle(atom_i, atom_j, atom_k, CoordinateFrameReader(ps));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -286,7 +286,7 @@ double dihedral_angle(const int atom_i, const int atom_j, const int atom_k, cons
 //-------------------------------------------------------------------------------------------------
 double dihedral_angle(const int atom_i, const int atom_j, const int atom_k, const int atom_l,
                       const PhaseSpace &ps) {
-  return dihedral_angle(atom_i, atom_j, atom_k, atom_l, getCoordinateFrameReader(ps));
+  return dihedral_angle(atom_i, atom_j, atom_k, atom_l, CoordinateFrameReader(ps));
 }
 
 } // namespace geometry

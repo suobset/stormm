@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) {
  
   // Try making a CoordinateFrameReader object based on an existing PhaseSpace object
   section(3);
-  CoordinateFrameWriter tip5p_access = getCoordinateFrameWriter(&tip5p);
+  CoordinateFrameWriter tip5p_access(&tip5p);
   check(tip5p_access.natom, RelationalOperator::EQUAL, tip5p.getAtomCount(), "Making a "
         "CoordinateFrameWriter based on a PhaseSpace object obtains the wrong number of atoms.",
         do_tip5p);

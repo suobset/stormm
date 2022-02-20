@@ -3,6 +3,7 @@
 #define OMNI_PHASE_SPACE_H
 
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/trajectory_enumerators.h"
 
@@ -11,6 +12,7 @@ namespace trajectory {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
+using constants::CartesianDimension;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::CoordinateFileKind;
@@ -147,6 +149,27 @@ struct PhaseSpace {
   /// \brief Get the unit cell type of the coordinate system
   UnitCellType getUnitCellType() const;
 
+  /// \brief Get a pointer to the particle X, Y, or Z coordinates, velocities, or forces, on either
+  ///        the host or device.  Use this when the entire abstract is unnecessary or would be
+  ///        inefficient to retrieve.
+  ///
+  /// Overloaded:
+  ///   - Get a const pointer for a const PhaseSpace object's data
+  ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///
+  /// \param dim   Cartesian dimension of interest
+  /// \param kind  Specify coordinates, velocities, or forces--anything that could be thought
+  ///              of as a trajectory
+  /// \param tier  Level at which to extract the data
+  /// \{
+  const double* getCoordinatePointer(CartesianDimension dim,
+                                     TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getCoordinatePointer(CartesianDimension dim,
+                               TrajectoryKind kind = TrajectoryKind::POSITIONS,
+                               HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
   /// \brief Get the coordinates returned in an X/Y/Z interlaced manner
   ///
   /// Overloaded:
@@ -168,8 +191,46 @@ struct PhaseSpace {
                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
-  /// \brief Initialize the forces (set them to zero)
-  void initializeForces();
+  /// \brief Get a pointer to the box space transformation matrix that can track its evolution in
+  ///        the PhaseSpace object's Hybrid data arrays, on either the host or device.
+  ///
+  /// Overloaded:
+  ///   - Get a const pointer for a const PhaseSpace object's data
+  ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///
+  /// \param tier  Level at which to extract the data
+  /// \{
+  const double*
+  getBoxSpaceTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getBoxSpaceTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
+  /// \brief Get a pointer to the inverse (back to real space) transformation matrix that can track
+  ///        its evolution in the PhaseSpace object's Hybrid data arrays, on either the host or
+  ///        device.
+  ///
+  /// Overloaded:
+  ///   - Get a const pointer for a const PhaseSpace object's data
+  ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///
+  /// \param tier  Level at which to extract the data
+  /// \{
+  const double* getInverseTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getInverseTransformPointer(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
+  /// \brief Get a pointer to the box dimensions that can track its evolution in the PhaseSpace
+  ///        object's Hybrid data arrays, on either the host or device.
+  ///
+  /// Overloaded:
+  ///   - Get a const pointer for a const PhaseSpace object's data
+  ///   - Get a non-const pointer to a mutable PhaseSpace object's data
+  ///
+  /// \param tier  Level at which to extract the data
+  /// \{
+  const double* getBoxSizePointer(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getBoxSizePointer(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
 
   /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The
   ///        result should be interpreted as a 3x3 matrix in column-major format.
@@ -194,6 +255,9 @@ struct PhaseSpace {
   Hybrid<double>* getStoragePointer();
   /// \}
 
+  /// \brief Initialize the forces (set them to zero)
+  void initializeForces();
+
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information
   void upload();
@@ -209,9 +273,6 @@ struct PhaseSpace {
 
   /// \brief Upload force information
   void uploadForces();
-
-  /// \brief Upload force information
-  void uploadNonbondedForces();
 
   /// \brief Upload previous positional information
   void uploadPriorPositions();
@@ -230,9 +291,6 @@ struct PhaseSpace {
 
   /// \brief Download force information
   void downloadForces();
-
-  /// \brief Download force information
-  void downloadNonbondedForces();
 
   /// \brief Download previous positional information
   void downloadPriorPositions();

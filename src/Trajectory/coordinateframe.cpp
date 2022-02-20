@@ -9,9 +9,31 @@
 namespace omni {
 namespace trajectory {
 
+using constants::CartesianDimension;
 using math::extractBoxDimensions;
 using math::roundUp;
-  
+using parse::TextFileReader;
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameWriter::CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in,
+                                             double* xcrd_in, double* ycrd_in, double* zcrd_in,
+                                             double* umat_in, double* invu_in, double* boxdim_in) :
+    natom{natom_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
+    umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameWriter::CoordinateFrameWriter(PhaseSpace *ps, const HybridTargetLevel tier) :
+    natom{ps->getAtomCount()},
+    unit_cell{ps->getUnitCellType()},
+    xcrd{ps->getCoordinatePointer(CartesianDimension::X, TrajectoryKind::POSITIONS, tier)},
+    ycrd{ps->getCoordinatePointer(CartesianDimension::Y, TrajectoryKind::POSITIONS, tier)},
+    zcrd{ps->getCoordinatePointer(CartesianDimension::Z, TrajectoryKind::POSITIONS, tier)},
+    umat{ps->getBoxSpaceTransformPointer(tier)},
+    invu{ps->getInverseTransformPointer(tier)},
+    boxdim{ps->getBoxSizePointer(tier)}
+{}
+
 //-------------------------------------------------------------------------------------------------
 CoordinateFrameReader::CoordinateFrameReader(const int natom_in, const UnitCellType unit_cell_in,
                                              const double* xcrd_in, const double* ycrd_in,
@@ -22,11 +44,21 @@ CoordinateFrameReader::CoordinateFrameReader(const int natom_in, const UnitCellT
 {}
 
 //-------------------------------------------------------------------------------------------------
-CoordinateFrameWriter::CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in,
-                                             double* xcrd_in, double* ycrd_in, double* zcrd_in,
-                                             double* umat_in, double* invu_in, double* boxdim_in) :
-    natom{natom_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
-    umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}
+CoordinateFrameReader::CoordinateFrameReader(const CoordinateFrameWriter &cfw) :
+    natom{cfw.natom}, unit_cell{cfw.unit_cell}, xcrd{cfw.xcrd}, ycrd{cfw.ycrd}, zcrd{cfw.zcrd},
+    umat{cfw.umat}, invu{cfw.invu}, boxdim{cfw.boxdim}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace &ps, const HybridTargetLevel tier) :
+    natom{ps.getAtomCount()},
+    unit_cell{ps.getUnitCellType()},
+    xcrd{ps.getCoordinatePointer(CartesianDimension::X, TrajectoryKind::POSITIONS, tier)},
+    ycrd{ps.getCoordinatePointer(CartesianDimension::Y, TrajectoryKind::POSITIONS, tier)},
+    zcrd{ps.getCoordinatePointer(CartesianDimension::Z, TrajectoryKind::POSITIONS, tier)},
+    umat{ps.getBoxSpaceTransformPointer(tier)},
+    invu{ps.getInverseTransformPointer(tier)},
+    boxdim{ps.getBoxSizePointer(tier)}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -482,20 +514,6 @@ CoordinateFrameWriter CoordinateFrame::data(HybridTargetLevel tier) {
 }
 
 //-------------------------------------------------------------------------------------------------
-const CoordinateFrameReader getCoordinateFrameReader(const PhaseSpace &ps) {
-  const PhaseSpaceReader psr = ps.data();
-  return CoordinateFrameReader(psr.natom, psr.unit_cell, psr.xcrd, psr.ycrd, psr.zcrd,
-                               psr.umat, psr.invu, psr.boxdim);
-}
-
-//-------------------------------------------------------------------------------------------------
-CoordinateFrameWriter getCoordinateFrameWriter(PhaseSpace *ps) {
-  PhaseSpaceWriter psw = ps->data();
-  return CoordinateFrameWriter(psw.natom, psw.unit_cell, psw.xcrd, psw.ycrd, psw.zcrd,
-                               psw.umat, psw.invu, psw.boxdim);
-}
-
-//-------------------------------------------------------------------------------------------------
 std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const CoordinateFileKind kind,
                                                const int atom_count, const UnitCellType unit_cell,
                                                const std::vector<int> &frame_numbers) {
@@ -557,6 +575,93 @@ std::vector<CoordinateFrame> getSelectedFrames(const std::string &file_name, con
   const TextFile tf(file_name);
   const CoordinateFileKind kind = detectCoordinateFileKind(tf);
   return getSelectedFrames(tf, kind, atom_count, unit_cell, frame_numbers);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<CoordinateFrame> getAllFrames(const TextFile &tf, const int atom_count,
+                                          const UnitCellType unit_cell,
+                                          const ExceptionResponse policy) {
+  const CoordinateFileKind kind = detectCoordinateFileKind(tf);
+  std::vector<int> frame_numbers;
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+    {
+      // Calculate the number of text lines per frame
+      int nline_per_frame = ((atom_count * 3) + 9) / 10;
+
+      // Test whether there is box information
+      const int box_line = 1 + nline_per_frame;
+      const TextFileReader tfr = tf.data();
+      bool box_info_detected = false;
+      if (atom_count == 1) {
+
+        // There would be no way to tell a trajectory of a single atom in empty space from a
+        // trajectory of a single atom in a box, so use the provided unit cell type.
+        switch (unit_cell) {
+        case UnitCellType::ORTHORHOMBIC:
+        case UnitCellType::TRICLINIC:
+          box_info_detected = true;
+          break;
+        case UnitCellType::NONE:
+          break;
+        }
+      }
+      else if (tfr.line_count > box_line) {
+        const int llim = tfr.line_limits[box_line];
+        const int hlim = tfr.line_limits[box_line + 1];
+        int ndots = 0;
+        for (int i = llim; i < hlim; i++) {
+          ndots += (tfr.text[i] == '.');
+        }
+        box_info_detected = (ndots == 3);
+      }
+      nline_per_frame += (box_info_detected);
+
+      // Calculate the number of frames in the file
+      const int nframe = (tfr.line_count - 1) / nline_per_frame;
+      if (tfr.line_count - (nframe * nline_per_frame) != 0) {
+        const std::string boxmsg = (box_info_detected) ? "Box dimensions were detected.  " : "";
+        const std::string errmsg = "In file " + tf.getFileName() + ", an atom count of " +
+                                   std::to_string(atom_count) + "implies a total of " +
+                                   std::to_string(nframe) + " frames.  " + boxmsg +
+                                   "However, a total of " +
+                                   std::to_string(tfr.line_count - (nframe * nline_per_frame)) +
+                                   " lines remain, which cannot be construed as a whole frame.";
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr(errmsg, "getAllFrames");
+        case ExceptionResponse::WARN:
+          rtWarn(errmsg, "getAllFrames");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+      frame_numbers.resize(nframe);
+      for (int i = 0; i < nframe; i++) {
+        frame_numbers[i] = i;
+      }
+    }
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    frame_numbers.resize(1, 0);
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The format of " + tf.getFileName() + " could not be understood.", "getSelectedFrames");
+  }
+  return getSelectedFrames(tf, kind, atom_count, unit_cell, frame_numbers);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const int atom_count,
+                                          const UnitCellType unit_cell,
+                                          const ExceptionResponse policy) {
+  const TextFile tf(file_name);
+  return getAllFrames(tf, atom_count, unit_cell, policy);
 }
 
 } // namespace trajectory

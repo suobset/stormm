@@ -521,7 +521,7 @@ AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
 AtomMask::AtomMask(const std::string &input_text_in, const AtomGraph *ag_in,
                    const ChemicalFeatures *chemfe_in, const PhaseSpace &ps,
                    const MaskInputMode mode, const std::string &description_in) :
-    AtomMask(input_text_in, ag_in, chemfe_in, getCoordinateFrameReader(ps), mode, description_in)
+    AtomMask(input_text_in, ag_in, chemfe_in, CoordinateFrameReader(ps), mode, description_in)
 {}
   
 //-------------------------------------------------------------------------------------------------

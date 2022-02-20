@@ -1,6 +1,7 @@
 #include "Constants/symbol_values.h"
 #include "Math/vector_ops.h"
 #include "Math/matrix_ops.h"
+#include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "Topology/atomgraph.h"
 #include "valence_potential.h"
@@ -16,7 +17,6 @@ using symbols::twopi;
 using symbols::inverse_twopi;
 using topology::NonbondedKit;
 using topology::TorsionKind;
-using topology::ValenceKit;
 using trajectory::PhaseSpaceWriter;
 
 //-------------------------------------------------------------------------------------------------
@@ -70,6 +70,37 @@ double evaluateBondTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 
   // Return the double-precision bond energy sum, if of interest
   return bond_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index) {
+  double bond_energy = 0.0;
+  llint bond_acc = 0LL;
+  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+  for (int pos = 0; pos < vk.nbond; pos++) {
+    const int i_atom = vk.bond_i_atoms[pos];
+    const int j_atom = vk.bond_j_atoms[pos];
+    const int param_idx = vk.bond_param_idx[pos];
+    const double keq = vk.bond_keq[param_idx];
+    const double leq = fabs(vk.bond_leq[param_idx]);
+    const double dx = cfr.xcrd[j_atom] - cfr.xcrd[i_atom];
+    const double dy = cfr.ycrd[j_atom] - cfr.ycrd[i_atom];
+    const double dz = cfr.zcrd[j_atom] - cfr.zcrd[i_atom];
+    const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    const double dl = dr - leq;
+    const double du = keq * dl * dl;
+    bond_energy += du;
+    bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
+  }
+  ecard->contribute(StateVariable::BOND, bond_acc, system_index);
+  return bond_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+                         ScoreCard *ecard, const int system_index) {
+  return evaluateBondTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------

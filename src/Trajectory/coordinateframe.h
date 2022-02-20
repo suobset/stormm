@@ -3,6 +3,7 @@
 #define OMNI_COORDINATE_FRAME_H
 
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 #include "Parsing/textfile.h"
 #include "Topology/atomgraph.h"
 #include "phasespace.h"
@@ -13,16 +14,52 @@ namespace trajectory {
 using card::Hybrid;
 using card::HybridKind;
 using card::HybridTargetLevel;
+using constants::ExceptionResponse;
 using parse::TextFile;
 using topology::AtomGraph;
+
+/// \brief Collect C-style pointers for the elements of a writable CoordinateFrame object.
+struct CoordinateFrameWriter {
+
+  /// \brief The constructor feeds all arguments straight to the inline initialization list.
+  ///
+  /// Overloaded:
+  ///   - Take all arguments piecemeal
+  ///   - Take a PhaseSpace object
+  /// \{
+  CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in, double* xcrd_in,
+                        double* ycrd_in, double* zcrd_in, double* umat_in, double* invu_in,
+                        double* boxdim_in);
+  CoordinateFrameWriter(PhaseSpace *ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
+  const int natom;               ///< The number of atoms in the system
+  const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  double* xcrd;                  ///< Cartesian X coordinates of all atoms
+  double* ycrd;                  ///< Cartesian Y coordinates of all atoms
+  double* zcrd;                  ///< Cartesian Z coordinates of all atoms
+  double* umat;                  ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  double* invu;                  ///< Inverse transformation matrix out of box space
+  const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
+};
 
 /// \brief Collect C-style pointers for the elements of a read-only CoordinateFrame object.
 struct CoordinateFrameReader {
 
-  /// \brief Constructor feeds all arguments straight to the inline initialization list
+  /// \brief The constructor feeds all arguments straight to the inline initialization list.
+  ///
+  /// Overloaded:
+  ///   - Take all arguments piecemeal
+  ///   - Take a CoordinateFrameWriter
+  ///   - Take a PhaseSpace object
+  /// \{
   CoordinateFrameReader(const int natom_in, const UnitCellType unit_cell_in, const double* xcrd_in,
                         const double* ycrd_in, const double* zcrd_in, const double* umat_in,
                         const double* invu_in, const double* boxdim_in);
+  CoordinateFrameReader(const CoordinateFrameWriter &cfw);
+  CoordinateFrameReader(const PhaseSpace &ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
 
   const int natom;               ///< The number of atoms in the system
   const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
@@ -32,25 +69,6 @@ struct CoordinateFrameReader {
   const double* umat;            ///< Transformation matrix to take coordinates into box
                                  ///<   (fractional) space
   const double* invu;            ///< Inverse transformation matrix out of box space
-  const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
-};
-
-/// \brief Collect C-style pointers for the elements of a writable CoordinateFrame object.
-struct CoordinateFrameWriter {
-
-  /// \brief Constructor feeds all arguments straight to the inline initialization list
-  CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in, double* xcrd_in,
-                        double* ycrd_in, double* zcrd_in, double* umat_in, double* invu_in,
-                        double* boxdim_in);
-
-  const int natom;               ///< The number of atoms in the system
-  const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
-  double* xcrd;                  ///< Cartesian X coordinates of all atoms
-  double* ycrd;                  ///< Cartesian Y coordinates of all atoms
-  double* zcrd;                  ///< Cartesian Z coordinates of all atoms
-  double* umat;                  ///< Transformation matrix to take coordinates into box
-                                 ///<   (fractional) space
-  double* invu;                  ///< Inverse transformation matrix out of box space
   const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
 };
 
@@ -231,22 +249,6 @@ private:
   void allocate();
 };
 
-/// \brief Create a coordinate frame reader or writer based on a const or non-const PhaseSpace
-///        object.  This is not a constructor, but gets around the problem of const constructor
-///        overloading (more precisely, lacking the ability to create an object and have it be
-///        const or non-const based on the constructor arguments).
-///
-/// Overloaded:
-///   - Make a const CoordinateFrame pointing into a const PhaseSpace object
-///   - Make a non-const CoordinateFrame pointing into a non-const PhaseSpace object (supply a
-///     pointer to the PhaseSpace object rather than a const reference)
-///
-/// \param ps  The PhaseSpace object of interest
-/// \{
-const CoordinateFrameReader getCoordinateFrameReader(const PhaseSpace &ps);
-CoordinateFrameWriter getCoordinateFrameWriter(PhaseSpace* ps);
-/// \}
-
 /// \brief Read a series of frames from a trajectory file.
 ///
 /// Overloaded:
@@ -268,7 +270,28 @@ std::vector<CoordinateFrame> getSelectedFrames(const std::string &file_name, int
                                                UnitCellType unit_cell,
                                                const std::vector<int> &frame_numbers);
 /// \}
-  
+
+/// \brief Read all available frames from a trajectory file.
+///
+/// Overloaded:
+///   - Read all frames of an ASCII-format trajectory (the frame count will be predicted by the
+///     number of lines in the text file and the expected format)
+///   - Read all frames from a binary trajectory file
+///
+/// \param tf             ASCII text file pre-loaded into memory
+/// \param kind           Type of coordinate or restart file
+/// \param atom_count     Expected atom count (will be checked against the file, if possible)
+/// \param unit_cell      Expected unit cell type (will be written to each frame)
+/// \{
+std::vector<CoordinateFrame> getAllFrames(const TextFile &tf, const int atom_count,
+                                          const UnitCellType unit_cell,
+                                          const ExceptionResponse policy);
+
+std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const int atom_count,
+                                          const UnitCellType unit_cell,
+                                          const ExceptionResponse policy);
+/// \}
+
 } // namespace trajectory
 } // namespace omni
 

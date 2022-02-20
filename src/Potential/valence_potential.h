@@ -2,8 +2,10 @@
 #ifndef OMNI_VALENCE_POTENTIAL_H
 #define OMNI_VALENCE_POTENTIAL_H
 
+#include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "Topology/atomgraph.h"
+#include "Topology/atomgraph_abstracts.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
 
@@ -11,6 +13,9 @@ namespace omni {
 namespace energy {
 
 using topology::AtomGraph;
+using topology::ValenceKit;
+using trajectory::CoordinateFrameReader;
+using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpace;
 
 /// \brief A value which approaches one from below.  This is used in dihedral and similar
@@ -28,27 +33,40 @@ constexpr double inverse_one_minus_asymptote_lf = 1048576.0;
 constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \}
 
-/// \brief Evaluate the bond energy contributions based on a topology and a PhaseSpace object to
-///        provide coordinates and store the resulting forces.  This simple routine can serve as a
-///        check on much more complex routines involving streamlined data structures and GPU
-///        execution.
+/// \brief Evaluate the bond energy contributions based on a topology and a coordinate set.
+///        These simple routines can serve as a check on much more complex routines involving
+///        streamlined data structures and GPU execution.
+///
+/// Overloaded:
+///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
+///   - Evaluate based on a CoordinateFrame abstract
 ///
 /// \param ag            System topology
-/// \param ps            Coordinates and force accumulators (modified by this function)
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
+/// \{
 double evaluateBondTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
+double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index);
+
+double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+                         ScoreCard *ecard, const int system_index);
+/// \}
+  
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
 ///        topology and a PhaseSpace object to store forces in double precision.  The contribution
 ///        to the angle energy in the tracking object can be compared directly to the function
 ///        output.
 ///
 /// \param ag            System topology
-/// \param ps            Coordinates and force accumulators (modified by this function)
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -63,7 +81,7 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 ///        to the fixed-precision accumulators in the energy tracking object.
 ///
 /// \param ag            System topology
-/// \param ps            Coordinates and force accumulators (modified by this function)
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -77,7 +95,7 @@ double2 evaluateDihedralTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ec
 ///        compared to the result obtained with fixed-precision accumulation.
 ///
 /// \param ag            System topology
-/// \param ps            Coordinates and force accumulators (modified by this function)
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -91,7 +109,7 @@ double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *
 ///        result in fixed-precision accumulation.
 ///
 /// \param ag            System topology
-/// \param ps            Coordinates and force accumulators (modified by this function)
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -104,7 +122,7 @@ double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCar
 ///        for comparison to fixed-precision results.
 ///
 /// \param ag            System topology
-/// \param ps            Coordinates and force accumulators (modified by this function)
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -118,7 +136,8 @@ double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 ///        routine will work from that setup.
 ///
 /// \param ag               System topology
-/// \param ps               Coordinates and force accumulators (modified by this function)
+/// \param ps               Coordinates, box size, and force accumulators (modified by this
+///                         function)
 /// \param ecard            Energy components and other state variables (volume, temperature, etc.)
 ///                         (modified by this function)
 /// \param eval_elec_force  Flag to have electrostatic forces evaluated

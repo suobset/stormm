@@ -2,10 +2,13 @@
 #ifndef OMNI_USER_SETTINGS_H
 #define OMNI_USER_SETTINGS_H
 
+#include "../../../src/Constants/behavior.h"
+#include "../../../src/Namelists/namelist_emulator.h"
 #include "../../../src/Namelists/nml_files.h"
 #include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/nml_random.h"
 #include "../../../src/Namelists/nml_solvent.h"
+#include "../../../src/Parsing/textfile.h"
 #include "../../../src/Topology/atomgraph.h"
 #include "../../../src/Topology/atomgraph_enumerators.h"
 #include "../../../src/Trajectory/coordinateframe.h"
@@ -14,10 +17,13 @@
 namespace conf_app {
 namespace user_input {
 
+using omni::constants::ExceptionResponse;
 using omni::namelist::FilesControls;
 using omni::namelist::MinimizeControls;
+using omni::namelist::NamelistEmulator;
 using omni::namelist::RandomControls;
 using omni::namelist::SolventControls;
+using omni::parse::TextFile;
 using omni::topology::AtomGraph;
 using omni::topology::ImplicitSolventModel;
 using omni::trajectory::CoordinateFrame;
@@ -41,6 +47,9 @@ struct UserSettings {
 
 private:
 
+  /// Action in the event of bad input
+  ExceptionResponse policy;
+  
   /// Name of the original input file
   std::string input_file;
   
@@ -72,6 +81,20 @@ private:
   ///        controlsthe motion of each coordinate set.
   void gatherUniqueTopologies();
 };
+
+/// \brief Free function to read the &conformer namelist.  This works in analogous fashion to
+///        various namelist-assoicated objects implemented in src/Namelists/, except that the
+///        &conformer namelist is private to this application.  The UserSettings object is the
+///        object associated in this manner to the &conformer namelist.  Unlike the objects linked
+///        to general-purpose namelists in src/Namelists, the UserSettings object does not need
+///        additional setter functions for keyword-associated content in a &confomer namelist, as
+///        the namelist in an input file is the one way that this information will enter the
+///        program.
+///
+/// \param tf
+/// \param start_line
+  
+NamelistEmulator conformerInput(const TextFile &tf, int *start_line, ExceptionResponse policy);
 
 } // namespace user_input
 } // namespace conf_app

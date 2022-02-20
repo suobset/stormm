@@ -240,7 +240,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
 //-------------------------------------------------------------------------------------------------
 ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
                                    const double temperature_in) :
-  ChemicalFeatures(ag_in, getCoordinateFrameReader(ps), temperature_in)
+  ChemicalFeatures(ag_in, CoordinateFrameReader(ps), temperature_in)
 {}
 
 //-------------------------------------------------------------------------------------------------

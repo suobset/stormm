@@ -27,6 +27,11 @@ enum class PrecisionModel {
            ///< References double-precision data arrays if available.
 };
 
+/// \brief Enumerate the Cartesian dimensions
+enum class CartesianDimension {
+  X, Y, Z
+};
+  
 } // namespace constants
 } // namespace omni
 
