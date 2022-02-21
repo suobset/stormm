@@ -143,19 +143,22 @@ struct ChemicalFeatures {
   ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps, double temperature_in = 300.0);
   /// \}
 
-  /// \brief Copy constructor
+  /// \brief Copy and move constructors
   ///
   /// \param original  The ChemicalFeatures object to copy
+  /// \{
+  ChemicalFeatures(const ChemicalFeatures &original);
+  ChemicalFeatures(ChemicalFeatures &&original);
+  /// \}
+  
+  /// \brief Copy assignment and move assignment operators
+  ///
   /// \param other     The ChemicalFeatures object to copy (a different name for a better semantic
   ///                  fit in the context of the = sign)
   /// \{
-#if 0
-  ChemicalFeatures(const ChemicalFeatures &original);
   ChemicalFeatures& operator=(const ChemicalFeatures &other);
-#endif
+  ChemicalFeatures& operator=(ChemicalFeatures &&other);
   /// \}
-
-  /// \brief Move constructor
   
 #ifdef OMNI_USE_HPC
   /// \brief Upload data to the GPU
@@ -347,6 +350,21 @@ private:
   std::vector<int> findChiralCenters(const NonbondedKit<double> &nbk, const ValenceKit<double> &vk,
                                      const ChemicalDetailsKit &cdk,
                                      const CoordinateFrameReader &cfr) const;
+
+  /// \brief Find rotatable bonds in the system, those with bond order of 1.0 and nontrivial groups
+  ///        sprouting from either end, and return a vector of the atom indices at either end.
+  ///
+  /// \param vk   Valence term abstract from the original topology
+  /// \param nbk  Nonbonded system details, abstract taken from the original topology
+  std::vector<int2> findRotatableBonds(const ValenceKit<double> &vk,
+                                       const ChemicalDetailsKit &cdk,
+                                       const NonbondedKit<double> &nbk,
+                                       const std::vector<int> &ring_atoms,
+                                       const std::vector<int> &ring_atom_bounds);
+
+  /// \brief Reset POINTER-kind Hybrid objects to target the appropriate ARRAY-kind object in
+  ///        the copy constructor and copy assignment operator.
+  void repairPointers();
 };
 
 /// \brief Score the four branches of a chiral molecule.  This is called by the findChiralCenters()

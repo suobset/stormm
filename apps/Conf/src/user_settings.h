@@ -76,10 +76,6 @@ private:
   /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
   /// when composing the synthesis objects.
   std::vector<int> topology_indices;
-
-  /// \brief Create vectors of topologies, starting coordinates, and indices of which topology
-  ///        controlsthe motion of each coordinate set.
-  void gatherUniqueTopologies();
 };
 
 /// \brief Free function to read the &conformer namelist.  This works in analogous fashion to
@@ -91,9 +87,9 @@ private:
 ///        the namelist in an input file is the one way that this information will enter the
 ///        program.
 ///
-/// \param tf
-/// \param start_line
-  
+/// \param tf          Text of file containing the input deck, read into RAM
+/// \param start_line  Line of the input file at which to begin the scan
+/// \param policy      Response to bad inputs
 NamelistEmulator conformerInput(const TextFile &tf, int *start_line, ExceptionResponse policy);
 
 } // namespace user_input
