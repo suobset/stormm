@@ -81,6 +81,13 @@ std::string getBaseName(const std::string &path);
 /// \param path  The path to analyze
 std::vector<std::string> separatePath(const std::string &path);
 
+/// \brief Split a path into parts before and after the final dot (".")
+///
+/// \param path    The original path
+/// \param before  The part of the path before the final dot, might be an empty string (returned)
+/// \param after   The part of the path after the final dot, might be an empty string (returned)
+void splitPath(const std::string &path, std::string *before, std::string *after);
+  
 /// \brief Given a path that has been established to be a regular expression, list all files it
 ///        could describe, recursively descend into subdirectories if requested.  The recursion
 ///        only kicks in once the regular expression has been interpreted into a path that is,

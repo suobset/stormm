@@ -189,6 +189,20 @@ std::vector<std::string> separatePath(const std::string &path) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void splitPath(const std::string &path, std::string *before, std::string *after) {
+  const int pathsize = path.size();
+  int dotpos = pathsize;
+  for (int i = pathsize - 1; i >= 0; i--) {
+    if (path[i] == '.') {
+      dotpos = i;
+      break;
+    }
+  }
+  *after = (dotpos < pathsize) ? path.substr(dotpos + 1, pathsize - dotpos - 1) : "";
+  *before = (dotpos > 0) ? path.substr(0, dotpos) : "";
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<std::string> listFilesInPath(const std::string &regexp_path, SearchStyle r_option) {
   std::vector<std::string> ls_result;
 

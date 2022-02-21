@@ -15,11 +15,14 @@ namespace conf_app {
 namespace user_input {
 
 using omni::diskutil::DrivePathType;
+using omni::diskutil::getBaseName;
 using omni::diskutil::getDrivePathType;
+using omni::diskutil::splitPath;
 using omni::energy::evaluateBondTerms;
 using omni::energy::evaluateAngleTerms;
 using omni::errors::rtErr;
 using omni::errors::rtWarn;
+using omni::namelist::MoleculeSystem;
 using omni::parse::NumberFormat;
 using omni::parse::TextOrigin;
 using omni::parse::verifyNumberFormat;
@@ -138,13 +141,33 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
   
   // Read all free topologies and free coordinate sets, then determine which free topology
   // matches which free coordinate set.
-  const int n_free_top = file_io_input.getFreeTopologyCount();
+  int n_free_top = file_io_input.getFreeTopologyCount();
   topology_cache.reserve(n_free_top);
   for (int i = 0; i < n_free_top; i++) {
-    topology_cache.push_back(AtomGraph(file_io_input.getFreeTopologyName(i)));
+    try {
+      topology_cache.push_back(AtomGraph(file_io_input.getFreeTopologyName(i)));
+    }
+    catch (std::runtime_error) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("The format of topology " + file_io_input.getFreeTopologyName(i) + " could not be "
+              "understood.", "UserSettings");
+      case ExceptionResponse::WARN:
+        rtWarn("The format of topology " + file_io_input.getFreeTopologyName(i) + " could not be "
+               "understood.  The file will be skipped.", "UserSettings");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
+    }
   }
-  const int n_free_crd = file_io_input.getFreeCoordinatesCount();
+  n_free_top = topology_cache.size();
+  int n_free_crd = file_io_input.getFreeCoordinatesCount();
   initial_coordinates_cache.reserve(n_free_crd);
+  std::vector<int> initial_coordinates_frame_count;
+  initial_coordinates_frame_count.reserve(n_free_crd);
+  std::vector<CoordinateFileKind> initial_coordinates_kind;
+  initial_coordinates_kind.reserve(n_free_crd);
   for (int i = 0; i < n_free_crd; i++) {
     const std::string crd_name = file_io_input.getFreeCoordinateName(i);
     const CoordinateFileKind kind = detectCoordinateFileKind(crd_name);
@@ -157,18 +180,32 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
     case CoordinateFileKind::AMBER_INPCRD:
     case CoordinateFileKind::AMBER_ASCII_RST:
       initial_coordinates_cache.push_back(CoordinateFrame(crd_name, kind));
+      initial_coordinates_frame_count.push_back(1);
+      initial_coordinates_kind.push_back(kind);
       break;
     case CoordinateFileKind::AMBER_NETCDF:
     case CoordinateFileKind::AMBER_NETCDF_RST:
       break;
     case CoordinateFileKind::UNKNOWN:
-      rtErr("The format of " + crd_name + " could not be understood.", "UserSettings");
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("The format of " + crd_name + " could not be understood.", "UserSettings");
+      case ExceptionResponse::WARN:
+        rtWarn("The format of " + crd_name + " could not be understood.  The file will be skipped",
+               "UserSettings");
+        break;
+      case ExceptionResponse::SILENT:
+        break;
+      }
     }
   }
+  n_free_crd = initial_coordinates_cache.size();
+
+  // CHECK
+  printf("There were %d free topologies and %d free coordinate sets.\n", n_free_top, n_free_crd);
+  // END CHECK
   
   // Filter the unique topologies and match them to systems.  List the atom counts of each.
-  printf("There were %d unique, free topologies and %d free coordinate sets read.\n", n_free_top,
-         n_free_crd);
   int max_match = 0;
   std::vector<int> topology_atom_counts(n_free_top);
   std::vector<int> coordinate_atom_counts(n_free_top);
@@ -258,14 +295,18 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
     }
   }
   
-  // Test each coordinate set with respect to topologies of the appropriate size.  Evaluate
-  // bond and angle energy, and take the best scoring result as the indicator of which topology
-  // describes which coordinate set.
+  // Test each coordinate set with respect to topologies of the appropriate size.  Evaluate bond
+  // and angle energy, and take the best scoring result as the indicator of which topology
+  // describes which coordinate set.  Make new systems based on each coordinate set.
   const int n_unique_sizes = unique_topology_sizes.size();
   ScoreCard sc(1);
+  std::string trajectory_base, trajectory_ext, restart_base, restart_ext;
+  splitPath(file_io_input.getTrajectoryFileName(), &trajectory_base, &trajectory_ext);
+  splitPath(file_io_input.getCheckpointFileName(), &restart_base, &restart_ext);
   for (int i = 0; i < n_unique_sizes; i++) {
 
     // Loop over all coordinates in this size group.  Try interpreting them with each topology.
+    // Store each result as a unique MoleculeSystem and expand the list.
     const int j_llim = unique_coordinate_size_bounds[i];
     const int j_hlim = unique_coordinate_size_bounds[i + 1];
     const int k_llim = unique_topology_size_bounds[i];
@@ -289,22 +330,27 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
         }
       }
 
-      // CHECK
-      printf("- %s ->\n  %s with %9.4lf / %9.4lf\n",
-             initial_coordinates_cache[icrdj].getFileName().c_str(),
-             topology_cache[best_topology].getFileName().c_str(), min_bond_e, min_angl_e);
-      // END CHECK
-    }
+      // Construct the trajectory and restart file names for this system based on generic paths.
+      // Hack a solution in the odd event that the user has stuffed their file differentiation
+      // behind the final dot.
+      const std::string orig_crd_file = initial_coordinates_cache[icrdj].getFileName();
+      std::string orig_base, orig_ext;
+      splitPath(getBaseName(orig_crd_file), &orig_base, &orig_ext);
+      const std::string trajectory_middle = (orig_base.size() > 0) ? orig_base : orig_ext;
 
-    // CHECK
-    printf("Size %4d : ", unique_topology_sizes[i]);
-    for (int j = unique_coordinate_size_bounds[i]; j < unique_coordinate_size_bounds[i + 1]; j++) {
-      printf("%2d ", coordinate_series[j]);
+      // Add this pair to the list of systems
+      file_io_input.addSystem(MoleculeSystem(topology_cache[best_topology].getFileName(),
+                                             initial_coordinates_cache[icrdj].getFileName(),
+                                             trajectory_base + trajectory_middle + trajectory_ext,
+                                             restart_base + trajectory_middle + restart_ext, 0,
+                                             initial_coordinates_frame_count[icrdj], 1,
+                                             initial_coordinates_kind[icrdj],
+                                             file_io_input.getOutputCoordinateFormat(),
+                                             file_io_input.getCheckpointFormat()));
     }
-    printf("\n");
-    // END CHECK
-
   }
+
+  // 
 }
 
 //-------------------------------------------------------------------------------------------------

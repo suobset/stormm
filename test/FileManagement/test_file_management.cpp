@@ -100,6 +100,21 @@ int main(int argc, char* argv[]) {
   }
   check(getDrivePathType(simple_file_name) == DrivePathType::FILE, "The file " + simple_file_name +
 	" was not created as expected.", fi_priority);
+  std::string before, after;
+  const std::string path1("./trj/abc/pos/my.crd");
+  splitPath(path1, &before, &after);
+  check(before, RelationalOperator::EQUAL, "./trj/abc/pos/my", "Path splitting with " + path1 +
+        " fails.");
+  check(after, RelationalOperator::EQUAL, "crd", "Path splitting with " + path1 + " fails.");
+  const std::string path2("/trj/abc/pos/mycrd");
+  splitPath(path2, &before, &after);
+  check(before, RelationalOperator::EQUAL, "/trj/abc/pos/mycrd", "Path splitting with " + path2 +
+        " fails.");
+  check(after, RelationalOperator::EQUAL, "", "Path splitting with " + path2 + " fails.");
+  const std::string path3(".crd");
+  splitPath(path3, &before, &after);
+  check(before, RelationalOperator::EQUAL, "", "Path splitting with " + path3 + " fails.");
+  check(after, RelationalOperator::EQUAL, "crd", "Path splitting with " + path3 + " fails.");
 
   // There is a possibility that the temporary directory could not be created, which would
   // negate a number of tests but also prevent the successful creation or reading of a TextFile

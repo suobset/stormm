@@ -481,6 +481,31 @@ void FilesControls::addFreeTopologyName(const std::string &file_name) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void FilesControls::removeFreeTopologyName(const int starting_index, const int stretch) {
+  if (starting_index < 0 || starting_index >= static_cast<int>(topology_file_names.size())) {
+    rtErr("Unable to remove elements starting at index " + std::to_string(starting_index) +
+          "from a list of " + std::to_string(topology_file_names.size()) + ".", "FilesControls",
+          "removeFreeTopologyName");
+  }
+  if (starting_index + stretch >= static_cast<int>(topology_file_names.size())) {
+    rtErr("Unable to remove " + std::to_string(stretch) + " elements starting at index " +
+          std::to_string(starting_index) + "from a list of " +
+          std::to_string(topology_file_names.size()) + ".", "FilesControls",
+          "removeFreeTopologyName");
+  }
+  topology_file_names.erase(topology_file_names.begin() + starting_index,
+                            topology_file_names.begin() + starting_index + stretch);
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::removeFreeTopologyName(const std::string &fname) {
+  const size_t findex = findStringInVector(topology_file_names, fname);
+  if (findex < topology_file_names.size()) {
+    topology_file_names.erase(topology_file_names.begin() + findex);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void FilesControls::addFreeCoordinateName(const std::string &file_name) {
   if (findStringInVector(coordinate_file_names, file_name) == coordinate_file_names.size()) {
     coordinate_file_names.push_back(file_name);
@@ -490,10 +515,50 @@ void FilesControls::addFreeCoordinateName(const std::string &file_name) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void FilesControls::removeFreeCoordinateName(const int starting_index, const int stretch) {
+  if (starting_index < 0 || starting_index >= static_cast<int>(coordinate_file_names.size())) {
+    rtErr("Unable to remove elements starting at index " + std::to_string(starting_index) +
+          "from a list of " + std::to_string(coordinate_file_names.size()) + ".", "FilesControls",
+          "removeFreeCoordinateName");
+  }
+  if (starting_index + stretch >= static_cast<int>(coordinate_file_names.size())) {
+    rtErr("Unable to remove " + std::to_string(stretch) + " elements starting at index " +
+          std::to_string(starting_index) + "from a list of " +
+          std::to_string(coordinate_file_names.size()) + ".", "FilesControls",
+          "removeFreeCoordinateName");
+  }
+  coordinate_file_names.erase(coordinate_file_names.begin() + starting_index,
+                              coordinate_file_names.begin() + starting_index + stretch);
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::removeFreeCoordinateName(const std::string &fname) {
+  const size_t findex = findStringInVector(coordinate_file_names, fname);
+  if (findex < coordinate_file_names.size()) {
+    coordinate_file_names.erase(coordinate_file_names.begin() + findex);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void FilesControls::addSystem(const MoleculeSystem &new_mol) {
   systems.push_back(new_mol);
   system_count++;
   structure_count += new_mol.getTotalFrames();
+}
+
+//-------------------------------------------------------------------------------------------------
+void FilesControls::removeSystem(const int starting_index, const int stretch) {
+  if (starting_index < 0 || starting_index >= static_cast<int>(systems.size())) {
+    rtErr("Unable to remove elements starting at index " + std::to_string(starting_index) +
+          "from a list of " + std::to_string(systems.size()) + ".", "FilesControls",
+          "removeSystem");
+  }
+  if (starting_index + stretch >= static_cast<int>(systems.size())) {
+    rtErr("Unable to remove " + std::to_string(stretch) + " elements starting at index " +
+          std::to_string(starting_index) + "from a list of " +
+          std::to_string(systems.size()) + ".", "FilesControls", "removeSystem");
+  }
+  systems.erase(systems.begin() + starting_index, systems.begin() + starting_index + stretch);
 }
 
 //-------------------------------------------------------------------------------------------------

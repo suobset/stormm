@@ -154,7 +154,7 @@ struct MoleculeSystem {
   void setCheckpointFileKind(const std::string &kind);
   void setCheckpointFileKind(CoordinateFileKind kind);
   /// \}
-
+  
   /// \brief Report whether the topology file named in this system is a valid file.  This validator
   ///        is public so that it can be called by a wholistic validation strategy employed in the
   ///        containing FilesControls object.
@@ -306,15 +306,47 @@ struct FilesControls {
   /// \param file_name  Name of the topology file to add
   void addFreeTopologyName(const std::string &file_name);
 
+  /// \brief Remove entries from the free topologies array.
+  ///
+  /// Overloaded:
+  ///   - Remove topologies in a numbered range
+  ///   - Remove a topology by name
+  ///
+  /// \param index    Starting index for system removal, or the one system to remove
+  /// \param stretch  Number of systems, including the starting index, to remove from the list
+  /// \{
+  void removeFreeTopologyName(int index, int stretch = 1);
+  void removeFreeTopologyName(const std::string &fname);
+  /// \}
+  
   /// \brief Add a free coordinate file to the list, after checking for its prior existence.
   ///
   /// \param file_name  Name of the coordinate file to add
   void addFreeCoordinateName(const std::string &file_name);
 
+  /// \brief Remove entries from the free coordinates array
+  ///
+  /// Overloaded:
+  ///   - Remove coordinate files in a numbered range
+  ///   - Remove a coordinate file by name
+  ///
+  /// \param index    Starting index for system removal, or the one system to remove
+  /// \param stretch  Number of systems, including the starting index, to remove from the list
+  /// \{
+  void removeFreeCoordinateName(int index, int stretch = 1);
+  void removeFreeCoordinateName(const std::string &fname);
+  /// \}
+
   /// \brief Add a system to the list.
   ///
   /// \param new_mol  The new molecule system to push to the back of the list
   void addSystem(const MoleculeSystem &new_mol);
+
+  /// \brief Remove entries from the systems array.
+  ///
+  /// \param index    Starting index for system removal, or the one system to remove
+  /// \param stretch  Number of systems, including the starting index, to remove from the list
+  void removeSystem(int index, int stretch = 1);
 
   /// \brief Set the report file name.
   ///
