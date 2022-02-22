@@ -200,6 +200,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
   std::string trajectory_base, trajectory_ext, restart_base, restart_ext;
   splitPath(fcon.getTrajectoryFileName(), &trajectory_base, &trajectory_ext);
   splitPath(fcon.getCheckpointFileName(), &restart_base, &restart_ext);
+  std::vector<bool> topology_in_use(n_free_top, false);
   for (int i = 0; i < n_unique_sizes; i++) {
 
     // Loop over all coordinates in this size group.  Try interpreting them with each topology.
@@ -244,6 +245,79 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
                                       tmp_coordinates_kind[icrdj],
                                       fcon.getOutputCoordinateFormat(), 
                                       fcon.getCheckpointFormat()));
+
+      // Note that the topology is used
+      topology_in_use[best_topology] = true;
+    }
+  }
+
+  // Loop back over the systems (now representing all entries, including the paired free topologies
+  // and coordinate sets).  If the topology has already been read, don't read it again.  Read
+  // coordinates (and perhaps velocities, if available) into phase space objects.
+  std::vector<std::string> current_topology_holdings;
+  current_topology_holdings.resize(n_free_top);
+  for (int i = 0; i < n_free_top; i++) {
+    if (topology_in_use[i]) {
+      current_topology_holdings.push_back(topology_cache[i].getFileName());
+    }
+    else {
+      topology_cache.erase(topology_cache.begin() + i);
+    }
+  }
+  const size_t nsys = sysvec.size();
+  for (size_t i = 0; i < nsys; i++) {
+    const int top_idx = findStringInVector(current_topology_holdings,
+                                           sysvec[i].getTopologyFileName());
+    bool topology_ok = false;
+    if (top_idx >= current_topology_holdings.size()) {
+      try {
+        topology_cache.push_back(AtomGraph(sysvec[i].getTopologyFileName()));
+        top_idx = topology_cache.size() - 1LLU;
+        topology_ok = true;
+      }
+      catch (std::runtime_error) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("The format of topology " + sysvec[i].getTopologyFileName(i) +
+                " for system " + std::to_string(i) + " could not be understood.", "UserSettings");
+        case ExceptionResponse::WARN:
+          rtWarn("The format of topology " + sysvec[i].getTopologyFileName(i) +
+                 " could not be understood.  System " + std::to_string(i + 1) +
+                 " will be skipped.", "UserSettings");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+    }
+    else {
+      topology_ok = true;
+    }
+    if (topology_ok) {
+      bool coordinates_ok = false;
+      try {
+        coordinates_cache.push_back(PhaseSpace(sysvec[i].getInputCoordinateFileName(),
+                                               sysvec[i].getInputCoordinateFileKind()));
+        coordinates_ok = true;
+      }
+      catch (std::runtime_error) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("The format of coordinate file " + sysvec[i].getTopologyFileName() +
+                " for system " + std::to_string(i) + " could not be understood.",
+                "UserSettings");
+        case ExceptionResponse::WARN:
+          rtWarn("The format of coordinate file " + sysvec[i].getTopologyFileName() +
+                 " could not be understood.  System " + std::to_string(i + 1) +
+                 " will be skipped.", "UserSettings");
+          break;
+        case ExceptionResponse::SILENT:
+          break;
+        }
+      }
+      if (coordinates_ok) {
+        topology_indices.push_back
+      }
     }
   }
 }

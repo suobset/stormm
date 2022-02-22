@@ -488,14 +488,13 @@ $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
 
 # Target: Benchmarking split accumulation of valence bond and angle forces 
 $(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so \
-			       $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/command.cpp \
+			       $(APPDIR)/Conf/src/conformer.cpp \
 			       $(APPDIR)/Conf/src/user_settings.cpp \
 			       $(APPDIR)/Conf/src/nml_conformer.cpp
 	@echo "[OMNI]  Building conformer.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.omni \
-	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/command.cpp \
-	  $(APPDIR)/Conf/src/user_settings.cpp $(APPDIR)/Conf/src/nml_conformer.cpp \
-	  -L$(LIBDIR) -I$(SRCDIR) -lomni
+	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/user_settings.cpp \
+	  $(APPDIR)/Conf/src/nml_conformer.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 install : $(LIBDIR)/libomni.so
 
