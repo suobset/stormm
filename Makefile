@@ -53,6 +53,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Structure/local_arrangement.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
+		 $(SRCDIR)/Synthesis/systemcache.cpp \
 		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
 	         $(SRCDIR)/Topology/amber_prmtop_util.cpp \
 	         $(SRCDIR)/Topology/atomgraph.cpp \
@@ -137,6 +138,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/structure_enumerators.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
+		   $(SRCDIR)/Synthesis/systemcache.h \
 		   $(SRCDIR)/Synthesis/valence_workunit.h \
 		   $(SRCDIR)/Topology/amber_prmtop_util.h \
 		   $(SRCDIR)/Topology/atomgraph.h \
@@ -221,6 +223,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Structure/local_arrangement.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
+		$(SRCDIR)/Synthesis/systemcache.o \
 		$(SRCDIR)/Synthesis/valence_workunit.o \
 		$(SRCDIR)/Topology/amber_prmtop_util.o \
 		$(SRCDIR)/Topology/atomgraph.o \
@@ -486,11 +489,13 @@ $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
 # Target: Benchmarking split accumulation of valence bond and angle forces 
 $(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so \
 			       $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/command.cpp \
-			       $(APPDIR)/Conf/src/user_settings.cpp
+			       $(APPDIR)/Conf/src/user_settings.cpp \
+			       $(APPDIR)/Conf/src/nml_conformer.cpp
 	@echo "[OMNI]  Building conformer.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.omni \
 	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/command.cpp \
-	  $(APPDIR)/Conf/src/user_settings.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+	  $(APPDIR)/Conf/src/user_settings.cpp $(APPDIR)/Conf/src/nml_conformer.cpp \
+	  -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 install : $(LIBDIR)/libomni.so
 
