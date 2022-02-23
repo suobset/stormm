@@ -1,6 +1,6 @@
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/UnitTesting/unit_test.h"
-#include "command.h"
+#include "user_settings.h"
 
 using omni::synthesis::SystemCache;
 using conf_app::user_input::UserSettings;

@@ -276,7 +276,7 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_atommask \
 	          $(TESTDIR)/bin/test_local_arrangement \
-		  $(TESTDIR)/bin/test_phase_space_synthesis \
+		  $(TESTDIR)/bin/test_synthesis \
 	          $(TESTDIR)/bin/test_valence_evaluation \
 	          $(TESTDIR)/bin/test_nonbonded_evaluation \
 	          $(TESTDIR)/bin/test_generalized_born \
@@ -422,11 +422,11 @@ $(TESTDIR)/bin/test_numerics : $(LIBDIR)/libomni.so $(TESTDIR)/Math/test_numeric
 	  $(TESTDIR)/Math/test_numerics.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: testing the collated coordinate / velocity / force object
-$(TESTDIR)/bin/test_phase_space_synthesis : $(LIBDIR)/libomni.so \
-					    $(TESTDIR)/Trajectory/test_phase_space_synthesis.cpp
-	@echo "[OMNI]  Building test_phase_space_synthesis..."
-	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_phase_space_synthesis \
-	  $(TESTDIR)/Trajectory/test_phase_space_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+$(TESTDIR)/bin/test_synthesis : $(LIBDIR)/libomni.so \
+				$(TESTDIR)/Synthesis/test_synthesis.cpp
+	@echo "[OMNI]  Building test_synthesis..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_synthesis \
+	  $(TESTDIR)/Synthesis/test_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: valence term evaluation by the most basic CPU routines
 $(TESTDIR)/bin/test_valence_evaluation : $(LIBDIR)/libomni.so \

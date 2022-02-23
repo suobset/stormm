@@ -41,21 +41,38 @@ struct SystemCache {
   SystemCache(const FilesControls &fcon, ExceptionResponse policy);
   /// \}
 
-  /// \brief Get a pointer to a topology in the cache.
+  /// \brief Get the number of systems
+  int getSystemCount() const;
+
+  /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
   ///
   /// Overloaded:
-  ///   - Get a pointer to a specific topology (this will apply a bounds check)
-  ///   - Get a pointer to the array for all topologies (this will not apply a bounds check)
+  ///   - Get a pointer to the topology for a specific coordinate set (this will apply a bounds
+  ///     check)
+  ///   - Get pointers to topologies for all coordinate sets (this will not apply a bounds check)
   ///   - Const and non-const versions of each
   ///
-  /// \param int index  Index of the requested topology
+  /// \param int index  Index of the PhaseSpace entry object of interest
   /// \{
   const AtomGraph* getTopologyPointer(int index) const;
   AtomGraph* getTopologyPointer(int index);
-  const AtomGraph* getTopologyPointer() const;
-  AtomGraph* getTopologyPointer();
+  std::vector<const AtomGraph*> getTopologyPointer() const;
+  std::vector<AtomGraph*> getTopologyPointer();
   /// \}
 
+  /// \brief Return a reference to the topology that describes a particular set of coordinates
+  ///        within the SystemCache.  All overloads apply a bounds check.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to a const SystemCache
+  ///   - Return a non-const reference to a non-const SystemCache
+  ///
+  /// \param int index  Index of the PhaseSpace entry object of interest
+  /// \{
+  const AtomGraph& getTopologyReference(const int index) const;
+  AtomGraph& getTopologyReference(const int index);
+  /// \}
+  
   /// \brief Get a pointer to a set of coordinates, velocities, and forces in the cache.
   ///
   /// Overloaded:
@@ -65,12 +82,26 @@ struct SystemCache {
   ///
   /// \param int index  Index of the requested PhaseSpace object
   /// \{
-  const PhaseSpace* getPhaseSpacePointer(int index) const;
-  PhaseSpace* getPhaseSpacePointer(int index);
-  const PhaseSpace* getPhaseSpacePointer() const;
-  PhaseSpace* getPhaseSpacePointer();
+  const PhaseSpace* getCoordinatePointer(int index) const;
+  PhaseSpace* getCoordinatePointer(int index);
+  std::vector<const PhaseSpace*> getCoordinatePointer() const;
+  std::vector<PhaseSpace*> getCoordinatePointer();
   /// \}
 
+  /// \brief Return a reference to a set of coordinates, velocities, and forces in the cache.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to an object in a const SystemCache
+  ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the PhaseSpace entry object of interest
+  /// \{
+  const PhaseSpace& getCoordinateReference(const int index) const;
+  PhaseSpace& getCoordinateReference(const int index);
+  /// \}
+
+  /// \brief Get the indexing of a given 
+  
 private:
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.

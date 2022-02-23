@@ -1,5 +1,6 @@
 #include "systemcache.h"
 #include "FileManagement/file_listing.h"
+#include "Parsing/parse.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -13,6 +14,7 @@ using omni::energy::evaluateBondTerms;
 using omni::energy::evaluateAngleTerms;
 using omni::energy::ScoreCard;
 using omni::namelist::MoleculeSystem;
+using omni::parse::findStringInVector;
 using omni::topology::ValenceKit;
 using omni::trajectory::detectCoordinateFileKind;
 
@@ -90,10 +92,6 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     }
   }
   n_free_crd = tmp_coordinates_cache.size();
-
-  // CHECK
-  printf("There were %d free topologies and %d free coordinate sets.\n", n_free_top, n_free_crd);
-  // END CHECK
 
   // Filter the unique topologies and match them to systems.  List the atom counts of each.
   int max_match = 0;
@@ -255,7 +253,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
   // and coordinate sets).  If the topology has already been read, don't read it again.  Read
   // coordinates (and perhaps velocities, if available) into phase space objects.
   std::vector<std::string> current_topology_holdings;
-  current_topology_holdings.resize(n_free_top);
+  current_topology_holdings.reserve(n_free_top);
   for (int i = 0; i < n_free_top; i++) {
     if (topology_in_use[i]) {
       current_topology_holdings.push_back(topology_cache[i].getFileName());
@@ -264,10 +262,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       topology_cache.erase(topology_cache.begin() + i);
     }
   }
-  const size_t nsys = sysvec.size();
-  for (size_t i = 0; i < nsys; i++) {
-    const int top_idx = findStringInVector(current_topology_holdings,
-                                           sysvec[i].getTopologyFileName());
+  nsys = sysvec.size();
+  for (int i = 0; i < nsys; i++) {
+    int top_idx = findStringInVector(current_topology_holdings, sysvec[i].getTopologyFileName());
     bool topology_ok = false;
     if (top_idx >= current_topology_holdings.size()) {
       try {
@@ -278,10 +275,10 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       catch (std::runtime_error) {
         switch (policy) {
         case ExceptionResponse::DIE:
-          rtErr("The format of topology " + sysvec[i].getTopologyFileName(i) +
+          rtErr("The format of topology " + sysvec[i].getTopologyFileName() +
                 " for system " + std::to_string(i) + " could not be understood.", "UserSettings");
         case ExceptionResponse::WARN:
-          rtWarn("The format of topology " + sysvec[i].getTopologyFileName(i) +
+          rtWarn("The format of topology " + sysvec[i].getTopologyFileName() +
                  " could not be understood.  System " + std::to_string(i + 1) +
                  " will be skipped.", "UserSettings");
           break;
@@ -316,70 +313,135 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
         }
       }
       if (coordinates_ok) {
-        topology_indices.push_back
+        topology_indices.push_back(top_idx);
       }
     }
   }
 }
 
 //-------------------------------------------------------------------------------------------------
+int SystemCache::getSystemCount() const {
+  return coordinates_cache.size();
+}
+
+//-------------------------------------------------------------------------------------------------
 const AtomGraph* SystemCache::getTopologyPointer(const int index) const {
-  if (index >= static_cast<int>(topology_cache.size())) {
+  if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(topology_cache.size()) + ".", "SystemCache", "getTopologyPointer");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
   }
   const AtomGraph* tp_cache_ptr = topology_cache.data();
-  return &tp_cache_ptr[index];
+  return &tp_cache_ptr[topology_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph* SystemCache::getTopologyPointer(const int index) {
-  if (index >= static_cast<int>(topology_cache.size())) {
-    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(topology_cache.size()) + ".", "SystemCache", "getTopologyPointer");
-  }
-  AtomGraph* tp_cache_ptr = topology_cache.data();
-  return &tp_cache_ptr[index];
-}
-
-//-------------------------------------------------------------------------------------------------
-const AtomGraph* SystemCache::getTopologyPointer() const {
-  return topology_cache.data();
-}
-
-//-------------------------------------------------------------------------------------------------
-AtomGraph* SystemCache::getTopologyPointer() {
-  return topology_cache.data();
-}
-
-//-------------------------------------------------------------------------------------------------
-const PhaseSpace* SystemCache::getPhaseSpacePointer(const int index) const {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getPhaseSpacePointer");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
+  }
+  AtomGraph* tp_cache_ptr = topology_cache.data();
+  return &tp_cache_ptr[topology_indices[index]];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<const AtomGraph*> SystemCache::getTopologyPointer() const {
+  const size_t nsys = coordinates_cache.size();
+  std::vector<const AtomGraph*> result(nsys);
+  const AtomGraph* tp_data = topology_cache.data();
+  for (size_t i = 0; i < nsys; i++) {
+    result[i] = &tp_data[topology_indices[i]];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<AtomGraph*> SystemCache::getTopologyPointer() {
+  const size_t nsys = coordinates_cache.size();
+  std::vector<AtomGraph*> result(nsys);
+  AtomGraph* tp_data = topology_cache.data();
+  for (size_t i = 0; i < nsys; i++) {
+    result[i] = &tp_data[topology_indices[i]];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph& SystemCache::getTopologyReference(const int index) const {
+  if (index >= static_cast<int>(coordinates_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyReference");
+  }
+  return topology_cache[topology_indices[index]];
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraph& SystemCache::getTopologyReference(const int index) {
+  if (index >= static_cast<int>(coordinates_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyReference");
+  }
+  return topology_cache[topology_indices[index]];
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpace* SystemCache::getCoordinatePointer(const int index) const {
+  if (index >= static_cast<int>(coordinates_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinatePointer");
   }
   const PhaseSpace* crd_cache_ptr = coordinates_cache.data();
   return &crd_cache_ptr[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace* SystemCache::getPhaseSpacePointer(const int index) {
+PhaseSpace* SystemCache::getCoordinatePointer(const int index) {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getPhaseSpacePointer");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinatePointer");
   }
   PhaseSpace* crd_cache_ptr = coordinates_cache.data();
   return &crd_cache_ptr[index];
 }
 
 //-------------------------------------------------------------------------------------------------
-const PhaseSpace* SystemCache::getPhaseSpacePointer() const {
-  return coordinates_cache.data();
+std::vector<const PhaseSpace*> SystemCache::getCoordinatePointer() const {
+  const PhaseSpace* ps_ptr = coordinates_cache.data();
+  const int nsys = coordinates_cache.size();
+  std::vector<const PhaseSpace*> result(nsys);
+  for (size_t i = 0; i < nsys; i++) {
+    result[i] = &ps_ptr[i];
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace* SystemCache::getPhaseSpacePointer() {
-  return coordinates_cache.data();
+std::vector<PhaseSpace*> SystemCache::getCoordinatePointer() {
+  PhaseSpace* ps_ptr = coordinates_cache.data();
+  const int nsys = coordinates_cache.size();
+  std::vector<PhaseSpace*> result(nsys);
+  for (size_t i = 0; i < nsys; i++) {
+    result[i] = &ps_ptr[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpace& SystemCache::getCoordinateReference(const int index) const {
+  if (index >= static_cast<int>(coordinates_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinateReference");
+  }
+  return coordinates_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpace& SystemCache::getCoordinateReference(const int index) {
+  if (index >= static_cast<int>(coordinates_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getCoordinateReference");
+  }
+  return coordinates_cache[index];
 }
 
 } // namespace synthesis

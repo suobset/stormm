@@ -2,17 +2,23 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Namelists/nml_files.h"
+#include "../../src/Parsing/textfile.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Synthesis/systemcache.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
-using omni::random::Ran2Generator;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
+using omni::namelist::FilesControls;
+using omni::parse::TextFile;
+using omni::random::Ran2Generator;
+using omni::synthesis::SystemCache;
 using namespace omni::card;
 using namespace omni::trajectory;
 using namespace omni::testing;
@@ -23,12 +29,53 @@ int main(int argc, char* argv[]) {
   TestEnvironment oe(argc, argv);
 
   // Section 1
+  section("Test SystemCache construction");
+
+  // Section 2
   section("Test PhaseSpaceSynthesis layout");
 
+  section(1);
+  const char osc = osSeparator();
+  const std::string base_inp_name = oe.getOmniSourcePath() + osc + "test" + osc + "Synthesis";
+  const std::string mdin_name = base_inp_name + osc + "cachetest.in";
+  const bool mdin_exists = (getDrivePathType(mdin_name) == DrivePathType::FILE);
+  const TestPriority test_sysc = (mdin_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  const TextFile tf = (mdin_exists) ? TextFile(mdin_name) : TextFile();
+  int start_line = 0;
+  FilesControls fcon(tf, &start_line);
+  SystemCache sysc(fcon, ExceptionResponse::SILENT);
+  const int nsys = sysc.getSystemCount();
+  check(nsys, RelationalOperator::EQUAL, 16, "The number of systems detected with regular "
+        "expression searching did not meet expectations.", test_sysc);
+  const std::vector<AtomGraph*> ag_ptr = sysc.getTopologyPointer();
+  const std::vector<PhaseSpace*> ps_ptr = sysc.getCoordinatePointer();
+  std::vector<int> ag_atoms(nsys);
+  std::vector<int> ps_atoms(nsys);
+  for (int i = 0; i < nsys; i++) {
+    ag_atoms[i] = ag_ptr[i]->getAtomCount();
+    ps_atoms[i] = ps_ptr[i]->getAtomCount();
+  }
+  check(ag_atoms, RelationalOperator::EQUAL, ps_atoms, "The numbers of atoms found with pointers "
+        "matched to topologies and coordinate sets of the same SystemCache object disagree.",
+        test_sysc);
+  std::vector<int> ag_ref_atoms(nsys);
+  std::vector<int> ps_ref_atoms(nsys);
+  for (int i = 0; i < nsys; i++) {
+    const AtomGraph  &ag_ref = sysc.getTopologyReference(i);
+    const PhaseSpace &ps_ref = sysc.getCoordinateReference(i);
+    ag_ref_atoms[i] = ag_ref.getAtomCount();
+    ps_ref_atoms[i] = ps_ref.getAtomCount();
+  }
+  check(ag_ref_atoms, RelationalOperator::EQUAL, ps_ref_atoms, "The numbers of atoms found with "
+        "references to matching topologies and coordinate sets of the same SystemCache object "
+        "disagree.", test_sysc);
+  check(ag_ref_atoms, RelationalOperator::EQUAL, ps_atoms, "The numbers of atoms found with "
+        "pointers and references matched to topologies and coordinate sets of the same "
+        "SystemCache object disagree.", test_sysc);
+  
   // Create some vectors of random numbers, then upload them and test what happens when perturbing
   // atomic coordinates by these numbers.
   Ran2Generator my_prng(oe.getRandomSeed());
-  const char osc = osSeparator();
   const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
   const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
