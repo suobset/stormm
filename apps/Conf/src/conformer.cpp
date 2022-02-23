@@ -13,5 +13,4 @@ int main(int argc, const char* argv[]) {
 
   // Read topologies and coordinate files
   SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior());
-
 }

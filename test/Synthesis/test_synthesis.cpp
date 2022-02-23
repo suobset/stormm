@@ -1,3 +1,4 @@
+#include <string>
 #include <vector>
 #include "../../src/Constants/behavior.h"
 #include "../../src/Accelerator/hybrid.h"
@@ -13,6 +14,7 @@
 using omni::constants::ExceptionResponse;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
+using omni::diskutil::openOutputFile;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
 using omni::namelist::FilesControls;
@@ -36,17 +38,30 @@ int main(int argc, char* argv[]) {
 
   section(1);
   const char osc = osSeparator();
-  const std::string base_inp_name = oe.getOmniSourcePath() + osc + "test" + osc + "Synthesis";
-  const std::string mdin_name = base_inp_name + osc + "cachetest.in";
+  const TestPriority test_sysc = (oe.getTemporaryDirectoryAccess()) ? TestPriority::CRITICAL :
+                                                                      TestPriority::ABORT;
+  const std::string mdin_name = oe.getTemporaryDirectoryPath() + osc + "cachetest.in";
+  if (oe.getTemporaryDirectoryAccess()) {
+    std::ofstream foutp = openOutputFile(mdin_name, PrintSituation::OVERWRITE, "Prepare a brief "
+                                         "input file for testing the SystemCache machinery.");
+    std::string buffer("&files\n  -p ");
+    buffer += oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" + osc + "topol" + osc +
+              ".*.top\n  -c ";
+    buffer += oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" + osc + "coord" + osc +
+              ".*.inpcrd\n&end\n";
+    foutp.write(buffer.c_str(), buffer.size());
+    foutp.close();
+  }
   const bool mdin_exists = (getDrivePathType(mdin_name) == DrivePathType::FILE);
-  const TestPriority test_sysc = (mdin_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   const TextFile tf = (mdin_exists) ? TextFile(mdin_name) : TextFile();
   int start_line = 0;
   FilesControls fcon(tf, &start_line);
   SystemCache sysc(fcon, ExceptionResponse::SILENT);
   const int nsys = sysc.getSystemCount();
   check(nsys, RelationalOperator::EQUAL, 16, "The number of systems detected with regular "
-        "expression searching did not meet expectations.", test_sysc);
+        "expression searching did not meet expectations.  This may indicate a problem with the "
+        "${OMNI_SOURCE} environment variable that did not show up in test program setup.",
+        test_sysc);
   const std::vector<AtomGraph*> ag_ptr = sysc.getTopologyPointer();
   const std::vector<PhaseSpace*> ps_ptr = sysc.getCoordinatePointer();
   std::vector<int> ag_atoms(nsys);

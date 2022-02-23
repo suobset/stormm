@@ -8,13 +8,15 @@
 #include "Trajectory/barostat.h"
 #include "Trajectory/phasespace.h"
 #include "Trajectory/thermostat.h"
+#include "systemcache.h"
 
 namespace omni {
 namespace trajectory {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
-
+using synthesis::SystemCache;
+  
 /// \brief The reader for a PhaseSpaceSynthesis object, containing all of the data relevant for
 ///        propagating dynamics in a collection of systems.
 struct PsSynthesisReader {
@@ -27,8 +29,8 @@ struct PsSynthesisReader {
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
                     const llint* boxvecs_in, const double* umat_in, const double* invu_in,
                     const double* boxdims_in, const float* sp_umat_in, const float* sp_invu_in,
-                    const float* sp_boxdims_in, const longlong4* xyz_qlj_in, const double* xvel_in,
-                    const double* yvel_in, const double* zvel_in, const llint* xfrc_in,
+                    const float* sp_boxdims_in, const longlong4* xyz_qlj_in, const llint* xvel_in,
+                    const llint* yvel_in, const llint* zvel_in, const llint* xfrc_in,
                     const llint* yfrc_in, const llint* zfrc_in);
 
   // Even in the writer, some information may not be altered.  This includes the simulation
@@ -56,9 +58,9 @@ struct PsSynthesisReader {
   // forces and letting a trajectory evolve.
   const longlong4* xyz_qlj;  ///< Non-wrapped coordinates with non-bonded property indices,
                              ///<   including non-bonded exclusions
-  const double* xvel;        ///< Cartesian X velocities
-  const double* yvel;        ///< Cartesian Y velocities
-  const double* zvel;        ///< Cartesian Z velocities
+  const llint* xvel;         ///< Cartesian X velocities
+  const llint* yvel;         ///< Cartesian Y velocities
+  const llint* zvel;         ///< Cartesian Z velocities
   const llint* xfrc;         ///< Discretized Cartesian X forces
   const llint* yfrc;         ///< Discretized Cartesian Y forces
   const llint* zfrc;         ///< Discretized Cartesian Z forces
@@ -75,8 +77,8 @@ struct PsSynthesisWriter {
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
                     const llint* boxvecs_in, const double* umat_in, const double* invu_in,
                     const double* boxdims_in, const float* sp_umat_in, const float* sp_invu_in,
-                    const float* sp_boxdims_in, longlong4* xyz_qlj_in, double* xvel_in,
-                    double* yvel_in, double* zvel_in, llint* xfrc_in, llint* yfrc_in,
+                    const float* sp_boxdims_in, longlong4* xyz_qlj_in, llint* xvel_in,
+                    llint* yvel_in, llint* zvel_in, llint* xfrc_in, llint* yfrc_in,
                     llint* zfrc_in);
 
   // Even in the writer, some information may not be altered.  This includes the simulation
@@ -103,9 +105,9 @@ struct PsSynthesisWriter {
   // Pointers to the coordinate, velocity, and force data--these are mutable for accumulating
   // forces and letting a trajectory evolve.
   longlong4* xyz_qlj;  ///< Non-wrapped coordinates
-  double* xvel;        ///< Cartesian X velocities
-  double* yvel;        ///< Cartesian Y velocities
-  double* zvel;        ///< Cartesian Z velocities
+  llint* xvel;         ///< Cartesian X velocities
+  llint* yvel;         ///< Cartesian Y velocities
+  llint* zvel;         ///< Cartesian Z velocities
   llint* xfrc;         ///< Discretized Cartesian X forces
   llint* yfrc;         ///< Discretized Cartesian Y forces
   llint* zfrc;         ///< Discretized Cartesian Z forces
@@ -121,16 +123,26 @@ struct PhaseSpaceSynthesis {
   /// \brief The constructor works from a series PhaseSpace object, importing  The LabFrame is not
   ///        a POINTER-kind object of any sort.
   ///
+  /// Overloaded:
+  ///   - Take arrays of PhaseSpace objects and AtomGraph pointers
+  ///   - Take a SystemCache object and unpack it
+  ///
   /// \param ps            Input coordinates, velocities, and forces object
   /// \param time_step_in  The initial time step (will be converted to integer representation as
   ///                      described above, default 1.0fs which converts to llint(8))
   /// \param heat_bath_in  A thermostat to govern integration of the equations of motion
   /// \param piston_in     A barostat to govern box rescaling (if there is a unit cell)
+  /// \{
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, double time_step_in,
-                      const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<const AtomGraph*> &ag_list,
                       const std::vector<Thermostat> &heat_baths_in,
                       const std::vector<Barostat> &pistons_in);
 
+  PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
+                      const std::vector<Thermostat> &heat_baths_in,
+                      const std::vector<Barostat> &pistons_in);
+  /// \}
+  
 #ifdef OMNI_USE_HPC
   /// \brief Upload data to the device
   void upload();
@@ -198,9 +210,9 @@ private:
   Hybrid<longlong4> xyz_qlj;
 
   // These variables are POINTER-kind Hybrid objects targeting the llint_data array
-  Hybrid<double> x_velocities;  ///< Cartesian velocities of all particles in the X direction
-  Hybrid<double> y_velocities;  ///< Cartesian velocities of all particles in the Y direction
-  Hybrid<double> z_velocities;  ///< Cartesian velocities of all particles in the Z direction
+  Hybrid<llint> x_velocities;   ///< Cartesian velocities of all particles in the X direction
+  Hybrid<llint> y_velocities;   ///< Cartesian velocities of all particles in the Y direction
+  Hybrid<llint> z_velocities;   ///< Cartesian velocities of all particles in the Z direction
   Hybrid<llint> x_forces;       ///< Cartesian forces acting on all particles in the X direction
   Hybrid<llint> y_forces;       ///< Cartesian forces acting on all particles in the Y direction
   Hybrid<llint> z_forces;       ///< Cartesian forces acting on all particles in the Z direction

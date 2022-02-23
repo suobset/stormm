@@ -44,6 +44,17 @@ struct SystemCache {
   /// \brief Get the number of systems
   int getSystemCount() const;
 
+  /// \brief Get the topology index of one of the coordinate sets contained in this cache.  This
+  ///        will apply a bounds check to the coordinate index query.  This function should be used
+  ///        to access topologies in the output of a getTopologyReference() call when the full
+  ///        array is returned without function input arguments, but not to access the output og
+  ///        getTopologyPointer() as that array is returned indexing the topology pointers with
+  ///        the coordinate systems (just use coord_index as seen in input to this function to
+  ///        access that array directly).
+  ///
+  /// \param int coord_index  Index of the PhaseSpace entry object of interest
+  int getTopologyIndex(int coord_index) const;
+  
   /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
   ///
   /// Overloaded:
@@ -66,11 +77,16 @@ struct SystemCache {
   /// Overloaded:
   ///   - Return a const reference to a const SystemCache
   ///   - Return a non-const reference to a non-const SystemCache
+  ///   - Return a reference to the entire array of AtomGraph objects (this is a raw take on the
+  ///     underlying topologies and will need to be accessed according to the indexing present in
+  ///     the topology_indices array)
   ///
   /// \param int index  Index of the PhaseSpace entry object of interest
   /// \{
   const AtomGraph& getTopologyReference(const int index) const;
   AtomGraph& getTopologyReference(const int index);
+  const std::vector<AtomGraph>& getTopologyReference() const;
+  std::vector<AtomGraph>& getTopologyReference();
   /// \}
   
   /// \brief Get a pointer to a set of coordinates, velocities, and forces in the cache.
@@ -93,11 +109,14 @@ struct SystemCache {
   /// Overloaded:
   ///   - Return a const reference to an object in a const SystemCache
   ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///   - Return a reference to the entire array of PhaseSpace objects
   ///
   /// \param int index  Index of the PhaseSpace entry object of interest
   /// \{
   const PhaseSpace& getCoordinateReference(const int index) const;
   PhaseSpace& getCoordinateReference(const int index);
+  const std::vector<PhaseSpace>& getCoordinateReference() const;
+  std::vector<PhaseSpace>& getCoordinateReference();
   /// \}
 
   /// \brief Get the indexing of a given 

@@ -13,7 +13,7 @@ using numerics::global_position_scale_lf;
 using numerics::global_position_scale_bits;
 using numerics::global_force_scale_lf;
 using topology::UnitCellType;
-
+  
 //-------------------------------------------------------------------------------------------------
 PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellType unit_cell_in,
                                      const ThermostatKind heat_bath_kind_in,
@@ -23,8 +23,8 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
                                      const double* invu_in, const double* boxdims_in,
                                      const float* sp_umat_in, const float* sp_invu_in,
                                      const float* sp_boxdims_in, const longlong4* xyz_qlj_in,
-                                     const double* xvel_in, const double* yvel_in,
-                                     const double* zvel_in, const llint* xfrc_in,
+                                     const llint* xvel_in, const llint* yvel_in,
+                                     const llint* zvel_in, const llint* xfrc_in,
                                      const llint* yfrc_in, const llint* zfrc_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
@@ -43,7 +43,7 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
                                      const double* invu_in, const double* boxdims_in,
                                      const float* sp_umat_in, const float* sp_invu_in,
                                      const float* sp_boxdims_in, longlong4* xyz_qlj_in,
-                                     double* xvel_in, double* yvel_in, double* zvel_in,
+                                     llint* xvel_in, llint* yvel_in, llint* zvel_in,
                                      llint* xfrc_in, llint* yfrc_in, llint* zfrc_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
@@ -56,7 +56,7 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const double time_step_in,
-                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<const AtomGraph*> &ag_list,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in) :
     system_count{static_cast<int>(ps_list.size())},
@@ -67,9 +67,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     atom_starts{ps_list.size(), "labframe_starts"},
     atom_counts{ps_list.size(), "labframe_counts"},
     xyz_qlj{Hybrid<longlong4>(HybridKind::ARRAY, "labframe_xyz_idqlj")},
-    x_velocities{Hybrid<double>(HybridKind::POINTER, "labframe_vx")},
-    y_velocities{Hybrid<double>(HybridKind::POINTER, "labframe_vy")},
-    z_velocities{Hybrid<double>(HybridKind::POINTER, "labframe_vz")},
+    x_velocities{Hybrid<llint>(HybridKind::POINTER, "labframe_vx")},
+    y_velocities{Hybrid<llint>(HybridKind::POINTER, "labframe_vy")},
+    z_velocities{Hybrid<llint>(HybridKind::POINTER, "labframe_vz")},
     x_forces{Hybrid<llint>(HybridKind::POINTER, "labframe_fx")},
     y_forces{Hybrid<llint>(HybridKind::POINTER, "labframe_fy")},
     z_forces{Hybrid<llint>(HybridKind::POINTER, "labframe_fz")},
@@ -171,9 +171,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     // Assign coordinates, converting from double precision to fixed precision format
     std::vector<int> lj_indices = ag_list[i]->getLennardJonesIndex();
     std::vector<int> charge_indices = ag_list[i]->getChargeIndex();
-    double* xvel_ptr = x_velocities.data();
-    double* yvel_ptr = y_velocities.data();
-    double* zvel_ptr = z_velocities.data();
+    llint* xvel_ptr = x_velocities.data();
+    llint* yvel_ptr = y_velocities.data();
+    llint* zvel_ptr = z_velocities.data();
     llint* xfrc_ptr = x_forces.data();
     llint* yfrc_ptr = y_forces.data();
     llint* zfrc_ptr = z_forces.data();
@@ -225,6 +225,14 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     sp_box_space_transforms.putHost(box_space_transforms.readHost(i), i);
   }
 }
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
+                                         const std::vector<Thermostat> &heat_baths_in,
+                                         const std::vector<Barostat> &pistons_in) :
+  PhaseSpaceSynthesis(sysc.getCoordinateReference(), time_step_in, sysc.getTopologyPointer(),
+                      heat_baths_in, pistons_in)
+{}
 
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
