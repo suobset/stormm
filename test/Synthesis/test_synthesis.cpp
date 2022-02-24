@@ -138,6 +138,23 @@ int main(int argc, char* argv[]) {
     }
   }
   PhaseSpaceSynthesis psynth(psv, agv);   
+
+  // Try extracting a system from it
+  PhaseSpace tip3p_ps_copy(tip3p_ps.getAtomCount(), tip3p_ps.getUnitCellType());
+  psynth.extractPhaseSpace(&tip3p_ps_copy, 3);
+  PhaseSpaceWriter tip3p_orig_writer = tip3p_ps.data();
+  PhaseSpaceWriter tip3p_muta_writer = psv[3].data();
+  PhaseSpaceWriter tip3p_copy_writer = tip3p_ps_copy.data();
+  std::vector<double> y_orig(tip3p_orig_writer.natom);
+  std::vector<double> y_muta(tip3p_orig_writer.natom);
+  std::vector<double> y_copy(tip3p_orig_writer.natom);
+  for (int i = 0; i < tip3p_orig_writer.natom; i++) {
+    y_orig[i] = tip3p_orig_writer.ycrd[i];
+    y_muta[i] = tip3p_muta_writer.ycrd[i];
+    y_copy[i] = tip3p_copy_writer.ycrd[i];
+  }
+  check(y_muta, RelationalOperator::EQUAL, y_copy, "The PhaseSpaceSynthesis object was not able "
+        "to return the correct image of one of its systems.", do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
