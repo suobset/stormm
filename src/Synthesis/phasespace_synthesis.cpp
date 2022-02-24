@@ -56,7 +56,7 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const double time_step_in,
-                                         const std::vector<const AtomGraph*> &ag_list,
+                                         const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in) :
     system_count{static_cast<int>(ps_list.size())},
@@ -64,8 +64,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     heat_bath_kind{ThermostatKind::NONE},
     piston_kind{BarostatKind::NONE},
     time_step{time_step_in},
-    atom_starts{ps_list.size(), "labframe_starts"},
-    atom_counts{ps_list.size(), "labframe_counts"},
+    atom_starts{HybridKind::POINTER, "labframe_starts"},
+    atom_counts{HybridKind::POINTER, "labframe_counts"},
     xyz_qlj{Hybrid<longlong4>(HybridKind::ARRAY, "labframe_xyz_idqlj")},
     x_velocities{Hybrid<llint>(HybridKind::POINTER, "labframe_vx")},
     y_velocities{Hybrid<llint>(HybridKind::POINTER, "labframe_vy")},
@@ -80,6 +80,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     sp_box_space_transforms{Hybrid<float>(HybridKind::POINTER, "labframe_umat")},
     sp_inverse_transforms{Hybrid<float>(HybridKind::POINTER, "labframe_invu")},
     sp_box_dimensions{Hybrid<float>(HybridKind::POINTER, "labframe_dims")},
+    int_data{Hybrid<int>(HybridKind::ARRAY, "labframe_int")},
     llint_data{Hybrid<llint>(HybridKind::ARRAY, "labframe_llint")},
     double_data{Hybrid<double>(HybridKind::ARRAY, "labframe_double")},
     float_data{Hybrid<float>(HybridKind::ARRAY, "labframe_float")},
@@ -129,6 +130,13 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     }
   }
 
+  // Allocate data and set internal pointers
+  int atom_stride = 0;
+  for (int i = 0; i < system_count; i++) {
+    atom_stride += roundUp(ps_list[i].getAtomCount(), warp_size_int);
+  }
+  allocate(atom_stride);
+
   // Check that coordinates match topologies.  Set atom starts and counts in the process.
   int acc_limit = 0;
   for (int i = 0; i < system_count; i++) {
@@ -143,26 +151,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     acc_limit += roundUp(natom, warp_size_int);
   }
 
-  // Allocate data and set internal pointers
-  const int atom_stride = acc_limit;
-  const int mtrx_stride = roundUp(9, warp_size_int);
-  const int xfrm_stride = system_count * mtrx_stride;
-  xyz_qlj.resize(atom_stride);
-  llint_data.resize((3 * atom_stride) + xfrm_stride);
-  x_forces.setPointer(&llint_data,                  0, atom_stride);
-  y_forces.setPointer(&llint_data,        atom_stride, atom_stride);
-  z_forces.setPointer(&llint_data,    2 * atom_stride, atom_stride);
-  box_vectors.setPointer(&llint_data, 3 * atom_stride, xfrm_stride);
-  double_data.resize(3 * xfrm_stride);
-  box_space_transforms.setPointer(&double_data,               0, xfrm_stride);
-  inverse_transforms.setPointer(&double_data,       xfrm_stride, xfrm_stride);
-  box_dimensions.setPointer(&double_data,       2 * xfrm_stride, xfrm_stride);
-  float_data.resize(3 * xfrm_stride);
-  sp_box_space_transforms.setPointer(&float_data,               0, xfrm_stride);
-  sp_inverse_transforms.setPointer(&float_data,       xfrm_stride, xfrm_stride);
-  sp_box_dimensions.setPointer(&float_data,       2 * xfrm_stride, xfrm_stride);
-
   // Loop over all systems
+  const int mtrx_stride = roundUp(9, warp_size_int);
   for (int i = 0; i < system_count; i++) {
 
     // Get a reader for the PhaseSpace object's host-side data
@@ -230,8 +220,76 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in) :
-  PhaseSpaceSynthesis(sysc.getCoordinateReference(), time_step_in, sysc.getTopologyPointer(),
-                      heat_baths_in, pistons_in)
+    PhaseSpaceSynthesis(sysc.getCoordinateReference(), time_step_in, sysc.getTopologyPointerCC(),
+                        heat_baths_in, pistons_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
+    system_count{original.system_count},
+    unit_cell{original.unit_cell},
+    heat_bath_kind{original.heat_bath_kind},
+    piston_kind{original.piston_kind},
+    time_step{original.time_step},
+    atom_starts{original.atom_starts},
+    atom_counts{original.atom_counts},
+    xyz_qlj{original.xyz_qlj},
+    x_velocities{original.x_velocities},
+    y_velocities{original.y_velocities},
+    z_velocities{original.z_velocities},
+    x_forces{original.x_forces},
+    y_forces{original.y_forces},
+    z_forces{original.z_forces},
+    box_vectors{original.box_vectors},
+    box_space_transforms{original.box_space_transforms},
+    inverse_transforms{original.inverse_transforms},
+    box_dimensions{original.box_dimensions},
+    sp_box_space_transforms{original.sp_box_space_transforms},
+    sp_inverse_transforms{original.sp_inverse_transforms},
+    sp_box_dimensions{original.sp_box_dimensions},
+    int_data{original.int_data},
+    llint_data{original.llint_data},
+    double_data{original.double_data},
+    float_data{original.float_data}
+{
+  // The allocate function again handle pointer repair, just like in the PhaseSpace object.
+  // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
+  // the original must have been in agreement in order for it to exist in the first place.  The
+  // Hybrid objects will not be resized as they already have the proper sizes.
+  int atom_stride = 0;
+  for (int i = 0; i < system_count; i++) {
+    atom_stride += roundUp(topologies[i]->getAtomCount(), warp_size_int);
+  }
+  allocate(atom_stride);
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
+    system_count{std::move(original.system_count)},
+    unit_cell{std::move(original.unit_cell)},
+    heat_bath_kind{std::move(original.heat_bath_kind)},
+    piston_kind{std::move(original.piston_kind)},
+    time_step{std::move(original.time_step)},
+    atom_starts{std::move(original.atom_starts)},
+    atom_counts{std::move(original.atom_counts)},
+    xyz_qlj{std::move(original.xyz_qlj)},
+    x_velocities{std::move(original.x_velocities)},
+    y_velocities{std::move(original.y_velocities)},
+    z_velocities{std::move(original.z_velocities)},
+    x_forces{std::move(original.x_forces)},
+    y_forces{std::move(original.y_forces)},
+    z_forces{std::move(original.z_forces)},
+    box_vectors{std::move(original.box_vectors)},
+    box_space_transforms{std::move(original.box_space_transforms)},
+    inverse_transforms{std::move(original.inverse_transforms)},
+    box_dimensions{std::move(original.box_dimensions)},
+    sp_box_space_transforms{std::move(original.sp_box_space_transforms)},
+    sp_inverse_transforms{std::move(original.sp_inverse_transforms)},
+    sp_box_dimensions{std::move(original.sp_box_dimensions)},
+    int_data{std::move(original.int_data)},
+    llint_data{std::move(original.llint_data)},
+    double_data{std::move(original.double_data)},
+    float_data{std::move(original.float_data)}
 {}
 
 #ifdef OMNI_USE_HPC
@@ -298,6 +356,32 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
                            xyz_qlj.data(tier), x_velocities.data(tier), y_velocities.data(tier),
                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
                            z_forces.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::allocate(const int atom_stride) {
+  const int system_stride = roundUp(system_count, warp_size_int);
+  int_data.resize(2 * system_stride);
+  atom_counts.setPointer(&int_data, 0, system_count);
+  atom_counts.setPointer(&int_data, system_stride, system_count);
+  const int xfrm_stride = system_count * roundUp(9, warp_size_int);
+  xyz_qlj.resize(atom_stride);
+  llint_data.resize((6 * atom_stride) + xfrm_stride);
+  x_velocities.setPointer(&llint_data,               0, atom_stride);
+  y_velocities.setPointer(&llint_data,     atom_stride, atom_stride);
+  z_velocities.setPointer(&llint_data, 2 * atom_stride, atom_stride);
+  x_forces.setPointer(&llint_data,     3 * atom_stride, atom_stride);
+  y_forces.setPointer(&llint_data,     4 * atom_stride, atom_stride);
+  z_forces.setPointer(&llint_data,     5 * atom_stride, atom_stride);
+  box_vectors.setPointer(&llint_data,  6 * atom_stride, xfrm_stride);
+  double_data.resize(3 * xfrm_stride);
+  box_space_transforms.setPointer(&double_data,               0, xfrm_stride);
+  inverse_transforms.setPointer(&double_data,       xfrm_stride, xfrm_stride);
+  box_dimensions.setPointer(&double_data,       2 * xfrm_stride, xfrm_stride);
+  float_data.resize(3 * xfrm_stride);
+  sp_box_space_transforms.setPointer(&float_data,               0, xfrm_stride);
+  sp_inverse_transforms.setPointer(&float_data,       xfrm_stride, xfrm_stride);
+  sp_box_dimensions.setPointer(&float_data,       2 * xfrm_stride, xfrm_stride);
 }
 
 } // namespace trajectory

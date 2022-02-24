@@ -21,7 +21,6 @@ using synthesis::SystemCache;
 ///        propagating dynamics in a collection of systems.
 struct PsSynthesisReader {
 
-
   /// \brief Constructor takes a straight list of pointers and constants from the parent object
   ///        (in this case, a PhaseSpaceSynthesis), like other abstracts.
   PsSynthesisReader(int system_count_in, UnitCellType unit_cell_in,
@@ -134,13 +133,22 @@ struct PhaseSpaceSynthesis {
   /// \param piston_in     A barostat to govern box rescaling (if there is a unit cell)
   /// \{
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, double time_step_in,
-                      const std::vector<const AtomGraph*> &ag_list,
+                      const std::vector<AtomGraph*> &ag_list,
                       const std::vector<Thermostat> &heat_baths_in,
                       const std::vector<Barostat> &pistons_in);
 
   PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
                       const std::vector<Thermostat> &heat_baths_in,
                       const std::vector<Barostat> &pistons_in);
+  /// \}
+
+  /// \brief Copy and move constructors work much like their counterparts in the smaller
+  ///        PhaseSpace object.
+  ///
+  /// \param original  The original PhaseSpaceSynthesis object
+  /// \{
+  PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original);
+  PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original);
   /// \}
   
 #ifdef OMNI_USE_HPC
@@ -236,6 +244,7 @@ private:
   Hybrid<float> sp_box_dimensions;       ///< Single precision box dimensions
 
   // Data arrays
+  Hybrid<int> int_data;        ///< Counts of atoms and starting points for each system 
   Hybrid<llint> llint_data;    ///< The discretized data for all of phase space and forces
   Hybrid<double> double_data;  ///< Double-precision floating point transformations--these are the
                                ///<   standard for moving coordinates into a re-imaged
@@ -254,6 +263,9 @@ private:
 
   // Pointer to the topology that describes this system
   const std::vector<AtomGraph*> topologies;
+
+  /// \brief Allocate private array data
+  void allocate(int atom_stride);
 };
 
 } // namespace trajectory

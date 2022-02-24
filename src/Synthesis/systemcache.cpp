@@ -376,6 +376,17 @@ std::vector<AtomGraph*> SystemCache::getTopologyPointer() {
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*> SystemCache::getTopologyPointerCC() const {
+  const size_t nsys = coordinates_cache.size();
+  std::vector<AtomGraph*> result(nsys);
+  const AtomGraph* tp_data = topology_cache.data();
+  for (size_t i = 0; i < nsys; i++) {
+    result[i] = const_cast<AtomGraph*>(&tp_data[topology_indices[i]]);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 const AtomGraph& SystemCache::getTopologyReference(const int index) const {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +

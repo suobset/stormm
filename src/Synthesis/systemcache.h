@@ -71,6 +71,11 @@ struct SystemCache {
   std::vector<AtomGraph*> getTopologyPointer();
   /// \}
 
+  /// \brief Get a const std::vector of non-const (const-casted) topology pointers.  This is for
+  ///        the specific case of feeding other functions that require std::vectors of topology
+  ///        pointers in this format.
+  const std::vector<AtomGraph*> getTopologyPointerCC() const;
+
   /// \brief Return a reference to the topology that describes a particular set of coordinates
   ///        within the SystemCache.  All overloads apply a bounds check.
   ///
