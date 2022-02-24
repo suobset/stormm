@@ -1,3 +1,4 @@
+#include <cmath>
 #include "Constants/fixed_precision.h"
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
@@ -9,9 +10,6 @@ namespace trajectory {
 using card::HybridKind;
 using math::roundUp;
 using math::invertSquareMatrix;
-using numerics::global_position_scale_lf;
-using numerics::global_position_scale_bits;
-using numerics::global_force_scale_lf;
 using topology::UnitCellType;
   
 //-------------------------------------------------------------------------------------------------
@@ -58,12 +56,28 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                                          const double time_step_in,
                                          const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in) :
+                                         const std::vector<Barostat> &pistons_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
     system_count{static_cast<int>(ps_list.size())},
     unit_cell{UnitCellType::NONE},
     heat_bath_kind{ThermostatKind::NONE},
     piston_kind{BarostatKind::NONE},
     time_step{time_step_in},
+    globalpos_scale{pow(2.0, globalpos_scale_bits_in)},
+    inverse_globalpos_scale{1.0 / globalpos_scale},
+    globalpos_scale_bits{globalpos_scale_bits_in},
+    localpos_scale{pow(2.0, localpos_scale_bits_in)},
+    inverse_localpos_scale{1.0 / localpos_scale},
+    localpos_scale_bits{localpos_scale_bits_in},
+    velocity_scale{pow(2.0, velocity_scale_bits_in)},
+    inverse_velocity_scale{1.0 / velocity_scale},
+    velocity_scale_bits{velocity_scale_bits_in},
+    force_scale{pow(2.0, force_scale_bits_in)},
+    inverse_force_scale{1.0 / force_scale},
+    force_scale_bits{force_scale_bits_in},
     atom_starts{HybridKind::POINTER, "labframe_starts"},
     atom_counts{HybridKind::POINTER, "labframe_counts"},
     xyz_qlj{Hybrid<longlong4>(HybridKind::ARRAY, "labframe_xyz_idqlj")},
@@ -172,9 +186,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
       llint4 atompt;
 
       // The x, y, and z components hold x, y, and z positions in a "lab frame" unwrapped form.
-      atompt.x = static_cast<llint>(psr.xcrd[j] * global_position_scale_lf);
-      atompt.y = static_cast<llint>(psr.ycrd[j] * global_position_scale_lf);
-      atompt.z = static_cast<llint>(psr.zcrd[j] * global_position_scale_lf);
+      atompt.x = static_cast<llint>(psr.xcrd[j] * globalpos_scale);
+      atompt.y = static_cast<llint>(psr.ycrd[j] * globalpos_scale);
+      atompt.z = static_cast<llint>(psr.zcrd[j] * globalpos_scale);
       const llint qi = charge_indices[j];
       const llint qlj = lj_indices[j];
 
@@ -188,9 +202,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
       xvel_ptr[asi_j] = psr.xvel[j];
       yvel_ptr[asi_j] = psr.yvel[j];
       zvel_ptr[asi_j] = psr.zvel[j];
-      xfrc_ptr[asi_j] = static_cast<llint>(psr.xfrc[j] * global_force_scale_lf);
-      yfrc_ptr[asi_j] = static_cast<llint>(psr.yfrc[j] * global_force_scale_lf);
-      zfrc_ptr[asi_j] = static_cast<llint>(psr.zfrc[j] * global_force_scale_lf);
+      xfrc_ptr[asi_j] = static_cast<llint>(psr.xfrc[j] * force_scale);
+      yfrc_ptr[asi_j] = static_cast<llint>(psr.yfrc[j] * force_scale);
+      zfrc_ptr[asi_j] = static_cast<llint>(psr.zfrc[j] * force_scale);
     }
 
     // Handle the box space transformation.  The transformation matrices of the labframe will
@@ -198,8 +212,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     // interest of making a system which can be represented in fixed precision, pixelated
     // coordinates with box vectors which are likewise multiples of the positional discretization.
     for (int j = 0; j < 9; j++) {
-      const llint lli_invu = psr.invu[j] * global_position_scale_lf;
-      const double d_invu = static_cast<double>(lli_invu >> global_position_scale_bits);
+      const llint lli_invu = psr.invu[j] * globalpos_scale;
+      const double d_invu = static_cast<double>(lli_invu >> globalpos_scale_bits);
       inverse_transforms.putHost(d_invu, i * mtrx_stride + j);
       sp_inverse_transforms.putHost(d_invu, i * mtrx_stride + j);
     }
@@ -219,9 +233,14 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
                                          const std::vector<Thermostat> &heat_baths_in,
-                                         const std::vector<Barostat> &pistons_in) :
+                                         const std::vector<Barostat> &pistons_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
     PhaseSpaceSynthesis(sysc.getCoordinateReference(), time_step_in, sysc.getTopologyPointerCC(),
-                        heat_baths_in, pistons_in)
+                        heat_baths_in, pistons_in, globalpos_scale_bits_in, localpos_scale_bits_in,
+                        velocity_scale_bits_in, force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -231,6 +250,18 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     heat_bath_kind{original.heat_bath_kind},
     piston_kind{original.piston_kind},
     time_step{original.time_step},
+    globalpos_scale{original.globalpos_scale},
+    inverse_globalpos_scale{original.inverse_globalpos_scale},
+    globalpos_scale_bits{original.globalpos_scale_bits},
+    localpos_scale{original.localpos_scale},
+    inverse_localpos_scale{original.inverse_localpos_scale},
+    localpos_scale_bits{original.localpos_scale_bits},
+    velocity_scale{original.velocity_scale},
+    inverse_velocity_scale{original.inverse_velocity_scale},
+    velocity_scale_bits{original.velocity_scale_bits},
+    force_scale{original.force_scale},
+    inverse_force_scale{original.inverse_force_scale},
+    force_scale_bits{original.force_scale_bits},
     atom_starts{original.atom_starts},
     atom_counts{original.atom_counts},
     xyz_qlj{original.xyz_qlj},
@@ -265,11 +296,23 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
-    system_count{std::move(original.system_count)},
-    unit_cell{std::move(original.unit_cell)},
-    heat_bath_kind{std::move(original.heat_bath_kind)},
-    piston_kind{std::move(original.piston_kind)},
-    time_step{std::move(original.time_step)},
+    system_count{original.system_count},
+    unit_cell{original.unit_cell},
+    heat_bath_kind{original.heat_bath_kind},
+    piston_kind{original.piston_kind},
+    time_step{original.time_step},
+    globalpos_scale{original.globalpos_scale},
+    inverse_globalpos_scale{original.inverse_globalpos_scale},
+    globalpos_scale_bits{original.globalpos_scale_bits},
+    localpos_scale{original.localpos_scale},
+    inverse_localpos_scale{original.inverse_localpos_scale},
+    localpos_scale_bits{original.localpos_scale_bits},
+    velocity_scale{original.velocity_scale},
+    inverse_velocity_scale{original.inverse_velocity_scale},
+    velocity_scale_bits{original.velocity_scale_bits},
+    force_scale{original.force_scale},
+    inverse_force_scale{original.inverse_force_scale},
+    force_scale_bits{original.force_scale_bits},
     atom_starts{std::move(original.atom_starts)},
     atom_counts{std::move(original.atom_counts)},
     xyz_qlj{std::move(original.xyz_qlj)},
@@ -331,6 +374,40 @@ void PhaseSpaceSynthesis::assignMaxwellVelocities() {
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::berendsenThermocoupling() {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::extractPhaseSpace(PhaseSpace *ps, const int index,
+                                            const HybridTargetLevel tier) {
+  PhaseSpaceWriter psw = ps->data();
+  if (atom_counts.readHost(index) != psw.natom) {
+    rtErr("A PhaseSpace object sized for " + std::to_string(psw.natom) + " atoms is not prepared "
+          "to accept a system of " + std::to_string(atom_counts.readHost(index)) + " atoms from "
+          "this synthesis.", "PhaseSpaceSynthesis", "extractPhaseSpace");
+  }
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    const longlong4* xyz_ptr = xyz_qlj.data();
+    const int offset = atom_starts.readHost(index);
+    const double crd_deflation = inverse_globalpos_scale;
+    for (int i = 0; i < psw.natom; i++) {
+      psw.xcrd[i] = static_cast<double>(xyz_ptr[i].x) * crd_deflation;
+      psw.ycrd[i] = static_cast<double>(xyz_ptr[i].y) * crd_deflation;
+      psw.zcrd[i] = static_cast<double>(xyz_ptr[i].z) * crd_deflation;
+    }
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
+                                             const TrajectoryKind trajkind,
+                                             const HybridTargetLevel tier) {
 
 }
 

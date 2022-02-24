@@ -17,14 +17,10 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
-using omni::numerics::global_position_scale_lf;
-using omni::numerics::global_position_scale_f;
-using omni::numerics::inverse_global_position_scale_lf;
-using omni::numerics::inverse_global_position_scale_f;
-using omni::numerics::global_force_scale_lf;
-using omni::numerics::global_force_scale_f;
-using omni::numerics::inverse_global_force_scale_lf;
-using omni::numerics::inverse_global_force_scale_f;
+using omni::numerics::default_globalpos_scale_lf;
+using omni::numerics::default_globalpos_scale_f;
+using omni::numerics::default_inverse_globalpos_scale_lf;
+using omni::numerics::default_inverse_globalpos_scale_f;
 using omni::data_types::double_type_index;
 using omni::data_types::double3;
 using omni::data_types::float2;
@@ -141,19 +137,19 @@ int main(int argc, char* argv[]) {
     frc_with_fequil[i] = bond_force(crd1[i], crd2[i], static_cast<double>(f_equil[i]), stiff[i]);
 
     // Perform the computation with all coordinates reduced to long long integers
-    lli_crd1[i].x = crd1[i].x * global_position_scale_lf;
-    lli_crd1[i].y = crd1[i].y * global_position_scale_lf;
-    lli_crd1[i].z = crd1[i].z * global_position_scale_lf;
-    lli_crd2[i].x = crd2[i].x * global_position_scale_lf;
-    lli_crd2[i].y = crd2[i].y * global_position_scale_lf;
-    lli_crd2[i].z = crd2[i].z * global_position_scale_lf;
+    lli_crd1[i].x = crd1[i].x * default_globalpos_scale_lf;
+    lli_crd1[i].y = crd1[i].y * default_globalpos_scale_lf;
+    lli_crd1[i].z = crd1[i].z * default_globalpos_scale_lf;
+    lli_crd2[i].x = crd2[i].x * default_globalpos_scale_lf;
+    lli_crd2[i].y = crd2[i].y * default_globalpos_scale_lf;
+    lli_crd2[i].z = crd2[i].z * default_globalpos_scale_lf;
     {
       const float dx = static_cast<float>(lli_crd2[i].x - lli_crd1[i].x) *
-                       inverse_global_position_scale_f;
+                       default_inverse_globalpos_scale_f;
       const float dy = static_cast<float>(lli_crd2[i].y - lli_crd1[i].y) *
-                       inverse_global_position_scale_f;
+                       default_inverse_globalpos_scale_f;
       const float dz = static_cast<float>(lli_crd2[i].z - lli_crd1[i].z) *
-                       inverse_global_position_scale_f;
+                       default_inverse_globalpos_scale_f;
       const float r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
       const float dl = r - f_equil[i];
       const float fmag = 2.0 * f_stiff[i] * dl / r;
@@ -169,23 +165,23 @@ int main(int argc, char* argv[]) {
       const llint idz = lli_crd2[i].z - lli_crd1[i].z;
       if (llabs(idx) < 1600000000LL && llabs(idy) < 1600000000LL && llabs(idz) < 1600000000LL) {
         const llint ir2 = (idx * idx) + (idy * idy) + (idz * idz);
-        const double r = sqrt(static_cast<double>(ir2)) * inverse_global_position_scale_lf;
+        const double r = sqrt(static_cast<double>(ir2)) * default_inverse_globalpos_scale_lf;
         const float dl = static_cast<float>(r - equil[i]);
         const float fmag = 2.0 * f_stiff[i] * dl / r;
-        const float dx = static_cast<float>(idx) * inverse_global_position_scale_f;
-        const float dy = static_cast<float>(idy) * inverse_global_position_scale_f;
-        const float dz = static_cast<float>(idz) * inverse_global_position_scale_f;
+        const float dx = static_cast<float>(idx) * default_inverse_globalpos_scale_f;
+        const float dy = static_cast<float>(idy) * default_inverse_globalpos_scale_f;
+        const float dz = static_cast<float>(idz) * default_inverse_globalpos_scale_f;
         f2lli_frc[i].x = fmag * dx;
         f2lli_frc[i].y = fmag * dy;
         f2lli_frc[i].z = fmag * dz;
       }
       else {
         const float dx = static_cast<float>(lli_crd2[i].x - lli_crd1[i].x) *
-                         inverse_global_position_scale_f;
+                         default_inverse_globalpos_scale_f;
         const float dy = static_cast<float>(lli_crd2[i].y - lli_crd1[i].y) *
-                         inverse_global_position_scale_f;
+                         default_inverse_globalpos_scale_f;
         const float dz = static_cast<float>(lli_crd2[i].z - lli_crd1[i].z) *
-                         inverse_global_position_scale_f;
+                         default_inverse_globalpos_scale_f;
         const float r = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
         const float dl = r - f_equil[i];
         const float fmag = 2.0 * f_stiff[i] * dl / r;

@@ -2,6 +2,7 @@
 #ifndef OMNI_PHASESPACE_SYNTHESIS_H
 #define OMNI_PHASESPACE_SYNTHESIS_H
 
+#include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
@@ -15,6 +16,10 @@ namespace trajectory {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
+using numerics::default_globalpos_scale_bits;
+using numerics::default_localpos_scale_bits;
+using numerics::default_velocity_scale_bits;
+using numerics::default_force_scale_bits;
 using synthesis::SystemCache;
   
 /// \brief The reader for a PhaseSpaceSynthesis object, containing all of the data relevant for
@@ -135,11 +140,17 @@ struct PhaseSpaceSynthesis {
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, double time_step_in,
                       const std::vector<AtomGraph*> &ag_list,
                       const std::vector<Thermostat> &heat_baths_in,
-                      const std::vector<Barostat> &pistons_in);
+                      const std::vector<Barostat> &pistons_in,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
 
   PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
                       const std::vector<Thermostat> &heat_baths_in,
-                      const std::vector<Barostat> &pistons_in);
+                      const std::vector<Barostat> &pistons_in, int globalpos_scale_bits_in,
+                      int localpos_scale_bits_in, int velocity_scale_bits_in,
+                      int force_scale_bits_in);
   /// \}
 
   /// \brief Copy and move constructors work much like their counterparts in the smaller
@@ -182,6 +193,31 @@ struct PhaseSpaceSynthesis {
   /// \param ag  System topology (for atomic masses)
   void berendsenThermocoupling();
 
+  /// \brief Extract the phase space (plus forces) of a specific system within the synthesis.
+  ///
+  /// \param ps     Pointer to an allocated PhaseSpace object (i.e. the original) ready to accept
+  ///               data from the synthesis (which may have evolved since it was first loaded)
+  /// \param tier  The level (host or device) at which to get the data
+  /// \param index  Index of the system of interest within the synthesis
+  void extractPhaseSpace(PhaseSpace *ps, int index,
+                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  /// \brief Extract a specific type of coordinate from the synthesis.
+  ///
+  /// Overloaded:
+  ///   - Load the result into a (writeable) CoordinateFrame object
+  ///   - Load the result into a PhaseSpace object
+  ///
+  /// \param ps        Pointer to an allocated PhaseSpace object (i.e. the original) ready to
+  ///                  accept data from the synthesis (which may have evolved since it was first
+  ///                  loaded)
+  /// \param trajkind  Type of trajectory to copy
+  /// \param tier      The level (host or device) at which to get the data
+  /// \param index     Index of the system of interest within the synthesis
+  void extractCoordinates(PhaseSpace *ps, int index,
+                          TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
+                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+  
   /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
   ///
   /// \param tier  The level (host or device) at which to get the set of pointers
@@ -191,18 +227,36 @@ struct PhaseSpaceSynthesis {
   /// \}
 
 private:
-  int system_count;              ///< The number of systems to tend at once
-  UnitCellType unit_cell;        ///< The types of unit cells.  All unit cells must exist in
-                                 ///<   isolated boundary conditions, or all cells must exist in
-                                 ///<   periodic boundary conditions with a rectilinear or
-                                 ///<   triclinic unit cell.
-  ThermostatKind heat_bath_kind; ///< The type of thermostat that all systems will run.  Other
-                                 ///<   details are variable between systems and stored in their
-                                 ///<   own arrays.
-  BarostatKind piston_kind;      ///< The pressure scaling method for all systems if the unit cells
-                                 ///<   are periodic.  Additional details may vary between systems
-                                 ///<   and are held in their own arrays.
-  double time_step;              ///< The time step for every system, in femtoseconds
+  int system_count;               ///< The number of systems to tend at once
+  UnitCellType unit_cell;         ///< The types of unit cells.  All unit cells must exist in
+                                  ///<   isolated boundary conditions, or all cells must exist in
+                                  ///<   periodic boundary conditions with a rectilinear or
+                                  ///<   triclinic unit cell.
+  ThermostatKind heat_bath_kind;  ///< The type of thermostat that all systems will run.  Other
+                                  ///<   details are variable between systems and stored in their
+                                  ///<   own arrays.
+  BarostatKind piston_kind;       ///< The pressure scaling method for all systems if the unit
+                                  ///<   cells are periodic.  Additional details may vary between
+                                  ///<   systems and are held in their own arrays.
+  double time_step;               ///< The time step for every system, in femtoseconds
+  double globalpos_scale;         ///< Scaling factor for fixed-precision coordinate information in
+                                  ///<   the global frame of reference
+  double inverse_globalpos_scale; ///< Inverse global coordinate scaling factor
+  int globalpos_scale_bits;       ///< Number of fixed-precision bits after the decimal for storing
+                                  ///<   global coordinates.  This is log2(position_scale).
+  double localpos_scale;          ///< Scaling factor for fixed-precision local coordinate
+                                  ///<   information in the local frame of reference
+  double inverse_localpos_scale;  ///< Inverse local coordinate scaling factor
+  int localpos_scale_bits;        ///< Number of fixed-precision bits after the decimal for storing
+                                  ///<   local coordinates.  This is log2(position_scale).
+  double velocity_scale;          ///< Scaling factor for fixed-precision velocity information
+  double inverse_velocity_scale;  ///< Inverse velocity scaling factor
+  int velocity_scale_bits;        ///< Number of fixed-precision bits after the decimal for storing
+                                  ///<   velocities.  This is log2(velocity_scale).
+  double force_scale;             ///< Scaling factor for fixed-precision force information
+  double inverse_force_scale;     ///< Inverse force scaling factor
+  int force_scale_bits;           ///< Number of fixed-precision bits after the decimal for storing
+                                  ///<   forces.  This is log2(force_scale).
 
   /// Starting positions for each system's stretch of atoms in xyz_qlj, (x,y,z)_velocities, and
   /// (x,y,z)_forces.  Atoms in each of those arrays will remain in their original orders, as

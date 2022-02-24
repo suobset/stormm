@@ -7,10 +7,10 @@ namespace omni {
 namespace energy {
 
 using math::roundUp;
-using numerics::global_energy_scale_f;
-using numerics::global_energy_scale_lf;
-using numerics::inverse_global_energy_scale_f;
-using numerics::inverse_global_energy_scale_lf;
+using numerics::default_energy_scale_f;
+using numerics::default_energy_scale_lf;
+using numerics::default_inverse_energy_scale_f;
+using numerics::default_inverse_energy_scale_lf;
 
 //-------------------------------------------------------------------------------------------------
 ScoreCardReader::ScoreCardReader(const int system_count_in, const int data_stride_in,
@@ -76,11 +76,11 @@ ScoreCard::ScoreCard(const int system_count_in, const int nrg_scale_bits_in) :
   }
 
   // Determine the energy scaling factors
-  if (nrg_scale_bits == global_energy_scale_bits) {
-    nrg_scale_lf = global_energy_scale_lf;
-    nrg_scale_f = global_energy_scale_f;
-    inverse_nrg_scale_lf = inverse_global_energy_scale_lf;
-    inverse_nrg_scale_f = inverse_global_energy_scale_f;
+  if (nrg_scale_bits == default_energy_scale_bits) {
+    nrg_scale_lf = default_energy_scale_lf;
+    nrg_scale_f = default_energy_scale_f;
+    inverse_nrg_scale_lf = default_inverse_energy_scale_lf;
+    inverse_nrg_scale_f = default_inverse_energy_scale_f;
   }
   else {
     int ib = 0;

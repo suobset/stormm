@@ -8,18 +8,29 @@ namespace numerics {
 /// \brief The fixed-precision discretizations of global and local coordinate frame positions, in
 ///        parts per Angstrom (the internal unit of length).  
 /// \{
-constexpr double global_position_scale_lf = 268435456.0;
-constexpr float  global_position_scale_f  = (float)global_position_scale_lf;
-constexpr int    global_position_scale_bits = 28;
-constexpr double inverse_global_position_scale_lf = 1.0 / global_position_scale_lf;
-constexpr float  inverse_global_position_scale_f  = (float)1.0 / global_position_scale_f;
-constexpr double local_position_scale_lf = 16777216.0;
-constexpr float  local_position_scale_f  = (float)local_position_scale_lf;
-constexpr int    local_position_scale_bits = 24;
-constexpr double inverse_local_position_scale_lf = 1.0 / local_position_scale_lf;
-constexpr float  inverse_local_position_scale_f  = (float)1.0 / local_position_scale_f;
+constexpr double default_globalpos_scale_lf = 268435456.0;
+constexpr float  default_globalpos_scale_f  = (float)default_globalpos_scale_lf;
+constexpr int    default_globalpos_scale_bits = 28;
+constexpr double default_inverse_globalpos_scale_lf = 1.0 / default_globalpos_scale_lf;
+constexpr float  default_inverse_globalpos_scale_f  = (float)1.0 / default_globalpos_scale_f;
+constexpr double default_localpos_scale_lf = 16777216.0;
+constexpr float  default_localpos_scale_f  = (float)default_localpos_scale_lf;
+constexpr int    default_localpos_scale_bits = 24;
+constexpr double default_inverse_localpos_scale_lf = 1.0 / default_localpos_scale_lf;
+constexpr float  default_inverse_localpos_scale_f  = (float)1.0 / default_localpos_scale_f;
 /// \}
 
+/// \brief Velocities are expressed in A / sqrt(418.4) fs, and as such the velocity scaling should
+///        be high in order to preserve bits commensurate with the force and position
+///        quantities.
+/// \{
+constexpr double default_velocity_scale_lf = 17179869184.0;
+constexpr float  default_velocity_scale_f  = (float)default_velocity_scale_lf;
+constexpr int    default_velocity_scale_bits = 34;
+constexpr double default_inverse_velocity_scale_lf = 1.0 / default_velocity_scale_lf;
+constexpr float  default_inverse_velocity_scale_f = (float)1.0 / default_velocity_scale_f;
+/// \}
+  
 /// \brief Time is expressed in units of femtoseconds, and forces are discretized into increments
 ///        one part in 8,388,608 of one kcal/mol-A.  For 32-bit integer accumulation, this gives a
 ///        range of [ -256.0, +256.0 ) for each of three force components, which will suffice for
@@ -28,25 +39,22 @@ constexpr float  inverse_local_position_scale_f  = (float)1.0 / local_position_s
 ///        accumulator, ensuring that there is no practical upper bound to the magnitudes of
 ///        forces that can be accumulated.
 /// \{
-constexpr double global_force_scale_lf = 8388608.0;
-constexpr float  global_force_scale_f  = (float)global_force_scale_lf;
-constexpr int    global_force_scale_bits = 23;
-constexpr double inverse_global_force_scale_lf = 1.0 / global_force_scale_lf;
-constexpr float  inverse_global_force_scale_f  = (float)inverse_global_force_scale_lf;
-constexpr double nonbond_force_scale_lf = 8388608.0;
-constexpr float  nonbond_force_scale_f  = (float)nonbond_force_scale_lf;
-constexpr int    nonbond_force_scale_bits = 23;
+constexpr double default_force_scale_lf = 8388608.0;
+constexpr float  default_force_scale_f  = (float)default_force_scale_lf;
+constexpr int    default_force_scale_bits = 23;
+constexpr double default_inverse_force_scale_lf = 1.0 / default_force_scale_lf;
+constexpr float  default_inverse_force_scale_f  = (float)default_inverse_force_scale_lf;
 /// \}
 
 /// \brief Energies are accumulated in units of kcal/mol, discretized into one part in 33554432
 ///        of one kcal/mol.  Summation funnels directly into 64-bit, long long int accumulators,
 ///        again with no practical upper bound on the numbers.
 /// \{
-constexpr double global_energy_scale_lf = 33554432.0;
-constexpr float  global_energy_scale_f  = (float)global_energy_scale_lf;
-constexpr int    global_energy_scale_bits = 25;
-constexpr double inverse_global_energy_scale_lf = 1.0 / global_energy_scale_lf;
-constexpr float  inverse_global_energy_scale_f  = (float)1.0 / global_energy_scale_f;
+constexpr double default_energy_scale_lf = 33554432.0;
+constexpr float  default_energy_scale_f  = (float)default_energy_scale_lf;
+constexpr int    default_energy_scale_bits = 25;
+constexpr double default_inverse_energy_scale_lf = 1.0 / default_energy_scale_lf;
+constexpr float  default_inverse_energy_scale_f  = (float)1.0 / default_energy_scale_f;
 /// \}
   
 } // namespace numerics

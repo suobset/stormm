@@ -10,7 +10,7 @@ namespace energy {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
-using numerics::global_energy_scale_bits;
+using numerics::default_energy_scale_bits;
 
 /// \brief Enumerate all state variables that OMNI will track
 enum class StateVariable {
@@ -112,7 +112,7 @@ struct ScoreCard {
   /// \brief The constructor requires only the number of systems.
   ///
   /// \param system_count_in  The number of systems to track
-  ScoreCard(int system_count_in, int nrg_scale_bits_in = global_energy_scale_bits);
+  ScoreCard(int system_count_in, int nrg_scale_bits_in = default_energy_scale_bits);
 
   /// \brief Get the number of systems that this object is tracking
   int getSystemCount() const;
@@ -236,7 +236,7 @@ private:
   Hybrid<llint> instantaneous_accumulators;  ///< Instantaneous accumulators for reporting the
                                              ///<   energy at one time step, accumulated in fixed
                                              ///<   precision after scaling by
-                                             ///<   global_energy_scale_lf (see fixed_precision.h
+                                             ///<   default_energy_scale_lf (see fixed_precision.h
                                              ///<   in Constants/ ).
   Hybrid<double> running_accumulators;       ///< Running sums of the energy and other state
                                              ///<   variables, collected over each sampled time
