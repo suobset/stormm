@@ -144,20 +144,23 @@ struct PhaseSpaceSynthesis {
   /// \param heat_bath_in  A thermostat to govern integration of the equations of motion
   /// \param piston_in     A barostat to govern box rescaling (if there is a unit cell)
   /// \{
-  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, double time_step_in,
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list,
-                      const std::vector<Thermostat> &heat_baths_in,
-                      const std::vector<Barostat> &pistons_in,
+                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
+                      const std::vector<Barostat> &pistons_in = { Barostat() },
+                      double time_step_in = 1.0,
                       int globalpos_scale_bits_in = default_globalpos_scale_bits,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
 
-  PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
+  PhaseSpaceSynthesis(const SystemCache &sysc,
                       const std::vector<Thermostat> &heat_baths_in,
-                      const std::vector<Barostat> &pistons_in, int globalpos_scale_bits_in,
-                      int localpos_scale_bits_in, int velocity_scale_bits_in,
-                      int force_scale_bits_in);
+                      const std::vector<Barostat> &pistons_in, double time_step_in = 1.0,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
   /// \}
 
   /// \brief Copy and move constructors work much like their counterparts in the smaller

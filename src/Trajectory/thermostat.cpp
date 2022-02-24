@@ -3,6 +3,22 @@
 namespace omni {
 namespace trajectory {
 
+//-------------------------------------------------------------------------------------------------
+Thermostat::Thermostat() :
+    kind{ThermostatKind::NONE}
+{}
+
+//-------------------------------------------------------------------------------------------------
+Thermostat::Thermostat(const ThermostatKind kind_in) :
+    kind{kind_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+ThermostatKind Thermostat::getKind() const {
+  return kind;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::string getThermostatName(const ThermostatKind kind) {
   switch (kind) {
   case ThermostatKind::NONE:

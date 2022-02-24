@@ -15,7 +15,20 @@ enum class BarostatKind {
 /// \brief Store the parameters for a simulation barostat.  Includes Monte-Carlo and Berendesen
 ///        barostats with atomic virials.
 struct Barostat {
-  BarostatKind kind;
+
+  /// \brief The constructor can be blank (implying a barostat of kind NONE), take a specific
+  ///        barostat kind (implying default settings for that type of piston), or take specific
+  ///        settings for all aspects of the barostat.
+  /// \{
+  Barostat();
+  Barostat(BarostatKind kind);
+  /// \}
+
+  /// \brief Get the kind of barostat
+  BarostatKind getKind() const;
+  
+private:
+  BarostatKind kind;      ///< The type of barostat
 };
 
 /// \brief Return the name of the barostat choice (another enumerator string conversion function)

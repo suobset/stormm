@@ -55,10 +55,10 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
-                                         const double time_step_in,
                                          const std::vector<AtomGraph*> &ag_list,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
@@ -103,6 +103,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     topologies{std::vector<AtomGraph*>(ag_list.begin(), ag_list.end())}
 {
   // Check validity of input arrays
+  const int nbaths = heat_baths_in.size();
+  const int npumps = pistons_in.size();
   if (system_count == 0) {
     rtErr("At least one PhaseSpace object must be provided.", "PhaseSpaceSynthesis");
   }
@@ -111,37 +113,37 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
           std::to_string(ag_list.size()) + " topology pointers and " +
           std::to_string(system_count) + " PhaseSpace objects.", "PhaseSpaceSynthesis");
   }
-  else if (heat_baths_in.size() != system_count) {
-    rtErr("One thermostat must be provided for each system (currently " +
-          std::to_string(system_count) + " systems and " + std::to_string(heat_baths_in.size()) +
-          " thermostats.", "PhaseSpaceSynthesis");
+  else if (nbaths != 1 && nbaths != system_count) {
+    rtErr("One thermostat must be provided, or one thermostat for each system (currently " +
+          std::to_string(system_count) + " systems and " + std::to_string(nbaths) +
+          " thermostats).", "PhaseSpaceSynthesis");
   }
-  else if (pistons_in.size() != system_count) {
-    rtErr("One barostat must be provided for each system (currently " +
-          std::to_string(system_count) + " systems and " + std::to_string(pistons_in.size()) +
-          " barostats.", "PhaseSpaceSynthesis");
+  else if (npumps != 1 && npumps != system_count) {
+    rtErr("One barostat must be provided, or one barostat for each system (currently " +
+          std::to_string(system_count) + " systems and " + std::to_string(npumps) +
+          " barostats).", "PhaseSpaceSynthesis");
   }
 
   // Check validity of thermostats: all thermostats must be of the same type, but temperatures
   // and details of the coupling strength may vary between systems
-  heat_bath_kind = heat_baths_in[0].kind;
-  for (int i = 1; i < system_count; i++) {
-    if (heat_baths_in[i].kind != heat_baths_in[0].kind) {
+  heat_bath_kind = heat_baths_in[0].getKind();
+  for (int i = 1; i < nbaths; i++) {
+    if (heat_baths_in[i].getKind() != heat_baths_in[0].getKind()) {
       rtErr("All system thermostats must be of the same class.  System " + std::to_string(i) +
-            " uses a " + getThermostatName(heat_baths_in[i].kind) + " thermostat whereas the "
-            "first system locks the method to " + getThermostatName(heat_baths_in[0].kind) + ".",
-            "PhaseSpaceSynthesis");
+            " uses a " + getThermostatName(heat_baths_in[i].getKind()) + " thermostat whereas the "
+            "first system locks the method to " + getThermostatName(heat_baths_in[0].getKind()) +
+            ".", "PhaseSpaceSynthesis");
     }
   }
 
   // Check validity of barostats: all barostats must be of the same type, but pressures and
   // details of the rescaling may vary between systems
-  piston_kind = pistons_in[0].kind;
-  for (int i = 1; i < system_count; i++) {
-    if (pistons_in[i].kind != pistons_in[0].kind) {
+  piston_kind = pistons_in[0].getKind();
+  for (int i = 1; i < npumps; i++) {
+    if (pistons_in[i].getKind() != pistons_in[0].getKind()) {
       rtErr("All system barostats must be of the same class.  System " + std::to_string(i) +
-            " uses a " + getBarostatName(pistons_in[i].kind) + " barostat whereas the first "
-            "system locks the method to " + getBarostatName(pistons_in[0].kind) + ".",
+            " uses a " + getBarostatName(pistons_in[i].getKind()) + " barostat whereas the first "
+            "system locks the method to " + getBarostatName(pistons_in[0].getKind()) + ".",
             "PhaseSpaceSynthesis");
     }
   }
@@ -234,15 +236,16 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc, double time_step_in,
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
                                          const std::vector<Thermostat> &heat_baths_in,
                                          const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
                                          const int globalpos_scale_bits_in,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(sysc.getCoordinateReference(), time_step_in, sysc.getTopologyPointerCC(),
-                        heat_baths_in, pistons_in, globalpos_scale_bits_in, localpos_scale_bits_in,
+    PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getTopologyPointerCC(), heat_baths_in,
+                        pistons_in, time_step_in, globalpos_scale_bits_in, localpos_scale_bits_in,
                         velocity_scale_bits_in, force_scale_bits_in)
 {}
 
@@ -562,7 +565,7 @@ void PhaseSpaceSynthesis::allocate(const int atom_stride) {
   const int system_stride = roundUp(system_count, warp_size_int);
   int_data.resize(2 * system_stride);
   atom_counts.setPointer(&int_data, 0, system_count);
-  atom_counts.setPointer(&int_data, system_stride, system_count);
+  atom_starts.setPointer(&int_data, system_stride, system_count);
   const int xfrm_stride = system_count * roundUp(9, warp_size_int);
   xyz_qlj.resize(atom_stride);
   llint_data.resize((6 * atom_stride) + xfrm_stride);

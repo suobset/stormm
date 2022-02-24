@@ -8,6 +8,7 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Synthesis/systemcache.h"
+#include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
@@ -19,9 +20,9 @@ using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
 using omni::namelist::FilesControls;
 using omni::parse::TextFile;
-using omni::random::Ran2Generator;
+using omni::random::Xoroshiro128pGenerator;
 using omni::synthesis::SystemCache;
-using namespace omni::card;
+using namespace omni::synthesis;
 using namespace omni::trajectory;
 using namespace omni::testing;
 
@@ -88,9 +89,8 @@ int main(int argc, char* argv[]) {
         "pointers and references matched to topologies and coordinate sets of the same "
         "SystemCache object disagree.", test_sysc);
   
-  // Create some vectors of random numbers, then upload them and test what happens when perturbing
-  // atomic coordinates by these numbers.
-  Ran2Generator my_prng(oe.getRandomSeed());
+  // Create some topologies and coordinate sets.
+  Xoroshiro128pGenerator my_prng(oe.getRandomSeed());
   const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
   const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
                             getDrivePathType(trpcage_crd_name) == DrivePathType::FILE &&
                             getDrivePathType(trpcage_top_name) == DrivePathType::FILE);
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  PhaseSpace tip3p_ps, tip4p_ps, trpcage_ps;
+  PhaseSpace tip3p_ps, tip4p_ps, trpcage_ps, tip3p_ps_2, tip4p_ps_2, trpcage_ps_2;
   AtomGraph tip3p_ag, tip4p_ag, trpcage_ag;
   if (files_exist) {
     tip3p_ag.buildFromPrmtop(tip3p_top_name);
@@ -124,6 +124,21 @@ int main(int argc, char* argv[]) {
            "be skipped.", "test_phase_space_synthesis");
   }
 
+  // Make a PhaseSpaceSynthesis the meticulous way
+  std::vector<PhaseSpace>  psv = { tip3p_ps, tip4p_ps, trpcage_ps, tip3p_ps, tip4p_ps,
+                                   tip3p_ps, tip3p_ps, tip4p_ps, trpcage_ps };
+  const std::vector<AtomGraph*> agv = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &tip3p_ag, &tip4p_ag,
+                                        &tip3p_ag, &tip3p_ag, &tip4p_ag, &trpcage_ag };
+  for (size_t i = 3; i < psv.size(); i++) {
+    PhaseSpaceWriter pswi = psv[i].data();
+    for (int j = 0; j < pswi.natom; j++) {
+      pswi.xcrd[j] += 0.02 * my_prng.gaussianRandomNumber();
+      pswi.ycrd[j] += 0.02 * my_prng.gaussianRandomNumber();
+      pswi.zcrd[j] += 0.02 * my_prng.gaussianRandomNumber();
+    }
+  }
+  PhaseSpaceSynthesis psynth(psv, agv);   
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 
