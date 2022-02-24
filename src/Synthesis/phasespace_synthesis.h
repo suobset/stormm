@@ -9,10 +9,11 @@
 #include "Trajectory/barostat.h"
 #include "Trajectory/phasespace.h"
 #include "Trajectory/thermostat.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "systemcache.h"
 
 namespace omni {
-namespace trajectory {
+namespace synthesis {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
@@ -20,7 +21,13 @@ using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
 using numerics::default_force_scale_bits;
-using synthesis::SystemCache;
+using topology::UnitCellType;
+using trajectory::Barostat;
+using trajectory::BarostatKind;
+using trajectory::PhaseSpace;
+using trajectory::Thermostat;
+using trajectory::ThermostatKind;
+using trajectory::TrajectoryKind;
   
 /// \brief The reader for a PhaseSpaceSynthesis object, containing all of the data relevant for
 ///        propagating dynamics in a collection of systems.
@@ -204,10 +211,6 @@ struct PhaseSpaceSynthesis {
 
   /// \brief Extract a specific type of coordinate from the synthesis.
   ///
-  /// Overloaded:
-  ///   - Load the result into a (writeable) CoordinateFrame object
-  ///   - Load the result into a PhaseSpace object
-  ///
   /// \param ps        Pointer to an allocated PhaseSpace object (i.e. the original) ready to
   ///                  accept data from the synthesis (which may have evolved since it was first
   ///                  loaded)
@@ -239,24 +242,21 @@ private:
                                   ///<   cells are periodic.  Additional details may vary between
                                   ///<   systems and are held in their own arrays.
   double time_step;               ///< The time step for every system, in femtoseconds
-  double globalpos_scale;         ///< Scaling factor for fixed-precision coordinate information in
-                                  ///<   the global frame of reference
-  double inverse_globalpos_scale; ///< Inverse global coordinate scaling factor
-  int globalpos_scale_bits;       ///< Number of fixed-precision bits after the decimal for storing
-                                  ///<   global coordinates.  This is log2(position_scale).
-  double localpos_scale;          ///< Scaling factor for fixed-precision local coordinate
-                                  ///<   information in the local frame of reference
-  double inverse_localpos_scale;  ///< Inverse local coordinate scaling factor
-  int localpos_scale_bits;        ///< Number of fixed-precision bits after the decimal for storing
-                                  ///<   local coordinates.  This is log2(position_scale).
-  double velocity_scale;          ///< Scaling factor for fixed-precision velocity information
-  double inverse_velocity_scale;  ///< Inverse velocity scaling factor
-  int velocity_scale_bits;        ///< Number of fixed-precision bits after the decimal for storing
-                                  ///<   velocities.  This is log2(velocity_scale).
-  double force_scale;             ///< Scaling factor for fixed-precision force information
-  double inverse_force_scale;     ///< Inverse force scaling factor
-  int force_scale_bits;           ///< Number of fixed-precision bits after the decimal for storing
-                                  ///<   forces.  This is log2(force_scale).
+
+  // Scaling constants for fixed-precision coordinates (position, velocity) and also forces
+  // in this PhaseSpaceSynthesis are fixed upon creation
+  const double globalpos_scale;         ///< Global position coordinate scaling factor
+  const double localpos_scale;          ///< Local position coordinate scaling factor
+  const double velocity_scale;          ///< Velocity coordinate scaling factor
+  const double force_scale;             ///< Scaling factor for fixed-precision force accumulation
+  const double inverse_force_scale;     ///< Inverse force scaling factor
+  const double inverse_globalpos_scale; ///< Inverse global coordinate scaling factor
+  const double inverse_localpos_scale;  ///< Inverse local coordinate scaling factor
+  const double inverse_velocity_scale;  ///< Inverse velocity scaling factor
+  const int globalpos_scale_bits;       ///< Global position coordinate bits after the decimal
+  const int localpos_scale_bits;        ///< Local position coordinate bits after the decimal
+  const int velocity_scale_bits;        ///< Velocity coordinate bits after the decimal
+  const int force_scale_bits;           ///< Force component bits after the decimal
 
   /// Starting positions for each system's stretch of atoms in xyz_qlj, (x,y,z)_velocities, and
   /// (x,y,z)_forces.  Atoms in each of those arrays will remain in their original orders, as
