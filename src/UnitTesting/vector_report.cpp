@@ -104,7 +104,7 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
             }
           }
           const NumberFormat scifm = NumberFormat::SCIENTIFIC;
-          if (n_match > 0) {
+          if (n_mismatch > 0) {
             result += "The vectors fail to match in " + std::to_string(n_mismatch) +
                       " indices out of " + std::to_string(n_va) + ", with a mean unsigned error "
                       "(among the deviating entries) of " +

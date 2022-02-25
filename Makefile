@@ -14,6 +14,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Chemistry/chemical_features.cpp \
 		 $(SRCDIR)/Chemistry/indigo.cpp \
 		 $(SRCDIR)/Chemistry/znumber.cpp \
+		 $(SRCDIR)/Constants/fixed_precision.cpp \
 		 $(SRCDIR)/Constants/generalized_born.cpp \
 		 $(SRCDIR)/FileManagement/directory_util.cpp \
 		 $(SRCDIR)/FileManagement/file_listing.cpp \
@@ -185,6 +186,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Chemistry/chemical_features.o \
 		$(SRCDIR)/Chemistry/indigo.o \
 		$(SRCDIR)/Chemistry/znumber.o \
+		$(SRCDIR)/Constants/fixed_precision.o \
 		$(SRCDIR)/Constants/generalized_born.o \
 		$(SRCDIR)/FileManagement/directory_util.o \
 		$(SRCDIR)/FileManagement/file_listing.o \

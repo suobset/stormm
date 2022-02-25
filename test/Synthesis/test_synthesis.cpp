@@ -1,6 +1,8 @@
 #include <string>
 #include <vector>
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/fixed_precision.h"
+#include "../../src/Constants/scaling.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Namelists/nml_files.h"
@@ -13,6 +15,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
+using omni::constants::verytiny;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::openOutputFile;
@@ -22,6 +25,7 @@ using omni::namelist::FilesControls;
 using omni::parse::TextFile;
 using omni::random::Xoroshiro128pGenerator;
 using omni::synthesis::SystemCache;
+using namespace omni::numerics;
 using namespace omni::synthesis;
 using namespace omni::trajectory;
 using namespace omni::testing;
@@ -155,6 +159,83 @@ int main(int argc, char* argv[]) {
   }
   check(y_muta, RelationalOperator::EQUAL, y_copy, "The PhaseSpaceSynthesis object was not able "
         "to return the correct image of one of its systems.", do_tests);
+  const std::vector<double> scaling_answer = {
+    default_globalpos_scale_lf, default_localpos_scale_lf, default_velocity_scale_lf,
+    default_force_scale_lf, default_inverse_globalpos_scale_lf, default_inverse_localpos_scale_lf,
+    default_inverse_velocity_scale_lf, default_inverse_force_scale_lf };
+  const std::vector<int> scale_bits_answer = {
+    default_globalpos_scale_bits, default_localpos_scale_bits, default_velocity_scale_bits,
+    default_force_scale_bits };
+  PsSynthesisWriter psynth_w = psynth.data();
+  const std::vector<double> scaling_result = { psynth_w.gpos_scale, psynth_w.lpos_scale,
+                                               psynth_w.vel_scale, psynth_w.frc_scale,
+                                               psynth_w.inv_gpos_scale, psynth_w.inv_lpos_scale,
+                                               psynth_w.inv_vel_scale, psynth_w.inv_frc_scale };
+  const std::vector<float> scaling_result_f = { psynth_w.gpos_scale_f, psynth_w.lpos_scale_f,
+                                                psynth_w.vel_scale_f, psynth_w.frc_scale_f,
+                                                psynth_w.inv_gpos_scale_f,
+                                                psynth_w.inv_lpos_scale_f,
+                                                psynth_w.inv_vel_scale_f,
+                                                psynth_w.inv_frc_scale_f };
+  const std::vector<int> scale_bits_result = { psynth_w.gpos_bits, psynth_w.lpos_bits,
+                                               psynth_w.vel_bits, psynth_w.frc_bits };
+  check(scaling_result, RelationalOperator::EQUAL,
+        Approx(scaling_answer, ComparisonType::RELATIVE, omni::constants::verytiny),
+        "Double-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
+        "not meet expectations.");
+  check(scaling_result_f, RelationalOperator::EQUAL,
+        Approx(scaling_answer, ComparisonType::RELATIVE, omni::constants::verytiny),
+        "Single-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
+        "not meet expectations.");
+  check(scale_bits_result, RelationalOperator::EQUAL, scale_bits_answer, "Fixed-precision bit "
+        "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.");
+  check(psynth_w.time_step, RelationalOperator::EQUAL, 1.0, "The time step was not correctly "
+        "copied into a PhaseSpaceSynthesis writeable abstract.");
+  PhaseSpaceSynthesis psynth2(psv, agv, std::vector<Thermostat>(1), std::vector<Barostat>(1),
+                              2.5, 24, 25, 40, 28);
+  PsSynthesisWriter psynth_w2 = psynth2.data();
+  const std::vector<double> scaling_answer2 = { pow(2.0, 24), pow(2.0, 25), pow(2.0, 40),
+                                                pow(2.0, 28), 1.0 / pow(2.0, 24),
+                                                1.0 / pow(2.0, 25), 1.0 / pow(2.0, 40),
+                                                1.0 / pow(2.0, 28) };
+  const std::vector<float> scaling_answer2_f(scaling_answer2.begin(), scaling_answer2.end());
+  const std::vector<int> scale_bits_answer2 = { 24, 25, 40, 28 };
+  const std::vector<double> scaling_result2 = { psynth_w2.gpos_scale, psynth_w2.lpos_scale,
+                                                psynth_w2.vel_scale, psynth_w2.frc_scale,
+                                                psynth_w2.inv_gpos_scale, psynth_w2.inv_lpos_scale,
+                                                psynth_w2.inv_vel_scale, psynth_w2.inv_frc_scale };
+  const std::vector<float> scaling_result2_f = { psynth_w2.gpos_scale_f, psynth_w2.lpos_scale_f,
+                                                 psynth_w2.vel_scale_f, psynth_w2.frc_scale_f,
+                                                 psynth_w2.inv_gpos_scale_f,
+                                                 psynth_w2.inv_lpos_scale_f,
+                                                 psynth_w2.inv_vel_scale_f,
+                                                 psynth_w2.inv_frc_scale_f };
+  const std::vector<int> scale_bits_result2 = { psynth_w2.gpos_bits, psynth_w2.lpos_bits,
+                                                psynth_w2.vel_bits, psynth_w2.frc_bits };
+  check(scaling_result2, RelationalOperator::EQUAL,
+        Approx(scaling_answer2, ComparisonType::RELATIVE, omni::constants::verytiny),
+        "Double-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
+        "not meet expectations.");
+  check(scaling_result2_f, RelationalOperator::EQUAL,
+        Approx(scaling_answer2, ComparisonType::RELATIVE, omni::constants::verytiny),
+        "Single-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
+        "not meet expectations.");
+  check(scale_bits_result2, RelationalOperator::EQUAL, scale_bits_answer2, "Fixed-precision bit "
+        "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.");
+  check(psynth_w2.time_step, RelationalOperator::EQUAL, 2.5, "The time step was not correctly "
+        "copied into a PhaseSpaceSynthesis writeable abstract.");
+  psynth2.extractPhaseSpace(&tip3p_ps_copy, 3);
+  for (int i = 0; i < tip3p_orig_writer.natom; i++) {
+    y_orig[i] = tip3p_orig_writer.ycrd[i];
+    y_muta[i] = tip3p_muta_writer.ycrd[i];
+    y_copy[i] = tip3p_copy_writer.ycrd[i];
+  }
+  check(y_muta, RelationalOperator::EQUAL, Approx(y_copy).margin(1.0e-6),
+        "The PhaseSpaceSynthesis object returns an incorrect image of one of its systems, even "
+        "after compensating for a lower global position resolution", do_tests);
+  check(y_muta, RelationalOperator::NOT_EQUAL, Approx(y_copy).margin(1.0e-8),
+        "The PhaseSpaceSynthesis object returns an image of one of its systems with higher "
+        "fidelity to the original than expected.", do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

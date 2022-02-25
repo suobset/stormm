@@ -120,11 +120,10 @@ struct PsSynthesisWriter {
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
                     double gpos_scale_in, double lpos_scale_in, double vel_scale_in,
                     double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
-                    int frc_bits_in, const llint* boxvecs_in, const double* umat_in,
-                    const double* invu_in, const double* boxdims_in, const float* sp_umat_in,
-                    const float* sp_invu_in, const float* sp_boxdims_in, longlong4* xyz_qlj_in,
-                    llint* xvel_in, llint* yvel_in, llint* zvel_in, llint* xfrc_in, llint* yfrc_in,
-                    llint* zfrc_in);
+                    int frc_bits_in, llint* boxvecs_in, double* umat_in, double* invu_in,
+                    double* boxdims_in, float* sp_umat_in, float* sp_invu_in, float* sp_boxdims_in,
+                    longlong4* xyz_qlj_in, llint* xvel_in, llint* yvel_in, llint* zvel_in,
+                    llint* xfrc_in, llint* yfrc_in, llint* zfrc_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -168,15 +167,14 @@ struct PsSynthesisWriter {
   const int vel_bits;            ///< Velocity coordinate bits after the decimal
   const int frc_bits;            ///< Force component bits after the decimal
 
-  // Pointers to the transformations and box vectors are likewise const--once created, this
-  // object is valid for a system held in constant volume.
-  const llint* boxvecs;     ///< Discretized box vectors
-  const double* umat;       ///< Box (fractional) space transformation matrices, one per warp
-  const double* invu;       ///< Inverse transformation matrices, one per warp
-  const double* boxdims;    ///< Box dimensions (a, b, c, alpha, beta, gamma)
-  const float* sp_umat;     ///< Single precision fractional coordinate transformation matrices
-  const float* sp_invu;     ///< Single precision inverse transformation matrices
-  const float* sp_boxdims;  ///< Single precision box dimensions
+  // Pointers to the transformations and box vectors are mutable if the systems change volume.
+  llint* boxvecs;     ///< Discretized box vectors
+  double* umat;       ///< Box (fractional) space transformation matrices, one per warp
+  double* invu;       ///< Inverse transformation matrices, one per warp
+  double* boxdims;    ///< Box dimensions (a, b, c, alpha, beta, gamma)
+  float* sp_umat;     ///< Single precision fractional coordinate transformation matrices
+  float* sp_invu;     ///< Single precision inverse transformation matrices
+  float* sp_boxdims;  ///< Single precision box dimensions
 
   // Pointers to the coordinate, velocity, and force data--these are mutable for accumulating
   // forces and letting a trajectory evolve.

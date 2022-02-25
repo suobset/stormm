@@ -10,6 +10,10 @@ namespace synthesis {
 using card::HybridKind;
 using math::roundUp;
 using math::invertSquareMatrix;
+using numerics::checkGlobalPositionBits;
+using numerics::checkLocalPositionBits;
+using numerics::checkVelocityBits;
+using numerics::checkForceBits;
 using topology::UnitCellType;
 using trajectory::PhaseSpaceWriter;
 using trajectory::PhaseSpaceReader;
@@ -61,12 +65,11 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
                                      const double vel_scale_in, const double frc_scale_in,
                                      const int gpos_bits_in, const int lpos_bits_in,
                                      const int vel_bits_in, const int frc_bits_in,
-                                     const llint* boxvecs_in, const double* umat_in,
-                                     const double* invu_in, const double* boxdims_in,
-                                     const float* sp_umat_in, const float* sp_invu_in,
-                                     const float* sp_boxdims_in, longlong4* xyz_qlj_in,
-                                     llint* xvel_in, llint* yvel_in, llint* zvel_in,
-                                     llint* xfrc_in, llint* yfrc_in, llint* zfrc_in) :
+                                     llint* boxvecs_in, double* umat_in, double* invu_in,
+                                     double* boxdims_in, float* sp_umat_in, float* sp_invu_in,
+                                     float* sp_boxdims_in, longlong4* xyz_qlj_in, llint* xvel_in,
+                                     llint* yvel_in, llint* zvel_in, llint* xfrc_in,
+                                     llint* yfrc_in, llint* zfrc_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
     atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
@@ -138,7 +141,11 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     float_data{Hybrid<float>(HybridKind::ARRAY, "labframe_float")},
     topologies{std::vector<AtomGraph*>(ag_list.begin(), ag_list.end())}
 {
-  // Check validity of input arrays
+  // Check validity of input
+  checkGlobalPositionBits(globalpos_scale_bits);
+  checkLocalPositionBits(localpos_scale_bits);
+  checkVelocityBits(velocity_scale_bits);
+  checkForceBits(force_scale_bits);
   const int nbaths = heat_baths_in.size();
   const int npumps = pistons_in.size();
   if (system_count == 0) {

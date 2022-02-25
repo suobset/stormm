@@ -28,6 +28,13 @@ struct PhaseSpaceReader {
                    const double* yfrc_in, const double* zfrc_in, const double* xprv_in,
                    const double* yprv_in, const double* zprv_in);
 
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  PhaseSpaceReader(const PhaseSpaceReader &original) = default;
+  PhaseSpaceReader(PhaseSpaceReader &&original) = default;
+  PhaseSpaceReader& operator=(const PhaseSpaceReader &original) = default;
+  /// \}
+  
   const int natom;                ///< Atom count for this system (still a constant)
   const UnitCellType unit_cell;  ///< The type of unit cell
   const double* xcrd;            ///< Cartesian X positions of all particles
@@ -58,6 +65,13 @@ struct PhaseSpaceWriter {
                    double* boxdim_in, double* xvel_in, double* yvel_in, double* zvel_in,
                    double* xfrc_in, double* yfrc_in, double* zfrc_in, double* xprv_in,
                    double* yprv_in, double* zprv_in);
+
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  PhaseSpaceWriter(const PhaseSpaceWriter &original) = default;
+  PhaseSpaceWriter(PhaseSpaceWriter &&original) = default;
+  PhaseSpaceWriter& operator=(const PhaseSpaceWriter &original) = default;
+  /// \}
 
   const int natom;               ///< Atom count for this system (still a constant)
   const UnitCellType unit_cell;  ///< The type of unit cell
