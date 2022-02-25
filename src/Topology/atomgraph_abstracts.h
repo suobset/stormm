@@ -133,11 +133,12 @@ template <typename T> struct ValenceKit {
                       const int* cmap_asgn_atoms_in, const int* cmap_asgn_index_in,
                       const int* cmap_asgn_terms_in, const int* cmap_asgn_bounds_in);
 
-  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  /// \brief Take the default copy and move constructors.  The move assignment operator will get
   ///        implicitly deleted as this is just a collection of constants.
   /// \{
   ValenceKit(const ValenceKit &original) = default;
-  ValenceKit(ValenceKit &&original) = default;
+  ValenceKit(ValenceKit &&other) = default;
+  ValenceKit& operator=(const ValenceKit &original) = default;
   /// \}
   
   // The purpose of this struct is to store a collection of pointers for HPC kernels.  As such, it
@@ -293,7 +294,8 @@ template <typename T> struct NonbondedKit {
   ///        implicitly deleted as this is just a collection of constants.
   /// \{
   NonbondedKit(const NonbondedKit &original) = default;
-  NonbondedKit(NonbondedKit &&original) = default;
+  NonbondedKit(NonbondedKit &&other) = default;
+  NonbondedKit& operator=(const NonbondedKit &original) = default;
   /// \}
 
   // Member variables again store a collection of atomic parameters
@@ -348,7 +350,8 @@ template <typename T> struct ImplicitSolventKit {
   /// \brief Take the default copy and move constructors as well as assignment operators
   /// \{
   ImplicitSolventKit(const ImplicitSolventKit &original) = default;
-  ImplicitSolventKit(ImplicitSolventKit &&original) = default;
+  ImplicitSolventKit(ImplicitSolventKit &&other) = default;
+  ImplicitSolventKit& operator=(const ImplicitSolventKit &original) = default;
   /// \}
 
   // Member variables again store a collection of atomic parameters
@@ -382,7 +385,8 @@ struct ChemicalDetailsKit {
   ///        implicitly deleted as this is just a collection of constants.
   /// \{
   ChemicalDetailsKit(const ChemicalDetailsKit &original) = default;
-  ChemicalDetailsKit(ChemicalDetailsKit &&original) = default;
+  ChemicalDetailsKit(ChemicalDetailsKit &&other) = default;
+  ChemicalDetailsKit& operator=(const ChemicalDetailsKit &original) = default;
   /// \}
 
   // Member variables store the atom count, residue count, and other ways to quantify the system
@@ -417,7 +421,8 @@ template <typename T> struct VirtualSiteKit {
   ///        implicitly deleted as this is just a collection of constants.
   /// \{
   VirtualSiteKit(const VirtualSiteKit &original) = default;
-  VirtualSiteKit(VirtualSiteKit &&original) = default;
+  VirtualSiteKit(VirtualSiteKit &&other) = default;
+  VirtualSiteKit& operator=(const VirtualSiteKit &original) = default;
   /// \}
   
   const int nsite;        ///< The number of virtual sites in the topology
@@ -445,7 +450,8 @@ template <typename T> struct ConstraintKit {
   ///        implicitly deleted as this is just a collection of constants.
   /// \{
   ConstraintKit(const ConstraintKit &original) = default;
-  ConstraintKit(ConstraintKit &&original) = default;
+  ConstraintKit(ConstraintKit &&other) = default;
+  ConstraintKit& operator=(const ConstraintKit &original) = default;
   /// \}
   
   const int nspoke;          ///< The number of "hub and spoke" constrained groups of bonds.

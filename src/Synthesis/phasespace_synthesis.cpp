@@ -19,6 +19,10 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
                                      const ThermostatKind heat_bath_kind_in,
                                      const BarostatKind piston_kind_in, const double time_step_in,
                                      const int* atom_starts_in, const int* atom_counts_in,
+                                     const double gpos_scale_in, const double lpos_scale_in,
+                                     const double vel_scale_in, const double frc_scale_in,
+                                     const int gpos_bits_in, const int lpos_bits_in,
+                                     const int vel_bits_in, const int frc_bits_in,
                                      const llint* boxvecs_in, const double* umat_in,
                                      const double* invu_in, const double* boxdims_in,
                                      const float* sp_umat_in, const float* sp_invu_in,
@@ -28,10 +32,24 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
                                      const llint* yfrc_in, const llint* zfrc_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
-    atom_counts{atom_counts_in}, boxvecs{boxvecs_in}, umat{umat_in}, invu{invu_in},
-    boxdims{boxdims_in}, sp_umat{sp_umat_in}, sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in},
-    xyz_qlj{xyz_qlj_in}, xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xfrc{xfrc_in}, yfrc{yfrc_in},
-    zfrc{zfrc_in}
+    atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
+    vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
+    inv_gpos_scale{1.0 / gpos_scale_in},
+    inv_lpos_scale{1.0 / lpos_scale_in},
+    inv_vel_scale{1.0 / vel_scale_in},
+    inv_frc_scale{1.0 / frc_scale_in},
+    gpos_scale_f{static_cast<float>(gpos_scale)},
+    lpos_scale_f{static_cast<float>(lpos_scale)},
+    vel_scale_f{static_cast<float>(vel_scale)},
+    frc_scale_f{static_cast<float>(frc_scale)},
+    inv_gpos_scale_f{static_cast<float>(inv_gpos_scale)},
+    inv_lpos_scale_f{static_cast<float>(inv_lpos_scale)},
+    inv_vel_scale_f{static_cast<float>(inv_vel_scale)},
+    inv_frc_scale_f{static_cast<float>(inv_frc_scale)},
+    gpos_bits{gpos_bits_in}, lpos_bits{lpos_bits_in}, vel_bits{vel_bits_in}, frc_bits{frc_bits_in},
+    boxvecs{boxvecs_in}, umat{umat_in}, invu{invu_in}, boxdims{boxdims_in}, sp_umat{sp_umat_in},
+    sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in}, xyz_qlj{xyz_qlj_in}, xvel{xvel_in},
+    yvel{yvel_in}, zvel{zvel_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -39,6 +57,10 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
                                      const ThermostatKind heat_bath_kind_in,
                                      const BarostatKind piston_kind_in, const double time_step_in,
                                      const int* atom_starts_in, const int* atom_counts_in,
+                                     const double gpos_scale_in, const double lpos_scale_in,
+                                     const double vel_scale_in, const double frc_scale_in,
+                                     const int gpos_bits_in, const int lpos_bits_in,
+                                     const int vel_bits_in, const int frc_bits_in,
                                      const llint* boxvecs_in, const double* umat_in,
                                      const double* invu_in, const double* boxdims_in,
                                      const float* sp_umat_in, const float* sp_invu_in,
@@ -47,10 +69,24 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
                                      llint* xfrc_in, llint* yfrc_in, llint* zfrc_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
-    atom_counts{atom_counts_in}, boxvecs{boxvecs_in}, umat{umat_in}, invu{invu_in},
-    boxdims{boxdims_in}, sp_umat{sp_umat_in}, sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in},
-    xyz_qlj{xyz_qlj_in}, xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xfrc{xfrc_in}, yfrc{yfrc_in},
-    zfrc{zfrc_in}
+    atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
+    vel_scale{vel_scale_in}, frc_scale{frc_scale_in},
+    inv_gpos_scale{1.0 / gpos_scale_in},
+    inv_lpos_scale{1.0 / lpos_scale_in},
+    inv_vel_scale{1.0 / vel_scale_in},
+    inv_frc_scale{1.0 / frc_scale_in},
+    gpos_scale_f{static_cast<float>(gpos_scale)},
+    lpos_scale_f{static_cast<float>(lpos_scale)},
+    vel_scale_f{static_cast<float>(vel_scale)},
+    frc_scale_f{static_cast<float>(frc_scale)},
+    inv_gpos_scale_f{static_cast<float>(inv_gpos_scale)},
+    inv_lpos_scale_f{static_cast<float>(inv_lpos_scale)},
+    inv_vel_scale_f{static_cast<float>(inv_vel_scale)},
+    inv_frc_scale_f{static_cast<float>(inv_frc_scale)},
+    gpos_bits{gpos_bits_in}, lpos_bits{lpos_bits_in}, vel_bits{vel_bits_in}, frc_bits{frc_bits_in},
+    boxvecs{boxvecs_in}, umat{umat_in}, invu{invu_in}, boxdims{boxdims_in}, sp_umat{sp_umat_in},
+    sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in}, xyz_qlj{xyz_qlj_in}, xvel{xvel_in},
+    yvel{yvel_in}, zvel{zvel_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -539,11 +575,14 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
 //-------------------------------------------------------------------------------------------------
 const PsSynthesisReader PhaseSpaceSynthesis::data(HybridTargetLevel tier) const {
   return PsSynthesisReader(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                           atom_starts.data(tier), atom_counts.data(tier), box_vectors.data(tier),
-                           box_space_transforms.data(tier), inverse_transforms.data(tier),
-                           box_dimensions.data(tier), sp_box_space_transforms.data(tier),
-                           sp_inverse_transforms.data(tier), sp_box_dimensions.data(tier),
-                           xyz_qlj.data(tier), x_velocities.data(tier), y_velocities.data(tier),
+                           atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
+                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                           box_vectors.data(tier), box_space_transforms.data(tier),
+                           inverse_transforms.data(tier), box_dimensions.data(tier),
+                           sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
+                           sp_box_dimensions.data(tier), xyz_qlj.data(tier),
+                           x_velocities.data(tier), y_velocities.data(tier),
                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
                            z_forces.data(tier));
 }
@@ -551,11 +590,14 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(HybridTargetLevel tier) const 
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
   return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                           atom_starts.data(tier), atom_counts.data(tier), box_vectors.data(tier),
-                           box_space_transforms.data(tier), inverse_transforms.data(tier),
-                           box_dimensions.data(tier), sp_box_space_transforms.data(tier),
-                           sp_inverse_transforms.data(tier), sp_box_dimensions.data(tier),
-                           xyz_qlj.data(tier), x_velocities.data(tier), y_velocities.data(tier),
+                           atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
+                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                           box_vectors.data(tier), box_space_transforms.data(tier),
+                           inverse_transforms.data(tier), box_dimensions.data(tier),
+                           sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
+                           sp_box_dimensions.data(tier), xyz_qlj.data(tier),
+                           x_velocities.data(tier), y_velocities.data(tier),
                            z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
                            z_forces.data(tier));
 }

@@ -38,15 +38,24 @@ struct PsSynthesisReader {
   PsSynthesisReader(int system_count_in, UnitCellType unit_cell_in,
                     ThermostatKind heat_bath_kind_in, BarostatKind piston_kind_in,
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
-                    const llint* boxvecs_in, const double* umat_in, const double* invu_in,
-                    const double* boxdims_in, const float* sp_umat_in, const float* sp_invu_in,
-                    const float* sp_boxdims_in, const longlong4* xyz_qlj_in, const llint* xvel_in,
-                    const llint* yvel_in, const llint* zvel_in, const llint* xfrc_in,
-                    const llint* yfrc_in, const llint* zfrc_in);
+                    double gpos_scale_in, double lpos_scale_in, double vel_scale_in,
+                    double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
+                    int frc_bits_in, const llint* boxvecs_in, const double* umat_in,
+                    const double* invu_in, const double* boxdims_in, const float* sp_umat_in,
+                    const float* sp_invu_in, const float* sp_boxdims_in,
+                    const longlong4* xyz_qlj_in, const llint* xvel_in, const llint* yvel_in,
+                    const llint* zvel_in, const llint* xfrc_in, const llint* yfrc_in,
+                    const llint* zfrc_in);
 
-  // Even in the writer, some information may not be altered.  This includes the simulation
-  // conditions, the number of systems, and the number of atoms in each system.  The layout
-  // of the data must not be corrupted.
+  /// \brief Copy and move constructors--as with any object containing const members, the move
+  ///        assignment operator is implicitly deleted.
+  /// \{
+  PsSynthesisReader(const PsSynthesisReader &original) = default;
+  PsSynthesisReader(PsSynthesisReader &&other) = default;
+  PsSynthesisReader& operator=(const PsSynthesisReader &original) = default;
+  /// \}
+  
+  // System sizing information
   const int system_count;               ///< The number of independent systems
   const UnitCellType unit_cell;         ///< Type of unit cells (or none) each system resides in
   const ThermostatKind heat_bath_kind;  ///< The type of thermostat used throughout all systems
@@ -55,6 +64,29 @@ struct PsSynthesisReader {
   const int* atom_starts;               ///< Points at which each system starts in the atom list
   const int* atom_counts;               ///< Atom counts for all systems
 
+  // Scaling factors: the PhaseSpaceSynthesis permits a customizable discretization of fixed-point
+  // arithmetic.
+  const double gpos_scale;       ///< Global position coordinate scaling factor
+  const double lpos_scale;       ///< Local position coordinate scaling factor
+  const double vel_scale;        ///< Velocity coordinate scaling factor
+  const double frc_scale;        ///< Scaling factor for fixed-precision force accumulation
+  const double inv_gpos_scale;   ///< Inverse global coordinate scaling factor
+  const double inv_lpos_scale;   ///< Inverse local coordinate scaling factor
+  const double inv_vel_scale;    ///< Inverse velocity scaling factor
+  const double inv_frc_scale;    ///< Inverse force scaling factor
+  const float gpos_scale_f;      ///< Global position coordinate scaling factor
+  const float lpos_scale_f;      ///< Local position coordinate scaling factor
+  const float vel_scale_f;       ///< Velocity coordinate scaling factor
+  const float frc_scale_f;       ///< Scaling factor for fixed-precision force accumulation
+  const float inv_gpos_scale_f;  ///< Inverse global coordinate scaling factor
+  const float inv_lpos_scale_f;  ///< Inverse local coordinate scaling factor
+  const float inv_vel_scale_f;   ///< Inverse velocity scaling factor
+  const float inv_frc_scale_f;   ///< Inverse force scaling factor
+  const int gpos_bits;           ///< Global position coordinate bits after the decimal
+  const int lpos_bits;           ///< Local position coordinate bits after the decimal
+  const int vel_bits;            ///< Velocity coordinate bits after the decimal
+  const int frc_bits;            ///< Force component bits after the decimal
+  
   // Pointers to the transformations and box vectors are likewise const--once created, this
   // object is valid for a system held in constant volume.
   const llint* boxvecs;     ///< Discretized box vectors
@@ -86,12 +118,22 @@ struct PsSynthesisWriter {
   PsSynthesisWriter(int system_count_in, UnitCellType unit_cell_in,
                     ThermostatKind heat_bath_kind_in, BarostatKind piston_kind_in,
                     double time_step_in, const int* atom_starts_in, const int* atom_counts_in,
-                    const llint* boxvecs_in, const double* umat_in, const double* invu_in,
-                    const double* boxdims_in, const float* sp_umat_in, const float* sp_invu_in,
-                    const float* sp_boxdims_in, longlong4* xyz_qlj_in, llint* xvel_in,
-                    llint* yvel_in, llint* zvel_in, llint* xfrc_in, llint* yfrc_in,
+                    double gpos_scale_in, double lpos_scale_in, double vel_scale_in,
+                    double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
+                    int frc_bits_in, const llint* boxvecs_in, const double* umat_in,
+                    const double* invu_in, const double* boxdims_in, const float* sp_umat_in,
+                    const float* sp_invu_in, const float* sp_boxdims_in, longlong4* xyz_qlj_in,
+                    llint* xvel_in, llint* yvel_in, llint* zvel_in, llint* xfrc_in, llint* yfrc_in,
                     llint* zfrc_in);
 
+  /// \brief Copy and move constructors--as with any object containing const members, the move
+  ///        assignment operator is implicitly deleted.
+  /// \{
+  PsSynthesisWriter(const PsSynthesisWriter &original) = default;
+  PsSynthesisWriter(PsSynthesisWriter &&other) = default;
+  PsSynthesisWriter& operator=(const PsSynthesisWriter &original) = default;
+  /// \}
+  
   // Even in the writer, some information may not be altered.  This includes the simulation
   // conditions, the number of systems, and the number of atoms in each system.  The layout
   // of the data must not be corrupted.
@@ -102,6 +144,29 @@ struct PsSynthesisWriter {
   const double time_step;               ///< Time step used in all simulations
   const int* atom_starts;               ///< Points at which each system starts in the atom list
   const int* atom_counts;               ///< Atom counts for all systems
+
+  // Scaling factors: the PhaseSpaceSynthesis permits a customizable discretization of fixed-point
+  // arithmetic.
+  const double gpos_scale;       ///< Global position coordinate scaling factor
+  const double lpos_scale;       ///< Local position coordinate scaling factor
+  const double vel_scale;        ///< Velocity coordinate scaling factor
+  const double frc_scale;        ///< Scaling factor for fixed-precision force accumulation
+  const double inv_gpos_scale;   ///< Inverse global coordinate scaling factor
+  const double inv_lpos_scale;   ///< Inverse local coordinate scaling factor
+  const double inv_vel_scale;    ///< Inverse velocity scaling factor
+  const double inv_frc_scale;    ///< Inverse force scaling factor
+  const float gpos_scale_f;      ///< Global position coordinate scaling factor
+  const float lpos_scale_f;      ///< Local position coordinate scaling factor
+  const float vel_scale_f;       ///< Velocity coordinate scaling factor
+  const float frc_scale_f;       ///< Scaling factor for fixed-precision force accumulation
+  const float inv_gpos_scale_f;  ///< Inverse global coordinate scaling factor
+  const float inv_lpos_scale_f;  ///< Inverse local coordinate scaling factor
+  const float inv_vel_scale_f;   ///< Inverse velocity scaling factor
+  const float inv_frc_scale_f;   ///< Inverse force scaling factor
+  const int gpos_bits;           ///< Global position coordinate bits after the decimal
+  const int lpos_bits;           ///< Local position coordinate bits after the decimal
+  const int vel_bits;            ///< Velocity coordinate bits after the decimal
+  const int frc_bits;            ///< Force component bits after the decimal
 
   // Pointers to the transformations and box vectors are likewise const--once created, this
   // object is valid for a system held in constant volume.
@@ -252,10 +317,10 @@ private:
   const double localpos_scale;          ///< Local position coordinate scaling factor
   const double velocity_scale;          ///< Velocity coordinate scaling factor
   const double force_scale;             ///< Scaling factor for fixed-precision force accumulation
-  const double inverse_force_scale;     ///< Inverse force scaling factor
   const double inverse_globalpos_scale; ///< Inverse global coordinate scaling factor
   const double inverse_localpos_scale;  ///< Inverse local coordinate scaling factor
   const double inverse_velocity_scale;  ///< Inverse velocity scaling factor
+  const double inverse_force_scale;     ///< Inverse force scaling factor
   const int globalpos_scale_bits;       ///< Global position coordinate bits after the decimal
   const int localpos_scale_bits;        ///< Local position coordinate bits after the decimal
   const int velocity_scale_bits;        ///< Velocity coordinate bits after the decimal
