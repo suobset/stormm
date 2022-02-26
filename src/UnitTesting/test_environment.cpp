@@ -327,7 +327,7 @@ TestEnvironment::TestEnvironment(int argc, char* argv[], const TmpdirStatus tmpd
 
 //-------------------------------------------------------------------------------------------------
 TestEnvironment::~TestEnvironment() {
-
+  
   // Remove files
   if (remove_files) {
     const int n_files = files_created.size();

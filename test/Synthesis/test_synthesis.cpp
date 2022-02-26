@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
               ".*.inpcrd\n&end\n";
     foutp.write(buffer.c_str(), buffer.size());
     foutp.close();
+    oe.logFileCreated(mdin_name);
   }
   const bool mdin_exists = (getDrivePathType(mdin_name) == DrivePathType::FILE);
   const TextFile tf = (mdin_exists) ? TextFile(mdin_name) : TextFile();
