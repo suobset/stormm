@@ -3,10 +3,23 @@
 #define OMNI_FIXED_PRECISION_H
 
 #include <string>
+#include "Constants/behavior.h"
 
 namespace omni {
 namespace numerics {
 
+using constants::ExceptionResponse;
+  
+/// \brief Enumerate different available precision models
+enum class PrecisionLevel {
+  SINGLE,       ///< Computations will take place in fp32 or int64 fixed-precision.  This may limit
+                ///<   the upper bound on some fixed-precision bit settings.
+  SINGLE_PLUS,  ///< Computations will take place in fp32 or int64 fixed-precision, with some
+                ///<   enhancements depending on the situation.  This may limit the upper bound on
+                ///<   some fixed-precision bit settings.
+  DOUBLE        ///< Computations will take place in fp64 or int64 fixed-precision
+};
+  
 /// \brief The fixed-precision discretizations of global and local coordinate frame positions, in
 ///        parts per Angstrom (the internal unit of length).  The local position scaling is
 ///        intended to work in local coordinate frames, perhaps in an implicit solvent enviroment
@@ -67,10 +80,32 @@ constexpr double default_energy_scale_lf = 67108864.0;
 constexpr float  default_energy_scale_f  = (float)default_energy_scale_lf;
 constexpr int    default_energy_scale_bits = 26;
 constexpr double default_inverse_energy_scale_lf = 1.0 / default_energy_scale_lf;
-constexpr float  default_inverse_energy_scale_f  = (float)1.0 / default_energy_scale_f;
+constexpr float  default_inverse_energy_scale_f  = (float)default_inverse_energy_scale_lf;
 constexpr int    min_energy_scale_bits = 22;
 constexpr int    max_energy_scale_bits = 40;
 /// \}
+
+/// \brief Charges are mapped to the mesh in atomic units--the forces on atoms are later multiplied
+///        by Coulomb's constant, just like the electrostatic short-ranged non-bonded forces.
+/// \{
+constexpr double default_charge_mesh_scale_lf = 268435456.0;
+constexpr float  default_charge_mesh_scale_f = (float)default_charge_mesh_scale_lf;
+constexpr int    default_charge_mesh_scale_bits = 28;
+constexpr double default_inverse_charge_mesh_scale_lf = 1.0 / default_charge_mesh_scale_lf;
+constexpr float  default_inverse_charge_mesh_scale_f = (float)default_inverse_charge_mesh_scale_lf;
+constexpr int    min_charge_mesh_scale_bits = 24;
+constexpr int    max_charge_mesh_scale_bits = 48;
+/// \}
+
+/// \brief Translate a string into a known precision level enumeration.
+///
+/// \param choice  The named precision level (will be checked for validity)
+PrecisionLevel translatePrecisionLevel(const std::string &choice, ExceptionResponse policy);
+
+/// \brief Get a descriptive string corresponding to each enumerated compute precision level.
+///
+/// \param plevel  The precision level to name
+std::string getPrecisionLevelName(PrecisionLevel plevel);
 
 /// \brief Produce an error message describing range violations in user choices for various
 ///        fixed-precision methods.
@@ -98,11 +133,24 @@ void checkLocalPositionBits(int choice);
 /// \param choice  The fixed-precision bits for representing particle velocities
 void checkVelocityBits(int choice);
 
-/// \brief Check user input regarding the fixed-precision force scaling.  Forces are represented
-///        in units of kcal/mol - Angstroms.
+/// \brief Check user input regarding the fixed-precision force accumulation.  Forces are
+///        represented in units of kcal/mol - Angstroms.
 ///
-/// \param choice  The fixed-precision bits for representing particle velocities
+/// \param choice  The fixed-precision bits for representing forces acting on particles
 void checkForceBits(int choice);
+
+/// \brief Check user input regarding the fixed-precision energy accumulation.  Energies are
+///        represented in units of kcal/mol.
+///
+/// \param choice  The fixed-precision bits for representing energy contributions
+void checkEnergyBits(int choice);
+
+/// \brief Check user input regarding the fixed-precision charge denisty accumulation on the mesh.
+///        Charge density per grid point is represented in atomic units.
+///
+/// \param choice  The fixed-precision bits for performing charge density accumulation
+/// \param pmdoel  The fixed-precision model, which implies the accumulation range
+void checkChargeMeshBits(int choice, PrecisionLevel pmodel);
 
 } // namespace numerics
 } // namespace omni

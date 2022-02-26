@@ -29,6 +29,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/nml_dynamics.cpp \
 	         $(SRCDIR)/Namelists/nml_files.cpp \
 	         $(SRCDIR)/Namelists/nml_minimize.cpp \
+	         $(SRCDIR)/Namelists/nml_precision.cpp \
 	         $(SRCDIR)/Namelists/nml_random.cpp \
 	         $(SRCDIR)/Namelists/nml_restraint.cpp \
 	         $(SRCDIR)/Namelists/nml_solvent.cpp \
@@ -111,6 +112,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/nml_dynamics.h \
 		   $(SRCDIR)/Namelists/nml_files.h \
 		   $(SRCDIR)/Namelists/nml_minimize.h \
+		   $(SRCDIR)/Namelists/nml_precision.h \
 		   $(SRCDIR)/Namelists/nml_random.h \
 		   $(SRCDIR)/Namelists/nml_restraint.h \
 		   $(SRCDIR)/Namelists/nml_solvent.h \
@@ -200,6 +202,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
 	        $(SRCDIR)/Namelists/nml_files.o \
 	        $(SRCDIR)/Namelists/nml_minimize.o \
+	        $(SRCDIR)/Namelists/nml_precision.o \
 	        $(SRCDIR)/Namelists/nml_random.o \
 	        $(SRCDIR)/Namelists/nml_restraint.o \
 	        $(SRCDIR)/Namelists/nml_solvent.o \

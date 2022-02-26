@@ -1,8 +1,41 @@
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "fixed_precision.h"
 
 namespace omni {
 namespace numerics {
+
+using parse::strcmpCased;
+  
+//-------------------------------------------------------------------------------------------------
+PrecisionLevel translatePrecisionLevel(const std::string &choice, ExceptionResponse policy) {
+  if (strcmpCased(choice, std::string("single"))) {
+    return PrecisionLevel::SINGLE;
+  }
+  else if (strcmpCased(choice, std::string("single_plus"))) {
+    return PrecisionLevel::SINGLE_PLUS;
+  }
+  else if (strcmpCased(choice, std::string("double"))) {
+    return PrecisionLevel::DOUBLE;
+  }
+  else {
+    rtErr("Invalid request for precision level " + choice + ".", "translatePrecisionLevel");
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::string getPrecisionLevelName(PrecisionLevel plevel) {
+  switch (plevel) {
+  case PrecisionLevel::SINGLE:
+    return std::string("SINGLE");
+  case PrecisionLevel::SINGLE_PLUS:
+    return std::string("SINGLE_PLUS");
+  case PrecisionLevel::DOUBLE:
+    return std::string("DOUBLE");
+  }
+  __builtin_unreachable();
+}
 
 //-------------------------------------------------------------------------------------------------
 std::string fixedPrecisionRangeErrorMessage(const int choice, const int min_val,
@@ -60,6 +93,48 @@ void checkForceBits(const int choice) {
           std::to_string(max_force_scale_bits) + " bits.  A value of " + std::to_string(choice) +
           fixedPrecisionRangeErrorMessage(choice, min_force_scale_bits, max_force_scale_bits),
           "checkForceBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkEnergyBits(const int choice) {
+  if (choice < min_energy_scale_bits || choice > max_energy_scale_bits) {
+    rtErr("Energy accumulation is allowed in a fixed precision range of " +
+          std::to_string(min_energy_scale_bits) + " to " +
+          std::to_string(max_energy_scale_bits) + " bits.  A value of " + std::to_string(choice) +
+          fixedPrecisionRangeErrorMessage(choice, min_energy_scale_bits, max_energy_scale_bits),
+          "checkEnergyBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkChargeMeshBits(const int choice, const PrecisionLevel pmodel) {
+  if (choice < min_charge_mesh_scale_bits) {
+    rtErr("Charge mesh accumulation must take place with at least " +
+          std::to_string(min_charge_mesh_scale_bits) + " bits.  A values of " +
+          std::to_string(choice) +
+          fixedPrecisionRangeErrorMessage(choice, min_charge_mesh_scale_bits, 64),
+          "checkChargeMeshBits");
+  }
+  switch (pmodel) {
+  case PrecisionLevel::SINGLE:
+  case PrecisionLevel::SINGLE_PLUS:
+    if (choice > 29) {
+      rtErr("Charge mesh accumulation in a " + getPrecisionLevelName(pmodel) + " precision model "
+            "will take place with a 32-bit signed integer accumulation grid.  A value of " +
+            std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, 8, 29),
+            "checkChargeMeshBits");
+    }
+    break;
+  case PrecisionLevel::DOUBLE:
+    if (choice > max_charge_mesh_scale_bits) {
+      rtErr("Charge mesh accumulation in a " + getPrecisionLevelName(pmodel) + " precision model "
+            "will take place with a 64-bit signed integer accumulation grid.  A value of " +
+            std::to_string(choice) +
+            fixedPrecisionRangeErrorMessage(choice, 8, max_charge_mesh_scale_bits),
+            "checkChargeMeshBits");
+    }
+    break;
   }
 }
 
