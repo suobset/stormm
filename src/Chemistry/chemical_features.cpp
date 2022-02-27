@@ -169,6 +169,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     aromatic_pi_electrons{HybridKind::POINTER, "chemfe_pi_elec"},
     aromatic_groups{HybridKind::POINTER, "chemfe_arom_groups"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
+    rotatable_bonds{HybridKind::POINTER, "chemfe_rotators"},
     formal_charges{HybridKind::POINTER, "chemfe_formal_charges"},
     bond_orders{HybridKind::POINTER, "chemfe_bond_orders"},
     free_electrons{HybridKind::POINTER, "chemfe_free_e"},
@@ -218,9 +219,14 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   chiral_center_count = tmp_chiral_centers.size();
 
   // Find rotatable bonds
-  const std::vector<int2> tmp_rotatable_bonds = findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms,
-                                                                   tmp_ring_atom_bounds);
-  rotatable_bond_count = tmp_rotatable_bonds.size();
+  const std::vector<int2> tmp_rotators = findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms,
+                                                            tmp_ring_atom_bounds);
+  rotatable_bond_count = tmp_rotators.size();
+  std::vector<int> tmp_rotatable_bonds(2 * rotatable_bond_count);
+  for (int i = 0; i < rotatable_bond_count; i++) {
+    tmp_rotatable_bonds[2 * i      ] = tmp_rotators[i].x;
+    tmp_rotatable_bonds[(2 * i) + 1] = tmp_rotators[i].y;
+  }
   
   // Store the integer results
   const size_t nint = roundUp(tmp_planar_centers.size(), warp_size_zu) +
@@ -229,7 +235,8 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                       roundUp(tmp_aromatic_group_bounds.size(), warp_size_zu) +
                       roundUp(tmp_aromatic_pi_electrons.size(), warp_size_zu) +
                       roundUp(tmp_aromatic_groups.size(), warp_size_zu) +
-                      roundUp(static_cast<size_t>(chiral_center_count), warp_size_zu);    
+                      roundUp(static_cast<size_t>(chiral_center_count), warp_size_zu) +
+                      roundUp(2 * rotatable_bond_count, warp_size_int);
   int_data.resize(nint);
   size_t ic = planar_centers.putHost(&int_data, tmp_planar_centers, 0, warp_size_zu);
   ic = ring_atom_bounds.putHost(&int_data, tmp_ring_atom_bounds, 0, warp_size_zu);
@@ -238,6 +245,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ic = aromatic_pi_electrons.putHost(&int_data, tmp_aromatic_pi_electrons, 0, warp_size_zu);
   ic = aromatic_groups.putHost(&int_data, tmp_aromatic_groups, 0, warp_size_zu);
   ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, 0, warp_size_zu);
+  ic = rotatable_bonds.putHost(&int_data, tmp_rotatable_bonds, 0, warp_size_zu);
 }
 
 //-------------------------------------------------------------------------------------------------

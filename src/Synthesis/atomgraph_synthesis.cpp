@@ -69,6 +69,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     dihe_term_offsets{HybridKind::POINTER, "typsyn_dihe_offset"},
     virtual_site_offsets{HybridKind::POINTER, "typsyn_vsite_offset"},
     nb_exclusion_offsets{HybridKind::POINTER, "typsyn_nbexcl_offset"},
+    lennard_jones_abc_offsets{HybridKind::POINTER, "typsyn_ljtable_offset"},
     int_system_data{HybridKind::ARRAY, "tpsyn_int_data"},
     residue_limits{HybridKind::ARRAY, "tpsyn_res_lims"},
     atom_struc_numbers{HybridKind::ARRAY, "tpsyn_atom_struc_nums"},
@@ -141,6 +142,14 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     dihe_param_idx{HybridKind::ARRAY, "tpsyn_dihe_idx"},
     charge_indices{HybridKind::ARRAY, "tpsyn_q_idx"},
     lennard_jones_indices{HybridKind::ARRAY, "tpsyn_lj_idx"},
+    lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab"},
+    lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c"},
+    lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab"},
+    lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c"},
+    sp_lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab_sp"},
+    sp_lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c_sp"},
+    sp_lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab_sp"},
+    sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
     nmr_initial_steps{HybridKind::ARRAY, "tpsyn_nmr_init_step"},
     nmr_final_steps{HybridKind::ARRAY, "tpsyn_nmr_final_step"},
     nmr_increments{HybridKind::ARRAY, "tpsyn_nmr_inc"},
@@ -285,7 +294,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate memory and set POINTER-kind arrays for the small packets of data
   const int padded_system_count = roundUp(system_count, warp_size_int);
-  int_system_data.resize(33 * padded_system_count);
+  int_system_data.resize(34 * padded_system_count);
   int pivot = 0;
   topology_indices.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -352,6 +361,8 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   virtual_site_offsets.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   nb_exclusion_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  lennard_jones_abc_offsets.setPointer(&int_system_data, pivot, system_count);
   
   // Load the topology indexing first
   for (int i = 0; i < system_count; i++) {
@@ -1022,172 +1033,117 @@ void AtomGraphSynthesis::condenseParameterTables() {
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::extendLJMatrices() {
 
-  // Search the diagonal entries first.  Use approximate comparisons with tolerances of 1.0e-5 in
-  // an effort to accommodate very large Lennard-Jones A coefficients (~10^7).  Make a vector of
-  // all unique diagonal entries.
-  std::vector<double3> diag_entries;
-  std::vector<int> lj_type_bounds(topology_count + 1, 0);
+  // Identify systems with identical Lennard-Jones tables and have their offsets point to the
+  // same table in the synthesis.  This may conserve some L1 cache if everything else is done
+  // right.  Track the necessary array size to hold all tables.
+  int table_acc = 0;
+  std::vector<NonbondedKit<double>> nbkvec;
+  nbkvec.reserve(topology_count);
+  std::vector<int> table_idx(topology_count, -1);
   for (int i = 0; i < topology_count; i++) {
-    lj_type_bounds[i + 1] = lj_type_bounds[i] + topologies[i]->getAtomTypeCount();
+    nbkvec.push_back(topologies[i]->getDoublePrecisionNonbondedKit());
   }
-  const int total_types = lj_type_bounds[topology_count];
-  std::vector<bool> lj_coverage(total_types, false);
-  std::vector<int> lj_diagtypes(total_types);
-  int n_unique_diags = 0;
+  int n_unique_tables = 0;
   for (int i = 0; i < topology_count; i++) {
-    const NonbondedKit<double> i_nbk = topologies[i]->getDoublePrecisionNonbondedKit();
-    for (int j = lj_type_bounds[i]; j < lj_type_bounds[i + 1]; j++) {
-      if (lj_coverage[j]) {
+    const int ni_lj_types = nbkvec[i].n_lj_types;
+    for (int j = i + 1; j < topology_count; j++) {
+      if (ni_lj_types != nbkvec[j].n_lj_types) {
         continue;
       }
-      const size_t matpos = (j - lj_type_bounds[i]) * (i_nbk.n_lj_types + 1);
-      const Approx ent_a(i_nbk.lja_coeff[matpos], 1.0e-5);
-      const Approx ent_b(i_nbk.ljb_coeff[matpos], 1.0e-5);
-      const Approx ent_c(i_nbk.ljc_coeff[matpos], 1.0e-5);
-      for (int k = i; k < topology_count; k++) {
-        const int mstart = (k == i) ? j : lj_type_bounds[k];
-        const NonbondedKit<double> k_nbk = topologies[k]->getDoublePrecisionNonbondedKit();
-        for (int m = mstart; m < lj_type_bounds[k + 1]; m++) {
-          const size_t testpos = (m - lj_type_bounds[k]) * (k_nbk.n_lj_types + 1);
-          if (lj_coverage[m] == false && ent_a.test(k_nbk.lja_coeff[testpos]) &&
-              ent_b.test(k_nbk.ljb_coeff[testpos]) && ent_c.test(k_nbk.ljc_coeff[testpos])) {
-            lj_coverage[m] = true;
-            lj_diagtypes[m] = n_unique_diags;
-          }
-        }
+      bool diags_identical = true;
+      for (int k = 0; k < ni_lj_types; k++) {
+        const int dgidx = k * (ni_lj_types + 1);
+        diags_identical = (diags_identical &&
+                           nbkvec[i].lja_coeff[dgidx] == nbkvec[j].lja_coeff[dgidx] &&
+                           nbkvec[i].ljb_coeff[dgidx] == nbkvec[j].ljb_coeff[dgidx] &&
+                           nbkvec[i].ljc_coeff[dgidx] == nbkvec[j].ljc_coeff[dgidx] &&
+                           nbkvec[i].lja_14_coeff[dgidx] == nbkvec[j].lja_14_coeff[dgidx] &&
+                           nbkvec[i].ljb_14_coeff[dgidx] == nbkvec[j].ljb_14_coeff[dgidx] &&
+                           nbkvec[i].ljc_14_coeff[dgidx] == nbkvec[j].ljc_14_coeff[dgidx]);
       }
-      diag_entries.push_back({i_nbk.lja_coeff[matpos], i_nbk.ljb_coeff[matpos],
-                              i_nbk.ljc_coeff[matpos]});
-      n_unique_diags++;
+      if (diags_identical == false) {
+        continue;
+      }
+      bool tables_identical = true;
+      for (int k = 0; k < ni_lj_types * ni_lj_types; k++) {
+        tables_identical = (tables_identical &&
+                            nbkvec[i].lja_coeff[k] == nbkvec[j].lja_coeff[k] &&
+                            nbkvec[i].ljb_coeff[k] == nbkvec[j].ljb_coeff[k] &&
+                            nbkvec[i].ljc_coeff[k] == nbkvec[j].ljc_coeff[k] &&
+                            nbkvec[i].lja_14_coeff[k] == nbkvec[j].lja_14_coeff[k] &&
+                            nbkvec[i].ljb_14_coeff[k] == nbkvec[j].ljb_14_coeff[k] &&
+                            nbkvec[i].ljc_14_coeff[k] == nbkvec[j].ljc_14_coeff[k]);
+      }
+      if (tables_identical) {
+        table_idx[j] = n_unique_tables;      
+      }
     }
+    table_idx[i] = n_unique_tables;
+    n_unique_tables++;
   }
 
-  // CHECK
-#if 0
-  printf("Global LJ IDs (%d topologies) = [\n", topology_count);
+  // Loop back over systems to obtain the necessary allocation base on the unique tables
+  int seek_idx = 0;
+  int alloc_size = 0;
+  std::vector<int> tmp_table_offsets(topology_count, 0);
   for (int i = 0; i < topology_count; i++) {
-    printf("%4d -> %4d    ", topologies[i]->getAtomTypeCount(),
-           lj_type_bounds[i + 1] - lj_type_bounds[i]);
-  }
-  printf("\n];\n");
-  for (int i = 0; i < n_unique_diags; i++) {
-    for (int j = 0; j < topology_count; j++) {
-      if (lj_type_bounds[j + 1] - lj_type_bounds[j] > i) {
-        printf("%4d ", lj_diagtypes[lj_type_bounds[j] + i]);
-      }
-      else {
-        printf("     ");
+    for (int j = i; j < topology_count; j++) {
+      if (table_idx[i] == seek_idx) {
+        tmp_table_offsets[j] = alloc_size;
       }
     }
-    printf("\n");
-  }
-  printf("];\n");
-#endif
-  // END CHECK
-  
-  // Loop back over each topology and find all cross-terms involving the various diagonals.
-  // Fill out a map of the numbers of unique cross-terms.
-  std::vector<double3> lj_entries;
-  std::vector<int> lj_entry_bounds(1, 0);
-  std::vector<int2> lj_entry_map;
-  int pos = 0;
-  int n_lj_entry = 0;
-  for (int i = 0; i < n_unique_diags; i++) {
-    for (int j = i; j < n_unique_diags; j++) {
-
-      // Each element p of the map stores the row and column for the Lennard-Jones table entries
-      // catalogged between entries p and (p + 1) of the bounds array.
-      lj_entry_map.push_back({i, j});
-      for (int k = 0; k < topology_count; k++) {
-        const NonbondedKit<double> k_nbk = topologies[k]->getDoublePrecisionNonbondedKit();
-        for (int m = lj_type_bounds[k]; m < lj_type_bounds[k + 1]; m++) {
-          if (lj_diagtypes[m] == i) {
-            for (int n = lj_type_bounds[k]; n < lj_type_bounds[k + 1]; n++) {
-              if (lj_diagtypes[n] == j) {
-                const int matpos = (m - lj_type_bounds[k]) +
-                                   ((n - lj_type_bounds[k]) * k_nbk.n_lj_types);
-                const Approx ent_a(k_nbk.lja_coeff[matpos], 1.0e-5);
-                const Approx ent_b(k_nbk.ljb_coeff[matpos], 1.0e-5);
-                const Approx ent_c(k_nbk.ljc_coeff[matpos], 1.0e-5);
-                bool found = false;
-                for (int p = lj_entry_bounds[pos]; p < n_lj_entry; p++) {
-                  found = (found || (ent_a.test(lj_entries[p].x) && ent_b.test(lj_entries[p].y) &&
-                                     ent_c.test(lj_entries[p].z)));
-                }
-                if (found == false) {
-                  lj_entries.push_back({k_nbk.lja_coeff[matpos], k_nbk.ljb_coeff[matpos],
-                                        k_nbk.ljc_coeff[matpos]});
-                  n_lj_entry++;
-                }
-              }
-            }
-          }
-        }
-      }
-      lj_entry_bounds.push_back(n_lj_entry);
-      pos++;
+    if (table_idx[i] == seek_idx) {
+      alloc_size += roundUp(nbkvec[i].n_lj_types * nbkvec[i].n_lj_types, warp_size_int);
+      seek_idx++;
     }
   }
 
-  // CHECK
-#if 0
-  printf("matrix_ideas = [\n");
-  int jj = 0;
-  for (int i = 0; i < n_unique_diags; i++) {
-    for (int j = i; j < n_unique_diags; j++) {
-      printf(" %d", lj_entry_bounds[jj + 1] - lj_entry_bounds[jj]);
-      jj++;
-    }
-    printf("\n");
-  }
-  printf("];\n");
-#endif
-  // END CHECK
-  
-  // Loop back over the compiled matrix and find cases where a single type pair interaction
-  // can have more than a single set of Lennard-Jones A, B, and C coefficients.  Split those
-  // N unique sets of values across ceil(sqrt(N)) different sub-types of each atom.
-  pos = 0;
-  std::vector<int> n_type_copy(n_unique_diags + 1, 0);
-  for (int i = 0; i < n_unique_diags; i++) {
-    for (int j = i; j < n_unique_diags; j++) {
-      const int n_takes = lj_entry_bounds[pos + 1] - lj_entry_bounds[pos];
-      switch (n_takes) {
-      case 1:
-        n_type_copy[i] = std::max(n_type_copy[i], 1);
-        break;
-      case 4:
-        n_type_copy[i] = std::max(n_type_copy[i], 2);
-        break;
-      case 9:
-        n_type_copy[i] = std::max(n_type_copy[i], 3);
-        break;
-      default:
-        n_type_copy[i] = std::max(n_type_copy[i], static_cast<int>(ceil(sqrt(n_takes))));
-        break;
+  // Allocate and fill the Lennard-Jones tables
+  lennard_jones_ab_coeff.resize(alloc_size);
+  lennard_jones_c_coeff.resize(alloc_size);
+  lennard_jones_14_ab_coeff.resize(alloc_size);
+  lennard_jones_14_c_coeff.resize(alloc_size);
+  sp_lennard_jones_ab_coeff.resize(alloc_size);
+  sp_lennard_jones_c_coeff.resize(alloc_size);
+  sp_lennard_jones_14_ab_coeff.resize(alloc_size);
+  sp_lennard_jones_14_c_coeff.resize(alloc_size);
+  double2* ab_ptr = lennard_jones_ab_coeff.data();
+  double* c_ptr = lennard_jones_c_coeff.data();
+  double2* ab_14_ptr = lennard_jones_14_ab_coeff.data();
+  double* c_14_ptr = lennard_jones_14_c_coeff.data();
+  float2* sp_ab_ptr = sp_lennard_jones_ab_coeff.data();
+  float* sp_c_ptr = sp_lennard_jones_c_coeff.data();
+  float2* sp_ab_14_ptr = sp_lennard_jones_14_ab_coeff.data();
+  float* sp_c_14_ptr = sp_lennard_jones_14_c_coeff.data();
+  seek_idx = 0;
+  for (int i = 0; i < topology_count; i++) {
+    if (table_idx[i] == seek_idx) {
+      const int offset = tmp_table_offsets[i];
+      for (int j = 0; j < nbkvec[i].n_lj_types * nbkvec[i].n_lj_types; j++) {
+        const int joffset = offset + j;
+        ab_ptr[joffset].x = nbkvec[i].lja_coeff[j];
+        ab_ptr[joffset].y = nbkvec[i].ljb_coeff[j];
+        c_ptr[joffset] = nbkvec[i].ljc_coeff[j];
+        ab_14_ptr[joffset].x = nbkvec[i].lja_14_coeff[j];
+        ab_14_ptr[joffset].y = nbkvec[i].ljb_14_coeff[j];
+        c_14_ptr[joffset] = nbkvec[i].ljc_14_coeff[j];
+        sp_ab_ptr[joffset].x = nbkvec[i].lja_coeff[j];
+        sp_ab_ptr[joffset].y = nbkvec[i].ljb_coeff[j];
+        sp_c_ptr[joffset] = nbkvec[i].ljc_coeff[j];
+        sp_ab_14_ptr[joffset].x = nbkvec[i].lja_14_coeff[j];
+        sp_ab_14_ptr[joffset].y = nbkvec[i].ljb_14_coeff[j];
+        sp_c_14_ptr[joffset] = nbkvec[i].ljc_14_coeff[j];
       }
-      pos++;
+      seek_idx++;
     }
   }
-  prefixSumInPlace<int>(&n_type_copy, PrefixSumType::EXCLUSIVE, "ExtendLJMatrices");
 
-  // CHECK
-#if 0
-  printf("LJ types = [\n");
-  for (int i = 0; i < n_unique_diags; i++) {
-    printf("  %12.4lf %12.4lf %12.4lf  %2d\n", diag_entries[i].x, diag_entries[i].y,
-           diag_entries[i].z, n_type_copy[i]);
+  // Expand the topology-oriented offsets to become system-oriented offsets
+  std::vector<int> tmp_lj_system_offsets(system_count, 0);
+  for (int i = 0; i < system_count; i++) {
+    tmp_lj_system_offsets[i] = tmp_table_offsets[topology_indices.readHost(i)];
   }
-  printf("];\n");
-#endif
-  // END CHECK
-  
-  // Expand the matrices of Lennard-Jones atom types
-  for (int i = 0; i < n_unique_diags; i++) {
-    for (int j = n_type_copy[i]; j < n_type_copy[i + 1]; j++) {
-
-    }
-  }
+  lennard_jones_abc_offsets.putHost(tmp_table_offsets);
 }
 
 //-------------------------------------------------------------------------------------------------

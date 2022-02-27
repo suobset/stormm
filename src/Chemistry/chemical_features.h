@@ -242,7 +242,11 @@ private:
   /// this list indicate that an atom is L-chiral, while negative values indicate that an atom
   /// with the index equal to the absolute value is D-chiral.
   Hybrid<int> chiral_centers;
-  
+
+  /// List of rotatable bonds.  The first atom is given in every even-numbered index, the second
+  /// atom in each odd-numbered index.
+  Hybrid<int> rotatable_bonds;
+
   /// Formal charges determined for all atoms in the system, based on a Lewis structure drawing
   /// with the Indigo method
   Hybrid<double> formal_charges;

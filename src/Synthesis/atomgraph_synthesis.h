@@ -210,9 +210,7 @@ private:
   Hybrid<int> virtual_site_counts;  ///< Number of v-sites / extra points out of all atoms
 
   // Information relevant to non-bonded calculations
-  Hybrid<int> atom_type_counts;        ///< Number of distinct Lennard-Jones types (this is more
-                                       ///<   for record-keeping, as all systems in this synthesis
-                                       ///<   will work from the same table)
+  Hybrid<int> atom_type_counts;        ///< Number of distinct Lennard-Jones types in each system
   Hybrid<int> total_exclusion_counts;  ///< Total number of non-bonded exclusions, including 1-4
 
   // Information relevant to the MD propagation algorithm
@@ -236,25 +234,27 @@ private:
   // indices of atoms in unified (but not re-ordered) arrays of atom descriptors and also
   // coordinates.  In this sense, these arrays are intermediates between the valence work units
   // that follow and the original AtomGraph objects used to construct this AtomGraphSynthesis.
-  Hybrid<int> atom_offsets;           ///< Starting indices for each system's various atomic
-                                      ///<   descriptor arrays, which will have eponymous
-                                      ///<   names to their AtomGraph counterparts.
-  Hybrid<int> atom_bit_offsets;       ///< Starting indices for each system's bit masks.
-  Hybrid<int> residue_offsets;        ///< Starting indices for each system's residue
-                                      ///<   descriptor arrays
-  Hybrid<int> molecule_offsets;       ///< Starting indices for each system's molecule descriptor
-                                      ///<   arrays
-  Hybrid<int> ubrd_term_offsets;      ///< Starting indices for Urey-Bradley parameter index
-                                      ///<   lists for each system
-  Hybrid<int> cimp_term_offsets;      ///< CHARMM improper parameter index lists
-  Hybrid<int> cmap_term_offsets;      ///< CMAP atom indexing lists
-  Hybrid<int> bond_term_offsets;      ///< Bond stretching term parameter index lists
-  Hybrid<int> angl_term_offsets;      ///< Angle bending term parameter index lists
-  Hybrid<int> dihe_term_offsets;      ///< Dihedral term parameter index lists
-  Hybrid<int> virtual_site_offsets;   ///< Starting indices for each system's virtual site
-                                      ///<   descriptor lists
-  Hybrid<int> nb_exclusion_offsets;   ///< Starting indices for unified nonbonded exclusion
-                                      ///<   lists
+  Hybrid<int> atom_offsets;               ///< Starting indices for each system's various atomic
+                                          ///<   descriptor arrays, which will have eponymous
+                                          ///<   names to their AtomGraph counterparts.
+  Hybrid<int> atom_bit_offsets;           ///< Starting indices for each system's bit masks.
+  Hybrid<int> residue_offsets;            ///< Starting indices for each system's residue
+                                          ///<   descriptor arrays
+  Hybrid<int> molecule_offsets;           ///< Starting indices for each system's molecule
+                                          ///<   descriptor arrays
+  Hybrid<int> ubrd_term_offsets;          ///< Starting indices for Urey-Bradley parameter index
+                                          ///<   lists for each system
+  Hybrid<int> cimp_term_offsets;          ///< CHARMM improper parameter index lists
+  Hybrid<int> cmap_term_offsets;          ///< CMAP atom indexing lists
+  Hybrid<int> bond_term_offsets;          ///< Bond stretching term parameter index lists
+  Hybrid<int> angl_term_offsets;          ///< Angle bending term parameter index lists
+  Hybrid<int> dihe_term_offsets;          ///< Dihedral term parameter index lists
+  Hybrid<int> virtual_site_offsets;       ///< Starting indices for each system's virtual site
+                                          ///<   descriptor lists
+  Hybrid<int> nb_exclusion_offsets;       ///< Starting indices for unified nonbonded exclusion
+                                          ///<   lists
+  Hybrid<int> lennard_jones_abc_offsets;  ///< Starting indices for each system's relevant
+                                          ///<   Lennard-Jones tables (A + B, or C coefficients)
   
   /// Data array to hold all system size information, the target of all the above pointers
   Hybrid<int> int_system_data;          
@@ -295,38 +295,38 @@ private:
   Hybrid<char4> residue_names;            ///< Four letter names of all residues, i.e. PDB names
 
   // CHARMM valence term details
-  Hybrid<double> ubrd_stiffnesses;        ///< Stiffness constant of each Urey-Bradley stretch
-  Hybrid<double> ubrd_equilibria;         ///< Equilibrium length of each Urey-Bradley stretch
-  Hybrid<double> cimp_stiffnesses;        ///< CHARMM impropers are harmonic, too!
-  Hybrid<double> cimp_phase_angles;       ///< The "equilibria" for CHARMM impropers
-  Hybrid<int> cmap_surface_dimensions;    ///< Dimensions for every unique CMAP surface
-  Hybrid<int> cmap_surface_bounds;        ///< Bounds array for every unique CMAP surface
-  Hybrid<double> cmap_surfaces;           ///< Concatenated, column-major format matrices for
-                                          ///<   every CMAP surface term
-  Hybrid<float> sp_ubrd_stiffnesses;      ///< Stiffness constant of each Urey-Bradley stretch,
-                                          ///<   in single precision
-  Hybrid<float> sp_ubrd_equilibria;       ///< Equilibrium length of each Urey-Bradley stretch,
-                                          ///<   in single precision
-  Hybrid<float> sp_cimp_stiffnesses;      ///< CHARMM impropers are harmonic, too!
-  Hybrid<float> sp_cimp_phase_angles;     ///< The "equilibria" for CHARMM impropers
-  Hybrid<float> sp_cmap_surfaces;         ///< Concatenated, column-major format matrices for
-                                          ///<   every CMAP surface term, in single precision
+  Hybrid<double> ubrd_stiffnesses;      ///< Stiffness constant of each Urey-Bradley stretch
+  Hybrid<double> ubrd_equilibria;       ///< Equilibrium length of each Urey-Bradley stretch
+  Hybrid<double> cimp_stiffnesses;      ///< CHARMM impropers are harmonic, too!
+  Hybrid<double> cimp_phase_angles;     ///< The "equilibria" for CHARMM impropers
+  Hybrid<int> cmap_surface_dimensions;  ///< Dimensions for every unique CMAP surface
+  Hybrid<int> cmap_surface_bounds;      ///< Bounds array for every unique CMAP surface
+  Hybrid<double> cmap_surfaces;         ///< Concatenated, column-major format matrices for
+                                        ///<   every CMAP surface term
+  Hybrid<float> sp_ubrd_stiffnesses;    ///< Stiffness constant of each Urey-Bradley stretch,
+                                        ///<   in single precision
+  Hybrid<float> sp_ubrd_equilibria;     ///< Equilibrium length of each Urey-Bradley stretch,
+                                        ///<   in single precision
+  Hybrid<float> sp_cimp_stiffnesses;    ///< CHARMM impropers are harmonic, too!
+  Hybrid<float> sp_cimp_phase_angles;   ///< The "equilibria" for CHARMM impropers
+  Hybrid<float> sp_cmap_surfaces;       ///< Concatenated, column-major format matrices for every
+                                        ///<   CMAP surface term, in single precision
 
   // Basic force field valence term details
-  Hybrid<double> bond_stiffnesses;       ///< Stiffness of each bond stretch, kcal/mol-A^2
-  Hybrid<double> bond_equilibria;        ///< Equilibrium lengths of all bonds, A
-  Hybrid<double> angl_stiffnesses;       ///< Stiffness of each angle bend, kcal/mol-rad^2
-  Hybrid<double> angl_equilibria;        ///< Equilibrium angle for all bending terms, radians
-  Hybrid<double> dihe_amplitudes;        ///< Amplitudes of each dihedral cosine term, kcal/mol
-  Hybrid<double> dihe_periodicities;     ///< Periodicity of each dihedral / torsion cosine term
-  Hybrid<double> dihe_phase_angles;      ///< Phase angle of each dihedral / torsion cosine term
-  Hybrid<float> sp_bond_stiffnesses;     ///< Stiffness of each bond stretch (single precision)
-  Hybrid<float> sp_bond_equilibria;      ///< Equilibrium lengths of all bonds (single precision)
-  Hybrid<float> sp_angl_stiffnesses;     ///< Angle bending stiffnesses (single precision)
-  Hybrid<float> sp_angl_equilibria;      ///< Angle bending equilibria (single precision)
-  Hybrid<float> sp_dihe_amplitudes;      ///< Amplitudes of torsion cosine terms (single precision)
-  Hybrid<float> sp_dihe_periodicities;   ///< Periodicities of torsion terms (single precision)
-  Hybrid<float> sp_dihe_phase_angles;    ///< Phase angles of torsion terms (single precision)
+  Hybrid<double> bond_stiffnesses;      ///< Stiffness of each bond stretch, kcal/mol-A^2
+  Hybrid<double> bond_equilibria;       ///< Equilibrium lengths of all bonds, A
+  Hybrid<double> angl_stiffnesses;      ///< Stiffness of each angle bend, kcal/mol-rad^2
+  Hybrid<double> angl_equilibria;       ///< Equilibrium angle for all bending terms, radians
+  Hybrid<double> dihe_amplitudes;       ///< Amplitudes of each dihedral cosine term, kcal/mol
+  Hybrid<double> dihe_periodicities;    ///< Periodicity of each dihedral / torsion cosine term
+  Hybrid<double> dihe_phase_angles;     ///< Phase angle of each dihedral / torsion cosine term
+  Hybrid<float> sp_bond_stiffnesses;    ///< Stiffness of each bond stretch (single precision)
+  Hybrid<float> sp_bond_equilibria;     ///< Equilibrium lengths of all bonds (single precision)
+  Hybrid<float> sp_angl_stiffnesses;    ///< Angle bending stiffnesses (single precision)
+  Hybrid<float> sp_angl_equilibria;     ///< Angle bending equilibria (single precision)
+  Hybrid<float> sp_dihe_amplitudes;     ///< Amplitudes of torsion cosine terms (single precision)
+  Hybrid<float> sp_dihe_periodicities;  ///< Periodicities of torsion terms (single precision)
+  Hybrid<float> sp_dihe_phase_angles;   ///< Phase angles of torsion terms (single precision)
   
   // Valence term indexing arrays, all of them indexing atoms in the synthesis list, updated from
   // the indexing in their original topologies and parameters in the condensed tables of the
@@ -358,9 +358,31 @@ private:
   Hybrid<int> dihe_l_atoms;    ///< Cosine-based dihedral (proper or improper) L atoms
   Hybrid<int> dihe_param_idx;  ///< Cosine-based dihedral parameter indices
 
-  // Non-bonded parameter indexing
-  Hybrid<int> charge_indices;            ///< Atomic charge indices, 0 to charge_type_count - 1
-  Hybrid<int> lennard_jones_indices;     ///< Lennard-Jones indices, 0 to atom_type_count - 1
+  // Non-bonded parameter indexing and van-der Waals tables
+  Hybrid<int> charge_indices;                   ///< Atomic charge indices, 0 to
+                                                ///<   charge_type_count - 1
+  Hybrid<int> lennard_jones_indices;            ///< Lennard-Jones indices, 0 to
+                                                ///<   atom_type_count - 1
+  Hybrid<double2> lennard_jones_ab_coeff;       ///< Lennard-Jones A and B coefficients, a series
+                                                ///<   of tables covering all systems
+  Hybrid<double> lennard_jones_c_coeff;         ///< Lennard-Jones C coefficients, a series of
+                                                ///<   tables covering all systems
+  Hybrid<double2> lennard_jones_14_ab_coeff;    ///< Lennard-Jones A and B coefficients, a series
+                                                ///<   of tables covering all systems
+  Hybrid<double> lennard_jones_14_c_coeff;      ///< Lennard-Jones C coefficients, a series of
+                                                ///<   tables covering all systems
+  Hybrid<float2> sp_lennard_jones_ab_coeff;     ///< Lennard-Jones A and B coefficients, a series
+                                                ///<   of tables covering all systems (single
+                                                ///<   precision)
+  Hybrid<float> sp_lennard_jones_c_coeff;       ///< Lennard-Jones C coefficients, a series of
+                                                ///<   tables covering all systems (single
+                                                ///<   precision)
+  Hybrid<float2> sp_lennard_jones_14_ab_coeff;  ///< Lennard-Jones A and B coefficients, a series
+                                                ///<   of tables covering all systems (single
+                                                ///<   precision)
+  Hybrid<float> sp_lennard_jones_14_c_coeff;    ///< Lennard-Jones C coefficients, a series of
+                                                ///<  tables covering all systems (single
+                                                ///<   precision)
   
   // NMR restraint term details: these function exactly like other parameter sets and are indexed
   // by lists of atoms in the bond work units arrays.  They can be included in the synthesis of
@@ -423,8 +445,8 @@ private:
   /// bit 31 to indicate whether the form of the potential should be a cosine term or the CHARMM
   /// harmonic term and another flag in bit 32, relevant only when energy is being computed and
   /// only if the term is not a CHARMM improper, to indicate whether to add the energy to a proper
-  /// improper accumulator.  A fourth atom index in the y member (bits 1-10) precedes the index for
-  /// 1:4 scaling factors (bits 11-15, up to 32 unique combinations of electrostatic and
+  /// or improper accumulator.  A fourth atom index in the y member (bits 1-10) precedes the index
+  /// for 1:4 scaling factors (bits 11-15, up to 32 unique combinations of electrostatic and
   /// Lennard-Jones scaling factors, including zero to indicate that no 1:4 interaction should be
   /// computed).  The final bits (16-32) indiate the dihedral or CHARMM improper dihedral parameter
   /// index (up to 131072 of either, a number larger than nearly any force field, but the limit

@@ -6,9 +6,10 @@ namespace omni {
 namespace symbols {
 
 /// The number pi, to twenty decimal places (deeper than double precision)
-constexpr double pi = 3.14159265358979323846;
-constexpr double twopi = 6.28318530717958647692;
-constexpr double inverse_twopi = 0.159154943091895345608;
+constexpr double pi = 3.141592653589793115997963468544185161590576171875;
+constexpr double twopi = 2.0 * pi;
+constexpr double inverse_pi = 1.0 / pi;
+constexpr double inverse_twopi = 1.0 / twopi;
 
 /// The tetrahedral bond angle, in radians to twenty decimal places
 constexpr double tetrahedral_angle = 1.91063323624901859610;
