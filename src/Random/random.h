@@ -165,6 +165,9 @@ struct Xoshiro256ppGenerator {
 
   /// \brief Reveal the current state of the generator.
   ullint4 revealState() const;
+
+  /// \brief Reveal the random bit string.
+  ullint revealBitString() const;
   
 private:
   ullint4 state;  ///< 128-bit state vector for the generator

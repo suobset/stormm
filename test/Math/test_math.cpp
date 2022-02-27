@@ -16,6 +16,7 @@
 #include "../../src/UnitTesting/file_snapshot.h"
 
 using omni::ulint;
+using omni::ullint;
 using omni::double3;
 using omni::constants::tiny;
 using omni::card::Hybrid;
@@ -188,7 +189,46 @@ int main(int argc, char* argv[]) {
   check(xrs256pp_result, RelationalOperator::EQUAL, xrs256pp_jump_result, "Two xoroshiro256++ "
         "generators do not re-synchronize after different combinations of random bit string "
         "generation and a jump.");
-
+  Xoshiro256ppGenerator xrs256ppb({ 0x7743a154e17a5e9bLLU, 0x7823a1cd9453899bLLU,
+                                    0x976589eefbb1c7f5LLU, 0x702cf168260fa29eLLU });
+  const std::vector<ullint> orbit = { 0xd5c766557e6e16e4LLU, 0xf8eb8f8747a8cc67LLU,
+                                      0xfc18365710a653eeLLU, 0xc698a193593f232LLU,
+                                      0xa44ddeaac93b1be7LLU, 0x678dcd0e0516c741LLU,
+                                      0x351d94668d7c35eLLU,  0x73160e24fc8768daLLU,
+                                      0x562ca11220c31698LLU, 0x3dba336235c48913LLU };
+  std::vector<ullint> xrsb_result(orbit.size());
+  for (size_t i = 0; i < orbit.size(); i++) {
+    xrsb_result[i] = xrs256ppb.revealBitString();
+    xrs256ppb.uniformRandomNumber();
+  }
+  std::vector<int> xrsb_diff(orbit.size());
+  for (size_t i = 0; i < orbit.size(); i++) {
+    xrsb_diff[i] = xrsb_result[i] - orbit[i];
+  }
+  check(xrsb_diff, RelationalOperator::EQUAL, std::vector<ullint>(orbit.size(), 0LLU),
+        "The Xoshiro256++ random number generator did not produce the expected bit strings when "
+        "initialized with a specific state.");
+  Xoshiro256ppGenerator xrs256ppc({ 0x7743a154e17a5e9bLLU, 0x7823a1cd9453899bLLU,
+                                    0x976589eefbb1c7f5LLU, 0x702cf168260fa29eLLU });
+  xrs256ppc.jump();
+  const std::vector<ullint> orbit_ii = { 0x39c4396d8759c874LLU, 0x4b948d9de69752ecLLU,
+                                         0x871591604b03d9a6LLU, 0x444d6d471322d17bLLU,
+                                         0xb0a9eb9383bf0803LLU, 0x481f6c796c1d0ecaLLU,
+                                         0xb89a346b480341bfLLU, 0x1494bad1d1b19126LLU,
+                                         0xa2f5ca0a0ab0805LLU,  0x75a4de1da308cc8fLLU };
+  std::vector<ullint> xrsc_result(orbit_ii.size());
+  for (size_t i = 0; i < orbit_ii.size(); i++) {
+    xrsc_result[i] = xrs256ppc.revealBitString();
+    xrs256ppc.uniformRandomNumber();
+  }
+  std::vector<int> xrsc_diff(orbit.size());
+  for (size_t i = 0; i < orbit.size(); i++) {
+    xrsc_diff[i] = xrsc_result[i] - orbit_ii[i];
+  }
+  check(xrsc_diff, RelationalOperator::EQUAL, std::vector<ullint>(orbit_ii.size(), 0LLU),
+        "The Xoshiro256++ random number generator did not produce the expected bit strings after "
+        "traversing a jump.");
+  
   // Verify rounding results
   section(3);
   const size_t szt_a = 159283;

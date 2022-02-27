@@ -276,6 +276,12 @@ ullint4 Xoshiro256ppGenerator::revealState() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+ullint Xoshiro256ppGenerator::revealBitString() const {
+  const ullint sxsw = state.x + state.w;
+  return state.x + ((sxsw << 23) | (sxsw >> (64 - 23)));
+}
+
+//-------------------------------------------------------------------------------------------------
 ullint4 Xoshiro256ppGenerator::seed256(const int igseed) {
 
   // It is within the C and C++ standards to set an unsigned integer equal to a signed integer,
