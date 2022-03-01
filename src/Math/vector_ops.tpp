@@ -709,7 +709,7 @@ template <typename T> int findBin(const T* limits, const T value, const int leng
   }
   if (value >= limits[length]) {
     reportBinLimitError("right", value, policy);
-    length + 1;
+    return length + 1;
   }
   int lguess = 0;
   int hguess = length;

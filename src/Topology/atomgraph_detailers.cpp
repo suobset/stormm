@@ -22,6 +22,400 @@ using parse::TextOrigin;
 using parse::verifyNumberFormat;
 
 //-------------------------------------------------------------------------------------------------
+void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
+                                 const std::vector<int> &tmp_residue_limits,
+                                 const std::vector<int> &tmp_atom_struc_numbers,
+                                 const std::vector<int> &tmp_residue_numbers,
+                                 const std::vector<int> &tmp_molecule_limits,
+                                 const std::vector<int> &tmp_atomic_numbers,
+                                 const std::vector<int> &tmp_molecule_membership,
+                                 const std::vector<int> &tmp_mobile_atoms,
+                                 const std::vector<int> &tmp_molecule_contents,
+                                 const std::vector<int> &tmp_cmap_surf_dims,
+                                 const std::vector<int> &tmp_cmap_surf_bounds,
+                                 const std::vector<int> &tmp_charge_indices,
+                                 const std::vector<int> &tmp_lennard_jones_indices,
+                                 const std::vector<int> &tmp_inferred_14_i_atoms,
+                                 const std::vector<int> &tmp_inferred_14_j_atoms,
+                                 const std::vector<int> &tmp_inferred_14_param_idx,
+                                 const std::vector<int> &tmp_neck_gb_indices,
+                                 const std::vector<int> &tmp_tree_joining_info,
+                                 const std::vector<int> &tmp_last_rotator_info,
+                                 const std::vector<double> &tmp_charges,
+                                 const std::vector<double> &tmp_masses,
+                                 const std::vector<double> &tmp_ub_stiffnesses,
+                                 const std::vector<double> &tmp_ub_equilibria,
+                                 const std::vector<double> &tmp_charmm_impr_stiffnesses,
+                                 const std::vector<double> &tmp_charmm_impr_phase_angles,
+                                 const std::vector<double> &tmp_cmap_surfaces,
+                                 const std::vector<double> &tmp_bond_stiffnesses,
+                                 const std::vector<double> &tmp_bond_equilibria,
+                                 const std::vector<double> &tmp_angl_stiffnesses,
+                                 const std::vector<double> &tmp_angl_equilibria,
+                                 const std::vector<double> &tmp_dihe_amplitudes,
+                                 const std::vector<double> &tmp_dihe_periodicities,
+                                 const std::vector<double> &tmp_dihe_phase_angles,
+                                 const std::vector<double> &tmp_charge_parameters,
+                                 const std::vector<double> &tmp_lj_a_values,
+                                 const std::vector<double> &tmp_lj_b_values,
+                                 const std::vector<double> &tmp_lj_c_values,
+                                 const std::vector<double> &tmp_lj_14_a_values,
+                                 const std::vector<double> &tmp_lj_14_b_values,
+                                 const std::vector<double> &tmp_lj_14_c_values,
+                                 const std::vector<double> &tmp_atomic_pb_radii,
+                                 const std::vector<double> &tmp_gb_screening_factors,
+                                 const std::vector<double> &tmp_gb_coef,
+                                 const std::vector<double> &tmp_solty_info,
+                                 const std::vector<double> &tmp_hbond_a_values,
+                                 const std::vector<double> &tmp_hbond_b_values,
+                                 const std::vector<double> &tmp_hbond_cutoffs,
+                                 const std::vector<char4> &tmp_atom_names,
+                                 const std::vector<char4> &tmp_atom_types,
+                                 const std::vector<char4> &tmp_residue_names,
+                                 const std::vector<char4> &tmp_tree_symbols,
+                                 const CmapAccessories &cmap_table,
+                                 const CondensedExclusions &cond_excl,
+                                 const BasicValenceTable &basic_vtable,
+                                 const CharmmValenceTable &charmm_vtable,
+                                 const AttenuationParameterSet &attn_parm,
+                                 const VirtualSiteTable &vsite_table,
+                                 const Map1234 &all_nb_excl) {
+
+  // Allocate the Hybrid ARRAY-kind objects based on the compiled data
+  size_t int_items = roundUp<int>(tmp_desc.size(), warp_size_int) +
+                     roundUp(residue_count + 1, warp_size_int) +
+                     roundUp(molecule_count + 1, warp_size_int) +
+                     roundUp(tmp_mobile_atoms.size(), warp_size_zu) +
+                     13 * roundUp(atom_count, warp_size_int) +
+                     10 * roundUp(atom_count + 1, warp_size_int) +
+                      7 * roundUp(urey_bradley_term_count, warp_size_int) +
+                     10 * roundUp(charmm_impr_term_count, warp_size_int) +
+                     12 * roundUp(cmap_term_count, warp_size_int) +
+                     roundUp(cmap_surface_count, warp_size_int) +
+                      2 * roundUp(cmap_surface_count + 1, warp_size_int) +
+                      6 * roundUp(bond_term_count, warp_size_int) +
+                      8 * roundUp(angl_term_count, warp_size_int) +
+                     11 * roundUp(dihe_term_count, warp_size_int) +
+                      6 * roundUp(virtual_site_count, warp_size_int) +
+                     roundUp(total_exclusions, warp_size_int) +
+                      3 * roundUp(inferred_14_attenuations, warp_size_int) +
+                     roundUp<int>(all_nb_excl.nb11_excl_list.size(), warp_size_int) +
+                     roundUp<int>(all_nb_excl.nb12_excl_list.size(), warp_size_int) +
+                     roundUp<int>(all_nb_excl.nb13_excl_list.size(), warp_size_int) +
+                     roundUp<int>(all_nb_excl.nb14_excl_list.size(), warp_size_int);
+  size_t double_items =  9 * roundUp(atom_count, warp_size_int) +
+                         2 * roundUp(urey_bradley_parameter_count, warp_size_int) +
+                         2 * roundUp(charmm_impr_parameter_count, warp_size_int) +
+                        20 * roundUp<int>(tmp_cmap_surfaces.size(), warp_size_int) +
+                         2 * roundUp(bond_parameter_count, warp_size_int) +
+                         2 * roundUp(angl_parameter_count, warp_size_int) +
+                         3 * roundUp(dihe_parameter_count, warp_size_int) +
+                         3 * roundUp(virtual_site_count, warp_size_int) +
+                         8 * roundUp(atom_type_count * atom_type_count, warp_size_int) +
+                         2 * roundUp(atom_type_count, warp_size_int) +
+                         roundUp(charge_type_count,  warp_size_int) +
+                         2 * roundUp(attenuated_14_type_count, warp_size_int) ;
+  size_t float_items = double_items;
+  size_t char4_items = 4 * roundUp(atom_count, warp_size_int) +
+                       roundUp(residue_count, warp_size_int) +
+                       2 * roundUp(bond_term_count, warp_size_int) +
+                       2 * roundUp(angl_term_count, warp_size_int) +
+                       2 * roundUp(dihe_term_count, warp_size_int);
+  int_data.resize(int_items);
+  double_data.resize(double_items);
+  float_data.resize(float_items);
+  char4_data.resize(char4_items);
+
+  // Lay out Hybrid POINTER-kind int objects based on the compiled data.  The putHost member
+  // function of the Hybrid class has an overloaded version that sets a POINTER-kind object to its
+  // target and then fills the object, thus populating the appropriate segment of the target.
+  size_t ic = descriptors.putHost(&int_data, tmp_desc, 0, warp_size_zu);
+  ic = residue_limits.putHost(&int_data, tmp_residue_limits, ic, warp_size_zu);
+  ic = atom_struc_numbers.putHost(&int_data, tmp_atom_struc_numbers, ic, warp_size_zu);
+  ic = residue_numbers.putHost(&int_data, tmp_residue_numbers, ic, warp_size_zu);
+  ic = molecule_limits.putHost(&int_data, tmp_molecule_limits, ic, warp_size_zu);
+  ic = atomic_numbers.putHost(&int_data, tmp_atomic_numbers, ic, warp_size_zu);
+  ic = molecule_membership.putHost(&int_data, tmp_molecule_membership, ic, warp_size_zu);
+  ic = mobile_atoms.putHost(&int_data, tmp_mobile_atoms, ic, warp_size_zu);
+  ic = molecule_contents.putHost(&int_data, tmp_molecule_contents, ic, warp_size_zu);
+  ic = urey_bradley_i_atoms.putHost(&int_data, charmm_vtable.ub_i_atoms, ic, warp_size_zu);
+  ic = urey_bradley_k_atoms.putHost(&int_data, charmm_vtable.ub_k_atoms, ic, warp_size_zu);
+  ic = urey_bradley_parameter_indices.putHost(&int_data, charmm_vtable.ub_param_idx, ic,
+                                              warp_size_zu);
+  ic = urey_bradley_assigned_atoms.putHost(&int_data, charmm_vtable.ub_assigned_atoms, ic,
+                                           warp_size_zu);
+  ic = urey_bradley_assigned_index.putHost(&int_data, charmm_vtable.ub_assigned_index, ic,
+                                           warp_size_zu);
+  ic = urey_bradley_assigned_terms.putHost(&int_data, charmm_vtable.ub_assigned_terms, ic,
+                                           warp_size_zu);
+  ic = urey_bradley_assigned_bounds.putHost(&int_data, charmm_vtable.ub_assigned_bounds, ic,
+                                            warp_size_zu);
+  ic = charmm_impr_i_atoms.putHost(&int_data, charmm_vtable.impr_i_atoms, ic, warp_size_zu);
+  ic = charmm_impr_j_atoms.putHost(&int_data, charmm_vtable.impr_j_atoms, ic, warp_size_zu);
+  ic = charmm_impr_k_atoms.putHost(&int_data, charmm_vtable.impr_k_atoms, ic, warp_size_zu);
+  ic = charmm_impr_l_atoms.putHost(&int_data, charmm_vtable.impr_l_atoms, ic, warp_size_zu);
+  ic = charmm_impr_parameter_indices.putHost(&int_data, charmm_vtable.impr_param_idx, ic,
+                                             warp_size_zu);
+  ic = charmm_impr_assigned_atoms.putHost(&int_data, charmm_vtable.impr_assigned_atoms, ic,
+                                          warp_size_zu);
+  ic = charmm_impr_assigned_index.putHost(&int_data, charmm_vtable.impr_assigned_index, ic,
+                                          warp_size_zu);
+  ic = charmm_impr_assigned_terms.putHost(&int_data, charmm_vtable.impr_assigned_terms, ic,
+                                          warp_size_zu);
+  ic = charmm_impr_assigned_bounds.putHost(&int_data, charmm_vtable.impr_assigned_bounds, ic,
+                                           warp_size_zu);
+  ic = cmap_i_atoms.putHost(&int_data, charmm_vtable.cmap_i_atoms, ic, warp_size_zu);
+  ic = cmap_j_atoms.putHost(&int_data, charmm_vtable.cmap_j_atoms, ic, warp_size_zu);
+  ic = cmap_k_atoms.putHost(&int_data, charmm_vtable.cmap_k_atoms, ic, warp_size_zu);
+  ic = cmap_l_atoms.putHost(&int_data, charmm_vtable.cmap_l_atoms, ic, warp_size_zu);
+  ic = cmap_m_atoms.putHost(&int_data, charmm_vtable.cmap_m_atoms, ic, warp_size_zu);
+  ic = cmap_surface_dimensions.putHost(&int_data, tmp_cmap_surf_dims, ic, warp_size_zu);
+  ic = cmap_surface_bounds.putHost(&int_data, tmp_cmap_surf_bounds, ic, warp_size_zu);
+  ic = cmap_patch_bounds.putHost(&int_data, cmap_table.patch_matrix_bounds, ic, warp_size_zu);
+  ic = cmap_surface_indices.putHost(&int_data, charmm_vtable.cmap_param_idx, ic, warp_size_zu);
+  ic = cmap_assigned_atoms.putHost(&int_data, charmm_vtable.cmap_assigned_atoms, ic, warp_size_zu);
+  ic = cmap_assigned_index.putHost(&int_data, charmm_vtable.cmap_assigned_index, ic, warp_size_zu);
+  ic = cmap_assigned_terms.putHost(&int_data, charmm_vtable.cmap_assigned_terms, ic, warp_size_zu);
+  ic = cmap_assigned_bounds.putHost(&int_data, charmm_vtable.cmap_assigned_bounds, ic,
+                                    warp_size_zu);
+  ic = bond_i_atoms.putHost(&int_data, basic_vtable.bond_i_atoms, ic, warp_size_zu);
+  ic = bond_j_atoms.putHost(&int_data, basic_vtable.bond_j_atoms, ic, warp_size_zu);
+  ic = bond_parameter_indices.putHost(&int_data, basic_vtable.bond_param_idx, ic, warp_size_zu);
+  ic = bond_assigned_atoms.putHost(&int_data, basic_vtable.bond_assigned_atoms, ic, warp_size_zu);
+  ic = bond_assigned_index.putHost(&int_data, basic_vtable.bond_assigned_index, ic, warp_size_zu);
+  ic = bond_assigned_terms.putHost(&int_data, basic_vtable.bond_assigned_terms, ic, warp_size_zu);
+  ic = bond_assigned_bounds.putHost(&int_data, basic_vtable.bond_assigned_bounds, ic,
+                                    warp_size_zu);
+  ic = angl_i_atoms.putHost(&int_data, basic_vtable.angl_i_atoms, ic, warp_size_zu);
+  ic = angl_j_atoms.putHost(&int_data, basic_vtable.angl_j_atoms, ic, warp_size_zu);
+  ic = angl_k_atoms.putHost(&int_data, basic_vtable.angl_k_atoms, ic, warp_size_zu);
+  ic = angl_parameter_indices.putHost(&int_data, basic_vtable.angl_param_idx, ic, warp_size_zu);
+  ic = angl_assigned_atoms.putHost(&int_data, basic_vtable.angl_assigned_atoms, ic, warp_size_zu);
+  ic = angl_assigned_index.putHost(&int_data, basic_vtable.angl_assigned_index, ic, warp_size_zu);
+  ic = angl_assigned_terms.putHost(&int_data, basic_vtable.angl_assigned_terms, ic, warp_size_zu);
+  ic = angl_assigned_bounds.putHost(&int_data, basic_vtable.angl_assigned_bounds, ic,
+                                    warp_size_zu);
+  ic = dihe_i_atoms.putHost(&int_data, basic_vtable.dihe_i_atoms, ic, warp_size_zu);
+  ic = dihe_j_atoms.putHost(&int_data, basic_vtable.dihe_j_atoms, ic, warp_size_zu);
+  ic = dihe_k_atoms.putHost(&int_data, basic_vtable.dihe_k_atoms, ic, warp_size_zu);
+  ic = dihe_l_atoms.putHost(&int_data, basic_vtable.dihe_l_atoms, ic, warp_size_zu);
+  ic = dihe_parameter_indices.putHost(&int_data, basic_vtable.dihe_param_idx, ic, warp_size_zu);
+  ic = dihe14_parameter_indices.putHost(&int_data, attn_parm.dihe14_parameter_indices, ic,
+                                        warp_size_zu);
+  ic = dihe_assigned_atoms.putHost(&int_data, basic_vtable.dihe_assigned_atoms, ic, warp_size_zu);
+  ic = dihe_assigned_index.putHost(&int_data, basic_vtable.dihe_assigned_index, ic, warp_size_zu);
+  ic = dihe_assigned_terms.putHost(&int_data, basic_vtable.dihe_assigned_terms, ic, warp_size_zu);
+  ic = dihe_assigned_bounds.putHost(&int_data, basic_vtable.dihe_assigned_bounds, ic,
+                                    warp_size_zu);
+  ic = virtual_site_atoms.putHost(&int_data, vsite_table.vs_atoms, ic, warp_size_zu);
+  ic = virtual_site_frame_types.putHost(&int_data, vsite_table.frame_types, ic, warp_size_zu);
+  ic = virtual_site_frame1_atoms.putHost(&int_data, vsite_table.frame1_atoms, ic, warp_size_zu);
+  ic = virtual_site_frame2_atoms.putHost(&int_data, vsite_table.frame2_atoms, ic, warp_size_zu);
+  ic = virtual_site_frame3_atoms.putHost(&int_data, vsite_table.frame3_atoms, ic, warp_size_zu);
+  ic = virtual_site_frame4_atoms.putHost(&int_data, vsite_table.frame4_atoms, ic, warp_size_zu);
+  ic = charge_indices.putHost(&int_data, tmp_charge_indices, ic, warp_size_zu);
+  ic = lennard_jones_indices.putHost(&int_data, tmp_lennard_jones_indices, ic, warp_size_zu);
+  ic = atom_exclusion_bounds.putHost(&int_data, cond_excl.atom_excl_bounds, ic, warp_size_zu);
+  ic = atom_exclusion_list.putHost(&int_data, cond_excl.atom_excl_list, ic, warp_size_zu);
+  ic = nb11_exclusion_bounds.putHost(&int_data, all_nb_excl.nb11_excl_bounds, ic, warp_size_zu);
+  ic = nb11_exclusion_list.putHost(&int_data, all_nb_excl.nb11_excl_list, ic, warp_size_zu);
+  ic = nb12_exclusion_bounds.putHost(&int_data, all_nb_excl.nb12_excl_bounds, ic, warp_size_zu);
+  ic = nb12_exclusion_list.putHost(&int_data, all_nb_excl.nb12_excl_list, ic, warp_size_zu);
+  ic = nb13_exclusion_bounds.putHost(&int_data, all_nb_excl.nb13_excl_bounds, ic, warp_size_zu);
+  ic = nb13_exclusion_list.putHost(&int_data, all_nb_excl.nb13_excl_list, ic, warp_size_zu);
+  ic = nb14_exclusion_bounds.putHost(&int_data, all_nb_excl.nb14_excl_bounds, ic, warp_size_zu);
+  ic = nb14_exclusion_list.putHost(&int_data, all_nb_excl.nb14_excl_list, ic, warp_size_zu);
+  ic = infr14_i_atoms.putHost(&int_data, tmp_inferred_14_i_atoms, ic, warp_size_zu);
+  ic = infr14_j_atoms.putHost(&int_data, tmp_inferred_14_j_atoms, ic, warp_size_zu);
+  ic = infr14_parameter_indices.putHost(&int_data, tmp_inferred_14_param_idx, ic, warp_size_zu);
+  ic = neck_gb_indices.putHost(&int_data, tmp_neck_gb_indices, ic, warp_size_zu);
+  ic = tree_joining_info.putHost(&int_data, tmp_tree_joining_info, ic, warp_size_zu);
+  ic = last_rotator_info.putHost(&int_data, tmp_last_rotator_info, ic, warp_size_zu);
+
+  // Do the same for double Hybrid POINTER-kind objects
+  size_t dc = atomic_charges.putHost(&double_data, tmp_charges, 0, warp_size_zu);
+  dc = atomic_masses.putHost(&double_data, tmp_masses, dc, warp_size_zu);
+  std::vector<double> inv_mass(atom_count, 0.0);
+  for (int i = 0; i < atom_count; i++) {
+    inv_mass[i] = (tmp_masses[i] > constants::tiny) ? 1.0 / tmp_masses[i] : 0.0;
+  }
+  dc = inverse_atomic_masses.putHost(&double_data, inv_mass, dc, warp_size_zu);
+  dc = urey_bradley_stiffnesses.putHost(&double_data, tmp_ub_stiffnesses, dc, warp_size_zu);
+  dc = urey_bradley_equilibria.putHost(&double_data, tmp_ub_equilibria, dc, warp_size_zu);
+  dc = charmm_impr_stiffnesses.putHost(&double_data, tmp_charmm_impr_stiffnesses, dc,
+                                       warp_size_zu);
+  dc = charmm_impr_phase_angles.putHost(&double_data, tmp_charmm_impr_phase_angles, dc,
+                                        warp_size_zu);
+  dc = cmap_surfaces.putHost(&double_data, tmp_cmap_surfaces, dc, warp_size_zu);
+  dc = cmap_phi_derivatives.putHost(&double_data, cmap_table.phi_derivatives, dc, warp_size_zu);
+  dc = cmap_psi_derivatives.putHost(&double_data, cmap_table.psi_derivatives, dc, warp_size_zu);
+  dc = cmap_phi_psi_derivatives.putHost(&double_data, cmap_table.phi_psi_derivatives, dc,
+                                        warp_size_zu);
+  dc = cmap_patches.putHost(&double_data, cmap_table.patch_matrix_form, dc, warp_size_zu);
+  dc = bond_stiffnesses.putHost(&double_data, tmp_bond_stiffnesses, dc, warp_size_zu);
+  dc = bond_equilibria.putHost(&double_data, tmp_bond_equilibria, dc, warp_size_zu);
+  dc = angl_stiffnesses.putHost(&double_data, tmp_angl_stiffnesses, dc, warp_size_zu);
+  dc = angl_equilibria.putHost(&double_data, tmp_angl_equilibria, dc, warp_size_zu);
+  dc = dihe_amplitudes.putHost(&double_data, tmp_dihe_amplitudes, dc, warp_size_zu);
+  dc = dihe_periodicities.putHost(&double_data, tmp_dihe_periodicities, dc, warp_size_zu);
+  dc = dihe_phase_angles.putHost(&double_data, tmp_dihe_phase_angles, dc, warp_size_zu);
+  dc = virtual_site_frame_dim1.putHost(&double_data, vsite_table.frame_dim1, dc, warp_size_zu);
+  dc = virtual_site_frame_dim2.putHost(&double_data, vsite_table.frame_dim2, dc, warp_size_zu);
+  dc = virtual_site_frame_dim3.putHost(&double_data, vsite_table.frame_dim3, dc, warp_size_zu);
+  dc = charge_parameters.putHost(&double_data, tmp_charge_parameters, dc, warp_size_zu);
+  dc = lj_a_values.putHost(&double_data, tmp_lj_a_values, dc, warp_size_zu);
+  dc = lj_b_values.putHost(&double_data, tmp_lj_b_values, dc, warp_size_zu);
+  dc = lj_c_values.putHost(&double_data, tmp_lj_c_values, dc, warp_size_zu);
+  dc = lj_14_a_values.putHost(&double_data, tmp_lj_14_a_values, dc, warp_size_zu);
+  dc = lj_14_b_values.putHost(&double_data, tmp_lj_14_b_values, dc, warp_size_zu);
+  dc = lj_14_c_values.putHost(&double_data, tmp_lj_14_c_values, dc, warp_size_zu);
+  dc = lj_type_corrections.putHost(&double_data, std::vector<double>(atom_type_count, 0.0), dc,
+                                   warp_size_zu);
+  dc = attn14_elec_factors.putHost(&double_data, attn_parm.elec_screening_factors, dc,
+                                   warp_size_zu);
+  dc = attn14_vdw_factors.putHost(&double_data, attn_parm.vdw_screening_factors, dc, warp_size_zu);
+  dc = atomic_pb_radii.putHost(&double_data, tmp_atomic_pb_radii, dc, warp_size_zu);
+  dc = gb_screening_factors.putHost(&double_data, tmp_gb_screening_factors, dc, warp_size_zu);
+  dc = gb_alpha_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
+  dc = gb_beta_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
+  dc = gb_gamma_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
+  dc = solty_info.putHost(&double_data, tmp_solty_info, dc, warp_size_zu);
+  dc = hbond_a_values.putHost(&double_data, tmp_hbond_a_values, dc, warp_size_zu);
+  dc = hbond_b_values.putHost(&double_data, tmp_hbond_b_values, dc, warp_size_zu);
+  dc = hbond_cutoffs.putHost(&double_data, tmp_hbond_cutoffs, dc, warp_size_zu);
+
+  // Do the same for float Hybrid POINTER-kind objects, using the range constructor to make
+  // single-precision vectors out of their dobule-precision counterparts before loading the
+  // Hybrid objects.
+  const std::vector<float>sp_tmp_charges(tmp_charges.begin(), tmp_charges.end());
+  size_t fc = sp_atomic_charges.putHost(&float_data, sp_tmp_charges, 0, warp_size_zu);
+  const std::vector<float>sp_tmp_masses(tmp_masses.begin(), tmp_masses.end());
+  fc = sp_atomic_masses.putHost(&float_data, sp_tmp_masses, fc, warp_size_zu);
+  std::vector<float> sp_inv_mass(atom_count, 0.0);
+  for (int i = 0; i < atom_count; i++) {
+    sp_inv_mass[i] = (tmp_masses[i] > constants::tiny) ? 1.0 / tmp_masses[i] : 0.0;
+  }
+  fc = sp_inverse_atomic_masses.putHost(&float_data, sp_inv_mass, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_ub_stiffnesses(tmp_ub_stiffnesses.begin(),
+                                                 tmp_ub_stiffnesses.end());
+  fc = sp_urey_bradley_stiffnesses.putHost(&float_data, sp_tmp_ub_stiffnesses, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_ub_equilibria(tmp_ub_equilibria.begin(),
+                                                tmp_ub_equilibria.end());
+  fc = sp_urey_bradley_equilibria.putHost(&float_data, sp_tmp_ub_equilibria, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_charmm_impr_stiffnesses(tmp_charmm_impr_stiffnesses.begin(),
+                                                          tmp_charmm_impr_stiffnesses.end());
+  fc = sp_charmm_impr_stiffnesses.putHost(&float_data, sp_tmp_charmm_impr_stiffnesses, fc,
+                                          warp_size_zu);
+  const std::vector<float> sp_tmp_charmm_impr_phase_angles(tmp_charmm_impr_phase_angles.begin(),
+                                                           tmp_charmm_impr_phase_angles.end());
+  fc = sp_charmm_impr_phase_angles.putHost(&float_data, sp_tmp_charmm_impr_phase_angles, fc,
+                                           warp_size_zu);
+  const std::vector<float> sp_tmp_cmap_surfaces(tmp_cmap_surfaces.begin(),
+                                                tmp_cmap_surfaces.end());
+  fc = sp_cmap_surfaces.putHost(&float_data, sp_tmp_cmap_surfaces, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_cmap_dphi(cmap_table.phi_derivatives.begin(),
+                                            cmap_table.phi_derivatives.end());
+  fc = sp_cmap_phi_derivatives.putHost(&float_data, sp_tmp_cmap_dphi, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_cmap_dpsi(cmap_table.psi_derivatives.begin(),
+                                            cmap_table.psi_derivatives.end());
+  fc = sp_cmap_psi_derivatives.putHost(&float_data, sp_tmp_cmap_dpsi, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_cmap_dphipsi(cmap_table.phi_psi_derivatives.begin(),
+                                               cmap_table.phi_psi_derivatives.end());
+  fc = sp_cmap_phi_psi_derivatives.putHost(&float_data, sp_tmp_cmap_dphipsi, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_cmap_patches(cmap_table.patch_matrix_form.begin(),
+                                               cmap_table.patch_matrix_form.end());
+  fc = sp_cmap_patches.putHost(&float_data, sp_tmp_cmap_patches, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_bond_stiffnesses(tmp_bond_stiffnesses.begin(),
+                                                   tmp_bond_stiffnesses.end());
+  fc = sp_bond_stiffnesses.putHost(&float_data, sp_tmp_bond_stiffnesses, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_bond_equilibria(tmp_bond_equilibria.begin(),
+                                                  tmp_bond_equilibria.end());
+  fc = sp_bond_equilibria.putHost(&float_data, sp_tmp_bond_equilibria, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_angl_stiffnesses(tmp_angl_stiffnesses.begin(),
+                                                   tmp_angl_stiffnesses.end());
+  fc = sp_angl_stiffnesses.putHost(&float_data, sp_tmp_angl_stiffnesses, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_angl_equilibria(tmp_angl_equilibria.begin(),
+                                                  tmp_angl_equilibria.end());
+  fc = sp_angl_equilibria.putHost(&float_data, sp_tmp_angl_equilibria, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_dihe_amplitudes(tmp_dihe_amplitudes.begin(),
+                                                  tmp_dihe_amplitudes.end());
+  fc = sp_dihe_amplitudes.putHost(&float_data, sp_tmp_dihe_amplitudes, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_dihe_periodicities(tmp_dihe_periodicities.begin(),
+                                                     tmp_dihe_periodicities.end());
+  fc = sp_dihe_periodicities.putHost(&float_data, sp_tmp_dihe_periodicities, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_dihe_phase_angles(tmp_dihe_phase_angles.begin(),
+                                                    tmp_dihe_phase_angles.end());
+  fc = sp_dihe_phase_angles.putHost(&float_data, sp_tmp_dihe_phase_angles, fc, warp_size_zu);
+  const std::vector<float> sp_frame_dim1(vsite_table.frame_dim1.begin(),
+                                         vsite_table.frame_dim1.end());
+  fc = sp_virtual_site_frame_dim1.putHost(&float_data, sp_frame_dim1, fc, warp_size_zu);
+  const std::vector<float> sp_frame_dim2(vsite_table.frame_dim2.begin(),
+                                         vsite_table.frame_dim2.end());
+  fc = sp_virtual_site_frame_dim2.putHost(&float_data, sp_frame_dim2, fc, warp_size_zu);
+  const std::vector<float> sp_frame_dim3(vsite_table.frame_dim3.begin(),
+                                         vsite_table.frame_dim3.end());
+  fc = sp_virtual_site_frame_dim3.putHost(&float_data, sp_frame_dim3, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_charge_parameters(tmp_charge_parameters.begin(),
+                                                    tmp_charge_parameters.end());
+  fc = sp_charge_parameters.putHost(&float_data, sp_tmp_charge_parameters, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_lj_a_values(tmp_lj_a_values.begin(), tmp_lj_a_values.end());
+  fc = sp_lj_a_values.putHost(&float_data, sp_tmp_lj_a_values, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_lj_b_values(tmp_lj_b_values.begin(), tmp_lj_b_values.end());
+  fc = sp_lj_b_values.putHost(&float_data, sp_tmp_lj_b_values, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_lj_c_values(tmp_lj_c_values.begin(), tmp_lj_c_values.end());
+  fc = sp_lj_c_values.putHost(&float_data, sp_tmp_lj_c_values, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_lj_14_a_values(tmp_lj_14_a_values.begin(),
+                                                 tmp_lj_14_a_values.end());
+  fc = sp_lj_14_a_values.putHost(&float_data, sp_tmp_lj_14_a_values, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_lj_14_b_values(tmp_lj_14_b_values.begin(),
+                                                 tmp_lj_14_b_values.end());
+  fc = sp_lj_14_b_values.putHost(&float_data, sp_tmp_lj_14_b_values, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_lj_14_c_values(tmp_lj_14_c_values.begin(),
+                                                 tmp_lj_14_c_values.end());
+  fc = sp_lj_14_c_values.putHost(&float_data, sp_tmp_lj_14_c_values, fc, warp_size_zu);
+  fc = sp_lj_type_corrections.putHost(&float_data, std::vector<float>(atom_type_count, 0.0), fc,
+                                      warp_size_zu);
+  const std::vector<float> sp_tmp_elec_screening_factors(attn_parm.elec_screening_factors.begin(),
+                                                         attn_parm.elec_screening_factors.end());
+  fc = sp_attn14_elec_factors.putHost(&float_data, sp_tmp_elec_screening_factors, fc,
+                                      warp_size_zu);
+  const std::vector<float> sp_tmp_vdw_screening_factors(attn_parm.vdw_screening_factors.begin(),
+                                                        attn_parm.vdw_screening_factors.end());
+  fc = sp_attn14_vdw_factors.putHost(&float_data, sp_tmp_vdw_screening_factors, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_atomic_pb_radii(tmp_atomic_pb_radii.begin(),
+                                                  tmp_atomic_pb_radii.end());
+  fc = sp_atomic_pb_radii.putHost(&float_data, sp_tmp_atomic_pb_radii, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_gb_screening_factors(tmp_gb_screening_factors.begin(),
+                                                       tmp_gb_screening_factors.end());
+  fc = sp_gb_screening_factors.putHost(&float_data, sp_tmp_gb_screening_factors, fc, warp_size_zu);
+  const std::vector<float> sp_tmp_gb_coef(tmp_gb_coef.begin(), tmp_gb_coef.end());
+  fc = sp_gb_alpha_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
+  fc = sp_gb_beta_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
+  fc = sp_gb_gamma_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
+
+  // Do the same for char4 Hybrid POINTER-kind objects
+  size_t c4c = atom_names.putHost(&char4_data, tmp_atom_names, 0, warp_size_zu);
+  c4c = atom_types.putHost(&char4_data, tmp_atom_types, c4c, warp_size_zu);
+  c4c = residue_names.putHost(&char4_data, tmp_residue_names, c4c, warp_size_zu);
+  c4c = bond_modifiers.putHost(&char4_data, basic_vtable.bond_mods, c4c, warp_size_zu);
+  c4c = angl_modifiers.putHost(&char4_data, basic_vtable.angl_mods, c4c, warp_size_zu);
+  c4c = dihe_modifiers.putHost(&char4_data, basic_vtable.dihe_mods, c4c, warp_size_zu);
+  c4c = bond_assigned_mods.putHost(&char4_data, basic_vtable.bond_assigned_mods, c4c,
+                                   warp_size_zu);
+  c4c = angl_assigned_mods.putHost(&char4_data, basic_vtable.angl_assigned_mods, c4c,
+                                   warp_size_zu);
+  c4c = dihe_assigned_mods.putHost(&char4_data, basic_vtable.dihe_assigned_mods, c4c,
+                                   warp_size_zu);
+  c4c = tree_symbols.putHost(&char4_data, tmp_tree_symbols, c4c, warp_size_zu);
+  
+  // The Amber topology read here does not contain overflow names of any sort
+  const std::vector<char4> blank_overflow;
+  c4c = atom_overflow_names.putHost(&char4_data, blank_overflow, c4c, warp_size_zu);
+  c4c = atom_overflow_types.putHost(&char4_data, blank_overflow, c4c, warp_size_zu);
+  c4c = residue_overflow_names.putHost(&char4_data, blank_overflow, c4c, warp_size_zu);
+}
+  
+//-------------------------------------------------------------------------------------------------
 void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionResponse policy,
                                 const double coulomb_constant_in,
                                 const double default_elec14_screening,
@@ -707,337 +1101,24 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   const int mobile_atom_mask_size = roundUp<int>(atom_count / (sizeof(int) * 8), warp_size_int);
   const std::vector<int> tmp_mobile_atoms(mobile_atom_mask_size, -1);
 
-  // Allocate the Hybrid ARRAY-kind objects based on the compiled data
-  size_t int_items = roundUp<int>(tmp_desc.size(), warp_size_int) +
-                     roundUp(residue_count + 1, warp_size_int) +
-                     roundUp(molecule_count + 1, warp_size_int) + mobile_atom_mask_size +
-                     13 * roundUp(atom_count, warp_size_int) +
-                     10 * roundUp(atom_count + 1, warp_size_int) +
-                      7 * roundUp(urey_bradley_term_count, warp_size_int) +
-                     10 * roundUp(charmm_impr_term_count, warp_size_int) +
-                     12 * roundUp(cmap_term_count, warp_size_int) +
-                     roundUp(cmap_surface_count, warp_size_int) +
-                      2 * roundUp(cmap_surface_count + 1, warp_size_int) +
-                      6 * roundUp(bond_term_count, warp_size_int) +
-                      8 * roundUp(angl_term_count, warp_size_int) +
-                     11 * roundUp(dihe_term_count, warp_size_int) +
-                      6 * roundUp(virtual_site_count, warp_size_int) +
-                     roundUp(total_exclusions, warp_size_int) +
-                      3 * roundUp(inferred_14_attenuations, warp_size_int) +
-                     roundUp<int>(all_nb_excl.nb11_excl_list.size(), warp_size_int) +
-                     roundUp<int>(all_nb_excl.nb12_excl_list.size(), warp_size_int) +
-                     roundUp<int>(all_nb_excl.nb13_excl_list.size(), warp_size_int) +
-                     roundUp<int>(all_nb_excl.nb14_excl_list.size(), warp_size_int);
-  size_t double_items =  9 * roundUp(atom_count, warp_size_int) +
-                         2 * roundUp(urey_bradley_parameter_count, warp_size_int) +
-                         2 * roundUp(charmm_impr_parameter_count, warp_size_int) +
-                        20 * roundUp<int>(tmp_cmap_surfaces.size(), warp_size_int) +
-                         2 * roundUp(bond_parameter_count, warp_size_int) +
-                         2 * roundUp(angl_parameter_count, warp_size_int) +
-                         3 * roundUp(dihe_parameter_count, warp_size_int) +
-                         3 * roundUp(virtual_site_count, warp_size_int) +
-                         8 * roundUp(atom_type_count * atom_type_count, warp_size_int) +
-                         2 * roundUp(atom_type_count, warp_size_int) +
-                         roundUp(charge_type_count,  warp_size_int) +
-                         2 * roundUp(attenuated_14_type_count, warp_size_int) ;
-  size_t float_items = double_items;
-  size_t char4_items = 4 * roundUp(atom_count, warp_size_int) +
-                       roundUp(residue_count, warp_size_int) +
-                       2 * roundUp(bond_term_count, warp_size_int) +
-                       2 * roundUp(angl_term_count, warp_size_int) +
-                       2 * roundUp(dihe_term_count, warp_size_int);
-  int_data.resize(int_items);
-  double_data.resize(double_items);
-  float_data.resize(float_items);
-  char4_data.resize(char4_items);
-
-  // Lay out Hybrid POINTER-kind int objects based on the compiled data.  The putHost member
-  // function of the Hybrid class has an overloaded version that sets a POINTER-kind object to its
-  // target and then fills the object, thus populating the appropriate segment of the target.
-  size_t ic = descriptors.putHost(&int_data, tmp_desc, 0, warp_size_zu);
-  ic = residue_limits.putHost(&int_data, tmp_residue_limits, ic, warp_size_zu);
-  ic = atom_struc_numbers.putHost(&int_data, tmp_atom_struc_numbers, ic, warp_size_zu);
-  ic = residue_numbers.putHost(&int_data, tmp_residue_numbers, ic, warp_size_zu);
-  ic = molecule_limits.putHost(&int_data, tmp_molecule_limits, ic, warp_size_zu);
-  ic = atomic_numbers.putHost(&int_data, tmp_atomic_numbers, ic, warp_size_zu);
-  ic = molecule_membership.putHost(&int_data, tmp_molecule_membership, ic, warp_size_zu);
-  ic = mobile_atoms.putHost(&int_data, tmp_mobile_atoms, ic, warp_size_zu);
-  ic = molecule_contents.putHost(&int_data, tmp_molecule_contents, ic, warp_size_zu);
-  ic = urey_bradley_i_atoms.putHost(&int_data, charmm_vtable.ub_i_atoms, ic, warp_size_zu);
-  ic = urey_bradley_k_atoms.putHost(&int_data, charmm_vtable.ub_k_atoms, ic, warp_size_zu);
-  ic = urey_bradley_parameter_indices.putHost(&int_data, charmm_vtable.ub_param_idx, ic,
-                                              warp_size_zu);
-  ic = urey_bradley_assigned_atoms.putHost(&int_data, charmm_vtable.ub_assigned_atoms, ic,
-                                           warp_size_zu);
-  ic = urey_bradley_assigned_index.putHost(&int_data, charmm_vtable.ub_assigned_index, ic,
-                                           warp_size_zu);
-  ic = urey_bradley_assigned_terms.putHost(&int_data, charmm_vtable.ub_assigned_terms, ic,
-                                           warp_size_zu);
-  ic = urey_bradley_assigned_bounds.putHost(&int_data, charmm_vtable.ub_assigned_bounds, ic,
-                                            warp_size_zu);
-  ic = charmm_impr_i_atoms.putHost(&int_data, charmm_vtable.impr_i_atoms, ic, warp_size_zu);
-  ic = charmm_impr_j_atoms.putHost(&int_data, charmm_vtable.impr_j_atoms, ic, warp_size_zu);
-  ic = charmm_impr_k_atoms.putHost(&int_data, charmm_vtable.impr_k_atoms, ic, warp_size_zu);
-  ic = charmm_impr_l_atoms.putHost(&int_data, charmm_vtable.impr_l_atoms, ic, warp_size_zu);
-  ic = charmm_impr_parameter_indices.putHost(&int_data, charmm_vtable.impr_param_idx, ic,
-                                             warp_size_zu);
-  ic = charmm_impr_assigned_atoms.putHost(&int_data, charmm_vtable.impr_assigned_atoms, ic,
-                                          warp_size_zu);
-  ic = charmm_impr_assigned_index.putHost(&int_data, charmm_vtable.impr_assigned_index, ic,
-                                          warp_size_zu);
-  ic = charmm_impr_assigned_terms.putHost(&int_data, charmm_vtable.impr_assigned_terms, ic,
-                                          warp_size_zu);
-  ic = charmm_impr_assigned_bounds.putHost(&int_data, charmm_vtable.impr_assigned_bounds, ic,
-                                           warp_size_zu);
-  ic = cmap_i_atoms.putHost(&int_data, charmm_vtable.cmap_i_atoms, ic, warp_size_zu);
-  ic = cmap_j_atoms.putHost(&int_data, charmm_vtable.cmap_j_atoms, ic, warp_size_zu);
-  ic = cmap_k_atoms.putHost(&int_data, charmm_vtable.cmap_k_atoms, ic, warp_size_zu);
-  ic = cmap_l_atoms.putHost(&int_data, charmm_vtable.cmap_l_atoms, ic, warp_size_zu);
-  ic = cmap_m_atoms.putHost(&int_data, charmm_vtable.cmap_m_atoms, ic, warp_size_zu);
-  ic = cmap_surface_dimensions.putHost(&int_data, tmp_cmap_surf_dims, ic, warp_size_zu);
-  ic = cmap_surface_bounds.putHost(&int_data, tmp_cmap_surf_bounds, ic, warp_size_zu);
-  ic = cmap_patch_bounds.putHost(&int_data, cmap_table.patch_matrix_bounds, ic, warp_size_zu);
-  ic = cmap_surface_indices.putHost(&int_data, charmm_vtable.cmap_param_idx, ic, warp_size_zu);
-  ic = cmap_assigned_atoms.putHost(&int_data, charmm_vtable.cmap_assigned_atoms, ic, warp_size_zu);
-  ic = cmap_assigned_index.putHost(&int_data, charmm_vtable.cmap_assigned_index, ic, warp_size_zu);
-  ic = cmap_assigned_terms.putHost(&int_data, charmm_vtable.cmap_assigned_terms, ic, warp_size_zu);
-  ic = cmap_assigned_bounds.putHost(&int_data, charmm_vtable.cmap_assigned_bounds, ic,
-                                    warp_size_zu);
-  ic = bond_i_atoms.putHost(&int_data, basic_vtable.bond_i_atoms, ic, warp_size_zu);
-  ic = bond_j_atoms.putHost(&int_data, basic_vtable.bond_j_atoms, ic, warp_size_zu);
-  ic = bond_parameter_indices.putHost(&int_data, basic_vtable.bond_param_idx, ic, warp_size_zu);
-  ic = bond_assigned_atoms.putHost(&int_data, basic_vtable.bond_assigned_atoms, ic, warp_size_zu);
-  ic = bond_assigned_index.putHost(&int_data, basic_vtable.bond_assigned_index, ic, warp_size_zu);
-  ic = bond_assigned_terms.putHost(&int_data, basic_vtable.bond_assigned_terms, ic, warp_size_zu);
-  ic = bond_assigned_bounds.putHost(&int_data, basic_vtable.bond_assigned_bounds, ic,
-                                    warp_size_zu);
-  ic = angl_i_atoms.putHost(&int_data, basic_vtable.angl_i_atoms, ic, warp_size_zu);
-  ic = angl_j_atoms.putHost(&int_data, basic_vtable.angl_j_atoms, ic, warp_size_zu);
-  ic = angl_k_atoms.putHost(&int_data, basic_vtable.angl_k_atoms, ic, warp_size_zu);
-  ic = angl_parameter_indices.putHost(&int_data, basic_vtable.angl_param_idx, ic, warp_size_zu);
-  ic = angl_assigned_atoms.putHost(&int_data, basic_vtable.angl_assigned_atoms, ic, warp_size_zu);
-  ic = angl_assigned_index.putHost(&int_data, basic_vtable.angl_assigned_index, ic, warp_size_zu);
-  ic = angl_assigned_terms.putHost(&int_data, basic_vtable.angl_assigned_terms, ic, warp_size_zu);
-  ic = angl_assigned_bounds.putHost(&int_data, basic_vtable.angl_assigned_bounds, ic,
-                                    warp_size_zu);
-  ic = dihe_i_atoms.putHost(&int_data, basic_vtable.dihe_i_atoms, ic, warp_size_zu);
-  ic = dihe_j_atoms.putHost(&int_data, basic_vtable.dihe_j_atoms, ic, warp_size_zu);
-  ic = dihe_k_atoms.putHost(&int_data, basic_vtable.dihe_k_atoms, ic, warp_size_zu);
-  ic = dihe_l_atoms.putHost(&int_data, basic_vtable.dihe_l_atoms, ic, warp_size_zu);
-  ic = dihe_parameter_indices.putHost(&int_data, basic_vtable.dihe_param_idx, ic, warp_size_zu);
-  ic = dihe14_parameter_indices.putHost(&int_data, attn_parm.dihe14_parameter_indices, ic,
-                                        warp_size_zu);
-  ic = dihe_assigned_atoms.putHost(&int_data, basic_vtable.dihe_assigned_atoms, ic, warp_size_zu);
-  ic = dihe_assigned_index.putHost(&int_data, basic_vtable.dihe_assigned_index, ic, warp_size_zu);
-  ic = dihe_assigned_terms.putHost(&int_data, basic_vtable.dihe_assigned_terms, ic, warp_size_zu);
-  ic = dihe_assigned_bounds.putHost(&int_data, basic_vtable.dihe_assigned_bounds, ic,
-                                    warp_size_zu);
-  ic = virtual_site_atoms.putHost(&int_data, vsite_table.vs_atoms, ic, warp_size_zu);
-  ic = virtual_site_frame_types.putHost(&int_data, vsite_table.frame_types, ic, warp_size_zu);
-  ic = virtual_site_frame1_atoms.putHost(&int_data, vsite_table.frame1_atoms, ic, warp_size_zu);
-  ic = virtual_site_frame2_atoms.putHost(&int_data, vsite_table.frame2_atoms, ic, warp_size_zu);
-  ic = virtual_site_frame3_atoms.putHost(&int_data, vsite_table.frame3_atoms, ic, warp_size_zu);
-  ic = virtual_site_frame4_atoms.putHost(&int_data, vsite_table.frame4_atoms, ic, warp_size_zu);
-  ic = charge_indices.putHost(&int_data, tmp_charge_indices, ic, warp_size_zu);
-  ic = lennard_jones_indices.putHost(&int_data, tmp_lennard_jones_indices, ic, warp_size_zu);
-  ic = atom_exclusion_bounds.putHost(&int_data, cond_excl.atom_excl_bounds, ic, warp_size_zu);
-  ic = atom_exclusion_list.putHost(&int_data, cond_excl.atom_excl_list, ic, warp_size_zu);
-  ic = nb11_exclusion_bounds.putHost(&int_data, all_nb_excl.nb11_excl_bounds, ic, warp_size_zu);
-  ic = nb11_exclusion_list.putHost(&int_data, all_nb_excl.nb11_excl_list, ic, warp_size_zu);
-  ic = nb12_exclusion_bounds.putHost(&int_data, all_nb_excl.nb12_excl_bounds, ic, warp_size_zu);
-  ic = nb12_exclusion_list.putHost(&int_data, all_nb_excl.nb12_excl_list, ic, warp_size_zu);
-  ic = nb13_exclusion_bounds.putHost(&int_data, all_nb_excl.nb13_excl_bounds, ic, warp_size_zu);
-  ic = nb13_exclusion_list.putHost(&int_data, all_nb_excl.nb13_excl_list, ic, warp_size_zu);
-  ic = nb14_exclusion_bounds.putHost(&int_data, all_nb_excl.nb14_excl_bounds, ic, warp_size_zu);
-  ic = nb14_exclusion_list.putHost(&int_data, all_nb_excl.nb14_excl_list, ic, warp_size_zu);
-  ic = infr14_i_atoms.putHost(&int_data, tmp_inferred_14_i_atoms, ic, warp_size_zu);
-  ic = infr14_j_atoms.putHost(&int_data, tmp_inferred_14_j_atoms, ic, warp_size_zu);
-  ic = infr14_parameter_indices.putHost(&int_data, tmp_inferred_14_param_idx, ic, warp_size_zu);
-  ic = neck_gb_indices.putHost(&int_data, tmp_neck_gb_indices, ic, warp_size_zu);
-  ic = tree_joining_info.putHost(&int_data, tmp_tree_joining_info, ic, warp_size_zu);
-  ic = last_rotator_info.putHost(&int_data, tmp_last_rotator_info, ic, warp_size_zu);
-
-  // Do the same for double Hybrid POINTER-kind objects
-  size_t dc = atomic_charges.putHost(&double_data, tmp_charges, 0, warp_size_zu);
-  dc = atomic_masses.putHost(&double_data, tmp_masses, dc, warp_size_zu);
-  std::vector<double> inv_mass(atom_count, 0.0);
-  for (int i = 0; i < atom_count; i++) {
-    inv_mass[i] = (tmp_masses[i] > constants::tiny) ? 1.0 / tmp_masses[i] : 0.0;
-  }
-  dc = inverse_atomic_masses.putHost(&double_data, inv_mass, dc, warp_size_zu);
-  dc = urey_bradley_stiffnesses.putHost(&double_data, tmp_ub_stiffnesses, dc, warp_size_zu);
-  dc = urey_bradley_equilibria.putHost(&double_data, tmp_ub_equilibria, dc, warp_size_zu);
-  dc = charmm_impr_stiffnesses.putHost(&double_data, tmp_charmm_impr_stiffnesses, dc,
-                                       warp_size_zu);
-  dc = charmm_impr_phase_angles.putHost(&double_data, tmp_charmm_impr_phase_angles, dc,
-                                        warp_size_zu);
-  dc = cmap_surfaces.putHost(&double_data, tmp_cmap_surfaces, dc, warp_size_zu);
-  dc = cmap_phi_derivatives.putHost(&double_data, cmap_table.phi_derivatives, dc, warp_size_zu);
-  dc = cmap_psi_derivatives.putHost(&double_data, cmap_table.psi_derivatives, dc, warp_size_zu);
-  dc = cmap_phi_psi_derivatives.putHost(&double_data, cmap_table.phi_psi_derivatives, dc,
-                                        warp_size_zu);
-  dc = cmap_patches.putHost(&double_data, cmap_table.patch_matrix_form, dc, warp_size_zu);
-  dc = bond_stiffnesses.putHost(&double_data, tmp_bond_stiffnesses, dc, warp_size_zu);
-  dc = bond_equilibria.putHost(&double_data, tmp_bond_equilibria, dc, warp_size_zu);
-  dc = angl_stiffnesses.putHost(&double_data, tmp_angl_stiffnesses, dc, warp_size_zu);
-  dc = angl_equilibria.putHost(&double_data, tmp_angl_equilibria, dc, warp_size_zu);
-  dc = dihe_amplitudes.putHost(&double_data, tmp_dihe_amplitudes, dc, warp_size_zu);
-  dc = dihe_periodicities.putHost(&double_data, tmp_dihe_periodicities, dc, warp_size_zu);
-  dc = dihe_phase_angles.putHost(&double_data, tmp_dihe_phase_angles, dc, warp_size_zu);
-  dc = virtual_site_frame_dim1.putHost(&double_data, vsite_table.frame_dim1, dc, warp_size_zu);
-  dc = virtual_site_frame_dim2.putHost(&double_data, vsite_table.frame_dim2, dc, warp_size_zu);
-  dc = virtual_site_frame_dim3.putHost(&double_data, vsite_table.frame_dim3, dc, warp_size_zu);
-  dc = charge_parameters.putHost(&double_data, tmp_charge_parameters, dc, warp_size_zu);
-  dc = lj_a_values.putHost(&double_data, tmp_lj_a_values, dc, warp_size_zu);
-  dc = lj_b_values.putHost(&double_data, tmp_lj_b_values, dc, warp_size_zu);
-  dc = lj_c_values.putHost(&double_data, tmp_lj_c_values, dc, warp_size_zu);
-  dc = lj_14_a_values.putHost(&double_data, tmp_lj_14_a_values, dc, warp_size_zu);
-  dc = lj_14_b_values.putHost(&double_data, tmp_lj_14_b_values, dc, warp_size_zu);
-  dc = lj_14_c_values.putHost(&double_data, tmp_lj_14_c_values, dc, warp_size_zu);
-  dc = lj_type_corrections.putHost(&double_data, std::vector<double>(atom_type_count, 0.0), dc,
-                                   warp_size_zu);
-  dc = attn14_elec_factors.putHost(&double_data, attn_parm.elec_screening_factors, dc,
-                                   warp_size_zu);
-  dc = attn14_vdw_factors.putHost(&double_data, attn_parm.vdw_screening_factors, dc, warp_size_zu);
-  dc = atomic_pb_radii.putHost(&double_data, tmp_atomic_pb_radii, dc, warp_size_zu);
-  dc = gb_screening_factors.putHost(&double_data, tmp_gb_screening_factors, dc, warp_size_zu);
-  dc = gb_alpha_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
-  dc = gb_beta_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
-  dc = gb_gamma_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
-  dc = solty_info.putHost(&double_data, tmp_solty_info, dc, warp_size_zu);
-  dc = hbond_a_values.putHost(&double_data, tmp_hbond_a_values, dc, warp_size_zu);
-  dc = hbond_b_values.putHost(&double_data, tmp_hbond_b_values, dc, warp_size_zu);
-  dc = hbond_cutoffs.putHost(&double_data, tmp_hbond_cutoffs, dc, warp_size_zu);
-
-  // Do the same for float Hybrid POINTER-kind objects, using the range constructor to make
-  // single-precision vectors out of their dobule-precision counterparts before loading the
-  // Hybrid objects.
-  const std::vector<float>sp_tmp_charges(tmp_charges.begin(), tmp_charges.end());
-  size_t fc = sp_atomic_charges.putHost(&float_data, sp_tmp_charges, 0, warp_size_zu);
-  const std::vector<float>sp_tmp_masses(tmp_masses.begin(), tmp_masses.end());
-  fc = sp_atomic_masses.putHost(&float_data, sp_tmp_masses, fc, warp_size_zu);
-  std::vector<float> sp_inv_mass(atom_count, 0.0);
-  for (int i = 0; i < atom_count; i++) {
-    sp_inv_mass[i] = (tmp_masses[i] > constants::tiny) ? 1.0 / tmp_masses[i] : 0.0;
-  }
-  fc = sp_inverse_atomic_masses.putHost(&float_data, sp_inv_mass, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_ub_stiffnesses(tmp_ub_stiffnesses.begin(),
-                                                 tmp_ub_stiffnesses.end());
-  fc = sp_urey_bradley_stiffnesses.putHost(&float_data, sp_tmp_ub_stiffnesses, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_ub_equilibria(tmp_ub_equilibria.begin(),
-                                                tmp_ub_equilibria.end());
-  fc = sp_urey_bradley_equilibria.putHost(&float_data, sp_tmp_ub_equilibria, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_charmm_impr_stiffnesses(tmp_charmm_impr_stiffnesses.begin(),
-                                                          tmp_charmm_impr_stiffnesses.end());
-  fc = sp_charmm_impr_stiffnesses.putHost(&float_data, sp_tmp_charmm_impr_stiffnesses, fc,
-                                          warp_size_zu);
-  const std::vector<float> sp_tmp_charmm_impr_phase_angles(tmp_charmm_impr_phase_angles.begin(),
-                                                           tmp_charmm_impr_phase_angles.end());
-  fc = sp_charmm_impr_phase_angles.putHost(&float_data, sp_tmp_charmm_impr_phase_angles, fc,
-                                           warp_size_zu);
-  const std::vector<float> sp_tmp_cmap_surfaces(tmp_cmap_surfaces.begin(),
-                                                tmp_cmap_surfaces.end());
-  fc = sp_cmap_surfaces.putHost(&float_data, sp_tmp_cmap_surfaces, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_cmap_dphi(cmap_table.phi_derivatives.begin(),
-                                            cmap_table.phi_derivatives.end());
-  fc = sp_cmap_phi_derivatives.putHost(&float_data, sp_tmp_cmap_dphi, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_cmap_dpsi(cmap_table.psi_derivatives.begin(),
-                                            cmap_table.psi_derivatives.end());
-  fc = sp_cmap_psi_derivatives.putHost(&float_data, sp_tmp_cmap_dpsi, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_cmap_dphipsi(cmap_table.phi_psi_derivatives.begin(),
-                                               cmap_table.phi_psi_derivatives.end());
-  fc = sp_cmap_phi_psi_derivatives.putHost(&float_data, sp_tmp_cmap_dphipsi, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_cmap_patches(cmap_table.patch_matrix_form.begin(),
-                                               cmap_table.patch_matrix_form.end());
-  fc = sp_cmap_patches.putHost(&float_data, sp_tmp_cmap_patches, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_bond_stiffnesses(tmp_bond_stiffnesses.begin(),
-                                                   tmp_bond_stiffnesses.end());
-  fc = sp_bond_stiffnesses.putHost(&float_data, sp_tmp_bond_stiffnesses, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_bond_equilibria(tmp_bond_equilibria.begin(),
-                                                  tmp_bond_equilibria.end());
-  fc = sp_bond_equilibria.putHost(&float_data, sp_tmp_bond_equilibria, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_angl_stiffnesses(tmp_angl_stiffnesses.begin(),
-                                                   tmp_angl_stiffnesses.end());
-  fc = sp_angl_stiffnesses.putHost(&float_data, sp_tmp_angl_stiffnesses, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_angl_equilibria(tmp_angl_equilibria.begin(),
-                                                  tmp_angl_equilibria.end());
-  fc = sp_angl_equilibria.putHost(&float_data, sp_tmp_angl_equilibria, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_dihe_amplitudes(tmp_dihe_amplitudes.begin(),
-                                                  tmp_dihe_amplitudes.end());
-  fc = sp_dihe_amplitudes.putHost(&float_data, sp_tmp_dihe_amplitudes, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_dihe_periodicities(tmp_dihe_periodicities.begin(),
-                                                     tmp_dihe_periodicities.end());
-  fc = sp_dihe_periodicities.putHost(&float_data, sp_tmp_dihe_periodicities, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_dihe_phase_angles(tmp_dihe_phase_angles.begin(),
-                                                    tmp_dihe_phase_angles.end());
-  fc = sp_dihe_phase_angles.putHost(&float_data, sp_tmp_dihe_phase_angles, fc, warp_size_zu);
-  const std::vector<float> sp_frame_dim1(vsite_table.frame_dim1.begin(),
-                                         vsite_table.frame_dim1.end());
-  fc = sp_virtual_site_frame_dim1.putHost(&float_data, sp_frame_dim1, fc, warp_size_zu);
-  const std::vector<float> sp_frame_dim2(vsite_table.frame_dim2.begin(),
-                                         vsite_table.frame_dim2.end());
-  fc = sp_virtual_site_frame_dim2.putHost(&float_data, sp_frame_dim2, fc, warp_size_zu);
-  const std::vector<float> sp_frame_dim3(vsite_table.frame_dim3.begin(),
-                                         vsite_table.frame_dim3.end());
-  fc = sp_virtual_site_frame_dim3.putHost(&float_data, sp_frame_dim3, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_charge_parameters(tmp_charge_parameters.begin(),
-                                                    tmp_charge_parameters.end());
-  fc = sp_charge_parameters.putHost(&float_data, sp_tmp_charge_parameters, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_lj_a_values(tmp_lj_a_values.begin(), tmp_lj_a_values.end());
-  fc = sp_lj_a_values.putHost(&float_data, sp_tmp_lj_a_values, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_lj_b_values(tmp_lj_b_values.begin(), tmp_lj_b_values.end());
-  fc = sp_lj_b_values.putHost(&float_data, sp_tmp_lj_b_values, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_lj_c_values(tmp_lj_c_values.begin(), tmp_lj_c_values.end());
-  fc = sp_lj_c_values.putHost(&float_data, sp_tmp_lj_c_values, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_lj_14_a_values(tmp_lj_14_a_values.begin(),
-                                                 tmp_lj_14_a_values.end());
-  fc = sp_lj_14_a_values.putHost(&float_data, sp_tmp_lj_14_a_values, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_lj_14_b_values(tmp_lj_14_b_values.begin(),
-                                                 tmp_lj_14_b_values.end());
-  fc = sp_lj_14_b_values.putHost(&float_data, sp_tmp_lj_14_b_values, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_lj_14_c_values(tmp_lj_14_c_values.begin(),
-                                                 tmp_lj_14_c_values.end());
-  fc = sp_lj_14_c_values.putHost(&float_data, sp_tmp_lj_14_c_values, fc, warp_size_zu);
-  fc = sp_lj_type_corrections.putHost(&float_data, std::vector<float>(atom_type_count, 0.0), fc,
-                                      warp_size_zu);
-  const std::vector<float> sp_tmp_elec_screening_factors(attn_parm.elec_screening_factors.begin(),
-                                                         attn_parm.elec_screening_factors.end());
-  fc = sp_attn14_elec_factors.putHost(&float_data, sp_tmp_elec_screening_factors, fc,
-                                      warp_size_zu);
-  const std::vector<float> sp_tmp_vdw_screening_factors(attn_parm.vdw_screening_factors.begin(),
-                                                        attn_parm.vdw_screening_factors.end());
-  fc = sp_attn14_vdw_factors.putHost(&float_data, sp_tmp_vdw_screening_factors, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_atomic_pb_radii(tmp_atomic_pb_radii.begin(),
-                                                  tmp_atomic_pb_radii.end());
-  fc = sp_atomic_pb_radii.putHost(&float_data, sp_tmp_atomic_pb_radii, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_gb_screening_factors(tmp_gb_screening_factors.begin(),
-                                                       tmp_gb_screening_factors.end());
-  fc = sp_gb_screening_factors.putHost(&float_data, sp_tmp_gb_screening_factors, fc, warp_size_zu);
-  const std::vector<float> sp_tmp_gb_coef(tmp_gb_coef.begin(), tmp_gb_coef.end());
-  fc = sp_gb_alpha_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
-  fc = sp_gb_beta_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
-  fc = sp_gb_gamma_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
-
-  // Do the same for char4 Hybrid POINTER-kind objects
-  size_t c4c = atom_names.putHost(&char4_data, tmp_atom_names, 0, warp_size_zu);
-  c4c = atom_types.putHost(&char4_data, tmp_atom_types, c4c, warp_size_zu);
-  c4c = residue_names.putHost(&char4_data, tmp_residue_names, c4c, warp_size_zu);
-  c4c = bond_modifiers.putHost(&char4_data, basic_vtable.bond_mods, c4c, warp_size_zu);
-  c4c = angl_modifiers.putHost(&char4_data, basic_vtable.angl_mods, c4c, warp_size_zu);
-  c4c = dihe_modifiers.putHost(&char4_data, basic_vtable.dihe_mods, c4c, warp_size_zu);
-  c4c = bond_assigned_mods.putHost(&char4_data, basic_vtable.bond_assigned_mods, c4c,
-                                   warp_size_zu);
-  c4c = angl_assigned_mods.putHost(&char4_data, basic_vtable.angl_assigned_mods, c4c,
-                                   warp_size_zu);
-  c4c = dihe_assigned_mods.putHost(&char4_data, basic_vtable.dihe_assigned_mods, c4c,
-                                   warp_size_zu);
-  c4c = tree_symbols.putHost(&char4_data, tmp_tree_symbols, c4c, warp_size_zu);
-  
-  // The Amber topology read here does not contain overflow names of any sort
-  const std::vector<char4> blank_overflow;
-  c4c = atom_overflow_names.putHost(&char4_data, blank_overflow, c4c, warp_size_zu);
-  c4c = atom_overflow_types.putHost(&char4_data, blank_overflow, c4c, warp_size_zu);
-  c4c = residue_overflow_names.putHost(&char4_data, blank_overflow, c4c, warp_size_zu);
+  // Transfer data from the CPU-bound std::vectors and unguarded structs into HPC-capable Hybrid
+  // objects.
+  loadHybridArrays(tmp_desc, tmp_residue_limits, tmp_atom_struc_numbers, tmp_residue_numbers,
+                   tmp_molecule_limits, tmp_atomic_numbers, tmp_molecule_membership,
+                   tmp_mobile_atoms, tmp_molecule_contents, tmp_cmap_surf_dims,
+                   tmp_cmap_surf_bounds, tmp_charge_indices, tmp_lennard_jones_indices,
+                   tmp_inferred_14_i_atoms, tmp_inferred_14_j_atoms, tmp_inferred_14_param_idx,
+                   tmp_neck_gb_indices, tmp_tree_joining_info, tmp_last_rotator_info, tmp_charges,
+                   tmp_masses, tmp_ub_stiffnesses, tmp_ub_equilibria, tmp_charmm_impr_stiffnesses,
+                   tmp_charmm_impr_phase_angles, tmp_cmap_surfaces, tmp_bond_stiffnesses,
+                   tmp_bond_equilibria, tmp_angl_stiffnesses, tmp_angl_equilibria,
+                   tmp_dihe_amplitudes, tmp_dihe_periodicities, tmp_dihe_phase_angles,
+                   tmp_charge_parameters, tmp_lj_a_values, tmp_lj_b_values, tmp_lj_c_values,
+                   tmp_lj_14_a_values, tmp_lj_14_b_values, tmp_lj_14_c_values,
+                   tmp_atomic_pb_radii, tmp_gb_screening_factors, tmp_gb_coef, tmp_solty_info,
+                   tmp_hbond_a_values, tmp_hbond_b_values, tmp_hbond_cutoffs, tmp_atom_names,
+                   tmp_atom_types, tmp_residue_names, tmp_tree_symbols, cmap_table,
+                   cond_excl, basic_vtable, charmm_vtable, attn_parm, vsite_table, all_nb_excl);
 }
 
 } // namespace topology
