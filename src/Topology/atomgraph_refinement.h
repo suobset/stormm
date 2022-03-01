@@ -19,6 +19,22 @@ using parse::WildCardKind;
 ///        or other topology file.  All Class I force fields will have, or could have, terms like
 ///        these.  All descriptions follow from the eponymous member variables in an AtomGraph.
 struct BasicValenceTable {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// Overloaded:
+  ///   - Create an empty object
+  ///   - Create an object with pre-allocated memory for each type of basic valence term
+  ///
+  /// \param natom_in  The number of atoms in the system (for bounds arrays)
+  /// \param nbond_in  The number of bonds to prepare for
+  /// \param nangl_in  The number of angles to prepare for
+  /// \param ndihe_in  The number of dihedrals to prepare for
+  /// \{
+  BasicValenceTable();
+  BasicValenceTable(size_t natom_in, size_t nbond_in, size_t nangl_in, size_t ndihe_in);
+  /// \}
+  
   int total_bonds;
   int total_angls;
   int total_dihes;

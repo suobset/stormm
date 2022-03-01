@@ -30,6 +30,58 @@ using parse::realToString;
 using testing::Approx;
 
 //-------------------------------------------------------------------------------------------------
+BasicValenceTable::BasicValenceTable() :
+    total_bonds{0}, total_angls{0}, total_dihes{0},
+    bond_i_atoms{}, bond_j_atoms{}, bond_param_idx{}, angl_i_atoms{}, angl_j_atoms{},
+    angl_k_atoms{}, angl_param_idx{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{},
+    dihe_l_atoms{}, dihe_param_idx{}, bond_mods{}, angl_mods{}, dihe_mods{}, bond_assigned_atoms{},
+    bond_assigned_index{}, bond_assigned_terms{}, bond_assigned_bounds{}, angl_assigned_atoms{},
+    angl_assigned_index{}, angl_assigned_terms{}, angl_assigned_bounds{}, dihe_assigned_atoms{},
+    dihe_assigned_index{}, dihe_assigned_terms{}, dihe_assigned_bounds{}, bond_assigned_mods{},
+    angl_assigned_mods{}, dihe_assigned_mods{}
+{}
+
+//-------------------------------------------------------------------------------------------------
+BasicValenceTable::BasicValenceTable(const size_t natom_in, const size_t nbond_in,
+                                     const size_t nangl_in, const size_t ndihe_in) :
+    BasicValenceTable()
+{
+  total_bonds = nbond_in;
+  total_angls = nangl_in;
+  total_dihes = ndihe_in;
+  bond_i_atoms.resize(nbond_in);
+  bond_j_atoms.resize(nbond_in);
+  bond_param_idx.resize(nbond_in);
+  angl_i_atoms.resize(nangl_in);
+  angl_j_atoms.resize(nangl_in);
+  angl_k_atoms.resize(nangl_in);
+  angl_param_idx.resize(nangl_in);
+  dihe_i_atoms.resize(ndihe_in);
+  dihe_j_atoms.resize(ndihe_in);
+  dihe_k_atoms.resize(ndihe_in);
+  dihe_l_atoms.resize(ndihe_in);
+  dihe_param_idx.resize(ndihe_in);
+  bond_mods.resize(nbond_in);
+  angl_mods.resize(nangl_in);
+  dihe_mods.resize(ndihe_in);
+  bond_assigned_atoms.resize(    nbond_in);
+  angl_assigned_atoms.resize(2 * nangl_in);
+  dihe_assigned_atoms.resize(3 * ndihe_in);
+  bond_assigned_index.resize(nbond_in);
+  angl_assigned_index.resize(nangl_in);
+  dihe_assigned_index.resize(ndihe_in);
+  bond_assigned_terms.resize(nbond_in);
+  angl_assigned_terms.resize(nangl_in);
+  dihe_assigned_terms.resize(ndihe_in);
+  bond_assigned_bounds.resize(natom_in);
+  angl_assigned_bounds.resize(natom_in);
+  dihe_assigned_bounds.resize(natom_in);
+  bond_assigned_mods.resize(nbond_in);
+  angl_assigned_mods.resize(nangl_in);
+  dihe_assigned_mods.resize(ndihe_in);
+}
+
+//-------------------------------------------------------------------------------------------------
 void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_parameters,
                    std::vector<int> *tmp_charge_indices, int *q_param_count,
                    const double rounding_tol, const double charge_discretization,

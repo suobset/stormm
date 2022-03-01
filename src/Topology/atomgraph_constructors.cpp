@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <climits>
@@ -281,6 +282,199 @@ AtomGraph::AtomGraph(const std::string &file_name, const ExceptionResponse polic
   case TopologyKind::OPENMM:
     rtErr("Construction from non-Amber format files is not yet implemented.", "AtomGraph");
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
+                     const ExceptionResponse policy) :
+  AtomGraph()
+{
+  // Sort the subset in ascending order
+  std::vector<int> local_subset(atom_subset);
+  std::sort(local_subset.begin(), local_subset.end(), [](int a, int b) { return a < b; });
+  
+  // The number of atoms is the first thing that can be known.  Load all properties of atoms.
+  const int nsubset = local_subset.size();
+  int nskip = 0;
+  for (int i = 0; i < nsubset; i++) {
+    if (local_subset[i] < 0 || local_subset[i] >= original.atom_count) {
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("Subset index " + std::to_string(i) + ", for atom " +
+              std::to_string(local_subset[i]) + ", is invalid for a topology containing " +
+              std::to_string(original.atom_count) + " atoms.", "AtomGraph");
+      case ExceptionResponse::WARN:
+        rtWarn("Subset index " + std::to_string(i) + ", for atom " +
+               std::to_string(local_subset[i]) + ", is invalid for a topology containing " +
+               std::to_string(original.atom_count) + " atoms.  This entry will be skipped",
+               "AtomGraph");
+        nskip++;
+        break;
+      case ExceptionResponse::SILENT:
+        nskip++;
+        break;
+      }
+    }
+  }
+  atom_count = nsubset - nskip;
+  if (atom_count == 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No valid atoms were found in the subset of " + std::to_string(nsubset) + ", applied "
+            "to topology " + original.source + " with " + std::to_string(original.atom_count) +
+            " atoms.", "AtomGraph");
+    case ExceptionResponse::WARN:
+      rtWarn("No valid atoms were found in the subset of " + std::to_string(nsubset) + ", applied "
+             "to topology " + original.source + " with " + std::to_string(original.atom_count) +
+             " atoms.  An empty object will be returned.", "AtomGraph");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  
+  // Prepare a table of residue indices for the original topology
+  const std::vector<int> base_residue_indices = original.getResidueIndex();
+  std::vector<int> tmp_residue_index(atom_count);
+
+  // Prepare a mask of atoms in the subset, based on the original topology.  The mask is set to
+  // -1 to indicate that an atom is not in the subset, and >= 0 to indicate the atom's index in
+  // the subset, hence its index in the new topology.
+  std::vector<int> subset_mask(original.atom_count, -1);
+
+  // Get the relevant abstracts to help with pointers
+  const ChemicalDetailsKit cdk         = original.getChemicalDetailsKit();
+  const NonbondedKit<double> nbk       = original.getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> vk          = original.getDoublePrecisionValenceKit();
+  const ImplicitSolventKit<double> isk = original.getDoublePrecisionImplicitSolventKit();
+  
+  // Allocate and tabulate all properties of atoms.
+  std::vector<int> tmp_atom_struc_numbers(atom_count);
+  std::vector<int> tmp_residue_numbers(atom_count);
+  std::vector<int> tmp_atomic_numbers(atom_count);
+  std::vector<int> tmp_molecule_membership(atom_count);
+  std::vector<int> tmp_mobile_atoms(atom_count);
+  std::vector<int> tmp_molecule_contents(atom_count);
+  std::vector<int> tmp_neck_gb_indices(atom_count);
+  std::vector<int> tmp_tree_joining_info(atom_count);
+  std::vector<int> tmp_last_rotator_info(atom_count);
+  std::vector<double> tmp_charges(atom_count);
+  std::vector<double> tmp_masses(atom_count);
+  std::vector<double> tmp_atomic_pb_radii(atom_count);
+  std::vector<double> tmp_gb_screening_factors(atom_count);
+  std::vector<char4> tmp_atom_names(atom_count);
+  std::vector<char4> tmp_atom_types(atom_count);
+  std::vector<char4> tmp_residue_names(atom_count);
+  std::vector<char4> tmp_tree_symbols(atom_count);
+  int j = 0;
+  for (int i = 0; i < nsubset; i++) {
+    const int orig_idx = local_subset[i];
+    if (orig_idx < 0 || orig_idx >= original.atom_count) {
+      continue;
+    }
+    tmp_atom_struc_numbers[j] = cdk.atom_numbers[orig_idx];
+    tmp_residue_numbers[j] = cdk.res_numbers[orig_idx];
+    tmp_atomic_numbers[j] = cdk.z_numbers[orig_idx];
+    tmp_molecule_membership[j] = cdk.mol_home[orig_idx];
+    tmp_mobile_atoms[j] = original.mobile_atoms.readHost(orig_idx);
+    tmp_molecule_contents[j] = cdk.mol_contents[orig_idx];
+    tmp_neck_gb_indices[j] = isk.neck_gb_idx[orig_idx];
+    tmp_tree_joining_info[j] = original.tree_joining_info.readHost(orig_idx);
+    tmp_last_rotator_info[j] = original.last_rotator_info.readHost(orig_idx);
+    tmp_charges[j] = nbk.charge[orig_idx];
+    tmp_masses[j] = original.atomic_masses.readHost(orig_idx);
+    tmp_atomic_pb_radii[j] = isk.pb_radii[orig_idx];
+    tmp_gb_screening_factors[j] = isk.gb_screen[orig_idx];
+    tmp_atom_names[j] = cdk.atom_names[orig_idx];
+    tmp_atom_types[j] = cdk.atom_types[orig_idx];
+    tmp_residue_names[j] = cdk.res_names[orig_idx];
+    tmp_tree_symbols[j] = original.tree_symbols.readHost(orig_idx);
+    tmp_residue_index[j] = base_residue_indices[orig_idx];
+    subset_mask[orig_idx] = i;
+  }
+
+  // Allocate and tabulate residue and molecule-level information.  Adjust the residue indices
+  // to fit a pattern appropriate to the subset and prepare molecule-specific information.
+  int min_resid = tmp_residue_index[0];
+  int max_resid = tmp_residue_index[0];
+  int min_molid = tmp_molecule_membership[0];
+  int max_molid = tmp_molecule_membership[0];
+  for (int i = 0; i < atom_count; i++) {
+    min_resid = std::min(tmp_residue_index[i], min_resid);
+    max_resid = std::max(tmp_residue_index[i], max_resid);
+    min_molid = std::min(tmp_molecule_membership[i], min_molid);
+    max_molid = std::max(tmp_molecule_membership[i], max_molid);
+  }
+  std::vector<int> res_found(max_resid - min_resid + 1, 0);
+  std::vector<int> mol_found(max_molid - min_molid + 1, 0);
+  for (int i = 0; i < atom_count; i++) {
+    res_found[tmp_residue_index[i] - min_resid] = 1;
+    mol_found[tmp_molecule_membership[i] - min_molid] = 1;
+  }
+  int n_unique_res = 0;
+  for (int i = min_resid; i <= max_resid; i++) {
+    if (res_found[i - min_resid] == 1) {
+      res_found[i - min_resid] = n_unique_res;
+      n_unique_res++;
+    }
+  }
+  int n_unique_mol = 0;
+  for (int i = min_molid; i <= max_molid; i++) {
+    if (mol_found[i - min_molid] == 1) {
+      mol_found[i - min_molid] = n_unique_mol;
+      n_unique_mol++;
+    }
+  }
+  for (int i = 0; i < atom_count; i++) {
+    tmp_residue_index[i] = res_found[tmp_residue_index[i] - min_resid];
+    tmp_molecule_membership[i] = mol_found[tmp_molecule_membership[i] - min_molid];
+  }
+
+  // Scan the original topology for each force field term and add the terms to the new topology
+  // if all atoms are present in the subset.
+  int n_new_bond = 0;
+  for (int pos = 0; pos < vk.nbond; pos++) {
+    if (subset_mask[vk.bond_i_atoms[pos]] >= 0 && subset_mask[vk.bond_j_atoms[pos]] >= 0) {
+      n_new_bond++;
+    }
+  }
+  int n_new_angl = 0;
+  for (int pos = 0; pos < vk.nangl; pos++) {
+    if (subset_mask[vk.angl_i_atoms[pos]] >= 0 && subset_mask[vk.angl_j_atoms[pos]] >= 0 &&
+        subset_mask[vk.angl_k_atoms[pos]] >= 0) {
+      n_new_angl++;
+    }
+  }
+  int n_new_dihe = 0;
+  for (int pos = 0; pos < vk.ndihe; pos++) {
+    if (subset_mask[vk.dihe_i_atoms[pos]] >= 0 && subset_mask[vk.dihe_j_atoms[pos]] >= 0 &&
+        subset_mask[vk.dihe_k_atoms[pos]] >= 0 && subset_mask[vk.dihe_l_atoms[pos]] >= 0) {
+      n_new_dihe++;
+    }
+  }
+  BasicValenceTable bvt(atom_count, n_new_bond, n_new_angl, n_new_dihe);
+  int n_new_ubrd = 0;
+  for (int pos = 0; pos < vk.nubrd; pos++) {
+    if (subset_mask[vk.ubrd_i_atoms[pos]] >= 0 && subset_mask[vk.ubrd_k_atoms[pos]] >= 0) {
+      n_new_ubrd++;
+    }
+  }
+  int n_new_cimp = 0;
+  for (int pos = 0; pos < vk.ncimp; pos++) {
+    if (subset_mask[vk.cimp_i_atoms[pos]] >= 0 && subset_mask[vk.cimp_j_atoms[pos]] >= 0 &&
+        subset_mask[vk.cimp_k_atoms[pos]] >= 0 && subset_mask[vk.cimp_l_atoms[pos]] >= 0) {
+      n_new_cimp++;
+    }
+  }
+  int n_new_cmap = 0;
+  for (int pos = 0; pos < vk.ncmap; pos++) {
+    if (subset_mask[vk.cmap_i_atoms[pos]] >= 0 && subset_mask[vk.cmap_j_atoms[pos]] >= 0 &&
+        subset_mask[vk.cmap_k_atoms[pos]] >= 0 && subset_mask[vk.cmap_l_atoms[pos]] >= 0 &&
+        subset_mask[vk.cmap_m_atoms[pos]] >= 0) {
+      n_new_cmap++;
+    }
+  }
+  
 }
 
 //-------------------------------------------------------------------------------------------------

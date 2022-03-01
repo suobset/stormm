@@ -83,7 +83,8 @@ struct AtomGraph {
             double default_vdw14_screening, double charge_rounding_tol,
             double charge_discretization);
 
-  AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset);
+  AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset,
+            ExceptionResponse policy = ExceptionResponse::DIE);
   /// \}
 
   /// \brief The default destructor is adequate
