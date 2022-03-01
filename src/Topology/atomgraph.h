@@ -59,6 +59,10 @@ struct AtomGraph {
   ///     APpropriate default values will be applied for each kind of topology.
   ///   - In addition, take specific values for Coulomb's constant, the general 1:4 screening 
   ///     parameters, and charge discretization.
+  ///   - Extract a subset of the atoms from an existing AtomGraph and create a new AtomGraph
+  ///     from it.  All parameters and terms from the original AtomGraph will be carried over,
+  ///     provided that the new AtomGraph contains all of the atoms that each term spans.
+  ///     Exclusions from the original AtomGraph will be inferred from the bonding pattern.
   ///
   /// \param file_name                 Name of the source file
   /// \param policy                    The alert level to raise if a problem is encountered
@@ -78,6 +82,8 @@ struct AtomGraph {
             double coulomb_constant_in, double default_elec14_screening,
             double default_vdw14_screening, double charge_rounding_tol,
             double charge_discretization);
+
+  AtomGraph(const AtomGraph &original, const std::vector<int> &atom_subset);
   /// \}
 
   /// \brief The default destructor is adequate

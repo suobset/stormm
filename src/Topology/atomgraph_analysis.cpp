@@ -1,11 +1,15 @@
 #include <cmath>
 #include "Constants/scaling.h"
+#include "Math/vector_ops.h"
+#include "Parsing/parse.h"
 #include "UnitTesting/approx.h"
 #include "atomgraph_analysis.h"
 
 namespace omni {
 namespace topology {
 
+using math::findBin;
+using parse::char4ToString;
 using testing::Approx;
 
 //-------------------------------------------------------------------------------------------------
@@ -530,6 +534,97 @@ WaterModel identifyWaterModel(const AtomGraph &ag) {
     }
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
+                                  const int atom_i, const int atom_j) {
+  std::vector<bool> marked(nbk.natom, false);
+  marked[atom_i] = true;
+  marked[atom_j] = true;
+  std::vector<int> prev_atoms(16);
+  std::vector<int> new_atoms(16);
+  prev_atoms.resize(1);
+  new_atoms.resize(0);
+  prev_atoms[0] = atom_j;
+  bool more_added = true;
+  size_t nrot = 0LLU;
+  while (more_added) {
+    more_added = false;
+    new_atoms.resize(0);
+    const size_t nprev = prev_atoms.size();
+    for (size_t i = 0; i < nprev; i++) {
+      const size_t jlim = nbk.nb12_bounds[prev_atoms[i] + 1];
+      for (size_t j = nbk.nb12_bounds[prev_atoms[i]]; j < jlim; j++) {
+        const size_t candidate_atom = nbk.nb12x[j];
+        if (marked[candidate_atom]) {
+          continue;
+        }
+        else {
+          new_atoms.push_back(candidate_atom);
+          marked[candidate_atom] = true;
+          if (candidate_atom == atom_i && prev_atoms[i] != atom_j) {
+            rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
+                  std::to_string(atom_j + 1) + ", " +
+                  char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
+                  std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+                  char4ToString(cdk.atom_names[atom_i]) + " and " +
+                  char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
+                  std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+                  char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring "
+                  "system.  This should not have happened if the bond was selected from a "
+                  "ChemicalFeatures object.", "selectRotatingAtoms");
+          }
+        }
+      }
+    }
+    const size_t nnew = new_atoms.size();
+    nrot += nnew;
+    if (nnew > 0LLU) {
+      more_added = true;
+      prev_atoms.resize(nnew);
+      for (size_t i = 0; i < nnew; i++) {
+        prev_atoms[i] = new_atoms[i];
+      }
+    }
+  }
+  if (nrot == 0LLU || nrot == static_cast<size_t>(nbk.natom - 2)) {
+    rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
+          std::to_string(atom_j + 1) + ", " +
+          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
+          std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+          char4ToString(cdk.atom_names[atom_i]) + " and " +
+          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
+          std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+          char4ToString(cdk.atom_names[atom_j]) + ", does not appear to be worth rotating.  This "
+          "should not have happened if the bond was selected from a ChemicalFeatures object.",
+          "selectRotatingAtoms");
+  }
+  std::vector<int> result(nrot);
+  int counter = 0;
+  marked[atom_i] = false;
+  marked[atom_j] = false;
+  for (int i = 0; i < nbk.natom; i++) {
+    if (marked[i]) {
+      result[counter] = i;
+      counter++;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> selectRotatingAtoms(const AtomGraph &ag, const int atom_i, const int atom_j) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  return mapRotatingGroup(nbk, cdk, atom_i, atom_j);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> selectRotatingAtoms(const AtomGraph *ag, const int atom_i, const int atom_j) {
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
+  return mapRotatingGroup(nbk, cdk, atom_i, atom_j);
 }
 
 } // namespace topology

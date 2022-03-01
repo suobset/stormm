@@ -21,9 +21,18 @@ using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
 
-/// \brief An unguarded struct to serve as a tracker of progress through a molecule in the search
-///        for loops.  Proceeding forward in the search, every link will have come from one and
-///        only one previous link, but could go in multiple directions thereafter.
+/// \brief An unguarded struct for delivering information about a rotatable group of atoms.
+struct RotatorGroup {
+  int root_atom;                     ///< The root atom helping to define the rotatable bond axis
+  int pivot_atom;                    ///< Pivot atom completing the rotatable bond axis (more
+                                     ///<   proximal to atoms that will turn than the root atom)
+  std::vector<int> rotatable_atoms;  ///< List of all atoms that turn as a consequence of twisting
+                                     ///<   about the rotatable bond axis
+};
+  
+/// \brief A struct to serve as a tracker of progress through a molecule in the search for loops.
+///        Proceeding forward in the search, every link will have come from one and only one
+///        previous link, but could go in multiple directions thereafter.
 struct BondedNode {
 
   /// \brief Basic constructor simply initializes the members to blank values
@@ -135,12 +144,16 @@ struct ChemicalFeatures {
   ChemicalFeatures();
 
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
+                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0);
 
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame &cf,
+                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
                    double temperature_in = 300.0);
 
-  ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps, double temperature_in = 300.0);
+  ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
+                   MapRotatableGroups map_group_in = MapRotatableGroups::NO,
+                   double temperature_in = 300.0);
   /// \}
 
   /// \brief Copy and move constructors
@@ -165,6 +178,27 @@ struct ChemicalFeatures {
   void upload();
 #endif
 
+  /// \brief Get the number of planar atoms
+  int getPlanarAtomCount() const;
+
+  /// \brief Get the number of rings in the system
+  int getRingCount() const;
+
+  /// \brief Get the number of fused rings in the system
+  int getFusedRingCount() const;
+
+  /// \brief Get the number of malleable, non-aromatic twistable ringsin the system
+  int getMutableRingCount() const;
+
+  /// \brief Get the number of aromatic groups in the system
+  int getAromaticGroupCount() const;
+
+  /// \brief Get the number of chiral centers in the system
+  int getChiralCenterCount() const;
+
+  /// \brief Get the number of rotatable bonds in the system
+  int getRotatableBondCount() const;
+  
   /// \brief Return a mask of rings within a given size range for this system
   ///
   /// \param min_ring_size  The minimum number of atoms in the rings that will be reported
@@ -181,6 +215,36 @@ struct ChemicalFeatures {
   ///
   /// \param direction  Allows one to select R- (D-), S- (L-), or both chiralities for the maks
   std::vector<uint> getChiralityMask(ChiralOrientation direction) const;
+
+  /// \brief Get the atom endpoints of a rotatable bond.  The bond root atom is returned in the x
+  ///        member of the tuple, the pivot atom (the second atom, closest to atoms that will turn)
+  ///        is listed in the y member.
+  ///
+  /// Overloaded:
+  ///   - Get all rotatable bonds without re-ordering the list.
+  ///   - Get a list of all rotatable bonds upon which a minimum number of atoms turn.
+  ///   - Get a list of rotatable bonds for which the pivot is within a specific cutoff of the
+  ///     current conformation's center of mass.
+  ///   - Get a list of rotatable bonds for which the pivot is within a specific cutoff of the
+  ///     center of mass of some atom mask (the mask must be supplied as a raw bitmask of the
+  ///     entire system, a std::vector of unsigned ints, to prevent making a circular dependency
+  ///     whereby the AtomMask object depends on ChemicalFeatures and vice-versa).
+  ///   - Get a list of the N largest rotatable groups of atoms.
+  ///
+  /// \param index   The index of the rotatable bond to obtain.  Such a request is naive as to what
+  ///                the list actually contains, but a bounds check will be applied to ensure that
+  ///                the request is valid.
+  /// \param cutoff  The threshold at which to accept rotatable bond groups.  The meaning depends
+  ///                the value of the choice enumeration (see below).  If the choice is
+  ///                COM_PRXIMITY, then cutoff is a distance with units of Angstroms.  If the
+  ///                choice is GROUP_SIZE, then cutoff is a minimium number of rotating atoms.
+  /// \param choice     Specification of the means for discriminating different rotatable bond
+  ///                   groups.  See the description for cutoff, above.
+  /// \param mol_index  The molecule of interest (the system may have multiple molecules).
+  /// \{
+  std::vector<RotatorGroup> getRotatableBondGroups() const;
+  std::vector<RotatorGroup> getRotatableBondGroups(int cutoff, int mol_index = 0) const;
+  /// \}
   
 private:
   int atom_count;              ///< Number of atoms in the system
@@ -203,6 +267,7 @@ private:
                                ///<   unsigned integer (stored for reference)
   double temperature;          ///< The temperature at which these chemical features were
                                ///<   determined (this can influence the Lewis structure)
+  bool rotating_groups_mapped; ///< Flag to indicate that rotating groups have been mapped
   
   /// List of atoms which constitute planar centers (needs no bounds array, simply a list of
   /// unique atoms at the centers of improper dihedrals)
@@ -243,10 +308,18 @@ private:
   /// with the index equal to the absolute value is D-chiral.
   Hybrid<int> chiral_centers;
 
-  /// List of rotatable bonds.  The first atom is given in every even-numbered index, the second
-  /// atom in each odd-numbered index.
-  Hybrid<int> rotatable_bonds;
+  /// List of rotating atoms, and the endpoints of bonds defining the axes of rotation.  The first
+  /// atom in each group is the "root," distal to the atoms that move from the "pivot," the second
+  /// atom listed in each group.  Neither the root atom or the pivot actually moves, but subsequent
+  /// atoms in each group do.  Use the rotatable_group_bounds array to determine the extent of each
+  /// group.
+  Hybrid<int> rotatable_groups;
 
+  /// Bounds array for rotatable groups.  Each group will have at least three members: the root
+  /// atom, the pivot atom, and one or more atoms beyond the pivot that rotate as a consequence of
+  /// twisting about the rotatable bond.
+  Hybrid<int> rotatable_group_bounds;
+  
   /// Formal charges determined for all atoms in the system, based on a Lewis structure drawing
   /// with the Indigo method
   Hybrid<double> formal_charges;
@@ -358,13 +431,22 @@ private:
   /// \brief Find rotatable bonds in the system, those with bond order of 1.0 and nontrivial groups
   ///        sprouting from either end, and return a vector of the atom indices at either end.
   ///
-  /// \param vk   Valence term abstract from the original topology
-  /// \param nbk  Nonbonded system details, abstract taken from the original topology
-  std::vector<int2> findRotatableBonds(const ValenceKit<double> &vk,
-                                       const ChemicalDetailsKit &cdk,
-                                       const NonbondedKit<double> &nbk,
-                                       const std::vector<int> &ring_atoms,
-                                       const std::vector<int> &ring_atom_bounds);
+  /// \param vk                          Valence term abstract from the original topology
+  /// \param cdk                         Chemical details of the system (for atomic numbers)
+  /// \param nbk                         Nonbonded system details, abstract taken from the
+  ///                                    original topology
+  /// \param ring_atoms                  List of atoms in rings, indexing the original topology
+  /// \param ring_atom_bounds            Bounds array for the ring_atoms array
+  /// \param tmp_rotatable_groups        List of all atoms involved in rotation about a rotatable
+  ///                                    bond, including the endpoints of the bond itself in the
+  ///                                    first two slots.  This vector is assembled and returned.
+  /// \param tmp_rotatable_group_bounds  Bounds array for tmp_rotatable_groups, assembled and
+  ///                                    returned.
+  void findRotatableBonds(const ValenceKit<double> &vk, const ChemicalDetailsKit &cdk,
+                          const NonbondedKit<double> &nbk, const std::vector<int> &ring_atoms,
+                          const std::vector<int> &ring_atom_bounds,
+                          std::vector<int> *tmp_rotatable_groups,
+                          std::vector<int> *tmp_rotatable_group_bounds);
 
   /// \brief Reset POINTER-kind Hybrid objects to target the appropriate ARRAY-kind object in
   ///        the copy constructor and copy assignment operator.

@@ -6,9 +6,11 @@
 #include <cmath>
 #include <vector>
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "statistics.h"
 
@@ -16,13 +18,14 @@ namespace omni {
 namespace math {
 
 using card::Hybrid;
+using constants::ExceptionResponse;
 using data_types::getHpcVectorTypeSize;
 using data_types::isHpcVectorType;
 using data_types::isFloatingPointScalarType;
 using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
-
+  
 /// \brief Check that two vectors of the same data type are compatible for various arithmetic
 ///        comparisons.  Throws and exception if the vectors cannot be compared.
 ///
@@ -340,6 +343,38 @@ template <typename T> std::vector<T> project(const std::vector<T> &va, const std
 template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb);
 /// \}
 
+/// \brief Report an error for the histogram / bin finding function below, if the requested value
+///        exceeds the available range.
+///
+/// \param desc          Description to provide with an error or warning message
+/// \param value         Value that violated the known bin limits
+/// \param policy        Indicator of how to respond to this contingency
+template <typename T> void reportBinLimitError(const std::string &desc, const T value,
+                                               const ExceptionResponse policy);
+  
+/// \brief Find the bin to which a value belongs, given a monotonically increasing set of limits.
+///        Returns -1 if the value is less than the leftmost bin limit, or the number of bins
+///        plus 1 if the value is greater than the rightmost bin limit, if the exception handling
+///        permits.
+///
+/// Overloaded:
+///   - Operate on a C-style array of trusted length
+///   - Operate on a Standard Template Library vector
+///   - Operate on a Hybrid object (host side only)
+///
+/// \param limits  Bin limits
+/// \param value   Value to search for within one of the bins
+/// \param length  Trusted length of a C-style array (the array is assumed to be length + 1)
+/// \param policy  Indication of what to do if the value is outside the listed limits
+/// \{
+template <typename T> int findBin(const T* limits, const T value, const int length,
+                                  const ExceptionResponse policy = ExceptionResponse::DIE);
+template <typename T> int findBin(const std::vector<T> &limits, const T value,
+                                  const ExceptionResponse policy = ExceptionResponse::DIE);
+template <typename T> int findBin(const Hybrid<T> &limits, const T value,
+                                  const ExceptionResponse policy = ExceptionResponse::DIE);
+/// \}
+  
 } // namespace math
 } // namespace omni
 

@@ -52,6 +52,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		 $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		 $(SRCDIR)/Restraints/restraint_builder.cpp \
+		 $(SRCDIR)/Structure/isomerization.cpp \
 		 $(SRCDIR)/Structure/local_arrangement.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
@@ -137,6 +138,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Restraints/bounded_restraint.h \
 	           $(SRCDIR)/Restraints/restraint_apparatus.h \
 	           $(SRCDIR)/Restraints/restraint_builder.h \
+		   $(SRCDIR)/Structure/isomerization.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
 		   $(SRCDIR)/Structure/structure_enumerators.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
@@ -225,6 +227,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Restraints/bounded_restraint.o \
 	        $(SRCDIR)/Restraints/restraint_apparatus.o \
 	        $(SRCDIR)/Restraints/restraint_builder.o \
+		$(SRCDIR)/Structure/isomerization.o \
 		$(SRCDIR)/Structure/local_arrangement.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
@@ -281,6 +284,7 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_atommask \
 	          $(TESTDIR)/bin/test_local_arrangement \
+	          $(TESTDIR)/bin/test_isomerization \
 		  $(TESTDIR)/bin/test_synthesis \
 	          $(TESTDIR)/bin/test_valence_evaluation \
 	          $(TESTDIR)/bin/test_nonbonded_evaluation \
@@ -420,6 +424,13 @@ $(TESTDIR)/bin/test_local_arrangement : $(LIBDIR)/libomni.so \
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_local_arrangement \
 	  $(TESTDIR)/Structure/test_local_arrangement.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
+# Target: isomer generation and "broad brush strokes" manipulation
+$(TESTDIR)/bin/test_isomerization : $(LIBDIR)/libomni.so \
+				    $(TESTDIR)/Structure/test_isomerization.cpp
+	@echo "[OMNI]  Building test_isomerization..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_isomerization \
+	  $(TESTDIR)/Structure/test_isomerization.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
 # Target: numerical precision model
 $(TESTDIR)/bin/test_numerics : $(LIBDIR)/libomni.so $(TESTDIR)/Math/test_numerics.cpp
 	@echo "[OMNI]  Building test_numerics..."
@@ -539,7 +550,6 @@ bench : $(OMNI_BENCH_PROGS)
 	done
 
 apps : $(OMNI_APPS)
-
 test.cuda.exe : $(OMNI_TEST_CUDA_PROGS)
 
 test.cuda : $(OMNI_TEST_CUDA_PROGS)

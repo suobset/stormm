@@ -20,7 +20,9 @@ using trajectory::PhaseSpace;
 
 /// \brief A value which approaches one from below.  This is used in dihedral and similar
 ///        computations to detect when a value is nearing 1.0 and might generate a singularity
-///        in some denominator.
+///        in some denominator.  It is nearly the closest value to 1.0 that can be represented in
+///        an IEEE-754 format 32-bit floating point number (the format can go a couple of bits'
+///        worth of precision closer, but this is 1 part in about a million).
 /// \{
 constexpr double asymptotic_to_one_lf = 0.99999904632568359375;
 constexpr float  asymptotic_to_one_f  = (float)asymptotic_to_one_lf;

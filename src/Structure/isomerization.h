@@ -2,6 +2,7 @@
 #ifndef OMNI_ISOMERIZATION_H
 #define OMNI_ISOMERIZATION_H
 
+#include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "Synthesis/phasespace_synthesis.h"
@@ -9,6 +10,8 @@
 namespace omni {
 namespace structure {
 
+using topology::AtomGraph;
+using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpace;
@@ -45,25 +48,26 @@ using synthesis::PsSynthesisWriter;
 ///                        angle is oriented by the right hand rule with one's hand on atom_i and
 ///                        thumb pointed towards atom_j.
 /// \{
-void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, int atom_i, int atom_j,
+void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const double* umat,
+                     const double* invu, UnitCellType unit_cell, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 
 void rotateAboutBond(CoordinateFrame *cf, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 
-void rotateAboutBond(CoordinateFrameWriter *cfw, int atom_i, int atom_j,
+void rotateAboutBond(CoordinateFrameWriter cfw, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 
 void rotateAboutBond(PhaseSpace *ps, int atom_i, int atom_j, const std::vector<int> &moving_atoms,
                      const double rotation_angle);
 
-void rotateAboutBond(PhaseSpaceWriter *psw, int atom_i, int atom_j,
+void rotateAboutBond(PhaseSpaceWriter psw, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 
 void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 
-void rotateAboutBond(PsSynthesisWriter *psynthw, int system_index, int atom_i, int atom_j,
+void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 /// \}
 

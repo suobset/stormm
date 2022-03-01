@@ -3,6 +3,8 @@
 #include <climits>
 #include "Constants/generalized_born.h"
 #include "Constants/scaling.h"
+#include "Math/rounding.h"
+#include "Math/vector_ops.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
@@ -17,6 +19,7 @@ using constants::PrecisionModel;
 using card::HybridTargetLevel;
 using card::HybridKind;
 using math::addScalarToVector;
+using math::findBin;
 using math::roundUp;
 using parse::CaseSensitivity;
 using parse::char4ToString;
@@ -2706,24 +2709,7 @@ int AtomGraph::getResidueIndex(const int atom_index) const {
 
   // This will still happen on the fly, rather than storing a long list of numbers.  It's simply
   // not common, or critical in performant code, to access the residue number.
-  int lguess = 0;
-  int hguess = residue_count;
-  const int* limits_ptr = residue_limits.data();
-  while (lguess < hguess - 1) {
-
-    // Choose a residue intermediate between the lower and upper bounds
-    const int mguess = lguess + ((hguess - lguess) / 2);
-    if (atom_index >= limits_ptr[mguess + 1]) {
-      lguess = mguess;
-    }
-    else if (atom_index < limits_ptr[mguess]) {
-      hguess = mguess;
-    }
-    else {
-      return mguess;
-    }
-  }
-  return lguess;
+  return findBin(residue_limits.data(), atom_index, residue_count);
 }
 
 //-------------------------------------------------------------------------------------------------

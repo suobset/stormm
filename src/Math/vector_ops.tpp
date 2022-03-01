@@ -2,6 +2,9 @@
 namespace omni {
 namespace math {
 
+using parse::NumberFormat;
+using parse::realToString;
+
 //-------------------------------------------------------------------------------------------------
 template <typename T> void vectorComparisonCheck(const std::vector<T> &va,
                                                  const std::vector<T> &vb, const char* caller) {
@@ -645,6 +648,98 @@ template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb
     res_data[i] = vb_data[i] * dp_val;
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void reportBinLimitError(const std::string &desc, const T value,
+                                               const ExceptionResponse policy) {
+  switch (policy) {
+  case ExceptionResponse::DIE:
+    if (isSignedIntegralScalarType<T>()) {
+      rtErr("A value of " + std::to_string(static_cast<llint>(value)) + 
+            " is off the " + desc + " end of the range.", "findBin");
+    }
+    else if (isUnsignedIntegralScalarType<T>()) {
+      rtErr("A value of " + std::to_string(static_cast<ullint>(value)) + 
+            " is off the " + desc + " end of the range.", "findBin");
+    }
+    else if (isFloatingPointScalarType<T>()) {
+      rtErr("A value of " +
+            realToString(static_cast<double>(value), 11, 4, NumberFormat::SCIENTIFIC) +
+            " is off the " + desc + " end of the range.", "findBin");
+    }
+    break;
+  case ExceptionResponse::WARN:
+    if (isSignedIntegralScalarType<T>()) {
+      rtWarn("A value of " + std::to_string(static_cast<llint>(value)) + 
+             " is off the " + desc + " end of the range.", "findBin");
+    }
+    else if (isUnsignedIntegralScalarType<T>()) {
+      rtWarn("A value of " + std::to_string(static_cast<ullint>(value)) + 
+             " is off the " + desc + " end of the range.", "findBin");
+    }
+    else if (isFloatingPointScalarType<T>()) {
+      rtWarn("A value of " +
+             realToString(static_cast<double>(value), 11, 4, NumberFormat::SCIENTIFIC) +
+             " is off the " + desc + " end of the range.", "findBin");
+    }
+    break;
+  case ExceptionResponse::SILENT:
+    break;
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> int findBin(const T* limits, const T value, const int length,
+                                  const ExceptionResponse policy) {
+  if (length == 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A zero-length set of bin limits was supplied.", "findBin");
+    case ExceptionResponse::WARN:
+      rtWarn("A zero-length set of bin limits was supplied.", "findBin");
+      return -1;
+    case ExceptionResponse::SILENT:
+      return -1;
+    }
+  }
+  if (value < limits[0]) {
+    reportBinLimitError("left", value, policy);
+    return -1;
+  }
+  if (value >= limits[length]) {
+    reportBinLimitError("right", value, policy);
+    length + 1;
+  }
+  int lguess = 0;
+  int hguess = length;
+  while (lguess < hguess - 1LLU) {
+
+    // Choose a residue intermediate between the lower and upper bounds
+    const int mguess = lguess + ((hguess - lguess) / 2);
+    if (value >= limits[mguess + 1LLU]) {
+      lguess = mguess;
+    }
+    else if (value < limits[mguess]) {
+      hguess = mguess;
+    }
+    else {
+      return mguess;
+    }
+  }
+  return lguess;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> int findBin(const std::vector<T> &limits, const T value,
+                                  const ExceptionResponse policy) {
+  return findBin(limits.data(), value, limits.size(), policy);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> int findBin(const Hybrid<T> &limits, const T value,
+                                  const ExceptionResponse policy) {
+  return findBin(limits.data(), value, limits.size(), policy);
 }
 
 } // namespace math
