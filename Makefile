@@ -59,7 +59,11 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Synthesis/systemcache.cpp \
 		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
 	         $(SRCDIR)/Topology/amber_prmtop_util.cpp \
-	         $(SRCDIR)/Topology/atomgraph.cpp \
+	         $(SRCDIR)/Topology/atomgraph_constructors.cpp \
+	         $(SRCDIR)/Topology/atomgraph_detailers.cpp \
+	         $(SRCDIR)/Topology/atomgraph_getters.cpp \
+	         $(SRCDIR)/Topology/atomgraph_setters.cpp \
+	         $(SRCDIR)/Topology/atomgraph_miscellaneous.cpp \
 	         $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
 	         $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
@@ -234,7 +238,11 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Synthesis/systemcache.o \
 		$(SRCDIR)/Synthesis/valence_workunit.o \
 		$(SRCDIR)/Topology/amber_prmtop_util.o \
-		$(SRCDIR)/Topology/atomgraph.o \
+		$(SRCDIR)/Topology/atomgraph_constructors.o \
+		$(SRCDIR)/Topology/atomgraph_detailers.o \
+		$(SRCDIR)/Topology/atomgraph_getters.o \
+		$(SRCDIR)/Topology/atomgraph_setters.o \
+		$(SRCDIR)/Topology/atomgraph_miscellaneous.o \
 		$(SRCDIR)/Topology/atomgraph_abstracts.o \
 		$(SRCDIR)/Topology/atomgraph_analysis.o \
 		$(SRCDIR)/Topology/atomgraph_enumerators.o \
