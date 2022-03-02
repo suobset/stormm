@@ -412,10 +412,48 @@ void RestraintControls::checkFinalRestraintSettings(const bool nstep1_found, con
 }
 
 //-------------------------------------------------------------------------------------------------
-BoundedRestraint RestraintControls::getRestraint() const {
-
+BoundedRestraint RestraintControls::getRestraint(const AtomGraph *ag,
+                                                 const ChemicalFeatures *chemfe,
+                                                 const CoordinateFrameReader &cfr) const {
+  switch (getAtomSpecification()) {
+  case RestraintAnchoring::INDICES:
+    return BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, initiation_step,
+                            maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
+                            initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
+                            mature_r3, mature_r4, initial_crd, mature_crd);
+  case RestraintAnchoring::ATOMMASK:
+    return BoundedRestraint(mask_i, mask_j, mask_k, mask_l, ag, chemfe, cfr, initiation_step,
+                            maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
+                            initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
+                            mature_r3, mature_r4, initial_crd, mature_crd);
+  case RestraintAnchoring::MIXED:
+  case RestraintAnchoring::UNKNOWN:
+    rtErr("The restraint atom encoding could not be determined.", "RestraintControls",
+          "getRestraint");
+  }
+  __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint RestraintControls::getRestraint(const AtomGraph *ag) const {
+  switch (getAtomSpecification()) {
+  case RestraintAnchoring::INDICES:
+    return BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, initiation_step,
+                            maturation_step, initial_k2, initial_k3, initial_r1, initial_r2,
+                            initial_r3, initial_r4, mature_k2, mature_k3, mature_r1, mature_r2,
+                            mature_r3, mature_r4, initial_crd, mature_crd);
+  case RestraintAnchoring::ATOMMASK:
+    rtErr("A restraint cannot be specified with atom masks unless its chemical features and "
+          "coordinates are also provided.  An alternative overload of getRestraint() must be "
+          "called instead.", "RestraintControls", "getRestraint");
+  case RestraintAnchoring::MIXED:
+  case RestraintAnchoring::UNKNOWN:
+    rtErr("The restraint atom encoding could not be determined.", "RestraintControls",
+          "getRestraint");
+  }
+  __builtin_unreachable();
+}
+
 //-------------------------------------------------------------------------------------------------
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                                 const ExceptionResponse policy) {

@@ -5,13 +5,18 @@
 #include "input.h"
 #include "namelist_emulator.h"
 #include "namelist_enumerations.h"
+#include "Chemistry/chemical_features.h"
 #include "Parsing/textfile.h"
 #include "Restraints/bounded_restraint.h"
+#include "Topology/atomgraph.h"
 
 namespace omni {
 namespace namelist {
 
+using chemistry::ChemicalFeatures;
 using restraints::BoundedRestraint;
+using topology::AtomGraph;
+using trajectory::CoordinateFrameReader;
   
 /// \brief Object to encapsulate and dispense restraint information collected from a single
 ///        &restraint namelist.
@@ -33,8 +38,22 @@ struct RestraintControls {
   ///        for individual details, nor setters to manually edit the result.  Restraints can be
   ///        built by many means, namelists being only one, and editing should be done on the
   ///        more tractable BoundedRestraint form.
-  BoundedRestraint getRestraint() const;
-  
+  ///
+  /// Overloaded:
+  ///   - Produce a restraint based on atom index specifications
+  ///   - Produce a restraint based on atom masks (probably from user input)
+  ///
+  /// \param ag      The system topology (needed to check the atom indexing--this member function
+  ///                can only be called once the topology to which the restraint shall apply has
+  ///                been constructed, which may be well after user input has been transcribed)
+  /// \param chemfe  Chemical features of the system (needed to evaluate atom masks)
+  /// \param cfr     Coordinates of the system (needed to evaluate atom masks)
+  /// \{
+  BoundedRestraint getRestraint(const AtomGraph *ag, const ChemicalFeatures *chemfe,
+                                const CoordinateFrameReader &cfr) const;
+
+  BoundedRestraint getRestraint(const AtomGraph *ag) const;
+  /// \}  
 private:
   ExceptionResponse policy;  ///< Protocol to follow in the event of bad input data
   bool restraint_is_valid;   ///< Indicator that the restraints passes various quality checks

@@ -21,6 +21,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/FileManagement/file_util.cpp \
 		 $(SRCDIR)/Math/matrix_ops.cpp \
 		 $(SRCDIR)/Math/rounding.cpp \
+		 $(SRCDIR)/Math/set_ops.cpp \
 		 $(SRCDIR)/Math/statistics.cpp \
 		 $(SRCDIR)/MoleculeFormat/mdl_mol_format.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
@@ -105,6 +106,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Math/matrix.h \
 		   $(SRCDIR)/Math/matrix_ops.h \
 		   $(SRCDIR)/Math/rounding.h \
+		   $(SRCDIR)/Math/set_ops.h \
 		   $(SRCDIR)/Math/sorting.h \
 	           $(SRCDIR)/Math/statistics.h \
 	           $(SRCDIR)/Math/summation.h \
@@ -178,6 +180,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Math/matrix.tpp \
 		 $(SRCDIR)/Math/matrix_ops.tpp \
 		 $(SRCDIR)/Math/rounding.tpp \
+		 $(SRCDIR)/Math/set_ops.tpp \
 		 $(SRCDIR)/Math/summation.tpp \
 		 $(SRCDIR)/Math/vector_ops.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
@@ -201,6 +204,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/FileManagement/file_util.o \
 		$(SRCDIR)/Math/matrix_ops.o \
 		$(SRCDIR)/Math/rounding.o \
+	        $(SRCDIR)/Math/set_ops.o \
 	        $(SRCDIR)/Math/statistics.o \
 	        $(SRCDIR)/MoleculeFormat/mdl_mol_format.o \
 		$(SRCDIR)/Namelists/input.o \

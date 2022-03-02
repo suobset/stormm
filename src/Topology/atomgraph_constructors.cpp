@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
+#include "Math/set_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 
@@ -10,7 +11,9 @@ namespace topology {
 
 using card::HybridTargetLevel;
 using card::HybridKind;
-
+using math::getSubsetIndexPattern;
+using math::extractIndexedValues;
+  
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph() :
     version_stamp{""},
@@ -343,10 +346,10 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
   std::vector<int> subset_mask(original.atom_count, -1);
 
   // Get the relevant abstracts to help with pointers
-  const ChemicalDetailsKit cdk         = original.getChemicalDetailsKit();
-  const NonbondedKit<double> nbk       = original.getDoublePrecisionNonbondedKit();
-  const ValenceKit<double> vk          = original.getDoublePrecisionValenceKit();
-  const ImplicitSolventKit<double> isk = original.getDoublePrecisionImplicitSolventKit();
+  const ChemicalDetailsKit orig_cdk         = original.getChemicalDetailsKit();
+  const NonbondedKit<double> orig_nbk       = original.getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> orig_vk          = original.getDoublePrecisionValenceKit();
+  const ImplicitSolventKit<double> orig_isk = original.getDoublePrecisionImplicitSolventKit();
   
   // Allocate and tabulate all properties of atoms.
   std::vector<int> tmp_atom_struc_numbers(atom_count);
@@ -355,6 +358,7 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
   std::vector<int> tmp_molecule_membership(atom_count);
   std::vector<int> tmp_mobile_atoms(atom_count);
   std::vector<int> tmp_molecule_contents(atom_count);
+  std::vector<int> tmp_lennard_jones_indices(atom_count);
   std::vector<int> tmp_neck_gb_indices(atom_count);
   std::vector<int> tmp_tree_joining_info(atom_count);
   std::vector<int> tmp_last_rotator_info(atom_count);
@@ -372,22 +376,23 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
     if (orig_idx < 0 || orig_idx >= original.atom_count) {
       continue;
     }
-    tmp_atom_struc_numbers[j] = cdk.atom_numbers[orig_idx];
-    tmp_residue_numbers[j] = cdk.res_numbers[orig_idx];
-    tmp_atomic_numbers[j] = cdk.z_numbers[orig_idx];
-    tmp_molecule_membership[j] = cdk.mol_home[orig_idx];
+    tmp_atom_struc_numbers[j] = orig_cdk.atom_numbers[orig_idx];
+    tmp_residue_numbers[j] = orig_cdk.res_numbers[orig_idx];
+    tmp_atomic_numbers[j] = orig_cdk.z_numbers[orig_idx];
+    tmp_molecule_membership[j] = orig_cdk.mol_home[orig_idx];
     tmp_mobile_atoms[j] = original.mobile_atoms.readHost(orig_idx);
-    tmp_molecule_contents[j] = cdk.mol_contents[orig_idx];
-    tmp_neck_gb_indices[j] = isk.neck_gb_idx[orig_idx];
+    tmp_molecule_contents[j] = orig_cdk.mol_contents[orig_idx];
+    tmp_lennard_jones_indices[j] = orig_nbk.lj_idx[orig_idx];
+    tmp_neck_gb_indices[j] = orig_isk.neck_gb_idx[orig_idx];
     tmp_tree_joining_info[j] = original.tree_joining_info.readHost(orig_idx);
     tmp_last_rotator_info[j] = original.last_rotator_info.readHost(orig_idx);
-    tmp_charges[j] = nbk.charge[orig_idx];
+    tmp_charges[j] = orig_nbk.charge[orig_idx];
     tmp_masses[j] = original.atomic_masses.readHost(orig_idx);
-    tmp_atomic_pb_radii[j] = isk.pb_radii[orig_idx];
-    tmp_gb_screening_factors[j] = isk.gb_screen[orig_idx];
-    tmp_atom_names[j] = cdk.atom_names[orig_idx];
-    tmp_atom_types[j] = cdk.atom_types[orig_idx];
-    tmp_residue_names[j] = cdk.res_names[orig_idx];
+    tmp_atomic_pb_radii[j] = orig_isk.pb_radii[orig_idx];
+    tmp_gb_screening_factors[j] = orig_isk.gb_screen[orig_idx];
+    tmp_atom_names[j] = orig_cdk.atom_names[orig_idx];
+    tmp_atom_types[j] = orig_cdk.atom_types[orig_idx];
+    tmp_residue_names[j] = orig_cdk.res_names[orig_idx];
     tmp_tree_symbols[j] = original.tree_symbols.readHost(orig_idx);
     tmp_residue_index[j] = base_residue_indices[orig_idx];
     subset_mask[orig_idx] = j;
@@ -433,45 +438,54 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
 
   // Scan the original topology for each force field term and add the terms to the new topology
   // if all atoms are present in the subset.
-  int n_new_bond = 0;
-  for (int pos = 0; pos < vk.nbond; pos++) {
-    if (subset_mask[vk.bond_i_atoms[pos]] >= 0 && subset_mask[vk.bond_j_atoms[pos]] >= 0) {
-      n_new_bond++;
+  bond_term_count = 0;
+  for (int pos = 0; pos < orig_vk.nbond; pos++) {
+    if (subset_mask[orig_vk.bond_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.bond_j_atoms[pos]] >= 0) {
+      bond_term_count++;
     }
   }
-  int n_new_angl = 0;
-  for (int pos = 0; pos < vk.nangl; pos++) {
-    if (subset_mask[vk.angl_i_atoms[pos]] >= 0 && subset_mask[vk.angl_j_atoms[pos]] >= 0 &&
-        subset_mask[vk.angl_k_atoms[pos]] >= 0) {
-      n_new_angl++;
+  angl_term_count = 0;
+  for (int pos = 0; pos < orig_vk.nangl; pos++) {
+    if (subset_mask[orig_vk.angl_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.angl_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.angl_k_atoms[pos]] >= 0) {
+      angl_term_count++;
     }
   }
-  int n_new_dihe = 0;
-  for (int pos = 0; pos < vk.ndihe; pos++) {
-    if (subset_mask[vk.dihe_i_atoms[pos]] >= 0 && subset_mask[vk.dihe_j_atoms[pos]] >= 0 &&
-        subset_mask[vk.dihe_k_atoms[pos]] >= 0 && subset_mask[vk.dihe_l_atoms[pos]] >= 0) {
-      n_new_dihe++;
+  dihe_term_count = 0;
+  for (int pos = 0; pos < orig_vk.ndihe; pos++) {
+    if (subset_mask[orig_vk.dihe_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.dihe_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.dihe_k_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.dihe_l_atoms[pos]] >= 0) {
+      dihe_term_count++;
     }
   }
-  int n_new_ubrd = 0;
-  for (int pos = 0; pos < vk.nubrd; pos++) {
-    if (subset_mask[vk.ubrd_i_atoms[pos]] >= 0 && subset_mask[vk.ubrd_k_atoms[pos]] >= 0) {
-      n_new_ubrd++;
+  urey_bradley_term_count = 0;
+  for (int pos = 0; pos < orig_vk.nubrd; pos++) {
+    if (subset_mask[orig_vk.ubrd_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.ubrd_k_atoms[pos]] >= 0) {
+      urey_bradley_term_count++;
     }
   }
-  int n_new_cimp = 0;
-  for (int pos = 0; pos < vk.ncimp; pos++) {
-    if (subset_mask[vk.cimp_i_atoms[pos]] >= 0 && subset_mask[vk.cimp_j_atoms[pos]] >= 0 &&
-        subset_mask[vk.cimp_k_atoms[pos]] >= 0 && subset_mask[vk.cimp_l_atoms[pos]] >= 0) {
-      n_new_cimp++;
+  charmm_impr_term_count = 0;
+  for (int pos = 0; pos < orig_vk.ncimp; pos++) {
+    if (subset_mask[orig_vk.cimp_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cimp_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cimp_k_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cimp_l_atoms[pos]] >= 0) {
+      charmm_impr_term_count++;
     }
   }
-  int n_new_cmap = 0;
-  for (int pos = 0; pos < vk.ncmap; pos++) {
-    if (subset_mask[vk.cmap_i_atoms[pos]] >= 0 && subset_mask[vk.cmap_j_atoms[pos]] >= 0 &&
-        subset_mask[vk.cmap_k_atoms[pos]] >= 0 && subset_mask[vk.cmap_l_atoms[pos]] >= 0 &&
-        subset_mask[vk.cmap_m_atoms[pos]] >= 0) {
-      n_new_cmap++;
+  cmap_term_count = 0;
+  for (int pos = 0; pos < orig_vk.ncmap; pos++) {
+    if (subset_mask[orig_vk.cmap_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_k_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_l_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_m_atoms[pos]] >= 0) {
+      cmap_term_count++;
     }
   }
 
@@ -479,49 +493,77 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
   // new topology's holding arrays will bear the parameter indices of the old topology.  This
   // data will be used, in turn, to create the filtered parameter tables for the new topology
   // before updating the indexing tables.
-  BasicValenceTable bvt(atom_count, n_new_bond, n_new_angl, n_new_dihe);
+  BasicValenceTable bvt(atom_count, bond_term_count, angl_term_count, dihe_term_count);
   int new_bond_counter = 0;
-  for (int pos = 0; pos < vk.nbond; pos++) {
-    if (subset_mask[vk.bond_i_atoms[pos]] >= 0 && subset_mask[vk.bond_j_atoms[pos]] >= 0) {
-      bvt.bond_i_atoms[new_bond_counter]    = subset_mask[vk.bond_i_atoms[pos]];
-      bvt.bond_j_atoms[new_bond_counter]    = subset_mask[vk.bond_j_atoms[pos]];
-      bvt.bond_param_idx[new_bond_counter]  = vk.bond_param_idx[pos];
-      bvt.bond_mods[new_bond_counter] = vk.bond_modifiers[pos];
+  for (int pos = 0; pos < orig_vk.nbond; pos++) {
+    if (subset_mask[orig_vk.bond_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.bond_j_atoms[pos]] >= 0) {
+      bvt.bond_i_atoms[new_bond_counter]    = subset_mask[orig_vk.bond_i_atoms[pos]];
+      bvt.bond_j_atoms[new_bond_counter]    = subset_mask[orig_vk.bond_j_atoms[pos]];
+      bvt.bond_param_idx[new_bond_counter]  = orig_vk.bond_param_idx[pos];
+      bvt.bond_mods[new_bond_counter] = orig_vk.bond_modifiers[pos];
       new_bond_counter++;
     }
   }
   int new_angl_counter = 0;
-  for (int pos = 0; pos < vk.nangl; pos++) {
-    if (subset_mask[vk.angl_i_atoms[pos]] >= 0 && subset_mask[vk.angl_j_atoms[pos]] >= 0 &&
-        subset_mask[vk.angl_k_atoms[pos]] >= 0) {
-      bvt.angl_i_atoms[new_angl_counter]    = subset_mask[vk.angl_i_atoms[pos]];
-      bvt.angl_j_atoms[new_angl_counter]    = subset_mask[vk.angl_j_atoms[pos]];
-      bvt.angl_k_atoms[new_angl_counter]    = subset_mask[vk.angl_k_atoms[pos]];
-      bvt.angl_param_idx[new_angl_counter]  = vk.angl_param_idx[pos];
-      bvt.angl_mods[new_angl_counter] = vk.angl_modifiers[pos];
+  for (int pos = 0; pos < orig_vk.nangl; pos++) {
+    if (subset_mask[orig_vk.angl_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.angl_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.angl_k_atoms[pos]] >= 0) {
+      bvt.angl_i_atoms[new_angl_counter]    = subset_mask[orig_vk.angl_i_atoms[pos]];
+      bvt.angl_j_atoms[new_angl_counter]    = subset_mask[orig_vk.angl_j_atoms[pos]];
+      bvt.angl_k_atoms[new_angl_counter]    = subset_mask[orig_vk.angl_k_atoms[pos]];
+      bvt.angl_param_idx[new_angl_counter]  = orig_vk.angl_param_idx[pos];
+      bvt.angl_mods[new_angl_counter] = orig_vk.angl_modifiers[pos];
       new_angl_counter++;
     }
   }
   int new_dihe_counter = 0;
-  for (int pos = 0; pos < vk.ndihe; pos++) {
-    if (subset_mask[vk.dihe_i_atoms[pos]] >= 0 && subset_mask[vk.dihe_j_atoms[pos]] >= 0 &&
-        subset_mask[vk.dihe_k_atoms[pos]] >= 0 && subset_mask[vk.dihe_l_atoms[pos]] >= 0) {
-      bvt.dihe_i_atoms[new_dihe_counter]    = subset_mask[vk.dihe_i_atoms[pos]];
-      bvt.dihe_j_atoms[new_dihe_counter]    = subset_mask[vk.dihe_j_atoms[pos]];
-      bvt.dihe_k_atoms[new_dihe_counter]    = subset_mask[vk.dihe_k_atoms[pos]];
-      bvt.dihe_l_atoms[new_dihe_counter]    = subset_mask[vk.dihe_l_atoms[pos]];
-      bvt.dihe_param_idx[new_dihe_counter]  = vk.dihe_param_idx[pos];
-      bvt.dihe_mods[new_dihe_counter] = vk.dihe_modifiers[pos];
+  for (int pos = 0; pos < orig_vk.ndihe; pos++) {
+    if (subset_mask[orig_vk.dihe_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.dihe_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.dihe_k_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.dihe_l_atoms[pos]] >= 0) {
+      bvt.dihe_i_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_i_atoms[pos]];
+      bvt.dihe_j_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_j_atoms[pos]];
+      bvt.dihe_k_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_k_atoms[pos]];
+      bvt.dihe_l_atoms[new_dihe_counter]    = subset_mask[orig_vk.dihe_l_atoms[pos]];
+      bvt.dihe_param_idx[new_dihe_counter]  = orig_vk.dihe_param_idx[pos];
+      bvt.dihe_mods[new_dihe_counter] = orig_vk.dihe_modifiers[pos];
       new_dihe_counter++;
     }
   }
-  std::vector<int> bond_correspondence(vk.nbond_param, -1);
-  for (int i = 0; i < n_new_bond; i++) {
-    bond_correspondence[bvt.bond_param_idx[i]] = 1;
-    
-  }
+  std::vector<int> bond_correspondence = getSubsetIndexPattern(bvt.bond_param_idx,
+                                                               &bond_parameter_count);
+  std::vector<int> angl_correspondence = getSubsetIndexPattern(bvt.angl_param_idx,
+                                                               &angl_parameter_count);
+  std::vector<int> dihe_correspondence = getSubsetIndexPattern(bvt.dihe_param_idx,
+                                                               &dihe_parameter_count);
+  std::vector<double> tmp_bond_stiffnesses = extractIndexedValues(original.bond_stiffnesses,
+                                                                  bond_correspondence,
+                                                                  bond_parameter_count);
+  std::vector<double> tmp_bond_equilibria = extractIndexedValues(original.bond_equilibria,
+                                                                 bond_correspondence,
+                                                                 bond_parameter_count);
+  std::vector<double> tmp_angl_stiffnesses = extractIndexedValues(original.angl_stiffnesses,
+                                                                  angl_correspondence,
+                                                                  angl_parameter_count);
+  std::vector<double> tmp_angl_equilibria = extractIndexedValues(original.angl_equilibria,
+                                                                 angl_correspondence,
+                                                                 angl_parameter_count);
+  std::vector<double> tmp_dihe_amplitudes = extractIndexedValues(original.dihe_amplitudes,
+                                                                 dihe_correspondence,
+                                                                 dihe_parameter_count);
+  std::vector<double> tmp_dihe_periodicities = extractIndexedValues(original.dihe_periodicities,
+                                                                    dihe_correspondence,
+                                                                    dihe_parameter_count);
+  std::vector<double> tmp_dihe_phase_angles = extractIndexedValues(original.dihe_phase_angles,
+                                                                    dihe_correspondence,
+                                                                    dihe_parameter_count);
   
-  CharmmValenceTable mvt(atom_count, n_new_ubrd, n_new_cimp, n_new_cmap);
+  
+  CharmmValenceTable mvt(atom_count, urey_bradley_term_count, charmm_impr_term_count,
+                         cmap_term_count);
 }
 
 //-------------------------------------------------------------------------------------------------
