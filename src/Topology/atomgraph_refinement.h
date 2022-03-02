@@ -34,40 +34,67 @@ struct BasicValenceTable {
   BasicValenceTable();
   BasicValenceTable(int natom_in, int nbond_in, int nangl_in, int ndihe_in);
   /// \}
+
+  /// \brief Populate the atom assignments for this object.  This can only be called once the
+  ///        Atom index arrays have been assigned.
+  void makeAtomAssignments();
   
-  int total_bonds;
-  int total_angls;
-  int total_dihes;
-  std::vector<int> bond_i_atoms;
-  std::vector<int> bond_j_atoms;
-  std::vector<int> bond_param_idx;
-  std::vector<int> angl_i_atoms;
-  std::vector<int> angl_j_atoms;
-  std::vector<int> angl_k_atoms;
-  std::vector<int> angl_param_idx;
-  std::vector<int> dihe_i_atoms;
-  std::vector<int> dihe_j_atoms;
-  std::vector<int> dihe_k_atoms;
-  std::vector<int> dihe_l_atoms;
-  std::vector<int> dihe_param_idx;
-  std::vector<char4> bond_mods;
-  std::vector<char4> angl_mods;
-  std::vector<char4> dihe_mods;
-  std::vector<int> bond_assigned_atoms;
-  std::vector<int> bond_assigned_index;
-  std::vector<int> bond_assigned_terms;
-  std::vector<int> bond_assigned_bounds;
-  std::vector<int> angl_assigned_atoms;
-  std::vector<int> angl_assigned_index;
-  std::vector<int> angl_assigned_terms;
-  std::vector<int> angl_assigned_bounds;
-  std::vector<int> dihe_assigned_atoms;
-  std::vector<int> dihe_assigned_index;
-  std::vector<int> dihe_assigned_terms;
-  std::vector<int> dihe_assigned_bounds;
-  std::vector<char4> bond_assigned_mods;
-  std::vector<char4> angl_assigned_mods;
-  std::vector<char4> dihe_assigned_mods;
+  int total_bonds;                        ///< Total number of harmonic bond terms in the topology
+  int total_angls;                        ///< Total number of harmonic angle terms in the topology
+  int total_dihes;                        ///< Total number of cosine-based proper and improper
+                                          ///<   torsions in the topology
+  std::vector<int> bond_i_atoms;          ///< First atom of each bond term
+  std::vector<int> bond_j_atoms;          ///< Second atom of each bond term
+  std::vector<int> bond_param_idx;        ///< Parameter index for each bond term
+  std::vector<int> angl_i_atoms;          ///< First atom of each harmonic angle term
+  std::vector<int> angl_j_atoms;          ///< Second atom of each harmonic angle term
+  std::vector<int> angl_k_atoms;          ///< Third atom of each harmonic angle term
+  std::vector<int> angl_param_idx;        ///< Parameter index for each harmonic angle term
+  std::vector<int> dihe_i_atoms;          ///< First atom in each cosine-based torsion term
+  std::vector<int> dihe_j_atoms;          ///< Second atom in each cosine-based torsion term
+  std::vector<int> dihe_k_atoms;          ///< Third atom in each cosine-based torsion term
+  std::vector<int> dihe_l_atoms;          ///< Fourth atom in each cosine-based torsion term
+  std::vector<int> dihe_param_idx;        ///< Parameter index for each coside-based torsion term
+  std::vector<char4> bond_mods;           ///< Notes on each harmonic bond term, i.e. "contains
+                                          ///<   hydrogen"
+  std::vector<char4> angl_mods;           ///< Notes on each harmonic angle term
+  std::vector<char4> dihe_mods;           ///< Notes on each cosine-based torsion term, i.e. "is
+                                          ///<   improper, has no associated 1-4 interaction"
+  std::vector<int> bond_assigned_atoms;   ///< Each bond term is assigned to an atom, and details
+                                          ///<   of the bond assignments for the ith atom are held
+                                          ///<   between indices bond_assigned_bounds[i] and
+                                          ///<   bond_assigned_bounds[i + 1] of the atoms, index,
+                                          ///<   and terms arrays.  The atoms array holds the
+                                          ///<   topological indices of atoms in the bond, other
+                                          ///<   than the obivous atom i to which the bond is
+                                          ///<   assigned.
+  std::vector<int> bond_assigned_index;   ///< Parameter indices relevant to bond assignments
+  std::vector<int> bond_assigned_terms;   ///< Bond term indices relevant to bond assignments
+  std::vector<int> bond_assigned_bounds;  ///< Bounds array stating the limits of bond terms
+                                          ///<   assigned to each atom (see the longer explanation
+                                          ///<   above)
+  std::vector<int> angl_assigned_atoms;   ///< See the description above for the corresponding
+                                          ///<   member variable about bonds.  This array has two
+                                          ///<   entries for every assignment, so multiply the
+                                          ///<   indexing and realize that the relevant atoms for
+                                          ///<   bonds assigned to atom i are contained in entries
+                                          ///<   2 * angl_assigned_bounds[i] to
+                                          ///<   2 * angl_assigned_bounds[i + 1].
+  std::vector<int> angl_assigned_index;   ///< Parameter indices relevant to angle assignments
+  std::vector<int> angl_assigned_terms;   ///< Angle term indices relevant to angle assignments
+  std::vector<int> angl_assigned_bounds;  ///< Bounds array stating the limits of angle terms
+                                          ///<   assigned to each atom
+  std::vector<int> dihe_assigned_atoms;   ///< See the descriptions about for other atoms relevant
+                                          ///<   to bond and angle terms.  There are three atoms
+                                          ///<   per assignment in this array.
+  std::vector<int> dihe_assigned_index;   ///< Parameter indices relevant to torsion assignments
+  std::vector<int> dihe_assigned_terms;   ///< Torsion term indices relevant to torsion assignments
+  std::vector<int> dihe_assigned_bounds;  ///< Bounds array for the limits of torsion assignments
+                                          ///<   to each atom
+  std::vector<char4> bond_assigned_mods;  ///< Notes on bonds assigned to each atom (follows the
+                                          ///<   ordering set forth in bond_assigned_bounds)
+  std::vector<char4> angl_assigned_mods;  ///< Notes on angles assigned to each atom
+  std::vector<char4> dihe_assigned_mods;  ///< Notes on torsions assigned to each atom
 };
 
 /// \brief Unguarded struct to assemble special "CHARMM" force field terms read from an Amber or
@@ -90,6 +117,10 @@ struct CharmmValenceTable {
   CharmmValenceTable();
   CharmmValenceTable(int natom_in, int nubrd_in, int ncimp_in, int ncmap_in);
   /// \}
+
+  /// \brief Populate the atom assignments for this object.  This can only be called once the
+  ///        Atom index arrays have been assigned.
+  void makeAtomAssignments();
 
   int total_ub_angles;
   int total_impropers;

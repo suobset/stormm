@@ -533,6 +533,8 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
       new_dihe_counter++;
     }
   }
+
+  // Create parameter tables for the basic valence terms, condensed for the new topology
   std::vector<int> bond_correspondence = getSubsetIndexPattern(bvt.bond_param_idx,
                                                                &bond_parameter_count);
   std::vector<int> angl_correspondence = getSubsetIndexPattern(bvt.angl_param_idx,
@@ -560,10 +562,51 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
   std::vector<double> tmp_dihe_phase_angles = extractIndexedValues(original.dihe_phase_angles,
                                                                     dihe_correspondence,
                                                                     dihe_parameter_count);
-  
+
+  // Finish up the basic valence parameter detailing with the atom assignments
+  bvt.makeAtomAssignments();
   
   CharmmValenceTable mvt(atom_count, urey_bradley_term_count, charmm_impr_term_count,
                          cmap_term_count);
+  int new_ubrd_counter = 0;
+  for (int pos = 0; pos < orig_vk.nubrd; pos++) {
+    if (subset_mask[orig_vk.ubrd_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.ubrd_k_atoms[pos]] >= 0) {
+      mvt.ubrd_i_atoms[new_ubrd_counter] = subset_mask[orig_vk.ubrd_i_atoms[pos]];
+      mvt.ubrd_k_atoms[new_ubrd_counter] = subset_mask[orig_vk.ubrd_k_atoms[pos]];
+      mvt.ubrd_param_idx[new_ubrd_counter] = orig_vk.ubrd_param_idx[pos];
+      new_ubrd_counter++;
+    }
+  }
+  int new_cimp_counter = 0;
+  for (int pos = 0; pos < orig_vk.ncimp; pos++) {
+    if (subset_mask[orig_vk.cimp_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cimp_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cimp_k_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cimp_l_atoms[pos]] >= 0) {
+      mvt.impr_i_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_i_atoms[pos]];
+      mvt.impr_j_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_j_atoms[pos]];
+      mvt.impr_k_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_k_atoms[pos]];
+      mvt.impr_l_atoms[new_cimp_counter] = subset_mask[orig_vk.cimp_l_atoms[pos]];
+      mvt.impr_param_idx[new_cimp_counter] = orig_vk.cimp_param_idx[pos];
+      new_cimp_counter++;
+    }
+  }
+  int new_cmap_counter = 0;
+  for (int pos = 0; pos < orig_vk.ncmap; pos++) {
+    if (subset_mask[orig_vk.cmap_i_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_j_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_k_atoms[pos]] >= 0 &&
+        subset_mask[orig_vk.cmap_l_atoms[pos]] >= 0) {
+      mvt.cmap_i_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_i_atoms[pos]];
+      mvt.cmap_j_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_j_atoms[pos]];
+      mvt.cmap_k_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_k_atoms[pos]];
+      mvt.cmap_l_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_l_atoms[pos]];
+      mvt.cmap_m_atoms[new_cmap_counter] = subset_mask[orig_vk.cmap_m_atoms[pos]];
+      mvt.cmap_param_idx[new_cmap_counter] = orig_vk.cmap_surf_idx[pos];
+      new_cmap_counter++;
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

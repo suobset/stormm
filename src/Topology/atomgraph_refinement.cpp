@@ -82,6 +82,70 @@ BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
 }
 
 //-------------------------------------------------------------------------------------------------
+void BasicValenceTable::makeAtomAssignments() {
+
+  // Bonds go to the first atom in the pair (i), angles go to the center atom (j),
+  // and dihedrals are the responsibility of the second atom (j) in the list.
+  for (int pos = 0; pos < total_bonds; pos++) {
+    bond_assigned_bounds[bond_i_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < total_angls; pos++) {
+    angl_assigned_bounds[angl_j_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < total_dihes; pos++) {
+    dihe_assigned_bounds[dihe_k_atoms[pos]] += 1;
+  }
+  const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
+  prefixSumInPlace<llint>(&bond_assigned_bounds, pfx_excl, "basicValenceIndexing");
+  prefixSumInPlace<llint>(&angl_assigned_bounds, pfx_excl, "basicValenceIndexing");
+  prefixSumInPlace<llint>(&dihe_assigned_bounds, pfx_excl, "basicValenceIndexing");
+
+  // Populate the bond, angle, and dihedral assignements.  Dihedrals are assigned to the third
+  // atom in the quartet.  In Amber-format topologies this is the central atom of an improper.
+  for (int pos = 0; pos < total_bonds; pos++) {
+    const int control_atom = bond_i_atoms[pos];
+    const int fill_slot = bond_assigned_bounds[control_atom];
+    bond_assigned_atoms[fill_slot]     = bond_j_atoms[pos];
+    bond_assigned_index[fill_slot]     = bond_param_idx[pos];
+    bond_assigned_terms[fill_slot]     = pos;
+    bond_assigned_mods[fill_slot]      = bond_mods[pos];
+    bond_assigned_bounds[control_atom] = fill_slot + 1;
+  }
+  for (int pos = 0; pos < total_angls; pos++) {
+    const int control_atom = angl_j_atoms[pos];
+    const int fill_slot = angl_assigned_bounds[control_atom];
+    angl_assigned_atoms[ 2 * fill_slot     ] = angl_i_atoms[pos];
+    angl_assigned_atoms[(2 * fill_slot) + 1] = angl_k_atoms[pos];
+    angl_assigned_index[fill_slot]           = angl_param_idx[pos];
+    angl_assigned_terms[fill_slot]           = pos;
+    angl_assigned_mods[fill_slot]            = angl_mods[pos];
+    angl_assigned_bounds[control_atom]       = fill_slot + 1;
+  }
+  for (int pos = 0; pos < total_dihes; pos++) {
+    const int control_atom = dihe_k_atoms[pos];
+    const int fill_slot = dihe_assigned_bounds[control_atom];
+    dihe_assigned_atoms[ 3 * fill_slot     ] = dihe_i_atoms[pos];
+    dihe_assigned_atoms[(3 * fill_slot) + 1] = dihe_k_atoms[pos];
+    dihe_assigned_atoms[(3 * fill_slot) + 2] = dihe_l_atoms[pos];
+    dihe_assigned_index[fill_slot]           = dihe_param_idx[pos];
+    dihe_assigned_terms[fill_slot]           = pos;
+    dihe_assigned_mods[fill_slot]            = dihe_mods[pos];
+    dihe_assigned_bounds[control_atom]       = fill_slot + 1;
+  }
+
+  // Trim the prefix sums--they have been advanced one atom's register
+  const int atom_count = static_cast<int>(bond_assigned_bounds.size()) - 1;
+  for (int pos = atom_count; pos > 0; pos--) {
+    bond_assigned_bounds[pos] = bond_assigned_bounds[pos - 1];
+    angl_assigned_bounds[pos] = angl_assigned_bounds[pos - 1];
+    dihe_assigned_bounds[pos] = dihe_assigned_bounds[pos - 1];
+  }
+  bond_assigned_bounds[0] = 0;
+  angl_assigned_bounds[0] = 0;
+  dihe_assigned_bounds[0] = 0;
+}
+  
+//-------------------------------------------------------------------------------------------------
 CharmmValenceTable::CharmmValenceTable() :
     total_ub_angles{0}, total_impropers{0}, total_cmaps{0}, ubrd_i_atoms{}, ubrd_k_atoms{},
     ubrd_param_idx{}, impr_i_atoms{}, impr_j_atoms{}, impr_k_atoms{}, impr_l_atoms{},
@@ -127,6 +191,68 @@ CharmmValenceTable::CharmmValenceTable(const int natom_in, const int nubrd_in,
   impr_assigned_bounds.resize(natom_in + 1, 0);
   cmap_assigned_bounds.resize(natom_in + 1, 0);
 
+}
+
+//-------------------------------------------------------------------------------------------------
+void CharmmValenceTable::makeAtomAssignments() {
+
+  // Urey Bradley angles go to the first atom in the pair, CHARMM harmonic impropers and CMAP
+  // terms go to the third atom in the quartet / quintet.
+  for (int pos = 0; pos < total_ub_angles; pos++) {
+    ubrd_assigned_bounds[ubrd_i_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < total_impropers; pos++) {
+    impr_assigned_bounds[impr_k_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < total_cmaps; pos++) {
+    cmap_assigned_bounds[cmap_k_atoms[pos]] += 1;
+  }
+  const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
+  prefixSumInPlace<llint>(&ubrd_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+  prefixSumInPlace<llint>(&impr_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+  prefixSumInPlace<llint>(&cmap_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+
+  // Populate the CHARMM valence assignments.
+  for (int pos = 0; pos < total_ub_angles; pos++) {
+    const int control_atom = ubrd_i_atoms[pos];
+    const int fill_slot = ubrd_assigned_bounds[control_atom];
+    ubrd_assigned_atoms[fill_slot]     = ubrd_k_atoms[pos];
+    ubrd_assigned_index[fill_slot]     = ubrd_param_idx[pos];
+    ubrd_assigned_terms[fill_slot]     = pos;
+    ubrd_assigned_bounds[control_atom] = fill_slot + 1;
+  }
+  for (int pos = 0; pos < total_impropers; pos++) {
+    const int control_atom = impr_k_atoms[pos];
+    const int fill_slot = impr_assigned_bounds[control_atom];
+    impr_assigned_atoms[ 3 * fill_slot     ]  = impr_i_atoms[pos];
+    impr_assigned_atoms[(3 * fill_slot) + 1]  = impr_k_atoms[pos];
+    impr_assigned_atoms[(3 * fill_slot) + 2]  = impr_l_atoms[pos];
+    impr_assigned_index[fill_slot]            = impr_param_idx[pos];
+    impr_assigned_terms[fill_slot]            = pos;
+    impr_assigned_bounds[control_atom]        = fill_slot + 1;
+  }
+  for (int pos = 0; pos < total_cmaps; pos++) {
+    const int control_atom = cmap_k_atoms[pos];
+    const int fill_slot = cmap_assigned_bounds[control_atom];
+    cmap_assigned_atoms[ 4 * fill_slot     ]  = cmap_i_atoms[pos];
+    cmap_assigned_atoms[(4 * fill_slot) + 1]  = cmap_k_atoms[pos];
+    cmap_assigned_atoms[(4 * fill_slot) + 2]  = cmap_l_atoms[pos];
+    cmap_assigned_atoms[(4 * fill_slot) + 3]  = cmap_m_atoms[pos];
+    cmap_assigned_index[fill_slot]            = cmap_param_idx[pos];
+    cmap_assigned_terms[fill_slot]            = pos;
+    cmap_assigned_bounds[control_atom]        = fill_slot + 1;
+  }
+
+  // Readjust the bounds arrays (trim the prefix sums)
+  const int atom_count = static_cast<int>(ubrd_assigned_bounds.size()) - 1;
+  for (int pos = atom_count; pos > 0; pos--) {
+    ubrd_assigned_bounds[pos] = ubrd_assigned_bounds[pos - 1];
+    impr_assigned_bounds[pos] = impr_assigned_bounds[pos - 1];
+    cmap_assigned_bounds[pos] = cmap_assigned_bounds[pos - 1];
+  }
+  ubrd_assigned_bounds[0] = 0;
+  impr_assigned_bounds[0] = 0;
+  cmap_assigned_bounds[0] = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -588,65 +714,9 @@ BasicValenceTable basicValenceIndexing(const int atom_count,
     }
   }
 
-  // Bonds go to the first atom in the pair (i), angles go to the center atom (j),
-  // and dihedrals are the responsibility of the second atom (j) in the list.
-  for (int pos = 0; pos < bvt.total_bonds; pos++) {
-    bvt.bond_assigned_bounds[bvt.bond_i_atoms[pos]] += 1;
-  }
-  for (int pos = 0; pos < bvt.total_angls; pos++) {
-    bvt.angl_assigned_bounds[bvt.angl_j_atoms[pos]] += 1;
-  }
-  for (int pos = 0; pos < bvt.total_dihes; pos++) {
-    bvt.dihe_assigned_bounds[bvt.dihe_k_atoms[pos]] += 1;
-  }
-  const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
-  prefixSumInPlace<llint>(&bvt.bond_assigned_bounds, pfx_excl, "basicValenceIndexing");
-  prefixSumInPlace<llint>(&bvt.angl_assigned_bounds, pfx_excl, "basicValenceIndexing");
-  prefixSumInPlace<llint>(&bvt.dihe_assigned_bounds, pfx_excl, "basicValenceIndexing");
-
-  // Populate the bond, angle, and dihedral assignements.  Dihedrals are assigned to the third
-  // atom in the quartet.  In Amber-format topologies this is the central atom of an improper.
-  for (int pos = 0; pos < bvt.total_bonds; pos++) {
-    const int control_atom = bvt.bond_i_atoms[pos];
-    const int fill_slot = bvt.bond_assigned_bounds[control_atom];
-    bvt.bond_assigned_atoms[fill_slot]     = bvt.bond_j_atoms[pos];
-    bvt.bond_assigned_index[fill_slot]     = bvt.bond_param_idx[pos];
-    bvt.bond_assigned_terms[fill_slot]     = pos;
-    bvt.bond_assigned_mods[fill_slot]      = bvt.bond_mods[pos];
-    bvt.bond_assigned_bounds[control_atom] = fill_slot + 1;
-  }
-  for (int pos = 0; pos < bvt.total_angls; pos++) {
-    const int control_atom = bvt.angl_j_atoms[pos];
-    const int fill_slot = bvt.angl_assigned_bounds[control_atom];
-    bvt.angl_assigned_atoms[ 2 * fill_slot     ] = bvt.angl_i_atoms[pos];
-    bvt.angl_assigned_atoms[(2 * fill_slot) + 1] = bvt.angl_k_atoms[pos];
-    bvt.angl_assigned_index[fill_slot]           = bvt.angl_param_idx[pos];
-    bvt.angl_assigned_terms[fill_slot]           = pos;
-    bvt.angl_assigned_mods[fill_slot]            = bvt.angl_mods[pos];
-    bvt.angl_assigned_bounds[control_atom]       = fill_slot + 1;
-  }
-  for (int pos = 0; pos < bvt.total_dihes; pos++) {
-    const int control_atom = bvt.dihe_k_atoms[pos];
-    const int fill_slot = bvt.dihe_assigned_bounds[control_atom];
-    bvt.dihe_assigned_atoms[ 3 * fill_slot     ] = bvt.dihe_i_atoms[pos];
-    bvt.dihe_assigned_atoms[(3 * fill_slot) + 1] = bvt.dihe_k_atoms[pos];
-    bvt.dihe_assigned_atoms[(3 * fill_slot) + 2] = bvt.dihe_l_atoms[pos];
-    bvt.dihe_assigned_index[fill_slot]           = bvt.dihe_param_idx[pos];
-    bvt.dihe_assigned_terms[fill_slot]           = pos;
-    bvt.dihe_assigned_mods[fill_slot]            = bvt.dihe_mods[pos];
-    bvt.dihe_assigned_bounds[control_atom]       = fill_slot + 1;
-  }
-
-  // Trim the prefix sums--they have been advanced one atom's register
-  for (int pos = atom_count; pos > 0; pos--) {
-    bvt.bond_assigned_bounds[pos] = bvt.bond_assigned_bounds[pos - 1];
-    bvt.angl_assigned_bounds[pos] = bvt.angl_assigned_bounds[pos - 1];
-    bvt.dihe_assigned_bounds[pos] = bvt.dihe_assigned_bounds[pos - 1];
-  }
-  bvt.bond_assigned_bounds[0] = 0;
-  bvt.angl_assigned_bounds[0] = 0;
-  bvt.dihe_assigned_bounds[0] = 0;
-
+  // Assign terms to each atom
+  bvt.makeAtomAssignments();
+  
   return bvt;
 }
 
@@ -681,62 +751,8 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
     mvt.cmap_param_idx[pos] = tmp_cmap_atoms[6*pos + 5] - 1;
   }
 
-  // Urey Bradley angles go to the first atom in the pair, CHARMM harmonic impropers and CMAP
-  // terms go to the third atom in the quartet / quintet.
-  for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
-    mvt.ubrd_assigned_bounds[mvt.ubrd_i_atoms[pos]] += 1;
-  }
-  for (int pos = 0; pos < mvt.total_impropers; pos++) {
-    mvt.impr_assigned_bounds[mvt.impr_k_atoms[pos]] += 1;
-  }
-  for (int pos = 0; pos < mvt.total_cmaps; pos++) {
-    mvt.cmap_assigned_bounds[mvt.cmap_k_atoms[pos]] += 1;
-  }
-  const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
-  prefixSumInPlace<llint>(&mvt.ubrd_assigned_bounds, pfx_excl, "charmmValenceIndexing");
-  prefixSumInPlace<llint>(&mvt.impr_assigned_bounds, pfx_excl, "charmmValenceIndexing");
-  prefixSumInPlace<llint>(&mvt.cmap_assigned_bounds, pfx_excl, "charmmValenceIndexing");
-
-  // Populate the CHARMM valence assignments.
-  for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
-    const int control_atom = mvt.ubrd_i_atoms[pos];
-    const int fill_slot = mvt.ubrd_assigned_bounds[control_atom];
-    mvt.ubrd_assigned_atoms[fill_slot]     = mvt.ubrd_k_atoms[pos];
-    mvt.ubrd_assigned_index[fill_slot]     = mvt.ubrd_param_idx[pos];
-    mvt.ubrd_assigned_terms[fill_slot]     = pos;
-    mvt.ubrd_assigned_bounds[control_atom] = fill_slot + 1;
-  }
-  for (int pos = 0; pos < mvt.total_impropers; pos++) {
-    const int control_atom = mvt.impr_k_atoms[pos];
-    const int fill_slot = mvt.impr_assigned_bounds[control_atom];
-    mvt.impr_assigned_atoms[ 3 * fill_slot     ]  = mvt.impr_i_atoms[pos];
-    mvt.impr_assigned_atoms[(3 * fill_slot) + 1]  = mvt.impr_k_atoms[pos];
-    mvt.impr_assigned_atoms[(3 * fill_slot) + 2]  = mvt.impr_l_atoms[pos];
-    mvt.impr_assigned_index[fill_slot]            = mvt.impr_param_idx[pos];
-    mvt.impr_assigned_terms[fill_slot]            = pos;
-    mvt.impr_assigned_bounds[control_atom]        = fill_slot + 1;
-  }
-  for (int pos = 0; pos < mvt.total_cmaps; pos++) {
-    const int control_atom = mvt.cmap_k_atoms[pos];
-    const int fill_slot = mvt.cmap_assigned_bounds[control_atom];
-    mvt.cmap_assigned_atoms[ 4 * fill_slot     ]  = mvt.cmap_i_atoms[pos];
-    mvt.cmap_assigned_atoms[(4 * fill_slot) + 1]  = mvt.cmap_k_atoms[pos];
-    mvt.cmap_assigned_atoms[(4 * fill_slot) + 2]  = mvt.cmap_l_atoms[pos];
-    mvt.cmap_assigned_atoms[(4 * fill_slot) + 3]  = mvt.cmap_m_atoms[pos];
-    mvt.cmap_assigned_index[fill_slot]            = mvt.cmap_param_idx[pos];
-    mvt.cmap_assigned_terms[fill_slot]            = pos;
-    mvt.cmap_assigned_bounds[control_atom]        = fill_slot + 1;
-  }
-
-  // Readjust the bounds arrays (trim the prefix sums)
-  for (int pos = atom_count; pos > 0; pos--) {
-    mvt.ubrd_assigned_bounds[pos] = mvt.ubrd_assigned_bounds[pos - 1];
-    mvt.impr_assigned_bounds[pos] = mvt.impr_assigned_bounds[pos - 1];
-    mvt.cmap_assigned_bounds[pos] = mvt.cmap_assigned_bounds[pos - 1];
-  }
-  mvt.ubrd_assigned_bounds[0] = 0;
-  mvt.impr_assigned_bounds[0] = 0;
-  mvt.cmap_assigned_bounds[0] = 0;
+  // Assign terms to each atom
+  mvt.makeAtomAssignments();
 
   return mvt;
 }
