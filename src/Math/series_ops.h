@@ -60,6 +60,6 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
 } // namespace math
 } // namespace omni
 
-#include "set_ops.tpp"
+#include "series_ops.tpp"
 
 #endif

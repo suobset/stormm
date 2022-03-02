@@ -1,5 +1,5 @@
 #include "DataTypes/omni_vector_types.h"
-#include "set_ops.h"
+#include "series_ops.h"
 #include "vector_ops.h"
 
 namespace omni {

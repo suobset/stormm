@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
-#include "Math/set_ops.h"
+#include "Math/series_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 
