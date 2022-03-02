@@ -42,8 +42,8 @@ BasicValenceTable::BasicValenceTable() :
 {}
 
 //-------------------------------------------------------------------------------------------------
-BasicValenceTable::BasicValenceTable(const size_t natom_in, const size_t nbond_in,
-                                     const size_t nangl_in, const size_t ndihe_in) :
+BasicValenceTable::BasicValenceTable(const int natom_in, const int nbond_in,
+                                     const int nangl_in, const int ndihe_in) :
     BasicValenceTable()
 {
   total_bonds = nbond_in;
@@ -73,14 +73,109 @@ BasicValenceTable::BasicValenceTable(const size_t natom_in, const size_t nbond_i
   bond_assigned_terms.resize(nbond_in);
   angl_assigned_terms.resize(nangl_in);
   dihe_assigned_terms.resize(ndihe_in);
-  bond_assigned_bounds.resize(natom_in);
-  angl_assigned_bounds.resize(natom_in);
-  dihe_assigned_bounds.resize(natom_in);
+  bond_assigned_bounds.resize(natom_in + 1);
+  angl_assigned_bounds.resize(natom_in + 1);
+  dihe_assigned_bounds.resize(natom_in + 1);
   bond_assigned_mods.resize(nbond_in);
   angl_assigned_mods.resize(nangl_in);
   dihe_assigned_mods.resize(ndihe_in);
 }
 
+//-------------------------------------------------------------------------------------------------
+CharmmValenceTable::CharmmValenceTable() :
+    total_ub_angles{0}, total_impropers{0}, total_cmaps{0}, ubrd_i_atoms{}, ubrd_k_atoms{},
+    ubrd_param_idx{}, impr_i_atoms{}, impr_j_atoms{}, impr_k_atoms{}, impr_l_atoms{},
+    impr_param_idx{}, cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{},
+    cmap_m_atoms{}, cmap_param_idx{}, ubrd_assigned_atoms{}, ubrd_assigned_index{},
+    ubrd_assigned_terms{}, ubrd_assigned_bounds{}, impr_assigned_atoms{}, impr_assigned_index{},
+    impr_assigned_terms{}, impr_assigned_bounds{}, cmap_assigned_atoms{}, cmap_assigned_index{},
+    cmap_assigned_terms{}, cmap_assigned_bounds{}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CharmmValenceTable::CharmmValenceTable(const int natom_in, const int nubrd_in,
+                                       const int ncimp_in, const int ncmap_in) :
+    CharmmValenceTable()
+{
+  total_ub_angles = nubrd_in;
+  total_impropers = ncimp_in;
+  total_cmaps     = ncmap_in;
+  ubrd_i_atoms.resize(nubrd_in);
+  ubrd_k_atoms.resize(nubrd_in);
+  ubrd_param_idx.resize(nubrd_in);
+  impr_i_atoms.resize(ncimp_in);
+  impr_j_atoms.resize(ncimp_in);
+  impr_k_atoms.resize(ncimp_in);
+  impr_l_atoms.resize(ncimp_in);
+  impr_param_idx.resize(ncimp_in);
+  cmap_i_atoms.resize(ncmap_in);
+  cmap_j_atoms.resize(ncmap_in);
+  cmap_k_atoms.resize(ncmap_in);
+  cmap_l_atoms.resize(ncmap_in);
+  cmap_m_atoms.resize(ncmap_in);
+  cmap_param_idx.resize(ncmap_in);
+  ubrd_assigned_atoms.resize(    nubrd_in);
+  impr_assigned_atoms.resize(3 * ncimp_in);
+  cmap_assigned_atoms.resize(4 * ncmap_in);
+  ubrd_assigned_index.resize(nubrd_in);
+  impr_assigned_index.resize(ncimp_in);
+  cmap_assigned_index.resize(ncmap_in);
+  ubrd_assigned_terms.resize(nubrd_in);
+  impr_assigned_terms.resize(ncimp_in);
+  cmap_assigned_terms.resize(ncmap_in);
+  ubrd_assigned_bounds.resize(natom_in + 1, 0);
+  impr_assigned_bounds.resize(natom_in + 1, 0);
+  cmap_assigned_bounds.resize(natom_in + 1, 0);
+
+}
+
+//-------------------------------------------------------------------------------------------------
+AttenuationParameterSet::AttenuationParameterSet(const int set_count_in) :
+    total_14_sets{set_count_in},
+    dihe14_parameter_indices{}, elec_screening_factors{}, vdw_screening_factors{}
+{
+  dihe14_parameter_indices.resize(set_count_in);
+  elec_screening_factors.resize(set_count_in);
+  vdw_screening_factors.resize(set_count_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+CondensedExclusions::CondensedExclusions() :
+    total_exclusions{0}, atom_excl_bounds{}, atom_excl_list{}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CondensedExclusions::CondensedExclusions(const int natom_in, const int total_exclusions_in) :
+    total_exclusions{total_exclusions_in},
+    atom_excl_bounds{}, atom_excl_list{}
+{
+  atom_excl_bounds.resize(natom_in + 1, 0);
+  atom_excl_list.resize(total_exclusions);
+}
+
+//-------------------------------------------------------------------------------------------------
+VirtualSiteTable::VirtualSiteTable() :
+    vs_count{0}, vs_numbers{}, vs_atoms{}, frame_types{}, frame1_atoms{}, frame2_atoms{},
+    frame3_atoms{}, frame4_atoms{}, frame_dim1{}, frame_dim2{}, frame_dim3{}  
+{}
+
+//-------------------------------------------------------------------------------------------------
+VirtualSiteTable::VirtualSiteTable(const int natom_in, const int vs_count_in) :
+    VirtualSiteTable()
+{
+  vs_count = vs_count_in;
+  vs_numbers.resize(natom_in);
+  vs_atoms.resize(vs_count_in);
+  frame_types.resize(vs_count_in);
+  frame1_atoms.resize(vs_count_in);
+  frame2_atoms.resize(vs_count_in);
+  frame3_atoms.resize(vs_count_in);
+  frame4_atoms.resize(vs_count_in);
+  frame_dim1.resize(vs_count_in);
+  frame_dim2.resize(vs_count_in);
+  frame_dim3.resize(vs_count_in);
+}
+  
 //-------------------------------------------------------------------------------------------------
 void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_parameters,
                    std::vector<int> *tmp_charge_indices, int *q_param_count,
@@ -364,7 +459,6 @@ BasicValenceTable basicValenceIndexing(const int atom_count,
                                        const std::vector<int> &tmp_angl_atoms_noh,
                                        const std::vector<int> &tmp_dihe_atoms_h,
                                        const std::vector<int> &tmp_dihe_atoms_noh) {
-  BasicValenceTable bvt;
 
   // Resize the arrays to accommdate the incoming data
   const int n_bonds_h   = tmp_bond_atoms_h.size() / 3;
@@ -373,24 +467,8 @@ BasicValenceTable basicValenceIndexing(const int atom_count,
   const int n_angls_noh = tmp_angl_atoms_noh.size() / 4;
   const int n_dihes_h   = tmp_dihe_atoms_h.size() / 5;
   const int n_dihes_noh = tmp_dihe_atoms_noh.size() / 5;
-  bvt.total_bonds  = n_bonds_h + n_bonds_noh;
-  bvt.total_angls  = n_angls_h + n_angls_noh;
-  bvt.total_dihes  = n_dihes_h + n_dihes_noh;
-  bvt.bond_i_atoms.resize(bvt.total_bonds);
-  bvt.bond_j_atoms.resize(bvt.total_bonds);
-  bvt.bond_param_idx.resize(bvt.total_bonds);
-  bvt.angl_i_atoms.resize(bvt.total_angls);
-  bvt.angl_j_atoms.resize(bvt.total_angls);
-  bvt.angl_k_atoms.resize(bvt.total_angls);
-  bvt.angl_param_idx.resize(bvt.total_angls);
-  bvt.dihe_i_atoms.resize(bvt.total_dihes);
-  bvt.dihe_j_atoms.resize(bvt.total_dihes);
-  bvt.dihe_k_atoms.resize(bvt.total_dihes);
-  bvt.dihe_l_atoms.resize(bvt.total_dihes);
-  bvt.dihe_param_idx.resize(bvt.total_dihes);
-  bvt.bond_mods.resize(bvt.total_bonds);
-  bvt.angl_mods.resize(bvt.total_angls);
-  bvt.dihe_mods.resize(bvt.total_dihes);
+  BasicValenceTable bvt(atom_count, n_bonds_h + n_bonds_noh, n_angls_h + n_angls_noh,
+                        n_dihes_h + n_dihes_noh);
 
   // Pluck the indices and parameters, adjusting everything for C / C++ along the way
   for (int pos = 0; pos < n_bonds_h; pos++) {
@@ -467,23 +545,6 @@ BasicValenceTable basicValenceIndexing(const int atom_count,
     }
   }
 
-  // With the master lists assembled, assign ownership of all bonds, angles, and dihedrals
-  bvt.bond_assigned_atoms  = std::vector<int>(    bvt.total_bonds);
-  bvt.bond_assigned_index  = std::vector<int>(    bvt.total_bonds);
-  bvt.bond_assigned_terms  = std::vector<int>(    bvt.total_bonds);
-  bvt.bond_assigned_bounds = std::vector<int>(atom_count + 1, 0);
-  bvt.angl_assigned_atoms  = std::vector<int>(2 * bvt.total_angls);
-  bvt.angl_assigned_index  = std::vector<int>(    bvt.total_angls);
-  bvt.angl_assigned_terms  = std::vector<int>(    bvt.total_angls);
-  bvt.angl_assigned_bounds = std::vector<int>(atom_count + 1, 0);
-  bvt.dihe_assigned_atoms  = std::vector<int>(3 * bvt.total_dihes);
-  bvt.dihe_assigned_index  = std::vector<int>(    bvt.total_dihes);
-  bvt.dihe_assigned_terms  = std::vector<int>(    bvt.total_dihes);
-  bvt.dihe_assigned_bounds = std::vector<int>(atom_count + 1, 0);
-  bvt.bond_assigned_mods   = std::vector<char4>(  bvt.total_bonds);
-  bvt.angl_assigned_mods   = std::vector<char4>(  bvt.total_angls);
-  bvt.dihe_assigned_mods   = std::vector<char4>(  bvt.total_dihes);
-
   // Bonds go to the first atom in the pair (i), angles go to the center atom (j),
   // and dihedrals are the responsibility of the second atom (j) in the list.
   for (int pos = 0; pos < bvt.total_bonds; pos++) {
@@ -551,34 +612,15 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
                                          const std::vector<int> &tmp_ub_atoms,
                                          const std::vector<int> &tmp_charmm_impr_atoms,
                                          const std::vector<int> &tmp_cmap_atoms) {
-  CharmmValenceTable mvt;
-
-  // These counts are already part of the developing topology, but
-  // recover them here from dimensions of the input arrays.
-  mvt.total_ub_angles = tmp_ub_atoms.size() / 3;
-  mvt.total_impropers = tmp_charmm_impr_atoms.size() / 5;
-  mvt.total_cmaps = tmp_cmap_atoms.size() / 6;
-  mvt.ub_i_atoms.resize(mvt.total_ub_angles);
-  mvt.ub_k_atoms.resize(mvt.total_ub_angles);
-  mvt.ub_param_idx.resize(mvt.total_ub_angles);
-  mvt.impr_i_atoms.resize(mvt.total_impropers);
-  mvt.impr_j_atoms.resize(mvt.total_impropers);
-  mvt.impr_k_atoms.resize(mvt.total_impropers);
-  mvt.impr_l_atoms.resize(mvt.total_impropers);
-  mvt.impr_param_idx.resize(mvt.total_impropers);
-  mvt.cmap_i_atoms.resize(mvt.total_cmaps);
-  mvt.cmap_j_atoms.resize(mvt.total_cmaps);
-  mvt.cmap_k_atoms.resize(mvt.total_cmaps);
-  mvt.cmap_l_atoms.resize(mvt.total_cmaps);
-  mvt.cmap_m_atoms.resize(mvt.total_cmaps);
-  mvt.cmap_param_idx.resize(mvt.total_cmaps);
+  CharmmValenceTable mvt(atom_count, tmp_ub_atoms.size() / 3, tmp_charmm_impr_atoms.size() / 5,
+                         tmp_cmap_atoms.size() / 6);
 
   // The indexing for CHARMM force field terms does not contain pre-computations like the basic
   // valence term indexing in an Amber topology.  All elements are Fortran-indexed.
   for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
-    mvt.ub_i_atoms[pos] =   tmp_ub_atoms[3*pos    ] - 1;
-    mvt.ub_k_atoms[pos] =   tmp_ub_atoms[3*pos + 1] - 1;
-    mvt.ub_param_idx[pos] = tmp_ub_atoms[3*pos + 2] - 1;
+    mvt.ubrd_i_atoms[pos] =   tmp_ub_atoms[3*pos    ] - 1;
+    mvt.ubrd_k_atoms[pos] =   tmp_ub_atoms[3*pos + 1] - 1;
+    mvt.ubrd_param_idx[pos] = tmp_ub_atoms[3*pos + 2] - 1;
   }
   for (int pos = 0; pos < mvt.total_impropers; pos++) {
     mvt.impr_i_atoms[pos]   = tmp_charmm_impr_atoms[5*pos    ] - 1;
@@ -596,24 +638,10 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
     mvt.cmap_param_idx[pos] = tmp_cmap_atoms[6*pos + 5] - 1;
   }
 
-  // Assign ownership of CHARMM Urey-Bradley, improper, and CMAP terms
-  mvt.ub_assigned_atoms  = std::vector<int>(2 * mvt.total_ub_angles);
-  mvt.ub_assigned_index  = std::vector<int>(    mvt.total_ub_angles);
-  mvt.ub_assigned_terms  = std::vector<int>(    mvt.total_ub_angles);
-  mvt.ub_assigned_bounds = std::vector<int>(atom_count + 1, 0);
-  mvt.impr_assigned_atoms  = std::vector<int>(3 * mvt.total_impropers);
-  mvt.impr_assigned_index  = std::vector<int>(    mvt.total_impropers);
-  mvt.impr_assigned_terms  = std::vector<int>(    mvt.total_impropers);
-  mvt.impr_assigned_bounds = std::vector<int>(atom_count + 1, 0);
-  mvt.cmap_assigned_atoms  = std::vector<int>(4 * mvt.total_cmaps);
-  mvt.cmap_assigned_index  = std::vector<int>(    mvt.total_cmaps);
-  mvt.cmap_assigned_terms  = std::vector<int>(    mvt.total_cmaps);
-  mvt.cmap_assigned_bounds = std::vector<int>(atom_count + 1, 0);
-
   // Urey Bradley angles go to the first atom in the pair, CHARMM harmonic impropers and CMAP
   // terms go to the third atom in the quartet / quintet.
   for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
-    mvt.ub_assigned_bounds[mvt.ub_i_atoms[pos]] += 1;
+    mvt.ubrd_assigned_bounds[mvt.ubrd_i_atoms[pos]] += 1;
   }
   for (int pos = 0; pos < mvt.total_impropers; pos++) {
     mvt.impr_assigned_bounds[mvt.impr_k_atoms[pos]] += 1;
@@ -622,18 +650,18 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
     mvt.cmap_assigned_bounds[mvt.cmap_k_atoms[pos]] += 1;
   }
   const PrefixSumType pfx_excl = PrefixSumType::EXCLUSIVE;
-  prefixSumInPlace<llint>(&mvt.ub_assigned_bounds, pfx_excl, "charmmValenceIndexing");
+  prefixSumInPlace<llint>(&mvt.ubrd_assigned_bounds, pfx_excl, "charmmValenceIndexing");
   prefixSumInPlace<llint>(&mvt.impr_assigned_bounds, pfx_excl, "charmmValenceIndexing");
   prefixSumInPlace<llint>(&mvt.cmap_assigned_bounds, pfx_excl, "charmmValenceIndexing");
 
   // Populate the CHARMM valence assignments.
   for (int pos = 0; pos < mvt.total_ub_angles; pos++) {
-    const int control_atom = mvt.ub_i_atoms[pos];
-    const int fill_slot = mvt.ub_assigned_bounds[control_atom];
-    mvt.ub_assigned_atoms[fill_slot]     = mvt.ub_k_atoms[pos];
-    mvt.ub_assigned_index[fill_slot]     = mvt.ub_param_idx[pos];
-    mvt.ub_assigned_terms[fill_slot]     = pos;
-    mvt.ub_assigned_bounds[control_atom] = fill_slot + 1;
+    const int control_atom = mvt.ubrd_i_atoms[pos];
+    const int fill_slot = mvt.ubrd_assigned_bounds[control_atom];
+    mvt.ubrd_assigned_atoms[fill_slot]     = mvt.ubrd_k_atoms[pos];
+    mvt.ubrd_assigned_index[fill_slot]     = mvt.ubrd_param_idx[pos];
+    mvt.ubrd_assigned_terms[fill_slot]     = pos;
+    mvt.ubrd_assigned_bounds[control_atom] = fill_slot + 1;
   }
   for (int pos = 0; pos < mvt.total_impropers; pos++) {
     const int control_atom = mvt.impr_k_atoms[pos];
@@ -659,11 +687,11 @@ CharmmValenceTable charmmValenceIndexing(const int atom_count,
 
   // Readjust the bounds arrays (trim the prefix sums)
   for (int pos = atom_count; pos > 0; pos--) {
-    mvt.ub_assigned_bounds[pos]   = mvt.ub_assigned_bounds[pos - 1];
+    mvt.ubrd_assigned_bounds[pos] = mvt.ubrd_assigned_bounds[pos - 1];
     mvt.impr_assigned_bounds[pos] = mvt.impr_assigned_bounds[pos - 1];
     mvt.cmap_assigned_bounds[pos] = mvt.cmap_assigned_bounds[pos - 1];
   }
-  mvt.ub_assigned_bounds[0]   = 0;
+  mvt.ubrd_assigned_bounds[0] = 0;
   mvt.impr_assigned_bounds[0] = 0;
   mvt.cmap_assigned_bounds[0] = 0;
 
@@ -770,8 +798,6 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
 
   using symbols::tetrahedral_angle;
 
-  VirtualSiteTable vst;
-
   // Count the number of massless particles and allocate the table
   const int natom = tmp_masses.size();
   std::vector<bool> is_vs(natom, false);
@@ -815,17 +841,7 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
           " virtual sites but " + std::to_string(n_virtual_site) +
           " massless particles were found.", "listVirtualSites");
   }
-  vst.vs_count = n_virtual_site;
-  vst.vs_numbers.resize(natom);
-  vst.vs_atoms.resize(n_virtual_site);
-  vst.frame_types.resize(n_virtual_site);
-  vst.frame1_atoms.resize(n_virtual_site);
-  vst.frame2_atoms.resize(n_virtual_site);
-  vst.frame3_atoms.resize(n_virtual_site);
-  vst.frame4_atoms.resize(n_virtual_site);
-  vst.frame_dim1.resize(n_virtual_site);
-  vst.frame_dim2.resize(n_virtual_site);
-  vst.frame_dim3.resize(n_virtual_site);
+  VirtualSiteTable vst(natom, n_virtual_site);
 
   // If custom virtual site arrays are provided, identify all of the custom sites from amongst the
   // virtual sites in general.  All remaining sites must be implicit, based on bonding patterns.

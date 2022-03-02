@@ -138,17 +138,17 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   ic = molecule_membership.putHost(&int_data, tmp_molecule_membership, ic, warp_size_zu);
   ic = mobile_atoms.putHost(&int_data, tmp_mobile_atoms, ic, warp_size_zu);
   ic = molecule_contents.putHost(&int_data, tmp_molecule_contents, ic, warp_size_zu);
-  ic = urey_bradley_i_atoms.putHost(&int_data, charmm_vtable.ub_i_atoms, ic, warp_size_zu);
-  ic = urey_bradley_k_atoms.putHost(&int_data, charmm_vtable.ub_k_atoms, ic, warp_size_zu);
-  ic = urey_bradley_parameter_indices.putHost(&int_data, charmm_vtable.ub_param_idx, ic,
+  ic = urey_bradley_i_atoms.putHost(&int_data, charmm_vtable.ubrd_i_atoms, ic, warp_size_zu);
+  ic = urey_bradley_k_atoms.putHost(&int_data, charmm_vtable.ubrd_k_atoms, ic, warp_size_zu);
+  ic = urey_bradley_parameter_indices.putHost(&int_data, charmm_vtable.ubrd_param_idx, ic,
                                               warp_size_zu);
-  ic = urey_bradley_assigned_atoms.putHost(&int_data, charmm_vtable.ub_assigned_atoms, ic,
+  ic = urey_bradley_assigned_atoms.putHost(&int_data, charmm_vtable.ubrd_assigned_atoms, ic,
                                            warp_size_zu);
-  ic = urey_bradley_assigned_index.putHost(&int_data, charmm_vtable.ub_assigned_index, ic,
+  ic = urey_bradley_assigned_index.putHost(&int_data, charmm_vtable.ubrd_assigned_index, ic,
                                            warp_size_zu);
-  ic = urey_bradley_assigned_terms.putHost(&int_data, charmm_vtable.ub_assigned_terms, ic,
+  ic = urey_bradley_assigned_terms.putHost(&int_data, charmm_vtable.ubrd_assigned_terms, ic,
                                            warp_size_zu);
-  ic = urey_bradley_assigned_bounds.putHost(&int_data, charmm_vtable.ub_assigned_bounds, ic,
+  ic = urey_bradley_assigned_bounds.putHost(&int_data, charmm_vtable.ubrd_assigned_bounds, ic,
                                             warp_size_zu);
   ic = charmm_impr_i_atoms.putHost(&int_data, charmm_vtable.impr_i_atoms, ic, warp_size_zu);
   ic = charmm_impr_j_atoms.putHost(&int_data, charmm_vtable.impr_j_atoms, ic, warp_size_zu);

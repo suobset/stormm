@@ -32,7 +32,7 @@ struct BasicValenceTable {
   /// \param ndihe_in  The number of dihedrals to prepare for
   /// \{
   BasicValenceTable();
-  BasicValenceTable(size_t natom_in, size_t nbond_in, size_t nangl_in, size_t ndihe_in);
+  BasicValenceTable(int natom_in, int nbond_in, int nangl_in, int ndihe_in);
   /// \}
   
   int total_bonds;
@@ -75,12 +75,28 @@ struct BasicValenceTable {
 ///        harmonic dihedrals, and CMAP terms.  All descriptions follow from the eponymous member
 ///        variables in an AtomGraph.
 struct CharmmValenceTable {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// Overloaded:
+  ///   - Create an empty object
+  ///   - Create an object with pre-allocated memory for each type of CHARMM valence term
+  ///
+  /// \param natom_in  The number of atoms in the system (for bounds arrays)
+  /// \param nubrd_in  The number of Urey-Bradley harmonic angles terms to prepare for
+  /// \param ncimp_in  The number of CHARMM improper dihedrals to prepare for
+  /// \param ncmap_in  The number of CMAP terms to prepare for
+  /// \{
+  CharmmValenceTable();
+  CharmmValenceTable(int natom_in, int nubrd_in, int ncimp_in, int ncmap_in);
+  /// \}
+
   int total_ub_angles;
   int total_impropers;
   int total_cmaps;
-  std::vector<int> ub_i_atoms;
-  std::vector<int> ub_k_atoms;
-  std::vector<int> ub_param_idx;
+  std::vector<int> ubrd_i_atoms;
+  std::vector<int> ubrd_k_atoms;
+  std::vector<int> ubrd_param_idx;
   std::vector<int> impr_i_atoms;
   std::vector<int> impr_j_atoms;
   std::vector<int> impr_k_atoms;
@@ -92,10 +108,10 @@ struct CharmmValenceTable {
   std::vector<int> cmap_l_atoms;
   std::vector<int> cmap_m_atoms;
   std::vector<int> cmap_param_idx;
-  std::vector<int> ub_assigned_atoms;
-  std::vector<int> ub_assigned_index;
-  std::vector<int> ub_assigned_terms;
-  std::vector<int> ub_assigned_bounds;
+  std::vector<int> ubrd_assigned_atoms;
+  std::vector<int> ubrd_assigned_index;
+  std::vector<int> ubrd_assigned_terms;
+  std::vector<int> ubrd_assigned_bounds;
   std::vector<int> impr_assigned_atoms;
   std::vector<int> impr_assigned_index;
   std::vector<int> impr_assigned_terms;
@@ -116,6 +132,12 @@ struct CharmmValenceTable {
 ///        form, then a pair of cached screening terms for the 1:4 interactions of its I and L
 ///        atoms.
 struct AttenuationParameterSet {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// \param set_count_in
+  AttenuationParameterSet(int set_count_in = 0);
+  
   int total_14_sets;                          ///< Total number of unique 1:4 scaling factor pairs
   std::vector<int> dihe14_parameter_indices;  ///< Array with length equal to the number of unique
                                               ///<   dihedral parameter sets in the original
@@ -133,6 +155,20 @@ struct AttenuationParameterSet {
 ///        atoms with no actual exclusions will be listed as having zero exclusions, and blank
 ///        atoms will be removed from the excluded atoms list.
 struct CondensedExclusions {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// Overloaded:
+  ///   - Create an empty object
+  ///   - Create an object with pre-allocated memory for each virtual site
+  ///
+  /// \param natom_in        
+  /// \param total_exclusions_in
+  /// \{
+  CondensedExclusions();
+  CondensedExclusions(int natom_in, int total_exclusions_in);
+  /// \}
+
   int total_exclusions;
   std::vector<int> atom_excl_bounds;
   std::vector<int> atom_excl_list;
@@ -140,6 +176,21 @@ struct CondensedExclusions {
 
 /// \brief Unguarded struct to collect information about virtual sites in the topology.
 struct VirtualSiteTable {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// Overloaded:
+  ///   - Create an empty object
+  ///   - Create an object with pre-allocated memory for each virtual site 
+  ///
+  /// \param natom_in     The number of atoms in the system (for an array indicating which atom is
+  ///                     which virtual site)
+  /// \param vs_count_in  The number of virtual sites in the system (for bounds arrays)
+  /// \{
+  VirtualSiteTable();
+  VirtualSiteTable(int natom_in, int vs_count_in);
+  /// \}
+
   int vs_count;                     ///< Number of virtual sites found, a check on the topology
   std::vector<int> vs_numbers;      ///< An array covering all atoms in the topology and stating
                                     ///<   which virtual site they correspond to, containing -1
