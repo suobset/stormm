@@ -26,7 +26,8 @@ enum class MatrixFillMode {
 };
 
 /// \brief A matrix object that can traverse CPU and GPU memory
-template <typename T> struct HpcMatrix {
+template <typename T> class HpcMatrix {
+public:
 
   // Public-facing, read-only forms of the private variables (allows syntactically simpler access
   // than getter functions)

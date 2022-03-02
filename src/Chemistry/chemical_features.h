@@ -33,8 +33,9 @@ struct RotatorGroup {
 /// \brief A struct to serve as a tracker of progress through a molecule in the search for loops.
 ///        Proceeding forward in the search, every link will have come from one and only one
 ///        previous link, but could go in multiple directions thereafter.
-struct BondedNode {
-
+class BondedNode {
+public:
+  
   /// \brief Basic constructor simply initializes the members to blank values
   BondedNode();
 
@@ -124,7 +125,8 @@ private:
   
 /// \brief An object to store information about chemical motifs: participation in rings, planarity,
 ///        chirality, aromaticity, conjugation, planarity, and bonds with different rotatability.
-struct ChemicalFeatures {
+class ChemicalFeatures {
+public:
 
   /// \brief The constructor requires a topology and some coordinate set.
   ///

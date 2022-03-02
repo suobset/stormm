@@ -11,7 +11,8 @@ namespace docs {
 using parse::TextFileReader;
 
 /// \brief Stores data on instances of an object (i.e. a function or struct found in a given file.
-struct ObjectIdentifier {
+class ObjectIdentifier {
+public:
 
   /// \brief Constructor for the ObjectIdentifier struct
   ///

@@ -19,7 +19,8 @@ using data_types::isScalarType;
 /// \brief Class for handling comparisons of floating-point results versus expected values in unit
 ///        tests.  The general form is to take a vector of real numbers and apply the comparison
 ///        across all entries.
-struct Approx {
+class Approx {
+public:
 
   /// \brief Constructors for real number comparisons based on a vector of multiple input values.
   ///        Other floating point and integer vectors can be converted to double-precision vectors.

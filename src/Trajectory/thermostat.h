@@ -14,7 +14,8 @@ enum class ThermostatKind {
 
 /// \brief Store the parameters for a simulation thermostat.  Includes Berendsen, Andersen, and
 ///        Langevin methods.
-struct Thermostat {
+class Thermostat {
+public:
 
   /// \brief Constructors can be blank (implying a thermostat of kind NONE), take a specific kind
   ///        (implying default values for that kind), or take a kind and specific settings.

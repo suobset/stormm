@@ -16,7 +16,8 @@ namespace testing {
 ///        findStringInVector() function.  The relative time can be computed in a number of ways,
 ///        so that the timer can be called less frequently but not accrue all of the time since
 ///        it last sampled the computation.
-struct StopWatch {
+class StopWatch {
+public:
 
   /// \brief The basic constructor records the time at which initialization was called and creates
   ///        a section called "Miscellaneous" to capture any times not assigned to a particular

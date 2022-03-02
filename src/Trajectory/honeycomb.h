@@ -12,7 +12,8 @@ constexpr float default_scaling_resolution = (float)33554432.0;
 ///        exact layout depends on the slant on the unit cell's alpha angle (alpha rotates in a
 ///        plane perpendicular to the x axis, along which all of the Honeycomb's pencil-shaped
 ///        hexagonal prisms are oriented).
-struct Honeycomb {
+class Honeycomb {
+public:
 
 private:
   int position_scaling_res;     ///< Scaling resolution (per Angstrom) for positional integers.

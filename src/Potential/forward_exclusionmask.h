@@ -39,7 +39,8 @@ struct ForwardExclusionMaskReader {
 ///        exclusions, meaning excluded atoms with higher index than the one for which the mask
 ///        is made.  There is no double-counting: if atom 1 excludes atom 5, then atom 5 does not
 ///        note an exclusion of atom 1.
-struct ForwardExclusionMask {
+class ForwardExclusionMask {
+public:
 
   ForwardExclusionMask(const AtomGraph *ag_in);
 

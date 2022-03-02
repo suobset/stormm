@@ -15,7 +15,8 @@ using chemistry::ChemicalFeatures;
 using topology::AtomGraph;
 using trajectory::CoordinateFrameReader;
 
-struct BoundedRestraint {
+class BoundedRestraint {
+public:
 
   /// Constructors take either four atom masks (each of whcih must evaluate to exactly one atom)
   /// or four atom numbers (numbers are given for a series 1... atom_count in the topology pointer,

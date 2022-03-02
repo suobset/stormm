@@ -16,8 +16,9 @@ using constants::ExceptionResponse;
 
 /// \brief Take an image of the available system hardware.  One or more GPUs can be assigned to a
 ///        thread based on this information.
-struct HpcConfig {
-
+class HpcConfig {
+public:
+  
   /// \brief Constructor for an HpcConfig object.  One such object should be present in any given
   ///        OMNI executable.
   HpcConfig(ExceptionResponse policy = ExceptionResponse::DIE);

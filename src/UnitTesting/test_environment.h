@@ -12,7 +12,8 @@ namespace testing {
 /// \brief Object for parsing and storing environment as well as command-line input relevant to
 ///        unit testing (Test Driven Development) in OMNI.  Environment variables will be sought,
 ///        but command-line inputs addressing the same information will take precedence.
-struct TestEnvironment {
+class TestEnvironment {
+public:
 
   /// \brief The TestEnvironment constructor takes command line arguments but also searches for
   ///        native environment variables.

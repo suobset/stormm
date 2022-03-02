@@ -7,7 +7,8 @@
 namespace omni {
 namespace trajectory {
 
-struct AmberNetcdf {
+class AmberNetcdf {
+public:
 
   /// \brief The constructor takes a file name and other critical information, which will be
   ///        used to open a NetCDF file and write its preamble

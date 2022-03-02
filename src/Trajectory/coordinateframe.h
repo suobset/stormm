@@ -76,7 +76,8 @@ struct CoordinateFrameReader {
 ///        serve when the full PhaseSpace object would allocate too much memory.  It also comes
 ///        with its own POINTER mode, such that it allocates no memory of its own and merely points
 ///        to another CoordinateFrame object or PhaseSpace object that does have memory allocated.
-struct CoordinateFrame {
+class CoordinateFrame {
+public:
 
   /// \brief There are several options for construction of this abridged, coordinate-only object.
   ///

@@ -46,7 +46,8 @@ constexpr double amber_coulomb_constant    = 332.0522173;
 ///        http://ambermd.org/FileFormats.php
 ///
 ///        The design is intended to be both performant as well as accessible to developers.
-struct AtomGraph {
+class AtomGraph {
+public:
 
   /// \brief The blank constructor makes a blank AtomGraph, which is used by the general-
   ///        purpose file-based constructor to delegate initialization

@@ -107,7 +107,8 @@ struct ScoreCardWriter {
 ///        object uses the familiar trick of defining an enumerator (StateVariables) with a final
 ///        entry to indicate its total length, so that if more energy components need to be tracked
 ///        in the future the storage and indexing can automatically adjust with new entries.
-struct ScoreCard {
+class ScoreCard {
+public:
 
   /// \brief The constructor requires only the number of systems.
   ///

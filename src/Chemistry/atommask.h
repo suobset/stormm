@@ -57,7 +57,8 @@ enum class SelectionItemKind {
 ///        residues.  A vector of these composes one part of an atom mask.  Multiple masks combine
 ///        according to additional operators (not '!', and '&', as well as or '|') in order to
 ///        compile a single ambmask.  This struct is unguarded.
-struct SelectionItem {
+class SelectionItem {
+public:
 
   /// \brief Initialization for this struct makes it simpler to create an array of such objects
   ///        and be assured that they will not direct mask formulation until filled.
@@ -91,7 +92,8 @@ enum class MaskComponentKind {
 /// \brief A mask is a series of operators and more primitive masks.  This struct comprises both
 ///        things, with an indicator as to what it contains.  A complete mask for a given scope is
 ///        composed by stepping through a list of these objects.
-struct MaskComponent {
+class MaskComponent {
+public:
 
   /// \brief Constructor takes either an operator designation or a series of atoms or residues
   ///
@@ -191,7 +193,8 @@ enum class MaskInputMode {
 ///        particle, to denote whether it is in the mask.  The object also stores the original
 ///        string upon which the mask was constructed and a description of the mask, as it is a
 ///        significant computation to build.
-struct AtomMask {
+class AtomMask {
+public:
 
   /// \brief Constructor takes a mask string, topology, and coordinates
   ///

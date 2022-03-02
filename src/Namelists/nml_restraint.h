@@ -20,7 +20,8 @@ using trajectory::CoordinateFrameReader;
   
 /// \brief Object to encapsulate and dispense restraint information collected from a single
 ///        &restraint namelist.
-struct RestraintControls {
+class RestraintControls {
+public:
 
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.

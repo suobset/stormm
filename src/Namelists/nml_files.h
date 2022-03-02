@@ -33,7 +33,8 @@ constexpr char default_filecon_chkcrd_type[] = "AMBER_ASCII_RST";
 /// \brief Object to encapsulate a system, a coupled set of coordinates and a single topology.
 ///        This can be used to enforce conf.omni to read certain coordinates in the context of a
 ///        particular topology, even when other viable topologies might be available.
-struct MoleculeSystem {
+class MoleculeSystem {
+public:
 
   /// \brief The constructor can make a blank system or automatically fill values.
   ///
@@ -185,7 +186,8 @@ private:
 /// \brief Distill the results of file identification, producing clean lists of free topologies,
 ///        free coordinate files, and linked topology / coordinate systems.  Record output and
 ///        trajectory files, if available.
-struct FilesControls {
+class FilesControls {
+public:
 
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.

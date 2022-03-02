@@ -98,7 +98,8 @@ struct PhaseSpaceWriter {
 ///        particles in a system.  This is not designed to be the most performant representation of
 ///        the system's structure.  Rather, it serves to hold a high-precision representation of a
 ///        single system and transport it between CPUs and high-performance accelerators.
-struct PhaseSpace {
+class PhaseSpace {
+public:
 
   /// \brief Construction of a phase space object, like a topology, is typically done from a file.
   ///

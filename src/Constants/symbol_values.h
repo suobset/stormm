@@ -5,7 +5,8 @@
 namespace omni {
 namespace symbols {
 
-/// The number pi, to twenty decimal places (deeper than double precision)
+/// \brief Pi and related quantities, represented in values that can be stored exactly in
+///        double-precision floating point numbers according to the IEEE_754 standard.
 constexpr double pi = 3.141592653589793115997963468544185161590576171875;
 constexpr double twopi = 2.0 * pi;
 constexpr double inverse_pi = 1.0 / pi;

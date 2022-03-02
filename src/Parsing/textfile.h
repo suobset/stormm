@@ -45,7 +45,8 @@ struct TextFileReader {
 ///        and a Writer.  Private objects of these structs can then be accessed with eponymous
 ///        data() getter functions, returning the appropriate kind of access depending on the
 ///        const-ness of the TextFile object itself.
-struct TextFile {
+class TextFile {
+public:
 
   /// \brief Constructor for taking an ascii file or a very long, formatted string and transforming
   ///        it into a std::vector of characters with line limits recorded.

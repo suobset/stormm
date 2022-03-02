@@ -118,7 +118,8 @@ struct LedgerEntry {
 ///        tables of identifiers that indicate the most recent state of a group of Hybrid arrays,
 ///        which can be accessed by structs of pointers to make sure that they reflect the most
 ///        recent state of all their underlying arrays.
-struct Ledger {
+class Ledger {
+public:
 
   /// \brief Constructor initializes the number of entries and allocations
   Ledger();
@@ -222,7 +223,8 @@ private:
 ///        noteworthy behavior of std::vector, but with the potential to behave as a pointer as
 ///        well.  In this manner, it is intended to confer the convenience of C++ with the freedom
 ///        of classic C programming.
-template <typename T> struct Hybrid {
+template <typename T> class Hybrid {
+public:
 
   /// \brief Constructors vary based on whether CUDA is part of the compilation.
   ///

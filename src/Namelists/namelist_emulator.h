@@ -14,7 +14,8 @@ using constants::CaseSensitivity;
 using constants::ExceptionResponse;
 
 /// \brief Collection of variables to transcribe information contained within a namelist
-struct NamelistEmulator {
+class NamelistEmulator {
+public:
 
   /// \brief Construct an object to emulate Fortran namelist functionality, with improvements.
   ///

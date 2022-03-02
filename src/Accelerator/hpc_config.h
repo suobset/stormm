@@ -21,7 +21,8 @@ constexpr long long int significant_gpu_memory = constants::mega;
   
 /// \brief Pertinent aspects of one particular GPU.  Condensing the data for each GPU in this
 ///        manner helps to ensure that one cache line will obtain all statistics for a single GPU.
-struct GpuDetails {
+class GpuDetails {
+public:
 
   /// \brief Constructors include a blank constructor (which automatically labels the GPU as
   ///        unavailable) and constructors based on cudaDeviceProp or hipDeviceProp.

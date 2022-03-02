@@ -18,7 +18,8 @@ using card::Hybrid;
 ///        targeted a single ARRAY-kind object of the correct memory type, the synthesis, which may
 ///        have many topologies and a great deal more overall information, stores most of its data
 ///        in a series of ARRAY-kind objects, one for each member variable.
-struct AtomGraphSynthesis {
+class AtomGraphSynthesis {
+public:
 
   /// \brief The constructor takes a series of topologies and NMR restraints.  The NMR restraints
   ///        point to specific topologies and thereby apply to any coordinate sets that also point

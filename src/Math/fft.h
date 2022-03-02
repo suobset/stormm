@@ -8,7 +8,8 @@ namespace omni {
 namespace math {
 
 /// \brief Object for managing an FFT, equivalent in some sense to FFTW-wisdom.
-template <typename T> struct FFTConfig {
+template <typename T> class FFTConfig {
+public:
 
   /// \brief The constructor needs a dimension.
   FFTConfig(const int length);

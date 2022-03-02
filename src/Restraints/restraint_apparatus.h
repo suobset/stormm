@@ -13,7 +13,8 @@ using card::Hybrid;
 
 /// \brief A collection of all restraints pertaining to a specific topology for the purposes of
 ///        one simulation, energy minimization, or even a single molecular mechanics calculation.
-struct RestraintApparatus {
+class RestraintApparatus {
+public:
 
   /// \brief The constructor takes a vector of individual restraints
   RestraintApparatus(const std::vector<BoundedRestraint> &rbasis);

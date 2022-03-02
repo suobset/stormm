@@ -192,7 +192,8 @@ struct PsSynthesisWriter {
 ///        stored as long long integers to utilize the 32-bit int pipeline for difference
 ///        computations, bypassing fp64 computations wherever possible to get the best throughput
 ///        on many visualization, AI-oriented, and gaming cards.
-struct PhaseSpaceSynthesis {
+class PhaseSpaceSynthesis {
+public:
 
   /// \brief The constructor works from a series PhaseSpace object, importing  The LabFrame is not
   ///        a POINTER-kind object of any sort.

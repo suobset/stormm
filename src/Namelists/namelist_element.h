@@ -36,7 +36,8 @@ enum class InputStatus {
 
 /// \brief One keyword found in a namelist, ready to store the namelist variable moniker, the
 ///        type, and the value read from the input file.
-struct NamelistElement {
+class NamelistElement {
+public:
 
   /// \brief Constructor for a non-STRUCT NamelistElement
   ///

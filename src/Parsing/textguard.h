@@ -14,7 +14,8 @@ enum class LineSpan {
 };
 
 /// \brief Structure for specifying the features of a comment in some text file
-struct TextGuard {
+class TextGuard {
+public:
 
   /// \brief Constructor for text comment records
   ///

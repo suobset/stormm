@@ -60,7 +60,8 @@ private:
 };
 
 /// \brief A molecule read from an MDL .mol file, or one of many read from a concatenated SDF file.
-struct MdlMolObj {
+class MdlMolObj {
+public:
 
   /// \brief Constructors for the MDL molecule format object (known as MolObj in RDKit)
   ///

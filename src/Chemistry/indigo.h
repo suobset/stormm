@@ -66,7 +66,8 @@ std::vector<int> indigoBondOrderScores();
 
 /// \brief Enumerate the possible combinations of formal charge state and the orders of bonds
 ///        relevant to a particular atom.  Also list the other atoms linked by those bonds.
-struct IndigoAtomCenter {
+class IndigoAtomCenter {
+public:
 
   /// \brief The constructor takes the parent IndigoTable's lists of atoms and bonds
   IndigoAtomCenter(int table_index_in, int z_number_in, int bond_count_in,
@@ -190,7 +191,8 @@ private:
 };
 
 /// \brief A fragment of a structure detailed with the Indigo scoring function
-struct IndigoFragment {
+class IndigoFragment {
+public:
 
   /// \brief Constructor takes a list of atoms, then determines the bonds between them and
   ///        whatever connections to other fragments.  The identities of other fragments are not
@@ -290,7 +292,8 @@ private:
   
 /// \brief Table of options and optimization targets for an Indigo formal charge and bond order
 ///        assignment.
-struct IndigoTable {
+class IndigoTable {
+public:
 
   /// \brief The constructor takes a topology and options for the min and max formal charge (these
   ///        are merely to accelerate the optimization and search for possible values from the

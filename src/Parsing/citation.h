@@ -10,7 +10,8 @@ namespace omni {
 namespace parse {
 
 /// \brief A means for numbering and tracking citations or other documented sources of information
-struct Citation {
+class Citation {
+public:
 
   /// \brief Constructor can take all attributes, but prioritizes the byline and index
   Citation(const std::string &byline_in, int index_in = 0);

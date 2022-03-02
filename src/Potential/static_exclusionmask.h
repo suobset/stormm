@@ -71,7 +71,8 @@ struct StaticExclusionMaskReader {
 ///        exclusions only between atoms +/-255 indices from one another would have space
 ///        requirements of at most 52MB, probably much less.  It is far better than the 2GB which
 ///        would be required to store every exclusion as a unique bit.
-struct StaticExclusionMask {
+class StaticExclusionMask {
+public:
 
   /// \brief The constructor requires a topology, which will have lists of exclusions
   ///

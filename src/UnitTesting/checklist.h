@@ -10,7 +10,8 @@ namespace omni {
 namespace testing {
 
 /// \brief Object for storing a series of test results, with labels
-struct CheckList {
+class CheckList {
+public:
 
   /// \brief Constructor for the CheckList object prepares a blank slate
   CheckList();

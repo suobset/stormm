@@ -29,7 +29,8 @@ constexpr char default_solvent_pbradii[] = "none";
 ///        C++ construction.  Having this object, like others accompanying their respective
 ///        namelists, makes the transition between namelists and custom-formatted control objects
 ///        much simpler.
-struct SolventControls {
+class SolventControls {
+public:
 
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.

@@ -16,7 +16,8 @@ namespace topology {
 ///        once valence work units that evaluate it are responsible for moving all atoms that the
 ///        valence term contains.  In order for a work unit to move any aotm, it must evaluate all
 ///        valence terms that include that atom.
-struct ValenceDelegator {
+class ValenceDelegator {
+public:
 
   /// \brief The object is constructed based on a single topology and oversees the construction of
   ///        an array of valence work units.
@@ -101,7 +102,8 @@ private:
 ///        atoms to implement coordinate updates, velocity updates, and constraints).  While the
 ///        work unit is encoded in the AtomGraphSynthesis object, the assembly is best done by a
 ///        dedicated object with plenty of its own methods.
-struct ValenceWorkUnit {
+class ValenceWorkUnit {
+public:
 
   /// \brief The constructor takes a specific input topology (multiple systems using the same
   ///        topology in an AtomGraphSynthesis can thereby take the same valence work unit and

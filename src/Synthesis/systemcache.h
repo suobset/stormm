@@ -28,7 +28,8 @@ using trajectory::detectCoordinateFileKind;
 ///        list of indices to indicate how they mix and match.  This object exists on the CPU and
 ///        in host memory only, but the topology and coordinate contents have CUDA-capable memory
 ///        components.
-struct SystemCache {
+class SystemCache {
+public:
 
   /// \brief The constructor takes the output of &files namelist reading, perhaps with some
   ///        additional command-line edits.  An empty object overload is available because it is

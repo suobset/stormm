@@ -32,7 +32,8 @@ constexpr double ran2_max = 1.0 - double_increment;
 ///        and unit testing purposes.  Developers that wish to use higher-performance random number
 ///        generators should use the Xoroshiro128Generator (below) or link other libraries for the
 ///        C++ layer (i.e. Intel MKL) or libraries that run on the GPU layer (i.e. cuRAND). 
-struct Ran2Generator {
+class Ran2Generator {
+public:
 
   /// \brief Initialize the unit testing on-board pseudo-random number generator.
   ///
@@ -80,7 +81,8 @@ constexpr ullint xrs256pp_longjump_iv  = 0x39109bb02acbe635LLU;
 ///        situations where a quarter million or more streams are producing random number sequences
 ///        in unison.  Those streams can end up containing correlated patterns.  This generator has
 ///        been shown to fail BigCrush.
-struct Xoroshiro128pGenerator {
+class Xoroshiro128pGenerator {
+public:
 
   /// \brief The constructor can start or restart the generator.
   ///
@@ -133,7 +135,8 @@ private:
 
 /// \brief The "Xoshiro256++" random number generator.  While not cryptographically useful, it is
 ///        a rock-solid random number generator for both floating-point and 64-bit integer results.
-struct Xoshiro256ppGenerator {
+class Xoshiro256ppGenerator {
+public:
 
   /// \brief The constructor can start or restart the generator.
   ///

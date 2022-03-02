@@ -132,7 +132,8 @@ template <typename T> struct NeckGeneralizedBornKit {
 /// \brief Object to hold a complex array of constants referenced by various GB calculations using
 ///        the "neck" formalism for the union of spheres.  This is an object of its own to
 ///        encapsulate the underlying Hybrid data structures.
-struct NeckGeneralizedBornTable {
+class NeckGeneralizedBornTable {
+public:
 
   /// The basic constructor hard-codes the large table of constants into the relevant Hybrid
   /// objects, with no arguments needed.  An overload of the constructor take custom arrays

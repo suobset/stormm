@@ -26,7 +26,8 @@ constexpr int default_random_warmup  = 96;
 ///        by a series of setters.  Validation of each piece of data is handled as it appears
 ///        either in the contructor or via setters.  Getter functions dispense the internal
 ///        information to any application using OMNI libraries.
-struct RandomControls {
+class RandomControls {
+public:
 
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
