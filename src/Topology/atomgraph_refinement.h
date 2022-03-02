@@ -216,6 +216,24 @@ struct VirtualSiteTable {
 /// \brief Unguarded struct to help in the construction of a AtomGraph's categorized non-bonded
 ///        exclusion lists.
 struct Map1234 {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// Overloaded:
+  ///   - Create an empty object
+  ///   - Create an object with pre-allocated memory for each virtual site
+  ///
+  /// \param natom_in       The number of atoms in the system (for bounds arrays)
+  /// \param nb11_count_in  The (known) number of 1:1 non-bonded exclusions
+  /// \param nb12_count_in  The (known) number of 1:2 non-bonded exclusions
+  /// \param nb13_count_in  The (known) number of 1:3 non-bonded exclusions
+  /// \param nb14_count_in  The (known) number of 1:4 non-bonded exclusions
+  /// \{
+  Map1234();
+  Map1234(int natom_in, int nb11_count_in, int nb12_count_in, int nb13_count_in,
+          int nb14_count_in);
+  /// \}
+  
   std::vector<int> nb11_excl_bounds;  ///< 1:1 exclusion bounds list for each atom (needed for
                                       ///<   virtual sites and atoms with virtual sites)
   std::vector<int> nb11_excl_list;    ///< 1:1 exclusions list (double-counts all exclusions)
@@ -229,6 +247,19 @@ struct Map1234 {
 
 /// \brief Unguarded struct to hold refined quantities associated with CMAP objects
 struct CmapAccessories {
+
+  /// \brief The constructor simply allocates memory, if dimensions are available.
+  ///
+  /// Overloaded:
+  ///   - Create an empty object
+  ///   - Create an object with pre-allocated memory for each virtual site
+  ///
+  /// \param cmap_dimensions_in  Dimensions of each CMAP surface
+  /// \{
+  CmapAccessories();
+  CmapAccessories(const std::vector<int> &cmap_dimensions_in);
+  /// \}
+  
   std::vector<double> phi_derivatives;      ///< First derivatives along the CMAP's first axis
   std::vector<double> psi_derivatives;      ///< First derivatives along the CMAP's second axis
   std::vector<double> phi_psi_derivatives;  ///< Cross derivatives at all grid points

@@ -175,7 +175,50 @@ VirtualSiteTable::VirtualSiteTable(const int natom_in, const int vs_count_in) :
   frame_dim2.resize(vs_count_in);
   frame_dim3.resize(vs_count_in);
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+Map1234::Map1234() :
+    nb11_excl_bounds{}, nb11_excl_list{}, nb12_excl_bounds{}, nb12_excl_list{}, nb13_excl_bounds{},
+    nb13_excl_list{}, nb14_excl_bounds{}, nb14_excl_list{}
+{}
+
+//-------------------------------------------------------------------------------------------------
+Map1234::Map1234(const int natom_in, const int nb11_count_in, const int nb12_count_in,
+                 const int nb13_count_in, const int nb14_count_in) :
+    Map1234()
+{
+  nb11_excl_bounds.resize(natom_in + 1, 0);
+  nb12_excl_bounds.resize(natom_in + 1, 0);
+  nb13_excl_bounds.resize(natom_in + 1, 0);
+  nb14_excl_bounds.resize(natom_in + 1, 0);
+  nb11_excl_list.resize(nb11_count_in);
+  nb12_excl_list.resize(nb12_count_in);
+  nb13_excl_list.resize(nb13_count_in);
+  nb14_excl_list.resize(nb14_count_in);
+}
+
+//-------------------------------------------------------------------------------------------------
+CmapAccessories::CmapAccessories() :
+    phi_derivatives{}, psi_derivatives{}, phi_psi_derivatives{}, patch_matrix_bounds{},
+    patch_matrix_form{}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CmapAccessories::CmapAccessories(const std::vector<int> &cmap_dimensions_in) :
+    CmapAccessories()
+{
+  const int nmaps = cmap_dimensions_in.size();
+  int nelem = 0;
+  for (int i = 0; i < nmaps; i++) {
+    nelem += cmap_dimensions_in[i] * cmap_dimensions_in[i];
+  }
+  phi_derivatives.resize(nelem);
+  psi_derivatives.resize(nelem);
+  phi_psi_derivatives.resize(nelem);
+  patch_matrix_bounds.resize(nmaps + 1);
+  patch_matrix_form.resize(nelem * 16);
+}
+
 //-------------------------------------------------------------------------------------------------
 void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_parameters,
                    std::vector<int> *tmp_charge_indices, int *q_param_count,

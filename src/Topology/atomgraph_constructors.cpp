@@ -390,7 +390,8 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
     tmp_residue_names[j] = cdk.res_names[orig_idx];
     tmp_tree_symbols[j] = original.tree_symbols.readHost(orig_idx);
     tmp_residue_index[j] = base_residue_indices[orig_idx];
-    subset_mask[orig_idx] = i;
+    subset_mask[orig_idx] = j;
+    j++;
   }
 
   // Allocate and tabulate residue and molecule-level information.  Adjust the residue indices
@@ -452,7 +453,6 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
       n_new_dihe++;
     }
   }
-  BasicValenceTable bvt(atom_count, n_new_bond, n_new_angl, n_new_dihe);
   int n_new_ubrd = 0;
   for (int pos = 0; pos < vk.nubrd; pos++) {
     if (subset_mask[vk.ubrd_i_atoms[pos]] >= 0 && subset_mask[vk.ubrd_k_atoms[pos]] >= 0) {
@@ -474,7 +474,54 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
       n_new_cmap++;
     }
   }
+
+  // Compose the basic valence table and the CHARMM valence table.  Initially, the terms in the
+  // new topology's holding arrays will bear the parameter indices of the old topology.  This
+  // data will be used, in turn, to create the filtered parameter tables for the new topology
+  // before updating the indexing tables.
+  BasicValenceTable bvt(atom_count, n_new_bond, n_new_angl, n_new_dihe);
+  int new_bond_counter = 0;
+  for (int pos = 0; pos < vk.nbond; pos++) {
+    if (subset_mask[vk.bond_i_atoms[pos]] >= 0 && subset_mask[vk.bond_j_atoms[pos]] >= 0) {
+      bvt.bond_i_atoms[new_bond_counter]    = subset_mask[vk.bond_i_atoms[pos]];
+      bvt.bond_j_atoms[new_bond_counter]    = subset_mask[vk.bond_j_atoms[pos]];
+      bvt.bond_param_idx[new_bond_counter]  = vk.bond_param_idx[pos];
+      bvt.bond_mods[new_bond_counter] = vk.bond_modifiers[pos];
+      new_bond_counter++;
+    }
+  }
+  int new_angl_counter = 0;
+  for (int pos = 0; pos < vk.nangl; pos++) {
+    if (subset_mask[vk.angl_i_atoms[pos]] >= 0 && subset_mask[vk.angl_j_atoms[pos]] >= 0 &&
+        subset_mask[vk.angl_k_atoms[pos]] >= 0) {
+      bvt.angl_i_atoms[new_angl_counter]    = subset_mask[vk.angl_i_atoms[pos]];
+      bvt.angl_j_atoms[new_angl_counter]    = subset_mask[vk.angl_j_atoms[pos]];
+      bvt.angl_k_atoms[new_angl_counter]    = subset_mask[vk.angl_k_atoms[pos]];
+      bvt.angl_param_idx[new_angl_counter]  = vk.angl_param_idx[pos];
+      bvt.angl_mods[new_angl_counter] = vk.angl_modifiers[pos];
+      new_angl_counter++;
+    }
+  }
+  int new_dihe_counter = 0;
+  for (int pos = 0; pos < vk.ndihe; pos++) {
+    if (subset_mask[vk.dihe_i_atoms[pos]] >= 0 && subset_mask[vk.dihe_j_atoms[pos]] >= 0 &&
+        subset_mask[vk.dihe_k_atoms[pos]] >= 0 && subset_mask[vk.dihe_l_atoms[pos]] >= 0) {
+      bvt.dihe_i_atoms[new_dihe_counter]    = subset_mask[vk.dihe_i_atoms[pos]];
+      bvt.dihe_j_atoms[new_dihe_counter]    = subset_mask[vk.dihe_j_atoms[pos]];
+      bvt.dihe_k_atoms[new_dihe_counter]    = subset_mask[vk.dihe_k_atoms[pos]];
+      bvt.dihe_l_atoms[new_dihe_counter]    = subset_mask[vk.dihe_l_atoms[pos]];
+      bvt.dihe_param_idx[new_dihe_counter]  = vk.dihe_param_idx[pos];
+      bvt.dihe_mods[new_dihe_counter] = vk.dihe_modifiers[pos];
+      new_dihe_counter++;
+    }
+  }
+  std::vector<int> bond_correspondence(vk.nbond_param, -1);
+  for (int i = 0; i < n_new_bond; i++) {
+    bond_correspondence[bvt.bond_param_idx[i]] = 1;
+    
+  }
   
+  CharmmValenceTable mvt(atom_count, n_new_ubrd, n_new_cimp, n_new_cmap);
 }
 
 //-------------------------------------------------------------------------------------------------
