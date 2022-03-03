@@ -22,7 +22,13 @@ enum class DataOrder {
   DESCENDING,  ///< The data is found in descending order, element i always >= element i + 1
   NONE         ///< The data is found in no discernible order
 };
-  
+
+/// \brief Enumerate resampling strategies
+enum class ResamplingMethod {
+  JACKKNIFE,      ///< Random resampling, without replacement
+  BOOTSTRAP       ///< Random resampling, without replacement
+};
+
 /// \brief Compute the variance of a set of data as a running quantity based on just the power
 ///        series of the one- and two-moments of the data.  Different methods fed to this function
 ///        can also produce standard deviation, root mean squared deviation, and either quantity

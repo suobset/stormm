@@ -13,16 +13,17 @@ namespace user_input {
 using omni::constants::ExceptionResponse;
 using omni::namelist::NamelistEmulator;
 using omni::parse::TextFile;
-  
+
 /// \brief Default input settings for the &conformer namelist
 /// \{
-constexpr int default_conf_rotation_samples   = 3;
-constexpr char default_conf_chirality[]       = "false";
-constexpr char default_conf_cis_trans[]       = "false";
-constexpr char default_conf_stop_hbonds[]     = "false";
-constexpr int default_conf_running_states     = 16;
-constexpr int default_conf_final_states       = 100;
-constexpr double default_conf_rmsd_tolerance  = 0.5;
+constexpr int default_conf_rotation_samples     = 3;
+constexpr char default_conf_chirality[]         = "false";
+constexpr char default_conf_cis_trans[]         = "false";
+constexpr char default_conf_stop_hbonds[]       = "false";
+constexpr int default_conf_running_states       = 16;
+constexpr int default_conf_final_states         = 100;
+constexpr double default_conf_rmsd_tolerance    = 0.5;
+constexpr int default_conf_reshuffle_iterations = 0;
 /// \}
 
 /// \brief Object to encapsulate the data that can be extracted from the &conformer namelist.
