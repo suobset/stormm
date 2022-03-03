@@ -742,5 +742,129 @@ template <typename T> int findBin(const Hybrid<T> &limits, const T value,
   return findBin(limits.data(), value, limits.size(), policy);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T> size_t locateValue(const T* vdata, const T value, const size_t length,
+                                         const DataOrder format) {
+  if (length == 0LLU) {
+    rtErr("Unable to search an array of zero length.", "locateValue");
+  }
+  switch (format) {
+  case DataOrder::ASCENDING:
+    if (value >= vdata[0] && value <= vdata[length - 1]) {
+      size_t min_pos = 0LLU;
+      size_t max_pos = length;
+      while (max_pos - min_pos > 1) {
+        size_t mid_pos = (max_pos + min_pos) / 2;
+        if (vdata[mid_pos] > value) {
+          max_pos = mid_pos;
+        }
+        else {
+          min_pos = mid_pos;
+        }
+      }
+      return (vdata[min_pos] == value) ? min_pos : length;
+    }
+    break;
+  case DataOrder::DESCENDING:
+    if (value <= vdata[0] && value >= vdata[length - 1]) {
+      size_t min_pos = 0LLU;
+      size_t max_pos = length;
+      while (max_pos - min_pos > 1) {
+        size_t mid_pos = (max_pos + min_pos) / 2;
+        if (vdata[mid_pos] < value) {
+          max_pos = mid_pos;
+        }
+        else {
+          min_pos = mid_pos;
+        }
+      }
+      return (vdata[min_pos] == value) ? min_pos : length;
+    }
+    break;
+  case DataOrder::NONE:
+    for (size_t i = 0; i < length; i++) {
+      if (vdata[i] == value) {
+        return i;
+      }
+    }
+    break;
+  }
+  return length;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> size_t locateValue(const std::vector<T> &vdata, const T value,
+                                         const DataOrder format) {
+  return locateValue(vdata.data(), value, vdata.size(), format);
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> size_t locateValue(const Hybrid<T> &vdata, const T value,
+                                         const DataOrder format) {
+  return locateValue(vdata.data(), value, vdata.size(), format);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> size_t locateValue(const Approx &value, const T* vdata, const size_t length,
+                                         const DataOrder format) {
+  if (length == 0LLU) {
+    rtErr("Unable to search an array of zero length.", "locateValue");
+  }
+  switch (format) {
+  case DataOrder::ASCENDING:
+    if (value >= vdata[0] && value <= vdata[length - 1]) {
+      size_t min_pos = 0LLU;
+      size_t max_pos = length;
+      while (max_pos - min_pos > 1) {
+        size_t mid_pos = (max_pos + min_pos) / 2;
+        if (vdata[mid_pos] > value) {
+          max_pos = mid_pos;
+        }
+        else {
+          min_pos = mid_pos;
+        }
+      }
+      return (vdata[min_pos] == value) ? min_pos : length;
+    }
+    break;
+  case DataOrder::DESCENDING:
+    if (value <= vdata[0] && value >= vdata[length - 1]) {
+      size_t min_pos = 0LLU;
+      size_t max_pos = length;
+      while (max_pos - min_pos > 1) {
+        size_t mid_pos = (max_pos + min_pos) / 2;
+        if (vdata[mid_pos] < value) {
+          max_pos = mid_pos;
+        }
+        else {
+          min_pos = mid_pos;
+        }
+      }
+      return (vdata[min_pos] == value) ? min_pos : length;
+    }
+    break;
+  case DataOrder::NONE:
+    for (size_t i = 0; i < length; i++) {
+      if (vdata[i] == value) {
+        return i;
+      }
+    }
+    break;
+  }
+  return length;
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> size_t locateValue(const Approx &value, const std::vector<T> &vdata,
+                                         const DataOrder format) {
+  return locateValue(value, vdata.data(), vdata.size(), format);
+}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &vdata,
+                                         const DataOrder format) {
+  return locateValue(value, vdata.data(), vdata.size(), format);
+}
+
 } // namespace math
 } // namespace omni

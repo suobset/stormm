@@ -12,6 +12,7 @@
 #include "DataTypes/omni_vector_types.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
+#include "UnitTesting/approx.h"
 #include "statistics.h"
 
 namespace omni {
@@ -25,6 +26,7 @@ using data_types::isFloatingPointScalarType;
 using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
+using testing::Approx;
   
 /// \brief Check that two vectors of the same data type are compatible for various arithmetic
 ///        comparisons.  Throws and exception if the vectors cannot be compared.
@@ -374,7 +376,43 @@ template <typename T> int findBin(const std::vector<T> &limits, const T value,
 template <typename T> int findBin(const Hybrid<T> &limits, const T value,
                                   const ExceptionResponse policy = ExceptionResponse::DIE);
 /// \}
-  
+
+/// \brief Search a data set for a particular value.  The index of the element containing the
+///        value of interest is returned.  The data can be stated as occurring in a particular
+///        order, which will be trusted (certain orderings will permit a binary search, otherwise
+///        a direct linear search will occur).  Returns the length of the array if the value is
+///        not found.
+///
+/// Overloaded:
+///   - Operate on a C-style array
+///   - Operate on a Standard Template Library vector
+///   - Operate on a Hybrid object
+///   - Search for an approximate value (return the first match meeting specified tolerance)
+///
+/// \param vdata   The array to search
+/// \param value   The value to seek out in the array (might be approximate)
+/// \param length  Length of the C-style array (will be trusted)
+/// \param format  Statement about the form of the data to expect (will be trusted)
+/// \{
+template <typename T> size_t locateValue(const T* vdata, const T value, const size_t length,
+                                         const DataOrder format = DataOrder::NONE);
+
+template <typename T> size_t locateValue(const std::vector<T> &vdata, const T value,
+                                         const DataOrder format = DataOrder::NONE);
+
+template <typename T> size_t locateValue(const Hybrid<T> &vdata, const T value,
+                                         const DataOrder format = DataOrder::NONE);
+
+template <typename T> size_t locateValue(const Approx &value, const T* vdata, const size_t length,
+                                         const DataOrder format = DataOrder::NONE);
+
+template <typename T> size_t locateValue(const Approx &value, const std::vector<T> &vdata,
+                                         const DataOrder format = DataOrder::NONE);
+
+template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &vdata,
+                                         const DataOrder format = DataOrder::NONE);
+/// \}
+
 } // namespace math
 } // namespace omni
 

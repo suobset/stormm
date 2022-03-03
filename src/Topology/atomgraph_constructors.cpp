@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <climits>
 #include "Math/series_ops.h"
+#include "Math/summation.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 
@@ -13,7 +14,10 @@ using card::HybridTargetLevel;
 using card::HybridKind;
 using math::getSubsetIndexPattern;
 using math::extractIndexedValues;
-  
+using math::prefixSumInPlace;
+using math::PrefixSumType;
+using math::sum;
+
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph() :
     version_stamp{""},
@@ -335,6 +339,32 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
       break;
     }
   }
+
+  // Get the relevant abstracts to help with pointers
+  const ChemicalDetailsKit orig_cdk         = original.getChemicalDetailsKit();
+  const NonbondedKit<double> orig_nbk       = original.getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> orig_vk          = original.getDoublePrecisionValenceKit();
+  const ImplicitSolventKit<double> orig_isk = original.getDoublePrecisionImplicitSolventKit();
+
+  // Check for virtual sites whose frames are not completely represented in the subset.  Die, or
+  // reject the virtual sites if their frames are incomplete, depending on the fault tolerance
+  // setting.
+  bool vs_in_ascending_order  = true;
+  bool vs_in_descending_order = true;
+  const int* vs_indices = original.virtual_site_atoms.data();
+  for (int i = 0; i < original.virtual_site_count - 1; i++) {
+    vs_in_ascending_order  = (vs_in_ascending_order  && vs_indices[i] < vs_indices[i + 1]);
+    vs_in_descending_order = (vs_in_descending_order && vs_indices[i] > vs_indices[i + 1]);
+  }
+  
+  for (int i = 0; i < nsubset; i++) {
+    if (orig_cdk.z_numbers[local_subset[i]] > 0) {
+      continue;
+    }
+
+    // This atom is a virtual site.  Make sure that the frame is completely represented.
+    
+  }
   
   // Prepare a table of residue indices for the original topology
   const std::vector<int> base_residue_indices = original.getResidueIndex();
@@ -344,12 +374,6 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
   // -1 to indicate that an atom is not in the subset, and >= 0 to indicate the atom's index in
   // the subset, hence its index in the new topology.
   std::vector<int> subset_mask(original.atom_count, -1);
-
-  // Get the relevant abstracts to help with pointers
-  const ChemicalDetailsKit orig_cdk         = original.getChemicalDetailsKit();
-  const NonbondedKit<double> orig_nbk       = original.getDoublePrecisionNonbondedKit();
-  const ValenceKit<double> orig_vk          = original.getDoublePrecisionValenceKit();
-  const ImplicitSolventKit<double> orig_isk = original.getDoublePrecisionImplicitSolventKit();
   
   // Allocate and tabulate all properties of atoms.
   std::vector<int> tmp_atom_struc_numbers(atom_count);
@@ -535,12 +559,12 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
   }
 
   // Create parameter tables for the basic valence terms, condensed for the new topology
-  std::vector<int> bond_correspondence = getSubsetIndexPattern(bvt.bond_param_idx,
-                                                               &bond_parameter_count);
-  std::vector<int> angl_correspondence = getSubsetIndexPattern(bvt.angl_param_idx,
-                                                               &angl_parameter_count);
-  std::vector<int> dihe_correspondence = getSubsetIndexPattern(bvt.dihe_param_idx,
-                                                               &dihe_parameter_count);
+  const std::vector<int> bond_correspondence = getSubsetIndexPattern(bvt.bond_param_idx,
+                                                                     &bond_parameter_count);
+  const std::vector<int> angl_correspondence = getSubsetIndexPattern(bvt.angl_param_idx,
+                                                                     &angl_parameter_count);
+  const std::vector<int> dihe_correspondence = getSubsetIndexPattern(bvt.dihe_param_idx,
+                                                                     &dihe_parameter_count);
   std::vector<double> tmp_bond_stiffnesses = extractIndexedValues(original.bond_stiffnesses,
                                                                   bond_correspondence,
                                                                   bond_parameter_count);
@@ -607,6 +631,49 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
       new_cmap_counter++;
     }
   }
+
+  // Make parameter tables for CHARMM force field terms
+  const std::vector<int> ubrd_correspondence =
+    getSubsetIndexPattern(mvt.ubrd_param_idx, &urey_bradley_parameter_count);
+  const std::vector<int> cimp_correspondence =
+    getSubsetIndexPattern(mvt.impr_param_idx, &charmm_impr_parameter_count);
+  const std::vector<int> cmap_correspondence =
+    getSubsetIndexPattern(mvt.cmap_param_idx, &cmap_surface_count);
+  const std::vector<double> tmp_urey_bradley_stiffnesses =
+    extractIndexedValues(original.urey_bradley_stiffnesses, ubrd_correspondence,
+                         urey_bradley_parameter_count);
+  const std::vector<double> tmp_urey_bradley_equilibria =
+    extractIndexedValues(original.urey_bradley_equilibria, ubrd_correspondence,
+                         urey_bradley_parameter_count);
+  const std::vector<double> tmp_charmm_impr_stiffnesses =
+    extractIndexedValues(original.charmm_impr_stiffnesses, cimp_correspondence,
+                         charmm_impr_parameter_count);
+  const std::vector<double> tmp_charmm_impr_phase_angles =
+    extractIndexedValues(original.charmm_impr_phase_angles, cimp_correspondence,
+                         charmm_impr_parameter_count);
+  const int nscan = cmap_correspondence.size();
+  std::vector<int> cmap_offsets(cmap_surface_count + 1, 0);
+  for (int i = 0; i < nscan; i++){
+    if (cmap_correspondence[i] >= 0) {
+      cmap_offsets[cmap_correspondence[i]] = orig_vk.cmap_dim[i] * orig_vk.cmap_dim[i];
+    }
+  }
+  prefixSumInPlace<int>(&cmap_offsets, PrefixSumType::EXCLUSIVE, "AtomGraph");
+  const int cmap_alloc_size = cmap_offsets[cmap_surface_count];
+  std::vector<double> tmp_cmap_surfaces(cmap_alloc_size);
+  for (int i = 0; i < nscan; i++) {
+    if (cmap_correspondence[i] >= 0) {
+      const int write_pos = cmap_offsets[cmap_correspondence[i]];
+      const int read_pos = orig_vk.cmap_surf_bounds[i];
+      const int map_element_count = orig_vk.cmap_dim[i] * orig_vk.cmap_dim[i];
+      for (int j = 0; j < map_element_count; j++) {
+        tmp_cmap_surfaces[write_pos + j] = orig_vk.cmap_surf[read_pos + j];
+      }
+    }
+  }
+
+  // Finish up CHARMM parameter indexing with the atom assignments
+  mvt.makeAtomAssignments();
 }
 
 //-------------------------------------------------------------------------------------------------

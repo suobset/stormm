@@ -10,7 +10,8 @@ namespace topology {
 
 using card::HybridTargetLevel;
 using math::findBin;
-
+using math::locateValue;
+  
 //-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getFileName() const {
   return source;
@@ -415,6 +416,29 @@ std::vector<int2> AtomGraph::findVirtualSites(const int low_index, const int hig
 //-------------------------------------------------------------------------------------------------
 int AtomGraph::findVirtualSites(const int index) const {
   return virtual_site_atoms.readHost(index);
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getVirtualSiteIndex(const int atom_index, const ExceptionResponse policy) const {
+  const int result = locateValue(virtual_site_atoms, atom_index);
+
+  // Check that the atom found is, indeed, a virtual site
+  if (virtual_site_atoms.readHost(result) != atom_index) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("Search for the virtual site index of atom index " + std::to_string(atom_index) +
+            "yielded a virtual site with atom index " +
+            std::to_string(virtual_site_atoms.readHost(result)) +
+            ".  The atomic number of atom index " + std::to_string(atom_index) + " is " +
+            std::to_string(atomic_numbers.readHost(atom_index)) + ".", "AtomGraph",
+            "getVirtualSiteIndex");
+    case ExceptionResponse::WARN:
+      return -1;
+    case ExceptionResponse::SILENT:
+      return -1;
+    }
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -8,13 +8,21 @@ namespace math {
 /// \brief Enumerate various statistical methods for computing the variance of a sequence of
 ///        n numbers (i.e. as presented in a std::vector).
 enum class VarianceMethod {
-  VARIANCE,                    // Basic variance, sum_i((x_i - <x>)^2)
-  STANDARD_DEVIATION,          // Normalized root variance, sqrt(sum_i((x_i - <x>)^2) / (n - 1))
-  ROOT_MEAN_SQUARED_DEVIATION, // Unnormalized root variance, sqrt(sum_i((x_i - <x>)^2) / n)
-  COEFFICIENT_OF_VARIATION,    // Standard deviation divided by mean absolute value <|x|>
-  NORMALIZED_RMSD              // Root mean squared deviation divided by mean absolute value <|x|>
+  VARIANCE,                    ///< Basic variance, sum_i((x_i - <x>)^2)
+  STANDARD_DEVIATION,          ///< Normalized root variance, sqrt(sum_i((x_i - <x>)^2) / (n - 1))
+  ROOT_MEAN_SQUARED_DEVIATION, ///< Unnormalized root variance, sqrt(sum_i((x_i - <x>)^2) / n)
+  COEFFICIENT_OF_VARIATION,    ///< Standard deviation divided by mean absolute value <|x|>
+  NORMALIZED_RMSD              ///< Root mean squared deviation divided by mean absolute
+                               ///<   value <|x|>
 };
 
+/// \brief Enumerate possible arrangements of data that might be encountered.
+enum class DataOrder {
+  ASCENDING,   ///< The data is found in ascending order, element i always <= element i + 1
+  DESCENDING,  ///< The data is found in descending order, element i always >= element i + 1
+  NONE         ///< The data is found in no discernible order
+};
+  
 /// \brief Compute the variance of a set of data as a running quantity based on just the power
 ///        series of the one- and two-moments of the data.  Different methods fed to this function
 ///        can also produce standard deviation, root mean squared deviation, and either quantity

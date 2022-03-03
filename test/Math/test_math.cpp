@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
 
   // Section 4
   section("Lightweight matrix math from the hand-coded routines");
-
+  
   // Check vector processing capabilities
   section(1);
   const std::vector<double> dv_i = { 0.1, 0.5, 0.9, 0.7, 0.8 };
@@ -99,7 +99,61 @@ int main(int argc, char* argv[]) {
   check(d3_c.x == Approx(cp_ab[0]).margin(tiny) && d3_c.y == Approx(cp_ab[1]).margin(tiny) &&
         d3_c.z == Approx(cp_ab[2]).margin(tiny), "Vector cross product does not function as "
         "expected when provided double-precision HPC tuples.");
-  
+  const std::vector<int> i_searchable_asc = {  0,  1,  2,  3,  4,  5, 16, 17, 28, 99 };
+  const std::vector<int> i_searchable_des = {  9,  8,  6,  5,  4,  2,  1, -3, -4, -6 };
+  const std::vector<int> i_searchable_non = {  9, 18, 46,  5, -4,  2,  1, -3, 15, -8 };
+  std::vector<int> search_order = { 0, 4, 8, 2, 6, 1, 5, 3, 7, 9 };
+  const int nsearch = i_searchable_asc.size();
+  std::vector<int> asc_result(nsearch), des_result(nsearch), non_result(nsearch);
+  for (int i = 0; i < nsearch; i++) {
+    asc_result[i] = locateValue(i_searchable_asc, i_searchable_asc[search_order[i]],
+                                DataOrder::ASCENDING);
+    des_result[i] = locateValue(i_searchable_des, i_searchable_des[search_order[i]],
+                                DataOrder::DESCENDING);
+    non_result[i] = locateValue(i_searchable_non, i_searchable_non[search_order[i]],
+                                DataOrder::NONE);
+  }
+  check(asc_result, RelationalOperator::EQUAL, search_order, "Searching a data set arranged in "
+        "ascending order yielded incorrect results.");
+  check(des_result, RelationalOperator::EQUAL, search_order, "Searching a data set arranged in "
+        "descending order yielded incorrect results.");
+  check(non_result, RelationalOperator::EQUAL, search_order, "Searching a data set arranged in "
+        "no discernible order yielded incorrect results.");
+  for (int i = 0; i < nsearch - 1; i++) {
+    asc_result[i] = locateValue(i_searchable_asc.data(), i_searchable_asc[search_order[i]],
+                                nsearch - 1, DataOrder::ASCENDING);
+    des_result[i] = locateValue(i_searchable_des.data(), i_searchable_des[search_order[i]],
+                                nsearch - 1, DataOrder::DESCENDING);
+    non_result[i] = locateValue(i_searchable_non.data(), i_searchable_non[search_order[i]],
+                                nsearch - 1, DataOrder::NONE);
+  }
+  asc_result.resize(nsearch - 1);
+  des_result.resize(nsearch - 1);
+  non_result.resize(nsearch - 1);
+  search_order.resize(nsearch - 1);
+  check(asc_result, RelationalOperator::EQUAL, search_order, "Searching a data set of size " +
+        std::to_string(nsearch - 1) + ", arranged in ascending order, yielded incorrect results.");
+  check(des_result, RelationalOperator::EQUAL, search_order, "Searching a data set of size " +
+        std::to_string(nsearch - 1) +
+        ", arranged in descending order, yielded incorrect results.");
+  check(non_result, RelationalOperator::EQUAL, search_order, "Searching a data set of size " +
+        std::to_string(nsearch - 1) +
+        ", arranged in no discernible order, yielded incorrect results.");
+  const std::vector<double> d_searchable_asc = { 0.1, 0.7, 2.3, 6.8, 7.1, 7.2, 9.3, 9.5, 9.7 };
+  const std::vector<double> d_searchable_des = { 6.1, 5.7, 4.3, 3.8, 3.1, 2.2, 1.3, 0.5, 0.2 };
+  const std::vector<double> d_searchable_non = { 5.1, 1.7, 4.3, 9.8, 3.1, 0.2, 0.3, 7.5, 1.8 };
+  check(locateValue(Approx(2.35).margin(0.06), d_searchable_asc, DataOrder::ASCENDING),
+        RelationalOperator::EQUAL, 2, "Binary search in ascending order with an approximate "
+        "target value that should hit its mark from above fails.");
+  check(locateValue(Approx(7.05).margin(0.06), d_searchable_asc, DataOrder::ASCENDING),
+        RelationalOperator::EQUAL, 4, "Binary search in ascending order with an approximate "
+        "target value that should hit its mark from below fails.");
+  check(locateValue(Approx(0.55).margin(0.06), d_searchable_des, DataOrder::DESCENDING),
+        RelationalOperator::EQUAL, 7, "Binary search in descending order with an approximate "
+        "target value that should hit its mark from above fails.");
+  check(locateValue(Approx(3.75).margin(0.06), d_searchable_des, DataOrder::DESCENDING),
+        RelationalOperator::EQUAL, 3, "Binary search in descending order with an approximate "
+        "target value that should hit its mark from below fails.");
   
   // Verify that the internal random number generation is consistent with expectations.  Create
   // three generators, the first two initialized in the same way (which thus should track one

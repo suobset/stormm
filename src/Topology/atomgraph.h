@@ -608,6 +608,13 @@ public:
   int findVirtualSites(int index) const;
   /// \}
 
+  /// \brief Get the virtual site index of an atom index.  If the atom index is not a virtual site,
+  ///        this function will throw an error.
+  ///
+  /// \param atom_index  Index of the atom in question
+  /// \param policy      Action to take if the atom turns out not to be a virtual site at all
+  int getVirtualSiteIndex(int atom_index, ExceptionResponse policy = ExceptionResponse::DIE) const;
+  
   /// \brief Get the frame type of a particular virtual site.
   ///
   /// \param index  The virtual site of interest, indexed according to its place in the list of
