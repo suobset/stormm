@@ -55,7 +55,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Restraints/restraint_builder.cpp \
 		 $(SRCDIR)/Structure/isomerization.cpp \
 		 $(SRCDIR)/Structure/local_arrangement.cpp \
-		 $(SRCDIR)/Structure/virtual_site_placement.cpp \
+		 $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/systemcache.cpp \
@@ -148,7 +148,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/isomerization.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
 		   $(SRCDIR)/Structure/structure_enumerators.h \
-		   $(SRCDIR)/Structure/virtual_site_placement.h \
+		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
 		   $(SRCDIR)/Synthesis/systemcache.h \
@@ -239,7 +239,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Restraints/restraint_builder.o \
 		$(SRCDIR)/Structure/isomerization.o \
 		$(SRCDIR)/Structure/local_arrangement.o \
-		$(SRCDIR)/Structure/virtual_site_placement.o \
+		$(SRCDIR)/Structure/virtual_site_handling.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		$(SRCDIR)/Synthesis/systemcache.o \
