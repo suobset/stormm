@@ -177,6 +177,33 @@ enum class WaterModel {
   TIP5P_2018,     ///< TIP5P-2018, Y Khalak et al., J. Chem. Phys. 149:224507 (2018)
 };
 
+/// \brief Enumerate the virtual site types available in Amber.
+enum class VirtualSiteKind {
+  FLEX_2,   ///< Flexible two-atom frame: the distance between the virtual site and its parent
+            ///<   atom scales with the distance between the parent atom and frame atom 2
+  FIXED_2,  ///< Fixed distance, two-atom frame: the distance between the virtual site and its
+            ///<   parent atom is fixed regardless of the way the frame stretches
+  FLEX_3,   ///< Flexible three-atom frame: the distance between the virtual site and its parent
+            ///<   atom scales with the distance between the parent atom and frame atoms 2 and 3
+  FIXED_3,  ///< Fixed distance, three-atom frame: the distance between the virtual site and its
+            ///<   parent atom is fixed, along a line between the parent atom and a point between
+            ///<   frame atoms 2 and 3 that does stretch with the distance between those atoms.
+            ///<   Mathematically, this is the equivalent of the FIXED_2 frame expanded to a third
+            ///<   dimension.
+  FAD_3,    ///< Fixed distance, fixed angle three-atom frame: the virtual site is placed at a
+            ///<   a fixed distance from its parent atom, such that the virtual site makes a fixed
+            ///<   angle with its parent atom and frame atom 2, the orientation of the angle being
+            ///<   by the position of frame atom 3.
+  OUT_3,    ///< Out of plane, flexible three-atom frame: the virtual site is placed at a point
+            ///<   determined in the manner of FLEX_3, then moved out of plane by some proportion
+            ///<   of the cross product of the vectors between the parent atom and frame atoms 2
+            ///<   or 3.
+  FIXED_4,  ///< Fixed distance, four-atom frame: this places the virtual site at a set distance
+            ///<   from its parent atom, along a vector determined by a cross product of vectors
+            ///<   between frame atoms 2, 3, and 4
+  NONE      ///< No frame type
+};
+  
 /// \brief Produce a string denoting the meaning of a UnitCellType enumeration.
 ///
 /// \param uc  The type of unit cell
