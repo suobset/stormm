@@ -55,6 +55,10 @@ void imageCoordinates(std::vector<double> *x, std::vector<double> *y, std::vecto
 void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
                       const double* umat, const double* invu, UnitCellType unit_cell,
                       ImagingMethod style);
+
+void imageCoordinates(PhaseSpace *ps, ImagingMethod style);
+
+void imageCoordinates(CoordinateFrame *cf, ImagingMethod style);
 /// \}
 
 /// \brief Compute the distance between two points in a coordinate set.  All forms of this

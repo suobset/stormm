@@ -34,7 +34,7 @@ using trajectory::PhaseSpaceWriter;
 /// \param ps         Coordinates of the system as a mutable PhaseSpace object
 /// \param cf         Coordinates of the system as a mutable CoordinateFrame object
 /// \param vsk        Virtual sites details abstracted from the original topology
-/// \param ag         System topology
+/// \param ag         System topology containing virtual site specifications        
 /// \{
 void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* umat,
                        const double* invu, const UnitCellType unit_cell,
@@ -45,6 +45,13 @@ void placeVirtualSites(PhaseSpace *ps, const AtomGraph &ag);
 void placeVirtualSites(CoordinateFrame *cf, const AtomGraph &ag);
 /// \}
 
+/// \brief Transmute forces on virtual sites to their frame atoms, using double-precision math
+///        throughout.
+///
+/// \param ps  Coordinates and forces of the system
+/// \param ag  System topology containing virtual site specifications        
+void transmuteVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag);
+ 
 } // namespace structure
 } // namespace omni
 

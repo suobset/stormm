@@ -246,6 +246,11 @@ std::string getWaterModelName(WaterModel wm);
 /// \param wm  The water model enumerated value
 Citation getWaterModelCitation(WaterModel wm);
 
+/// \brief Produce the name of a virtual site frame based on its enumeration.
+///
+/// \param vsf  The virtual site frame identifier
+std::string getVirtualSiteFrameName(VirtualSiteKind vsf);
+  
 } // namespace topology
 } // namespace omni
 

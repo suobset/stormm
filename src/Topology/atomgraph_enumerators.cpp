@@ -424,5 +424,26 @@ Citation getWaterModelCitation(const WaterModel wm) {
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string getVirtualSiteFrameName(const VirtualSiteKind vsf) {
+  switch (vsf) {
+  case VirtualSiteKind::FLEX_2:
+    return std::string("Flex-2 / FlexDis2");
+  case VirtualSiteKind::FIXED_2:
+    return std::string("FD-2 / FixedDis2");
+  case VirtualSiteKind::FLEX_3:
+    return std::string("Flex-3 / FlexDis3");
+  case VirtualSiteKind::FIXED_3:
+    return std::string("FD-3 / FixedDis3");
+  case VirtualSiteKind::FAD_3:
+    return std::string("FAD-3 / FixAnglDis");
+  case VirtualSiteKind::OUT_3:
+    return std::string("Out-3 / OutOfPlane");
+  case VirtualSiteKind::FIXED_4:
+    return std::string("FD-4 / FourPoint");
+  }
+  return std::string("No detected frame type.");
+}
+
 } // namespace topology
 } // namespace omni

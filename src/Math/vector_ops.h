@@ -8,6 +8,7 @@
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
+#include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Parsing/parse.h"
@@ -305,6 +306,22 @@ template <typename T> double magnitude(const std::vector<T> &va);
 template <typename T> double magnitude(const Hybrid<T> &va);
 /// \}
 
+/// \brief Normalize a vector, storing the unit normal vector in its place and returning the
+///        original magnitude.
+///
+/// Overloaded:
+///   - Operate on a C-style array of trusted length
+///   - Operate on a Standard Template Library vector
+///   - Operate on a Hybrid object
+///
+/// \param va      The vector of interest
+/// \param length  Length of va  
+/// \{
+template <typename T> double normalize(T* va, const size_t length);
+template <typename T> double normalize(std::vector<T> *va);
+template <typename T> double normalize(Hybrid<T> *va);
+/// \}
+  
 /// \brief Compute the dot product of two vectors.  The result is always returned as a
 ///        double-precision value, and accumulated as such, but individual elements are not
 ///        converted to double prior to multiplication.  This can overflow integer data types if
@@ -322,6 +339,24 @@ template <typename T> double magnitude(const Hybrid<T> &va);
 template <typename T> double dot(const T* va, const T* vb, const size_t length);
 template <typename T> double dot(const std::vector<T> &va, const std::vector<T> &vb);
 template <typename T> double dot(const Hybrid<T> &va, const Hybrid<T> &vb);
+/// \}
+
+/// \brief Compute the angle between two vectors using the cosine formula.
+///
+/// Overloaded:
+///   - Operate on a pair of C-style arrays of trusted length
+///   - Operate on a pair of Standard Template Library vectors (the vectors will be checked for
+///     consistent lengths)
+///   - Operate on a pair of Hybrid objects (consistency checked)
+///
+/// \param va      The first vector of interest
+/// \param vb      The second vector of interest
+/// \param length  The first vector of interest
+/// \{
+template <typename T> double angleBetweenVectors(const T* va, const T* vb, const size_t length);
+template <typename T> double angleBetweenVectors(const std::vector<T> &va,
+                                                 const std::vector<T> &vb);
+template <typename T> double angleBetweenVectors(const Hybrid<T> &va, const Hybrid<T> &vb);
 /// \}
   
 /// \brief Compute the projection of one vector onto another.
@@ -343,6 +378,28 @@ template <typename T> void project(const std::vector<T> &va, const std::vector<T
 template <typename T> void project(const Hybrid<T> &va, const Hybrid<T> &vb, Hybrid<T> *vc);
 template <typename T> std::vector<T> project(const std::vector<T> &va, const std::vector<T> &vb);
 template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb);
+/// \}
+
+/// \brief Compute the distance between a point and a plane (both in three dimensions, not a
+///        hyperplane, as the formula uses a cross-product).  This is done by computing a unit
+///        normal vector to the plane and taking the projection of the point positional vector
+///        onto the unit normal vector.  Requires vectors defining the plane and a point position
+///        all in the same local coordinate frame.
+///
+/// Overloaded:
+///   - Operate on a pair of C-style arrays of length trusted to be 3
+///   - Operate on a pair of Standard Template Library vectors
+///   - Operate on a pair of Hybrid objects
+///
+/// \param va      First defininig the plane
+/// \param vb      Second vector defining the plane
+/// \param pt_pos  Positional vector of the point
+/// \{
+template <typename T> double pointPlaneDistance(const T* va, const T* vb, const T* pt_pos);
+template <typename T> double pointPlaneDistance(const std::vector<T> &va, const std::vector<T> &vb,
+                                                const std::vector<T> &pt_pos);
+template <typename T> double pointPlaneDistance(const Hybrid<T> &va, const Hybrid<T> &vb,
+                                                const Hybrid<T> &pt_pos);
 /// \}
 
 /// \brief Report an error for the histogram / bin finding function below, if the requested value

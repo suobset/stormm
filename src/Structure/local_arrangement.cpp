@@ -9,7 +9,7 @@ namespace omni {
 namespace structure {
 
 using math::crossProduct;
-using trajectory::CoordinateFrameReader;
+using trajectory::CoordinateFrameWriter;
   
 //-------------------------------------------------------------------------------------------------
 double imageValue(const double x, const double range, const ImagingMethod style) {
@@ -177,6 +177,20 @@ void imageCoordinates(Hybrid<double> *x, Hybrid<double> *y, Hybrid<double> *z,
           "imageCoordinates");
   }
   imageCoordinates(x->data(), y->data(), z->data(), length, umat, invu, unit_cell, style);
+}
+
+//-------------------------------------------------------------------------------------------------
+void imageCoordinates(PhaseSpace *ps, const ImagingMethod style) {
+  CoordinateFrameWriter cfw(ps);
+  imageCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.natom, cfw.umat, cfw.invu, cfw.unit_cell,
+                   style);
+}
+
+//-------------------------------------------------------------------------------------------------
+void imageCoordinates(CoordinateFrame *cf, const ImagingMethod style) {
+  CoordinateFrameWriter cfw = cf->data();
+  imageCoordinates(cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.natom, cfw.umat, cfw.invu, cfw.unit_cell,
+                   style);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
+#include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Parsing/parse.h"
@@ -7,31 +8,224 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/structure_enumerators.h"
+#include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::tiny;
+using omni::data_types::double3;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
 using omni::math::computeBoxTransform;
 using omni::random::Xoshiro256ppGenerator;
-using omni::math::minValue;
+using omni::math::angleBetweenVectors;
+using omni::math::dot;
+using omni::math::magnitude;
 using omni::math::maxAbsValue;
 using omni::math::maxValue;
 using omni::math::matrixVectorMultiply;
+using omni::math::minValue;
+using omni::math::normalize;
+using omni::math::pointPlaneDistance;
 using omni::math::sum;
 using omni::symbols::pi;
 using omni::topology::AtomGraph;
 using omni::topology::UnitCellType;
+using omni::topology::VirtualSiteKind;
 using omni::trajectory::CoordinateFileKind;
 using omni::trajectory::CoordinateFrame;
 using omni::trajectory::CoordinateFrameWriter;
 using namespace omni::structure;
 using namespace omni::testing;
 
+//-------------------------------------------------------------------------------------------------
+// Scramble the positions of virtual sites in a system.  Scatter frame atoms between box images
+// but do not alter their re-imaged relative positions.
+//
+// Arguments:
+//   ps:   Coordinates and box dimensions of the system
+//   ag:   System topology (identifies virtual sites)
+//   xsr:  Random number generator
+//-------------------------------------------------------------------------------------------------
+void scrambleSystemCoordinates(PhaseSpace *ps, const AtomGraph &ag, Xoshiro256ppGenerator *xsr) {
+  PhaseSpaceWriter psw = ps->data();
+
+  // Scramble and recover the virtual site locations
+  for (int i = 0; i < ag.getAtomCount(); i++) {
+    if (ag.getAtomicNumber(i) == 0) {
+      psw.xcrd[i] += xsr->gaussianRandomNumber();
+      psw.ycrd[i] += xsr->gaussianRandomNumber();
+      psw.zcrd[i] += xsr->gaussianRandomNumber();
+    }
+    else {
+      const double indx = floor(8.0 * (xsr->uniformRandomNumber() - 0.5));
+      const double indy = floor(8.0 * (xsr->uniformRandomNumber() - 0.5));
+      const double indz = floor(8.0 * (xsr->uniformRandomNumber() - 0.5));
+      psw.xcrd[i] += (psw.invu[0] * indx) + (psw.invu[3] * indy) + (psw.invu[6] * indz);
+      psw.ycrd[i] += (psw.invu[1] * indx) + (psw.invu[4] * indy) + (psw.invu[7] * indz);
+      psw.zcrd[i] += (psw.invu[2] * indx) + (psw.invu[5] * indy) + (psw.invu[8] * indz);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Center a system on its first atom and re-image it according to the minimum image convention.
+//
+// Arguments:
+//   ps:   Coordinates and box dimensions of the system
+//-------------------------------------------------------------------------------------------------
+void centerAndReimageSystem(PhaseSpace *ps) {
+  PhaseSpaceWriter psw = ps->data();
+  const double dx = psw.xcrd[0];
+  const double dy = psw.ycrd[0];
+  const double dz = psw.zcrd[0];
+  for (int i = 0; i < psw.natom; i++) {
+    psw.xcrd[i] -= dx;
+    psw.ycrd[i] -= dy;
+    psw.zcrd[i] -= dz;
+  }
+  imageCoordinates(ps, ImagingMethod::MINIMUM_IMAGE);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the virtual site placement of a system using code independent of the virtual site
+// positioning functions.  Each virtual site gets up to three double-precision results, packed as
+// a double3, testing its characteristics against expected results.
+//
+// Arguments:
+//   ps:        Coordinates of the system
+//   ag:        System topology
+//-------------------------------------------------------------------------------------------------
+std::vector<double3> checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag) {
+  const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
+  const PhaseSpaceReader psr = ps.data();
+  std::vector<double3> result(vsk.nsite, { 0.0, 0.0, 0.0 });
+  for (int i = 0; i < vsk.nsite; i++) {
+    const int vsite_atom = vsk.vs_atoms[i];
+    const int parent_atom = vsk.frame1_idx[i];
+    const int frame2_atom = vsk.frame2_idx[i];
+    const std::vector<double> p_vs = { psr.xcrd[vsite_atom] - psr.xcrd[parent_atom],
+                                       psr.ycrd[vsite_atom] - psr.ycrd[parent_atom],
+                                       psr.zcrd[vsite_atom] - psr.zcrd[parent_atom] };
+    const std::vector<double> p_f2 = { psr.xcrd[frame2_atom] - psr.xcrd[parent_atom],
+                                       psr.ycrd[frame2_atom] - psr.ycrd[parent_atom],
+                                       psr.zcrd[frame2_atom] - psr.zcrd[parent_atom] };
+    const double p_vs_distance = sqrt((p_vs[0] * p_vs[0]) + (p_vs[1] * p_vs[1]) +
+                                      (p_vs[2] * p_vs[2]));
+    const double p_f2_distance = sqrt((p_f2[0] * p_f2[0]) + (p_f2[1] * p_f2[1]) +
+                                      (p_f2[2] * p_f2[2]));
+    int frame3_atom, frame4_atom;
+    double p_f3_distance, p_f4_distance;
+    std::vector<double> p_f3(3), p_f4(3);
+    const VirtualSiteKind kind = static_cast<VirtualSiteKind>(vsk.vs_types[i]);
+
+    // Get details of the the third frame atom
+    switch (kind) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+    case VirtualSiteKind::FIXED_4:
+      frame3_atom = vsk.frame3_idx[i];
+      p_f3 = { psr.xcrd[frame2_atom] - psr.xcrd[parent_atom],
+               psr.ycrd[frame2_atom] - psr.ycrd[parent_atom],
+               psr.zcrd[frame2_atom] - psr.zcrd[parent_atom] };
+      break;
+    }
+
+    // Get details of the the fourth frame atom
+    switch (kind) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      break;
+    case VirtualSiteKind::FIXED_4:
+      frame3_atom = vsk.frame3_idx[i];
+      p_f3 = { psr.xcrd[frame2_atom] - psr.xcrd[parent_atom],
+               psr.ycrd[frame2_atom] - psr.ycrd[parent_atom],
+               psr.zcrd[frame2_atom] - psr.zcrd[parent_atom] };
+      break;
+    }
+
+    // Evaluate each frame
+    switch (kind) {
+    case VirtualSiteKind::FLEX_2:
+      {
+        // Check the ratio of distances between the virtual site and its parent atom
+        result[i].x = p_vs_distance / p_f2_distance;
+
+        // Check co-linearity and fill in the second slot
+        result[i].y = dot(p_f2, p_vs);
+      }
+      break;
+    case VirtualSiteKind::FIXED_2:
+      {
+        // Check the distance between the virtual site and its parent atom
+        result[i].x = p_vs_distance;
+
+        // Check co-linearity and fill in the second slot
+        result[i].y = dot(p_f2, p_vs);
+      }
+      break;
+    case VirtualSiteKind::FLEX_3:
+      {
+        // Check the distance between the virtual site and its parent atom, comparing it to the
+        // expected distance.
+        std::vector<double> overall_displacement(3);
+        for (int j = 0; j < 3; j++) {
+          overall_displacement[j] = (p_f2[j] * vsk.dim1[i]) + (p_f3[j] * vsk.dim2[i]);
+        }
+        result[i].x = magnitude(p_vs) / magnitude(overall_displacement);
+
+        // Check the co-planarity of the virtual site with its frame and fill in the second slot.
+        // This should be zero.
+        result[i].y = pointPlaneDistance(p_f2, p_f3, p_vs);
+      }
+      break;
+    case VirtualSiteKind::FIXED_3:
+      {
+        // Check the distance between the virtual site and its parent atom.
+        result[i].x = magnitude(p_vs);
+
+        // Check the co-planarity of the virtual site with its frame and fill in the second slot.
+        // This should be zero.
+        result[i].y = pointPlaneDistance(p_f2, p_f3, p_vs);
+      }
+      break;
+    case VirtualSiteKind::FAD_3:
+      {
+        // Check the distance between the virtual site and its parent atom.
+        result[i].x = magnitude(p_vs);
+
+        // Check the co-planarity of the virtual site with its frame and fill in the second slot.
+        // This should be zero.
+        result[i].y = pointPlaneDistance(p_f2, p_f3, p_vs);
+
+        // Check the angle between the virtual site and the frame atoms.
+        result[i].z = angleBetweenVectors(p_f2, p_vs);
+        const std::vector<double> f2_f3 = { psr.xcrd[frame3_atom] - psr.xcrd[frame2_atom],
+                                            psr.ycrd[frame3_atom] - psr.ycrd[frame2_atom],
+                                            psr.zcrd[frame3_atom] - psr.zcrd[frame2_atom] };
+      }
+      break;
+    case VirtualSiteKind::OUT_3:
+    case VirtualSiteKind::FIXED_4:
+    case VirtualSiteKind::NONE:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
 
   // Some baseline initialization
@@ -42,6 +236,9 @@ int main(int argc, char* argv[]) {
 
   // Section 2
   section("Check distance, angle, and dihedral calculations");
+
+  // Section 3
+  section("Virtual site placement");
   
   // Get a realistic system
   const char osc = osSeparator();
@@ -308,6 +505,46 @@ int main(int argc, char* argv[]) {
         Approx(-1.6233704738).margin(tiny), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
 
+  // Check the placement of virtual sites, frame type by frame type.  Scramble and recover the
+  // virtual site locations, then place the entire system back in the primary unit cell and
+  // check the geometries.
+  section(3);
+  const std::string brbz_top_path = base_top_path + osc + "bromobenzene_vs.top";
+  const std::string brbz_crd_path = base_crd_path + osc + "bromobenzene_vs.inpcrd";
+  const bool vsfi_exist = (getDrivePathType(brbz_top_path) == DrivePathType::FILE &&
+                               getDrivePathType(brbz_crd_path) == DrivePathType::FILE);
+  const TestPriority do_vs_tests = (vsfi_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  AtomGraph brbz_ag = (vsfi_exist) ? AtomGraph(brbz_top_path) : AtomGraph();
+  PhaseSpace brbz_ps = (vsfi_exist) ? PhaseSpace(brbz_crd_path, CoordinateFileKind::AMBER_INPCRD) :
+                                      PhaseSpace();
+  const int n_brbz_vs = brbz_ag.getVirtualSiteCount();
+  std::vector<int> brbz_frame_type_answer(n_brbz_vs);
+  brbz_frame_type_answer[0] = static_cast<int>(VirtualSiteKind::FIXED_2);
+  for (int i = 1; i < n_brbz_vs; i++) {
+    brbz_frame_type_answer[i] = static_cast<int>(VirtualSiteKind::OUT_3);
+  }
+  std::vector<int> brbz_detected_frame_types(n_brbz_vs);
+  for (int i = 0; i < n_brbz_vs; i++) {
+    brbz_detected_frame_types[i] =  brbz_ag.getVirtualSiteFrameType(i);
+  }
+  check(brbz_frame_type_answer, RelationalOperator::EQUAL, brbz_detected_frame_types,
+        "The bromobenzene system, containing a mixture of FIXED_2 and OUT_3 virtual sites, did "
+        "not correctly report its virtual site content.", do_vs_tests);  
+  PhaseSpaceWriter brbz_psw = brbz_ps.data();
+  scrambleSystemCoordinates(&brbz_ps, brbz_ag, &xsr);
+  placeVirtualSites(&brbz_ps, brbz_ag);
+  centerAndReimageSystem(&brbz_ps);
+
+  
+  // CHECK
+  printf("Coords = [\n");
+  PhaseSpaceWriter psw = brbz_ps.data();
+  for (int i = 0; i < psw.natom; i++) {
+    printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
+  }
+  printf("];\n");
+  // END CHECK
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }

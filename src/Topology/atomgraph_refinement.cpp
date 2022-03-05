@@ -27,6 +27,7 @@ using math::sum;
 using parse::NumberFormat;
 using parse::PolyNumeric;
 using parse::realToString;
+using symbols::tetrahedral_angle;
 using testing::Approx;
 
 //-------------------------------------------------------------------------------------------------
@@ -854,8 +855,6 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
                                   const std::vector<char4> &tmp_atom_names,
                                   const std::vector<int> &vsite_custom_frames,
                                   const std::vector<double> &vsite_custom_details) {
-
-  using symbols::tetrahedral_angle;
 
   // Count the number of massless particles and allocate the table
   const int natom = tmp_masses.size();

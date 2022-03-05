@@ -939,6 +939,49 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   if (lstart >= 0) {
     vsite_custom_frames = iAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z, 0,
                                            virtual_site_count * 6);
+    
+    // Convert the virtual site frame type enumerations in the topology to the internal
+    // representation.
+    int vs_est_count = static_cast<int>(vsite_custom_frames.size()) / 6;
+    vs_est_count -= (vs_est_count * 6 < static_cast<int>(vsite_custom_frames.size()));
+    for (int i = 0; i < vs_est_count; i++) {
+      const int frame_slot = (i * 6) + 5;
+      switch (vsite_custom_frames[frame_slot]) {
+      case 0:
+      case 1:
+      case 2:
+      case 3:
+
+        // Cases 0 - 3 are reserved for innate Amber virtual site types and do not show up in
+        // Amber topology customized VIRTUAL_SITE_FRAMES format fields.
+        rtErr("Virtual site types 0 - 3 are reserved for Amber's inferred virtual site types.  "
+              "No such number (" + std::to_string(vsite_custom_frames[i]) + ") should be present "
+              "in an Amber topology file's custom VIRTUAL_SITE_FRAMES field, as was found in " +
+              "virtual site " + std::to_string((i / 6) + 1) + " of " + source + ".", "AtomGraph",
+              "buildAmberPrmtop");
+      case 4:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::FLEX_2);
+        break;
+      case 5:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::FLEX_3);
+        break;
+      case 6:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::FIXED_3);
+        break;
+      case 7:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::FAD_3);
+        break;
+      case 8:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::OUT_3);
+        break;
+      case 9:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::FIXED_2);
+        break;
+      case 10:
+        vsite_custom_frames[frame_slot] = static_cast<int>(VirtualSiteKind::FIXED_4);
+        break;
+      }
+    }
   }
   lstart = scanToFlag(fmem, "VIRTUAL_SITE_FRAME_DETAILS", &dfmt,
                       TopologyRequirement::OPTIONAL, lstart);

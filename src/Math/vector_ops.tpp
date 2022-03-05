@@ -568,6 +568,26 @@ template <typename T> double magnitude(const Hybrid<T> &va) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> double normalize(T* va, const size_t length) {
+  const double magvec = magnitude(va, length);
+  const double invmag = 1.0 / magvec;
+  for (size_t i = 0; i < length; i++) {
+    va[i] *= invmag;
+  }
+  return magvec;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double normalize(std::vector<T> *va) {
+  return normalize(va.data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double normalize(Hybrid<T> *va) {
+  return normalize(va.data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> double dot(const T* va, const T* vb, const size_t length) {
   double result = 0.0;
   for (size_t i = 0; i < length; i++) {
@@ -586,6 +606,57 @@ template <typename T> double dot(const std::vector<T> &va, const std::vector<T> 
 template <typename T> double dot(const Hybrid<T> &va, const Hybrid<T> &vb) {
   vectorComparisonCheck(va, vb, "dot");
   return dot(va.data(), vb.data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double angleBetweenVectors(const T* va, const T* vb, const size_t length) {
+
+  // Do this in slightly more optimized fashion
+  double dotp_acc = 0.0;
+  double maga_acc = 0.0;
+  double magb_acc = 0.0;
+  for (size_t i = 0; i < length; i++) {
+    const double vai = va[i];
+    const double vbi = vb[i];
+    dotp_acc += vai * vbi;
+    maga_acc += vai * vai;
+    magb_acc += vbi * vbi;
+  }
+  const double mag2_ab = maga_acc * magb_acc;
+  if (fabs(mag2_ab) < constants::tiny) {
+    rtErr("One or both vectors are of close to zero length.", "angleBetweenVectors");
+  }
+  const double acos_arg = dotp_acc / (sqrt(maga_acc) * sqrt(magb_acc));
+  if (acos_arg >= 1.0) {
+    return 0.0;
+  }
+  else if (acos_arg <= -1.0) {
+    return symbols::pi;
+  }
+  else {
+    return acos(acos_arg);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double angleBetweenVectors(const std::vector<T> &va,
+                                                 const std::vector<T> &vb) {
+  if (va.size() != vb.size()) {
+    rtErr("Vectors of differing sizes, " + std::to_string(va.size()) + " and " +
+          std::to_string(vb.size()) + ", cannot produce an angle value.", "angleBetweenVectors");
+  }
+  return angleBetweenVectors(va.data(), vb.data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double angleBetweenVectors(const Hybrid<T> &va, const Hybrid<T> &vb) {
+  if (va.size() != vb.size()) {
+    rtErr("Hybrid objects " + std::string(va.getLabel().name) + " and " +
+          std::string(vb.getLabel().name) + " have differing sizes, " + std::to_string(va.size()) +
+          " and " + std::to_string(vb.size()) + ", and therefore cannot produce an angle value.",
+          "angleBetweenVectors");
+  }
+  return angleBetweenVectors(va.data(), vb.data(), va.size());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -648,6 +719,39 @@ template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb
     res_data[i] = vb_data[i] * dp_val;
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double pointPlaneDistance(const T* va, const T* vb, const T* pt_pos) {
+  double unit_normal[3], pt_plane_displacement[3];
+  crossProduct(va, vb, unit_normal);
+  normalize(unit_normal, 3);
+  project(unit_normal, pt_pos, pt_plane_displacement, 3);
+  return magnitude(pt_plane_displacement, 3);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double pointPlaneDistance(const std::vector<T> &va, const std::vector<T> &vb,
+                                                const std::vector<T> &pt_pos) {
+  if (va.size() != 3LLU || vb.size() != 3LLU || pt_pos.size() != 3LLU) {
+    rtErr("The distance from a point to a plane is computed in three dimensions.  Dimensions of "
+          "vectors provided = [ " + std::to_string(va.size()) + ", " + std::to_string(vb.size()) +
+          ", " + std::to_string(pt_pos.size()) + " ].", "pointPlaneDistance");
+  }
+  return pointPlaneDistance(va.data(), vb.data(), pt_pos.data());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> double pointPlaneDistance(const Hybrid<T> &va, const Hybrid<T> &vb,
+                                                const Hybrid<T> &pt_pos) {
+  if (va.size() != 3LLU || vb.size() != 3LLU || pt_pos.size() != 3LLU) {
+    rtErr("The distance from a point to a plane is computed in three dimensions.  Dimensions of "
+          "Hybrid objects " + std::string(va.getLabel().name) + " and " +
+          std::string(vb.getLabel().name) + " are [ " + std::to_string(va.size()) + ", " +
+          std::to_string(vb.size()) + ", " + std::to_string(pt_pos.size()) + " ].",
+          "pointPlaneDistance");
+  }
+  return pointPlaneDistance(va.data(), vb.data(), pt_pos.data());
 }
 
 //-------------------------------------------------------------------------------------------------
