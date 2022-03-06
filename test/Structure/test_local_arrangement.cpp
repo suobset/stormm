@@ -13,6 +13,7 @@
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using omni::constants::small;
 using omni::constants::tiny;
 using omni::data_types::double3;
 using omni::diskutil::DrivePathType;
@@ -22,6 +23,7 @@ using omni::errors::rtWarn;
 using omni::math::computeBoxTransform;
 using omni::random::Xoshiro256ppGenerator;
 using omni::math::angleBetweenVectors;
+using omni::math::crossProduct;
 using omni::math::dot;
 using omni::math::magnitude;
 using omni::math::maxAbsValue;
@@ -29,6 +31,7 @@ using omni::math::maxValue;
 using omni::math::matrixVectorMultiply;
 using omni::math::minValue;
 using omni::math::normalize;
+using omni::math::perpendicularComponent;
 using omni::math::pointPlaneDistance;
 using omni::math::sum;
 using omni::symbols::pi;
@@ -92,14 +95,17 @@ void centerAndReimageSystem(PhaseSpace *ps) {
 
 //-------------------------------------------------------------------------------------------------
 // Check the virtual site placement of a system using code independent of the virtual site
-// positioning functions.  Each virtual site gets up to three double-precision results, packed as
-// a double3, testing its characteristics against expected results.
+// positioning functions.  Each virtual site gets up to three double-precision results, testing
+// its characteristics against expected results.  Tests for the structure will be run internally.
 //
 // Arguments:
 //   ps:        Coordinates of the system
 //   ag:        System topology
+//   answers:   Packed array of expected results
+//   do_tests:  Indicator of whether it is worth pursuing the tests
 //-------------------------------------------------------------------------------------------------
-std::vector<double3> checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag) {
+void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
+                             const std::vector<double3> &answers, const TestPriority do_tests) {
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   const PhaseSpaceReader psr = ps.data();
   std::vector<double3> result(vsk.nsite, { 0.0, 0.0, 0.0 });
@@ -133,9 +139,9 @@ std::vector<double3> checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGra
     case VirtualSiteKind::OUT_3:
     case VirtualSiteKind::FIXED_4:
       frame3_atom = vsk.frame3_idx[i];
-      p_f3 = { psr.xcrd[frame2_atom] - psr.xcrd[parent_atom],
-               psr.ycrd[frame2_atom] - psr.ycrd[parent_atom],
-               psr.zcrd[frame2_atom] - psr.zcrd[parent_atom] };
+      p_f3 = { psr.xcrd[frame3_atom] - psr.xcrd[parent_atom],
+               psr.ycrd[frame3_atom] - psr.ycrd[parent_atom],
+               psr.zcrd[frame3_atom] - psr.zcrd[parent_atom] };
       break;
     }
 
@@ -149,10 +155,10 @@ std::vector<double3> checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGra
     case VirtualSiteKind::OUT_3:
       break;
     case VirtualSiteKind::FIXED_4:
-      frame3_atom = vsk.frame3_idx[i];
-      p_f3 = { psr.xcrd[frame2_atom] - psr.xcrd[parent_atom],
-               psr.ycrd[frame2_atom] - psr.ycrd[parent_atom],
-               psr.zcrd[frame2_atom] - psr.zcrd[parent_atom] };
+      frame4_atom = vsk.frame4_idx[i];
+      p_f4 = { psr.xcrd[frame4_atom] - psr.xcrd[parent_atom],
+               psr.ycrd[frame4_atom] - psr.ycrd[parent_atom],
+               psr.zcrd[frame4_atom] - psr.zcrd[parent_atom] };
       break;
     }
 
@@ -173,7 +179,7 @@ std::vector<double3> checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGra
         result[i].x = p_vs_distance;
 
         // Check co-linearity and fill in the second slot
-        result[i].y = dot(p_f2, p_vs);
+        result[i].y = dot(p_f2, p_vs) / (magnitude(p_f2) * magnitude(p_vs));
       }
       break;
     case VirtualSiteKind::FLEX_3:
@@ -211,18 +217,109 @@ std::vector<double3> checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGra
         result[i].y = pointPlaneDistance(p_f2, p_f3, p_vs);
 
         // Check the angle between the virtual site and the frame atoms.
-        result[i].z = angleBetweenVectors(p_f2, p_vs);
         const std::vector<double> f2_f3 = { psr.xcrd[frame3_atom] - psr.xcrd[frame2_atom],
                                             psr.ycrd[frame3_atom] - psr.ycrd[frame2_atom],
                                             psr.zcrd[frame3_atom] - psr.zcrd[frame2_atom] };
+        const std::vector<double> f2_p = { psr.xcrd[parent_atom] - psr.xcrd[frame2_atom],
+                                           psr.ycrd[parent_atom] - psr.ycrd[frame2_atom],
+                                           psr.zcrd[parent_atom] - psr.zcrd[frame2_atom] };
+        const std::vector<double> f23_t_f2p = perpendicularComponent(f2_f3, f2_p);
+        const std::vector<double> pvs_t_f2p = perpendicularComponent(p_vs, f2_p);
+        result[i].z = angleBetweenVectors(p_f2, p_vs) + angleBetweenVectors(f23_t_f2p, pvs_t_f2p);
       }
       break;
     case VirtualSiteKind::OUT_3:
+      {
+        // Check the distance between the virtual site and its parent atom.
+        result[i].x = magnitude(p_vs);
+
+        // Check the distance between this point and the plane, comparing it to the distance
+        // prescribed by the ratio of the cross product between the vectors defining the plane.
+        std::vector<double> f2_x_f3(3);
+        crossProduct(p_f2, p_f3, &f2_x_f3);
+        result[i].y = pointPlaneDistance(p_f2, p_f3, p_vs) - (magnitude(f2_x_f3) * vsk.dim1[i] *
+                                                              vsk.dim2[i] * vsk.dim3[i]);
+
+        // Compute the distance of the virtual site from the axis perpendicular to the plane
+        // running through the parent atom.
+        std::vector<double> vs_t = perpendicularComponent(p_vs, f2_x_f3);
+        result[i].z = magnitude(vs_t);
+      }
+      break;
     case VirtualSiteKind::FIXED_4:
+      {
+        // Check the distance between the virtual site and its parent atom.
+        result[i].x = magnitude(p_vs);
+      }
+      break;
     case VirtualSiteKind::NONE:
       break;
     }
   }
+
+  // Compile a list of all frame types found in this system.
+  int n_unique = 0;
+  std::vector<int> unique_frm;
+  std::vector<bool> coverage(vsk.nsite);
+  for (int i = 0; i < vsk.nsite; i++) {
+    if (coverage[i]) {
+      continue;
+    }
+    for (int j = i; j < vsk.nsite; j++) {
+      coverage[j] = (coverage[j] || vsk.vs_types[j] == vsk.vs_types[i]);
+    }
+    unique_frm.push_back(vsk.vs_types[i]);
+    n_unique++;
+  }
+  std::string frame_type_list;
+  for (int i = 0; i < n_unique; i++) {
+    frame_type_list += getVirtualSiteFrameName(static_cast<VirtualSiteKind>(unique_frm[i]));
+    if (i < n_unique - 1) {
+      frame_type_list += ", ";
+    }
+  }
+
+  // CHECK
+  printf("Coords = [\n");
+  for (int i = 0; i < psr.natom; i++) {
+    if (ag.getAtomicNumber(i) == 0) {
+      const int nvs = ag.getVirtualSiteIndex(i);
+      printf("{ %12.9lf, %12.9lf, %12.9lf },\n", result[nvs].x, result[nvs].y, result[nvs].z);
+    }
+    else {
+      printf("\n");
+    }
+  }
+  printf("];\n");
+  // END CHECK
+  
+  // Compare the first result
+  std::vector<double> rvec(vsk.nsite), avec(vsk.nsite);
+  for (int i = 0; i < vsk.nsite; i++) {
+    rvec[i] = result[i].x;
+    avec[i] = answers[i].x;
+  }
+  check(rvec, RelationalOperator::EQUAL, Approx(avec).margin(small), "Metric 1, measuring "
+        "relative and absolute distances between virtual particles and their parent atoms, fails "
+        "in a system described by topology " + ag.getFileName() + ".  Virtual site types present "
+        "in this system: " + frame_type_list + ".", do_tests);
+  for (int i = 0; i < vsk.nsite; i++) {
+    rvec[i] = result[i].y;
+    avec[i] = answers[i].y;
+  }
+  check(rvec, RelationalOperator::EQUAL, Approx(avec).margin(small), "Metric 2, measuring dot "
+        "products and expected distances to test colinearity or point-plane distances, fails in a "
+        "system described by topology " + ag.getFileName() + ".  Virtual site types present in "
+        "this system: " + frame_type_list + ".", do_tests);
+  for (int i = 0; i < vsk.nsite; i++) {
+    rvec[i] = result[i].z;
+    avec[i] = answers[i].z;
+  }
+  check(rvec, RelationalOperator::EQUAL, Approx(avec).margin(small), "Metric 3, measuring "
+        "miscellaneous quantities like the distance between the virtual site and a normal vector "
+        "(Out-3) or the angle made by a virtual site with its nearby frame atoms (FAD-3), fails "
+        "in a system described by topology " + ag.getFileName() + ".  Virtual site types present "
+        "in this system: " + frame_type_list + ".", do_tests);        
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -482,27 +579,27 @@ int main(int argc, char* argv[]) {
 
   // Check internal coordinate computations
   section(2);
-  check(distance(0, 1, drug_cf), RelationalOperator::EQUAL, Approx(1.3656697990).margin(tiny),
+  check(distance(0, 1, drug_cf), RelationalOperator::EQUAL, Approx(1.3656697990).margin(small),
         "The distance between two atoms is not computed correctly.");
   CoordinateFrameWriter cfw = drug_cf.data();
   cfw.xcrd[9] +=       cfw.boxdim[0];
   cfw.ycrd[9] += 2.0 * cfw.boxdim[1];
   cfw.zcrd[9] -= 3.0 * cfw.boxdim[2];
-  check(distance(9, 10, drug_cf), RelationalOperator::EQUAL, Approx(1.5113186295).margin(tiny),
+  check(distance(9, 10, drug_cf), RelationalOperator::EQUAL, Approx(1.5113186295).margin(small),
         "The distance between two atoms is not computed correctly after one of them has been "
         "pushed into another unit cell image.");
-  check(angle(13, 46, 47, drug_cf), RelationalOperator::EQUAL, Approx(1.9124059543).margin(tiny),
+  check(angle(13, 46, 47, drug_cf), RelationalOperator::EQUAL, Approx(1.9124059543).margin(small),
         "The angle made by three atoms in a drug molecule is not computed correctly.");
   cfw.xcrd[22] -= 4.0 * cfw.boxdim[0];
   cfw.ycrd[22] +=       cfw.boxdim[1];
   cfw.zcrd[22] -= 2.0 * cfw.boxdim[2];
-  check(angle(40, 22, 50, drug_cf), RelationalOperator::EQUAL, Approx(1.8791980388).margin(tiny),
+  check(angle(40, 22, 50, drug_cf), RelationalOperator::EQUAL, Approx(1.8791980388).margin(small),
         "The angle made by three atoms in a drug molecule is not computed correctly.");
   check(dihedral_angle(9, 10, 11, 12, drug_cf), RelationalOperator::EQUAL,
-        Approx(-3.1069347104).margin(tiny), "The dihedral made by four atoms in a drug molecule "
+        Approx(-3.1069347104).margin(small), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
   check(dihedral_angle(20, 9, 10, 11, drug_cf), RelationalOperator::EQUAL,
-        Approx(-1.6233704738).margin(tiny), "The dihedral made by four atoms in a drug molecule "
+        Approx(-1.6233704738).margin(small), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
 
   // Check the placement of virtual sites, frame type by frame type.  Scramble and recover the
@@ -525,7 +622,7 @@ int main(int argc, char* argv[]) {
   }
   std::vector<int> brbz_detected_frame_types(n_brbz_vs);
   for (int i = 0; i < n_brbz_vs; i++) {
-    brbz_detected_frame_types[i] =  brbz_ag.getVirtualSiteFrameType(i);
+    brbz_detected_frame_types[i] = static_cast<int>(brbz_ag.getVirtualSiteFrameType(i));
   }
   check(brbz_frame_type_answer, RelationalOperator::EQUAL, brbz_detected_frame_types,
         "The bromobenzene system, containing a mixture of FIXED_2 and OUT_3 virtual sites, did "
@@ -534,16 +631,20 @@ int main(int argc, char* argv[]) {
   scrambleSystemCoordinates(&brbz_ps, brbz_ag, &xsr);
   placeVirtualSites(&brbz_ps, brbz_ag);
   centerAndReimageSystem(&brbz_ps);
-
-  
-  // CHECK
-  printf("Coords = [\n");
-  PhaseSpaceWriter psw = brbz_ps.data();
-  for (int i = 0; i < psw.natom; i++) {
-    printf("  %9.4lf %9.4lf %9.4lf\n", psw.xcrd[i], psw.ycrd[i], psw.zcrd[i]);
-  }
-  printf("];\n");
-  // END CHECK
+  const std::vector<double3> brbz_answers = { {  0.800000000, -1.000000000,  0.000000000 },
+                                              {  0.434257916,  1.000000000,  0.000000000 },
+                                              {  0.434257916,  1.000000000,  0.000000000 },
+                                              {  0.429810021,  1.000000000,  0.000000000 },
+                                              {  0.429810021,  1.000000000,  0.000000000 },
+                                              {  0.441946790,  1.000000000,  0.000000000 },
+                                              {  0.441946790,  1.000000000,  0.000000000 },
+                                              {  0.440347769,  1.000000000,  0.000000000 },
+                                              {  0.440347769,  1.000000000,  0.000000000 },
+                                              {  0.438562255,  1.000000000,  0.000000000 },
+                                              {  0.438562255,  1.000000000,  0.000000000 },
+                                              {  0.421362406,  1.000000000,  0.000000000 },
+                                              {  0.421362406,  1.000000000,  0.000000000 } };
+  checkVirtualSiteMetrics(brbz_ps, brbz_ag, brbz_answers, do_vs_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -619,7 +619,7 @@ public:
   ///
   /// \param index  The virtual site of interest, indexed according to its place in the list of
   ///               virtual sites (not the general topology atom list)
-  int getVirtualSiteFrameType(int index) const;
+  VirtualSiteKind getVirtualSiteFrameType(int index) const;
 
   /// \brief Get the general topology index of one of a virtual site's frame atoms
   ///

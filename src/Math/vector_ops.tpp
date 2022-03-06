@@ -579,12 +579,12 @@ template <typename T> double normalize(T* va, const size_t length) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> double normalize(std::vector<T> *va) {
-  return normalize(va.data(), va.size());
+  return normalize(va->data(), va->size());
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> double normalize(Hybrid<T> *va) {
-  return normalize(va.data(), va.size());
+  return normalize(va->data(), va->size());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -707,16 +707,31 @@ template <typename T> std::vector<T> project(const std::vector<T> &va, const std
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb) {
-  vectorComparisonCheck(va, vb, "project");
-  const size_t va_len = va.size();
-  const T* vb_data = vb.data();
-  const double mag_vb = magnitude(vb_data, va_len);
-  const double dp_val = dot(va.data(), vb_data, va_len) / (mag_vb * mag_vb);
-  Hybrid<T> result(va_len);
-  T* res_data = result.data();
-  for (size_t i = 0; i < va_len; i++) {
-    res_data[i] = vb_data[i] * dp_val;
+template <typename T> void perpendicularComponent(const T* va, const T* vb, T* result,
+                                                  const size_t length) {
+  project(va, vb, result, length);
+  for (size_t i = 0; i < length; i++) {
+    result[i] = va[i] - result[i];
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void perpendicularComponent(const std::vector<T> &va,
+                                                  const std::vector<T> &vb,
+                                                  std::vector<T> *result) {
+  vectorComparisonCheck(va, vb, "perpendicularComponent");
+  vectorComparisonCheck(va, result, "perpendicularComponent");
+  perpendicularComponent(va.data(), vb.data(), result->data(), va.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> perpendicularComponent(const std::vector<T> &va,
+                                                            const std::vector<T> &vb) {
+  vectorComparisonCheck(va, vb, "perpendicularComponent");
+  std::vector<double> result = project(va, vb);
+  const size_t va_dim = va.size();
+  for (size_t i = 0; i < va_dim; i++) {
+    result[i] = va[i] - result[i];
   }
   return result;
 }

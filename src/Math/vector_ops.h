@@ -351,7 +351,7 @@ template <typename T> double dot(const Hybrid<T> &va, const Hybrid<T> &vb);
 ///
 /// \param va      The first vector of interest
 /// \param vb      The second vector of interest
-/// \param length  The first vector of interest
+/// \param length  The length of both vectors
 /// \{
 template <typename T> double angleBetweenVectors(const T* va, const T* vb, const size_t length);
 template <typename T> double angleBetweenVectors(const std::vector<T> &va,
@@ -363,21 +363,43 @@ template <typename T> double angleBetweenVectors(const Hybrid<T> &va, const Hybr
 ///
 /// Overloaded:
 ///   - Operate on C-style arrays of trusted length
-///   - Operate on Standard Template Library vectors
-///   - Operate on a pair of Hybrid objects
+///   - Operate on Standard Template Library vectors (must be of consistent length)
+///   - Operate on a pair of Hybrid objects (must be of consistent length)
 ///   - Return a new array or work with a provided, pre-existing one (only works with vector
-///     objects, not raw pointers)
+///     objects, not raw pointers or Hybrids)
 ///
-/// \param va  The projection of va onto vb will be computed 
-/// \param vb  The projection of va onto vb will be computed 
-/// \param vc  Store the result in a pre-allocated space vc
+/// \param va      The projection of va onto vb will be computed 
+/// \param vb      The projection of va onto vb will be computed 
+/// \param vc      Store the result in a pre-allocated space vc
+/// \param length  The length of all vectors
 /// \{
 template <typename T> void project(const T* va, const T* vb, T* vc, size_t length);
 template <typename T> void project(const std::vector<T> &va, const std::vector<T> &vb,
                                    std::vector<T> *vc);
 template <typename T> void project(const Hybrid<T> &va, const Hybrid<T> &vb, Hybrid<T> *vc);
 template <typename T> std::vector<T> project(const std::vector<T> &va, const std::vector<T> &vb);
-template <typename T> Hybrid<T> project(const Hybrid<T> &va, const Hybrid<T> &vb);
+/// \}
+
+/// \brief Compute the perpendicular component of a vector A which has no alignment with vector B.
+///
+/// Overloaded:
+///   - Operate on C-style arrays of trusted length
+///   - Operate on Standard Template Library vectors (must be of consistent length)
+///   - Return a new array or work with a provided, pre-existing one (only works with vector
+///     objects, not raw pointers or Hybrids)
+///
+/// \param va      The projection of va onto vb will be computed 
+/// \param vb      The projection of va onto vb will be computed 
+/// \param result  Store the result in this pre-allocated space
+/// \param length  The length of all vectors
+/// \{
+template <typename T> void perpendicularComponent(const T* va, const T* vb, T* result,
+                                                  const size_t length);
+template <typename T> void perpendicularComponent(const std::vector<T> &va,
+                                                  const std::vector<T> &vb,
+                                                  std::vector<T> *result);
+template <typename T> std::vector<T> perpendicularComponent(const std::vector<T> &va,
+                                                            const std::vector<T> &vb);
 /// \}
 
 /// \brief Compute the distance between a point and a plane (both in three dimensions, not a
