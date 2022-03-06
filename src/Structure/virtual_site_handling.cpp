@@ -16,9 +16,9 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
                        const double* invu, const UnitCellType unit_cell,
                        const VirtualSiteKit<double> &vsk) {
   for (int i = 0; i < vsk.nsite; i++) {
-    const int vsite_atom = vsk.vs_atoms[i];
-    const int parent_atom  = vsk.frame1_idx[i];
-    const int frame2_atom  = vsk.frame2_idx[i];
+    const int vsite_atom  = vsk.vs_atoms[i];
+    const int parent_atom = vsk.frame1_idx[i];
+    const int frame2_atom = vsk.frame2_idx[i];
     const ImagingMethod minimum_image = ImagingMethod::MINIMUM_IMAGE;
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[i])) {
     case VirtualSiteKind::FLEX_2:
@@ -48,7 +48,7 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
       break;
     case VirtualSiteKind::FLEX_3:
       {
-        const int frame3_atom  = vsk.frame3_idx[i];
+        const int frame3_atom = vsk.frame3_idx[i];
         double dx2 = xcrd[frame2_atom] - xcrd[parent_atom];
         double dy2 = ycrd[frame2_atom] - ycrd[parent_atom];
         double dz2 = zcrd[frame2_atom] - zcrd[parent_atom];
@@ -66,15 +66,15 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
       break;
     case VirtualSiteKind::FIXED_3:
       {
-        const int frame3_atom  = vsk.frame3_idx[i];
+        const int frame3_atom = vsk.frame3_idx[i];
         double dx23 = xcrd[frame3_atom] - xcrd[frame2_atom];
         double dy23 = ycrd[frame3_atom] - ycrd[frame2_atom];
         double dz23 = zcrd[frame3_atom] - zcrd[frame2_atom];
         imageCoordinates(&dx23, &dy23, &dz23, umat, invu, unit_cell, minimum_image);
         const double f2_f3_factor  = vsk.dim2[i];
         const double x_midpoint = xcrd[frame2_atom] + (f2_f3_factor * dx23);
-        const double y_midpoint = ycrd[frame2_atom] + (f2_f3_factor * dx23);
-        const double z_midpoint = zcrd[frame2_atom] + (f2_f3_factor * dx23);
+        const double y_midpoint = ycrd[frame2_atom] + (f2_f3_factor * dy23);
+        const double z_midpoint = zcrd[frame2_atom] + (f2_f3_factor * dz23);
         double dxm = x_midpoint - xcrd[parent_atom];
         double dym = y_midpoint - ycrd[parent_atom];
         double dzm = z_midpoint - zcrd[parent_atom];
@@ -160,9 +160,9 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         p_f3[0] = xcrd[frame3_atom] - xcrd[parent_atom];
         p_f3[1] = ycrd[frame3_atom] - ycrd[parent_atom];
         p_f3[2] = zcrd[frame3_atom] - zcrd[parent_atom];
-        p_f4[0] = xcrd[frame3_atom] - xcrd[parent_atom];
-        p_f4[1] = ycrd[frame3_atom] - ycrd[parent_atom];
-        p_f4[2] = zcrd[frame3_atom] - zcrd[parent_atom];
+        p_f4[0] = xcrd[frame4_atom] - xcrd[parent_atom];
+        p_f4[1] = ycrd[frame4_atom] - ycrd[parent_atom];
+        p_f4[2] = zcrd[frame4_atom] - zcrd[parent_atom];
         imageCoordinates(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell, minimum_image);
         imageCoordinates(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell, minimum_image);
         imageCoordinates(&p_f4[0], &p_f4[1], &p_f4[2], umat, invu, unit_cell, minimum_image);

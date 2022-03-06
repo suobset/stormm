@@ -170,7 +170,7 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
         result[i].x = p_vs_distance / p_f2_distance;
 
         // Check co-linearity and fill in the second slot
-        result[i].y = dot(p_f2, p_vs);
+        result[i].y = dot(p_f2, p_vs) / (magnitude(p_f2) * magnitude(p_vs));
       }
       break;
     case VirtualSiteKind::FIXED_2:
@@ -278,20 +278,6 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
       frame_type_list += ", ";
     }
   }
-
-  // CHECK
-  printf("Coords = [\n");
-  for (int i = 0; i < psr.natom; i++) {
-    if (ag.getAtomicNumber(i) == 0) {
-      const int nvs = ag.getVirtualSiteIndex(i);
-      printf("{ %12.9lf, %12.9lf, %12.9lf },\n", result[nvs].x, result[nvs].y, result[nvs].z);
-    }
-    else {
-      printf("\n");
-    }
-  }
-  printf("];\n");
-  // END CHECK
   
   // Compare the first result
   std::vector<double> rvec(vsk.nsite), avec(vsk.nsite);
@@ -608,8 +594,16 @@ int main(int argc, char* argv[]) {
   section(3);
   const std::string brbz_top_path = base_top_path + osc + "bromobenzene_vs.top";
   const std::string brbz_crd_path = base_crd_path + osc + "bromobenzene_vs.inpcrd";
+  const std::string stro_top_path = base_top_path + osc + "stereo_L1_vs.top";
+  const std::string stro_crd_path = base_crd_path + osc + "stereo_L1_vs.inpcrd";
+  const std::string symm_top_path = base_top_path + osc + "symmetry_L1_vs.top";
+  const std::string symm_crd_path = base_crd_path + osc + "symmetry_L1_vs.inpcrd";
   const bool vsfi_exist = (getDrivePathType(brbz_top_path) == DrivePathType::FILE &&
-                               getDrivePathType(brbz_crd_path) == DrivePathType::FILE);
+                           getDrivePathType(brbz_crd_path) == DrivePathType::FILE &&
+                           getDrivePathType(symm_top_path) == DrivePathType::FILE &&
+                           getDrivePathType(symm_crd_path) == DrivePathType::FILE &&
+                           getDrivePathType(stro_top_path) == DrivePathType::FILE &&
+                           getDrivePathType(stro_crd_path) == DrivePathType::FILE);
   const TestPriority do_vs_tests = (vsfi_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   AtomGraph brbz_ag = (vsfi_exist) ? AtomGraph(brbz_top_path) : AtomGraph();
   PhaseSpace brbz_ps = (vsfi_exist) ? PhaseSpace(brbz_crd_path, CoordinateFileKind::AMBER_INPCRD) :
@@ -645,7 +639,36 @@ int main(int argc, char* argv[]) {
                                               {  0.421362406,  1.000000000,  0.000000000 },
                                               {  0.421362406,  1.000000000,  0.000000000 } };
   checkVirtualSiteMetrics(brbz_ps, brbz_ag, brbz_answers, do_vs_tests);
-  
+  AtomGraph stro_ag = (vsfi_exist) ? AtomGraph(stro_top_path) : AtomGraph();
+  PhaseSpace stro_ps = (vsfi_exist) ? PhaseSpace(stro_crd_path, CoordinateFileKind::AMBER_INPCRD) :
+                                      PhaseSpace();
+  PhaseSpaceWriter stro_psw = stro_ps.data();
+  scrambleSystemCoordinates(&stro_ps, stro_ag, &xsr);
+  placeVirtualSites(&stro_ps, stro_ag);
+  centerAndReimageSystem(&stro_ps);
+  const std::vector<double3> stro_answers = { {  1.000000000,  0.000000000,  0.000000000 },
+                                              {  0.450000000,  1.000000000,  0.000000000 },
+                                              {  0.300000000, -1.000000000,  0.000000000 },
+                                              {  0.250000000,  0.000000000,  0.000000000 } };
+  checkVirtualSiteMetrics(stro_ps, stro_ag, stro_answers, do_vs_tests);
+  AtomGraph symm_ag = (vsfi_exist) ? AtomGraph(symm_top_path) : AtomGraph();
+  PhaseSpace symm_ps = (vsfi_exist) ? PhaseSpace(symm_crd_path, CoordinateFileKind::AMBER_INPCRD) :
+                                      PhaseSpace();
+  PhaseSpaceWriter symm_psw = symm_ps.data();
+  scrambleSystemCoordinates(&symm_ps, symm_ag, &xsr);
+  placeVirtualSites(&symm_ps, symm_ag);
+  centerAndReimageSystem(&symm_ps);
+  const std::vector<double3> symm_answers = { {  0.500000000,  0.000000000,  2.094395121 },
+                                              {  0.500000000,  0.000000000,  2.094395115 },
+                                              {  0.500000000,  0.000000000,  2.094395115 },
+                                              {  0.500000000,  0.000000000,  2.094395115 },
+                                              {  0.500000000,  0.000000000,  2.094395100 },
+                                              {  0.500000000,  0.000000000,  2.094395100 },
+                                              {  0.450000000,  0.000000000,  0.000000000 },
+                                              {  0.450000000,  0.000000000,  0.000000000 },
+                                              {  0.450000000,  0.000000000,  0.000000000 } };
+  checkVirtualSiteMetrics(symm_ps, symm_ag, symm_answers, do_vs_tests);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }
