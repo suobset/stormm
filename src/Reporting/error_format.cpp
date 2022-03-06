@@ -27,6 +27,9 @@ std::string terminalFormat(const std::string &message, const char* class_caller,
     if (method_caller != nullptr) {
       msg += " :: (" + std::string(method_caller) + ") ";
     }
+    else {
+      msg += " :: ";
+    }
   }
   else if (class_caller != nullptr && strlen(class_caller) > 0 && method_caller != nullptr &&
            strlen(method_caller) > 0) {

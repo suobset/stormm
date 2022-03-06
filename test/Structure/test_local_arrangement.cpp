@@ -5,6 +5,7 @@
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/polynumeric.h"
+#include "../../src/Potential/nonbonded_potential.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/structure_enumerators.h"
@@ -15,10 +16,15 @@
 
 using omni::constants::small;
 using omni::constants::tiny;
+using omni::data_types::double2;
 using omni::data_types::double3;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
+using omni::energy::EvaluateForce;
+using omni::energy::evaluateNonbondedEnergy;
+using omni::energy::ScoreCard;
+using omni::energy::StaticExclusionMask;
 using omni::errors::rtWarn;
 using omni::math::computeBoxTransform;
 using omni::random::Xoshiro256ppGenerator;
@@ -55,6 +61,9 @@ using namespace omni::testing;
 //-------------------------------------------------------------------------------------------------
 void scrambleSystemCoordinates(PhaseSpace *ps, const AtomGraph &ag, Xoshiro256ppGenerator *xsr) {
   PhaseSpaceWriter psw = ps->data();
+  if (psw.unit_cell == UnitCellType::NONE) {
+    return;
+  }
 
   // Scramble and recover the virtual site locations
   for (int i = 0; i < ag.getAtomCount(); i++) {
@@ -64,9 +73,9 @@ void scrambleSystemCoordinates(PhaseSpace *ps, const AtomGraph &ag, Xoshiro256pp
       psw.zcrd[i] += xsr->gaussianRandomNumber();
     }
     else {
-      const double indx = floor(8.0 * (xsr->uniformRandomNumber() - 0.5));
-      const double indy = floor(8.0 * (xsr->uniformRandomNumber() - 0.5));
-      const double indz = floor(8.0 * (xsr->uniformRandomNumber() - 0.5));
+      const double indx = floor(4.0 * (xsr->uniformRandomNumber() - 0.5));
+      const double indy = floor(4.0 * (xsr->uniformRandomNumber() - 0.5));
+      const double indz = floor(4.0 * (xsr->uniformRandomNumber() - 0.5));
       psw.xcrd[i] += (psw.invu[0] * indx) + (psw.invu[3] * indy) + (psw.invu[6] * indz);
       psw.ycrd[i] += (psw.invu[1] * indx) + (psw.invu[4] * indy) + (psw.invu[7] * indz);
       psw.zcrd[i] += (psw.invu[2] * indx) + (psw.invu[5] * indy) + (psw.invu[8] * indz);
@@ -301,11 +310,54 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
     rvec[i] = result[i].z;
     avec[i] = answers[i].z;
   }
-  check(rvec, RelationalOperator::EQUAL, Approx(avec).margin(small), "Metric 3, measuring "
+  check(rvec, RelationalOperator::EQUAL, Approx(avec).margin(1.0e-7), "Metric 3, measuring "
         "miscellaneous quantities like the distance between the virtual site and a normal vector "
         "(Out-3) or the angle made by a virtual site with its nearby frame atoms (FAD-3), fails "
         "in a system described by topology " + ag.getFileName() + ".  Virtual site types present "
         "in this system: " + frame_type_list + ".", do_tests);        
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check the virtual site force transfer, first with analytic comparisons of the torque on the
+// frame atoms and then by finite difference computations.  Electrostatic forces exerted by all
+// particles on each other, in the minimum image convention as all of the systems have been placed
+// near the origin, will provide forces to transmit from the virtual sites to their frame atoms.
+//
+// Arguments:
+//   ps:      Coordinates and forces for the system
+//   ag:      System topology
+//-------------------------------------------------------------------------------------------------
+void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag) {
+  const StaticExclusionMask se(ag);
+  ScoreCard sc(1);
+  
+  const double2 base_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc, EvaluateForce::YES,
+                                                   EvaluateForce::NO, 0);
+  
+  // CHECK
+#if 0
+  PhaseSpaceWriter psw = ps->data();
+  printf("Forces = [\n");
+  for (int i = 0; i < psw.natom; i++) {
+    printf("    %4d %9.4lf %9.4lf %9.4lf\n", ag->getAtomicNumber(i), psw.xfrc[i], psw.yfrc[i],
+           psw.zfrc[i]);
+  }
+  printf("];\n");
+#endif
+  // END CHECK
+
+  transmitVirtualSiteForces(ps, *ag);
+
+  // CHECK
+#if 0
+  printf("Forces = [\n");
+  for (int i = 0; i < psw.natom; i++) {
+    printf("    %4d %9.4lf %9.4lf %9.4lf\n", ag->getAtomicNumber(i), psw.xfrc[i], psw.yfrc[i],
+           psw.zfrc[i]);
+  }
+  printf("];\n");
+#endif
+  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -322,7 +374,10 @@ int main(int argc, char* argv[]) {
 
   // Section 3
   section("Virtual site placement");
-  
+
+  // Section 3
+  section("Virtual site force transmission");
+
   // Get a realistic system
   const char osc = osSeparator();
   const std::string base_top_path = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -598,12 +653,16 @@ int main(int argc, char* argv[]) {
   const std::string stro_crd_path = base_crd_path + osc + "stereo_L1_vs.inpcrd";
   const std::string symm_top_path = base_top_path + osc + "symmetry_L1_vs.top";
   const std::string symm_crd_path = base_crd_path + osc + "symmetry_L1_vs.inpcrd";
+  const std::string dgvs_top_path = base_top_path + osc + "drug_example_vs.top";
+  const std::string dgvs_crd_path = base_crd_path + osc + "drug_example_vs.inpcrd";
   const bool vsfi_exist = (getDrivePathType(brbz_top_path) == DrivePathType::FILE &&
                            getDrivePathType(brbz_crd_path) == DrivePathType::FILE &&
+                           getDrivePathType(stro_top_path) == DrivePathType::FILE &&
+                           getDrivePathType(stro_crd_path) == DrivePathType::FILE &&
                            getDrivePathType(symm_top_path) == DrivePathType::FILE &&
                            getDrivePathType(symm_crd_path) == DrivePathType::FILE &&
-                           getDrivePathType(stro_top_path) == DrivePathType::FILE &&
-                           getDrivePathType(stro_crd_path) == DrivePathType::FILE);
+                           getDrivePathType(symm_top_path) == DrivePathType::FILE &&
+                           getDrivePathType(symm_crd_path) == DrivePathType::FILE);
   const TestPriority do_vs_tests = (vsfi_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   AtomGraph brbz_ag = (vsfi_exist) ? AtomGraph(brbz_top_path) : AtomGraph();
   PhaseSpace brbz_ps = (vsfi_exist) ? PhaseSpace(brbz_crd_path, CoordinateFileKind::AMBER_INPCRD) :
@@ -658,17 +717,83 @@ int main(int argc, char* argv[]) {
   scrambleSystemCoordinates(&symm_ps, symm_ag, &xsr);
   placeVirtualSites(&symm_ps, symm_ag);
   centerAndReimageSystem(&symm_ps);
-  const std::vector<double3> symm_answers = { {  0.500000000,  0.000000000,  2.094395121 },
-                                              {  0.500000000,  0.000000000,  2.094395115 },
-                                              {  0.500000000,  0.000000000,  2.094395115 },
-                                              {  0.500000000,  0.000000000,  2.094395115 },
-                                              {  0.500000000,  0.000000000,  2.094395100 },
-                                              {  0.500000000,  0.000000000,  2.094395100 },
+  const std::vector<double3> symm_answers = { {  0.500000000,  0.000000000,  2.094395102 },
+                                              {  0.500000000,  0.000000000,  2.094395102 },
+                                              {  0.500000000,  0.000000000,  2.094395102 },
+                                              {  0.500000000,  0.000000000,  2.094395102 },
+                                              {  0.500000000,  0.000000000,  2.094395102 },
+                                              {  0.500000000,  0.000000000,  2.094395102 },
                                               {  0.450000000,  0.000000000,  0.000000000 },
                                               {  0.450000000,  0.000000000,  0.000000000 },
                                               {  0.450000000,  0.000000000,  0.000000000 } };
   checkVirtualSiteMetrics(symm_ps, symm_ag, symm_answers, do_vs_tests);
+  AtomGraph dgvs_ag = (vsfi_exist) ? AtomGraph(dgvs_top_path) : AtomGraph();
+  PhaseSpace dgvs_ps = (vsfi_exist) ? PhaseSpace(dgvs_crd_path, CoordinateFileKind::AMBER_INPCRD) :
+                                      PhaseSpace();
+  PhaseSpaceWriter dgvs_psw = dgvs_ps.data();
 
+  // CHECK
+#if 0
+  PhaseSpace dgvs_ps_copy(dgvs_ps);
+  PhaseSpaceWriter dgvs_copy_psw = dgvs_ps_copy.data();
+#endif
+  // END CHECK
+  
+  scrambleSystemCoordinates(&dgvs_ps, dgvs_ag, &xsr);
+  placeVirtualSites(&dgvs_ps, dgvs_ag);
+
+  // CHECK
+#if 0
+  const VirtualSiteKit<double> vsk = dgvs_ag.getDoublePrecisionVirtualSiteKit();
+  for (int i = 0; i < dgvs_ag.getAtomCount(); i++) {
+    if (dgvs_ag.getAtomicNumber(i) == 0) {
+      const int vs_idx = dgvs_ag.getVirtualSiteIndex(i);
+      const int vsite_atom = vsk.vs_atoms[vs_idx];
+      const int parent_atom = vsk.frame1_idx[vs_idx];
+      const int frame2_atom = vsk.frame2_idx[vs_idx];
+      printf("%4.4s:\n", omni::parse::char4ToString(dgvs_ag.getAtomName(parent_atom)).c_str());
+      printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n", dgvs_psw.xcrd[parent_atom],
+             dgvs_psw.ycrd[parent_atom], dgvs_psw.zcrd[parent_atom],
+             dgvs_copy_psw.xcrd[parent_atom], dgvs_copy_psw.ycrd[parent_atom],
+             dgvs_copy_psw.zcrd[parent_atom]);
+      printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n", dgvs_psw.xcrd[frame2_atom],
+             dgvs_psw.ycrd[frame2_atom], dgvs_psw.zcrd[frame2_atom],
+             dgvs_copy_psw.xcrd[frame2_atom], dgvs_copy_psw.ycrd[frame2_atom],
+             dgvs_copy_psw.zcrd[frame2_atom]);
+      if (vsk.vs_types[vs_idx] == static_cast<int>(VirtualSiteKind::FIXED_4)) {
+        const int frame3_atom = vsk.frame3_idx[vs_idx];
+        const int frame4_atom = vsk.frame4_idx[vs_idx];
+        printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n",
+               dgvs_psw.xcrd[frame3_atom], dgvs_psw.ycrd[frame3_atom], dgvs_psw.zcrd[frame3_atom],
+               dgvs_copy_psw.xcrd[frame3_atom], dgvs_copy_psw.ycrd[frame3_atom],
+               dgvs_copy_psw.zcrd[frame3_atom]);
+        printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n",
+               dgvs_psw.xcrd[frame4_atom], dgvs_psw.ycrd[frame4_atom], dgvs_psw.zcrd[frame4_atom],
+               dgvs_copy_psw.xcrd[frame4_atom], dgvs_copy_psw.ycrd[frame4_atom],
+               dgvs_copy_psw.zcrd[frame4_atom]);
+      }
+      printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n\n",
+             dgvs_psw.xcrd[vsite_atom], dgvs_psw.ycrd[vsite_atom], dgvs_psw.zcrd[vsite_atom],
+             dgvs_copy_psw.xcrd[vsite_atom], dgvs_copy_psw.ycrd[vsite_atom],
+             dgvs_copy_psw.zcrd[vsite_atom]);
+    }
+  }
+#endif
+  // END CHECK
+  
+  centerAndReimageSystem(&dgvs_ps);
+  const std::vector<double3> dgvs_answers = { {  0.333300000,  0.000000000,  0.00000000 },
+                                              {  0.333300000,  0.000000000,  0.00000000 },
+                                              {  0.420000000,  0.000000000,  0.00000000 } };
+  checkVirtualSiteMetrics(dgvs_ps, dgvs_ag, dgvs_answers, do_vs_tests);
+  
+  // Check force transmission from virtual sites
+  section(4);
+  checkVirtualSiteForceXfer(&brbz_ps, &brbz_ag);
+  checkVirtualSiteForceXfer(&stro_ps, &stro_ag);
+  checkVirtualSiteForceXfer(&symm_ps, &symm_ag);
+  checkVirtualSiteForceXfer(&dgvs_ps, &dgvs_ag);
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }

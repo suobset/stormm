@@ -214,7 +214,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag) {
 
     // Copy the force on the virtual site into its own vector.  This will be needed in all
     // subsequent force transmissions.
-    const double vs_frc[3] = { psw.xfrc[vsite_atom], psw.xfrc[vsite_atom], psw.xfrc[vsite_atom] };
+    const double vs_frc[3] = { psw.xfrc[vsite_atom], psw.yfrc[vsite_atom], psw.zfrc[vsite_atom] };
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[i])) {
     case VirtualSiteKind::FLEX_2:
       {
@@ -229,7 +229,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag) {
       break;
     case VirtualSiteKind::FIXED_2:
       {
-        double p_f2[3], p_vs[3], vs_frc[3], vs_frc_proj[3], force_partition[3];
+        double p_f2[3], p_vs[3], vs_frc_proj[3], force_partition[3];
         p_f2[0] = psw.xcrd[frame2_atom] - psw.xcrd[parent_atom];
         p_f2[1] = psw.ycrd[frame2_atom] - psw.ycrd[parent_atom];
         p_f2[2] = psw.zcrd[frame2_atom] - psw.zcrd[parent_atom];
@@ -278,7 +278,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag) {
       break;
     case VirtualSiteKind::FIXED_3:
       {
-        double f2_f3[3], p_vs[3], midpoint[3], p_mid[3], vs_frc[3], vs_frc_proj[3];
+        double f2_f3[3], p_vs[3], midpoint[3], p_mid[3], vs_frc_proj[3];
         double force_partition[3];
         const int frame3_atom  = vsk.frame3_idx[i];
         f2_f3[0] = psw.xcrd[frame3_atom] - psw.xcrd[frame2_atom];

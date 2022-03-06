@@ -45,12 +45,12 @@ void placeVirtualSites(PhaseSpace *ps, const AtomGraph &ag);
 void placeVirtualSites(CoordinateFrame *cf, const AtomGraph &ag);
 /// \}
 
-/// \brief Transmute forces on virtual sites to their frame atoms, using double-precision math
+/// \brief Transmit forces on virtual sites to their frame atoms, using double-precision math
 ///        throughout.
 ///
 /// \param ps  Coordinates and forces of the system
 /// \param ag  System topology containing virtual site specifications        
-void transmuteVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag);
+void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag);
  
 } // namespace structure
 } // namespace omni

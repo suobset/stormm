@@ -27,11 +27,13 @@ using namespace generalized_born_defaults;
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
+/// \{
 double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se, PhaseSpace *ps,
                                 ScoreCard *ecard,
                                 EvaluateForce eval_elec_force = EvaluateForce::NO,
                                 EvaluateForce eval_vdw_force  = EvaluateForce::NO,
                                 int system_index = 0);
+/// \}
 
 /// \brief Evaluate the non-bonded Generalized Born energy of a system of particles (no cutoff is
 ///        applied in computation of the radii or evaluation of the energy and forces)
