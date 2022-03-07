@@ -24,6 +24,7 @@ using trajectory::PhaseSpaceWriter;
 ///   - Take the raw coordinate and box transformation pointers plus a virtual sites abstract
 ///   - Take a modifiable PhaseSpace object and the system topology
 ///   - Take a modifiable CoordinateFrame object and the system topology
+///   - Accept the topology by const reference or by const pointer
 ///
 /// \param xcrd       Cartesian X coordinates of all atoms
 /// \param ycrd       Cartesian Y coordinates of all atoms
@@ -42,16 +43,31 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
 
 void placeVirtualSites(PhaseSpace *ps, const AtomGraph &ag);
 
+void placeVirtualSites(PhaseSpace *ps, const AtomGraph *ag);
+
 void placeVirtualSites(CoordinateFrame *cf, const AtomGraph &ag);
+
+void placeVirtualSites(CoordinateFrame *cf, const AtomGraph *ag);
 /// \}
 
 /// \brief Transmit forces on virtual sites to their frame atoms, using double-precision math
 ///        throughout.
 ///
-/// \param ps  Coordinates and forces of the system
-/// \param ag  System topology containing virtual site specifications        
+/// Overloaded:
+///   - Pass the topology by const pointer or by const reference
+///   - Accept the virtual site abstract directly
+///
+/// \param ps   Coordinates and forces of the system
+/// \param ag   System topology containing virtual site specifications        
+/// \param vsk  Virtual site abstract (obtained from the original topology)
+/// \{
 void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag);
- 
+
+void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph *ag);
+
+void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk);
+/// \}
+  
 } // namespace structure
 } // namespace omni
 

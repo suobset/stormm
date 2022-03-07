@@ -3,7 +3,9 @@
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #include "UnitTesting/approx.h"
+#include "atomgraph_abstracts.h"
 #include "atomgraph_analysis.h"
+#include "atomgraph_enumerators.h"
 
 namespace omni {
 namespace topology {
@@ -534,6 +536,45 @@ WaterModel identifyWaterModel(const AtomGraph &ag) {
     }
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string listVirtualSiteFrameTypes(const AtomGraph &ag) {
+  const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
+  return listVirtualSiteFrameTypes(vsk.vs_types, vsk.nsite);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string listVirtualSiteFrameTypes(const AtomGraph *ag) {
+  const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+  return listVirtualSiteFrameTypes(vsk.vs_types, vsk.nsite);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string listVirtualSiteFrameTypes(const int* vs_types, const int nsite) {
+
+  // Compile a list of all frame types found in this system.
+  int n_unique = 0;
+  std::vector<int> unique_frm;
+  std::vector<bool> coverage(nsite);
+  for (int i = 0; i < nsite; i++) {
+    if (coverage[i]) {
+      continue;
+    }
+    for (int j = i; j < nsite; j++) {
+      coverage[j] = (coverage[j] || vs_types[j] == vs_types[i]);
+    }
+    unique_frm.push_back(vs_types[i]);
+    n_unique++;
+  }
+  std::string frame_type_list;
+  for (int i = 0; i < n_unique; i++) {
+    frame_type_list += getVirtualSiteFrameName(static_cast<VirtualSiteKind>(unique_frm[i]));
+    if (i < n_unique - 1) {
+      frame_type_list += ", ";
+    }
+  }
+  return frame_type_list;
 }
 
 //-------------------------------------------------------------------------------------------------

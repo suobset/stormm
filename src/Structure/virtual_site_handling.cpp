@@ -196,6 +196,13 @@ void placeVirtualSites(PhaseSpace *ps, const AtomGraph &ag) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void placeVirtualSites(PhaseSpace *ps, const AtomGraph *ag) {
+  PhaseSpaceWriter psw = ps->data();
+  placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                    ag->getDoublePrecisionVirtualSiteKit());
+}
+
+//-------------------------------------------------------------------------------------------------
 void placeVirtualSites(CoordinateFrame *cf, const AtomGraph &ag) {
   CoordinateFrameWriter cfw = cf->data();
   placeVirtualSites(cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.umat, cfw.invu, cfw.unit_cell,
@@ -203,9 +210,25 @@ void placeVirtualSites(CoordinateFrame *cf, const AtomGraph &ag) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void placeVirtualSites(CoordinateFrame *cf, const AtomGraph *ag) {
+  CoordinateFrameWriter cfw = cf->data();
+  placeVirtualSites(cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.umat, cfw.invu, cfw.unit_cell,
+                    ag->getDoublePrecisionVirtualSiteKit());
+}
+
+//-------------------------------------------------------------------------------------------------
 void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag) {
+  transmitVirtualSiteForces(ps, ag.getDoublePrecisionVirtualSiteKit());
+}
+
+//-------------------------------------------------------------------------------------------------
+void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph *ag) {
+  transmitVirtualSiteForces(ps, ag->getDoublePrecisionVirtualSiteKit());
+}
+
+//-------------------------------------------------------------------------------------------------
+void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk) {
   PhaseSpaceWriter psw = ps->data();
-  const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   for (int i = 0; i < vsk.nsite; i++) {
     const int vsite_atom = vsk.vs_atoms[i];
     const int parent_atom  = vsk.frame1_idx[i];

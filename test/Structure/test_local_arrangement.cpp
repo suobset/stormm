@@ -12,7 +12,9 @@
 #include "../../src/Structure/structure_ops.h"
 #include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_analysis.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::small;
@@ -43,11 +45,13 @@ using omni::math::pointPlaneDistance;
 using omni::math::sum;
 using omni::symbols::pi;
 using omni::topology::AtomGraph;
+using omni::topology::listVirtualSiteFrameTypes;
 using omni::topology::UnitCellType;
 using omni::topology::VirtualSiteKind;
 using omni::trajectory::CoordinateFileKind;
 using omni::trajectory::CoordinateFrame;
 using omni::trajectory::CoordinateFrameWriter;
+using omni::trajectory::TrajectoryKind;
 using namespace omni::structure;
 using namespace omni::testing;
 
@@ -268,26 +272,7 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
   }
 
   // Compile a list of all frame types found in this system.
-  int n_unique = 0;
-  std::vector<int> unique_frm;
-  std::vector<bool> coverage(vsk.nsite);
-  for (int i = 0; i < vsk.nsite; i++) {
-    if (coverage[i]) {
-      continue;
-    }
-    for (int j = i; j < vsk.nsite; j++) {
-      coverage[j] = (coverage[j] || vsk.vs_types[j] == vsk.vs_types[i]);
-    }
-    unique_frm.push_back(vsk.vs_types[i]);
-    n_unique++;
-  }
-  std::string frame_type_list;
-  for (int i = 0; i < n_unique; i++) {
-    frame_type_list += getVirtualSiteFrameName(static_cast<VirtualSiteKind>(unique_frm[i]));
-    if (i < n_unique - 1) {
-      frame_type_list += ", ";
-    }
-  }
+  const std::string frame_type_list = listVirtualSiteFrameTypes(ag);
   
   // Compare the first result
   std::vector<double> rvec(vsk.nsite), avec(vsk.nsite);
@@ -325,57 +310,102 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
 // near the origin, will provide forces to transmit from the virtual sites to their frame atoms.
 //
 // Arguments:
-//   ps:      Coordinates and forces for the system
-//   ag:      System topology
+//   ps:        Coordinates and forces for the system
+//   ag:        System topology
+//   do_tests:  Indicator of whether to attempt tests
 //-------------------------------------------------------------------------------------------------
-void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag) {
+void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag, const TestPriority do_tests) {
+
+  // The virtual sites should already be in position as of the time this function is called, but
+  // place them again rather than resting on that assumption.
+  placeVirtualSites(ps, ag);
   const StaticExclusionMask se(ag);
   ScoreCard sc(1);
-  
-  const double2 base_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc, EvaluateForce::YES,
-                                                   EvaluateForce::NO, 0);
-  
-  // CHECK
-#if 0
-  PhaseSpaceWriter psw = ps->data();
-  printf("Forces = [\n");
-  for (int i = 0; i < psw.natom; i++) {
-    printf("    %4d %9.4lf %9.4lf %9.4lf\n", ag->getAtomicNumber(i), psw.xfrc[i], psw.yfrc[i],
-           psw.zfrc[i]);
+  double2 base_qlj;
+  std::string vs_type_list;
+  switch (do_tests) {
+  case TestPriority::CRITICAL:
+  case TestPriority::NON_CRITICAL:
+    base_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc, EvaluateForce::YES,
+                                       EvaluateForce::NO, 0);
+    vs_type_list = listVirtualSiteFrameTypes(ag);
+    break;
+  case TestPriority::ABORT:
+    break;
   }
-  printf("];\n");
-#endif
-  // END CHECK
-
-  // Compute the torque on the molecule
+  
+  // Compute torque on the molecule, transmit forces to frame atoms, recalculate torque
   const double3 pre_xfer_torque = molecularTorque(ag, ps, 0);
+  transmitVirtualSiteForces(ps, ag);
+  const double3 pst_xfer_torque = molecularTorque(ag, ps, 0);
+  const std::vector<double> t_before = { pre_xfer_torque.x, pre_xfer_torque.y, pre_xfer_torque.z };
+  const std::vector<double> t_after  = { pst_xfer_torque.x, pst_xfer_torque.y, pst_xfer_torque.z };
+  check(t_before, RelationalOperator::EQUAL, t_after, "Net torque on a molecule bearing virtual "
+        "sites of type(s) " + vs_type_list + " is not conserved when transmitting the forces from "
+        "virtual sites to frame atoms.", do_tests);
 
-  // CHECK
-  printf("Before, torque = [ %12.8lf %12.8lf %12.8lf ]\n", pre_xfer_torque.x, pre_xfer_torque.y,
-         pre_xfer_torque.z);
-  // END CHECK
-  
-  transmitVirtualSiteForces(ps, *ag);
-
-  // Compute the torque on the molecule
-  const double3 post_xfer_torque = molecularTorque(ag, ps, 0);
-
-  // CHECK
-  printf("After, torque  = [ %12.8lf %12.8lf %12.8lf ]\n", post_xfer_torque.x, post_xfer_torque.y,
-         post_xfer_torque.z);
-  // END CHECK
-
-  // CHECK
-#if 0
-  printf("Forces = [\n");
-  for (int i = 0; i < psw.natom; i++) {
-    printf("    %4d %9.4lf %9.4lf %9.4lf\n", ag->getAtomicNumber(i), psw.xfrc[i], psw.yfrc[i],
-           psw.zfrc[i]);
+  // Move each of the virtual sites' frame atoms slightly, reposition the sites, recalculate the
+  // energy, and compare the analytic forces.
+  const std::vector<double> analytic_frc = ps->getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+  const int natom = ag->getAtomCount();
+  std::vector<bool> is_frame_atom(natom);
+  const int site_limit = (ag->getMoleculeCount() > 1 && natom > 200) ? 1 : vsk.nsite;
+  for (int i = 0; i < site_limit; i++) {
+    is_frame_atom[vsk.frame1_idx[i]] = true;
+    is_frame_atom[vsk.frame2_idx[i]] = true;
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[i])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      is_frame_atom[vsk.frame3_idx[i]] = true;
+      break;
+    case VirtualSiteKind::FIXED_4:
+      is_frame_atom[vsk.frame3_idx[i]] = true;
+      is_frame_atom[vsk.frame4_idx[i]] = true;
+      break;
+    case VirtualSiteKind::NONE:
+      break;
+    }
   }
-  printf("];\n");
-#endif
-  // END CHECK
-
+  const double fd_perturbation = 0.000001;
+  PhaseSpaceWriter psw = ps->data();
+  std::vector<double> finite_difference_frc(3 * natom, 0.0);
+  std::vector<double> analytic_frc_sample, finite_difference_frc_sample;
+  for (int i = 0; i < natom; i++) {
+    if (is_frame_atom[i] == false) {
+      continue;
+    }
+    psw.xcrd[i] += fd_perturbation;
+    placeVirtualSites(ps, ag);
+    const double2 xpos_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc);
+    psw.xcrd[i] -= fd_perturbation;
+    psw.ycrd[i] += fd_perturbation;
+    placeVirtualSites(ps, ag);
+    const double2 ypos_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc);
+    psw.ycrd[i] -= fd_perturbation;
+    psw.zcrd[i] += fd_perturbation;
+    placeVirtualSites(ps, ag);
+    const double2 zpos_qlj = evaluateNonbondedEnergy(*ag, se, ps, &sc);
+    psw.zcrd[i] -= fd_perturbation;
+    finite_difference_frc[ 3 * i     ] = (base_qlj.x - xpos_qlj.x) / fd_perturbation;
+    finite_difference_frc[(3 * i) + 1] = (base_qlj.x - ypos_qlj.x) / fd_perturbation;
+    finite_difference_frc[(3 * i) + 2] = (base_qlj.x - zpos_qlj.x) / fd_perturbation;
+    analytic_frc_sample.push_back(analytic_frc[ 3 * i     ]);
+    analytic_frc_sample.push_back(analytic_frc[(3 * i) + 1]);
+    analytic_frc_sample.push_back(analytic_frc[(3 * i) + 2]);
+    finite_difference_frc_sample.push_back(analytic_frc[ 3 * i     ]);
+    finite_difference_frc_sample.push_back(analytic_frc[(3 * i) + 1]);
+    finite_difference_frc_sample.push_back(analytic_frc[(3 * i) + 2]);
+  }
+  check(analytic_frc_sample, RelationalOperator::EQUAL,
+        Approx(finite_difference_frc_sample).margin(1.0e-4), "Analytic forces and those computed "
+        "by a finite difference scheme do not agree in a system bearing virtual sites of type(s)" +
+        vs_type_list + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -759,10 +789,10 @@ int main(int argc, char* argv[]) {
   
   // Check force transmission from virtual sites
   section(4);
-  checkVirtualSiteForceXfer(&brbz_ps, &brbz_ag);
-  checkVirtualSiteForceXfer(&stro_ps, &stro_ag);
-  checkVirtualSiteForceXfer(&symm_ps, &symm_ag);
-  checkVirtualSiteForceXfer(&dgvs_ps, &dgvs_ag);
+  checkVirtualSiteForceXfer(&brbz_ps, &brbz_ag, do_vs_tests);
+  checkVirtualSiteForceXfer(&stro_ps, &stro_ag, do_vs_tests);
+  checkVirtualSiteForceXfer(&symm_ps, &symm_ag, do_vs_tests);
+  checkVirtualSiteForceXfer(&dgvs_ps, &dgvs_ag, do_vs_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
