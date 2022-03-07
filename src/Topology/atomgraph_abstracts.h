@@ -379,7 +379,7 @@ struct ChemicalDetailsKit {
                      const char4* res_names_in, const char4* atom_types_in,
                      const int* z_numbers_in, const int* res_limits_in, const int* atom_numbers_in,
                      const int* res_numbers_in, const int* mol_home_in, const int* mol_contents_in,
-                     const int* mol_limits_in);
+                     const int* mol_limits_in, const double* masses_in, const float* sp_masses_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -405,6 +405,8 @@ struct ChemicalDetailsKit {
   const int* mol_home;     ///< Molecule index to which each atom belongs
   const int* mol_contents; ///< Contents of every molecule in the system, as lists of atom indices
   const int* mol_limits;   ///< Molecule limits, the bounds by which to read mol_contents
+  const double* masses;    ///< Masses of atoms in the system
+  const float* sp_masses;  ///< Masses of atoms in the system (single precision)
 };
 
 /// \brief Information needed for the placement of virtual sites and transmission of forces on

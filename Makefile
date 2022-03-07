@@ -55,6 +55,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Restraints/restraint_builder.cpp \
 		 $(SRCDIR)/Structure/isomerization.cpp \
 		 $(SRCDIR)/Structure/local_arrangement.cpp \
+		 $(SRCDIR)/Structure/structure_ops.cpp \
 		 $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
@@ -70,6 +71,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 	         $(SRCDIR)/Topology/atomgraph_refinement.cpp \
+	         $(SRCDIR)/Topology/topology_bounds_checks.cpp \
 	         $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	         $(SRCDIR)/Trajectory/barostat.cpp \
 	         $(SRCDIR)/Trajectory/coordinateframe.cpp \
@@ -148,6 +150,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/isomerization.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
 		   $(SRCDIR)/Structure/structure_enumerators.h \
+		   $(SRCDIR)/Structure/structure_ops.h \
 		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
@@ -159,6 +162,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Topology/atomgraph_analysis.h \
 		   $(SRCDIR)/Topology/atomgraph_enumerators.h \
 		   $(SRCDIR)/Topology/atomgraph_refinement.h \
+		   $(SRCDIR)/Topology/topology_bounds_checks.h \
 		   $(SRCDIR)/Trajectory/amber_ascii.h \
 		   $(SRCDIR)/Trajectory/barostat.h \
 		   $(SRCDIR)/Trajectory/coordinateframe.h \
@@ -239,6 +243,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Restraints/restraint_builder.o \
 		$(SRCDIR)/Structure/isomerization.o \
 		$(SRCDIR)/Structure/local_arrangement.o \
+		$(SRCDIR)/Structure/structure_ops.o \
 		$(SRCDIR)/Structure/virtual_site_handling.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
@@ -254,6 +259,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Topology/atomgraph_analysis.o \
 		$(SRCDIR)/Topology/atomgraph_enumerators.o \
 		$(SRCDIR)/Topology/atomgraph_refinement.o \
+		$(SRCDIR)/Topology/topology_bounds_checks.o \
 		$(SRCDIR)/Trajectory/amber_ascii.o \
 		$(SRCDIR)/Trajectory/barostat.o \
 		$(SRCDIR)/Trajectory/coordinateframe.o \

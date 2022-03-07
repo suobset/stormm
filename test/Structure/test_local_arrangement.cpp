@@ -346,6 +346,10 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag) {
 #endif
   // END CHECK
 
+  // Loop over all virtual sites and their frame atoms.  Compute the torque about the frame's
+  // center of mass.
+  
+  
   transmitVirtualSiteForces(ps, *ag);
 
   // CHECK
@@ -358,6 +362,7 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag) {
   printf("];\n");
 #endif
   // END CHECK
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -731,56 +736,8 @@ int main(int argc, char* argv[]) {
   PhaseSpace dgvs_ps = (vsfi_exist) ? PhaseSpace(dgvs_crd_path, CoordinateFileKind::AMBER_INPCRD) :
                                       PhaseSpace();
   PhaseSpaceWriter dgvs_psw = dgvs_ps.data();
-
-  // CHECK
-#if 0
-  PhaseSpace dgvs_ps_copy(dgvs_ps);
-  PhaseSpaceWriter dgvs_copy_psw = dgvs_ps_copy.data();
-#endif
-  // END CHECK
-  
   scrambleSystemCoordinates(&dgvs_ps, dgvs_ag, &xsr);
   placeVirtualSites(&dgvs_ps, dgvs_ag);
-
-  // CHECK
-#if 0
-  const VirtualSiteKit<double> vsk = dgvs_ag.getDoublePrecisionVirtualSiteKit();
-  for (int i = 0; i < dgvs_ag.getAtomCount(); i++) {
-    if (dgvs_ag.getAtomicNumber(i) == 0) {
-      const int vs_idx = dgvs_ag.getVirtualSiteIndex(i);
-      const int vsite_atom = vsk.vs_atoms[vs_idx];
-      const int parent_atom = vsk.frame1_idx[vs_idx];
-      const int frame2_atom = vsk.frame2_idx[vs_idx];
-      printf("%4.4s:\n", omni::parse::char4ToString(dgvs_ag.getAtomName(parent_atom)).c_str());
-      printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n", dgvs_psw.xcrd[parent_atom],
-             dgvs_psw.ycrd[parent_atom], dgvs_psw.zcrd[parent_atom],
-             dgvs_copy_psw.xcrd[parent_atom], dgvs_copy_psw.ycrd[parent_atom],
-             dgvs_copy_psw.zcrd[parent_atom]);
-      printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n", dgvs_psw.xcrd[frame2_atom],
-             dgvs_psw.ycrd[frame2_atom], dgvs_psw.zcrd[frame2_atom],
-             dgvs_copy_psw.xcrd[frame2_atom], dgvs_copy_psw.ycrd[frame2_atom],
-             dgvs_copy_psw.zcrd[frame2_atom]);
-      if (vsk.vs_types[vs_idx] == static_cast<int>(VirtualSiteKind::FIXED_4)) {
-        const int frame3_atom = vsk.frame3_idx[vs_idx];
-        const int frame4_atom = vsk.frame4_idx[vs_idx];
-        printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n",
-               dgvs_psw.xcrd[frame3_atom], dgvs_psw.ycrd[frame3_atom], dgvs_psw.zcrd[frame3_atom],
-               dgvs_copy_psw.xcrd[frame3_atom], dgvs_copy_psw.ycrd[frame3_atom],
-               dgvs_copy_psw.zcrd[frame3_atom]);
-        printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n",
-               dgvs_psw.xcrd[frame4_atom], dgvs_psw.ycrd[frame4_atom], dgvs_psw.zcrd[frame4_atom],
-               dgvs_copy_psw.xcrd[frame4_atom], dgvs_copy_psw.ycrd[frame4_atom],
-               dgvs_copy_psw.zcrd[frame4_atom]);
-      }
-      printf("  %12.8lf %12.8lf %12.8lf --> %12.8lf %12.8lf %12.8lf\n\n",
-             dgvs_psw.xcrd[vsite_atom], dgvs_psw.ycrd[vsite_atom], dgvs_psw.zcrd[vsite_atom],
-             dgvs_copy_psw.xcrd[vsite_atom], dgvs_copy_psw.ycrd[vsite_atom],
-             dgvs_copy_psw.zcrd[vsite_atom]);
-    }
-  }
-#endif
-  // END CHECK
-  
   centerAndReimageSystem(&dgvs_ps);
   const std::vector<double3> dgvs_answers = { {  0.333300000,  0.000000000,  0.00000000 },
                                               {  0.333300000,  0.000000000,  0.00000000 },

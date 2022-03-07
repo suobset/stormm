@@ -4,6 +4,7 @@
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
+#include "topology_bounds_checks.h"
 
 namespace omni {
 namespace topology {
@@ -119,11 +120,7 @@ std::vector<int> AtomGraph::getResidueNumber() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getResidueNumber(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("A topology with " + std::to_string(atom_count) + " atoms cannot report residue numbers "
-          "for indices " + std::to_string(low_index) + " to " + std::to_string(high_index) + ".",
-          "AtomGraph", "getResidueNumber");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getResidueNumber");
   return residue_numbers.readHost(low_index, high_index - low_index);
 }
 
@@ -165,11 +162,7 @@ std::vector<int> AtomGraph::getAtomicNumber() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getAtomicNumber(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("A topology with " + std::to_string(atom_count) + " atoms cannot report atomic numbers "
-          "for indices " + std::to_string(low_index) + " to " + std::to_string(high_index) + ".",
-          "AtomGraph", "getAtomicNumber");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getAtomicNumber");
   return atomic_numbers.readHost(low_index, high_index - low_index);
 }
 
@@ -187,11 +180,7 @@ std::vector<bool> AtomGraph::getAtomMobility() const {
 std::vector<bool> AtomGraph::getAtomMobility(const int low_index, const int high_index) const {
 
   // Range check as this will use the pointer
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("A topology with " + std::to_string(atom_count) + " atoms cannot report atom mobility "
-          "for indices " + std::to_string(low_index) + " to " + std::to_string(high_index) + ".",
-          "AtomGraph", "getAtomMobility");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getAtomMobility");
   std::vector<bool> mobiles(high_index - low_index, true);
   const int* m_ptr = mobile_atoms.data();
   const int int_bits = sizeof(int) * 8;
@@ -250,10 +239,7 @@ std::vector<int> AtomGraph::getMoleculeMembership() const {
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getMoleculeMembership(const int low_index,
                                                   const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("Invalid molecule range " + std::to_string(low_index) + " to " +
-          std::to_string(high_index) + ".", "AtomGraph", "getMoleculeMemberhip");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getMoleculeMembership");
   return molecule_membership.readHost(low_index, high_index);
 }
 
@@ -280,10 +266,7 @@ std::vector<char4> AtomGraph::getAtomName() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<char4> AtomGraph::getAtomName(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("Invalid atom range " + std::to_string(low_index) + " to " + std::to_string(high_index) +
-          ".", "AtomGraph", "getAtomName");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getAtomName");
   return atom_names.readHost(low_index, high_index);
 }
 
@@ -299,10 +282,7 @@ std::vector<char4> AtomGraph::getAtomType() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<char4> AtomGraph::getAtomType(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("Invalid atom range " + std::to_string(low_index) + " to " + std::to_string(high_index) +
-          ".", "AtomGraph", "getAtomType");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getAtomType");
   return atom_types.readHost(low_index, high_index);
 }
 
@@ -398,10 +378,7 @@ std::vector<int> AtomGraph::findVirtualSites() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int2> AtomGraph::findVirtualSites(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("Invalid virtual site range " + std::to_string(low_index) + " to " +
-          std::to_string(high_index) + ".", "AtomGraph", "findVirtualSites");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "findVirtualSites");
   std::vector<int2> result;
   const int* vstmp = virtual_site_atoms.data();
   const int nvs = virtual_site_count;
@@ -536,10 +513,7 @@ std::vector<int> AtomGraph::getChargeIndex() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getChargeIndex(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("Invalid atom range " + std::to_string(low_index) + " to " + std::to_string(high_index) +
-          ".", "AtomGraph", "getChargeIndex");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getChargeIndex");
   return charge_indices.readHost(low_index, high_index);
 }
 
@@ -555,10 +529,7 @@ std::vector<int> AtomGraph::getLennardJonesIndex() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getLennardJonesIndex(const int low_index, const int high_index) const {
-  if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
-    rtErr("Invalid atom range " + std::to_string(low_index) + " to " + std::to_string(high_index) +
-          ".", "AtomGraph", "getLennardJonesIndex");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getLennardJonesIndex");
   return lennard_jones_indices.readHost(low_index, high_index);
 }
 
@@ -797,7 +768,8 @@ ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(HybridTargetLevel tier) cons
                             atomic_numbers.data(tier), residue_limits.data(tier),
                             atom_struc_numbers.data(tier), residue_numbers.data(tier),
                             molecule_membership.data(tier), molecule_contents.data(tier),
-                            molecule_limits.data(tier));
+                            molecule_limits.data(tier), atomic_masses.data(tier),
+                            sp_atomic_masses.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
