@@ -50,7 +50,8 @@ double3 centerOfMass(const double* xcrd, const double* ycrd, const double* zcrd,
 /// \}
 
 /// \brief Posit that a molecular structure is a rigid body free to rotate in space, and compute
-///        the torque about its center of mass.
+///        the torque about its center of mass.  Assume that the molecule is whole, not broken by
+///        some sort of imaging artifact.
 ///
 /// Overloaded:
 ///   - Take a topology as a const reference or a const pointer
@@ -73,9 +74,9 @@ double3 centerOfMass(const double* xcrd, const double* ycrd, const double* zcrd,
 /// \param mol_contents  Pointer to the array of atoms (topological indices) contained in the
 ///                      molecule of interest
 /// \{
-double3 molecularTorque(const AtomGraph &ag, const PhaseSpace &ps, int mol_index);
+double3 molecularTorque(const AtomGraph &ag, const PhaseSpace &ps, int mol_index = 0);
 
-double3 molecularTorque(const AtomGraph *ag, const PhaseSpace *ps, int mol_index);
+double3 molecularTorque(const AtomGraph *ag, const PhaseSpace *ps, int mol_index = 0);
 
 double3 molecularTorque(const double* xcrd, const double* ycrd, const double* zcrd,
                         const double* xfrc, const double* yfrc, const double* zfrc,

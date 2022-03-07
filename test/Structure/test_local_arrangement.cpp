@@ -9,6 +9,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Structure/structure_enumerators.h"
+#include "../../src/Structure/structure_ops.h"
 #include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
@@ -346,11 +347,23 @@ void checkVirtualSiteForceXfer(PhaseSpace *ps, const AtomGraph *ag) {
 #endif
   // END CHECK
 
-  // Loop over all virtual sites and their frame atoms.  Compute the torque about the frame's
-  // center of mass.
-  
+  // Compute the torque on the molecule
+  const double3 pre_xfer_torque = molecularTorque(ag, ps, 0);
+
+  // CHECK
+  printf("Before, torque = [ %12.8lf %12.8lf %12.8lf ]\n", pre_xfer_torque.x, pre_xfer_torque.y,
+         pre_xfer_torque.z);
+  // END CHECK
   
   transmitVirtualSiteForces(ps, *ag);
+
+  // Compute the torque on the molecule
+  const double3 post_xfer_torque = molecularTorque(ag, ps, 0);
+
+  // CHECK
+  printf("After, torque  = [ %12.8lf %12.8lf %12.8lf ]\n", post_xfer_torque.x, post_xfer_torque.y,
+         post_xfer_torque.z);
+  // END CHECK
 
   // CHECK
 #if 0

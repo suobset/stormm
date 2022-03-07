@@ -91,6 +91,23 @@ double3 molecularTorque(const double* xcrd, const double* ycrd, const double* zc
                         const double* xfrc, const double* yfrc, const double* zfrc,
                         const double* masses, const int* mol_contents, const int mol_start,
                         const int mol_end) {
+  double3 result = { 0.0, 0.0, 0.0 };
+  const double3 c_of_m = centerOfMass(xcrd, ycrd, zcrd, masses, mol_contents, mol_start, mol_end);
+  for (int i = mol_start; i < mol_end; i++) {
+
+    // Compute the displacement from the center of mass.  This relies on cross-products, but
+    // do the accumulation directly for the most efficient code.
+    const double dx = xcrd[i] - c_of_m.x;
+    const double dy = ycrd[i] - c_of_m.y;
+    const double dz = zcrd[i] - c_of_m.z;
+    const double fx = xfrc[i];
+    const double fy = yfrc[i];
+    const double fz = zfrc[i];
+    result.x += (dy * fz) - (dz * fy);
+    result.y -= (dx * fz) - (dz * fx);
+    result.z += (dx * fy) - (dy * fx);
+  }
+  return result;
 }
 
 } // namespace structure
