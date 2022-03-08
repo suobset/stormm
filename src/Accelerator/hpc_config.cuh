@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_STATUS_HPC_H
-#define OMNI_HPC_STATUS_HPC_H
+#ifndef OMNI_HPC_CONFIG_CUH
+#define OMNI_HPC_CONFIG_CUH
 
 #ifdef OMNI_USE_CUDA
 #include <cusolverDn.h>
 #include "cublas_v2.h"
 #endif
 #include "Constants/behavior.h"
-#include "hpc_config.h"
+#include "gpu_details.h"
 
 namespace omni {
 namespace card {

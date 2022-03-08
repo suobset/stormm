@@ -1,9 +1,14 @@
 #include <cmath>
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+#include <cuda_runtime.h>
+#  endif
+#endif
 #include "Constants/fixed_precision.h"
 #include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
-#Include "Trajectory/write_frame.h"
+#include "Trajectory/write_frame.h"
 #include "phasespace_synthesis.h"
 
 namespace omni {
@@ -420,6 +425,92 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
 
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
+PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
+
+  // Some of this could be expedited by retracing the manner in which some of the ARRAY-kind
+  // Hybrids were allocated to infer the values of subsequent pointers, but
+  // cudaHostGetDevicePointer is not a high-latency or laborious call.  Reduce complexity in the
+  // central Hybrid object by generating the pointers every time this special case occurs.
+  int*       devc_atom_starts;
+  int*       devc_atom_counts;
+  llint*     devc_boxvecs;
+  double*    devc_umat;
+  double*    devc_invu;
+  double*    devc_boxdims;
+  float*     devc_sp_umat;
+  float*     devc_sp_invu;
+  float*     devc_sp_boxdims;
+  longlong4* devc_xyz_qlj;
+  llint*     devc_xvel;
+  llint*     devc_yvel;
+  llint*     devc_zvel;
+  llint*     devc_xfrc;
+  llint*     devc_yfrc;
+  llint*     devc_zfrc;
+  bool problem = false;
+#  ifdef OMNI_USE_CUDA
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_starts,
+                                                 (void *)atom_starts.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_counts,
+                                                 (void *)atom_counts.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_boxvecs,
+                                                 (void *)box_vectors.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_umat,
+                                      (void *)box_space_transforms.data(), 0) != cudaSuccess);
+  problem = (problem ||  
+             cudaHostGetDevicePointer((void **)&devc_invu,
+                                      (void *)inverse_transforms.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_boxdims,
+                                                 (void *)box_dimensions.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_sp_umat,
+                                      (void *)sp_box_space_transforms.data(), 0) != cudaSuccess);
+  problem = (problem ||  
+             cudaHostGetDevicePointer((void **)&devc_sp_invu,
+                                      (void *)sp_inverse_transforms.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_sp_boxdims,
+                                      (void *)box_sp_dimensions.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_xyz_qlj,
+                                                 (void *)xyz_qlj.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_xvel,
+                                                 (void *)x_velocities.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_yvel,
+                                                 (void *)y_velocities.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_zvel,
+                                                 (void *)z_velocities.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_xfrc,
+                                                 (void *)x_forces.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_yfrc,
+                                                 (void *)y_forces.data(), 0) != cudaSuccess);
+  problem = (problem || cudaHostGetDevicePointer((void **)&devc_zfrc,
+                                                 (void *)z_forces.data(), 0) != cudaSuccess);
+#  endif
+  if (problem) {
+    rtErr("Unable to get device-mapped pointers to host memory.  Types of memory used in each "
+          "array: " + std::string(xyz_qlj.getLabel().name) + " " +
+          std::to_string(xyz_qlj.getLabel().format) + ", " +
+          std::string(int_data.getLabel().name) + " " + std::string(int_data.getLabel().format) +
+          ", " + std::string(llint_data.getLabel().name) + " " +
+          std::string(llint_data.getLabel().format) + ", " +
+          std::string(double_data.getLabel().name) + " " +
+          std::string(double_data.getLabel().format) + ", "
+          std::string(float_data.getLabel().name) + " " +
+          std::string(float_data.getLabel().format) + ".", "PhaseSpaceSynthesis",
+          "deviceViewToHostData");
+  }
+  return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
+                           devc_atom_starts, devc_atom_counts, globalpos_scale,
+                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
+                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                           devc_box_vectors, devc_box_space_transforms, devc_inverse_transforms,
+                           devc_box_dimensions, devc_sp_box_space_transforms,
+                           devc_sp_inverse_transforms, devc_sp_box_dimensions, devc_xyz_qlj,
+                           devc_xvel, devc_yvel, devc_zvel, devc_xfrc, devc_yfrc, devc_zfrc);
+}
+
+//-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::upload() {
   atom_starts.upload();
   atom_counts.upload();
@@ -431,20 +522,36 @@ void PhaseSpaceSynthesis::upload() {
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::upload(const TrajectoryKind kind) {
-  xyz_qlj.upload();
-  double_data.upload();
-  float_data.upload();
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    xyz_qlj.upload();
+    double_data.upload();
+    float_data.upload();
+    box_vectors.upload();
+    break;
+  case TrajectoryKind::VELOCITIES:
+    x_velocities.upload();
+    y_velocities.upload();
+    z_velocities.upload();
+    break;
+  case TrajectoryKind::FORCES:
+    x_forces.upload();
+    y_forces.upload();
+    z_forces.upload();
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_index) {
-  upload(kind, system_index, system_index + 1);
+void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_index,
+                                 const GpuDetails &gpu) {
+  upload(kind, system_index, system_index + 1, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_lower_bound,
-                                 const int system_upper_bound) {
-
+                                 const int system_upper_bound, consst GpuDetails &gpu) {
+  systemUploader(kind, system_lower_bound, system_upper_bound, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -459,20 +566,36 @@ void PhaseSpaceSynthesis::download() {
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::download(const TrajectoryKind kind) {
-  xyz_qlj.download();
-  double_data.download();
-  float_data.download();
+  switch (kind) {
+  case TrajectoryKind::POSITIONS:
+    xyz_qlj.download();
+    double_data.download();
+    float_data.download();
+    box_vectors.download();
+    break;
+  case TrajectoryKind::VELOCITIES:
+    x_velocities.download();
+    y_velocities.download();
+    z_velocities.download();
+    break;
+  case TrajectoryKind::FORCES:
+    x_forces.download();
+    y_forces.download();
+    z_forces.download();
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_index) {
-  download(kind, system_index, system_index + 1);
+void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_index,
+                                   const GPuDetails &gpu) {
+  download(kind, system_index, system_index + 1, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_lower_bound,
-                                   const int system_upper_bound) {
-
+                                   const int system_upper_bound, const GpuDetails &gpu) {
+  systemDownloader(kind, system_lower_bound, system_upper_bound, gpu);
 }
 #endif
 

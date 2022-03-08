@@ -1,4 +1,8 @@
 // -*-c++-*-
+#ifndef OMNI_HPC_RANDOM_CUH
+#define OMNI_HPC_RANDOM_CUH
+
+#include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
@@ -65,3 +69,5 @@ void seedXoshiro256pp(Hybrid<ullint4> *state_vector, int igseed, const GpuDetail
 
 } // namespace hpc_random
 } // namespace omni
+
+#endif

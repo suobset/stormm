@@ -257,6 +257,13 @@ public:
   /// \}
 
 #ifdef OMNI_USE_HPC
+  /// \brief Get a special writer which allows the device to read and write to host-mapped data.
+  ///        This form of the writer can be used in kernel calls that streamline download and
+  ///        upload of specific systems within the PhaseSpaceSynthesis with the launch latency
+  ///        of only a single kernel call.  This offers a huge reduction in bandwidth requirements
+  ///        and lower latency than multiple cudaMemcpy calls.
+  PsSynthesisWriter deviceViewToHostData();
+  
   /// \brief Upload data to the device.
   ///
   /// Overloaded:

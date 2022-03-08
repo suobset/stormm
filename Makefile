@@ -281,7 +281,7 @@ OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 
 # OMNI CUDA header files
 OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
-		    $(SRCDIR)/Accelerator/hpc_config.h \
+		    $(SRCDIR)/Accelerator/gpu_details.h \
 		    $(SRCDIR)/Accelerator/hpc_config.cuh \
 		    $(SRCDIR)/Accelerator/ptx_macros.h \
 		    $(SRCDIR)/Math/hpc_summation.cuh \

@@ -161,17 +161,6 @@ extern const std::vector<GpuDetails> queryGpuStats(const ExceptionResponse polic
     }
   }
   device_catalog.resize(n_gpus);
-
-  // CHECK
-  for (int i = 0; i < n_gpus; i++) {
-    if (device_catalog[i].getAvailability()) {
-      printf("Device %d is currently AVAIABLE.\n", i);
-    }
-    else if (device_catalog[i].getAvailability()) {
-      printf("Until individual devices are evaluated, device %d is currently AVAIABLE.\n", i);
-    }
-  }
-  // END CHECK
   
   // Activate zero-copy
   if (cudaSetDeviceFlags(cudaDeviceMapHost) != cudaSuccess) {
