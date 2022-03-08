@@ -1,13 +1,16 @@
 #include <cmath>
 #include "Constants/fixed_precision.h"
+#include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
+#Include "Trajectory/write_frame.h"
 #include "phasespace_synthesis.h"
 
 namespace omni {
 namespace synthesis {
 
 using card::HybridKind;
+using diskutil::splitPath;
 using math::roundUp;
 using math::invertSquareMatrix;
 using numerics::checkGlobalPositionBits;
@@ -17,7 +20,8 @@ using numerics::checkForceBits;
 using topology::UnitCellType;
 using trajectory::PhaseSpaceWriter;
 using trajectory::PhaseSpaceReader;
-
+using trajectory::writeFrame;
+  
 //-------------------------------------------------------------------------------------------------
 PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellType unit_cell_in,
                                      const ThermostatKind heat_bath_kind_in,
@@ -332,10 +336,6 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     double_data{original.double_data},
     float_data{original.float_data}
 {
-  // CHECK
-  printf("PhaseSpaceSynthesis copy constructor.\n");
-  // END CHECK
-  
   // The allocate function again handle pointer repair, just like in the PhaseSpace object.
   // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
   // the original must have been in agreement in order for it to exist in the first place.  The
@@ -386,10 +386,36 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     llint_data{std::move(original.llint_data)},
     double_data{std::move(original.double_data)},
     float_data{std::move(original.float_data)}
-{
-  // CHECK
-  printf("PhaseSpaceSynthesis move constructor.\n");
-  // END CHECK
+{}
+
+//-------------------------------------------------------------------------------------------------
+const PsSynthesisReader PhaseSpaceSynthesis::data(HybridTargetLevel tier) const {
+  return PsSynthesisReader(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
+                           atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
+                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                           box_vectors.data(tier), box_space_transforms.data(tier),
+                           inverse_transforms.data(tier), box_dimensions.data(tier),
+                           sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
+                           sp_box_dimensions.data(tier), xyz_qlj.data(tier),
+                           x_velocities.data(tier), y_velocities.data(tier),
+                           z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
+                           z_forces.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
+  return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
+                           atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
+                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
+                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
+                           box_vectors.data(tier), box_space_transforms.data(tier),
+                           inverse_transforms.data(tier), box_dimensions.data(tier),
+                           sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
+                           sp_box_dimensions.data(tier), xyz_qlj.data(tier),
+                           x_velocities.data(tier), y_velocities.data(tier),
+                           z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
+                           z_forces.data(tier));
 }
 
 #ifdef OMNI_USE_HPC
@@ -404,6 +430,24 @@ void PhaseSpaceSynthesis::upload() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::upload(const TrajectoryKind kind) {
+  xyz_qlj.upload();
+  double_data.upload();
+  float_data.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_index) {
+  upload(kind, system_index, system_index + 1);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_lower_bound,
+                                 const int system_upper_bound) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::download() {
   atom_starts.download();
   atom_counts.download();
@@ -411,6 +455,24 @@ void PhaseSpaceSynthesis::download() {
   llint_data.download();
   double_data.download();
   float_data.download();
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::download(const TrajectoryKind kind) {
+  xyz_qlj.download();
+  double_data.download();
+  float_data.download();
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_index) {
+  download(kind, system_index, system_index + 1);
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_lower_bound,
+                                   const int system_upper_bound) {
+
 }
 #endif
 
@@ -588,33 +650,143 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
 }
 
 //-------------------------------------------------------------------------------------------------
-const PsSynthesisReader PhaseSpaceSynthesis::data(HybridTargetLevel tier) const {
-  return PsSynthesisReader(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                           atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
-                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
-                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
-                           box_vectors.data(tier), box_space_transforms.data(tier),
-                           inverse_transforms.data(tier), box_dimensions.data(tier),
-                           sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
-                           sp_box_dimensions.data(tier), xyz_qlj.data(tier),
-                           x_velocities.data(tier), y_velocities.data(tier),
-                           z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                           z_forces.data(tier));
-}
+void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
+                                          const std::string &file_name,
+                                          const CoordinateFileKind output_kind,
+                                          const PrintSituation expectation) {
 
-//-------------------------------------------------------------------------------------------------
-PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
-  return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
-                           atom_starts.data(tier), atom_counts.data(tier), globalpos_scale,
-                           localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
-                           localpos_scale_bits, velocity_scale_bits, force_scale_bits,
-                           box_vectors.data(tier), box_space_transforms.data(tier),
-                           inverse_transforms.data(tier), box_dimensions.data(tier),
-                           sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
-                           sp_box_dimensions.data(tier), xyz_qlj.data(tier),
-                           x_velocities.data(tier), y_velocities.data(tier),
-                           z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                           z_forces.data(tier));
+  // Bail out if there are no frames to print
+  const size_t nframe = system_indices.size();
+  if (nframe == 0LLU) {
+    return;
+  }
+#ifdef OMNI_USE_HPC
+  int low_frame = nframe;
+  int high_frame = 0;
+  for (size_t i = 0; i < nframe; i++) {
+    low_frame = std::min(system_indices[i], low_frame);
+    high_frame = std::max(system_indices[i], high_frame);
+  }
+  high_frame++;
+  switch (output_kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_NETCDF:
+    download(TrajectoryKind::POSITIONS, low_frame, high_frame);
+    break;
+  case CoordinateFileKind::AMBER_ASCII_RST:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    download(TrajectoryKind::POSITIONS, low_frame, high_frame);
+    download(TrajectoryKind::VELOCITIES, low_frame, high_frame);
+    break;
+  case CoordinateFileKind::UNKNOWN:
+    break;
+  }
+#endif
+  
+  // The file is expected to exist.  Append it with the named frames by transferring the necessary
+  // data to temporary arrays (the fixed-precision conversion to real numbers is needed, and
+  // the pointers in the writer object are convenient).  Trajectories will write all frames to a
+  // single file.  Restart file formats will write individual frames to separate files.
+  std::ofstream foutp;
+
+  // If the request if to print a trajectory file, check that all frames have the same sizes.
+  switch (output_kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_NETCDF:
+    {
+      const int natom = atom_counts.readHost(system_indices[0]);
+      for (size_t i = 1; i < nframe; i++) {
+        if (atom_counts.readHost(system_indices[i]) != natom) {
+          rtErr("Frames of different sizes cannot be printed to a single trajectory.",
+                "PhaseSpaceSynthesis", "printTrajectory");
+        }
+      }
+      const DataFormat style = (output_kind == CoordinateFileKind::AMBER_CRD) ? DataFormat::ASCII :
+                                                                                DataFormat::BINARY;
+      foutp = openOutputFile(file_name, expectation, "Open an output trajectory for writing "
+                             "PhaseSpaceSynthesis contents.", style);
+    }
+    break;
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("Printing request for unknown file type.", "PhaseSpaceSynthesis", "printTrajectory");
+  }
+
+  // Proceed frame by frame
+  std::vector<double> tmp_xcrd, tmp_ycrd, tmp_zcrd, tmp_xvel, tmp_yvel, tmp_zvel; 
+  for (size_t i = 0; i < nframe; i++) {
+    const int fr_start = atom_starts.readHost(i);
+    const int fr_end   = fr_start + atom_counts.readHost(i);
+    const int frame_atom_count = fr_end - fr_start;
+
+    // Transfer the particle positions.  Resize the holding arrays at each frame: if the frames
+    // are for a trajectory and therefore all the same size, the resizing will take no effort.
+    // But, if restart files were requested, the holding arrays may need to be of different sizes.
+    tmp_xcrd.resize(frame_atom_count);
+    tmp_ycrd.resize(frame_atom_count);
+    tmp_zcrd.resize(frame_atom_count);
+    const xyz_qlj_ptr = xyz_qlj.data();
+    for (int j = fr_start; j < fr_end; j++) {
+      tmp_xcrd[j - fr_start] = static_cast<double>(xyz_qlj[j].x) * inverse_globalpos_scale;
+      tmp_ycrd[j - fr_start] = static_cast<double>(xyz_qlj[j].y) * inverse_globalpos_scale;
+      tmp_zcrd[j - fr_start] = static_cast<double>(xyz_qlj[j].z) * inverse_globalpos_scale;
+    }
+
+    // Transfer the particle velocities, if necessary
+    switch (output_kind) {
+    case CoordinateFileKind::AMBER_CRD:
+    case CoordinateFileKind::AMBER_NETCDF:
+    case CoordinateFileKind::AMBER_INPCRD:
+    case CoordinateFileKind::UNKNOWN:
+      break;
+    case CoordinateFileKind::AMBER_ASCII_RST:
+    case CoordinateFileKind::AMBER_NETCDF_RST:
+      {
+        const llint* xvel_ptr = x_velocities.data();
+        const llint* yvel_ptr = y_velocities.data();
+        const llint* zvel_ptr = z_velocities.data();
+        tmp_xvel.resize(frame_atom_count);
+        tmp_yvel.resize(frame_atom_count);
+        tmp_zvel.resize(frame_atom_count);
+        for (int j = fr_start; j < fr_end; j++) {
+          tmp_xvel[j - fr_start] = static_cast<double>(xvel_ptr[j]) * inverse_velocity_scale;
+          tmp_yvel[j - fr_start] = static_cast<double>(yvel_ptr[j]) * inverse_velocity_scale;
+          tmp_zvel[j - fr_start] = static_cast<double>(zvel_ptr[j]) * inverse_velocity_scale;
+        }
+      }
+      break;
+    }
+
+    // Open and write an individual restart file, or continue writing to a trajectory file
+    switch (output_kind) {
+    case CoordinateFileKind::AMBER_CRD:
+    case CoordinateFileKind::AMBER_NETCDF:
+      writeFrame(&foutp, file_name, output_kind, tmp_xcrd, tmp_ycrd, tmp_zcrd, tmp_xvel, tmp_yvel,
+                 tmp_zvel, box_dims);
+      break;
+    case CoordinateFileKind::AMBER_INPCRD:
+    case CoordinateFileKind::AMBER_ASCII_RST:
+    case CoordinateFileKind::AMBER_NETCDF_RST:
+      {
+        std::string before_dot, after_dot;
+        splitPath(file_name);
+        std::string aug_file_name = 
+        const DataFormat style = (output_kind == CoordinateFileKind::AMBER_INPCRD ||
+                                  output_kind == CoordinateFileKind::AMBER_ASCII_RST) ?
+                                 DataFormat::ASCII : DataFormat::BINARY;
+        foutp = openOutputFile(aug_file_name, expectation, "Open an output trajectory for writing "
+                               "frame " + std::to_string(i + 1) + " of a PhaseSpaceSynthesis "
+                               "object's contents.", style);
+      }
+      break;
+    case CoordinateFileKind::UNKNOWN:
+      break;
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

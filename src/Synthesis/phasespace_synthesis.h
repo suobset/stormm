@@ -2,9 +2,10 @@
 #ifndef OMNI_PHASESPACE_SYNTHESIS_H
 #define OMNI_PHASESPACE_SYNTHESIS_H
 
+#include "Accelerator/hybrid.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
-#include "Accelerator/hybrid.h"
+#include "FileManagement/file_util.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/barostat.h"
 #include "Trajectory/phasespace.h"
@@ -17,6 +18,7 @@ namespace synthesis {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
+using diskutil::PrintSituation;
 using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
@@ -24,6 +26,7 @@ using numerics::default_force_scale_bits;
 using topology::UnitCellType;
 using trajectory::Barostat;
 using trajectory::BarostatKind;
+using trajectory::CoordinateFileKind;
 using trajectory::PhaseSpace;
 using trajectory::Thermostat;
 using trajectory::ThermostatKind;
@@ -244,13 +247,53 @@ public:
   PhaseSpaceSynthesis& operator=(const PhaseSpaceSynthesis &other) = delete;
   PhaseSpaceSynthesis& operator=(PhaseSpaceSynthesis &&other) = delete;
   /// \}
+  
+  /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
+  ///
+  /// \param tier  The level (host or device) at which to get the set of pointers
+  /// \{
+  const PsSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  PsSynthesisWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
 
 #ifdef OMNI_USE_HPC
-  /// \brief Upload data to the device
+  /// \brief Upload data to the device.
+  ///
+  /// Overloaded:
+  ///   - Upload all data
+  ///   - Upload data associated with a specific type of coordinates
+  ///   - Upload data assoicated with a specific type of coordinates and specific systems
+  ///
+  /// \param kind                Choose from POSITIONS, VELOCITIES, FORCES (positional data will
+  ///                            include box dimensions and is the only way to get box dimensions)
+  /// \param system_index        The specific system to upload
+  /// \param system_lower_bound  Upload systems in the range [ lower_bound, upper_bound )
+  /// \param system_upper_bound  Upload systems in the range [ lower_bound, upper_bound )
+  /// \{
   void upload();
+  void upload(TrajectoryKind kind);
+  void upload(TrajectoryKind kind, int system_index);
+  void upload(TrajectoryKind kind, int system_lower_bound, int system_upper_bound);
+  /// \}
   
   /// \brief Download data from the device
+  ///
+  /// Overloaded:
+  ///   - Download all data
+  ///   - Download data associated with a specific type of coordinates
+  ///   - Download data assoicated with a specific type of coordinates and specific systems
+  ///
+  /// \param kind                Choose from POSITIONS, VELOCITIES, FORCES (positional data will
+  ///                            include box dimensions and is the only way to get box dimensions)
+  /// \param system_index        The specific system to download
+  /// \param system_lower_bound  Download systems in the range [ lower_bound, upper_bound )
+  /// \param system_upper_bound  Download systems in the range [ lower_bound, upper_bound )
+  /// \{
   void download();
+  void download(TrajectoryKind kind);
+  void download(TrajectoryKind kind, int system_index);
+  void download(TrajectoryKind kind, int system_lower_bound, int system_upper_bound);
+  /// \}
 #endif
   
   /// \brief Move particles according to a given set of forces, based on known masses, to complete
@@ -285,7 +328,7 @@ public:
   void extractPhaseSpace(PhaseSpace *ps, int index,
                          HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  /// \brief Extract a specific type of coordinate from the synthesis.
+  /// \brief Extract a specific type of coordinate from the synthesis into a pre-allocated space.
   ///
   /// \param ps        Pointer to an allocated PhaseSpace object (i.e. the original) ready to
   ///                  accept data from the synthesis (which may have evolved since it was first
@@ -296,15 +339,13 @@ public:
   void extractCoordinates(PhaseSpace *ps, int index,
                           TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
                           HybridTargetLevel tier = HybridTargetLevel::HOST);
-  
-  /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
-  ///
-  /// \param tier  The level (host or device) at which to get the set of pointers
-  /// \{
-  const PsSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  PsSynthesisWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
-  /// \}
 
+  /// \brief Print a list of structures to a trajectory file.  Download will be performed when
+  ///        calling this function, over the subset of relevant frames and data.
+  ///
+  /// \param system_indices  List of system coordinates / velocities / forces to print
+  
+  
 private:
   int system_count;               ///< The number of systems to tend at once
   UnitCellType unit_cell;         ///< The types of unit cells.  All unit cells must exist in
