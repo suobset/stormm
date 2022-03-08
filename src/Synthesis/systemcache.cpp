@@ -22,7 +22,8 @@ using omni::trajectory::detectCoordinateFileKind;
 SystemCache::SystemCache() :
     topology_cache{},
     coordinates_cache{},
-    topology_indices{}
+    topology_indices{},
+    example_indices{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -317,11 +318,28 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       }
     }
   }
+
+  // Collect examples of all systems, taking the first system in the list to use each topology
+  // as the example of coordinates for that topology.
+  const int top_count = topology_cache.size();
+  const int system_count = coordinates_cache.size();
+  example_indices.resize(top_count, -1);
+  for (int i = 0; i < system_count; i++) {
+    const int top_idx = topology_indices[i];
+    if (example_indices[top_idx] == -1) {
+      example_indices[top_idx] = i;
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
 int SystemCache::getSystemCount() const {
   return coordinates_cache.size();
+}
+
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getTopologyCount() const {
+  return topology_cache.size();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -333,6 +351,11 @@ int SystemCache::getTopologyIndex(const int coord_index) const {
   return topology_indices[coord_index];
 }
 
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getCoordinateExample(const int topology_index) const {
+  return example_indices[topology_index];
+}
+                                      
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* SystemCache::getTopologyPointer(const int index) const {
   if (index >= static_cast<int>(coordinates_cache.size())) {

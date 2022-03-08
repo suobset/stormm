@@ -13,6 +13,61 @@ using chemistry::AtomMask;
 using topology::AtomGraph;
 using trajectory::CoordinateFrameReader;
 
+/// \brief Unguarded struct to hold elemens of a flat bottom restraint.  Two such objects can hold
+///        the initial and final states of a restraint, as well as the steps at which each state
+///        takes effect.
+struct FlatBottomPlan {
+
+  /// \brief The default constructor sets stiffnesses to zero and the activation step to zero.
+  ///        Additional constructors touch on the most frequently used combinations of parameters.
+  FlatBottomPlan();
+  FlatBottomPlan(double k_in, double r_in);
+  FlatBottomPlan(double k_in, double r2_in, double r3_in);
+  FlatBottomPlan(double k2_in, double k3_in, double r2_in, double r3_in);
+  FlatBottomPlan(double k2_in, double k3_in, double r1_in, double r2_in, double r3_in,
+                 double r4_in, int step_in);
+  
+  int activation_step;  // Step number at which this state of the restraint will take (full) effect
+  double k2;            // Left-hand harmonic stiffness
+  double k3;            // Right-hand harmonic stiffness
+  double r1;            // Leftmost boundary between linear and harmonic behavior
+  double r2;            // Leftmost boundary of the flat-bottom potential
+  double r3;            // Rightmost boundary of the flat-bottom potential
+  double r4;            // Rightmost boundard between harmonic and linear behavior
+};
+  
+/// \brief Build a restraint to hold two atoms at a particular distance from one another.
+///  
+/// \param ag      System topology (needed to supply the pointer for the BoundedRestraint object)
+/// \param atom_i  The first atom of the angle
+/// \param atom_j  The second atom of the angle
+BoundedRestraint applyDistanceRestraint(const AtomGraph *ag, int atom_i, int atom_j,
+                                        const FlatBottomPlan fb_init,
+                                        const FlatBottomPlan fb_final = FlatBottomPlan());
+
+/// \brief Build a restraint to hold three atoms in a particular angle arrangement.
+///  
+/// \param ag      System topology (needed to supply the pointer for the BoundedRestraint object)
+/// \param atom_i  The first atom of the angle
+/// \param atom_j  The second atom of the angle
+/// \param atom_k  The third atom of the angle
+BoundedRestraint applyAngleRestraint(const AtomGraph *ag, int atom_i, int atom_j, int atom_k,
+                                     const FlatBottomPlan fb_init,
+                                     const FlatBottomPlan fb_final = FlatBottomPlan());
+  
+/// \brief Build a restraint to hold a dihedral towards a particular value.  This can rotate the
+///        group about a particular bond, or secure a conformation in a position to which it has
+///        already been rotated.
+///  
+/// \param ag      System topology (needed to supply the pointer for the BoundedRestraint object)
+/// \param atom_i  The first atom of the dihedral
+/// \param atom_j  The second atom of the dihedral (first atom of the bond about which to rotate)
+/// \param atom_k  The third atom of the dihedral (second atom of the bond about which to rotate)
+/// \param atom_l  The fourth atom of the dihedral
+BoundedRestraint applyDihedralRestraint(const AtomGraph *ag, int atom_i, int atom_j, int atom_k,
+                                        int atom_l, const FlatBottomPlan fb_init,
+                                        const FlatBottomPlan fb_final = FlatBottomPlan());
+
 /// \brief Perform basic checks the validity of the topology and coordinate frame needed by the
 ///        following restraint builders.
 ///
@@ -76,13 +131,7 @@ std::vector<BoundedRestraint>
 applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                        const AtomMask &mask, double penalty, double flat_bottom_half_width,
                        double harmonic_maximum);
-
-/// \brief Build a series of restraints to rotate about a particular bond.
-///  
-/// \param ag      System topology (this will be used to branch out from the rotatable bond
-/// \param atom_i  The first atom of the bond about which to rotate
-/// \param atom_j  The second atom of the bond about which to rotate
-
+  
 } // namespace restraints
 } // namespace omni
 

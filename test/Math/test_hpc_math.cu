@@ -11,10 +11,6 @@
 #include "../../src/Random/hpc_random.cuh"
 #include "../../src/UnitTesting/unit_test.h"
 
-// CHECK
-#include "../../src/UnitTesting/benchmark.h"
-// END CHECK
-
 using omni::constants::ExceptionResponse;
 using omni::constants::tiny;
 using omni::constants::large_block_size;

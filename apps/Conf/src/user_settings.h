@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_USER_SETTINGS_H
-#define OMNI_USER_SETTINGS_H
+#ifndef CONFORMER_USER_SETTINGS_H
+#define CONFORMER_USER_SETTINGS_H
 
 #include "../../../src/Constants/behavior.h"
 #include "../../../src/Namelists/nml_files.h"
@@ -61,7 +61,10 @@ struct UserSettings {
   
   /// \brief Get the block of information associated with the &random namelist.
   RandomControls getRandomNamelistInfo() const;
-  
+
+  /// \brief Get the block of information associated with the &conformer namelist.
+  ConformerControls getConformerNamelistInfo() const;
+
 private:
 
   /// Action in the event of bad input

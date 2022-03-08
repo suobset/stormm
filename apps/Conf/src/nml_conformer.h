@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NML_CONFORMER_H
-#define OMNI_NML_CONFORMER_H
+#ifndef CONFORMER_NML_CONFORMER_H
+#define CONFORMER_NML_CONFORMER_H
 
 #include "../../../src/Constants/behavior.h"
 #include "../../../src/Namelists/namelist_emulator.h"
@@ -17,6 +17,8 @@ using omni::parse::TextFile;
 /// \brief Default input settings for the &conformer namelist
 /// \{
 constexpr int default_conf_rotation_samples     = 3;
+constexpr int default_conf_max_rotatable_bonds  = 4;
+constexpr int default_conf_max_system_trials    = 5000;
 constexpr char default_conf_chirality[]         = "false";
 constexpr char default_conf_cis_trans[]         = "false";
 constexpr char default_conf_stop_hbonds[]       = "false";
@@ -41,6 +43,45 @@ struct ConformerControls {
                     ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
+  /// \brief Get the common atom mask string.
+  std::string getCommonAtomMask() const;
+
+  /// \brief Get an indicator of whether to sample chirality.
+  bool sampleChirality() const;
+
+  /// \brief Get an indicator of whether to sample cis- and trans- isomers.
+  bool sampleCisTrans() const;
+
+  /// \brief Get an indicator as to whether to apply restraints that will prevent hydrogen bond
+  ///        formation in the resulting conformers.
+  bool preventHydrogenBonding() const;
+
+  /// \brief Get the total number of states to attempt minimizing at one time.  This will put a
+  ///        limit on the expanded population of conformer systems that the program will attempt
+  ///        to model and minimize on the GPU, which takes a significant amount of memory.  If
+  ///        there are more systems, the program will expand each and attempt minimizations as
+  ///        this limit (a safeguard against overrunning available resources) permits.
+  int getRunningStateCount() const;
+
+  /// \brief Get the number of final states to produce for each initial system.
+  int getFinalStateCount() const;
+
+  /// \brief Get the number of samples to apply to each explicitly sampled rotatable bond.
+  int getRotationSampleCount() const;
+
+  /// \brief Get the maximum number of rotatable bonds to sample.
+  int getRotatableBondLimit() const;
+
+  /// \brief Get the maximum number of minimizations to attempt with any one molecule.  Each
+  ///        initial state provided by the user will be subject to this limit, so if the limit
+  ///        is 5000 and one molecule has two initial states listed in the input deck, the total
+  ///        number of conformations sampled will be no greater than 10000.
+  int getSystemTrialLimit() const;
+  
+  /// \brief Get the positional root mean squared deviation that will distinguish each reported
+  ///        confomer.
+  double getRmsdTolerance() const;
+
 private:
   ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
                                   ///<   abort program, WARN = warn the user, and likely reset to
@@ -55,6 +96,9 @@ private:
   int running_states;             ///< Number of states to try minimizing at one time
   int final_states;               ///< Number of final states to collect
   int rotation_samples;           ///< Number of times to sample about a rotatable bond
+  int rotatable_bond_limit;       ///< Maximum number of rotatable bonds to explicitly sample
+  int system_trial_limit;         ///< Maximum number of distinct minimizations to attempt with
+                                  ///<   one molecule
   double rmsd_tolerance;          ///< Minimum mass-weighted root-mean squared deviation between
                                   ///<   unique conformers
 };

@@ -1,5 +1,5 @@
 add_library(approx approx.cpp)
-add_library(benchmark benchmark.cpp)
+add_library(stopwatch stopwatch.cpp)
 add_library(checklist checklist.cpp)
 add_library(file_snapshot file_snapshot.cpp)
 add_library(test_environment test_environment.cpp)

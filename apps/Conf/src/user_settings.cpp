@@ -162,5 +162,10 @@ RandomControls UserSettings::getRandomNamelistInfo() const {
   return prng_input;
 }
 
+//-------------------------------------------------------------------------------------------------
+ConformerControls UserSettings::getConformerNamelistInfo() const {
+  return conf_input;
+}
+
 } // namespace user_input
 } // namespace conf_app

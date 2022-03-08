@@ -45,6 +45,9 @@ public:
   /// \brief Get the number of systems
   int getSystemCount() const;
 
+  /// \brief Get the number of topologies
+  int getTopologyCount() const;
+
   /// \brief Get the topology index of one of the coordinate sets contained in this cache.  This
   ///        will apply a bounds check to the coordinate index query.  This function should be used
   ///        to access topologies in the output of a getTopologyReference() call when the full
@@ -55,6 +58,12 @@ public:
   ///
   /// \param int coord_index  Index of the PhaseSpace entry object of interest
   int getTopologyIndex(int coord_index) const;
+
+  /// \brief Get the index of a coordinate set which provides an example of the system that one of
+  ///        the topologies in the cache describes.
+  ///
+  /// \param int topology_index  Index of the topology of interest
+  int getCoordinateExample(int topology_index) const;
   
   /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
   ///
@@ -140,6 +149,10 @@ private:
   /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
   /// when composing the synthesis objects.
   std::vector<int> topology_indices;
+
+  /// Each topology describes one or more systems in the cache.  This array will store the index
+  /// of a coordinate set which serves as an example of each topology.
+  std::vector<int> example_indices;
 };
   
 } // namespace synthesis

@@ -332,6 +332,10 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     double_data{original.double_data},
     float_data{original.float_data}
 {
+  // CHECK
+  printf("PhaseSpaceSynthesis copy constructor.\n");
+  // END CHECK
+  
   // The allocate function again handle pointer repair, just like in the PhaseSpace object.
   // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
   // the original must have been in agreement in order for it to exist in the first place.  The
@@ -382,7 +386,11 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     llint_data{std::move(original.llint_data)},
     double_data{std::move(original.double_data)},
     float_data{std::move(original.float_data)}
-{}
+{
+  // CHECK
+  printf("PhaseSpaceSynthesis move constructor.\n");
+  // END CHECK
+}
 
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------

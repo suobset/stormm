@@ -20,6 +20,67 @@ using topology::TorsionKind;
 using topology::ValenceKit;
 
 //-------------------------------------------------------------------------------------------------
+FlatBottomPlan::FlatBottomPlan() :
+    activation_step{0}, k2{0.0}, k3{0.3}, r1{0.0}, r2{0.0}, r3{0.0}, r4{0.0}
+{}
+
+//-------------------------------------------------------------------------------------------------
+FlatBottomPlan::FlatBottomPlan(const double k_in, const double r_in) :
+    activation_step{0}, k2{k_in}, k3{k_in}, r1{r_in - 10.0}, r2{r_in}, r3{r_in}, r4{r_in + 10.0}
+{}
+
+//-------------------------------------------------------------------------------------------------
+FlatBottomPlan::FlatBottomPlan(const double k_in, const double r2_in, const double r3_in) :
+    activation_step{0}, k2{k_in}, k3{k_in}, r1{r2_in - 10.0}, r2{r2_in}, r3{r3_in},
+    r4{r3_in + 10.0}
+{}
+
+//-------------------------------------------------------------------------------------------------
+FlatBottomPlan::FlatBottomPlan(const double k2_in, const double k3_in, const double r2_in,
+                               const double r3_in) :
+    activation_step{0}, k2{k2_in}, k3{k3_in}, r1{r2_in - 10.0}, r2{r2_in}, r3{r3_in},
+    r4{r3_in + 10.0}
+{}
+
+//-------------------------------------------------------------------------------------------------
+FlatBottomPlan::FlatBottomPlan(const double k2_in, const double k3_in, const double r1_in,
+                               const double r2_in, const double r3_in, const double r4_in,
+                               const int step_in) :
+    activation_step{step_in}, k2{k2_in}, k3{k3_in}, r1{r1_in}, r2{r2_in}, r3{r3_in}, r4{r4_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint applyDistanceRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                        const FlatBottomPlan fb_init,
+                                        const FlatBottomPlan fb_final) {
+  return BoundedRestraint(atom_i, atom_j, ag, fb_init.activation_step,
+                          fb_final.activation_step, fb_init.k2, fb_init.k3, fb_init.r1, fb_init.r2,
+                          fb_init.r3, fb_init.r4, fb_final.k2, fb_final.k3, fb_final.r1,
+                          fb_final.r2, fb_final.r3, fb_final.r4);
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint applyAngleRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                     const int atom_k, const FlatBottomPlan fb_init,
+                                     const FlatBottomPlan fb_final) {
+  return BoundedRestraint(atom_i, atom_j, atom_k, ag, fb_init.activation_step,
+                          fb_final.activation_step, fb_init.k2, fb_init.k3, fb_init.r1, fb_init.r2,
+                          fb_init.r3, fb_init.r4, fb_final.k2, fb_final.k3, fb_final.r1,
+                          fb_final.r2, fb_final.r3, fb_final.r4);
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint applyDihedralRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                        const int atom_k, const int atom_l,
+                                        const FlatBottomPlan fb_init,
+                                        const FlatBottomPlan fb_final) {
+  return BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, fb_init.activation_step,
+                          fb_final.activation_step, fb_init.k2, fb_init.k3, fb_init.r1, fb_init.r2,
+                          fb_init.r3, fb_init.r4, fb_final.k2, fb_final.k3, fb_final.r1,
+                          fb_final.r2, fb_final.r3, fb_final.r4);
+}
+
+//-------------------------------------------------------------------------------------------------
 void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                              const AtomMask &mask) {
   const int natom_expected = ag->getAtomCount();
@@ -40,9 +101,9 @@ void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &c
 std::vector<BoundedRestraint>
 applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                           const CoordinateFrameReader &reference_cframe, const AtomMask &mask,
-                          double displacement_penalty, double displacement_onset,
-                          double displacement_plateau, double proximity_penalty,
-                          double proximity_onset, double proximity_plateau) {
+                          const double displacement_penalty, const double displacement_onset,
+                          const double displacement_plateau, const double proximity_penalty,
+                          const double proximity_onset, const double proximity_plateau) {
   restraintTopologyChecks(ag, cframe, mask);
   
   // Loop over all atoms in the mask and create restraints

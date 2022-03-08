@@ -80,7 +80,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
 	         $(SRCDIR)/Trajectory/write_frame.cpp \
 		 $(SRCDIR)/UnitTesting/approx.cpp \
-		 $(SRCDIR)/UnitTesting/benchmark.cpp \
+		 $(SRCDIR)/UnitTesting/stopwatch.cpp \
 		 $(SRCDIR)/UnitTesting/checklist.cpp \
 		 $(SRCDIR)/UnitTesting/file_snapshot.cpp \
 		 $(SRCDIR)/UnitTesting/test_environment.cpp \
@@ -171,7 +171,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Trajectory/trajectory_enumerators.h \
 		   $(SRCDIR)/Trajectory/write_frame.h \
 		   $(SRCDIR)/UnitTesting/approx.h \
-		   $(SRCDIR)/UnitTesting/benchmark.h \
+		   $(SRCDIR)/UnitTesting/stopwatch.h \
 		   $(SRCDIR)/UnitTesting/checklist.h \
 		   $(SRCDIR)/UnitTesting/file_snapshot.h \
 		   $(SRCDIR)/UnitTesting/test_environment.h \
@@ -268,7 +268,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Trajectory/trajectory_enumerators.o \
 		$(SRCDIR)/Trajectory/write_frame.o \
 		$(SRCDIR)/UnitTesting/approx.o \
-		$(SRCDIR)/UnitTesting/benchmark.o \
+		$(SRCDIR)/UnitTesting/stopwatch.o \
 		$(SRCDIR)/UnitTesting/checklist.o \
 		$(SRCDIR)/UnitTesting/file_snapshot.o \
 		$(SRCDIR)/UnitTesting/test_environment.o \
@@ -329,7 +329,7 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++11 -fPIC -O0 -g
+CPP_FLAGS = -std=c++11 -fPIC -O3
 CUDA_FLAGS = -std=c++11 --compiler-options=-fPIC -O0 -g
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
@@ -526,12 +526,14 @@ $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
 # Target: Benchmarking split accumulation of valence bond and angle forces 
 $(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so \
 			       $(APPDIR)/Conf/src/conformer.cpp \
-			       $(APPDIR)/Conf/src/user_settings.cpp \
-			       $(APPDIR)/Conf/src/nml_conformer.cpp
+			       $(APPDIR)/Conf/src/nml_conformer.cpp \
+			       $(APPDIR)/Conf/src/setup.cpp \
+			       $(APPDIR)/Conf/src/user_settings.cpp
 	@echo "[OMNI]  Building conformer.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.omni \
-	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/user_settings.cpp \
-	  $(APPDIR)/Conf/src/nml_conformer.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/nml_conformer.cpp \
+	  $(APPDIR)/Conf/src/setup.cpp $(APPDIR)/Conf/src/user_settings.cpp \
+	  -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 install : $(LIBDIR)/libomni.so
 

@@ -7,7 +7,7 @@
 #include "Parsing/parse.h"
 #include "Parsing/tabulation.h"
 #include "Reporting/error_format.h"
-#include "benchmark.h"
+#include "stopwatch.h"
 
 namespace omni {
 namespace testing {

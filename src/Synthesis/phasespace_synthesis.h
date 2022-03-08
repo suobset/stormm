@@ -235,7 +235,16 @@ public:
   PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original);
   PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original);
   /// \}
-  
+
+  /// \brief Copy and move assignment operators work much like their counterparts in the smaller
+  ///        PhaseSpace object.
+  ///
+  /// \param other  The other PhaseSpaceSynthesis object
+  /// \{
+  PhaseSpaceSynthesis& operator=(const PhaseSpaceSynthesis &other) = delete;
+  PhaseSpaceSynthesis& operator=(PhaseSpaceSynthesis &&other) = delete;
+  /// \}
+
 #ifdef OMNI_USE_HPC
   /// \brief Upload data to the device
   void upload();

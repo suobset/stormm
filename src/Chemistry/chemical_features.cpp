@@ -23,7 +23,7 @@ using math::roundUp;
 using testing::Approx;
 using topology::selectRotatingAtoms;
 using trajectory::CoordinateFrameReader;
-  
+
 //-------------------------------------------------------------------------------------------------
 BondedNode::BondedNode() :
     previous_atom_index{-1}, atom_index{-1}, layer_index{-1}, root_bond_order{0.0},
@@ -231,7 +231,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   case MapRotatableGroups::YES:
     findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_rotatable_groups,
                        &tmp_rotatable_group_bounds);
-    rotatable_bond_count = tmp_rotatable_groups.size();
+    rotatable_bond_count = static_cast<int>(tmp_rotatable_group_bounds.size()) - 1;
     break;
   case MapRotatableGroups::NO:
     break;
@@ -1267,7 +1267,7 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
     if (nbranch_i < 1 || nbranch_j < 1) {
       continue;
     }
-    
+
     // Test the number of rotatable bonds with atom_i as the root and atom_j as the pivot (the
     // pivot atom is closest to the atoms that will move), then vice-versa.  List the atoms such
     // that the smallest number of atoms will move as a consequence of rotation about the bond.

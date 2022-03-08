@@ -11,4 +11,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-valgrind ${OMNI_HOME}/apps/bin/conformer.omni -i cgen.in -warn
+${OMNI_HOME}/apps/bin/conformer.omni -i cgen.in -warn

@@ -10,11 +10,6 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-// CHECK
-#include "../../src/UnitTesting/benchmark.h"
-using omni::testing::StopWatch;
-// END CHECK
-
 using omni::card::HybridTargetLevel;
 using omni::data_types::uint;
 using omni::data_types::char4;
@@ -83,16 +78,9 @@ int main(int argc, char* argv[]) {
            "where src/ and test/ subdirectories can be found.  Some subsequent tests will be "
            "skipped.", "test_atommask");
   }
-#if 0
   const ChemicalFeatures trpcage_chem = (trpcage_exists) ?
-                                         ChemicalFeatures(&trpcage, trpcage_crd) :
-                                         ChemicalFeatures();
-#endif
-
-  // CHECK
-  const ChemicalFeatures trpcage_chem(&trpcage, trpcage_crd);
-  // END CHECK
-  
+                                        ChemicalFeatures(&trpcage, trpcage_crd) :
+                                        ChemicalFeatures();
   const std::string mask_a_input(":1-5");
   const AtomMask mask_a = (trpcage_exists) ? AtomMask(mask_a_input, &trpcage, &trpcage_chem,
                                                       trpcage_crd, MaskInputMode::AMBMASK,

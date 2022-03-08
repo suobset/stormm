@@ -136,12 +136,19 @@ public:
   ///   - Create with a heavy-duty PhaseSpace object holding the coordinates (this will just be
   ///     stripped down to a CoordinateFrame object)
   ///
-  /// \param ag_in  Pointer to the system topology.  This topology will not be modified by
-  ///               submitting it to this constructor, but it is needed as a constant pointer so
-  ///               that the object itself can store a valid pointer to the original topology
-  ///               (passing by const reference would not create a valid pointer).
-  /// \param cfr    Coordinates of the system
-  /// \param ps     Coordinates of the system (a CoordinateFrameReader will be extracted)
+  /// \param ag_in           Pointer to the system topology.  This topology will not be modified by
+  ///                        submitting it to this constructor, but it is needed as a constant
+  ///                        pointer so that the object itself can store a valid pointer to the
+  ///                        original topology (passing by const reference would not create a valid
+  ///                        pointer).
+  /// \param cfr             Coordinates of the system
+  /// \param ps              Coordinates of the system (a CoordinateFrameReader will be extracted)
+  /// \param map_group_in    Indicator of whether to map rotatable groups (this is an O(N^2)
+  ///                        algorithm in memory as well as computation, as larger structures will
+  ///                        have more rotatable bonds and the entirety of the structure must be
+  ///                        traced in relation to each of them)
+  /// \param temperature_in  Temperature at which to take Boltzmann weights of different resonance
+  ///                        states
   /// \{
   ChemicalFeatures();
 

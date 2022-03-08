@@ -356,7 +356,6 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
     vs_in_ascending_order  = (vs_in_ascending_order  && vs_indices[i] < vs_indices[i + 1]);
     vs_in_descending_order = (vs_in_descending_order && vs_indices[i] > vs_indices[i + 1]);
   }
-  
   for (int i = 0; i < nsubset; i++) {
     if (orig_cdk.z_numbers[local_subset[i]] > 0) {
       continue;
@@ -420,6 +419,7 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
     tmp_tree_symbols[j] = original.tree_symbols.readHost(orig_idx);
     tmp_residue_index[j] = base_residue_indices[orig_idx];
     subset_mask[orig_idx] = j;
+    virtual_site_count += (orig_cdk.z_numbers[orig_idx] == 0);
     j++;
   }
 
@@ -674,6 +674,12 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
 
   // Finish up CHARMM parameter indexing with the atom assignments
   mvt.makeAtomAssignments();
+
+  // Collect virtual sites.  Any virtual sites from the original topology will have to come with
+  // their frame atoms, but a complete set of frame atoms in the new topology does not carry a
+  // requirement that the virtual site also be included.  The net charge of the subset topology
+  // is the thing most likely to be affected, and it will not be required to be integral.
+  VirtualSiteTable vs_table(atom_count, virtual_site_count);
 }
 
 //-------------------------------------------------------------------------------------------------
