@@ -351,7 +351,11 @@ public:
   ///        calling this function, over the subset of relevant frames and data.
   ///
   /// \param system_indices  List of system coordinates / velocities / forces to print
-  
+  /// \param file_name       Name of the file to write, or base name of a set of files to write
+  /// \param output_kind     The type of trajectory file to write
+  /// \param expectation     The state that the output trajectory file is expected to be found in
+  void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
+                       CoordinateFileKind output_kind, PrintSituation expectation);
   
 private:
   int system_count;               ///< The number of systems to tend at once

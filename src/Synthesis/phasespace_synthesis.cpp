@@ -16,6 +16,7 @@ namespace synthesis {
 
 using card::HybridKind;
 using diskutil::splitPath;
+using diskutil::DataFormat;
 using math::roundUp;
 using math::invertSquareMatrix;
 using numerics::checkGlobalPositionBits;
@@ -852,11 +853,11 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
     tmp_xcrd.resize(frame_atom_count);
     tmp_ycrd.resize(frame_atom_count);
     tmp_zcrd.resize(frame_atom_count);
-    const xyz_qlj_ptr = xyz_qlj.data();
+    const longlong4* xyz_qlj_ptr = xyz_qlj.data();
     for (int j = fr_start; j < fr_end; j++) {
-      tmp_xcrd[j - fr_start] = static_cast<double>(xyz_qlj[j].x) * inverse_globalpos_scale;
-      tmp_ycrd[j - fr_start] = static_cast<double>(xyz_qlj[j].y) * inverse_globalpos_scale;
-      tmp_zcrd[j - fr_start] = static_cast<double>(xyz_qlj[j].z) * inverse_globalpos_scale;
+      tmp_xcrd[j - fr_start] = static_cast<double>(xyz_qlj_ptr[j].x) * inverse_globalpos_scale;
+      tmp_ycrd[j - fr_start] = static_cast<double>(xyz_qlj_ptr[j].y) * inverse_globalpos_scale;
+      tmp_zcrd[j - fr_start] = static_cast<double>(xyz_qlj_ptr[j].z) * inverse_globalpos_scale;
     }
 
     // Transfer the particle velocities, if necessary
@@ -883,21 +884,34 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
       }
       break;
     }
-
+    std::vector<double> tmp_boxdims(6);
+    switch (unit_cell) {
+    case UnitCellType::NONE:
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      {
+        const int dim_stride = roundUp(6, warp_size_int);
+        for (int j = 0; j < 6; j++) {
+          tmp_boxdims[i] = box_dimensions.readHost((i * dim_stride) + j);
+        }
+      }
+    }
+    
     // Open and write an individual restart file, or continue writing to a trajectory file
     switch (output_kind) {
     case CoordinateFileKind::AMBER_CRD:
     case CoordinateFileKind::AMBER_NETCDF:
       writeFrame(&foutp, file_name, output_kind, tmp_xcrd, tmp_ycrd, tmp_zcrd, tmp_xvel, tmp_yvel,
-                 tmp_zvel, box_dims);
+                 tmp_zvel, tmp_boxdims);
       break;
     case CoordinateFileKind::AMBER_INPCRD:
     case CoordinateFileKind::AMBER_ASCII_RST:
     case CoordinateFileKind::AMBER_NETCDF_RST:
       {
         std::string before_dot, after_dot;
-        splitPath(file_name);
-        std::string aug_file_name = 
+        splitPath(file_name, &before_dot, &after_dot);
+        std::string aug_file_name = before_dot + "_" + std::to_string(i + 1) + "." + after_dot;
         const DataFormat style = (output_kind == CoordinateFileKind::AMBER_INPCRD ||
                                   output_kind == CoordinateFileKind::AMBER_ASCII_RST) ?
                                  DataFormat::ASCII : DataFormat::BINARY;
