@@ -15,7 +15,6 @@ using card::HybridTargetLevel;
 using constants::CartesianDimension;
 using topology::AtomGraph;
 using topology::UnitCellType;
-using trajectory::CoordinateFileKind;
 
 /// \brief Collect constants and pointers to the components of a read-only PhaseSpace object.
 struct PhaseSpaceReader {

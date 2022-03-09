@@ -6,6 +6,7 @@
 #endif
 #include "Reporting/error_format.h"
 #include "Trajectory/trajectory_enumerators.h"
+#include "hpc_phasespace_synthesis.h"
 #include "hpc_phasespace_synthesis.cuh"
 
 namespace omni {

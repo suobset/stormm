@@ -2,6 +2,9 @@
 #ifndef OMNI_PHASESPACE_SYNTHESIS_H
 #define OMNI_PHASESPACE_SYNTHESIS_H
 
+#ifdef OMNI_USE_HPC
+#include "Accelerator/gpu_details.h"
+#endif
 #include "Accelerator/hybrid.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
@@ -16,6 +19,9 @@
 namespace omni {
 namespace synthesis {
 
+#ifdef OMNI_USE_HPC
+using card::GpuDetails;
+#endif
 using card::Hybrid;
 using card::HybridTargetLevel;
 using diskutil::PrintSituation;
@@ -279,8 +285,9 @@ public:
   /// \{
   void upload();
   void upload(TrajectoryKind kind);
-  void upload(TrajectoryKind kind, int system_index);
-  void upload(TrajectoryKind kind, int system_lower_bound, int system_upper_bound);
+  void upload(TrajectoryKind kind, int system_index, const GpuDetails &gpu);
+  void upload(TrajectoryKind kind, int system_lower_bound, int system_upper_bound,
+              const GpuDetails &gpu);
   /// \}
   
   /// \brief Download data from the device
@@ -298,8 +305,9 @@ public:
   /// \{
   void download();
   void download(TrajectoryKind kind);
-  void download(TrajectoryKind kind, int system_index);
-  void download(TrajectoryKind kind, int system_lower_bound, int system_upper_bound);
+  void download(TrajectoryKind kind, int system_index, const GpuDetails &gpu);
+  void download(TrajectoryKind kind, int system_lower_bound, int system_upper_bound,
+                const GpuDetails &gpu);
   /// \}
 #endif
   
@@ -354,8 +362,15 @@ public:
   /// \param file_name       Name of the file to write, or base name of a set of files to write
   /// \param output_kind     The type of trajectory file to write
   /// \param expectation     The state that the output trajectory file is expected to be found in
+  /// \param gpu             Specs of the GPU in use for the calculation (HPC mode only)
+#ifdef OMNI_USE_HPC
+  void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
+                       CoordinateFileKind output_kind, PrintSituation expectation,
+                       const GpuDetails &gpu);
+#else
   void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
                        CoordinateFileKind output_kind, PrintSituation expectation);
+#endif
   
 private:
   int system_count;               ///< The number of systems to tend at once

@@ -277,7 +277,8 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 
 # OMNI CUDA source files
 OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
-		  $(SRCDIR)/Random/hpc_random.cu
+		  $(SRCDIR)/Random/hpc_random.cu \
+		  $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
 
 # OMNI CUDA header files
 OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
@@ -285,11 +286,14 @@ OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		    $(SRCDIR)/Accelerator/hpc_config.cuh \
 		    $(SRCDIR)/Accelerator/ptx_macros.h \
 		    $(SRCDIR)/Math/hpc_summation.cuh \
-		    $(SRCDIR)/Random/hpc_random.cuh
+		    $(SRCDIR)/Random/hpc_random.cuh \
+		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
+		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
 # OMNI CUDA object files
 OMNI_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
-		 $(SRCDIR)/Random/hpc_random.o
+		 $(SRCDIR)/Random/hpc_random.o \
+		 $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
 
 # Test programs using omni
 OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \

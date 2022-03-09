@@ -1,7 +1,7 @@
 #include <cmath>
 #ifdef OMNI_USE_HPC
 #  ifdef OMNI_USE_CUDA
-#include <cuda_runtime.h>
+#  include <cuda_runtime.h>
 #  endif
 #endif
 #include "Constants/fixed_precision.h"
@@ -9,6 +9,7 @@
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
 #include "Trajectory/write_frame.h"
+#include "hpc_phasespace_synthesis.h"
 #include "phasespace_synthesis.h"
 
 namespace omni {
@@ -472,7 +473,7 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
                                       (void *)sp_inverse_transforms.data(), 0) != cudaSuccess);
   problem = (problem ||
              cudaHostGetDevicePointer((void **)&devc_sp_boxdims,
-                                      (void *)box_sp_dimensions.data(), 0) != cudaSuccess);
+                                      (void *)sp_box_dimensions.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_xyz_qlj,
                                                  (void *)xyz_qlj.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_xvel,
@@ -490,25 +491,20 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
 #  endif
   if (problem) {
     rtErr("Unable to get device-mapped pointers to host memory.  Types of memory used in each "
-          "array: " + std::string(xyz_qlj.getLabel().name) + " " +
-          std::to_string(xyz_qlj.getLabel().format) + ", " +
-          std::string(int_data.getLabel().name) + " " + std::string(int_data.getLabel().format) +
-          ", " + std::string(llint_data.getLabel().name) + " " +
-          std::string(llint_data.getLabel().format) + ", " +
-          std::string(double_data.getLabel().name) + " " +
-          std::string(double_data.getLabel().format) + ", "
-          std::string(float_data.getLabel().name) + " " +
-          std::string(float_data.getLabel().format) + ".", "PhaseSpaceSynthesis",
-          "deviceViewToHostData");
+          "array: " + std::string(xyz_qlj.getLabel().name) + " " + xyz_qlj.getLabel().format +
+          ", " + std::string(int_data.getLabel().name) + " " + int_data.getLabel().format +
+          ", " + std::string(llint_data.getLabel().name) + " " + llint_data.getLabel().format +
+          ", " + std::string(double_data.getLabel().name) + " " + double_data.getLabel().format +
+          ", " + std::string(float_data.getLabel().name) + " " + float_data.getLabel().format +
+          ".", "PhaseSpaceSynthesis", "deviceViewToHostData");
   }
   return PsSynthesisWriter(system_count, unit_cell, heat_bath_kind, piston_kind, time_step,
                            devc_atom_starts, devc_atom_counts, globalpos_scale,
                            localpos_scale, velocity_scale, force_scale, globalpos_scale_bits,
                            localpos_scale_bits, velocity_scale_bits, force_scale_bits,
-                           devc_box_vectors, devc_box_space_transforms, devc_inverse_transforms,
-                           devc_box_dimensions, devc_sp_box_space_transforms,
-                           devc_sp_inverse_transforms, devc_sp_box_dimensions, devc_xyz_qlj,
-                           devc_xvel, devc_yvel, devc_zvel, devc_xfrc, devc_yfrc, devc_zfrc);
+                           devc_boxvecs, devc_umat, devc_invu, devc_boxdims, devc_sp_umat,
+                           devc_sp_invu, devc_sp_boxdims, devc_xyz_qlj, devc_xvel, devc_yvel,
+                           devc_zvel, devc_xfrc, devc_yfrc, devc_zfrc);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -551,8 +547,10 @@ void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_ind
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_lower_bound,
-                                 const int system_upper_bound, consst GpuDetails &gpu) {
-  systemUploader(kind, system_lower_bound, system_upper_bound, gpu);
+                                 const int system_upper_bound, const GpuDetails &gpu) {
+  PsSynthesisWriter devc_view = data(HybridTargetLevel::DEVICE);
+  PsSynthesisWriter host_view = deviceViewToHostData();
+  systemUploader(&devc_view, &host_view, kind, system_lower_bound, system_upper_bound, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -589,14 +587,16 @@ void PhaseSpaceSynthesis::download(const TrajectoryKind kind) {
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_index,
-                                   const GPuDetails &gpu) {
+                                   const GpuDetails &gpu) {
   download(kind, system_index, system_index + 1, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_lower_bound,
                                    const int system_upper_bound, const GpuDetails &gpu) {
-  systemDownloader(kind, system_lower_bound, system_upper_bound, gpu);
+  PsSynthesisWriter devc_view = data(HybridTargetLevel::DEVICE);
+  PsSynthesisWriter host_view = deviceViewToHostData();
+  systemDownloader(&devc_view, &host_view, kind, system_lower_bound, system_upper_bound, gpu);
 }
 #endif
 
@@ -774,10 +774,18 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
 }
 
 //-------------------------------------------------------------------------------------------------
+#ifdef OMNI_USE_HPC
 void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
                                           const std::string &file_name,
                                           const CoordinateFileKind output_kind,
-                                          const PrintSituation expectation) {
+                                          const PrintSituation expectation, const GpuDetails &gpu)
+#else
+void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
+                                          const std::string &file_name,
+                                          const CoordinateFileKind output_kind,
+                                          const PrintSituation expectation)
+#endif
+{
 
   // Bail out if there are no frames to print
   const size_t nframe = system_indices.size();
@@ -796,12 +804,12 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
   case CoordinateFileKind::AMBER_CRD:
   case CoordinateFileKind::AMBER_INPCRD:
   case CoordinateFileKind::AMBER_NETCDF:
-    download(TrajectoryKind::POSITIONS, low_frame, high_frame);
+    download(TrajectoryKind::POSITIONS, low_frame, high_frame, gpu);
     break;
   case CoordinateFileKind::AMBER_ASCII_RST:
   case CoordinateFileKind::AMBER_NETCDF_RST:
-    download(TrajectoryKind::POSITIONS, low_frame, high_frame);
-    download(TrajectoryKind::VELOCITIES, low_frame, high_frame);
+    download(TrajectoryKind::POSITIONS, low_frame, high_frame, gpu);
+    download(TrajectoryKind::VELOCITIES, low_frame, high_frame, gpu);
     break;
   case CoordinateFileKind::UNKNOWN:
     break;
