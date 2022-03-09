@@ -9,8 +9,10 @@
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
 #include "Trajectory/write_frame.h"
-#include "hpc_phasespace_synthesis.h"
 #include "phasespace_synthesis.h"
+#ifdef OMNI_USE_HPC
+#  include "hpc_phasespace_synthesis.h"
+#endif
 
 namespace omni {
 namespace synthesis {
