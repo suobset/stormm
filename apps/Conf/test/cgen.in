@@ -1,5 +1,0 @@
-&files
-  -p /projects2/insite/david.cerutti/Omni/test/Namelists/topol/.*.top
-  -c /projects2/insite/david.cerutti/Omni/test/Namelists/coord/.*.inpcrd
-&end
-
