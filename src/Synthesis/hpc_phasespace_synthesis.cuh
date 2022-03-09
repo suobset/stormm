@@ -15,31 +15,21 @@ namespace synthesis {
 
 using constants::large_block_size;
 
-/// \brief Upload scattered data from specific systems within a PhaseSpaceSynthesis object.  The
+/// \brief Transfer a subset of system coordinates (and perhaps box dimensions) data from specific
+///        systems within a PhaseSpaceSynthesis object betwee the host and the accelerator device.
 ///        PhaseSpaceSynthesis is a central object within OMNI and can be huge (multiple gigabytes
-///        worth of coordinate, velocity, and force data.  As such, it deserves dedicated kernels
+///        worth of coordinate, velocity, and force data.  As such, it deserves a dedicated kernel
 ///        for managing data transfer to and from the host.
 ///
-/// \param devc_view   Collection of pointers to PhaseSpaceSynthesis data on the device
-/// \param host_view   Collection of pointers to host mapped data, but visible on the device
-/// \param low_index   Lower bound of systems to upload
-/// \param high_index  Upper bound of systems to upload (the range is [low_index, high_index))
-  __global__ void __launch_bounds__(large_block_size, 1)
-kSystemUploader(PsSynthesisWriter devc_view, PsSynthesisWriter host_view, int low_index,
-                int high_index);
-  
-/// \brief Download scattered data from specific systems within a PhaseSpaceSynthesis object.  The
-///        PhaseSpaceSynthesis is a central object within OMNI and can be huge (multiple gigabytes
-///        worth of coordinate, velocity, and force data.  As such, it deserves dedicated kernels
-///        for managing data transfer to and from the host.
-///
-/// \param devc_view   Collection of pointers to PhaseSpaceSynthesis data on the device
-/// \param host_view   Collection of pointers to host mapped data, but visible on the device
-/// \param low_index   Lower bound of systems to download
-/// \param high_index  Upper bound of systems to download (the range is [low_index, high_index))
+/// \param destination  Collection of pointers to PhaseSpaceSynthesis data (this must be visible
+///                     on the device, but could be device-only memory or host-mapped memory)
+/// \param source       Collection of pointers to PhaseSpaceSynthesis data (this must be visible
+///                     on the device, but could be device-only memory or host-mapped memory)
+/// \param low_index    Lower bound of systems to upload
+/// \param high_index   Upper bound of systems to upload (the range is [low_index, high_index))
 __global__ void __launch_bounds__(large_block_size, 1)
-kSystemDownloader(PsSynthesisWriter devc_view, PsSynthesisWriter host_view, int low_index,
-                  int high_index);
+kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, int low_index,
+                int high_index, const TrajectoryKind material);
 
 } // namespace synthesis
 } // namespace omni

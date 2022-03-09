@@ -552,7 +552,7 @@ void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_low
                                  const int system_upper_bound, const GpuDetails &gpu) {
   PsSynthesisWriter devc_view = data(HybridTargetLevel::DEVICE);
   PsSynthesisWriter host_view = deviceViewToHostData();
-  systemUploader(&devc_view, &host_view, kind, system_lower_bound, system_upper_bound, gpu);
+  systemTransfer(&devc_view, &host_view, kind, system_lower_bound, system_upper_bound, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -598,7 +598,7 @@ void PhaseSpaceSynthesis::download(const TrajectoryKind kind, const int system_l
                                    const int system_upper_bound, const GpuDetails &gpu) {
   PsSynthesisWriter devc_view = data(HybridTargetLevel::DEVICE);
   PsSynthesisWriter host_view = deviceViewToHostData();
-  systemDownloader(&devc_view, &host_view, kind, system_lower_bound, system_upper_bound, gpu);
+  systemTransfer(&host_view, &devc_view, kind, system_lower_bound, system_upper_bound, gpu);
 }
 #endif
 

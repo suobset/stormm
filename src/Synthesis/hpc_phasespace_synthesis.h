@@ -15,22 +15,16 @@ using trajectory::TrajectoryKind;
 /// \brief Launch the above kernel to upload scattered data for specific systems within a
 ///        PhaseSpaceSynthesis object.
 ///
-/// \param devc_view   Collection of pointers to PhaseSpaceSynthesis data on the device
-/// \param host_view   Collection of pointers to host mapped data, but visible on the device
-/// \param low_index   Lower bound of systems to upload
-/// \param high_index  Upper bound of systems to upload (the range is [low_index, high_index))
-void systemUploader(PsSynthesisWriter *devc_view, PsSynthesisWriter *host_view,
+/// \param destination  Collection of pointers to PhaseSpaceSynthesis data on the host or device.
+///                     If on the host, these poiniters must be to host-mapped data visible by the
+///                     device.
+/// \param source       Collection of pointers to PhaseSpaceSynthesis data on the host or device
+///                     If on the host, these poiniters must be to host-mapped data visible by the
+///                     device.
+/// \param low_index    Lower bound of systems to upload
+/// \param high_index   Upper bound of systems to upload (the range is [low_index, high_index))
+void systemTransfer(PsSynthesisWriter *destination, PsSynthesisWriter *source,
                     TrajectoryKind kind, int low_index, int high_index, const GpuDetails &gpu);
-
-/// \brief Launch the above kernel to download scattered data for specific systems within a
-///        PhaseSpaceSynthesis object.
-///
-/// \param devc_view   Collection of pointers to PhaseSpaceSynthesis data on the device
-/// \param host_view   Collection of pointers to host mapped data, but visible on the device
-/// \param low_index   Lower bound of systems to download
-/// \param high_index  Upper bound of systems to download (the range is [low_index, high_index))
-void systemDownloader(PsSynthesisWriter *devc_view, PsSynthesisWriter *host_view,
-                      TrajectoryKind kind, int low_index, int high_index, const GpuDetails &gpu);
 
 } // namespace synthesis
 } // namespace omni

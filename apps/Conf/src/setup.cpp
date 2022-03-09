@@ -24,9 +24,9 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
   chemfe_list.reserve(ntop);
   for (int i = 0; i < ntop; i++) {
     const int example_system_idx = sc.getCoordinateExample(i);
-    chemfe_list.push_back(ChemicalFeatures(sc.getTopologyPointer(example_system_idx),
-                                           sc.getCoordinateReference(example_system_idx),
-                                           MapRotatableGroups::YES));
+    chemfe_list.emplace_back(sc.getTopologyPointer(example_system_idx),
+                             sc.getCoordinateReference(example_system_idx),
+                             MapRotatableGroups::YES);
   }
   const int nsys = sc.getSystemCount();  
   int nconformer = 0;
