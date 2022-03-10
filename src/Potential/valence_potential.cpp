@@ -18,20 +18,12 @@ using structure::ImagingMethod;
 using symbols::pi;
 using symbols::twopi;
 using symbols::inverse_twopi;
-using topology::NonbondedKit;
 using topology::TorsionKind;
 using topology::UnitCellType;
-using trajectory::CoordinateFrameReader;
-using trajectory::CoordinateFrameWriter;
-using trajectory::PhaseSpaceWriter;
 
 //-------------------------------------------------------------------------------------------------
-double evaluateBondTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                          const EvaluateForce eval_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  PhaseSpaceWriter psw = ps->data();
 
   // Use two accumulators: one, a standard double-precision accumulator and the other a
   // fixed-precision long long integer with discretization at the global energy scaling factor
@@ -83,7 +75,25 @@ double evaluateBondTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateBondTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index) {
+
+  // Unpack the topology and initialize the energy result
+  return evaluateBondTerms(ag.getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                           system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index) {
+
+  // Unpack the topology and initialize the energy result
+  return evaluateBondTerms(ag->getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                           system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                          ScoreCard *ecard, const int system_index) {
   double bond_energy = 0.0;
   llint bond_acc = 0LL;
@@ -120,12 +130,8 @@ double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWrit
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                           const EvaluateForce eval_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  PhaseSpaceWriter psw = ps->data();
 
   // As in the bond interaction computation above, use two accumulators.  The full double-precision
   // result will be returned if there is interest in comparing to the fixed-precision accumulation.
@@ -164,10 +170,10 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
     }
 
     // On to the angle force computation
-    const double mgba = ba[0]*ba[0] + ba[1]*ba[1] + ba[2]*ba[2];
-    const double mgbc = bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2];
+    const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
+    const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
     const double invbabc = 1.0 / sqrt(mgba * mgbc);
-    double costheta = (ba[0]*bc[0] + ba[1]*bc[1] + ba[2]*bc[2]) * invbabc;
+    double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
     costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
     const double theta = acos(costheta);
     const double dtheta = theta - theta0;
@@ -206,7 +212,21 @@ double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index) {
+  return evaluateAngleTerms(ag.getDoublePrecisionValenceKit(), ps->data(), ecard,
+                            eval_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index) {
+  return evaluateAngleTerms(ag->getDoublePrecisionValenceKit(), ps->data(), ecard,
+                            eval_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, const int system_index) {
   double angl_energy = 0.0;
   llint angl_acc = 0LL;
@@ -239,10 +259,10 @@ double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameRea
     }
 
     // On to the angle force computation
-    const double mgba = ba[0]*ba[0] + ba[1]*ba[1] + ba[2]*ba[2];
-    const double mgbc = bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2];
+    const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
+    const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
     const double invbabc = 1.0 / sqrt(mgba * mgbc);
-    double costheta = (ba[0]*bc[0] + ba[1]*bc[1] + ba[2]*bc[2]) * invbabc;
+    double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
     costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
     const double theta = acos(costheta);
     const double dtheta = theta - theta0;
@@ -255,18 +275,14 @@ double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameRea
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                           ScoreCard *ecard, const int system_index) {
   return evaluateAngleTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateDihedralTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                               const EvaluateForce eval_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  PhaseSpaceWriter psw = ps->data();
   double2 dihe_energy = { 0.0, 0.0 };
   llint proper_acc   = 0LL;
   llint improper_acc = 0LL;
@@ -386,7 +402,21 @@ double2 evaluateDihedralTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ec
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double2 evaluateDihedralTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                              const EvaluateForce eval_force, const int system_index) {
+  return evaluateDihedralTerms(ag.getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                               system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateDihedralTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                              const EvaluateForce eval_force, const int system_index) {
+  return evaluateDihedralTerms(ag->getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                               system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                               ScoreCard *ecard, const int system_index) {
 
   // Unpack the topology and initialize the energy result
@@ -466,18 +496,15 @@ double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFram
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                               ScoreCard *ecard, const int system_index) {
   return evaluateDihedralTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                const EvaluateForce eval_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  PhaseSpaceWriter psw = ps->data();
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
+                                ScoreCard *ecard, const EvaluateForce eval_force,
+                                const int system_index) {
 
   // Accumulate the results in two numerical precision models by looping over all terms
   double ubrd_energy = 0.0;
@@ -527,7 +554,21 @@ double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                                const EvaluateForce eval_force, const int system_index) {
+  return evaluateUreyBradleyTerms(ag.getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                                  system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateUreyBradleyTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                                const EvaluateForce eval_force, const int system_index) {
+  return evaluateUreyBradleyTerms(ag->getDoublePrecisionValenceKit(), ps->data(), ecard,
+                                  eval_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                                 ScoreCard *ecard, const int system_index) {
 
   // Accumulate the results in two numerical precision models by looping over all terms
@@ -564,18 +605,15 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFr
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                 ScoreCard *ecard, const int system_index) {
   return evaluateUreyBradleyTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                   const EvaluateForce eval_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  PhaseSpaceWriter psw = ps->data();
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
+                                   ScoreCard *ecard, const EvaluateForce eval_force,
+                                   const int system_index) {
   double cimp_energy = 0.0;
   llint cimp_acc = 0LL;
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
@@ -681,7 +719,21 @@ double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCar
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                                   const EvaluateForce eval_force, const int system_index) {
+  return evaluateCharmmImproperTerms(ag.getDoublePrecisionValenceKit(), ps->data(), ecard,
+                                     eval_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCharmmImproperTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                                   const EvaluateForce eval_force, const int system_index) {
+  return evaluateCharmmImproperTerms(ag->getDoublePrecisionValenceKit(), ps->data(), ecard,
+                                     eval_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                                    ScoreCard *ecard, const int system_index) {
 
   // Unpack the topology and initialize the energy result
@@ -747,18 +799,14 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const Coordinat
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                    ScoreCard *ecard, const int system_index) {
   return evaluateCharmmImproperTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                          const EvaluateForce eval_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  PhaseSpaceWriter psw = ps->data();
   double cmap_energy = 0.0;
   llint cmap_acc = 0LL;
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
@@ -980,7 +1028,21 @@ double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateCmapTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index) {
+  return evaluateCmapTerms(ag.getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                           system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCmapTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index) {
+  return evaluateCmapTerms(ag->getDoublePrecisionValenceKit(), ps->data(), ecard, eval_force,
+                           system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                          ScoreCard *ecard, const int system_index) {
 
   // Unpack the topology and initialize the energy result
@@ -1094,20 +1156,16 @@ double evaluateCmapTerms(const ValenceKit<double> &vk, const CoordinateFrameRead
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateCmapTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, const int system_index) {
   return evaluateCmapTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  PhaseSpaceWriter psw, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
                                   const EvaluateForce eval_vdw_force, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
-  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
-  PhaseSpaceWriter psw = ps->data();
   double vdw_energy = 0.0;
   llint vdw_acc = 0LL;
   double ele_energy = 0.0;
@@ -1184,10 +1242,27 @@ double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateAttenuated14Terms(const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                                  const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                  const int system_index) {
+double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
+                                  const EvaluateForce eval_elec_force,
+                                  const EvaluateForce eval_vdw_force, const int system_index) {
+  return evaluateAttenuated14Terms(ag.getDoublePrecisionValenceKit(),
+                                   ag.getDoublePrecisionNonbondedKit(), ps->data(), ecard,
+                                   eval_elec_force, eval_vdw_force, system_index);
+}
 
+//-------------------------------------------------------------------------------------------------
+double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                                  const EvaluateForce eval_elec_force,
+                                  const EvaluateForce eval_vdw_force, const int system_index) {
+  return evaluateAttenuated14Terms(ag->getDoublePrecisionValenceKit(),
+                                   ag->getDoublePrecisionNonbondedKit(), ps->data(), ecard,
+                                   eval_elec_force, eval_vdw_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  const CoordinateFrameReader cfr, ScoreCard *ecard,
+                                  const int system_index) {
   double vdw_energy = 0.0;
   llint vdw_acc = 0LL;
   double ele_energy = 0.0;
@@ -1247,7 +1322,7 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> &vk, const NonbondedK
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateAttenuated14Terms(const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                   const int system_index) {
   return evaluateAttenuated14Terms(vk, nbk, CoordinateFrameReader(cfw), ecard, system_index);

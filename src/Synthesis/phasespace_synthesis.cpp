@@ -427,6 +427,26 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
                            z_forces.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getGlobalPositionBits() const {
+  return globalpos_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getLocalPositionBits() const {
+  return localpos_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getVelocityBits() const {
+  return velocity_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getForceAccumulationBits() const {
+  return force_scale_bits;
+}
+
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {

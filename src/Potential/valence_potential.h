@@ -14,9 +14,11 @@ namespace energy {
 
 using topology::AtomGraph;
 using topology::ValenceKit;
+using topology::NonbondedKit;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpace;
+using trajectory::PhaseSpaceWriter;
 
 /// \brief A value which approaches one from below.  This is used in dihedral and similar
 ///        computations to detect when a value is nearing 1.0 and might generate a singularity
@@ -41,10 +43,13 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
+/// \param vk            Valence parameters abstract from the system topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
@@ -52,13 +57,19 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                         EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+
 double evaluateBondTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
-double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateBondTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                         EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+
+double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                          ScoreCard *ecard, const int system_index);
 
-double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, const int system_index);
 /// \}
   
@@ -68,10 +79,13 @@ double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWrit
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
+/// \param vk            Valence parameters abstract from the system topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
@@ -79,13 +93,19 @@ double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWrit
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+                          
 double evaluateAngleTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
-double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateAngleTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+
+double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, const int system_index);
 
-double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                           ScoreCard *ecard, const int system_index);
 /// \}
 
@@ -97,10 +117,13 @@ double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameWri
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
+/// \param vk            Valence parameters abstract from the system topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
@@ -108,13 +131,19 @@ double evaluateAngleTerms(const ValenceKit<double> &vk, const CoordinateFrameWri
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                              EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+
 double2 evaluateDihedralTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                               EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
-double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double2 evaluateDihedralTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                              EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
+
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                               ScoreCard *ecard, int system_index = 0);
 
-double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                               ScoreCard *ecard, int system_index = 0);
 /// \}
   
@@ -125,10 +154,13 @@ double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFram
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
+/// \param vk            Valence parameters abstract from the system topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
@@ -136,13 +168,20 @@ double2 evaluateDihedralTerms(const ValenceKit<double> &vk, const CoordinateFram
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
+                                ScoreCard *ecard, const EvaluateForce eval_force,
+                                const int system_index);
+
 double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                                 const EvaluateForce eval_force, const int system_index);
 
-double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateUreyBradleyTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                                const EvaluateForce eval_force, const int system_index);
+
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                                 ScoreCard *ecard, const int system_index);
 
-double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                 ScoreCard *ecard, const int system_index);
 /// \}
   
@@ -153,10 +192,13 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFr
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
+/// \param vk            Valence parameters abstract from the system topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
@@ -164,13 +206,20 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> &vk, const CoordinateFr
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
+                                   ScoreCard *ecard, const EvaluateForce eval_force,
+                                   const int system_index);
+
 double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                                    const EvaluateForce eval_force, const int system_index);
 
-double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateCharmmImproperTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                                   const EvaluateForce eval_force, const int system_index);
+
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                                    ScoreCard *ecard, const int system_index);
 
-double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                    ScoreCard *ecard, const int system_index);
 /// \}
 
@@ -180,10 +229,13 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const Coordinat
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
+/// \param vk            Valence parameters abstract from the system topology
 /// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
@@ -191,13 +243,19 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> &vk, const Coordinat
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index);
+
 double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                          const EvaluateForce eval_force, const int system_index);
 
-double evaluateCmapTerms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double evaluateCmapTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index);
+
+double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                          ScoreCard *ecard, const int system_index);
 
-double evaluateCmapTerms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, const int system_index);
 /// \}
 
@@ -207,27 +265,43 @@ double evaluateCmapTerms(const ValenceKit<double> &vk, const CoordinateFrameWrit
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
-/// \param ag               System topology
-/// \param ps               Coordinates, box size, and force accumulators (modified by this
-///                         function)
-/// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
-/// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param ag              System topology
+/// \param vk              Valence parameters abstract from the system topology
+/// \param nbk             Non-bonded parameters abstract from the system topology
+/// \param ps              Coordinates, box size, and force accumulators (modified by this
+///                        function)
+/// \param psw             Coordinates, box size, and force accumulators (modified by this
+///                        function)
+/// \param cfr             Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw             Coordinates of all particles, plus box dimensions (if needed)
 /// \param ecard            Energy components and other state variables (volume, temperature, etc.)
 ///                         (modified by this function)
 /// \param eval_elec_force  Flag to have electrostatic forces evaluated
 /// \param eval_vdw_force   Flag to have van-der Waals (Lennard-Jones) forces evaluated
 /// \param system_index     Index of the system to which this energy contributes
 /// \{
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  PhaseSpaceWriter psw, ScoreCard *ecard,
+                                  const EvaluateForce eval_elec_force,
+                                  const EvaluateForce eval_vdw_force, const int system_index);
+
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
                                   const EvaluateForce eval_vdw_force, const int system_index);
 
-double2 evaluateAttenuated14Terms(const ValenceKit<double> &vk, const CoordinateFrameReader &cfr,
+double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
+                                  const EvaluateForce eval_elec_force,
+                                  const EvaluateForce eval_vdw_force, const int system_index);
+
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  const CoordinateFrameReader cfr,
                                   ScoreCard *ecard, const int system_index);
 
-double2 evaluateAttenuated14Terms(const ValenceKit<double> &vk, const CoordinateFrameWriter &cfw,
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  const CoordinateFrameWriter &cfw,
                                   ScoreCard *ecard, const int system_index);
 /// \}
 

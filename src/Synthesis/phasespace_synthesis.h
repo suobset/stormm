@@ -253,6 +253,18 @@ public:
   PhaseSpaceSynthesis& operator=(const PhaseSpaceSynthesis &other) = delete;
   PhaseSpaceSynthesis& operator=(PhaseSpaceSynthesis &&other) = delete;
   /// \}
+
+  /// \brief Get the global position scaling bit count
+  int getGlobalPositionBits() const;
+
+  /// \brief Get the local position scaling bit count
+  int getLocalPositionBits() const;
+
+  /// \brief Get the velocity scaling bit count
+  int getVelocityBits() const;
+
+  /// \brief Get the force accumulation bit count
+  int getForceAccumulationBits() const;
   
   /// \brief Get the reader or writer, as appropriate based on the const-ness of this object.
   ///
@@ -261,7 +273,7 @@ public:
   const PsSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   PsSynthesisWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
-
+  
 #ifdef OMNI_USE_HPC
   /// \brief Get a special writer which allows the device to read and write to host-mapped data.
   ///        This form of the writer can be used in kernel calls that streamline download and
