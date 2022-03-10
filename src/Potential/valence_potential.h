@@ -71,6 +71,12 @@ double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReade
 
 double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, const int system_index);
+
+double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index);
+
+double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index);
 /// \}
   
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
@@ -106,6 +112,12 @@ double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameRead
                           ScoreCard *ecard, const int system_index);
 
 double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
+                          ScoreCard *ecard, const int system_index);
+
+double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                          ScoreCard *ecard, const int system_index);
+
+double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                           ScoreCard *ecard, const int system_index);
 /// \}
 
@@ -145,6 +157,12 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrame
 
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                               ScoreCard *ecard, int system_index = 0);
+
+double2 evaluateDihedralTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                              ScoreCard *ecard, int system_index = 0);
+
+double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                              ScoreCard *ecard, int system_index = 0);
 /// \}
   
 /// \brief Evaluate Urey-Bradley harmonic angle interactions with a simple routine.  This looks
@@ -182,6 +200,12 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFra
                                 ScoreCard *ecard, const int system_index);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
+                                ScoreCard *ecard, const int system_index);
+
+double evaluateUreyBradleyTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                                ScoreCard *ecard, const int system_index);
+
+double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                                 ScoreCard *ecard, const int system_index);
 /// \}
   
@@ -221,6 +245,12 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const Coordinate
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                    ScoreCard *ecard, const int system_index);
+
+double evaluateCharmmImproperTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                                   ScoreCard *ecard, const int system_index);
+
+double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                                   ScoreCard *ecard, const int system_index);
 /// \}
 
 /// \brief Evaluate CHARMM CMAP two-dimensional cubic spline potentials.  As with all other
@@ -257,6 +287,12 @@ double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameReade
 
 double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, const int system_index);
+
+double evaluateCmapTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                         const int system_index);
+
+double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                         const int system_index);
 /// \}
 
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
@@ -302,6 +338,12 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameWriter &cfw,
+                                  ScoreCard *ecard, const int system_index);
+
+double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                                  ScoreCard *ecard, const int system_index);
+
+double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                                   ScoreCard *ecard, const int system_index);
 /// \}
 

@@ -130,6 +130,18 @@ double evaluateBondTerms(const ValenceKit<double> &vk, const CoordinateFrameWrit
 }
 
 //-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index) {
+  return evaluateBondTerms(ag.getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index) {
+  return evaluateBondTerms(ag->getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
 double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                           const EvaluateForce eval_force, const int system_index) {
 
@@ -278,6 +290,18 @@ double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameRead
 double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                           ScoreCard *ecard, const int system_index) {
   return evaluateAngleTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                          ScoreCard *ecard, const int system_index) {
+  return evaluateAngleTerms(ag.getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                          ScoreCard *ecard, const int system_index) {
+  return evaluateAngleTerms(ag->getDoublePrecisionValenceKit(), cfr, ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -502,6 +526,18 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrame
 }
 
 //-------------------------------------------------------------------------------------------------
+double2 evaluateDihedralTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                              ScoreCard *ecard, const int system_index) {
+  return evaluateDihedralTerms(ag.getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                              ScoreCard *ecard, const int system_index) {
+  return evaluateDihedralTerms(ag->getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                 ScoreCard *ecard, const EvaluateForce eval_force,
                                 const int system_index) {
@@ -608,6 +644,18 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFra
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                 ScoreCard *ecard, const int system_index) {
   return evaluateUreyBradleyTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateUreyBradleyTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                                ScoreCard *ecard, const int system_index) {
+  return evaluateUreyBradleyTerms(ag.getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                                ScoreCard *ecard, const int system_index) {
+  return evaluateUreyBradleyTerms(ag->getDoublePrecisionValenceKit(), cfr, ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -802,6 +850,18 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const Coordinate
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                    ScoreCard *ecard, const int system_index) {
   return evaluateCharmmImproperTerms(vk, CoordinateFrameReader(cfw), ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCharmmImproperTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                                   ScoreCard *ecard, const int system_index) {
+  return evaluateCharmmImproperTerms(ag.getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                                   ScoreCard *ecard, const int system_index) {
+  return evaluateCharmmImproperTerms(ag->getDoublePrecisionValenceKit(), cfr, ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1162,6 +1222,18 @@ double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameWrite
 }
 
 //-------------------------------------------------------------------------------------------------
+double evaluateCmapTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index) {
+  return evaluateCmapTerms(ag.getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                         ScoreCard *ecard, const int system_index) {
+  return evaluateCmapTerms(ag->getDoublePrecisionValenceKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
@@ -1326,6 +1398,20 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
                                   const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                   const int system_index) {
   return evaluateAttenuated14Terms(vk, nbk, CoordinateFrameReader(cfw), ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+                                  ScoreCard *ecard, const int system_index) {
+  return evaluateAttenuated14Terms(ag.getDoublePrecisionValenceKit(),
+                                   ag.getDoublePrecisionNonbondedKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                                  ScoreCard *ecard, const int system_index) {
+  return evaluateAttenuated14Terms(ag->getDoublePrecisionValenceKit(),
+                                   ag->getDoublePrecisionNonbondedKit(), cfr, ecard, system_index);
 }
 
 } // namespace energy

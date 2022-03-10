@@ -66,6 +66,14 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExcl
 double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
                                 const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                 int system_index = 0);
+
+double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
+                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                int system_index = 0);
+
+double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
+                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                int system_index = 0);
 /// \}
 
 /// \brief Evaluate the non-bonded Generalized Born energy of a system of particles (no cutoff is
@@ -106,13 +114,23 @@ double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
-                                     CoordinateFrameReader cfr, ScoreCard *ecard,
+                                     const CoordinateFrameReader cfr, ScoreCard *ecard,
                                      const int system_index);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameWriter &cfw, ScoreCard *ecard,
+                                     const int system_index);
+
+double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
+                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                     const int system_index);
+
+double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
+                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
                                      const int system_index);
 /// \}
 

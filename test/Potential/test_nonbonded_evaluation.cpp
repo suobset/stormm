@@ -190,7 +190,7 @@ int main(int argc, char* argv[]) {
   const StaticExclusionMask alad_semask(&alad_ag);
   const StaticExclusionMask trpw_semask(&trpw_ag);
 
-  // Check exclusions three systems against the original topologies
+  // Check exclusions for three systems against the original topologies
   section(1);
   const std::vector<const StaticExclusionMask*> my_masks = { &trpi_semask, &alad_semask,
                                                              &trpw_semask };
@@ -271,7 +271,15 @@ int main(int argc, char* argv[]) {
            NumberFormat::SCIENTIFIC, "Forces due to Lennard-Jones 1:4 non-bonded interactions in "
            "the Trp-cage (isolated boundary conditions) system do not meet expectations.",
            oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, snap_check);
-
+  const double2 trpi_14_e_ii = evaluateAttenuated14Terms(trpi_ag, CoordinateFrameReader(trpi_ps),
+                                                         &secondary_sc, trpi_idx);
+  check(trpi_14_e_ii.x, RelationalOperator::EQUAL, Approx(1458.0998129).margin(1.0e-6),
+        "Electrostatic 1:4 energy for Trp-cage (AMBER ff99SB force field) was not computed "
+        "correctly when evaluating energy only with a coordinate frame object.", do_tests);
+  check(trpi_14_e_ii.y, RelationalOperator::EQUAL, Approx(62.6481811).margin(1.0e-6),
+        "van-der Waals 1:4 energy for Trp-cage (AMBER ff99SB force field) was not computed "
+        "correctly when evaluating energy only with a coordinate frame object.", do_tests);
+  
   // Compute 1:4 electrostatic and Lennard-Jones forces on the DHFR system
   dhfr_ps.initializeForces();
   const double2 dhfr_14_e = evaluateAttenuated14Terms(dhfr_ag, &dhfr_ps, &all_systems_sc,
@@ -338,6 +346,16 @@ int main(int argc, char* argv[]) {
   check(trpw_14_e.y, RelationalOperator::EQUAL, Approx(62.6481797).margin(1.0e-6), "van-der Waals "
         "1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not computed correctly.",
         do_tests);
+  const double2 trpw_14_e_ii = evaluateAttenuated14Terms(trpw_ag, CoordinateFrameReader(trpw_ps),
+                                                         &all_systems_sc, trpw_idx);
+  check(trpw_14_e_ii.x, RelationalOperator::EQUAL, Approx(1458.0996855).margin(1.0e-6),
+        "Electrostatic 1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not "
+        "computed correctly when evaluating energy only with a CoordinateFrame abstract.",
+        do_tests);
+  check(trpw_14_e_ii.y, RelationalOperator::EQUAL, Approx(62.6481797).margin(1.0e-6),
+        "van-der Waals 1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not "
+        "computed correctly when evaluating energy only with a CoordinateFrame abstract.",
+        do_tests);
 
   // Compute 1:4 electrostatic energies on the Trp-cage system with no explicit scaling factors in
   // the topology
@@ -387,6 +405,15 @@ int main(int argc, char* argv[]) {
   check(dhfr_nonb_e.y, RelationalOperator::EQUAL, Approx(-1009.1558078).margin(1.0e-6),
         "van-der Waals energy for DHFR (CHARMM force field) was not computed correctly.",
         do_tests);
+  const double2 dhfr_nonb_e_ii = evaluateNonbondedEnergy(dhfr_ag, dhfr_semask,
+                                                         CoordinateFrameReader(dhfr_ps),
+                                                         &secondary_sc, dhfr_idx);
+  check(dhfr_nonb_e_ii.x, RelationalOperator::EQUAL, Approx(-10036.4655324).margin(1.0e-6),
+        "Electrostatic energy for DHFR (CHARMM force field) was not computed correctly when "
+        "evaluating energy only with a CoordinateFrame abstract.", do_tests);
+  check(dhfr_nonb_e_ii.y, RelationalOperator::EQUAL, Approx(-1009.1558078).margin(1.0e-6),
+        "van-der Waals energy for DHFR (CHARMM force field) was not computed correctly when "
+        "evaluating energy only with a CoordinateFrame abstract.", do_tests);
 
   // Compute non-bonded energy for the alanine dipeptide system
   alad_ps.initializeForces();
@@ -404,6 +431,15 @@ int main(int argc, char* argv[]) {
   check(alad_nonb_e.y, RelationalOperator::EQUAL, Approx(-1.2452480).margin(1.0e-6),
         "van-der Waals energy for alanine dipeptide (ff19SB force field) was not computed "
         "correctly.", do_tests);
+  const double2 alad_nonb_e_ii = evaluateNonbondedEnergy(alad_ag, alad_semask,
+                                                         CoordinateFrameReader(alad_ps),
+                                                         &secondary_sc, alad_idx);
+  check(alad_nonb_e_ii.x, RelationalOperator::EQUAL, Approx(-78.8463310).margin(1.0e-6),
+        "Electrostatic energy for alanine dipeptide (ff19SB force field) was not computed "
+        "correctly when evaluating energy only with a CoordinateFrame abstract.", do_tests);
+  check(alad_nonb_e_ii.y, RelationalOperator::EQUAL, Approx(-1.2452480).margin(1.0e-6),
+        "van-der Waals energy for alanine dipeptide (ff19SB force field) was not computed "
+        "correctly when evaluating energy only with a CoordinateFrame abstract.", do_tests);  
 
   // Check forces for the above three systems (skip the Trp-cage system with no Z numbers or
   // explicit scaling factors (old form of Amber prmtop), as well as the Trp-cage system in water
