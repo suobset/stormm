@@ -346,7 +346,7 @@ double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrameRead
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                                   ScoreCard *ecard, const int system_index);
 /// \}
-
+  
 } // namespace energy
 } // namespace omni
 
