@@ -45,6 +45,10 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
     cmap_affector_bounds{atom_count + 1, 0},
     vste_affector_list{ag.getVirtualSiteCount() * 4},
     vste_affector_bounds{atom_count + 1, 0},
+    cnst_affector_list{ag.getConstraintGroupTotalSize()},
+    cnst_affector_bounds{atom_count + 1, 0},
+    sett_affector_list{ag.getRigidWaterCount() * 3},
+    sett_affector_bounds{atom_count + 1, 0},
     work_unit_assignments{atom_count, 0},
     work_unit_presence{atom_count * 4}
 {
@@ -52,6 +56,7 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
   // frame atom arrays.
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
+  const ConstraintKit cnk = ag.getConstraintKit();
   for (int pos = 0; pos < vk.nbond; pos++) {
     bond_affector_bounds[vk.bond_i_atoms[pos]] += 1;
     bond_affector_bounds[vk.bond_j_atoms[pos]] += 1;
@@ -86,12 +91,31 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
   for (int pos = 0; pos < vsk.nsite; pos++) {
     vste_affector_bounds[vsk.frame1_idx[pos]] += 1;
     vste_affector_bounds[vsk.frame2_idx[pos]] += 1;
-    if (vsk.frame3_idx[pos] >= 0) {
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
       vste_affector_bounds[vsk.frame3_idx[pos]] += 1;
-    }
-    if (vsk.frame4_idx[pos] >= 0) {
+      break;
+    case VirtualSiteKind::FIXED_4:
+      vste_affector_bounds[vsk.frame3_idx[pos]] += 1;
       vste_affector_bounds[vsk.frame4_idx[pos]] += 1;
+      break;
+    case VirtualSiteKind::NONE:
+      break;
     }
+  }
+  for (int pos = 0; pos < cnk.ngroup; pos++) {
+    for (int j = cnk.group_bounds[pos]; j < cnk.group_bounds[pos + 1]; j++) {
+      cnst_affector_bounds[cnk.group_list[j]] += 1;
+    }
+  }
+  for (int pos = 0; pos < cnk.nsettle; pos++) {
+    sett_affector_bounds[cnk.settle_ox_atoms[pos]] += 1;
   }
   prefixSumInPlace<int>(&bond_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   prefixSumInPlace<int>(&angl_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
@@ -192,6 +216,54 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
     cmap_affector_bounds[l_atom] += 1;
     cmap_affector_bounds[m_atom] += 1;
   }
+  for (int pos = 0; pos < vsk.nsite; pos++) {
+    const int parent_atom = vsk.frame1_idx[pos];
+    const int frame2_atom = vsk.frame2_idx[pos];
+    const int list_p_idx  = vste_affector_bounds[parent_atom];
+    const int list_f2_idx = vste_affector_bounds[frame2_atom];
+    vste_affector_list[list_p_idx ] = pos;
+    vste_affector_list[list_f2_idx] = pos;
+    vste_affector_bounds[parent_atom] += 1;
+    vste_affector_bounds[frame2_atom] += 1;
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      {
+        const int frame3_atom = vsk.frame3_idx[pos];
+        const int list_f3_idx = vste_affector_bounds[frame3_atom];
+        vste_affector_list[list_f3_idx] = pos;
+        vste_affector_bounds[frame3_atom] += 1;
+      }
+      break;
+    case VirtualSiteKind::FIXED_4:
+      {
+        const int frame3_atom = vsk.frame3_idx[pos];
+        const int frame4_atom = vsk.frame4_idx[pos];
+        const int list_f3_idx = vste_affector_bounds[frame3_atom];
+        const int list_f4_idx = vste_affector_bounds[frame4_atom];
+        vste_affector_list[list_f3_idx] = pos;
+        vste_affector_list[list_f4_idx] = pos;
+        vste_affector_bounds[frame3_atom] += 1;
+        vste_affector_bounds[frame4_atom] += 1;
+      }
+      break;
+    case VirtualSiteKind::NONE:
+      break;
+    }
+  }
+  for (int pos = 0; pos < cnk.ngroup; pos++) {
+    for (int j = cnk.group_bounds[pos]; j < cnk.group_bounds[pos + 1]; j++) {
+      const int c_atom = cnk.group_list[j];
+      const int list_c_idx = cnst_affector_bounds[c_atom];
+      cnst_affector_list[list_c_idx] = pos;
+      cnst_affector_bounds[c_atom] += 1;
+    }
+  }
   
   // Cast the atom count to a constant, just to avoid the *this pointer in subsequent loops.
   // Rewind the prefix sums after using them to populate the various affector lists.
@@ -216,7 +288,7 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
 
 //-------------------------------------------------------------------------------------------------
 #if 0
-  ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
+ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
                             const ConstraintKit<double> &cnsk, const RestraintKit<double> &rstk) {
 
 }

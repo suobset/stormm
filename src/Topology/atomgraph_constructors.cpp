@@ -230,7 +230,15 @@ AtomGraph::AtomGraph() :
     use_perturbation_info{PerturbationSetting::OFF}, use_solvent_cap_option{SolventCapSetting::ON},
     use_polarization{PolarizationSetting::ON}, water_residue_name{' ', ' ', ' ', ' '},
     bond_constraint_mask{""}, bond_constraint_omit_mask{""}, rigid_water_count{0},
-    bond_constraint_count{0}, degrees_of_freedom{0}, nonrigid_particle_count{0},
+    bond_constraint_count{0}, constraint_group_count{0}, degrees_of_freedom{0},
+    nonrigid_particle_count{0},
+    constraint_group_atoms{HybridKind::POINTER, "tp_cnst_atoms"},
+    constraint_group_bounds{HybridKind::POINTER, "tp_cnst_bounds"},
+    settle_oxygen_atoms{HybridKind::POINTER, "tp_settle_ox"},
+    settle_hydro1_atoms{HybridKind::POINTER, "tp_settle_h1"},
+    settle_hydro2_atoms{HybridKind::POINTER, "tp_settle_h2"},
+    constraint_group_targets{HybridKind::POINTER, "tp_cnst_targets"},
+    constraint_group_inv_masses{HybridKind::POINTER, "tp_cnst_invms"},
 
     // Overflow name keys
     atom_overflow_names{HybridKind::POINTER, "atom_name_xtkey"},
@@ -771,6 +779,11 @@ void AtomGraph::rebasePointers() {
   infr14_j_atoms.swapTarget(&int_data);
   infr14_parameter_indices.swapTarget(&int_data);
   neck_gb_indices.swapTarget(&int_data);
+  constraint_group_atoms.swapTarget(&int_data);
+  constraint_group_bounds.swapTarget(&int_data);
+  settle_oxygen_atoms.swapTarget(&int_data);
+  settle_hydro1_atoms.swapTarget(&int_data);
+  settle_hydro2_atoms.swapTarget(&int_data);
   tree_joining_info.swapTarget(&int_data);
   last_rotator_info.swapTarget(&int_data);
 
@@ -812,6 +825,8 @@ void AtomGraph::rebasePointers() {
   gb_alpha_parameters.swapTarget(&double_data);
   gb_beta_parameters.swapTarget(&double_data);
   gb_gamma_parameters.swapTarget(&double_data);
+  constraint_group_targets.swapTarget(&double_data);
+  constraint_group_inv_masses.swapTarget(&double_data);
   solty_info.swapTarget(&double_data);
   hbond_a_values.swapTarget(&double_data);
   hbond_b_values.swapTarget(&double_data);
@@ -1110,8 +1125,16 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     bond_constraint_omit_mask{original.bond_constraint_omit_mask},
     rigid_water_count{original.rigid_water_count},
     bond_constraint_count{original.bond_constraint_count},
+    constraint_group_count{original.constraint_group_count},
     degrees_of_freedom{original.degrees_of_freedom},
     nonrigid_particle_count{original.nonrigid_particle_count},
+    constraint_group_atoms{original.constraint_group_atoms},
+    constraint_group_bounds{original.constraint_group_bounds},
+    settle_oxygen_atoms{original.settle_oxygen_atoms},
+    settle_hydro1_atoms{original.settle_hydro1_atoms},
+    settle_hydro2_atoms{original.settle_hydro2_atoms},
+    constraint_group_targets{original.constraint_group_targets},
+    constraint_group_inv_masses{original.constraint_group_inv_masses},
     atom_overflow_names{original.atom_overflow_names},
     atom_overflow_types{original.atom_overflow_types},
     residue_overflow_names{original.residue_overflow_names},
@@ -1395,8 +1418,16 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   bond_constraint_omit_mask = other.bond_constraint_omit_mask;
   rigid_water_count = other.rigid_water_count;
   bond_constraint_count = other.bond_constraint_count;
+  constraint_group_count = other.constraint_group_count;
   degrees_of_freedom = other.degrees_of_freedom;
   nonrigid_particle_count = other.nonrigid_particle_count;
+  constraint_group_atoms = other.constraint_group_atoms;
+  constraint_group_bounds = other.constraint_group_bounds;
+  settle_oxygen_atoms = other.settle_oxygen_atoms;
+  settle_hydro1_atoms = other.settle_hydro1_atoms;
+  settle_hydro2_atoms = other.settle_hydro2_atoms;
+  constraint_group_targets = other.constraint_group_targets;
+  constraint_group_inv_masses = other.constraint_group_inv_masses;
   atom_overflow_names = other.atom_overflow_names;
   atom_overflow_types = other.atom_overflow_types;
   residue_overflow_names = other.residue_overflow_names;
@@ -1662,8 +1693,16 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     bond_constraint_omit_mask{std::move(original.bond_constraint_omit_mask)},
     rigid_water_count{original.rigid_water_count},
     bond_constraint_count{original.bond_constraint_count},
+    constraint_group_count{original.constraint_group_count},
     degrees_of_freedom{original.degrees_of_freedom},
     nonrigid_particle_count{original.nonrigid_particle_count},
+    constraint_group_atoms{std::move(original.constraint_group_atoms)},
+    constraint_group_bounds{std::move(original.constraint_group_bounds)},
+    settle_oxygen_atoms{std::move(original.settle_oxygen_atoms)},
+    settle_hydro1_atoms{std::move(original.settle_hydro1_atoms)},
+    settle_hydro2_atoms{std::move(original.settle_hydro2_atoms)},
+    constraint_group_targets{std::move(original.constraint_group_targets)},
+    constraint_group_inv_masses{std::move(original.constraint_group_inv_masses)},
     atom_overflow_names{std::move(original.atom_overflow_names)},
     atom_overflow_types{std::move(original.atom_overflow_types)},
     residue_overflow_names{std::move(original.residue_overflow_names)},
@@ -1941,8 +1980,16 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   bond_constraint_omit_mask = std::move(other.bond_constraint_omit_mask);
   rigid_water_count = other.rigid_water_count;
   bond_constraint_count = other.bond_constraint_count;
+  constraint_group_count = other.constraint_group_count;
   degrees_of_freedom = other.degrees_of_freedom;
   nonrigid_particle_count = other.nonrigid_particle_count;
+  constraint_group_atoms = std::move(other.constraint_group_atoms);
+  constraint_group_bounds = std::move(other.constraint_group_bounds);
+  settle_oxygen_atoms = std::move(other.settle_oxygen_atoms);
+  settle_hydro1_atoms = std::move(other.settle_hydro1_atoms);
+  settle_hydro2_atoms = std::move(other.settle_hydro2_atoms);
+  constraint_group_targets = std::move(other.constraint_group_targets);
+  constraint_group_inv_masses = std::move(other.constraint_group_inv_masses);
   atom_overflow_names = std::move(other.atom_overflow_names);
   atom_overflow_types = std::move(other.atom_overflow_types);
   residue_overflow_names = std::move(other.residue_overflow_names);

@@ -57,9 +57,9 @@ private:
   /// The work unit noted in the yth element of the following array places the yth virtual site.
   std::vector<int> virtual_site_placement;  
   
-  // The following lists are quick to construct and contain a double-counting of all information
-  // in the topology's own "atom assignment" arrays for the same valence terms.  Is there a better
-  // way?
+  // The following lists are quick to construct and contain a double-, triple-, or even a
+  // quintuple-counting of all information in the topology's own "atom assignment" arrays for the
+  // same valence terms.  Is there a better way?
   std::vector<int> bond_affector_list;    ///< List of all harmonic bonds affecting a given atom
   std::vector<int> bond_affector_bounds;  ///< Bounds array for bond_affector_list
   std::vector<int> angl_affector_list;    ///< List of all bond angles affecting a given atom
@@ -81,12 +81,20 @@ private:
 
   // SHAKE and RATTLE groups likewise must have all atoms present in a work group in order to
   // evaluate bond constraints.
-  std::vector<int> shake_affector_list;   ///< List of all SHAKE groups that affect any atom (these
-                                          ///<   must be detected through a special search so that
-                                          ///<   only a work unit with all affected atoms present
-                                          ///<   will be tasked with evaluating the constraints).
-  std::vector<int> shake_affector_bounds; ///< Bounds array for shake_affector_list
-  
+  std::vector<int> cnst_affector_list;    ///< List of all constraint groups affecting any atom
+                                          ///<   (these must be detected through a special search
+                                          ///<   so that only a work unit with all affected atoms
+                                          ///<   present will be tasked with evaluating the
+                                          ///<   constraints).
+  std::vector<int> cnst_affector_bounds;  ///< Bounds array for cnst_affector_list
+
+  // SETTLE groups are special constraint groups for a fast rigid water implementation, kept
+  // distinct because of the different treatment they get in the dynamics loop.
+  std::vector<int> sett_affector_list;    ///< List of all SETTLE groups affecting any atom
+                                          ///<   (only one work group will be tasked to evaluate
+                                          ///<   each SETTLE fast water)
+  std::vector<int> sett_affector_bounds;  ///< Bounds array for sett_affector_list
+
   // Individual atoms must leave a record of their whereabouts in the valence work units for rapid
   // retrieval of their locations
   std::vector<int> work_unit_assignments; ///< The numbers of work units in which each atom can

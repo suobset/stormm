@@ -116,7 +116,8 @@ public:
   AtomGraph& operator=(AtomGraph &&other);
 
   /// \brief Load the  AtomGraph's various Hybrid objects with data held in temporary CPU
-  ///        std::vectors.
+  ///        std::vectors.  See the function itself for details on each argument, but the arguments
+  ///        generally follow the names of member variables in the AtomGraph itself.
   void loadHybridArrays(const std::vector<int> &tmp_desc,
                         const std::vector<int> &tmp_residue_limits,
                         const std::vector<int> &tmp_atom_struc_numbers,
@@ -174,7 +175,7 @@ public:
                         const CharmmValenceTable &charmm_vtable,
                         const AttenuationParameterSet &attn_parm,
                         const VirtualSiteTable &vsite_table,
-                        const Map1234 &all_nb_excl);
+                        const Map1234 &all_nb_excl, const int2 hydro_spacing);
   
   /// \brief Build an AtomGraph form a file.  This is called by the general-purpose constructor
   ///        or also by the developer after instantiating an empty object.
@@ -672,6 +673,12 @@ public:
   /// \brief Get the number of bond constraints
   int getBondConstraintCount() const;
 
+  /// \brief Get the total number of constrained groups
+  int getConstraintGroupCount() const;
+
+  /// \brief Get the total size of the constrained group atoms list
+  int getConstraintGroupTotalSize() const;
+  
   /// \brief Get the number of degrees of freedom
   int getDegreesOfFreedom() const;
   
@@ -879,6 +886,12 @@ public:
   /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
   VirtualSiteKit<float>
   getSinglePrecisionVirtualSiteKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get an abstract for managing constraints.  In floating-point representation, this is
+  ///        only available as a double-precision object.
+  ///
+  /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
+  ConstraintKit getConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 #ifdef OMNI_USE_HPC
   /// \brief Push all data to the device
@@ -1297,20 +1310,43 @@ private:
   Hybrid<float> sp_gb_gamma_parameters;  ///< Single-precision Generalized Born gamma parameters
 
   // MD propagation algorithm directives
-  ShakeSetting use_bond_constraints;         ///< Toggles use of bond length constraints
-  SettleSetting use_settle;                  ///< Toggles analytic constraints on rigid water
-  PerturbationSetting use_perturbation_info; ///< Toggles perturbations
-  SolventCapSetting use_solvent_cap_option;  ///< Toggles the solvent cap option
-  PolarizationSetting use_polarization;      ///< Toggles use of polarization
-  char4 water_residue_name;                  ///< Name of water residue, compared to residue_names
-  std::string bond_constraint_mask;          ///< Atoms involved in bond length constraints
-  std::string bond_constraint_omit_mask;     ///< Atoms to be excluded from bond length constraints
-  int rigid_water_count;                     ///< Number of rigid water molecules subject to SETTLE
-  int bond_constraint_count;                 ///< Bonds with lengths constrained by SHAKE or RATTLE
-  int degrees_of_freedom;                    ///< Total degrees of freedom, 3N - 6 - constraints
-  int nonrigid_particle_count;               ///< A rigid water is one non-rigid particle.  A
-                                             ///<   protein with N atoms and no bond length
-                                             ///<   constraints is N particles.
+  ShakeSetting use_bond_constraints;          ///< Toggles use of bond length constraints
+  SettleSetting use_settle;                   ///< Toggles analytic constraints on rigid water
+  PerturbationSetting use_perturbation_info;  ///< Toggles perturbations
+  SolventCapSetting use_solvent_cap_option;   ///< Toggles the solvent cap option
+  PolarizationSetting use_polarization;       ///< Toggles use of polarization
+  char4 water_residue_name;                   ///< Name of water residue, compared to residue_names
+  std::string bond_constraint_mask;           ///< Atoms involved in bond length constraints
+  std::string bond_constraint_omit_mask;      ///< Atoms to be excluded from bond length
+                                              ///<   constraints
+  int rigid_water_count;                      ///< Number of rigid water molecules subject to
+                                              ///<   SETTLE
+  int bond_constraint_count;                  ///< Bonds with lengths constrained by SHAKE or
+                                              ///<   RATTLE.  This is more for informative
+                                              ///<   purposes, as groups of constrained bonds which
+                                              ///<   connect at the same central atom are handled
+                                              ///<   as their own individual objects.
+  int constraint_group_count;                 ///< Number of groups of constrained bonds
+  int degrees_of_freedom;                     ///< Total degrees of freedom, 3N - 6 - constraints
+  int nonrigid_particle_count;                ///< A rigid water is one non-rigid particle.  A
+                                              ///<   protein with N atoms and no bond length
+                                              ///<   constraints is N particles.
+  Hybrid<int> constraint_group_atoms;         ///< List of all atoms involved in constraint groups.
+                                              ///<   In each group, the central atom, to which all
+                                              ///<   others bind, is listed first.  It is the first
+                                              ///<   atom of any of the constrained bond.  All
+                                              ///<   other atoms are the distal termini of
+                                              ///<   constrained bonds.  Serial A-B-C-D constraints
+                                              ///<   and constrained ring systems are not
+                                              ///<   supported.
+  Hybrid<int> constraint_group_bounds;        ///< Bounds array for the constrained group atoms,
+                                              ///<   length constraint_group_count + 1 to provide
+                                              ///<   the limits on the final group.
+  Hybrid<int> settle_oxygen_atoms;            ///< List of oxygen atoms involved in fast waters
+  Hybrid<int> settle_hydro1_atoms;            ///< First hydrogen atoms involved in fast waters
+  Hybrid<int> settle_hydro2_atoms;            ///< Second hydrogen atoms involved in fast waters
+  Hybrid<double> constraint_group_targets;    ///< Target lengths for constrained bonds
+  Hybrid<double> constraint_group_inv_masses; ///< Inverse masses for atoms of constrained groups
 
   // Atom, atom type, and residue name overflow keys
   Hybrid<char4> atom_overflow_names;    ///< Codified names of atoms which were too long
@@ -1347,7 +1383,7 @@ private:
   /// \}
 
   /// \brief Function to wrap pointer re-assignments after copy constructor initialization or
-  //         a copy assignment operation.
+  ///        a copy assignment operation.
   void rebasePointers();
 };
 

@@ -497,6 +497,16 @@ int AtomGraph::getBondConstraintCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraph::getConstraintGroupCount() const {
+  return constraint_group_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getConstraintGroupTotalSize() const {
+  return constraint_group_bounds.readHost(constraint_group_count);
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraph::getDegreesOfFreedom() const {
   return degrees_of_freedom;
 }
@@ -798,6 +808,15 @@ AtomGraph::getSinglePrecisionVirtualSiteKit(const HybridTargetLevel tier) const 
                                sp_virtual_site_frame_dim1.data(tier),
                                sp_virtual_site_frame_dim2.data(tier),
                                sp_virtual_site_frame_dim3.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+ConstraintKit AtomGraph::getConstraintKit(const HybridTargetLevel tier) const {
+  return ConstraintKit(constraint_group_count, rigid_water_count,
+                       constraint_group_atoms.data(tier),
+                       constraint_group_bounds.data(tier), constraint_group_targets.data(tier),
+                       constraint_group_inv_masses.data(tier), settle_oxygen_atoms.data(tier),
+                       settle_hydro1_atoms.data(tier), settle_hydro2_atoms.data(tier));
 }
 
 } // namespace topology

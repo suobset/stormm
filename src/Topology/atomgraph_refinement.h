@@ -310,7 +310,7 @@ struct CmapAccessories {
                                             ///<   grid segment in contiguous stretches of 16
                                             ///<   numbers.
 };
-
+  
 /// \brief Unguarded struct to handle 1:4 attenuated interactions that are not explicitly
 ///        handled by the short-ranged non-bond scaling parameters of some dihedral linking the
 ///        atoms
@@ -686,8 +686,22 @@ std::vector<int> matchExtendedName(const char4* overflow_names, int n_overflow,
                                    const std::string &query,
                                    const std::vector<WildCardKind> &wildcards = {});
 
-/// \brief Enumerate the different charge values, assigning an index to every charge just as
-///        indices are assigned to Lennard-Jones values.
+/// \brief Estimate the maximum memory capacity that might be needed to store constraints for any
+///        layout of bonds to hydrogen.  This will direct additional storage space in the
+///        topology's int and double Hybrid arrays, as well as the targeting of POINTER-kind
+///        Hybrid objects for the respective details.  The result is returned as an integer tuple,
+///        with the maximum possible number of bond groups containing hydrogen in the first member,
+///        which implies a maximum total size (of all of those bonds were their own group), and
+///        the number of identifiable water molecules in the second member.
+///
+/// \param z_numbers    Atomic numbers of all atoms in the system (also provides the total atom
+///                     count)
+/// \param res_lims     Residue limits (for finding fast rigid waters)
+/// \param bond_atom_i  First atoms of each known bond
+/// \param bond_atom_j  Second atoms of each known bond
+int2 estimateConstraintCapacity(const std::vector<int> &z_numbers, const std::vector<int> res_lims,
+                                const std::vector<int> &bond_atom_i,
+                                const std::vector<int> &bond_atom_j);
 
 } // namespace topology
 } // namespace omni
