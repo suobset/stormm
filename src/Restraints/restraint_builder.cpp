@@ -185,5 +185,19 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyHydrogenBondingPreventors(const AtomGraph *ag, const CoordinateFrameReader &cframe,
+                               const AtomMask &mask, const double penalty,
+                               const double flat_bottom_half_width,
+                               const double harmonic_maximum) {
+  restraintTopologyChecks(ag, cframe, mask);
+  
+  // Seek out all proton donors and acceptors: donors are defined as electronegative atoms N, O,
+  // S, or P which have a hydrogen attached to them, while acceptors are electronegative atoms N,
+  // O, S, or P that have a lone pair available in the Lewis Structure.
+  
+}
+
 } // namespace restraints
 } // namespace omni

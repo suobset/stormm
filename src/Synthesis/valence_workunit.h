@@ -14,6 +14,9 @@ namespace synthesis {
 using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
 using topology::AtomGraph;
+using topology::ConstraintKit;
+using topology::ValenceKit;
+using topology::VirtualSiteKit;
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or
@@ -27,12 +30,18 @@ public:
   /// \brief The object is constructed based on a single topology and oversees the construction of
   ///        an array of valence work units.
   ///
+  /// Overloaded:
+  ///   - Constructor for an empty object
+  ///   - Take the original data structures by const pointer or const reference
+  ///
   /// \param ag  The topology containing valence terms to delegate among work units
   /// \param ra  The complete collection of restraints applicable to this topology
+  /// \{
+  ValenceDelegator();
   ValenceDelegator(const AtomGraph &ag, const RestraintApparatus &ra);
-
-  /// \brief Test whether a valence work unit contains a particular atom
-
+  ValenceDelegator(const AtomGraph *ag, const RestraintApparatus *ra);
+  /// \}
+  
 private:
   int atom_count;                 ///< The number of atoms in the system overall (taken from the
                                   ///<   topology)
@@ -168,13 +177,32 @@ private:
   
   // Individual atoms must leave a record of their whereabouts in the valence work units for rapid
   // retrieval of their locations
-  std::vector<int> work_unit_assignments; ///< The numbers of work units in which each atom can
-                                          ///<   be found
-  std::vector<int> work_unit_presence;    ///< Lists of the work units in which each atom is
-                                          ///<   found.  This is a column-format matrix with
-                                          ///<   atom_count rows and a number of columns expanded
-                                          ///<   as needed to accommodate the largest entry in
-                                          ///<   work_unit_assignments.
+  std::vector<int> work_unit_assignment_count;  ///< The numbers of work units in which each atom
+                                                ///<   can be found
+  std::vector<int> work_unit_presence;          ///< Lists of the work units in which each atom is
+                                                ///<   found.  This is a column-format matrix with
+                                                ///<   atom_count rows and a number of columns
+                                                ///<   expanded as needed to accommodate the largest
+                                                ///<   entry in work_unit_assignments.
+
+  /// \brief Allocate the necessary space for this work unit
+  ///
+  /// \param vk   Valence term abstract from the original topology
+  /// \param vsk  Virtual site abstract from the original topology
+  /// \param cnk  Constraint group abstract from the original topology
+  /// \param rar  Restraint apparatus abstract
+  void allocate(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
+                const ConstraintKit &cnk, const RestraintApparatusDpReader &rar);
+
+  /// \brief Fill the arrays describing how different atoms are affected by each potential term
+  ///        (including restraints), each virtual site, and each constraint.
+  ///
+  /// \param vk   Valence term abstract from the original topology
+  /// \param vsk  Virtual site abstract from the original topology
+  /// \param cnk  Constraint group abstract from the original topology
+  /// \param rar  Restraint apparatus abstract
+  void fillAffectorArrays(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
+                          const ConstraintKit &cnk, const RestraintApparatusDpReader &rar);
 };
   
 /// \brief An object to collect the components of a valence work unit (which will also track frozen

@@ -6,80 +6,131 @@ namespace synthesis {
 
 using math::prefixSumInPlace;
 using math::PrefixSumType;
-using topology::ConstraintKit;
-using topology::ValenceKit;
 using topology::VirtualSiteKind;
-using topology::VirtualSiteKit;
-  
+
+//-------------------------------------------------------------------------------------------------
+ValenceDelegator::ValenceDelegator() :
+    atom_count{0}, bond_i_presence{}, bond_j_presence{}, angl_i_presence{}, angl_j_presence{},
+    angl_k_presence{}, dihe_i_presence{}, dihe_j_presence{}, dihe_k_presence{}, dihe_l_presence{},
+    ubrd_i_presence{}, ubrd_k_presence{}, cimp_i_presence{}, cimp_j_presence{}, cimp_k_presence{},
+    cimp_l_presence{}, cmap_i_presence{}, cmap_j_presence{}, cmap_k_presence{}, cmap_l_presence{},
+    cmap_m_presence{}, vs_presence{}, vsf1_presence{}, vsf2_presence{}, vsf3_presence{},
+    vsf4_presence{}, cnst_n_presence{}, sett_ox_presence{}, sett_h1_presence{}, sett_h2_presence{},
+    rposn_i_presence{}, rbond_i_presence{}, rbond_j_presence{}, rangl_i_presence{},
+    rangl_j_presence{}, rangl_k_presence{}, rdihe_i_presence{}, rdihe_j_presence{},
+    rdihe_k_presence{}, rdihe_l_presence{}, bond_affector_list{}, bond_affector_bounds{},
+    angl_affector_list{}, angl_affector_bounds{}, dihe_affector_list{}, dihe_affector_bounds{},
+    ubrd_affector_list{}, ubrd_affector_bounds{}, cimp_affector_list{}, cimp_affector_bounds{},
+    cmap_affector_list{}, cmap_affector_bounds{}, vste_affector_list{}, vste_affector_bounds{},
+    cnst_affector_list{}, cnst_affector_bounds{}, sett_affector_list{}, sett_affector_bounds{},
+    work_unit_assignment_count{}, work_unit_presence{}
+{}
+
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator::ValenceDelegator(const AtomGraph &ag, const RestraintApparatus &ra) :
-    atom_count{ag.getAtomCount()},
-    bond_i_presence{2 * ag.getBondTermCount(), -1},
-    bond_j_presence{2 * ag.getBondTermCount(), -1},
-    angl_i_presence{2 * ag.getAngleTermCount(), -1},
-    angl_j_presence{2 * ag.getAngleTermCount(), -1},
-    angl_k_presence{2 * ag.getAngleTermCount(), -1},
-    dihe_i_presence{2 * ag.getDihedralTermCount(), -1},
-    dihe_j_presence{2 * ag.getDihedralTermCount(), -1},
-    dihe_k_presence{2 * ag.getDihedralTermCount(), -1},
-    dihe_l_presence{2 * ag.getDihedralTermCount(), -1},
-    ubrd_i_presence{2 * ag.getUreyBradleyTermCount(), -1},
-    ubrd_k_presence{2 * ag.getUreyBradleyTermCount(), -1},
-    cimp_i_presence{2 * ag.getCharmmImprTermCount(), -1},
-    cimp_j_presence{2 * ag.getCharmmImprTermCount(), -1},
-    cimp_k_presence{2 * ag.getCharmmImprTermCount(), -1},
-    cimp_l_presence{2 * ag.getCharmmImprTermCount(), -1},
-    cmap_i_presence{2 * ag.getCmapTermCount(), -1},
-    cmap_j_presence{2 * ag.getCmapTermCount(), -1},
-    cmap_k_presence{2 * ag.getCmapTermCount(), -1},
-    cmap_l_presence{2 * ag.getCmapTermCount(), -1},
-    cmap_m_presence{2 * ag.getCmapTermCount(), -1},
-    vs_presence{2 * ag.getVirtualSiteCount(), -1},
-    vsf1_presence{2 * ag.getVirtualSiteCount(), -1},
-    vsf2_presence{2 * ag.getVirtualSiteCount(), -1},
-    vsf3_presence{2 * ag.getVirtualSiteCount(), -1},
-    vsf4_presence{2 * ag.getVirtualSiteCount(), -1},
-    cnst_n_presence{2 * ag.getConstraintGroupTotalSize(), -1},
-    sett_ox_presence{2 * ag.getRigidWaterCount(), -1},
-    sett_h1_presence{2 * ag.getRigidWaterCount(), -1},
-    sett_h2_presence{2 * ag.getRigidWaterCount(), -1},
-    rposn_i_presence{2 * ra.getPositionalRestraintCount(), -1},
-    rbond_i_presence{2 * ra.getDistanceRestraintCount(), -1},
-    rbond_j_presence{2 * ra.getDistanceRestraintCount(), -1},
-    rangl_i_presence{2 * ra.getAngleRestraintCount(), -1},
-    rangl_j_presence{2 * ra.getAngleRestraintCount(), -1},
-    rangl_k_presence{2 * ra.getAngleRestraintCount(), -1},
-    rdihe_i_presence{2 * ra.getDihedralRestraintCount(), -1},
-    rdihe_j_presence{2 * ra.getDihedralRestraintCount(), -1},
-    rdihe_k_presence{2 * ra.getDihedralRestraintCount(), -1},
-    rdihe_l_presence{2 * ra.getDihedralRestraintCount(), -1},
-    bond_affector_list{ag.getBondTermCount() * 2},
-    bond_affector_bounds{atom_count + 1, 0},
-    angl_affector_list{ag.getAngleTermCount() * 3},
-    angl_affector_bounds{atom_count + 1, 0},
-    dihe_affector_list{ag.getDihedralTermCount() * 4},
-    dihe_affector_bounds{atom_count + 1, 0},
-    ubrd_affector_list{ag.getUreyBradleyTermCount() * 2},
-    ubrd_affector_bounds{atom_count + 1, 0},
-    cimp_affector_list{ag.getCharmmImprTermCount() * 4},
-    cimp_affector_bounds{atom_count + 1, 0},
-    cmap_affector_list{ag.getCmapTermCount() * 5},
-    cmap_affector_bounds{atom_count + 1, 0},
-    vste_affector_list{ag.getVirtualSiteCount() * 4},
-    vste_affector_bounds{atom_count + 1, 0},
-    cnst_affector_list{ag.getConstraintGroupTotalSize()},
-    cnst_affector_bounds{atom_count + 1, 0},
-    sett_affector_list{ag.getRigidWaterCount() * 3},
-    sett_affector_bounds{atom_count + 1, 0},
-    work_unit_assignments{atom_count, 0},
-    work_unit_presence{atom_count * 4, 0}
+    ValenceDelegator()
 {
-  // Pass through the topology, filling out the valence term affector arrays and the virtual site
-  // frame atom arrays.
+  // Get relevant abstracts
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   const ConstraintKit cnk = ag.getConstraintKit();
   const RestraintApparatusDpReader rar = ra.dpData();
+
+  // Allocate and fill the arrays
+  allocate(vk, vsk, cnk, rar);
+  fillAffectorArrays(vk, vsk, cnk, rar);
+}
+
+//-------------------------------------------------------------------------------------------------
+ValenceDelegator::ValenceDelegator(const AtomGraph *ag, const RestraintApparatus *ra) :
+    ValenceDelegator()
+{
+  // Get relevant abstracts
+  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
+  const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+  const ConstraintKit cnk = ag->getConstraintKit();
+  const RestraintApparatusDpReader rar = ra->dpData();
+
+  // Allocate and fill the arrays
+  allocate(vk, vsk, cnk, rar);
+  fillAffectorArrays(vk, vsk, cnk, rar);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceDelegator::allocate(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
+                                const ConstraintKit &cnk, const RestraintApparatusDpReader &rar) {
+
+  // Allocate memory as needed
+  atom_count = vk.natom;
+  bond_i_presence.resize(2 * vk.nbond, -1);
+  bond_j_presence.resize(2 * vk.nbond, -1);
+  angl_i_presence.resize(2 * vk.nangl, -1);
+  angl_j_presence.resize(2 * vk.nangl, -1);
+  angl_k_presence.resize(2 * vk.nangl, -1);
+  dihe_i_presence.resize(2 * vk.ndihe, -1);
+  dihe_j_presence.resize(2 * vk.ndihe, -1);
+  dihe_k_presence.resize(2 * vk.ndihe, -1);
+  dihe_l_presence.resize(2 * vk.ndihe, -1);
+  ubrd_i_presence.resize(2 * vk.nubrd, -1);
+  ubrd_k_presence.resize(2 * vk.nubrd, -1);
+  cimp_i_presence.resize(2 * vk.ncimp, -1);
+  cimp_j_presence.resize(2 * vk.ncimp, -1);
+  cimp_k_presence.resize(2 * vk.ncimp, -1);
+  cimp_l_presence.resize(2 * vk.ncimp, -1);
+  cmap_i_presence.resize(2 * vk.ncmap, -1);
+  cmap_j_presence.resize(2 * vk.ncmap, -1);
+  cmap_k_presence.resize(2 * vk.ncmap, -1);
+  cmap_l_presence.resize(2 * vk.ncmap, -1);
+  cmap_m_presence.resize(2 * vk.ncmap, -1);
+  vs_presence.resize(2 * vsk.nsite, -1);
+  vsf1_presence.resize(2 * vsk.nsite, -1);
+  vsf2_presence.resize(2 * vsk.nsite, -1);
+  vsf3_presence.resize(2 * vsk.nsite, -1);
+  vsf4_presence.resize(2 * vsk.nsite, -1);
+  cnst_n_presence.resize(2 * cnk.group_bounds[cnk.ngroup], -1);
+  sett_ox_presence.resize(2 * cnk.nsettle, -1);
+  sett_h1_presence.resize(2 * cnk.nsettle, -1);
+  sett_h2_presence.resize(2 * cnk.nsettle, -1);
+  rposn_i_presence.resize(2 * rar.nposn, -1);
+  rbond_i_presence.resize(2 * rar.nbond, -1);
+  rbond_j_presence.resize(2 * rar.nbond, -1);
+  rangl_i_presence.resize(2 * rar.nangl, -1);
+  rangl_j_presence.resize(2 * rar.nangl, -1);
+  rangl_k_presence.resize(2 * rar.nangl, -1);
+  rdihe_i_presence.resize(2 * rar.ndihe, -1);
+  rdihe_j_presence.resize(2 * rar.ndihe, -1);
+  rdihe_k_presence.resize(2 * rar.ndihe, -1);
+  rdihe_l_presence.resize(2 * rar.ndihe, -1);
+  bond_affector_list.resize(2 * vk.nbond);
+  bond_affector_bounds.resize(atom_count + 1, 0);
+  angl_affector_list.resize(3 * vk.nangl);
+  angl_affector_bounds.resize(atom_count + 1, 0);
+  dihe_affector_list.resize(4 * vk.ndihe);
+  dihe_affector_bounds.resize(atom_count + 1, 0);
+  ubrd_affector_list.resize(2 * vk.nubrd);
+  ubrd_affector_bounds.resize(atom_count + 1, 0);
+  cimp_affector_list.resize(4 * vk.ncimp);
+  cimp_affector_bounds.resize(atom_count + 1, 0);
+  cmap_affector_list.resize(5 * vk.ncmap);
+  cmap_affector_bounds.resize(atom_count + 1, 0);
+  vste_affector_list.resize(4 * vsk.nsite);
+  vste_affector_bounds.resize(atom_count + 1, 0);
+  cnst_affector_list.resize(2 * cnk.group_bounds[cnk.ngroup], -1);
+  cnst_affector_bounds.resize(atom_count + 1, 0);
+  sett_affector_list.resize(3 * cnk.nsettle);
+  sett_affector_bounds.resize(atom_count + 1, 0);
+  work_unit_assignment_count.resize(atom_count, 0);
+  work_unit_presence.resize(2 * atom_count, 0);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
+                                          const VirtualSiteKit<double> &vsk,
+                                          const ConstraintKit &cnk,
+                                          const RestraintApparatusDpReader &rar) {
+
+  // Pass through the topology, filling out the valence term affector arrays and the virtual site
+  // frame atom arrays.
   for (int pos = 0; pos < vk.nbond; pos++) {
     bond_affector_bounds[vk.bond_i_atoms[pos]] += 1;
     bond_affector_bounds[vk.bond_j_atoms[pos]] += 1;

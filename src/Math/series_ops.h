@@ -4,13 +4,39 @@
 
 #include <vector>
 #include "Accelerator/hybrid.h"
+#include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 
 namespace omni {
 namespace math {
 
 using card::Hybrid;
-  
+
+/// \brief Convert a number series into a bitmask, such that for a number series consisting of
+///        integers { a, b, c, d, e } bits a, b, c, d, and e are checked off in a mask broken into
+///        segments of 32 bits (or whatever the size of an unsigned integer happens to be).  The
+///        number series is trusted to have no values less than zero.
+///
+/// Overloaded:
+///   - Operate on a C-style array of trusted length
+///   - Operate on a std::vector of original values
+///   - Operate on a Hybrid object of original values
+///
+/// \param number_series  The series of numbers to map
+/// \param length         Length of the number_series array (if C-style)
+/// \param output_size    Output size to prepare (if set to zero or unspecified, the number series
+///                       will first be scanned to determine the necessary size from its largest
+///                       value)
+/// \{
+std::vector<uint> numberSeriesToBitMask(const int* number_series, const size_t length,
+                                        int output_size = 0);
+
+std::vector<uint> numberSeriesToBitMask(const std::vector<int> &number_series,
+                                        int output_size = 0);
+
+std::vector<uint> numberSeriesToBitMask(const Hybrid<int> &number_series, int output_size = 0);
+/// \}
+
 /// \brief Let a vector x_subset contain indices into a table of values, but (probably) not making
 ///        use of all indices, i.e. 0, 2, 3, 1, 1, 0, 5, 6, 9 with ten indices in all.  Create a
 ///        key for extracting from the original table the values which x_subset does index, which

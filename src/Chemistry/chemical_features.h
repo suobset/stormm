@@ -202,6 +202,15 @@ public:
   /// \brief Get the number of aromatic groups in the system
   int getAromaticGroupCount() const;
 
+  /// \brief Get the number of polar hydrogens in the system
+  int getPolarHydrogenCount() const;
+
+  /// \brief Get the number of hydrogen bond donors in the system
+  int getHydrogenBondDonorCount() const;
+
+  /// \brief Get the number of hydrogen bond acceptors in the system
+  int getHydrogenBondAcceptorCount() const;
+
   /// \brief Get the number of chiral centers in the system
   int getChiralCenterCount() const;
 
@@ -219,6 +228,27 @@ public:
   /// \param min_pi_electrons  Minimum number of electrons in the aromatic ring system to report
   /// \param max_pi_electrons  Maximum number of electrons in the aromatic ring system to report
   std::vector<uint> getAromaticMask(int min_pi_electrons, int max_pi_electrons) const;
+
+  /// \brief Get a list of all polar hydrogen atoms
+  std::vector<int> getPolarHydrogenList() const;
+
+  /// \brief Get a list of all hydrogen bond donor atoms
+  std::vector<int> getHydrogenBondDonorList() const;
+
+  /// \brief Get a list of all hydrogen bond acceptor atoms
+  std::vector<int> getHydrogenBondAcceptorList() const;
+
+  /// \brief Get a bit mask of all polar hydrogen atoms in the system, acceptable for inputs to
+  ///        creating new atom masks.
+  std::vector<uint> getPolarHydrogenMask() const;
+
+  /// \brief Get a bit mask of all hydrogen bond donors in the system, acceptable for inputs to
+  ///        creating new atom masks.
+  std::vector<uint> getHydrogenBondDonorMask() const;
+
+  /// \brief Get a bit mask of all hydrogen bond acceptors in the system, acceptable for inputs to
+  ///        creating new atom masks.
+  std::vector<uint> getHydrogenBondAcceptorMask() const;
 
   /// \brief Return a mask of chiral centers in the system
   ///
@@ -309,7 +339,17 @@ private:
   
   /// List of atoms indicating groups of aromaticity in the system
   Hybrid<int> aromatic_groups;
-    
+
+  /// List of polar hydrogen atoms
+  Hybrid<int> polar_hydrogens;
+  
+  /// List of hydrogen bond donor atoms (given in an order to correspond to the list of polar
+  /// hydrogens which they donate, above)
+  Hybrid<int> hydrogen_bond_donors;
+
+  /// List of hydrogen bond acceptor atoms
+  Hybrid<int> hydrogen_bond_acceptors;
+  
   /// List of chiral centers (needs no bounds array, but each center is a five-membered tuple
   /// consisting of the topological index of the center itself, followed by the four substituent
   /// atoms, in order of decreasing IUPAC score, which define its chirality.  Positive values in
@@ -337,7 +377,7 @@ private:
   /// the Indigo method
   Hybrid<double> bond_orders;
 
-  /// Free electron content of each atom in the molecule
+  /// Free electron content of each atom in the molecule, averaged over resonance states
   Hybrid<double> free_electrons;
 
   /// Integer data (the Hybrid<int> arrays above are POINTER-kind and will targer this storage)
@@ -456,6 +496,19 @@ private:
                           const std::vector<int> &ring_atom_bounds,
                           std::vector<int> *tmp_rotatable_groups,
                           std::vector<int> *tmp_rotatable_group_bounds);
+
+  /// \brief Find polar heavy atoms that can act as hydrogen bond donors, and label polar hydrogens
+  ///        in the process.  Unlike findRotatableBonds above, this is a fast evaluation and will
+  ///        be performed automatically with the ChemicalFeatures object construction.
+  ///
+  /// \param nbk          Non-bonded interaction abstract from the original topology
+  /// \param cdk          Chemical details of the system (for atomic numbers)
+  /// \param tmp_polar_h  Array for listing polar hydrogen atoms (modified and returned)
+  /// \param tmp_hb_don   Array for listing hydrogen bond donor atoms (modified and returned)
+  /// \param tmp_hb_acc   Array for listing hydrogen bond acceptor atoms (modified and returned)
+  void findHydrogenBondElements(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
+                                std::vector<int> *tmp_polar_h, std::vector<int> *tmp_hb_don,
+                                std::vector<int> *tmp_hb_acc);
 
   /// \brief Reset POINTER-kind Hybrid objects to target the appropriate ARRAY-kind object in
   ///        the copy constructor and copy assignment operator.

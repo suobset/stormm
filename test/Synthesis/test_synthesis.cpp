@@ -36,11 +36,14 @@ int main(int argc, char* argv[]) {
   TestEnvironment oe(argc, argv);
 
   // Section 1
-  section("Test SystemCache construction");
+  section("SystemCache construction");
 
   // Section 2
-  section("Test PhaseSpaceSynthesis layout");
+  section("PhaseSpaceSynthesis layout");
 
+  // Section 3
+  section("Valence work unit construction");
+  
   section(1);
   const char osc = osSeparator();
   const TestPriority test_sysc = (oe.getTemporaryDirectoryAccess()) ? TestPriority::CRITICAL :
@@ -237,7 +240,12 @@ int main(int argc, char* argv[]) {
   check(y_muta, RelationalOperator::NOT_EQUAL, Approx(y_copy).margin(1.0e-8),
         "The PhaseSpaceSynthesis object returns an image of one of its systems with higher "
         "fidelity to the original than expected.", do_tests);
-  
+
+  // Prepare valence work units for the array of topologies
+  for (int i = 0; i < sysc.getTopologyCount(); i++) {
+    
+  }
+       
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

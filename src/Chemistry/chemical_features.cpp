@@ -2,6 +2,7 @@
 #include "Constants/scaling.h"
 #include "DataTypes/mixed_types.h"
 #include "Math/rounding.h"
+#include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Topology/atomgraph_analysis.h"
@@ -16,6 +17,7 @@ using card::HybridKind;
 using topology::TorsionKind;
 using math::crossProduct;
 using math::dot;
+using math::numberSeriesToBitMask;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::project;
@@ -147,6 +149,9 @@ ChemicalFeatures::ChemicalFeatures() :
     aromatic_group_bounds{HybridKind::POINTER, "chemfe_arom_bounds"},
     aromatic_pi_electrons{HybridKind::POINTER, "chemfe_pi_elec"},
     aromatic_groups{HybridKind::POINTER, "chemfe_arom_groups"},
+    polar_hydrogens{HybridKind::POINTER, "chemfe_polar_h"},
+    hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
+    hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
     rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
     rotatable_group_bounds{HybridKind::POINTER, "chemfe_rotator_bounds"},
@@ -173,6 +178,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     aromatic_group_bounds{HybridKind::POINTER, "chemfe_arom_bounds"},
     aromatic_pi_electrons{HybridKind::POINTER, "chemfe_pi_elec"},
     aromatic_groups{HybridKind::POINTER, "chemfe_arom_groups"},
+    polar_hydrogens{HybridKind::POINTER, "chemfe_polar_h"},
+    hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
+    hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
     rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
     rotatable_group_bounds{HybridKind::POINTER, "chemfe_rotator_bounds"},
@@ -220,6 +228,13 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   findAromaticGroups(cdk, vk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_aromatic_group_bounds,
                      &tmp_aromatic_pi_electrons, &tmp_aromatic_groups);
 
+  // Mark polar hydrogens and hydrogen bond donors and acceptors
+  std::vector<int> tmp_polar_hydrogens;
+  std::vector<int> tmp_hydrogen_bond_donors;
+  std::vector<int> tmp_hydrogen_bond_acceptors;
+  findHydrogenBondElements(nbk, cdk, &tmp_polar_hydrogens, &tmp_hydrogen_bond_donors,
+                           &tmp_hydrogen_bond_acceptors);
+  
   // Find chiral centers
   const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
   chiral_center_count = tmp_chiral_centers.size();
@@ -246,17 +261,23 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                       roundUp(tmp_aromatic_groups.size(), warp_size_zu) +
                       roundUp(static_cast<size_t>(chiral_center_count), warp_size_zu) +
                       roundUp(tmp_rotatable_groups.size(), warp_size_zu) +
-                      roundUp(tmp_rotatable_group_bounds.size(), warp_size_zu);
+                      roundUp(tmp_rotatable_group_bounds.size(), warp_size_zu) +
+                      roundUp(tmp_polar_hydrogens.size(), warp_size_zu) +
+                      roundUp(tmp_hydrogen_bond_donors.size(), warp_size_zu) +
+                      roundUp(tmp_hydrogen_bond_acceptors.size(), warp_size_zu);
   int_data.resize(nint);
   size_t ic = planar_centers.putHost(&int_data, tmp_planar_centers, 0, warp_size_zu);
-  ic = ring_atom_bounds.putHost(&int_data, tmp_ring_atom_bounds, 0, warp_size_zu);
-  ic = ring_atoms.putHost(&int_data, tmp_ring_atoms, 0, warp_size_zu);
-  ic = aromatic_group_bounds.putHost(&int_data, tmp_aromatic_group_bounds, 0, warp_size_zu);
-  ic = aromatic_pi_electrons.putHost(&int_data, tmp_aromatic_pi_electrons, 0, warp_size_zu);
-  ic = aromatic_groups.putHost(&int_data, tmp_aromatic_groups, 0, warp_size_zu);
-  ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, 0, warp_size_zu);
-  ic = rotatable_groups.putHost(&int_data, tmp_rotatable_groups, 0, warp_size_zu);
-  ic = rotatable_group_bounds.putHost(&int_data, tmp_rotatable_group_bounds, 0, warp_size_zu);
+  ic = ring_atom_bounds.putHost(&int_data, tmp_ring_atom_bounds, ic, warp_size_zu);
+  ic = ring_atoms.putHost(&int_data, tmp_ring_atoms, ic, warp_size_zu);
+  ic = aromatic_group_bounds.putHost(&int_data, tmp_aromatic_group_bounds, ic, warp_size_zu);
+  ic = aromatic_pi_electrons.putHost(&int_data, tmp_aromatic_pi_electrons, ic, warp_size_zu);
+  ic = aromatic_groups.putHost(&int_data, tmp_aromatic_groups, ic, warp_size_zu);
+  ic = polar_hydrogens.putHost(&int_data, tmp_polar_hydrogens, ic, warp_size_zu);
+  ic = hydrogen_bond_donors.putHost(&int_data, tmp_hydrogen_bond_donors, ic, warp_size_zu);
+  ic = hydrogen_bond_acceptors.putHost(&int_data, tmp_hydrogen_bond_acceptors, ic, warp_size_zu);
+  ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, ic, warp_size_zu);
+  ic = rotatable_groups.putHost(&int_data, tmp_rotatable_groups, ic, warp_size_zu);
+  ic = rotatable_group_bounds.putHost(&int_data, tmp_rotatable_group_bounds, ic, warp_size_zu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -296,9 +317,12 @@ ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     aromatic_group_bounds{original.aromatic_group_bounds},
     aromatic_pi_electrons{original.aromatic_pi_electrons},
     aromatic_groups{original.aromatic_groups},
+    polar_hydrogens{original.polar_hydrogens},
+    hydrogen_bond_donors{original.hydrogen_bond_donors},
+    hydrogen_bond_acceptors{original.hydrogen_bond_acceptors},
+    chiral_centers{original.chiral_centers},
     rotatable_groups{original.rotatable_groups},
     rotatable_group_bounds{original.rotatable_group_bounds},
-    chiral_centers{original.chiral_centers},
     formal_charges{original.formal_charges},
     bond_orders{original.bond_orders},
     free_electrons{original.free_electrons},
@@ -332,9 +356,12 @@ ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
     aromatic_group_bounds{std::move(original.aromatic_group_bounds)},
     aromatic_pi_electrons{std::move(original.aromatic_pi_electrons)},
     aromatic_groups{std::move(original.aromatic_groups)},
+    polar_hydrogens{std::move(original.polar_hydrogens)},
+    hydrogen_bond_donors{std::move(original.hydrogen_bond_donors)},
+    hydrogen_bond_acceptors{std::move(original.hydrogen_bond_acceptors)},
+    chiral_centers{std::move(original.chiral_centers)},
     rotatable_groups{std::move(original.rotatable_groups)},
     rotatable_group_bounds{std::move(original.rotatable_group_bounds)},
-    chiral_centers{std::move(original.chiral_centers)},
     formal_charges{std::move(original.formal_charges)},
     bond_orders{std::move(original.bond_orders)},
     free_electrons{std::move(original.free_electrons)},
@@ -373,7 +400,12 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
   aromatic_group_bounds = other.aromatic_group_bounds;
   aromatic_pi_electrons = other.aromatic_pi_electrons;
   aromatic_groups = other.aromatic_groups;
+  polar_hydrogens = other.polar_hydrogens;
+  hydrogen_bond_donors = other.hydrogen_bond_donors;
+  hydrogen_bond_acceptors = other.hydrogen_bond_acceptors;
   chiral_centers = other.chiral_centers;
+  rotatable_groups = other.rotatable_groups;
+  rotatable_group_bounds = other.rotatable_group_bounds;
   formal_charges = other.formal_charges;
   bond_orders = other.bond_orders;
   free_electrons = other.free_electrons;
@@ -414,7 +446,12 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
   aromatic_group_bounds = std::move(other.aromatic_group_bounds);
   aromatic_pi_electrons = std::move(other.aromatic_pi_electrons);
   aromatic_groups = std::move(other.aromatic_groups);
+  polar_hydrogens = std::move(other.polar_hydrogens);
+  hydrogen_bond_donors = std::move(other.hydrogen_bond_donors);
+  hydrogen_bond_acceptors = std::move(other.hydrogen_bond_acceptors);
   chiral_centers = std::move(other.chiral_centers);
+  rotatable_groups = std::move(other.rotatable_groups);
+  rotatable_group_bounds = std::move(other.rotatable_group_bounds);
   formal_charges = std::move(other.formal_charges);
   bond_orders = std::move(other.bond_orders);
   free_electrons = std::move(other.free_electrons);
@@ -1312,6 +1349,30 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
 }
 
 //-------------------------------------------------------------------------------------------------
+void ChemicalFeatures::findHydrogenBondElements(const NonbondedKit<double> &nbk,
+                                                const ChemicalDetailsKit &cdk,
+                                                std::vector<int> *tmp_polar_h,
+                                                std::vector<int> *tmp_hb_don,
+                                                std::vector<int> *tmp_hb_acc) {
+  for (int i = 0; i < cdk.natom; i++) {
+    if (cdk.z_numbers[i] == 1 && nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] == 1) {
+      const int donor_z = cdk.z_numbers[nbk.nb12x[nbk.nb12_bounds[i]]];
+      if (donor_z == 7 || donor_z == 8 || donor_z == 15 || donor_z == 16) {
+        tmp_polar_h->push_back(i);
+        tmp_hb_don->push_back(nbk.nb12x[nbk.nb12_bounds[i]]);
+      }
+    }
+    else if ((cdk.z_numbers[i] ==  7 || cdk.z_numbers[i] ==  8 || cdk.z_numbers[i] == 15 |
+              cdk.z_numbers[i] == 16) && free_electrons.readHost(i) > 1.25) {
+
+      // Nitrogen, oxygen, phosphorus, and sulfur atoms with at least some lone pair occupancy
+      // are considered hydrogen bond acceptors.
+      tmp_hb_acc->push_back(i);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::repairPointers() {
   formal_charges.swapTarget(&double_data);
   free_electrons.swapTarget(&double_data);
@@ -1357,6 +1418,21 @@ int ChemicalFeatures::getMutableRingCount() const {
 //-------------------------------------------------------------------------------------------------
 int ChemicalFeatures::getAromaticGroupCount() const {
   return aromatic_group_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ChemicalFeatures::getPolarHydrogenCount() const {
+  return static_cast<int>(polar_hydrogens.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+int ChemicalFeatures::getHydrogenBondDonorCount() const {
+  return static_cast<int>(hydrogen_bond_donors.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+int ChemicalFeatures::getHydrogenBondAcceptorCount() const {
+  return static_cast<int>(hydrogen_bond_acceptors.size());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1413,6 +1489,36 @@ std::vector<uint> ChemicalFeatures::getAromaticMask(const int min_pi_electrons,
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ChemicalFeatures::getPolarHydrogenList() const {
+  return polar_hydrogens.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ChemicalFeatures::getHydrogenBondDonorList() const {
+  return hydrogen_bond_donors.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ChemicalFeatures::getHydrogenBondAcceptorList() const {
+  return hydrogen_bond_acceptors.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint> ChemicalFeatures::getPolarHydrogenMask() const {
+  return numberSeriesToBitMask(polar_hydrogens, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint> ChemicalFeatures::getHydrogenBondDonorMask() const {
+  return numberSeriesToBitMask(hydrogen_bond_donors, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint> ChemicalFeatures::getHydrogenBondAcceptorMask() const {
+  return numberSeriesToBitMask(hydrogen_bond_acceptors, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------

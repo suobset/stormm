@@ -71,10 +71,9 @@ BoundedRestraint applyDihedralRestraint(const AtomGraph *ag, int atom_i, int ato
 /// \brief Perform basic checks the validity of the topology and coordinate frame needed by the
 ///        following restraint builders.
 ///
-/// \param ag                    Pointer to the topology for the system of interest
-/// \param cframe                Coordinates of the system in its current state
-/// \param reference_cframe      Reference coordinates of the system, if different from
-/// \param mask                  Atom mask (must match the topology by some basic checks))
+/// \param ag      Pointer to the topology for the system of interest
+/// \param cframe  Coordinates of the system in its current state
+/// \param mask    Atom mask (must match the topology by some basic checks))
 void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                              const AtomMask &mask);
   

@@ -39,6 +39,14 @@ struct RestraintApparatusDpReader {
                              const double4* rangl_finl_r_in, const double4* rdihe_init_r_in,
                              const double4* rdihe_finl_r_in, const AtomGraph *ag_pointer_in);
 
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
+  /// \{
+  RestraintApparatusDpReader(const RestraintApparatusDpReader &original) = default;
+  RestraintApparatusDpReader(RestraintApparatusDpReader &&other) = default;
+  RestraintApparatusDpReader& operator=(const RestraintApparatusDpReader &original) = default;
+  /// \}
+
   const int total_rst;            ///< Total number of restraints in the apparatus
   const int nposn;                ///< Number of positional restraints
   const int nbond;                ///< Number of distance restraints
@@ -112,6 +120,14 @@ struct RestraintApparatusSpReader {
                              const float4* rbond_finl_r_in, const float4* rangl_init_r_in,
                              const float4* rangl_finl_r_in, const float4* rdihe_init_r_in,
                              const float4* rdihe_finl_r_in, const AtomGraph *ag_pointer_in);
+
+  /// \brief Take the default copy and move constructors.  The assignment operators will get
+  ///        implicitly deleted as this is just a collection of constants.
+  /// \{
+  RestraintApparatusSpReader(const RestraintApparatusSpReader &original) = default;
+  RestraintApparatusSpReader(RestraintApparatusSpReader &&other) = default;
+  RestraintApparatusSpReader& operator=(const RestraintApparatusSpReader &original) = default;
+  /// \}
 
   const int total_rst;           ///< Total number of restraints in the apparatus
   const int nposn;               ///< Number of positional restraints
