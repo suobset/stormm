@@ -2,35 +2,57 @@
 #include "valence_workunit.h"
 
 namespace omni {
-namespace topology {
+namespace synthesis {
 
 using math::prefixSumInPlace;
 using math::PrefixSumType;
+using topology::ConstraintKit;
+using topology::ValenceKit;
+using topology::VirtualSiteKind;
+using topology::VirtualSiteKit;
   
 //-------------------------------------------------------------------------------------------------
-ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
+ValenceDelegator::ValenceDelegator(const AtomGraph &ag, const RestraintApparatus &ra) :
     atom_count{ag.getAtomCount()},
-    bond_i_atoms{ag.getBondTermCount(), -1},
-    bond_j_atoms{ag.getBondTermCount(), -1},
-    angl_i_atoms{ag.getAngleTermCount(), -1},
-    angl_j_atoms{ag.getAngleTermCount(), -1},
-    angl_k_atoms{ag.getAngleTermCount(), -1},
-    dihe_i_atoms{ag.getDihedralTermCount(), -1},
-    dihe_j_atoms{ag.getDihedralTermCount(), -1},
-    dihe_k_atoms{ag.getDihedralTermCount(), -1},
-    dihe_l_atoms{ag.getDihedralTermCount(), -1},
-    ubrd_i_atoms{ag.getUreyBradleyTermCount(), -1},
-    ubrd_k_atoms{ag.getUreyBradleyTermCount(), -1},
-    cimp_i_atoms{ag.getCharmmImprTermCount(), -1},
-    cimp_j_atoms{ag.getCharmmImprTermCount(), -1},
-    cimp_k_atoms{ag.getCharmmImprTermCount(), -1},
-    cimp_l_atoms{ag.getCharmmImprTermCount(), -1},
-    cmap_i_atoms{ag.getCmapTermCount(), -1},
-    cmap_j_atoms{ag.getCmapTermCount(), -1},
-    cmap_k_atoms{ag.getCmapTermCount(), -1},
-    cmap_l_atoms{ag.getCmapTermCount(), -1},
-    cmap_m_atoms{ag.getCmapTermCount(), -1},
-    virtual_site_placement{ag.getVirtualSiteCount(), -1},
+    bond_i_presence{2 * ag.getBondTermCount(), -1},
+    bond_j_presence{2 * ag.getBondTermCount(), -1},
+    angl_i_presence{2 * ag.getAngleTermCount(), -1},
+    angl_j_presence{2 * ag.getAngleTermCount(), -1},
+    angl_k_presence{2 * ag.getAngleTermCount(), -1},
+    dihe_i_presence{2 * ag.getDihedralTermCount(), -1},
+    dihe_j_presence{2 * ag.getDihedralTermCount(), -1},
+    dihe_k_presence{2 * ag.getDihedralTermCount(), -1},
+    dihe_l_presence{2 * ag.getDihedralTermCount(), -1},
+    ubrd_i_presence{2 * ag.getUreyBradleyTermCount(), -1},
+    ubrd_k_presence{2 * ag.getUreyBradleyTermCount(), -1},
+    cimp_i_presence{2 * ag.getCharmmImprTermCount(), -1},
+    cimp_j_presence{2 * ag.getCharmmImprTermCount(), -1},
+    cimp_k_presence{2 * ag.getCharmmImprTermCount(), -1},
+    cimp_l_presence{2 * ag.getCharmmImprTermCount(), -1},
+    cmap_i_presence{2 * ag.getCmapTermCount(), -1},
+    cmap_j_presence{2 * ag.getCmapTermCount(), -1},
+    cmap_k_presence{2 * ag.getCmapTermCount(), -1},
+    cmap_l_presence{2 * ag.getCmapTermCount(), -1},
+    cmap_m_presence{2 * ag.getCmapTermCount(), -1},
+    vs_presence{2 * ag.getVirtualSiteCount(), -1},
+    vsf1_presence{2 * ag.getVirtualSiteCount(), -1},
+    vsf2_presence{2 * ag.getVirtualSiteCount(), -1},
+    vsf3_presence{2 * ag.getVirtualSiteCount(), -1},
+    vsf4_presence{2 * ag.getVirtualSiteCount(), -1},
+    cnst_n_presence{2 * ag.getConstraintGroupTotalSize(), -1},
+    sett_ox_presence{2 * ag.getRigidWaterCount(), -1},
+    sett_h1_presence{2 * ag.getRigidWaterCount(), -1},
+    sett_h2_presence{2 * ag.getRigidWaterCount(), -1},
+    rposn_i_presence{2 * ra.getPositionalRestraintCount(), -1},
+    rbond_i_presence{2 * ra.getDistanceRestraintCount(), -1},
+    rbond_j_presence{2 * ra.getDistanceRestraintCount(), -1},
+    rangl_i_presence{2 * ra.getAngleRestraintCount(), -1},
+    rangl_j_presence{2 * ra.getAngleRestraintCount(), -1},
+    rangl_k_presence{2 * ra.getAngleRestraintCount(), -1},
+    rdihe_i_presence{2 * ra.getDihedralRestraintCount(), -1},
+    rdihe_j_presence{2 * ra.getDihedralRestraintCount(), -1},
+    rdihe_k_presence{2 * ra.getDihedralRestraintCount(), -1},
+    rdihe_l_presence{2 * ra.getDihedralRestraintCount(), -1},
     bond_affector_list{ag.getBondTermCount() * 2},
     bond_affector_bounds{atom_count + 1, 0},
     angl_affector_list{ag.getAngleTermCount() * 3},
@@ -50,13 +72,14 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
     sett_affector_list{ag.getRigidWaterCount() * 3},
     sett_affector_bounds{atom_count + 1, 0},
     work_unit_assignments{atom_count, 0},
-    work_unit_presence{atom_count * 4}
+    work_unit_presence{atom_count * 4, 0}
 {
   // Pass through the topology, filling out the valence term affector arrays and the virtual site
   // frame atom arrays.
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   const ConstraintKit cnk = ag.getConstraintKit();
+  const RestraintApparatusDpReader rar = ra.dpData();
   for (int pos = 0; pos < vk.nbond; pos++) {
     bond_affector_bounds[vk.bond_i_atoms[pos]] += 1;
     bond_affector_bounds[vk.bond_j_atoms[pos]] += 1;
@@ -116,6 +139,26 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
   }
   for (int pos = 0; pos < cnk.nsettle; pos++) {
     sett_affector_bounds[cnk.settle_ox_atoms[pos]] += 1;
+    sett_affector_bounds[cnk.settle_h1_atoms[pos]] += 1;
+    sett_affector_bounds[cnk.settle_h2_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < rar.nposn; pos++) {
+    rposn_affector_bounds[rar.rposn_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < rar.nbond; pos++) {
+    rbond_affector_bounds[rar.rbond_i_atoms[pos]] += 1;
+    rbond_affector_bounds[rar.rbond_j_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < rar.nangl; pos++) {
+    rangl_affector_bounds[rar.rangl_i_atoms[pos]] += 1;
+    rangl_affector_bounds[rar.rangl_j_atoms[pos]] += 1;
+    rangl_affector_bounds[rar.rangl_k_atoms[pos]] += 1;
+  }
+  for (int pos = 0; pos < rar.ndihe; pos++) {
+    rdihe_affector_bounds[rar.rdihe_i_atoms[pos]] += 1;
+    rdihe_affector_bounds[rar.rdihe_j_atoms[pos]] += 1;
+    rdihe_affector_bounds[rar.rdihe_k_atoms[pos]] += 1;
+    rdihe_affector_bounds[rar.rdihe_l_atoms[pos]] += 1;
   }
   prefixSumInPlace<int>(&bond_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   prefixSumInPlace<int>(&angl_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
@@ -124,6 +167,12 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
   prefixSumInPlace<int>(&cimp_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   prefixSumInPlace<int>(&cmap_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   prefixSumInPlace<int>(&vste_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace<int>(&cnst_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace<int>(&sett_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace<int>(&rposn_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace<int>(&rbond_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace<int>(&rangl_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
+  prefixSumInPlace<int>(&rdihe_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   for (int pos = 0; pos < vk.nbond; pos++) {
     const int i_atom = vk.bond_i_atoms[pos];
     const int j_atom = vk.bond_j_atoms[pos];
@@ -264,27 +313,109 @@ ValenceDelegator::ValenceDelegator(const AtomGraph &ag) :
       cnst_affector_bounds[c_atom] += 1;
     }
   }
-  
+  for (int pos = 0; pos < cnk.nsettle; pos++) {
+    const int ox_atom = cnk.settle_ox_atoms[pos];
+    const int h1_atom = cnk.settle_h1_atoms[pos];
+    const int h2_atom = cnk.settle_h2_atoms[pos];
+    const int list_ox_idx = sett_affector_bounds[ox_atom];
+    const int list_h1_idx = sett_affector_bounds[h1_atom];
+    const int list_h2_idx = sett_affector_bounds[h2_atom];
+    sett_affector_list[list_ox_idx] = pos;
+    sett_affector_list[list_h1_idx] = pos;
+    sett_affector_list[list_h2_idx] = pos;
+    sett_affector_bounds[ox_atom] += 1;
+    sett_affector_bounds[h1_atom] += 1;
+    sett_affector_bounds[h2_atom] += 1;
+  }
+  for (int pos = 0; pos < rar.nposn; pos++) {
+    const int pr_atom = rar.rposn_atoms[pos];
+    const int list_pr_idx = rposn_affector_bounds[pr_atom];
+    rposn_affector_list[list_pr_idx] = pos;
+    rposn_affector_bounds[pr_atom] += 1;
+  }
+  for (int pos = 0; pos < rar.nbond; pos++) {
+    const int i_atom = rar.rbond_i_atoms[pos];
+    const int j_atom = rar.rbond_j_atoms[pos];
+    const int list_i_idx = rbond_affector_bounds[i_atom];
+    const int list_j_idx = rbond_affector_bounds[j_atom];
+    rbond_affector_list[list_i_idx] = pos;
+    rbond_affector_list[list_j_idx] = pos;
+    rbond_affector_bounds[i_atom] += 1;
+    rbond_affector_bounds[j_atom] += 1;
+  }
+  for (int pos = 0; pos < rar.nangl; pos++) {
+    const int i_atom = rar.rangl_i_atoms[pos];
+    const int j_atom = rar.rangl_j_atoms[pos];
+    const int k_atom = rar.rangl_k_atoms[pos];
+    const int list_i_idx = rangl_affector_bounds[i_atom];
+    const int list_j_idx = rangl_affector_bounds[j_atom];
+    const int list_k_idx = rangl_affector_bounds[k_atom];
+    rangl_affector_list[list_i_idx] = pos;
+    rangl_affector_list[list_j_idx] = pos;
+    rangl_affector_list[list_k_idx] = pos;
+    rangl_affector_bounds[i_atom] += 1;
+    rangl_affector_bounds[j_atom] += 1;
+    rangl_affector_bounds[k_atom] += 1;
+  }
+  for (int pos = 0; pos < rar.ndihe; pos++) {
+    const int i_atom = rar.rdihe_i_atoms[pos];
+    const int j_atom = rar.rdihe_j_atoms[pos];
+    const int k_atom = rar.rdihe_k_atoms[pos];
+    const int l_atom = rar.rdihe_l_atoms[pos];
+    const int list_i_idx = rdihe_affector_bounds[i_atom];
+    const int list_j_idx = rdihe_affector_bounds[j_atom];
+    const int list_k_idx = rdihe_affector_bounds[k_atom];
+    const int list_l_idx = rdihe_affector_bounds[l_atom];
+    rdihe_affector_list[list_i_idx] = pos;
+    rdihe_affector_list[list_j_idx] = pos;
+    rdihe_affector_list[list_k_idx] = pos;
+    rdihe_affector_list[list_l_idx] = pos;
+    rdihe_affector_bounds[i_atom] += 1;
+    rdihe_affector_bounds[j_atom] += 1;
+    rdihe_affector_bounds[k_atom] += 1;
+    rdihe_affector_bounds[l_atom] += 1;
+  }
+
   // Cast the atom count to a constant, just to avoid the *this pointer in subsequent loops.
   // Rewind the prefix sums after using them to populate the various affector lists.
   const int natom = atom_count;
   for (int i = natom; i > 0; i--) {
-    bond_affector_bounds[i] = bond_affector_bounds[i - 1];
-    angl_affector_bounds[i] = angl_affector_bounds[i - 1];
-    dihe_affector_bounds[i] = dihe_affector_bounds[i - 1];
-    ubrd_affector_bounds[i] = ubrd_affector_bounds[i - 1];
-    cimp_affector_bounds[i] = cimp_affector_bounds[i - 1];
-    cmap_affector_bounds[i] = cmap_affector_bounds[i - 1];
-    vste_affector_bounds[i] = vste_affector_bounds[i - 1];
+    bond_affector_bounds[i]  = bond_affector_bounds[i - 1];
+    angl_affector_bounds[i]  = angl_affector_bounds[i - 1];
+    dihe_affector_bounds[i]  = dihe_affector_bounds[i - 1];
+    ubrd_affector_bounds[i]  = ubrd_affector_bounds[i - 1];
+    cimp_affector_bounds[i]  = cimp_affector_bounds[i - 1];
+    cmap_affector_bounds[i]  = cmap_affector_bounds[i - 1];
+    vste_affector_bounds[i]  = vste_affector_bounds[i - 1];
+    cnst_affector_bounds[i]  = cnst_affector_bounds[i - 1];
+    sett_affector_bounds[i]  = sett_affector_bounds[i - 1];
+    rposn_affector_bounds[i] = rposn_affector_bounds[i - 1];
+    rbond_affector_bounds[i] = rbond_affector_bounds[i - 1];
+    rangl_affector_bounds[i] = rangl_affector_bounds[i - 1];
+    rdihe_affector_bounds[i] = rdihe_affector_bounds[i - 1];
   }
-  bond_affector_bounds[0] = 0;
-  angl_affector_bounds[0] = 0;
-  dihe_affector_bounds[0] = 0;
-  ubrd_affector_bounds[0] = 0;
-  cimp_affector_bounds[0] = 0;
-  cmap_affector_bounds[0] = 0;
-  vste_affector_bounds[0] = 0;
+  bond_affector_bounds[0]  = 0;
+  angl_affector_bounds[0]  = 0;
+  dihe_affector_bounds[0]  = 0;
+  ubrd_affector_bounds[0]  = 0;
+  cimp_affector_bounds[0]  = 0;
+  cmap_affector_bounds[0]  = 0;
+  vste_affector_bounds[0]  = 0;
+  cnst_affector_bounds[0]  = 0;
+  sett_affector_bounds[0]  = 0;
+  rposn_affector_bounds[0] = 0;
+  rbond_affector_bounds[0] = 0;
+  rangl_affector_bounds[0] = 0;
+  rdihe_affector_bounds[0] = 0;
 }
+
+
+//-------------------------------------------------------------------------------------------------
+ValenceWorkUnit::ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, const int seed_atom,
+                                 const int max_atoms) :
+    atom_count{ag.getAtomCount()},
+    atom_import_list{}
+{}
 
 //-------------------------------------------------------------------------------------------------
 #if 0
@@ -293,13 +424,6 @@ ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<d
 
 }
 #endif
-  
-//-------------------------------------------------------------------------------------------------
-ValenceWorkUnit::ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, const int seed_atom,
-                                 const int max_atoms) :
-    atom_count{ag.getAtomCount()},
-    atom_import_list{}
-{}
-  
+
 } // namespace topology
 } // namespace omni

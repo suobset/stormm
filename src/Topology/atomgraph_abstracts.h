@@ -473,7 +473,7 @@ struct ConstraintKit {
   const double* group_inv_masses; ///< Inverse masses for the particles in each group
   const int* settle_ox_atoms;     ///< Central 'oxygen' atoms for analytic SETTLE constraints
   const int* settle_h1_atoms;     ///< First 'hydrogen' atoms for analytic SETTLE constraints
-  const int* settle_h2_atoms;    ///< Second 'hydrogen' atoms for analytic SETTLE constraints
+  const int* settle_h2_atoms;     ///< Second 'hydrogen' atoms for analytic SETTLE constraints
 };
 
 } // namespace topology

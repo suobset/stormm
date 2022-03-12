@@ -7,10 +7,104 @@ namespace restraints {
 
 using card::HybridKind;
 using math::roundUp;
-  
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatusDpReader::
+RestraintApparatusDpReader(const int total_rst_in, const int nposn_in, const int nbond_in,
+                           const int nangl_in, const int ndihe_in, bool time_dependence_in,
+                           const int* rposn_atoms_in, const int* rbond_i_atoms_in,
+                           const int* rbond_j_atoms_in, const int* rangl_i_atoms_in,
+                           const int* rangl_j_atoms_in, const int* rangl_k_atoms_in,
+                           const int* rdihe_i_atoms_in, const int* rdihe_j_atoms_in,
+                           const int* rdihe_k_atoms_in, const int* rdihe_l_atoms_in,
+                           const int* rposn_init_step_in, const int* rposn_finl_step_in,
+                           const int* rbond_init_step_in, const int* rbond_finl_step_in,
+                           const int* rangl_init_step_in, const int* rangl_finl_step_in,
+                           const int* rdihe_init_step_in, const int* rdihe_finl_step_in,
+                           const double2* rposn_init_keq_in, const double2* rposn_finl_keq_in,
+                           const double2* rposn_init_xy_in, const double2* rposn_finl_xy_in,
+                           const double* rposn_init_z_in, const double* rposn_finl_z_in,
+                           const double2* rbond_init_keq_in, const double2* rbond_finl_keq_in,
+                           const double2* rangl_init_keq_in, const double2* rangl_finl_keq_in,
+                           const double2* rdihe_init_keq_in, const double2* rdihe_finl_keq_in,
+                           const double4* rposn_init_r_in, const double4* rposn_finl_r_in,
+                           const double4* rbond_init_r_in, const double4* rbond_finl_r_in,
+                           const double4* rangl_init_r_in, const double4* rangl_finl_r_in,
+                           const double4* rdihe_init_r_in, const double4* rdihe_finl_r_in,
+                           const AtomGraph *ag_pointer_in) :
+    total_rst{total_rst_in}, nposn{nposn_in}, nbond{nbond_in}, nangl{nangl_in}, ndihe{ndihe_in},
+    time_dependence{time_dependence_in}, rposn_atoms{rposn_atoms_in},
+    rbond_i_atoms{rbond_i_atoms_in}, rbond_j_atoms{rbond_j_atoms_in},
+    rangl_i_atoms{rangl_i_atoms_in}, rangl_j_atoms{rangl_j_atoms_in},
+    rangl_k_atoms{rangl_k_atoms_in}, rdihe_i_atoms{rdihe_i_atoms_in},
+    rdihe_j_atoms{rdihe_j_atoms_in}, rdihe_k_atoms{rdihe_k_atoms_in},
+    rdihe_l_atoms{rdihe_l_atoms_in}, rposn_init_step{rposn_init_step_in},
+    rposn_finl_step{rposn_finl_step_in}, rbond_init_step{rbond_init_step_in},
+    rbond_finl_step{rbond_finl_step_in}, rangl_init_step{rangl_init_step_in},
+    rangl_finl_step{rangl_finl_step_in}, rdihe_init_step{rdihe_init_step_in},
+    rdihe_finl_step{rdihe_finl_step_in}, rposn_init_keq{rposn_init_keq_in},
+    rposn_finl_keq{rposn_finl_keq_in}, rposn_init_xy{rposn_init_xy_in},
+    rposn_finl_xy{rposn_finl_xy_in}, rposn_init_z{rposn_init_z_in},
+    rposn_finl_z{rposn_finl_z_in}, rbond_init_keq{rbond_init_keq_in},
+    rbond_finl_keq{rbond_finl_keq_in}, rangl_init_keq{rangl_init_keq_in},
+    rangl_finl_keq{rangl_finl_keq_in}, rdihe_init_keq{rdihe_init_keq_in},
+    rdihe_finl_keq{rdihe_finl_keq_in}, rposn_init_r{rposn_init_r_in},
+    rposn_finl_r{rposn_finl_r_in}, rbond_init_r{rbond_init_r_in},
+    rbond_finl_r{rbond_finl_r_in}, rangl_init_r{rangl_init_r_in},
+    rangl_finl_r{rangl_finl_r_in}, rdihe_init_r{rdihe_init_r_in},
+    rdihe_finl_r{rdihe_finl_r_in}, ag_pointer{ag_pointer_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatusSpReader::
+RestraintApparatusSpReader(const int total_rst_in, const int nposn_in, const int nbond_in,
+                           const int nangl_in, const int ndihe_in, bool time_dependence_in,
+                           const int* rposn_atoms_in, const int* rbond_i_atoms_in,
+                           const int* rbond_j_atoms_in, const int* rangl_i_atoms_in,
+                           const int* rangl_j_atoms_in, const int* rangl_k_atoms_in,
+                           const int* rdihe_i_atoms_in, const int* rdihe_j_atoms_in,
+                           const int* rdihe_k_atoms_in, const int* rdihe_l_atoms_in,
+                           const int* rposn_init_step_in, const int* rposn_finl_step_in,
+                           const int* rbond_init_step_in, const int* rbond_finl_step_in,
+                           const int* rangl_init_step_in, const int* rangl_finl_step_in,
+                           const int* rdihe_init_step_in, const int* rdihe_finl_step_in,
+                           const float2* rposn_init_keq_in, const float2* rposn_finl_keq_in,
+                           const float2* rposn_init_xy_in, const float2* rposn_finl_xy_in,
+                           const float* rposn_init_z_in, const float* rposn_finl_z_in,
+                           const float2* rbond_init_keq_in, const float2* rbond_finl_keq_in,
+                           const float2* rangl_init_keq_in, const float2* rangl_finl_keq_in,
+                           const float2* rdihe_init_keq_in, const float2* rdihe_finl_keq_in,
+                           const float4* rposn_init_r_in, const float4* rposn_finl_r_in,
+                           const float4* rbond_init_r_in, const float4* rbond_finl_r_in,
+                           const float4* rangl_init_r_in, const float4* rangl_finl_r_in,
+                           const float4* rdihe_init_r_in, const float4* rdihe_finl_r_in,
+                           const AtomGraph *ag_pointer_in) :
+    total_rst{total_rst_in}, nposn{nposn_in}, nbond{nbond_in}, nangl{nangl_in}, ndihe{ndihe_in},
+    time_dependence{time_dependence_in}, rposn_atoms{rposn_atoms_in},
+    rbond_i_atoms{rbond_i_atoms_in}, rbond_j_atoms{rbond_j_atoms_in},
+    rangl_i_atoms{rangl_i_atoms_in}, rangl_j_atoms{rangl_j_atoms_in},
+    rangl_k_atoms{rangl_k_atoms_in}, rdihe_i_atoms{rdihe_i_atoms_in},
+    rdihe_j_atoms{rdihe_j_atoms_in}, rdihe_k_atoms{rdihe_k_atoms_in},
+    rdihe_l_atoms{rdihe_l_atoms_in}, rposn_init_step{rposn_init_step_in},
+    rposn_finl_step{rposn_finl_step_in}, rbond_init_step{rbond_init_step_in},
+    rbond_finl_step{rbond_finl_step_in}, rangl_init_step{rangl_init_step_in},
+    rangl_finl_step{rangl_finl_step_in}, rdihe_init_step{rdihe_init_step_in},
+    rdihe_finl_step{rdihe_finl_step_in}, rposn_init_keq{rposn_init_keq_in},
+    rposn_finl_keq{rposn_finl_keq_in}, rposn_init_xy{rposn_init_xy_in},
+    rposn_finl_xy{rposn_finl_xy_in}, rposn_init_z{rposn_init_z_in},
+    rposn_finl_z{rposn_finl_z_in}, rbond_init_keq{rbond_init_keq_in},
+    rbond_finl_keq{rbond_finl_keq_in}, rangl_init_keq{rangl_init_keq_in},
+    rangl_finl_keq{rangl_finl_keq_in}, rdihe_init_keq{rdihe_init_keq_in},
+    rdihe_finl_keq{rdihe_finl_keq_in}, rposn_init_r{rposn_init_r_in},
+    rposn_finl_r{rposn_finl_r_in}, rbond_init_r{rbond_init_r_in},
+    rbond_finl_r{rbond_finl_r_in}, rangl_init_r{rangl_init_r_in},
+    rangl_finl_r{rangl_finl_r_in}, rdihe_init_r{rdihe_init_r_in},
+    rdihe_finl_r{rdihe_finl_r_in}, ag_pointer{ag_pointer_in}
+{}
+
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbasis) :
-    restraint_count{static_cast<int>(rbasis.size())},
+    total_restraint_count{static_cast<int>(rbasis.size())},
     position_count{0}, distance_count{0}, angle_count{0}, dihedral_count{0},
     time_based_restraints{false},
     rposn_atoms{HybridKind::POINTER, "rst_position_i"},
@@ -78,10 +172,10 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
     float_data{HybridKind::ARRAY, "rst_float_data"},
     float2_data{HybridKind::ARRAY, "rst_float2_data"},
     float4_data{HybridKind::ARRAY, "rst_float4_data"},
-    ag_pointer{(restraint_count > 0) ? rbasis[0].getTopologyPointer() : nullptr}
+    ag_pointer{(total_restraint_count > 0) ? rbasis[0].getTopologyPointer() : nullptr}
 {
   // Do not let a restraint apparatus be created with an empty vector of BoundedRestraints
-  if (restraint_count == 0) {
+  if (total_restraint_count == 0) {
     rtErr("A restraint apparatus must be initialized with a topology pointer.  An empty vector "
           "is therefore unacceptable, as there is no individual restraint to suggest a topology.  "
           "Instead, use the overload taking the topology pointer as its sole argument.",
@@ -89,14 +183,14 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   }
 
   // Set the topology pointer and check for consistency
-  for (int i = 1; i < restraint_count; i++) {
+  for (int i = 1; i < total_restraint_count; i++) {
     if (rbasis[i].getTopologyPointer() != ag_pointer) {
       rtErr("All restraints must point to the same topology.", "RestraintApparatus");
     }
   }
   
   // Count distance, angle, and dihedral restraints
-  for (int i = 0; i < restraint_count; i++) {
+  for (int i = 0; i < total_restraint_count; i++) {
     const int rord = rbasis[i].getOrder();
     position_count += (rord == 1);
     distance_count += (rord == 2);
@@ -150,7 +244,7 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   int nbondr = 0;
   int nanglr = 0;
   int ndiher = 0;
-  for (int i = 0; i < restraint_count; i++) {
+  for (int i = 0; i < total_restraint_count; i++) {
     const int rord = rbasis[i].getOrder();
     if (rord == 1) {
       tmp_rposn_i[nposnr]          = rbasis[i].getAtomIndex(1);
@@ -321,7 +415,7 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
 
 //-------------------------------------------------------------------------------------------------
 RestraintApparatus::RestraintApparatus(const RestraintApparatus &original) :
-    restraint_count{original.restraint_count},
+    total_restraint_count{original.total_restraint_count},
     position_count{original.position_count},
     distance_count{original.distance_count},
     angle_count{original.angle_count},
@@ -400,8 +494,95 @@ RestraintApparatus::RestraintApparatus(const RestraintApparatus &original) :
 }
 
 //-------------------------------------------------------------------------------------------------
+RestraintApparatus& RestraintApparatus::operator=(const RestraintApparatus &other) {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  total_restraint_count = other.total_restraint_count;
+  position_count = other.position_count;
+  distance_count = other.distance_count;
+  angle_count = other.angle_count;
+  dihedral_count = other.dihedral_count;
+  time_based_restraints = other.time_based_restraints;
+  rposn_atoms = other.rposn_atoms;
+  rbond_i_atoms = other.rbond_i_atoms;
+  rbond_j_atoms = other.rbond_i_atoms;
+  rangl_i_atoms = other.rangl_i_atoms;
+  rangl_j_atoms = other.rangl_i_atoms;
+  rangl_k_atoms = other.rangl_k_atoms;
+  rdihe_i_atoms = other.rdihe_i_atoms;
+  rdihe_j_atoms = other.rdihe_i_atoms;
+  rdihe_k_atoms = other.rdihe_k_atoms;
+  rdihe_l_atoms = other.rdihe_l_atoms;
+  rposn_init_step = other.rposn_init_step;
+  rposn_final_step = other.rposn_final_step;
+  rbond_init_step = other.rbond_init_step;
+  rbond_final_step = other.rbond_final_step;
+  rangl_init_step = other.rangl_init_step;
+  rangl_final_step = other.rangl_final_step;
+  rdihe_init_step = other.rdihe_init_step;
+  rdihe_final_step = other.rdihe_final_step;
+  int_data = other.int_data;
+  rposn_init_keq = other.rposn_init_keq;
+  rposn_final_keq = other.rposn_final_keq;
+  rposn_init_r = other.rposn_init_r;
+  rposn_final_r = other.rposn_final_r;
+  rposn_init_xy = other.rposn_init_xy;
+  rposn_init_z = other.rposn_init_z;
+  rposn_final_xy = other.rposn_final_xy;
+  rposn_final_z = other.rposn_final_z;
+  rbond_init_keq = other.rbond_init_keq;
+  rbond_final_keq = other.rbond_final_keq;
+  rbond_init_r = other.rbond_init_r;
+  rbond_final_r = other.rbond_final_r;
+  rangl_init_keq = other.rangl_init_keq;
+  rangl_final_keq = other.rangl_final_keq;
+  rangl_init_r = other.rangl_init_r;
+  rangl_final_r = other.rangl_final_r;
+  rdihe_init_keq = other.rdihe_init_keq;
+  rdihe_final_keq = other.rdihe_final_keq;
+  rdihe_init_r = other.rdihe_init_r;
+  rdihe_final_r = other.rdihe_final_r;
+  double_data = other.double_data;
+  double2_data = other.double2_data;
+  double4_data = other.double4_data;
+  sp_rposn_init_keq = other.sp_rposn_init_keq;
+  sp_rposn_final_keq = other.sp_rposn_final_keq;
+  sp_rposn_init_r = other.sp_rposn_init_r;
+  sp_rposn_final_r = other.sp_rposn_final_r;
+  sp_rposn_init_xy = other.sp_rposn_init_xy;
+  sp_rposn_init_z = other.sp_rposn_init_z;
+  sp_rposn_final_xy = other.sp_rposn_final_xy;
+  sp_rposn_final_z = other.sp_rposn_final_z;
+  sp_rbond_init_keq = other.sp_rbond_init_keq;
+  sp_rbond_final_keq = other.sp_rbond_final_keq;
+  sp_rbond_init_r = other.sp_rbond_init_r;
+  sp_rbond_final_r = other.sp_rbond_final_r;
+  sp_rangl_init_keq = other.sp_rangl_init_keq;
+  sp_rangl_final_keq = other.sp_rangl_final_keq;
+  sp_rangl_init_r = other.sp_rangl_init_r;
+  sp_rangl_final_r = other.sp_rangl_final_r;
+  sp_rdihe_init_keq = other.sp_rdihe_init_keq;
+  sp_rdihe_final_keq = other.sp_rdihe_final_keq;
+  sp_rdihe_init_r = other.sp_rdihe_init_r;
+  sp_rdihe_final_r = other.sp_rdihe_final_r;
+  float_data = other.float_data;
+  float2_data = other.float2_data;
+  float4_data = other.float4_data;
+  ag_pointer = other.ag_pointer;
+
+  // Repair pointers to ensure correct access to data already copied over inside the ARRAY-kind
+  // Hybrid objects.
+  allocate();
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
 RestraintApparatus::RestraintApparatus(RestraintApparatus &&original) :
-    restraint_count{original.restraint_count},
+    total_restraint_count{original.total_restraint_count},
     position_count{original.position_count},
     distance_count{original.distance_count},
     angle_count{original.angle_count},
@@ -474,6 +655,168 @@ RestraintApparatus::RestraintApparatus(RestraintApparatus &&original) :
     float4_data{std::move(original.float4_data)},
     ag_pointer{original.ag_pointer}
 {}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatus& RestraintApparatus::operator=(RestraintApparatus &&other) {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+  total_restraint_count = other.total_restraint_count;
+  position_count = other.position_count;
+  distance_count = other.distance_count;
+  angle_count = other.angle_count;
+  dihedral_count = other.dihedral_count;
+  time_based_restraints = other.time_based_restraints;
+  rposn_atoms = std::move(other.rposn_atoms);
+  rbond_i_atoms = std::move(other.rbond_i_atoms);
+  rbond_j_atoms = std::move(other.rbond_i_atoms);
+  rangl_i_atoms = std::move(other.rangl_i_atoms);
+  rangl_j_atoms = std::move(other.rangl_i_atoms);
+  rangl_k_atoms = std::move(other.rangl_k_atoms);
+  rdihe_i_atoms = std::move(other.rdihe_i_atoms);
+  rdihe_j_atoms = std::move(other.rdihe_i_atoms);
+  rdihe_k_atoms = std::move(other.rdihe_k_atoms);
+  rdihe_l_atoms = std::move(other.rdihe_l_atoms);
+  rposn_init_step = std::move(other.rposn_init_step);
+  rposn_final_step = std::move(other.rposn_final_step);
+  rbond_init_step = std::move(other.rbond_init_step);
+  rbond_final_step = std::move(other.rbond_final_step);
+  rangl_init_step = std::move(other.rangl_init_step);
+  rangl_final_step = std::move(other.rangl_final_step);
+  rdihe_init_step = std::move(other.rdihe_init_step);
+  rdihe_final_step = std::move(other.rdihe_final_step);
+  int_data = std::move(other.int_data);
+  rposn_init_keq = std::move(other.rposn_init_keq);
+  rposn_final_keq = std::move(other.rposn_final_keq);
+  rposn_init_r = std::move(other.rposn_init_r);
+  rposn_final_r = std::move(other.rposn_final_r);
+  rposn_init_xy = std::move(other.rposn_init_xy);
+  rposn_init_z = std::move(other.rposn_init_z);
+  rposn_final_xy = std::move(other.rposn_final_xy);
+  rposn_final_z = std::move(other.rposn_final_z);
+  rbond_init_keq = std::move(other.rbond_init_keq);
+  rbond_final_keq = std::move(other.rbond_final_keq);
+  rbond_init_r = std::move(other.rbond_init_r);
+  rbond_final_r = std::move(other.rbond_final_r);
+  rangl_init_keq = std::move(other.rangl_init_keq);
+  rangl_final_keq = std::move(other.rangl_final_keq);
+  rangl_init_r = std::move(other.rangl_init_r);
+  rangl_final_r = std::move(other.rangl_final_r);
+  rdihe_init_keq = std::move(other.rdihe_init_keq);
+  rdihe_final_keq = std::move(other.rdihe_final_keq);
+  rdihe_init_r = std::move(other.rdihe_init_r);
+  rdihe_final_r = std::move(other.rdihe_final_r);
+  double_data = std::move(other.double_data);
+  double2_data = std::move(other.double2_data);
+  double4_data = std::move(other.double4_data);
+  sp_rposn_init_keq = std::move(other.sp_rposn_init_keq);
+  sp_rposn_final_keq = std::move(other.sp_rposn_final_keq);
+  sp_rposn_init_r = std::move(other.sp_rposn_init_r);
+  sp_rposn_final_r = std::move(other.sp_rposn_final_r);
+  sp_rposn_init_xy = std::move(other.sp_rposn_init_xy);
+  sp_rposn_init_z = std::move(other.sp_rposn_init_z);
+  sp_rposn_final_xy = std::move(other.sp_rposn_final_xy);
+  sp_rposn_final_z = std::move(other.sp_rposn_final_z);
+  sp_rbond_init_keq = std::move(other.sp_rbond_init_keq);
+  sp_rbond_final_keq = std::move(other.sp_rbond_final_keq);
+  sp_rbond_init_r = std::move(other.sp_rbond_init_r);
+  sp_rbond_final_r = std::move(other.sp_rbond_final_r);
+  sp_rangl_init_keq = std::move(other.sp_rangl_init_keq);
+  sp_rangl_final_keq = std::move(other.sp_rangl_final_keq);
+  sp_rangl_init_r = std::move(other.sp_rangl_init_r);
+  sp_rangl_final_r = std::move(other.sp_rangl_final_r);
+  sp_rdihe_init_keq = std::move(other.sp_rdihe_init_keq);
+  sp_rdihe_final_keq = std::move(other.sp_rdihe_final_keq);
+  sp_rdihe_init_r = std::move(other.sp_rdihe_init_r);
+  sp_rdihe_final_r = std::move(other.sp_rdihe_final_r);
+  float_data = std::move(other.float_data);
+  float2_data = std::move(other.float2_data);
+  float4_data = std::move(other.float4_data);
+  ag_pointer = other.ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RestraintApparatus::getTotalRestraintCount() const {
+  return total_restraint_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RestraintApparatus::getPositionalRestraintCount() const {
+  return position_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RestraintApparatus::getDistanceRestraintCount() const {
+  return distance_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RestraintApparatus::getAngleRestraintCount() const {
+  return angle_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int RestraintApparatus::getDihedralRestraintCount() const {
+  return dihedral_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool RestraintApparatus::getTimeDependence() const {
+  return time_based_restraints;
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatusDpReader RestraintApparatus::dpData(const HybridTargetLevel tier) const {
+  return RestraintApparatusDpReader(total_restraint_count, position_count, distance_count,
+                                    angle_count, dihedral_count, time_based_restraints,
+                                    rposn_atoms.data(tier), rbond_i_atoms.data(tier),
+                                    rbond_j_atoms.data(tier), rangl_i_atoms.data(tier),
+                                    rangl_j_atoms.data(tier), rangl_k_atoms.data(tier),
+                                    rdihe_i_atoms.data(tier), rdihe_j_atoms.data(tier),
+                                    rdihe_k_atoms.data(tier), rdihe_l_atoms.data(tier),
+                                    rposn_init_step.data(tier), rposn_final_step.data(tier),
+                                    rbond_init_step.data(tier), rbond_final_step.data(tier),
+                                    rangl_init_step.data(tier), rangl_final_step.data(tier),
+                                    rdihe_init_step.data(tier), rdihe_final_step.data(tier),
+                                    rposn_init_keq.data(tier), rposn_final_keq.data(tier),
+                                    rposn_init_xy.data(tier), rposn_final_xy.data(tier),
+                                    rposn_init_z.data(tier), rposn_final_z.data(tier),
+                                    rbond_init_keq.data(tier), rbond_final_keq.data(tier),
+                                    rangl_init_keq.data(tier), rangl_final_keq.data(tier),
+                                    rdihe_init_keq.data(tier), rdihe_final_keq.data(tier),
+                                    rposn_init_r.data(tier), rposn_final_r.data(tier),
+                                    rbond_init_r.data(tier), rbond_final_r.data(tier),
+                                    rangl_init_r.data(tier), rangl_final_r.data(tier),
+                                    rdihe_init_r.data(tier), rdihe_final_r.data(tier), ag_pointer);
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatusSpReader RestraintApparatus::spData(const HybridTargetLevel tier) const {
+  return RestraintApparatusSpReader(total_restraint_count, position_count, distance_count,
+                                    angle_count, dihedral_count, time_based_restraints,
+                                    rposn_atoms.data(tier), rbond_i_atoms.data(tier),
+                                    rbond_j_atoms.data(tier), rangl_i_atoms.data(tier),
+                                    rangl_j_atoms.data(tier), rangl_k_atoms.data(tier),
+                                    rdihe_i_atoms.data(tier), rdihe_j_atoms.data(tier),
+                                    rdihe_k_atoms.data(tier), rdihe_l_atoms.data(tier),
+                                    rposn_init_step.data(tier), rposn_final_step.data(tier),
+                                    rbond_init_step.data(tier), rbond_final_step.data(tier),
+                                    rangl_init_step.data(tier), rangl_final_step.data(tier),
+                                    rdihe_init_step.data(tier), rdihe_final_step.data(tier),
+                                    sp_rposn_init_keq.data(tier), sp_rposn_final_keq.data(tier),
+                                    sp_rposn_init_xy.data(tier), sp_rposn_final_xy.data(tier),
+                                    sp_rposn_init_z.data(tier), sp_rposn_final_z.data(tier),
+                                    sp_rbond_init_keq.data(tier), sp_rbond_final_keq.data(tier),
+                                    sp_rangl_init_keq.data(tier), sp_rangl_final_keq.data(tier),
+                                    sp_rdihe_init_keq.data(tier), sp_rdihe_final_keq.data(tier),
+                                    sp_rposn_init_r.data(tier), sp_rposn_final_r.data(tier),
+                                    sp_rbond_init_r.data(tier), sp_rbond_final_r.data(tier),
+                                    sp_rangl_init_r.data(tier), sp_rangl_final_r.data(tier),
+                                    sp_rdihe_init_r.data(tier), sp_rdihe_final_r.data(tier),
+                                    ag_pointer);
+}
 
 //-------------------------------------------------------------------------------------------------
 void RestraintApparatus::allocate() {
