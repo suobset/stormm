@@ -1622,6 +1622,11 @@ ChemicalFeatures::getRotatableBondGroups(const int cutoff, const int mol_index) 
 }
 
 //-------------------------------------------------------------------------------------------------
+const AtomGraph* ChemicalFeatures::getTopologyPointer() const {
+  return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
 bool scoreChiralBranches(const std::vector<std::vector<BondedNode>> &links,
                          const std::vector<int> &layer_llim, const std::vector<int> &layer_hlim,
                          const ChemicalDetailsKit &cdk, std::vector<int> *chiral_dominance,

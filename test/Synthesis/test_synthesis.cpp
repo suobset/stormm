@@ -1,5 +1,8 @@
 #include <string>
 #include <vector>
+#include "../../src/Chemistry/atommask.h"
+#include "../../src/Chemistry/chemical_features.h"
+#include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
@@ -9,11 +12,16 @@
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Restraints/restraint_apparatus.h"
+#include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using omni::chemistry::AtomMask;
+using omni::chemistry::ChemicalFeatures;
+using omni::chemistry::MapRotatableGroups;
 using omni::constants::ExceptionResponse;
 using omni::constants::verytiny;
 using omni::diskutil::DrivePathType;
@@ -24,6 +32,9 @@ using omni::errors::rtWarn;
 using omni::namelist::FilesControls;
 using omni::parse::TextFile;
 using omni::random::Xoroshiro128pGenerator;
+using omni::restraints::applyHydrogenBondPreventors;
+using omni::restraints::BoundedRestraint;
+using omni::restraints::RestraintApparatus;
 using omni::synthesis::SystemCache;
 using namespace omni::numerics;
 using namespace omni::synthesis;
@@ -243,7 +254,13 @@ int main(int argc, char* argv[]) {
 
   // Prepare valence work units for the array of topologies
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
-    
+    const AtomGraph *ag_i = sysc.getTopologyPointer(i);
+    const PhaseSpace &ps_i = sysc.getCoordinateReference(i);
+    const CoordinateFrameReader cfr_i(ps_i);
+    const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
+    const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, &chemfe_i, cfr_i);
+    RestraintApparatus ra_i(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
+    //ra_i.addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }
        
   // Summary evaluation

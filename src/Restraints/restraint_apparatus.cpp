@@ -819,6 +819,19 @@ RestraintApparatusSpReader RestraintApparatus::spData(const HybridTargetLevel ti
 }
 
 //-------------------------------------------------------------------------------------------------
+void RestraintApparatus::addRestraints(const std::vector<BoundedRestraint> &new_rest) {
+  const size_t n_terms = new_rest.size();
+  for (size_t i = 0; i < n_terms; i++) {
+    
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
+void RestraintApparatus::addRestraint(const BoundedRestraint &new_rest) {
+  addRestraints(std::vector<BoundedRestraint>(1, new_rest));
+}
+
+//-------------------------------------------------------------------------------------------------
 void RestraintApparatus::allocate() {
 
   // Allocate the necessary space and set pointers
@@ -883,9 +896,9 @@ void RestraintApparatus::allocate() {
 
   // Set pointers to double-precision data
   size_t dc = 0LLU;
-  rposn_init_z.setPointer(&double_data, ic, position_count);
+  rposn_init_z.setPointer(&double_data, dc, position_count);
   dc += padded_posn_count;
-  rposn_final_z.setPointer(&double_data, ic, position_count);
+  rposn_final_z.setPointer(&double_data, dc, position_count);
 
   // Set pointers to double2 data
   size_t d2c = 0LLU;
@@ -929,9 +942,9 @@ void RestraintApparatus::allocate() {
 
   // Set pointers to single-precision data
   size_t fc = 0LLU;
-  sp_rposn_init_z.setPointer(&float_data, ic, position_count);
+  sp_rposn_init_z.setPointer(&float_data, fc, position_count);
   fc += padded_posn_count;
-  sp_rposn_final_z.setPointer(&float_data, ic, position_count);
+  sp_rposn_final_z.setPointer(&float_data, fc, position_count);
 
   // Set pointers to float2 data
   size_t f2c = 0LLU;

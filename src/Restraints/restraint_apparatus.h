@@ -227,6 +227,18 @@ public:
 
   /// \brief Get a single-precision abstract of this apparatus
   RestraintApparatusSpReader spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Add restraints to the apparatus.
+  ///
+  /// Overloaded:
+  ///   - Add a vector of new restraints
+  ///   - Add a solitary new restraint
+  ///
+  /// \param new_rest  One or more new restraints
+  /// \{
+  void addRestraints(const std::vector<BoundedRestraint> &new_rest);
+  void addRestraint(const BoundedRestraint &new_rest);
+  /// \{
   
 private:
 

@@ -183,59 +183,59 @@ public:
   /// \}
   
 #ifdef OMNI_USE_HPC
-  /// \brief Upload data to the GPU
+  /// \brief Upload data to the GPU.
   void upload();
 #endif
 
-  /// \brief Get the number of planar atoms
+  /// \brief Get the number of planar atoms.
   int getPlanarAtomCount() const;
 
-  /// \brief Get the number of rings in the system
+  /// \brief Get the number of rings in the system.
   int getRingCount() const;
 
-  /// \brief Get the number of fused rings in the system
+  /// \brief Get the number of fused rings in the system.
   int getFusedRingCount() const;
 
-  /// \brief Get the number of malleable, non-aromatic twistable ringsin the system
+  /// \brief Get the number of malleable, non-aromatic twistable ringsin the system.
   int getMutableRingCount() const;
 
-  /// \brief Get the number of aromatic groups in the system
+  /// \brief Get the number of aromatic groups in the system.
   int getAromaticGroupCount() const;
 
-  /// \brief Get the number of polar hydrogens in the system
+  /// \brief Get the number of polar hydrogens in the system.
   int getPolarHydrogenCount() const;
 
-  /// \brief Get the number of hydrogen bond donors in the system
+  /// \brief Get the number of hydrogen bond donors in the system.
   int getHydrogenBondDonorCount() const;
 
-  /// \brief Get the number of hydrogen bond acceptors in the system
+  /// \brief Get the number of hydrogen bond acceptors in the system.
   int getHydrogenBondAcceptorCount() const;
 
-  /// \brief Get the number of chiral centers in the system
+  /// \brief Get the number of chiral centers in the system.
   int getChiralCenterCount() const;
 
-  /// \brief Get the number of rotatable bonds in the system
+  /// \brief Get the number of rotatable bonds in the system.
   int getRotatableBondCount() const;
   
-  /// \brief Return a mask of rings within a given size range for this system
+  /// \brief Return a mask of rings within a given size range for this system.
   ///
   /// \param min_ring_size  The minimum number of atoms in the rings that will be reported
   /// \param max_ring_size  The maximum number of atoms in the rings that will be reported
   std::vector<uint> getRingMask(int min_ring_size, int max_ring_size) const;
   
-  /// \brief Return a mask of atomatic atoms in the system
+  /// \brief Return a mask of atomatic atoms in the system.
   ///
   /// \param min_pi_electrons  Minimum number of electrons in the aromatic ring system to report
   /// \param max_pi_electrons  Maximum number of electrons in the aromatic ring system to report
   std::vector<uint> getAromaticMask(int min_pi_electrons, int max_pi_electrons) const;
 
-  /// \brief Get a list of all polar hydrogen atoms
+  /// \brief Get a list of all polar hydrogen atoms.
   std::vector<int> getPolarHydrogenList() const;
 
-  /// \brief Get a list of all hydrogen bond donor atoms
+  /// \brief Get a list of all hydrogen bond donor atoms.
   std::vector<int> getHydrogenBondDonorList() const;
 
-  /// \brief Get a list of all hydrogen bond acceptor atoms
+  /// \brief Get a list of all hydrogen bond acceptor atoms.
   std::vector<int> getHydrogenBondAcceptorList() const;
 
   /// \brief Get a bit mask of all polar hydrogen atoms in the system, acceptable for inputs to
@@ -250,7 +250,7 @@ public:
   ///        creating new atom masks.
   std::vector<uint> getHydrogenBondAcceptorMask() const;
 
-  /// \brief Return a mask of chiral centers in the system
+  /// \brief Return a mask of chiral centers in the system.
   ///
   /// \param direction  Allows one to select R- (D-), S- (L-), or both chiralities for the maks
   std::vector<uint> getChiralityMask(ChiralOrientation direction) const;
@@ -284,6 +284,9 @@ public:
   std::vector<RotatorGroup> getRotatableBondGroups() const;
   std::vector<RotatorGroup> getRotatableBondGroups(int cutoff, int mol_index = 0) const;
   /// \}
+
+  /// \brief Get a pointer to the AtomGraph which built this object.
+  const AtomGraph* getTopologyPointer() const;
   
 private:
   int atom_count;              ///< Number of atoms in the system
@@ -343,8 +346,9 @@ private:
   /// List of polar hydrogen atoms
   Hybrid<int> polar_hydrogens;
   
-  /// List of hydrogen bond donor atoms (given in an order to correspond to the list of polar
-  /// hydrogens which they donate, above)
+  /// List of hydrogen bond donor atoms (while the order of donors and actual polar hydrogens
+  /// may be similar, the fact that any one donor could have more than one polar hydrogen attached
+  /// to it prevents there being a 1:1 mapping between the arrays)
   Hybrid<int> hydrogen_bond_donors;
 
   /// List of hydrogen bond acceptor atoms

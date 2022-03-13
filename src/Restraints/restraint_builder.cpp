@@ -1,4 +1,5 @@
 #include "Constants/symbol_values.h"
+#include "DataTypes/omni_vector_types.h"
 #include "Restraints/bounded_restraint.h"
 #include "Structure/local_arrangement.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -17,6 +18,8 @@ using structure::imageValue;
 using structure::ImagingMethod;
 using symbols::twopi;
 using topology::TorsionKind;
+using topology::ChemicalDetailsKit;
+using topology::NonbondedKit;
 using topology::ValenceKit;
 
 //-------------------------------------------------------------------------------------------------
@@ -99,21 +102,23 @@ void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &c
   
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
-                          const CoordinateFrameReader &reference_cframe, const AtomMask &mask,
-                          const double displacement_penalty, const double displacement_onset,
-                          const double displacement_plateau, const double proximity_penalty,
-                          const double proximity_onset, const double proximity_plateau) {
-  restraintTopologyChecks(ag, cframe, mask);
+applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cf,
+                          const AtomMask &mask, const double displacement_penalty,
+                          const double displacement_onset, const double displacement_plateau,
+                          const double proximity_penalty, const double proximity_onset,
+                          const double proximity_plateau) {
+  restraintTopologyChecks(ag, ref_cf, mask);
   
   // Loop over all atoms in the mask and create restraints
   const int nmasked = mask.getMaskedAtomCount();
-  std::vector<BoundedRestraint> result(nmasked, BoundedRestraint(ag));
+  std::vector<BoundedRestraint> result;
+  result.reserve(nmasked);
   const std::vector<int> masked_atoms = mask.getMaskedAtomList();
   for (size_t i = 0; i < nmasked; i++) {
-    result[i] = BoundedRestraint(masked_atoms[i], ag, cframe, proximity_penalty,
-                                 displacement_penalty, proximity_plateau, proximity_onset,
-                                 displacement_onset, displacement_plateau);
+    const int atom_i = masked_atoms[i];
+    const double3 target = { ref_cf.xcrd[atom_i], ref_cf.ycrd[atom_i], ref_cf.zcrd[atom_i] };
+    result.emplace_back(atom_i, ag, proximity_penalty, displacement_penalty, proximity_plateau,
+                        proximity_onset, displacement_onset, displacement_plateau, target);
   }
   return result;
 }
@@ -187,16 +192,84 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
 
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-applyHydrogenBondingPreventors(const AtomGraph *ag, const CoordinateFrameReader &cframe,
-                               const AtomMask &mask, const double penalty,
-                               const double flat_bottom_half_width,
-                               const double harmonic_maximum) {
-  restraintTopologyChecks(ag, cframe, mask);
+applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
+                            const double penalty, const double approach_point) {
+  if (chemfe.getTopologyPointer() != ag) {
+    rtErr("AtomGraph pointers do not match.", "applyHydrogenBondingPreventors");
+  }
+
+  // Prepare the flat-bottom well template based on the input and a generous assumption
+  // about the maximum size of a molecule
+  FlatBottomPlan fbhw_template(penalty, 0.0, 0.0, approach_point, 1000.0, 1100.0, 0);
   
-  // Seek out all proton donors and acceptors: donors are defined as electronegative atoms N, O,
-  // S, or P which have a hydrogen attached to them, while acceptors are electronegative atoms N,
-  // O, S, or P that have a lone pair available in the Lewis Structure.
-  
+  // Get lists of all proton donors and acceptors
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
+  std::vector<int> donors = chemfe.getHydrogenBondDonorList();
+  std::vector<int> acceptors = chemfe.getHydrogenBondAcceptorList();
+
+  // Apply restraints such that both donor and acceptor are on the same molecule and not
+  // so close that they might be separated by a 1:4 interaction.
+  std::vector<BoundedRestraint> result;
+  int ndonor = donors.size();
+  int nacceptor = acceptors.size();
+
+  // The fact that this algorithm will ultimately test ndonor x nacceptor atoms is potentially
+  // harmful to performance.  Remove atoms which cannot be of interest.
+  if (cdk.nmol > 1) {
+    std::vector<int> heavy_atom_content(cdk.nmol, 0);
+    for (int i = 0; i < cdk.natom; i++) {
+      if (cdk.z_numbers[i] > 4) {
+        heavy_atom_content[cdk.mol_home[i]] += 1;
+      }
+    }
+    int j = 0;
+    for (int i = 0; i < ndonor; i++) {
+      donors[j] = donors[i];
+      j += (heavy_atom_content[cdk.mol_home[donors[i]]] > 4);
+    }
+    donors.resize(j);
+    j = 0;
+    for (int i = 0; i < nacceptor; i++) {
+      acceptors[j] = acceptors[i];
+      j += (heavy_atom_content[cdk.mol_home[acceptors[i]]] > 4);
+    }
+    acceptors.resize(j);
+  }
+
+  // Run through the (trimmed) lists to add restraints that prevent internal hydrogen bonding.
+  // For systems with many distinct molecules each having donors and / or acceptors, this search
+  // is still far less efficient than it could be, but the problem has been reduced to edge cases.
+  for (int i = 0; i < ndonor; i++) {
+    const int donor_atom = donors[i];
+    for (int j = 0; j < nacceptor; j++) {
+      const int acceptor_atom = acceptors[j];
+      if (cdk.mol_home[donor_atom] != cdk.mol_home[acceptor_atom]) {
+        continue;
+      }
+      bool excluded = false;
+      for (int k = nbk.nb12_bounds[donor_atom]; k < nbk.nb12_bounds[donor_atom]; k++) {
+        excluded = (excluded || nbk.nb12x[k] == acceptor_atom);
+      }
+      if (excluded == false) {
+        for (int k = nbk.nb13_bounds[donor_atom]; k < nbk.nb13_bounds[donor_atom]; k++) {
+          excluded = (excluded || nbk.nb13x[k] == acceptor_atom);
+        }
+      }
+      if (excluded == false) {
+        for (int k = nbk.nb14_bounds[donor_atom]; k < nbk.nb14_bounds[donor_atom]; k++) {
+          excluded = (excluded || nbk.nb14x[k] == acceptor_atom);
+        }
+      }
+      if (excluded == false) {
+
+        // Use the push_back method without pre-allocation, as it is not clear from the start
+        // how large the final array will need to be.
+        result.push_back(applyDistanceRestraint(ag, donor_atom, acceptor_atom, fbhw_template));
+      }
+    }
+  }
+  return result;
 }
 
 } // namespace restraints

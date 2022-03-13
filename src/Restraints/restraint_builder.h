@@ -81,9 +81,8 @@ void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &c
 ///        for the permittivity and stiffness.
 ///
 /// \param ag                    Pointer to the topology for the system of interest
-/// \param cframe                Coordinates of the system in its current state
-/// \param reference_cframe      Reference coordinates of the system, if different from
-/// \param mask                  Atom mask (must match the topology by some basic checks))
+/// \param ref_cf                Reference coordinates of the system, for positional targets
+/// \param mask                  Atom mask (must match the topology by some basic checks)
 /// \param displacement_penalty  Harmonic stiffness constant for displacing particles away from
 ///                              the target locations.  This is k3 in the terminology of Amber NMR
 ///                              restraints.
@@ -105,11 +104,11 @@ void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &c
 ///                              linearly rather than quadratically and the penalty force
 ///                              flatlines.  This is r1 in the Amber NMR nomeclature.
 std::vector<BoundedRestraint>
-applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
-                          const CoordinateFrameReader &reference_cframe, const AtomMask &mask,
-                          double displacement_penalty, double displacement_onset,
-                          double displacement_plateau, double proximity_penalty = 0.0,
-                          double proximity_onset = 0.0, double proximity_plateau = 0.0);
+applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cf,
+                          const AtomMask &mask, double displacement_penalty,
+                          double displacement_onset = 0.0, double displacement_plateau = 16.0,
+                          double proximity_penalty = 0.0, double proximity_onset = 0.0,
+                          double proximity_plateau = 0.0);
 
 /// \brief Build restraints needed to maintain elements of the conformation not intended to change
 ///        their shape.  This will be accomplished by distance, angle, and dihedral restraints
@@ -130,7 +129,23 @@ std::vector<BoundedRestraint>
 applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
                        const AtomMask &mask, double penalty, double flat_bottom_half_width,
                        double harmonic_maximum);
-  
+
+/// \brief Apply a set of restraints to prevent the formation of hydrogen bonds between donors
+///        and potential acceptors on any one molecule within a system.  The restraints operate
+///        by activating a harmonic restraint penalty if the donor and acceptor heavy atoms come
+///        too close, and otherwise apply no penalty for the atoms moving away from one another.
+///        Restraints against hydrogen bonding will only be applied to donors and acceptors that
+///        are not already coutned among the non-bonded exclusions (1:4 neighbors or closer).
+///
+/// \param ag              System topology (needed to get atomic numebrs and bonding patterns)
+/// \param chemfe          Chemical patterns detected within the topology (identifies hydrogen
+///                        donor and lone pair-bearing acceptor atoms)
+/// \param penalty         Restraint stiffness constant applied when donors and acceptors approach
+/// \param approach_point  Distance below which the harmonic penalty engages
+std::vector<BoundedRestraint>
+applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
+                            const double penalty, const double approach_point);
+
 } // namespace restraints
 } // namespace omni
 
