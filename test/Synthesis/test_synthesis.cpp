@@ -33,6 +33,7 @@ using omni::namelist::FilesControls;
 using omni::parse::TextFile;
 using omni::random::Xoroshiro128pGenerator;
 using omni::restraints::applyHydrogenBondPreventors;
+using omni::restraints::applyPositionalRestraints;
 using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
 using omni::synthesis::SystemCache;
@@ -260,7 +261,7 @@ int main(int argc, char* argv[]) {
     const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
     const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, &chemfe_i, cfr_i);
     RestraintApparatus ra_i(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
-    //ra_i.addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
+    ra_i.addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }
        
   // Summary evaluation

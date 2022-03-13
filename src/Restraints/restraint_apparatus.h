@@ -182,7 +182,13 @@ class RestraintApparatus {
 public:
 
   /// \brief The constructor takes a vector of individual restraints
-  RestraintApparatus(const std::vector<BoundedRestraint> &rbasis);
+  ///
+  /// \param rbasis  A list of restraint objects with which to build the apparatus
+  /// \param ag_in   Pointer to the topology for which this apparatus is built (if rbasis is of
+  ///                nonzero length, the topology pointer from the first restraint will be
+  ///                preferred, otherwise this must be supplied in order to initialize the const
+  ///                member variable ag_pointer)
+  RestraintApparatus(const std::vector<BoundedRestraint> &rbasis, const AtomGraph *ag_in = nullptr);
 
   /// \brief The copy constructor works like any other object containing POINTER-kind Hybrids.
   ///
@@ -227,6 +233,10 @@ public:
 
   /// \brief Get a single-precision abstract of this apparatus
   RestraintApparatusSpReader spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Produce a vector of all the restraints in this apparatus, essentially the inverse of
+  ///        the constructor.
+  std::vector<BoundedRestraint> getRestraintList() const;
 
   /// \brief Add restraints to the apparatus.
   ///
@@ -389,9 +399,24 @@ private:
   /// check that all individual restraints point to the same topology)
   const AtomGraph *ag_pointer;
 
+  /// \brief Check that the vector of restraints all apply to the same topology.
+  ///
+  /// \param rbasis  A list of restraint objects with which to build the apparatus
+  void checkTopologyPointers(const std::vector<BoundedRestraint> &rbasis);
+  
   /// \brief Allocate memory and set POINTER-kind Hybrid objects as appropriate.  This function
   ///        encapsulates actions needed by the base constructor as well as copy constructors.
+  ///        Requires prior computation of the numbers of various types of restraints, as set the
+  ///        member variables position_count, distance_count, angle_count, and dihedral_count.
   void allocate();
+
+  /// \brief Dissect each restraint in the list provided and populate the RestraintApparatus's
+  ///        internal data arrays.  Requires prior computation of the numbers of various types of
+  ///        restraints, as set the member variables position_count, distance_count, angle_count,
+  ///        and dihedral_count.
+  ///
+  /// \param rbasis  A list of restraint objects with which to build the apparatus
+  void populateInternalArrays(const std::vector<BoundedRestraint> &rbasis);
 };
 
 } // namespace restraints

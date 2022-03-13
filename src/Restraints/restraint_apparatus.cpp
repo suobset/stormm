@@ -1,3 +1,4 @@
+#include "DataTypes/omni_vector_types.h"
 #include "Math/rounding.h"
 #include "Reporting/error_format.h"
 #include "restraint_apparatus.h"
@@ -103,7 +104,8 @@ RestraintApparatusSpReader(const int total_rst_in, const int nposn_in, const int
 {}
 
 //-------------------------------------------------------------------------------------------------
-RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbasis) :
+RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbasis,
+                                       const AtomGraph *ag_in) :
     total_restraint_count{static_cast<int>(rbasis.size())},
     position_count{0}, distance_count{0}, angle_count{0}, dihedral_count{0},
     time_based_restraints{false},
@@ -172,22 +174,17 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
     float_data{HybridKind::ARRAY, "rst_float_data"},
     float2_data{HybridKind::ARRAY, "rst_float2_data"},
     float4_data{HybridKind::ARRAY, "rst_float4_data"},
-    ag_pointer{(total_restraint_count > 0) ? rbasis[0].getTopologyPointer() : nullptr}
+    ag_pointer{(total_restraint_count > 0) ? rbasis[0].getTopologyPointer() : ag_in}
 {
   // Do not let a restraint apparatus be created with an empty vector of BoundedRestraints
-  if (total_restraint_count == 0) {
+  if (total_restraint_count == 0 && ag_pointer == nullptr) {
     rtErr("A restraint apparatus must be initialized with a topology pointer.  An empty vector "
-          "is therefore unacceptable, as there is no individual restraint to suggest a topology.  "
-          "Instead, use the overload taking the topology pointer as its sole argument.",
+          "is therefore only acceptable if a topology pointer is explicitly provided.",
           "RestraintApparatus");
   }
 
-  // Set the topology pointer and check for consistency
-  for (int i = 1; i < total_restraint_count; i++) {
-    if (rbasis[i].getTopologyPointer() != ag_pointer) {
-      rtErr("All restraints must point to the same topology.", "RestraintApparatus");
-    }
-  }
+  // Check the consistency of the restraints provided
+  checkTopologyPointers(rbasis);
   
   // Count distance, angle, and dihedral restraints
   for (int i = 0; i < total_restraint_count; i++) {
@@ -201,216 +198,8 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   // Allocate Hybrid space and set pointers
   allocate();
   
-  // Collect all restraints' atoms and parameters in host-side vectors for upload en masse
-  std::vector<int> tmp_rposn_i(position_count);
-  std::vector<int> tmp_rbond_i(distance_count);
-  std::vector<int> tmp_rbond_j(distance_count);
-  std::vector<int> tmp_rangl_i(angle_count);
-  std::vector<int> tmp_rangl_j(angle_count);
-  std::vector<int> tmp_rangl_k(angle_count);
-  std::vector<int> tmp_rdihe_i(dihedral_count);
-  std::vector<int> tmp_rdihe_j(dihedral_count);
-  std::vector<int> tmp_rdihe_k(dihedral_count);
-  std::vector<int> tmp_rdihe_l(dihedral_count);
-  std::vector<int> tmp_rposn_init_step(position_count);
-  std::vector<int> tmp_rposn_final_step(position_count);
-  std::vector<int> tmp_rbond_init_step(distance_count);
-  std::vector<int> tmp_rbond_final_step(distance_count);
-  std::vector<int> tmp_rangl_init_step(angle_count);
-  std::vector<int> tmp_rangl_final_step(angle_count);
-  std::vector<int> tmp_rdihe_init_step(dihedral_count);
-  std::vector<int> tmp_rdihe_final_step(dihedral_count);
-  std::vector<double> tmp_rposn_init_z(position_count);
-  std::vector<double> tmp_rposn_final_z(position_count);
-  std::vector<double2> tmp_rposn_init_keq(position_count);
-  std::vector<double2> tmp_rposn_final_keq(position_count);
-  std::vector<double2> tmp_rposn_init_xy(position_count);
-  std::vector<double2> tmp_rposn_final_xy(position_count);
-  std::vector<double2> tmp_rbond_init_keq(distance_count);
-  std::vector<double2> tmp_rbond_final_keq(distance_count);
-  std::vector<double2> tmp_rangl_init_keq(angle_count);
-  std::vector<double2> tmp_rangl_final_keq(angle_count);
-  std::vector<double2> tmp_rdihe_init_keq(dihedral_count);
-  std::vector<double2> tmp_rdihe_final_keq(dihedral_count);
-  std::vector<double4> tmp_rposn_init_r(position_count);
-  std::vector<double4> tmp_rposn_final_r(position_count);
-  std::vector<double4> tmp_rbond_init_r(distance_count);
-  std::vector<double4> tmp_rbond_final_r(distance_count);
-  std::vector<double4> tmp_rangl_init_r(angle_count);
-  std::vector<double4> tmp_rangl_final_r(angle_count);
-  std::vector<double4> tmp_rdihe_init_r(dihedral_count);
-  std::vector<double4> tmp_rdihe_final_r(dihedral_count);
-  int nposnr = 0;
-  int nbondr = 0;
-  int nanglr = 0;
-  int ndiher = 0;
-  for (int i = 0; i < total_restraint_count; i++) {
-    const int rord = rbasis[i].getOrder();
-    if (rord == 1) {
-      tmp_rposn_i[nposnr]          = rbasis[i].getAtomIndex(1);
-      tmp_rposn_init_step[nposnr]  = rbasis[i].getInitialStep();
-      tmp_rposn_final_step[nposnr] = rbasis[i].getFinalStep();
-      tmp_rposn_init_keq[nposnr]   = rbasis[i].getInitialStiffness();
-      tmp_rposn_final_keq[nposnr]  = rbasis[i].getFinalStiffness();
-      double3 refcrd               = rbasis[i].getInitialTargetSite();
-      tmp_rposn_init_xy[nposnr]    = {refcrd.x, refcrd.y};
-      tmp_rposn_init_z[nposnr]     = refcrd.z;
-      refcrd                       = rbasis[i].getFinalTargetSite();
-      tmp_rposn_final_xy[nposnr]   = {refcrd.x, refcrd.y};
-      tmp_rposn_final_z[nposnr]    = refcrd.z;
-      tmp_rposn_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rposn_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
-      nposnr++;
-    }
-    else if (rord == 2) {
-      tmp_rbond_i[nbondr]          = rbasis[i].getAtomIndex(1);
-      tmp_rbond_j[nbondr]          = rbasis[i].getAtomIndex(2);
-      tmp_rbond_init_step[nanglr]  = rbasis[i].getInitialStep();
-      tmp_rbond_final_step[nanglr] = rbasis[i].getFinalStep();
-      tmp_rbond_init_keq[nbondr]   = rbasis[i].getInitialStiffness();
-      tmp_rbond_final_keq[nbondr]  = rbasis[i].getFinalStiffness();
-      tmp_rbond_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rbond_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
-      nbondr++;
-    }
-    else if (rord == 3) {
-      tmp_rangl_i[nanglr]          = rbasis[i].getAtomIndex(1);
-      tmp_rangl_j[nanglr]          = rbasis[i].getAtomIndex(2);
-      tmp_rangl_k[nanglr]          = rbasis[i].getAtomIndex(3);
-      tmp_rangl_init_step[nanglr]  = rbasis[i].getInitialStep();
-      tmp_rangl_final_step[nanglr] = rbasis[i].getFinalStep();
-      tmp_rangl_init_keq[nanglr]   = rbasis[i].getInitialStiffness();
-      tmp_rangl_final_keq[nanglr]  = rbasis[i].getFinalStiffness();
-      tmp_rangl_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rangl_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
-      nanglr++;
-    }
-    else if (rord == 4) {
-      tmp_rdihe_i[ndiher]          = rbasis[i].getAtomIndex(1);
-      tmp_rdihe_j[ndiher]          = rbasis[i].getAtomIndex(2);
-      tmp_rdihe_k[ndiher]          = rbasis[i].getAtomIndex(3);
-      tmp_rdihe_l[ndiher]          = rbasis[i].getAtomIndex(4);
-      tmp_rdihe_init_step[ndiher]  = rbasis[i].getInitialStep();
-      tmp_rdihe_final_step[ndiher] = rbasis[i].getFinalStep();
-      tmp_rdihe_init_keq[ndiher]   = rbasis[i].getInitialStiffness();
-      tmp_rdihe_final_keq[ndiher]  = rbasis[i].getFinalStiffness();
-      tmp_rdihe_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rdihe_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
-      ndiher++;
-    }
-  }
-  
-  // Load the integer data into Hybrid objects
-  rposn_atoms.putHost(tmp_rposn_i);
-  rbond_i_atoms.putHost(tmp_rbond_i);
-  rbond_j_atoms.putHost(tmp_rbond_j);
-  rangl_i_atoms.putHost(tmp_rangl_i);
-  rangl_j_atoms.putHost(tmp_rangl_j);
-  rangl_k_atoms.putHost(tmp_rangl_k);
-  rdihe_i_atoms.putHost(tmp_rdihe_i);
-  rdihe_j_atoms.putHost(tmp_rdihe_j);
-  rdihe_k_atoms.putHost(tmp_rdihe_k);
-  rdihe_l_atoms.putHost(tmp_rdihe_l);
-  rposn_init_step.putHost(tmp_rposn_init_step);
-  rposn_final_step.putHost(tmp_rposn_final_step);
-  rbond_init_step.putHost(tmp_rbond_init_step);
-  rbond_final_step.putHost(tmp_rbond_final_step);
-  rangl_init_step.putHost(tmp_rangl_init_step);
-  rangl_final_step.putHost(tmp_rangl_final_step);
-  rdihe_init_step.putHost(tmp_rdihe_init_step);
-  rdihe_final_step.putHost(tmp_rdihe_final_step);
-
-  // Load double-precision (including double2 and double4) data into Hybrid objects
-  rposn_init_z.putHost(tmp_rposn_init_z);
-  rposn_final_z.putHost(tmp_rposn_final_z);
-  rposn_init_keq.putHost(tmp_rposn_init_keq);
-  rposn_final_keq.putHost(tmp_rposn_final_keq);
-  rposn_init_xy.putHost(tmp_rposn_init_xy);
-  rposn_final_xy.putHost(tmp_rposn_final_xy);
-  rbond_init_keq.putHost(tmp_rbond_init_keq);
-  rbond_final_keq.putHost(tmp_rbond_final_keq);
-  rangl_init_keq.putHost(tmp_rangl_init_keq);
-  rangl_final_keq.putHost(tmp_rangl_final_keq);
-  rdihe_init_keq.putHost(tmp_rdihe_init_keq);
-  rdihe_final_keq.putHost(tmp_rdihe_final_keq);
-  rposn_init_r.putHost(tmp_rposn_init_r);
-  rposn_final_r.putHost(tmp_rposn_final_r);
-  rbond_init_r.putHost(tmp_rbond_init_r);
-  rbond_final_r.putHost(tmp_rbond_final_r);
-  rangl_init_r.putHost(tmp_rangl_init_r);
-  rangl_final_r.putHost(tmp_rangl_final_r);
-  rdihe_init_r.putHost(tmp_rdihe_init_r);
-  rdihe_final_r.putHost(tmp_rdihe_final_r);
-
-  // Copy double-precision data into single-precision format
-  std::vector<float> sp_tmp_rposn_init_z(tmp_rposn_init_z.begin(), tmp_rposn_init_z.end());
-  std::vector<float> sp_tmp_rposn_final_z(tmp_rposn_final_z.begin(), tmp_rposn_final_z.end());
-  std::vector<float2> sp_tmp_rposn_init_keq(position_count);
-  std::vector<float2> sp_tmp_rposn_final_keq(position_count);
-  std::vector<float2> sp_tmp_rposn_init_xy(position_count);
-  std::vector<float2> sp_tmp_rposn_final_xy(position_count);
-  std::vector<float2> sp_tmp_rbond_init_keq(distance_count);
-  std::vector<float2> sp_tmp_rbond_final_keq(distance_count);
-  std::vector<float2> sp_tmp_rangl_init_keq(angle_count);
-  std::vector<float2> sp_tmp_rangl_final_keq(angle_count);
-  std::vector<float2> sp_tmp_rdihe_init_keq(dihedral_count);
-  std::vector<float2> sp_tmp_rdihe_final_keq(dihedral_count);
-  std::vector<float4> sp_tmp_rposn_init_r(position_count);
-  std::vector<float4> sp_tmp_rposn_final_r(position_count);
-  std::vector<float4> sp_tmp_rbond_init_r(distance_count);
-  std::vector<float4> sp_tmp_rbond_final_r(distance_count);
-  std::vector<float4> sp_tmp_rangl_init_r(angle_count);
-  std::vector<float4> sp_tmp_rangl_final_r(angle_count);
-  std::vector<float4> sp_tmp_rdihe_init_r(dihedral_count);
-  std::vector<float4> sp_tmp_rdihe_final_r(dihedral_count);
-  for (int i = 0; i < position_count; i++) {
-    sp_tmp_rposn_init_keq[i]  = vtConv2f(tmp_rposn_init_keq[i]);
-    sp_tmp_rposn_final_keq[i] = vtConv2f(tmp_rposn_final_keq[i]);
-    sp_tmp_rposn_init_xy[i]   = vtConv2f(tmp_rposn_init_xy[i]);
-    sp_tmp_rposn_final_xy[i]  = vtConv2f(tmp_rposn_final_xy[i]);
-    sp_tmp_rposn_init_r[i]    = vtConv4f(tmp_rposn_init_r[i]);
-    sp_tmp_rposn_final_r[i]   = vtConv4f(tmp_rposn_final_r[i]);
-  }
-  for (int i = 0; i < distance_count; i++) {
-    sp_tmp_rbond_init_keq[i]  = vtConv2f(tmp_rbond_init_keq[i]);
-    sp_tmp_rbond_final_keq[i] = vtConv2f(tmp_rbond_final_keq[i]);
-    sp_tmp_rbond_init_r[i]    = vtConv4f(tmp_rbond_init_r[i]);
-    sp_tmp_rbond_final_r[i]   = vtConv4f(tmp_rbond_final_r[i]);    
-  }
-  for (int i = 0; i < angle_count; i++) {
-    sp_tmp_rangl_init_keq[i]  = vtConv2f(tmp_rangl_init_keq[i]);
-    sp_tmp_rangl_final_keq[i] = vtConv2f(tmp_rangl_final_keq[i]);
-    sp_tmp_rangl_init_r[i]    = vtConv4f(tmp_rangl_init_r[i]);
-    sp_tmp_rangl_final_r[i]   = vtConv4f(tmp_rangl_final_r[i]);    
-  }
-  for (int i = 0; i < dihedral_count; i++) {
-    sp_tmp_rdihe_init_keq[i]  = vtConv2f(tmp_rdihe_init_keq[i]);
-    sp_tmp_rdihe_final_keq[i] = vtConv2f(tmp_rdihe_final_keq[i]);
-    sp_tmp_rdihe_init_r[i]    = vtConv4f(tmp_rdihe_init_r[i]);
-    sp_tmp_rdihe_final_r[i]   = vtConv4f(tmp_rdihe_final_r[i]);    
-  }
-
-  // Load single-precision data
-  sp_rposn_init_z.putHost(sp_tmp_rposn_init_z);
-  sp_rposn_final_z.putHost(sp_tmp_rposn_final_z);
-  sp_rposn_init_keq.putHost(sp_tmp_rposn_init_keq);
-  sp_rposn_final_keq.putHost(sp_tmp_rposn_final_keq);
-  sp_rposn_init_xy.putHost(sp_tmp_rposn_init_xy);
-  sp_rposn_final_xy.putHost(sp_tmp_rposn_final_xy);
-  sp_rbond_init_keq.putHost(sp_tmp_rbond_init_keq);
-  sp_rbond_final_keq.putHost(sp_tmp_rbond_final_keq);
-  sp_rangl_init_keq.putHost(sp_tmp_rangl_init_keq);
-  sp_rangl_final_keq.putHost(sp_tmp_rangl_final_keq);
-  sp_rdihe_init_keq.putHost(sp_tmp_rdihe_init_keq);
-  sp_rdihe_final_keq.putHost(sp_tmp_rdihe_final_keq);
-  sp_rposn_init_r.putHost(sp_tmp_rposn_init_r);
-  sp_rposn_final_r.putHost(sp_tmp_rposn_final_r);
-  sp_rbond_init_r.putHost(sp_tmp_rbond_init_r);
-  sp_rbond_final_r.putHost(sp_tmp_rbond_final_r);
-  sp_rangl_init_r.putHost(sp_tmp_rangl_init_r);
-  sp_rangl_final_r.putHost(sp_tmp_rangl_final_r);
-  sp_rdihe_init_r.putHost(sp_tmp_rdihe_init_r);
-  sp_rdihe_final_r.putHost(sp_tmp_rdihe_final_r);
+  // Fill the Hybrid arrays
+  populateInternalArrays(rbasis);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -819,16 +608,107 @@ RestraintApparatusSpReader RestraintApparatus::spData(const HybridTargetLevel ti
 }
 
 //-------------------------------------------------------------------------------------------------
-void RestraintApparatus::addRestraints(const std::vector<BoundedRestraint> &new_rest) {
-  const size_t n_terms = new_rest.size();
-  for (size_t i = 0; i < n_terms; i++) {
-    
+std::vector<BoundedRestraint> RestraintApparatus::getRestraintList() const {
+
+  // Get the abstract despite the fact that this is a member function--the Hybrid arrays cloister
+  // the data slightly and the internal names are longer to write.
+  RestraintApparatusDpReader current = dpData();
+  std::vector<BoundedRestraint> result;
+  result.reserve(total_restraint_count);
+  for (size_t pos = 0; pos < position_count; pos++) {
+    const double3 init_ref_xyz = { current.rposn_init_xy[pos].x, current.rposn_init_xy[pos].y,
+                                   current.rposn_init_z[pos] };
+    const double3 finl_ref_xyz = { current.rposn_finl_xy[pos].x, current.rposn_finl_xy[pos].y,
+                                   current.rposn_finl_z[pos] };
+    const double2 init_k = current.rposn_init_keq[pos];
+    const double4 init_r = current.rposn_init_r[pos];
+    const double2 finl_k = current.rposn_finl_keq[pos];
+    const double4 finl_r = current.rposn_finl_r[pos];
+    result.emplace_back(current.rposn_atoms[pos], ag_pointer, current.rposn_init_step[pos],
+                        current.rposn_finl_step[pos], init_k.x, init_k.y, init_r.x, init_r.y,
+                        init_r.z, init_r.w, finl_k.x, finl_k.y, finl_r.x, finl_r.y, finl_r.z,
+                        finl_r.w, init_ref_xyz, finl_ref_xyz);
   }
+  for (size_t pos = 0; pos < distance_count; pos++) {
+    const double2 init_k = current.rbond_init_keq[pos];
+    const double4 init_r = current.rbond_init_r[pos];
+    const double2 finl_k = current.rbond_finl_keq[pos];
+    const double4 finl_r = current.rbond_finl_r[pos];
+    result.emplace_back(current.rbond_i_atoms[pos], current.rbond_j_atoms[pos], ag_pointer,
+                        current.rbond_init_step[pos], current.rbond_finl_step[pos], init_k.x,
+                        init_k.y, init_r.x, init_r.y, init_r.z, init_r.w, finl_k.x, finl_k.y,
+                        finl_r.x, finl_r.y, finl_r.z, finl_r.w);
+  }
+  for (size_t pos = 0; pos < angle_count; pos++) {
+    const double2 init_k = current.rangl_init_keq[pos];
+    const double4 init_r = current.rangl_init_r[pos];
+    const double2 finl_k = current.rangl_finl_keq[pos];
+    const double4 finl_r = current.rangl_finl_r[pos];
+    result.emplace_back(current.rangl_i_atoms[pos], current.rangl_j_atoms[pos],
+                        current.rangl_k_atoms[pos], ag_pointer, current.rangl_init_step[pos],
+                        current.rangl_finl_step[pos], init_k.x, init_k.y, init_r.x, init_r.y,
+                        init_r.z, init_r.w, finl_k.x, finl_k.y, finl_r.x, finl_r.y, finl_r.z,
+                        finl_r.w);
+  }
+  for (size_t pos = 0; pos < dihedral_count; pos++) {
+    const double2 init_k = current.rdihe_init_keq[pos];
+    const double4 init_r = current.rdihe_init_r[pos];
+    const double2 finl_k = current.rdihe_finl_keq[pos];
+    const double4 finl_r = current.rdihe_finl_r[pos];
+    result.emplace_back(current.rdihe_i_atoms[pos], current.rdihe_j_atoms[pos],
+                        current.rdihe_k_atoms[pos], current.rdihe_l_atoms[pos], ag_pointer,
+                        current.rdihe_init_step[pos], current.rdihe_finl_step[pos], init_k.x,
+                        init_k.y, init_r.x, init_r.y, init_r.z, init_r.w, finl_k.x, finl_k.y,
+                        finl_r.x, finl_r.y, finl_r.z, finl_r.w);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void RestraintApparatus::addRestraints(const std::vector<BoundedRestraint> &new_rest) {
+  std::vector<BoundedRestraint> rbasis = getRestraintList();
+  rbasis.insert(rbasis.end(), new_rest.begin(), new_rest.end());
+  
+  // Check the consistency of the restraints provided
+  checkTopologyPointers(rbasis);
+
+  // Re-tally distance, angle, and dihedral restraints
+  const size_t n_items = rbasis.size();
+  total_restraint_count = static_cast<int>(n_items);
+  position_count = 0;
+  distance_count = 0;
+  angle_count = 0;
+  dihedral_count = 0;
+  for (size_t i = 0; i < n_items; i++) {
+    const int rord = rbasis[i].getOrder();
+    position_count += (rord == 1);
+    distance_count += (rord == 2);
+    angle_count    += (rord == 3);
+    dihedral_count += (rord == 4);
+  }
+
+  // Re-allocate Hybrid space and reset pointers
+  allocate();
+
+  // Fill the Hybrid arrays with the augmented restraint set
+  populateInternalArrays(rbasis);
 }
   
 //-------------------------------------------------------------------------------------------------
 void RestraintApparatus::addRestraint(const BoundedRestraint &new_rest) {
   addRestraints(std::vector<BoundedRestraint>(1, new_rest));
+}
+
+//-------------------------------------------------------------------------------------------------
+void RestraintApparatus::checkTopologyPointers(const std::vector<BoundedRestraint> &rbasis) {
+  const size_t n_items = rbasis.size();
+  for (int i = 0; i < n_items; i++) {
+    if (rbasis[i].getTopologyPointer() != ag_pointer) {
+      rtErr("All restraints must point to the same topology.  Restraint index " +
+            std::to_string(i) + " out of " + std::to_string(n_items) + " is inconsistent.",
+            "RestraintApparatus", "checkTopologyPointers");
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -985,6 +865,221 @@ void RestraintApparatus::allocate() {
   sp_rdihe_init_r.setPointer(&float4_data, f4c, dihedral_count);
   f4c += padded_dihe_count;
   sp_rdihe_final_r.setPointer(&float4_data, f4c, dihedral_count);  
+}
+
+//-------------------------------------------------------------------------------------------------
+void RestraintApparatus::populateInternalArrays(const std::vector<BoundedRestraint> &rbasis) {
+
+  // Collect all restraints' atoms and parameters in host-side vectors for upload en masse
+  std::vector<int> tmp_rposn_i(position_count);
+  std::vector<int> tmp_rbond_i(distance_count);
+  std::vector<int> tmp_rbond_j(distance_count);
+  std::vector<int> tmp_rangl_i(angle_count);
+  std::vector<int> tmp_rangl_j(angle_count);
+  std::vector<int> tmp_rangl_k(angle_count);
+  std::vector<int> tmp_rdihe_i(dihedral_count);
+  std::vector<int> tmp_rdihe_j(dihedral_count);
+  std::vector<int> tmp_rdihe_k(dihedral_count);
+  std::vector<int> tmp_rdihe_l(dihedral_count);
+  std::vector<int> tmp_rposn_init_step(position_count);
+  std::vector<int> tmp_rposn_final_step(position_count);
+  std::vector<int> tmp_rbond_init_step(distance_count);
+  std::vector<int> tmp_rbond_final_step(distance_count);
+  std::vector<int> tmp_rangl_init_step(angle_count);
+  std::vector<int> tmp_rangl_final_step(angle_count);
+  std::vector<int> tmp_rdihe_init_step(dihedral_count);
+  std::vector<int> tmp_rdihe_final_step(dihedral_count);
+  std::vector<double> tmp_rposn_init_z(position_count);
+  std::vector<double> tmp_rposn_final_z(position_count);
+  std::vector<double2> tmp_rposn_init_keq(position_count);
+  std::vector<double2> tmp_rposn_final_keq(position_count);
+  std::vector<double2> tmp_rposn_init_xy(position_count);
+  std::vector<double2> tmp_rposn_final_xy(position_count);
+  std::vector<double2> tmp_rbond_init_keq(distance_count);
+  std::vector<double2> tmp_rbond_final_keq(distance_count);
+  std::vector<double2> tmp_rangl_init_keq(angle_count);
+  std::vector<double2> tmp_rangl_final_keq(angle_count);
+  std::vector<double2> tmp_rdihe_init_keq(dihedral_count);
+  std::vector<double2> tmp_rdihe_final_keq(dihedral_count);
+  std::vector<double4> tmp_rposn_init_r(position_count);
+  std::vector<double4> tmp_rposn_final_r(position_count);
+  std::vector<double4> tmp_rbond_init_r(distance_count);
+  std::vector<double4> tmp_rbond_final_r(distance_count);
+  std::vector<double4> tmp_rangl_init_r(angle_count);
+  std::vector<double4> tmp_rangl_final_r(angle_count);
+  std::vector<double4> tmp_rdihe_init_r(dihedral_count);
+  std::vector<double4> tmp_rdihe_final_r(dihedral_count);
+  int nposnr = 0;
+  int nbondr = 0;
+  int nanglr = 0;
+  int ndiher = 0;
+  for (int i = 0; i < total_restraint_count; i++) {
+    const int rord = rbasis[i].getOrder();
+    if (rord == 1) {
+      tmp_rposn_i[nposnr]          = rbasis[i].getAtomIndex(1);
+      tmp_rposn_init_step[nposnr]  = rbasis[i].getInitialStep();
+      tmp_rposn_final_step[nposnr] = rbasis[i].getFinalStep();
+      tmp_rposn_init_keq[nposnr]   = rbasis[i].getInitialStiffness();
+      tmp_rposn_final_keq[nposnr]  = rbasis[i].getFinalStiffness();
+      double3 refcrd               = rbasis[i].getInitialTargetSite();
+      tmp_rposn_init_xy[nposnr]    = {refcrd.x, refcrd.y};
+      tmp_rposn_init_z[nposnr]     = refcrd.z;
+      refcrd                       = rbasis[i].getFinalTargetSite();
+      tmp_rposn_final_xy[nposnr]   = {refcrd.x, refcrd.y};
+      tmp_rposn_final_z[nposnr]    = refcrd.z;
+      tmp_rposn_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rposn_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      nposnr++;
+    }
+    else if (rord == 2) {
+      tmp_rbond_i[nbondr]          = rbasis[i].getAtomIndex(1);
+      tmp_rbond_j[nbondr]          = rbasis[i].getAtomIndex(2);
+      tmp_rbond_init_step[nanglr]  = rbasis[i].getInitialStep();
+      tmp_rbond_final_step[nanglr] = rbasis[i].getFinalStep();
+      tmp_rbond_init_keq[nbondr]   = rbasis[i].getInitialStiffness();
+      tmp_rbond_final_keq[nbondr]  = rbasis[i].getFinalStiffness();
+      tmp_rbond_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rbond_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      nbondr++;
+    }
+    else if (rord == 3) {
+      tmp_rangl_i[nanglr]          = rbasis[i].getAtomIndex(1);
+      tmp_rangl_j[nanglr]          = rbasis[i].getAtomIndex(2);
+      tmp_rangl_k[nanglr]          = rbasis[i].getAtomIndex(3);
+      tmp_rangl_init_step[nanglr]  = rbasis[i].getInitialStep();
+      tmp_rangl_final_step[nanglr] = rbasis[i].getFinalStep();
+      tmp_rangl_init_keq[nanglr]   = rbasis[i].getInitialStiffness();
+      tmp_rangl_final_keq[nanglr]  = rbasis[i].getFinalStiffness();
+      tmp_rangl_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rangl_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      nanglr++;
+    }
+    else if (rord == 4) {
+      tmp_rdihe_i[ndiher]          = rbasis[i].getAtomIndex(1);
+      tmp_rdihe_j[ndiher]          = rbasis[i].getAtomIndex(2);
+      tmp_rdihe_k[ndiher]          = rbasis[i].getAtomIndex(3);
+      tmp_rdihe_l[ndiher]          = rbasis[i].getAtomIndex(4);
+      tmp_rdihe_init_step[ndiher]  = rbasis[i].getInitialStep();
+      tmp_rdihe_final_step[ndiher] = rbasis[i].getFinalStep();
+      tmp_rdihe_init_keq[ndiher]   = rbasis[i].getInitialStiffness();
+      tmp_rdihe_final_keq[ndiher]  = rbasis[i].getFinalStiffness();
+      tmp_rdihe_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
+      tmp_rdihe_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      ndiher++;
+    }
+  }
+  
+  // Load the integer data into Hybrid objects
+  rposn_atoms.putHost(tmp_rposn_i);
+  rbond_i_atoms.putHost(tmp_rbond_i);
+  rbond_j_atoms.putHost(tmp_rbond_j);
+  rangl_i_atoms.putHost(tmp_rangl_i);
+  rangl_j_atoms.putHost(tmp_rangl_j);
+  rangl_k_atoms.putHost(tmp_rangl_k);
+  rdihe_i_atoms.putHost(tmp_rdihe_i);
+  rdihe_j_atoms.putHost(tmp_rdihe_j);
+  rdihe_k_atoms.putHost(tmp_rdihe_k);
+  rdihe_l_atoms.putHost(tmp_rdihe_l);
+  rposn_init_step.putHost(tmp_rposn_init_step);
+  rposn_final_step.putHost(tmp_rposn_final_step);
+  rbond_init_step.putHost(tmp_rbond_init_step);
+  rbond_final_step.putHost(tmp_rbond_final_step);
+  rangl_init_step.putHost(tmp_rangl_init_step);
+  rangl_final_step.putHost(tmp_rangl_final_step);
+  rdihe_init_step.putHost(tmp_rdihe_init_step);
+  rdihe_final_step.putHost(tmp_rdihe_final_step);
+
+  // Load double-precision (including double2 and double4) data into Hybrid objects
+  rposn_init_z.putHost(tmp_rposn_init_z);
+  rposn_final_z.putHost(tmp_rposn_final_z);
+  rposn_init_keq.putHost(tmp_rposn_init_keq);
+  rposn_final_keq.putHost(tmp_rposn_final_keq);
+  rposn_init_xy.putHost(tmp_rposn_init_xy);
+  rposn_final_xy.putHost(tmp_rposn_final_xy);
+  rbond_init_keq.putHost(tmp_rbond_init_keq);
+  rbond_final_keq.putHost(tmp_rbond_final_keq);
+  rangl_init_keq.putHost(tmp_rangl_init_keq);
+  rangl_final_keq.putHost(tmp_rangl_final_keq);
+  rdihe_init_keq.putHost(tmp_rdihe_init_keq);
+  rdihe_final_keq.putHost(tmp_rdihe_final_keq);
+  rposn_init_r.putHost(tmp_rposn_init_r);
+  rposn_final_r.putHost(tmp_rposn_final_r);
+  rbond_init_r.putHost(tmp_rbond_init_r);
+  rbond_final_r.putHost(tmp_rbond_final_r);
+  rangl_init_r.putHost(tmp_rangl_init_r);
+  rangl_final_r.putHost(tmp_rangl_final_r);
+  rdihe_init_r.putHost(tmp_rdihe_init_r);
+  rdihe_final_r.putHost(tmp_rdihe_final_r);
+
+  // Copy double-precision data into single-precision format
+  std::vector<float> sp_tmp_rposn_init_z(tmp_rposn_init_z.begin(), tmp_rposn_init_z.end());
+  std::vector<float> sp_tmp_rposn_final_z(tmp_rposn_final_z.begin(), tmp_rposn_final_z.end());
+  std::vector<float2> sp_tmp_rposn_init_keq(position_count);
+  std::vector<float2> sp_tmp_rposn_final_keq(position_count);
+  std::vector<float2> sp_tmp_rposn_init_xy(position_count);
+  std::vector<float2> sp_tmp_rposn_final_xy(position_count);
+  std::vector<float2> sp_tmp_rbond_init_keq(distance_count);
+  std::vector<float2> sp_tmp_rbond_final_keq(distance_count);
+  std::vector<float2> sp_tmp_rangl_init_keq(angle_count);
+  std::vector<float2> sp_tmp_rangl_final_keq(angle_count);
+  std::vector<float2> sp_tmp_rdihe_init_keq(dihedral_count);
+  std::vector<float2> sp_tmp_rdihe_final_keq(dihedral_count);
+  std::vector<float4> sp_tmp_rposn_init_r(position_count);
+  std::vector<float4> sp_tmp_rposn_final_r(position_count);
+  std::vector<float4> sp_tmp_rbond_init_r(distance_count);
+  std::vector<float4> sp_tmp_rbond_final_r(distance_count);
+  std::vector<float4> sp_tmp_rangl_init_r(angle_count);
+  std::vector<float4> sp_tmp_rangl_final_r(angle_count);
+  std::vector<float4> sp_tmp_rdihe_init_r(dihedral_count);
+  std::vector<float4> sp_tmp_rdihe_final_r(dihedral_count);
+  for (int i = 0; i < position_count; i++) {
+    sp_tmp_rposn_init_keq[i]  = vtConv2f(tmp_rposn_init_keq[i]);
+    sp_tmp_rposn_final_keq[i] = vtConv2f(tmp_rposn_final_keq[i]);
+    sp_tmp_rposn_init_xy[i]   = vtConv2f(tmp_rposn_init_xy[i]);
+    sp_tmp_rposn_final_xy[i]  = vtConv2f(tmp_rposn_final_xy[i]);
+    sp_tmp_rposn_init_r[i]    = vtConv4f(tmp_rposn_init_r[i]);
+    sp_tmp_rposn_final_r[i]   = vtConv4f(tmp_rposn_final_r[i]);
+  }
+  for (int i = 0; i < distance_count; i++) {
+    sp_tmp_rbond_init_keq[i]  = vtConv2f(tmp_rbond_init_keq[i]);
+    sp_tmp_rbond_final_keq[i] = vtConv2f(tmp_rbond_final_keq[i]);
+    sp_tmp_rbond_init_r[i]    = vtConv4f(tmp_rbond_init_r[i]);
+    sp_tmp_rbond_final_r[i]   = vtConv4f(tmp_rbond_final_r[i]);    
+  }
+  for (int i = 0; i < angle_count; i++) {
+    sp_tmp_rangl_init_keq[i]  = vtConv2f(tmp_rangl_init_keq[i]);
+    sp_tmp_rangl_final_keq[i] = vtConv2f(tmp_rangl_final_keq[i]);
+    sp_tmp_rangl_init_r[i]    = vtConv4f(tmp_rangl_init_r[i]);
+    sp_tmp_rangl_final_r[i]   = vtConv4f(tmp_rangl_final_r[i]);    
+  }
+  for (int i = 0; i < dihedral_count; i++) {
+    sp_tmp_rdihe_init_keq[i]  = vtConv2f(tmp_rdihe_init_keq[i]);
+    sp_tmp_rdihe_final_keq[i] = vtConv2f(tmp_rdihe_final_keq[i]);
+    sp_tmp_rdihe_init_r[i]    = vtConv4f(tmp_rdihe_init_r[i]);
+    sp_tmp_rdihe_final_r[i]   = vtConv4f(tmp_rdihe_final_r[i]);    
+  }
+
+  // Load single-precision data
+  sp_rposn_init_z.putHost(sp_tmp_rposn_init_z);
+  sp_rposn_final_z.putHost(sp_tmp_rposn_final_z);
+  sp_rposn_init_keq.putHost(sp_tmp_rposn_init_keq);
+  sp_rposn_final_keq.putHost(sp_tmp_rposn_final_keq);
+  sp_rposn_init_xy.putHost(sp_tmp_rposn_init_xy);
+  sp_rposn_final_xy.putHost(sp_tmp_rposn_final_xy);
+  sp_rbond_init_keq.putHost(sp_tmp_rbond_init_keq);
+  sp_rbond_final_keq.putHost(sp_tmp_rbond_final_keq);
+  sp_rangl_init_keq.putHost(sp_tmp_rangl_init_keq);
+  sp_rangl_final_keq.putHost(sp_tmp_rangl_final_keq);
+  sp_rdihe_init_keq.putHost(sp_tmp_rdihe_init_keq);
+  sp_rdihe_final_keq.putHost(sp_tmp_rdihe_final_keq);
+  sp_rposn_init_r.putHost(sp_tmp_rposn_init_r);
+  sp_rposn_final_r.putHost(sp_tmp_rposn_final_r);
+  sp_rbond_init_r.putHost(sp_tmp_rbond_init_r);
+  sp_rbond_final_r.putHost(sp_tmp_rbond_final_r);
+  sp_rangl_init_r.putHost(sp_tmp_rangl_init_r);
+  sp_rangl_final_r.putHost(sp_tmp_rangl_final_r);
+  sp_rdihe_init_r.putHost(sp_tmp_rdihe_init_r);
+  sp_rdihe_final_r.putHost(sp_tmp_rdihe_final_r);
 }
 
 } // namespace restraints
