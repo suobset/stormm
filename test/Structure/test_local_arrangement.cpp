@@ -157,6 +157,8 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
                psr.ycrd[frame3_atom] - psr.ycrd[parent_atom],
                psr.zcrd[frame3_atom] - psr.zcrd[parent_atom] };
       break;
+    case VirtualSiteKind::NONE:
+      break;
     }
 
     // Get details of the the fourth frame atom
@@ -173,6 +175,8 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
       p_f4 = { psr.xcrd[frame4_atom] - psr.xcrd[parent_atom],
                psr.ycrd[frame4_atom] - psr.ycrd[parent_atom],
                psr.zcrd[frame4_atom] - psr.zcrd[parent_atom] };
+      break;
+    case VirtualSiteKind::NONE:
       break;
     }
 

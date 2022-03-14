@@ -44,7 +44,6 @@ struct RestraintApparatusDpReader {
   /// \{
   RestraintApparatusDpReader(const RestraintApparatusDpReader &original) = default;
   RestraintApparatusDpReader(RestraintApparatusDpReader &&other) = default;
-  RestraintApparatusDpReader& operator=(const RestraintApparatusDpReader &original) = default;
   /// \}
 
   const int total_rst;            ///< Total number of restraints in the apparatus
@@ -126,7 +125,6 @@ struct RestraintApparatusSpReader {
   /// \{
   RestraintApparatusSpReader(const RestraintApparatusSpReader &original) = default;
   RestraintApparatusSpReader(RestraintApparatusSpReader &&other) = default;
-  RestraintApparatusSpReader& operator=(const RestraintApparatusSpReader &original) = default;
   /// \}
 
   const int total_rst;           ///< Total number of restraints in the apparatus

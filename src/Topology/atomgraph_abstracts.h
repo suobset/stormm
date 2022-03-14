@@ -138,7 +138,6 @@ template <typename T> struct ValenceKit {
   /// \{
   ValenceKit(const ValenceKit &original) = default;
   ValenceKit(ValenceKit &&other) = default;
-  ValenceKit& operator=(const ValenceKit &original) = default;
   /// \}
   
   // The purpose of this struct is to store a collection of pointers for HPC kernels.  As such, it
@@ -295,7 +294,6 @@ template <typename T> struct NonbondedKit {
   /// \{
   NonbondedKit(const NonbondedKit &original) = default;
   NonbondedKit(NonbondedKit &&other) = default;
-  NonbondedKit& operator=(const NonbondedKit &original) = default;
   /// \}
 
   // Member variables again store a collection of atomic parameters
@@ -351,7 +349,6 @@ template <typename T> struct ImplicitSolventKit {
   /// \{
   ImplicitSolventKit(const ImplicitSolventKit &original) = default;
   ImplicitSolventKit(ImplicitSolventKit &&other) = default;
-  ImplicitSolventKit& operator=(const ImplicitSolventKit &original) = default;
   /// \}
 
   // Member variables again store a collection of atomic parameters
@@ -386,7 +383,6 @@ struct ChemicalDetailsKit {
   /// \{
   ChemicalDetailsKit(const ChemicalDetailsKit &original) = default;
   ChemicalDetailsKit(ChemicalDetailsKit &&other) = default;
-  ChemicalDetailsKit& operator=(const ChemicalDetailsKit &original) = default;
   /// \}
 
   // Member variables store the atom count, residue count, and other ways to quantify the system
@@ -424,7 +420,6 @@ template <typename T> struct VirtualSiteKit {
   /// \{
   VirtualSiteKit(const VirtualSiteKit &original) = default;
   VirtualSiteKit(VirtualSiteKit &&other) = default;
-  VirtualSiteKit& operator=(const VirtualSiteKit &original) = default;
   /// \}
   
   const int nsite;        ///< The number of virtual sites in the topology
@@ -456,7 +451,6 @@ struct ConstraintKit {
   /// \{
   ConstraintKit(const ConstraintKit &original) = default;
   ConstraintKit(ConstraintKit &&other) = default;
-  ConstraintKit& operator=(const ConstraintKit &original) = default;
   /// \}
   
   const int ngroup;               ///< Number of "hub and spoke" constrained groups of bonds.

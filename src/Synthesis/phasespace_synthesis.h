@@ -61,7 +61,6 @@ struct PsSynthesisReader {
   /// \{
   PsSynthesisReader(const PsSynthesisReader &original) = default;
   PsSynthesisReader(PsSynthesisReader &&other) = default;
-  PsSynthesisReader& operator=(const PsSynthesisReader &original) = default;
   /// \}
   
   // System sizing information
@@ -139,7 +138,6 @@ struct PsSynthesisWriter {
   /// \{
   PsSynthesisWriter(const PsSynthesisWriter &original) = default;
   PsSynthesisWriter(PsSynthesisWriter &&other) = default;
-  PsSynthesisWriter& operator=(const PsSynthesisWriter &original) = default;
   /// \}
   
   // Even in the writer, some information may not be altered.  This includes the simulation

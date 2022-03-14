@@ -441,6 +441,8 @@ std::string getVirtualSiteFrameName(const VirtualSiteKind vsf) {
     return std::string("Out-3 / OutOfPlane");
   case VirtualSiteKind::FIXED_4:
     return std::string("FD-4 / FourPoint");
+  case VirtualSiteKind::NONE:
+    break;
   }
   return std::string("No detected frame type.");
 }
