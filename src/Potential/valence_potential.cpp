@@ -42,10 +42,8 @@ double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Scor
     double dx = psw.xcrd[j_atom] - psw.xcrd[i_atom];
     double dy = psw.ycrd[j_atom] - psw.ycrd[i_atom];
     double dz = psw.zcrd[j_atom] - psw.zcrd[i_atom];
-    if (psw.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
+    imageCoordinates(&dx, &dy, &dz, psw.umat, psw.invu, psw.unit_cell,
+                     ImagingMethod::MINIMUM_IMAGE);
     const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
     const double dl = dr - leq;
     const double du = keq * dl * dl;
@@ -109,10 +107,8 @@ double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReade
     double dx = cfr.xcrd[j_atom] - cfr.xcrd[i_atom];
     double dy = cfr.ycrd[j_atom] - cfr.ycrd[i_atom];
     double dz = cfr.zcrd[j_atom] - cfr.zcrd[i_atom];
-    if (cfr.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
+    imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell,
+                     ImagingMethod::MINIMUM_IMAGE);
     const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
     const double dl = dr - leq;
     const double du = keq * dl * dl;
@@ -196,8 +192,8 @@ double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Sco
     // Compute forces
     if (eval_force == EvaluateForce::YES) {
       const double dA = -2.0 * keq * dtheta / sqrt(1.0 - costheta * costheta);
-      const double sqba = dA/mgba;
-      const double sqbc = dA/mgbc;
+      const double sqba = dA / mgba;
+      const double sqbc = dA / mgbc;
       const double mbabc = dA * invbabc;
       double adf[3], cdf[3];
       for (int i = 0; i < 3; i++) {
@@ -377,11 +373,11 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
     if (eval_force == EvaluateForce::YES) {
       const double fr = ampl * freq * sin(sangle);
       const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
-      const double invab = 1.0/mgab;
+      const double invab = 1.0 / mgab;
       const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
-      const double invbc = 1.0/mgbc;
+      const double invbc = 1.0 / mgbc;
       const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
-      const double invcd = 1.0/mgcd;
+      const double invcd = 1.0 / mgcd;
       const double cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
       const double isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
                             fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
@@ -557,10 +553,8 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter ps
     double dx = psw.xcrd[k_atom] - psw.xcrd[i_atom];
     double dy = psw.ycrd[k_atom] - psw.ycrd[i_atom];
     double dz = psw.zcrd[k_atom] - psw.zcrd[i_atom];
-    if (psw.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
+    imageCoordinates(&dx, &dy, &dz, psw.umat, psw.invu, psw.unit_cell,
+                     ImagingMethod::MINIMUM_IMAGE);
     const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
     const double dl = dr - leq;
     const double du = keq * dl * dl;
@@ -622,10 +616,8 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFra
     double dx = cfr.xcrd[k_atom] - cfr.xcrd[i_atom];
     double dy = cfr.ycrd[k_atom] - cfr.ycrd[i_atom];
     double dz = cfr.zcrd[k_atom] - cfr.zcrd[i_atom];
-    if (cfr.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
+    imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell,
+                     ImagingMethod::MINIMUM_IMAGE);
     const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
     const double dl = dr - leq;
     const double du = keq * dl * dl;
@@ -719,11 +711,11 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter
     if (eval_force == EvaluateForce::YES) {
       const double fr = -2.0 * keq * dtheta;
       const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
-      const double invab = 1.0/mgab;
+      const double invab = 1.0 / mgab;
       const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
-      const double invbc = 1.0/mgbc;
+      const double invbc = 1.0 / mgbc;
       const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
-      const double invcd = 1.0/mgcd;
+      const double invcd = 1.0 / mgcd;
       const double cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
       const double isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
                             fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
@@ -998,13 +990,13 @@ double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Scor
       // With the derivative in hand, evaluate the transformation of coordinates for either the
       // phi or psi dihedrals.
       const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
-      const double invab = 1.0/mgab;
+      const double invab = 1.0 / mgab;
       const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
-      const double invbc = 1.0/mgbc;
+      const double invbc = 1.0 / mgbc;
       const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
-      const double invcd = 1.0/mgcd;
+      const double invcd = 1.0 / mgcd;
       const double mgde = sqrt(de[0]*de[0] + de[1]*de[1] + de[2]*de[2]);
-      const double invde = 1.0/mgde;
+      const double invde = 1.0 / mgde;
       const double invabc = invab * invbc;
       const double invbcd = invbc * invcd;
       const double invcde = invcd * invde;
@@ -1412,6 +1404,344 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameRead
                                   ScoreCard *ecard, const int system_index) {
   return evaluateAttenuated14Terms(ag->getDoublePrecisionValenceKit(),
                                    ag->getDoublePrecisionNonbondedKit(), cfr, ecard, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 computeRestraintMixture(const int step_number, const int init_step, const int final_step) {
+  if (step_number < init_step) {
+
+    // If the restraint has not yet engaged, neither its initial or final values have any weight
+    return { 0.0, 0.0 };
+  }
+  else if (init_step == final_step) {
+
+    // The step count is far enough along that the restraint has been engaged, and it is constant.
+    // Only the initial value matters.
+    return { 1.0, 0.0 };
+  }
+  else if (step_number < final_step) {
+    const double wslide = static_cast<double>(step_number - init_step) /
+                          static_cast<double>(final_step - init_step);
+
+    // The difference between the initial and final steps is nonzero.  The mixture is a linear
+    // combination of the two end points.
+    return { 1.0 - wslide, wslide };
+  }
+  else {
+
+    // The step number has advanced beyond the point at which the restraint is mature.
+    return { 0.0, 1.0 };
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
+                       const double4 final_r, const double2 mixwt, const double dr) {
+  const double r1 = (mixwt.x * init_r.x) + (mixwt.y * final_r.x);
+  const double r2 = (mixwt.x * init_r.y) + (mixwt.y * final_r.y);
+  const double r3 = (mixwt.x * init_r.z) + (mixwt.y * final_r.z);
+  const double r4 = (mixwt.x * init_r.w) + (mixwt.y * final_r.w);
+  const double k2 = (mixwt.x * init_k.x) + (mixwt.y * final_k.x);
+  const double k3 = (mixwt.x * init_k.y) + (mixwt.y * final_k.y);
+  double dl, du, keq;
+  if (dr < r1) {
+    dl = r1 - r2;
+    du = k2 * ((dl * dl) + (r1 - dr));
+    keq = k2;
+  }
+  else if (dr < r2) {
+    dl = dr - r2;
+    du = k2 * dl * dl;
+    keq = k2;
+  }
+  else if (dr < r3) {
+    dl = 0.0;
+    du = 0.0;
+    keq = 0.0;
+  }
+  else if (dr < r4) {
+    dl = dr - r3;
+    du = k3 * dl * dl;
+    keq = k3;
+  }
+  else {
+    dl = r4 - r3;
+    du = k3 * ((dl * dl) + (dr - r4));
+    keq = k3;
+  }
+  return { keq, dl, du };
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xcrd,
+                          const double* ycrd, const double* zcrd, const double* umat,
+                          const double* invu, const UnitCellType unit_cell, double* xfrc,
+                          double* yfrc, double* zfrc, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index,
+                          const int step_number) {
+  double rest_energy = 0.0;
+  llint rest_acc = 0LL;
+  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+
+  // Accumulate results by looping over all restraint terms
+  for (int i = 0; i < rar.nposn; i++) {
+
+    // Determine the weight to give to each endpoint of the restraint
+    const double2 mixwt = computeRestraintMixture(step_number, rar.rposn_init_step[i],
+                                                  rar.rposn_finl_step[i]);
+    const int n_atom = rar.rposn_atoms[i];
+    double dx = xcrd[n_atom] - ((mixwt.x * rar.rposn_init_xy[i].x) +
+                                (mixwt.y * rar.rposn_finl_xy[i].x));
+    double dy = ycrd[n_atom] - ((mixwt.x * rar.rposn_init_xy[i].y) +
+                                (mixwt.y * rar.rposn_finl_xy[i].y));
+    double dz = zcrd[n_atom] - ((mixwt.x * rar.rposn_init_z[i]) + (mixwt.y * rar.rposn_finl_z[i]));
+    imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    const double3 rst_eval = restraintDelta(rar.rposn_init_keq[i], rar.rposn_finl_keq[i],
+                                            rar.rposn_init_r[i], rar.rposn_finl_r[i], mixwt, dr);
+    rest_energy += rst_eval.z;
+    rest_acc += static_cast<llint>(round(rst_eval.z * nrg_scale_factor));
+
+    // Compute forces
+    if (eval_force == EvaluateForce::YES) {
+      const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
+      xfrc[n_atom] += fmag * dx;
+      yfrc[n_atom] += fmag * dy;
+      zfrc[n_atom] += fmag * dz;
+    }
+  }
+  for (int pos = 0; pos < rar.nbond; pos++) {
+    const int i_atom = rar.rbond_i_atoms[pos];
+    const int j_atom = rar.rbond_j_atoms[pos];
+    double dx = xcrd[j_atom] - xcrd[i_atom];
+    double dy = ycrd[j_atom] - ycrd[i_atom];
+    double dz = zcrd[j_atom] - zcrd[i_atom];
+    imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    const double2 mixwt = computeRestraintMixture(step_number, rar.rbond_init_step[pos],
+                                                  rar.rbond_finl_step[pos]);
+    const double3 rst_eval = restraintDelta(rar.rbond_init_keq[pos], rar.rbond_finl_keq[pos],
+                                            rar.rbond_init_r[pos], rar.rbond_finl_r[pos], mixwt,
+                                            dr);
+    rest_energy += rst_eval.z;
+    rest_acc += static_cast<llint>(round(rst_eval.z * nrg_scale_factor));
+    if (eval_force == EvaluateForce::YES) {
+      const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
+      const double fmag_dx = fmag * dx;
+      const double fmag_dy = fmag * dy;
+      const double fmag_dz = fmag * dz;
+      xfrc[i_atom] += fmag_dx;
+      yfrc[i_atom] += fmag_dy;
+      zfrc[i_atom] += fmag_dz;
+      xfrc[j_atom] -= fmag_dx;
+      yfrc[j_atom] -= fmag_dy;
+      zfrc[j_atom] -= fmag_dz;
+    }    
+  }
+  for (int pos = 0; pos < rar.nangl; pos++) {
+    const int i_atom = rar.rangl_i_atoms[pos];
+    const int j_atom = rar.rangl_j_atoms[pos];
+    const int k_atom = rar.rangl_k_atoms[pos];
+    double ba[3], bc[3];
+    ba[0] = xcrd[i_atom] - xcrd[j_atom];
+    ba[1] = ycrd[i_atom] - ycrd[j_atom];
+    ba[2] = zcrd[i_atom] - zcrd[j_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+    imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+
+    // On to the angle force computation
+    const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
+    const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
+    const double invbabc = 1.0 / sqrt(mgba * mgbc);
+    double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
+    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
+    const double theta = acos(costheta);
+    const double2 mixwt = computeRestraintMixture(step_number, rar.rangl_init_step[pos],
+                                                  rar.rangl_finl_step[pos]);
+    const double3 rst_eval = restraintDelta(rar.rangl_init_keq[pos], rar.rangl_finl_keq[pos],
+                                            rar.rangl_init_r[pos], rar.rangl_finl_r[pos], mixwt,
+                                            theta);
+    rest_energy += rst_eval.z;
+    rest_acc += static_cast<llint>(round(rst_eval.z * nrg_scale_factor));
+
+    // Compute forces
+    if (eval_force == EvaluateForce::YES) {
+      const double dA = -2.0 * rst_eval.x * rst_eval.y / sqrt(1.0 - costheta * costheta);
+      const double sqba = dA / mgba;
+      const double sqbc = dA / mgbc;
+      const double mbabc = dA * invbabc;
+      double adf[3], cdf[3];
+      for (int i = 0; i < 3; i++) {
+        adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
+        cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
+      }
+      xfrc[i_atom] -= adf[0];
+      yfrc[i_atom] -= adf[1];
+      zfrc[i_atom] -= adf[2];
+      xfrc[j_atom] += adf[0] + cdf[0];
+      yfrc[j_atom] += adf[1] + cdf[1];
+      zfrc[j_atom] += adf[2] + cdf[2];
+      xfrc[k_atom] -= cdf[0];
+      yfrc[k_atom] -= cdf[1];
+      zfrc[k_atom] -= cdf[2];
+    }    
+  }
+  for (int pos = 0; pos < rar.ndihe; pos++) {
+    const int i_atom = rar.rangl_i_atoms[pos];
+    const int j_atom = rar.rangl_j_atoms[pos];
+    const int k_atom = rar.rangl_k_atoms[pos];
+    const int l_atom = rar.rangl_k_atoms[pos];
+
+    // Compute displacements
+    double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
+    ab[0] = xcrd[j_atom] - xcrd[i_atom];
+    ab[1] = ycrd[j_atom] - ycrd[i_atom];
+    ab[2] = zcrd[j_atom] - zcrd[i_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+    cd[0] = xcrd[l_atom] - xcrd[k_atom];
+    cd[1] = ycrd[l_atom] - ycrd[k_atom];
+    cd[2] = zcrd[l_atom] - zcrd[k_atom];
+    imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+
+    // Compute cross products and then the angle between the planes
+    crossProduct(ab, bc, crabbc);
+    crossProduct(bc, cd, crbccd);
+    double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
+    costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                     (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+    crossProduct(crabbc, crbccd, scr);
+    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
+    const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
+                                                                              -acos(costheta);
+    const double2 mixwt = computeRestraintMixture(step_number, rar.rdihe_init_step[pos],
+                                                  rar.rdihe_finl_step[pos]);
+    const double3 rst_eval = restraintDelta(rar.rdihe_init_keq[pos], rar.rdihe_finl_keq[pos],
+                                            rar.rdihe_init_r[pos], rar.rdihe_finl_r[pos], mixwt,
+                                            theta);
+
+    // Contribute the result to the correct pile: proper or improper
+    rest_energy += rst_eval.z;
+    rest_acc += static_cast<llint>(round(rst_eval.z * nrg_scale_factor));
+
+    // Compute forces
+    if (eval_force == EvaluateForce::YES) {
+      const double fr = -2.0 * rst_eval.x * rst_eval.y;
+      const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+      const double invab = 1.0 / mgab;
+      const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+      const double invbc = 1.0 / mgbc;
+      const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+      const double invcd = 1.0 / mgcd;
+      const double cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
+      const double isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
+                            fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
+      const double cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+      const double isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
+                            fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
+      const double invabc = invab * invbc;
+      const double invbcd = invbc * invcd;
+      for (int i = 0; i < 3; i++) {
+        crabbc[i] *= invabc;
+        crbccd[i] *= invbcd;
+      }
+
+      // Transform the rotational derivatives to cartesian coordinates
+      const double fa = -invab * isinb2;
+      const double fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
+      const double fb2 = cosc * invbc * isinc2;
+      const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
+      const double fc2 = cosb * invbc * isinb2;
+      const double fd = -invcd * isinc2;
+      xfrc[i_atom] += crabbc[0] * fa;
+      xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
+      xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
+      xfrc[l_atom] -= fd * crbccd[0];
+      yfrc[i_atom] += crabbc[1] * fa;
+      yfrc[j_atom] += (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
+      yfrc[k_atom] += (fc2 * crabbc[1]) - (fc1 * crbccd[1]);
+      yfrc[l_atom] -= fd * crbccd[1];
+      zfrc[i_atom] += crabbc[2] * fa;
+      zfrc[j_atom] += (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
+      zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
+      zfrc[l_atom] -= fd * crbccd[2];
+    }
+  }
+
+  // Contribute results
+  ecard->contribute(StateVariable::RESTRAINT, rest_acc, system_index);
+  
+  // Return the double-precision energy sum, if of interest
+  return rest_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatusDpReader rar, PhaseSpaceWriter psw,
+                          ScoreCard *ecard, const EvaluateForce eval_force, const int system_index,
+                          const int step_number) {
+  return evaluateRestraints(rar, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                            psw.xfrc, psw.yfrc, psw.zfrc, ecard, eval_force, system_index,
+                            step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatus &ra, PhaseSpace *ps, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index,
+                          const int step_number) {
+  PhaseSpaceWriter psw = ps->data();
+  return evaluateRestraints(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
+                            psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, ecard, eval_force,
+                            system_index, step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatus *ra, PhaseSpace *ps, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index,
+                          const int step_number) {
+  PhaseSpaceWriter psw = ps->data();
+  return evaluateRestraints(ra->dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
+                            psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, ecard, eval_force,
+                            system_index, step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatusDpReader rar, const CoordinateFrameReader cfr,
+                          ScoreCard *ecard, const int system_index, const int step_number) {
+  return evaluateRestraints(rar, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.unit_cell,
+                            nullptr, nullptr, nullptr, ecard, EvaluateForce::NO, system_index,
+                            step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatusDpReader rar, const CoordinateFrameWriter &cfw,
+                          ScoreCard *ecard, const int system_index, const int step_number) {
+  const CoordinateFrameReader cfr(cfw);
+  return evaluateRestraints(rar, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.unit_cell,
+                            nullptr, nullptr, nullptr, ecard, EvaluateForce::NO, system_index,
+                            step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatus &ra, const CoordinateFrameReader cfr,
+                          ScoreCard *ecard, const int system_index, const int step_number) {
+  return evaluateRestraints(ra.dpData(), cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
+                            cfr.unit_cell, nullptr, nullptr, nullptr, ecard, EvaluateForce::NO,
+                            system_index, step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameReader cfr,
+                          ScoreCard *ecard, const int system_index, const int step_number) {
+  return evaluateRestraints(ra->dpData(), cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
+                            cfr.unit_cell, nullptr, nullptr, nullptr, ecard, EvaluateForce::NO,
+                            system_index, step_number);
 }
 
 } // namespace energy

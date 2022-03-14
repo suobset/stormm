@@ -4,6 +4,7 @@
 
 #include "Constants/fixed_precision.h"
 #include "Accelerator/hybrid.h"
+#include "energy_enumerators.h"
 
 namespace omni {
 namespace energy {
@@ -11,45 +12,6 @@ namespace energy {
 using card::Hybrid;
 using card::HybridTargetLevel;
 using numerics::default_energy_scale_bits;
-
-/// \brief Enumerate all state variables that OMNI will track
-enum class StateVariable {
-  BOND = 0,               ///< Harmonic bond stretching energy
-  ANGLE,                  ///< Harmonic angle bending energy
-  PROPER_DIHEDRAL,        ///< Proper dihedral energy
-  IMPROPER_DIHEDRAL,      ///< Improper (plane-enforcing) dihedral energy
-  UREY_BRADLEY,           ///< CHARMM Urey-Bradley angle stretching energy
-  CHARMM_IMPROPER,        ///< CHARMM harmonic improper torsion energy
-  CMAP,                   ///< Correction map (typically, coupled dihedral-dihedral) energy
-  VDW,                    ///< van-der Waals (typically, Lennard Jones) energy from non-bonded
-                          ///<   interactions
-  VDW_ONE_FOUR,           ///< van-der Waals (typically, Lennard Jones) energy from 1-4 attenuated
-                          ///<   interactions
-  ELECTROSTATIC,          ///< Electrostatic energy from non-bonded interactions
-  ELECTROSTATIC_ONE_FOUR, ///< Electrostatic energy from 1-4 attenuated interactions
-  GENERALIZED_BORN,       ///< Generalized Born (implicit solvent) energy
-  PRESSURE,               ///< System pressure (only computed if virials are accumulated)
-  VIRIAL_11,              ///< Virial tensor (1,1) element
-  VIRIAL_12,              ///< Virial tensor (1,2) element
-  VIRIAL_22,              ///< Virial tensor (2,2) element
-  VIRIAL_13,              ///< Virial tensor (1,3) element
-  VIRIAL_23,              ///< Virial tensor (2,3) element
-  VIRIAL_33,              ///< Virial tensor (3,3) element
-  VOLUME,                 ///< Unit cell volume (only relevant to periodic simulations)
-  TEMPERATURE_ALL,        ///< Overall system temperature
-  TEMPERATURE_PROTEIN,    ///< Temperature of atoms in the "protein" component of the system (this,
-                          ///<   like the other temperature subcategories that collow, is an
-                          ///<   arbitrary subset of the atoms defined by a special mask in the
-                          ///<   control input)
-  TEMPERATURE_LIGAND,     ///< Overall system temperature
-  TEMPERATURE_SOLVENT,    ///< Overall system temperature
-  DU_DLAMBDA,             ///< Derivative of the mixed potential energy function with respect to
-                          ///<   the mixing parameter Lambda (relevant to thermodynamic
-                          ///<   integration applications only)
-  ALL_STATES              ///< This must always be the final entry.  The number of tracked
-                          ///<   quantities is equal to the value of this entry (ALL_STATES does
-                          ///<   not define its own index in the subsequent tracking arrays).
-};
 
 /// \brief Read-only abstract for the ScoreCard object.  This is needed more for completeness than
 ///        anything else, but could be useful in cases where virials are to be translated into

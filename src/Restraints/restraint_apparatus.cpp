@@ -200,6 +200,9 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
   
   // Fill the Hybrid arrays
   populateInternalArrays(rbasis);
+
+  // Assess the time dependence across the entire restraint collection, for simple reporting
+  assessTimeDependence();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -524,6 +527,7 @@ RestraintApparatus& RestraintApparatus::operator=(RestraintApparatus &&other) {
   float2_data = std::move(other.float2_data);
   float4_data = std::move(other.float4_data);
   ag_pointer = other.ag_pointer;
+  return *this;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -692,6 +696,9 @@ void RestraintApparatus::addRestraints(const std::vector<BoundedRestraint> &new_
 
   // Fill the Hybrid arrays with the augmented restraint set
   populateInternalArrays(rbasis);
+
+  // Assess the time dependence after the update
+  assessTimeDependence();
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -1080,6 +1087,34 @@ void RestraintApparatus::populateInternalArrays(const std::vector<BoundedRestrai
   sp_rangl_final_r.putHost(sp_tmp_rangl_final_r);
   sp_rdihe_init_r.putHost(sp_tmp_rdihe_init_r);
   sp_rdihe_final_r.putHost(sp_tmp_rdihe_final_r);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool RestraintApparatus::assessTimeDependence(int* init_steps, int* final_steps, int nrest) {
+  bool is_time_dependent = false;
+  for (size_t i = 0; i < nrest; i++) {
+    if (init_steps[i] < 0) {
+      init_steps[i] = 0;
+    }
+    if (final_steps[i] < init_steps[i]) {
+      final_steps[i] = init_steps[i];
+    }
+    is_time_dependent = (is_time_dependent || init_steps[i] > 0 || init_steps[i] < final_steps[i]);
+  }
+  return is_time_dependent;
+}
+
+//-------------------------------------------------------------------------------------------------
+void RestraintApparatus::assessTimeDependence() {
+  if (assessTimeDependence(rposn_init_step.data(), rposn_final_step.data(), position_count) ||
+      assessTimeDependence(rbond_init_step.data(), rbond_final_step.data(), distance_count) ||
+      assessTimeDependence(rangl_init_step.data(), rangl_final_step.data(), angle_count) ||
+      assessTimeDependence(rdihe_init_step.data(), rdihe_final_step.data(), dihedral_count)) {
+    time_based_restraints = true;
+  }
+  else {
+    time_based_restraints = false;
+  }
 }
 
 } // namespace restraints

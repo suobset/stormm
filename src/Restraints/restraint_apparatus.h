@@ -259,9 +259,9 @@ private:
   int angle_count;             ///< Number of angle (three-point) restraints
   int dihedral_count;          ///< Number of dihedral (four-point) restraints
   bool time_based_restraints;  ///< Flag to indicate whether restraints are at all dependent on
-                               ///<   the time step of the simulation (for energy minimizations or
-                               ///<   simple molecular mechanics calculations, restraints are
-                               ///<   are constant)
+                               ///<   the time step of the simulation (for most energy
+                               ///<   minimizations or simple molecular mechanics calculations,
+                               ///<   restraints are constant)
 
   // Integer data 
   Hybrid<int> rposn_atoms;       ///< Topological indices of positionally restrained atoms
@@ -417,6 +417,26 @@ private:
   ///
   /// \param rbasis  A list of restraint objects with which to build the apparatus
   void populateInternalArrays(const std::vector<BoundedRestraint> &rbasis);
+
+  /// \brief Loop over all restraints in the collection, clean up the initial and final steps for
+  ///        safe parsing by potential computations, and mark whether there is, in fact, any time
+  ///        dependence in any of the restraints.  A negative initial time step makes no sense, so
+  ///        make that zero.  Likewise, a final / maturation step lower than the initial step for
+  ///        applying a restraint makes no sense, so clean that up.  A final /maturation step
+  ///        value of zero thus means that the restraint is not time-dependent, and the initial
+  ///        values for its stiffnesses and displacements indicate how it behaves forever.
+  ///        Restraints that have a nonzero initial step but a final step equal to the initial
+  ///        step are time-dependent, but the initial values of the restraints still take
+  ///        precedence.  Only when there is a maturation step that occurs at some time after the
+  ///        initial step does a mixture of the settings at the two endpoints become important.
+  ///
+  /// Overloaded:
+  ///   - Assess a particular subset of the restraints and return a boolean value
+  ///   - Assess all of the restraints and set the object's flag
+  /// \{
+  bool assessTimeDependence(int* init_steps, int* final_steps, int nrest);
+  void assessTimeDependence();
+  /// \}
 };
 
 } // namespace restraints

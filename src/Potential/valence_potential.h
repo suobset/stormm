@@ -2,19 +2,24 @@
 #ifndef OMNI_VALENCE_POTENTIAL_H
 #define OMNI_VALENCE_POTENTIAL_H
 
-#include "Trajectory/coordinateframe.h"
-#include "Trajectory/phasespace.h"
+#include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
+#include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/phasespace.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
 
 namespace omni {
 namespace energy {
 
+using restraints::RestraintApparatus;
+using restraints::RestraintApparatusDpReader;
 using topology::AtomGraph;
 using topology::ValenceKit;
 using topology::NonbondedKit;
+using topology::UnitCellType;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpace;
@@ -67,16 +72,16 @@ double evaluateBondTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
 double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
-                         ScoreCard *ecard, const int system_index);
+                         ScoreCard *ecard, int system_index = 0);
 
 double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
-                         ScoreCard *ecard, const int system_index);
+                         ScoreCard *ecard, int system_index = 0);
 
 double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                         ScoreCard *ecard, const int system_index);
+                         ScoreCard *ecard, int system_index = 0);
 
 double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                         ScoreCard *ecard, const int system_index);
+                         ScoreCard *ecard, int system_index = 0);
 /// \}
   
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
@@ -109,16 +114,16 @@ double evaluateAngleTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
 double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
-                          ScoreCard *ecard, const int system_index);
+                          ScoreCard *ecard, int system_index = 0);
 
 double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
-                          ScoreCard *ecard, const int system_index);
+                          ScoreCard *ecard, int system_index = 0);
 
 double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                          ScoreCard *ecard, const int system_index);
+                          ScoreCard *ecard, int system_index = 0);
 
 double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                          ScoreCard *ecard, const int system_index);
+                          ScoreCard *ecard, int system_index = 0);
 /// \}
 
 /// \brief Evaluate the proper and improper dihedral energy contributions with a simple routine
@@ -187,26 +192,25 @@ double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrameReader &
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
-                                ScoreCard *ecard, const EvaluateForce eval_force,
-                                const int system_index);
+                                ScoreCard *ecard, EvaluateForce eval_force, int system_index = 0);
 
 double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                const EvaluateForce eval_force, const int system_index);
+                                EvaluateForce eval_force, int system_index = 0);
 
 double evaluateUreyBradleyTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                                const EvaluateForce eval_force, const int system_index);
+                                EvaluateForce eval_force, int system_index = 0);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
-                                ScoreCard *ecard, const int system_index);
+                                ScoreCard *ecard, int system_index = 0);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
-                                ScoreCard *ecard, const int system_index);
+                                ScoreCard *ecard, int system_index = 0);
 
 double evaluateUreyBradleyTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                                ScoreCard *ecard, const int system_index);
+                                ScoreCard *ecard, int system_index = 0);
 
 double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                                ScoreCard *ecard, const int system_index);
+                                ScoreCard *ecard, int system_index = 0);
 /// \}
   
 /// \brief Evaluate CHARMM harmonic improper dihedral terms with a simple routine.  This
@@ -231,26 +235,26 @@ double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
-                                   ScoreCard *ecard, const EvaluateForce eval_force,
-                                   const int system_index);
+                                   ScoreCard *ecard, EvaluateForce eval_force,
+                                   int system_index = 0);
 
 double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                   const EvaluateForce eval_force, const int system_index);
+                                   EvaluateForce eval_force, int system_index = 0);
 
 double evaluateCharmmImproperTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                                   const EvaluateForce eval_force, const int system_index);
+                                   EvaluateForce eval_force, int system_index = 0);
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
-                                   ScoreCard *ecard, const int system_index);
+                                   ScoreCard *ecard, int system_index = 0);
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
-                                   ScoreCard *ecard, const int system_index);
+                                   ScoreCard *ecard, int system_index = 0);
 
 double evaluateCharmmImproperTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                                   ScoreCard *ecard, const int system_index);
+                                   ScoreCard *ecard, int system_index = 0);
 
 double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                                   ScoreCard *ecard, const int system_index);
+                                   ScoreCard *ecard, int system_index = 0);
 /// \}
 
 /// \brief Evaluate CHARMM CMAP two-dimensional cubic spline potentials.  As with all other
@@ -274,25 +278,25 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
 double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
-                         const EvaluateForce eval_force, const int system_index);
+                         EvaluateForce eval_force, int system_index = 0);
 
 double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                         const EvaluateForce eval_force, const int system_index);
+                         EvaluateForce eval_force, int system_index = 0);
 
 double evaluateCmapTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                         const EvaluateForce eval_force, const int system_index);
+                         EvaluateForce eval_force, int system_index = 0);
 
 double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
-                         ScoreCard *ecard, const int system_index);
+                         ScoreCard *ecard, int system_index = 0);
 
 double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
-                         ScoreCard *ecard, const int system_index);
+                         ScoreCard *ecard, int system_index = 0);
 
 double evaluateCmapTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                         const int system_index);
+                         int system_index = 0);
 
 double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                         const int system_index);
+                         int system_index = 0);
 /// \}
 
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
@@ -321,30 +325,98 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
 /// \{
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
-                                  const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index);
+                                  EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                  int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                  const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index);
+                                  EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                  int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                                  const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index);
+                                  EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                  int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
-                                  const CoordinateFrameReader cfr,
-                                  ScoreCard *ecard, const int system_index);
+                                  const CoordinateFrameReader cfr, ScoreCard *ecard,
+                                  int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
-                                  const CoordinateFrameWriter &cfw,
-                                  ScoreCard *ecard, const int system_index);
+                                  const CoordinateFrameWriter &cfw, ScoreCard *ecard,
+                                  int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                                  ScoreCard *ecard, const int system_index);
+                                  ScoreCard *ecard, int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                                  ScoreCard *ecard, const int system_index);
+                                  ScoreCard *ecard, int system_index = 0);
+/// \}
+
+/// \brief Compute the mixture of end-point values that will determine the actual strength and
+///        displacement settings of a flat-bottom bimodal harmonic restraint.  The flag about a
+///        RestraintApparatus having time-dependent restraints is mostly for convenience, a way to
+///        tell whether there is any time-dependent restraint in the collection at all.  The initial
+///        and final settings of the steps for each restraint encode whether there is actual time
+///        dependence in the result.
+///
+/// \param step_number  The current step number of the simulation (may include energy minimization
+///                     step counts)
+/// \param init_step    The initial step at which the restraint engages
+/// \param final_step   The final step at which the restraint becomes mature
+double2 computeRestraintMixture(int step_number, int init_step, int final_step);
+
+/// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
+///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is
+///        recognized, although there is not the same diversity of time evolution functions in
+///        OMNI.
+///
+/// Overloaded:
+///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
+///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Pass the restraint collection by pointer, by reference, or the reader abstract by value
+///
+/// \param ra            Restraint apparatus applicable to the topology that describes the system
+/// \param rar           Double-precision reader for the restraint apparatus 
+/// \param ps            Coordinates, box size, and force accumulators (modified by this function)
+/// \param psw           Coordinates, box size, and force accumulators (modified by this function)
+/// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param ecard         Energy components and other state variables (volume, temperature, etc.)
+///                      (modified by this function)
+/// \param eval_force    Flag to have forces also evaluated
+/// \param system_index  Index of the system to which this energy contributes
+/// \param step_number   The step number at which the energy is being evaluated (may determine the
+///                      restraint parameters by mixing their endpoint values)
+/// \{
+double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xcrd,
+                          const double* ycrd, const double* zcrd, const double* umat,
+                          const double* invu, const UnitCellType unit_cell, double* xfrc,
+                          double* yfrc, double* zfrc, ScoreCard *ecard,
+                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
+                          int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatusDpReader rar, PhaseSpaceWriter psw,
+                          ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
+                          int system_index = 0, int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatus &ra, PhaseSpace *ps, ScoreCard *ecard,
+                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
+                          int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatus *ra, PhaseSpace *ps, ScoreCard *ecard,
+                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
+                          int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatusDpReader rar, const CoordinateFrameReader cfr,
+                          ScoreCard *ecard, int system_index = 0, int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatusDpReader rar, const CoordinateFrameWriter &cfw,
+                          ScoreCard *ecard, int system_index = 0, int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatus &ra, const CoordinateFrameReader cfr,
+                          ScoreCard *ecard, int system_index = 0, int step_number = 0);
+
+double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameReader cfr,
+                          ScoreCard *ecard, int system_index = 0, int step_number = 0);
 /// \}
   
 } // namespace energy
