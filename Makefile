@@ -307,6 +307,7 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_amber_prmtop \
 	          $(TESTDIR)/bin/test_amber_coordinates \
 	          $(TESTDIR)/bin/test_atomgraph_synthesis \
+	          $(TESTDIR)/bin/test_chemical_features \
 	          $(TESTDIR)/bin/test_atommask \
 	          $(TESTDIR)/bin/test_local_arrangement \
 	          $(TESTDIR)/bin/test_isomerization \
@@ -435,6 +436,13 @@ $(TESTDIR)/bin/test_amber_coordinates : $(LIBDIR)/libomni.so \
 	@echo "[OMNI]  Building test_amber_coordinates..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_amber_coordinates \
 	  $(TESTDIR)/Trajectory/test_amber_coordinates.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: chemical feature perception
+$(TESTDIR)/bin/test_chemical_features : $(LIBDIR)/libomni.so \
+					$(TESTDIR)/Chemistry/test_chemical_features.cpp
+	@echo "[OMNI]  Building test_chemical_features..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_chemical_features \
+	  $(TESTDIR)/Chemistry/test_chemical_features.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: atom mask parsing
 $(TESTDIR)/bin/test_atommask : $(LIBDIR)/libomni.so $(TESTDIR)/Chemistry/test_atommask.cpp
