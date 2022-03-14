@@ -719,13 +719,18 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
   // preliminary arrays before commiting them to the actual object.
   std::vector<int> prelim_net_charges;
   std::vector<int> prelim_scores;
+  int centers_participating = 0;
   do {
 
-    // Test whether this combination of settings is viable
+    // Test whether this combination of settings is viable.  For each pair, make sure that both
+    // atoms, whatever state they may be in, are participating in the current fragment structure.
     bool viable = true;
     for (int pos = 0; pos < total_pairs; pos++) {
       const int atom_i = relevant_pairs[pos].x;
       const int atom_j = relevant_pairs[pos].y;
+      if (atom_i >= centers_participating || atom_j >= centers_participating) {
+        continue;
+      }
       const int bond_out_of_i = relevant_pairs[pos].z;
       const int bond_out_of_j = relevant_pairs[pos].w;
       const int local_atom_i = local_pair_idx[pos].x;
@@ -738,22 +743,32 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     }
     if (viable) {
 
-      // Compute the score and net charge of this state, then push those results and the state
-      // itself onto the stack for this fragment.
-      int st_q = 0;
-      int st_score = 0;
-      for (int i = 0; i < ccenter_count; i++) {
-        const int c_idx = centers_list_in[i];
-        const int s_idx = settings[i];
-        st_q += all_centers[c_idx].getCharge(s_idx);
-        st_score += all_centers[c_idx].getScore(s_idx);
-        states_data.push_back(s_idx);
+      // If not all atom centers are participating, increment the number of centers that are
+      // included in the fragment and start the search for the state of the next atom at its
+      // first position.  Otherwise, compute the score and net charge of this state, then push
+      // those results and the state itself onto the stack for this fragment.
+      if (centers_participating < ccenter_count) {
+        settings[centers_participating] = 0;
+        centers_participating++;
+        continue;
       }
-      prelim_net_charges.push_back(st_q);
-      prelim_scores.push_back(st_score);
+      else {
+        int st_q = 0;
+        int st_score = 0;
+        for (int i = 0; i < ccenter_count; i++) {
+          const int c_idx = centers_list_in[i];
+          const int s_idx = settings[i];
+          st_q += all_centers[c_idx].getCharge(s_idx);
+          st_score += all_centers[c_idx].getScore(s_idx);
+          states_data.push_back(s_idx);
+        }
+        prelim_net_charges.push_back(st_q);
+        prelim_scores.push_back(st_score);
+      }
     }
 
-    // Increment the state
+    // Increment the state of the final participating atom, up until the point when there are
+    // no longer any participating 
     settings[0] += 1;
     int i = 0;
     while (settings[i] >= max_settings[i]) {
