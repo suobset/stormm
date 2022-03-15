@@ -75,11 +75,11 @@ int main(int argc, char* argv[]) {
   const std::vector<std::string> top_files = { mol1_top_name, mol2_top_name, mol3_top_name,
                                                drug_top_name, drug_vs_top_name, ala_top_name,
                                                gly_top_name, phe_top_name, trpcage_top_name,
-                                               ubiquit_top_name };
+                                               ubiquit_top_name, tip5p_top_name };
   const std::vector<std::string> crd_files = { mol1_crd_name, mol2_crd_name, mol3_crd_name,
                                                drug_crd_name, drug_vs_crd_name, ala_crd_name,
                                                gly_crd_name, phe_crd_name, trpcage_crd_name,
-                                               ubiquit_crd_name };
+                                               ubiquit_crd_name, tip5p_crd_name };
   bool files_exist = true;
   const size_t nsys = top_files.size();
   for (size_t i = 0; i < nsys; i++) {
@@ -100,6 +100,12 @@ int main(int argc, char* argv[]) {
       sys_ps[i].buildFromFile(crd_files[i], CoordinateFileKind::UNKNOWN);
     }
   }
+
+  // CHECK
+  printf("There are %d atoms in %s.\n", sys_ag[10].getAtomCount(),
+         sys_ag[10].getFileName().c_str());
+  // END CHECK
+  
   std::vector<int> first_mol_size(nsys);
   std::vector<ChemicalFeatures> sys_chem;
   const MapRotatableGroups mapg_yes = MapRotatableGroups::YES;
@@ -136,15 +142,24 @@ int main(int argc, char* argv[]) {
     chiral_center_counts[i] = sys_chem[i].getChiralCenterCount();
     rotatable_bond_counts[i] = sys_chem[i].getRotatableBondCount();
   }
-  std::vector<int> ring_cnt_ans           = {    1,    1,    4, 1226, 1234,    0,    0,    1, 1567,  966 };
-  std::vector<int> fused_ring_cnt_ans     = {    0,    0,    0,    0,    3,    0,    0,    0,    1,  480 };
-  std::vector<int> mutable_ring_cnt_ans   = {    1,    1,    4, 1226, 1234,    0,    0,    1, 1567,  966 };
-  std::vector<int> aromatic_group_cnt_ans = {    1,    1,    3,    1,    1,    0,    0,    1,    3,    3 };
-  std::vector<int> polar_h_cnt_ans        = {   64,   96,    6,    2,    2,    2,    3,    2,   35,  128 };
-  std::vector<int> hbond_donor_cnt_ans    = {   64,   96,    6,    2,    2,    2,    3,    2,   35,  128 };
-  std::vector<int> hbond_acceptor_cnt_ans = {   64,    1,    7, 1228, 1228,    4,    6,    4, 1614,  681 };
-  std::vector<int> chiral_center_cnt_ans  = {    0,    0,    0,    0,    0,    1,    0,    1,   18,   82 };
-  std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    7,    7,    4,    7,    6,    0,    0 };
+  std::vector<int> ring_cnt_ans           = {    1,    1,    4, 1226, 1226,    0,    0,    1,
+                                              1567,  486,  216 };
+  std::vector<int> fused_ring_cnt_ans     = {    0,    0,    0,    0,    0,    0,    0,    0,
+                                                 1,    0,    0 };
+  std::vector<int> mutable_ring_cnt_ans   = {    1,    1,    4, 1226, 1226,    0,    0,    1,
+                                              1567,  486,  216 };
+  std::vector<int> aromatic_group_cnt_ans = {    1,    1,    3,    1,    1,    0,    0,    1,
+                                                 3,    3,    0 };
+  std::vector<int> polar_h_cnt_ans        = {   64,   96,    6, 2450, 2450,    2,    3,    2,
+                                                35, 1088,  432 };
+  std::vector<int> hbond_donor_cnt_ans    = {   64,   96,    6, 1226, 1226,    2,    3,    2,
+                                                35,  128,  216 };
+  std::vector<int> hbond_acceptor_cnt_ans = {   64,    1,    7, 1228, 1228,    4,    6,    4,
+                                              1614,  681,  216 };
+  std::vector<int> chiral_center_cnt_ans  = {    0,    0,    0,    1,    1,    1,    0,    1,
+                                                18,   82,    0 };
+  std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    7,    7,    4,    7,    6,
+                                                 0,    0,    0 };
   std::vector<int> trp_cage_lchir = sys_chem[7].listChiralCenters(ChiralOrientation::SINISTER);
   std::vector<int> trp_cage_dchir = sys_chem[7].listChiralCenters(ChiralOrientation::RECTUS);
   check(ring_counts, RelationalOperator::EQUAL, ring_cnt_ans, "Overall counts of ring systems do "

@@ -57,8 +57,9 @@ public:
   /// \param current_layer  The current layer in the growing tree
   /// \param nbk            Nonbonded interactions abstract for the overarching topology (needed
   ///                       for list of 1:2 exclusions, which indicate bonds)
+  /// \param cdk            Atom, residue, and molecule details taken from the original topology
   void addToTree(int previous_in, int current_atom, int current_layer,
-                 const NonbondedKit<double> &nbk);
+                 const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk);
 
   /// \brief Add the bond order between this atom and its previous atom
   ///
@@ -411,6 +412,8 @@ private:
   /// \brief Trace all rings in the system based on a tree structure linked list.
   ///
   /// \param nbk                   Nonbonded abstract from the original topology
+  /// \param cdk                   Atom, residue, and molecule details taken from the original
+  ///                              topology
   /// \param tmp_ring_inclusions   Developing list of ring inlusions.  The nth bit of the kth
   ///                              array element indicates whether the kth atom participates in a
   ///                              ring of size n.
@@ -419,7 +422,7 @@ private:
   ///                              leading zero so that the push_back method can add the boundaries
   ///                              of each successive group and arrive at a capped, exclusive
   ///                              prefix sum of all ring sizes.
-  void traceTopologicalRings(const NonbondedKit<double> &nbk,
+  void traceTopologicalRings(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
                              std::vector<ullint> *tmp_ring_inclusion,
                              std::vector<int> *tmp_ring_atoms,
                              std::vector<int> *tmp_ring_atom_bounds);
@@ -439,7 +442,8 @@ private:
   void markRingAtoms(int j_atom, int k_atom, const std::vector<int> &tree_positions,
                      int node_count, std::vector<BondedNode> *links,
                      std::vector<ullint> *tmp_ring_inclusion, std::vector<int> *tmp_ring_atoms,
-                     std::vector<int> *tmp_ring_atom_bounds);
+                     std::vector<int> *tmp_ring_atom_bounds,
+                     const ChemicalDetailsKit &cdk);
 
   /// \brief Draw Lewis structures over the entire topology using the Indigo method.  Lewis
   ///        structures will be drawn for each unique molecule and copied otherwise, but that

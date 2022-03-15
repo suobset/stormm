@@ -30,6 +30,7 @@ using math::roundUp;
 
 // CHECK
 using parse::operator==;
+using parse::char4ToString;
 // END CHECK
 
 using testing::Approx;
@@ -55,7 +56,7 @@ void BondedNode::setBranchPointer(std::vector<int> *vi, const size_t pos,
 
 //-------------------------------------------------------------------------------------------------
 void BondedNode::addToTree(const int previous_in, const int current_atom, const int current_layer,
-                           const NonbondedKit<double> &nbk) {
+                           const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk) {
   previous_atom_index = previous_in;
   atom_index = current_atom;
   layer_index = current_layer;
@@ -64,7 +65,7 @@ void BondedNode::addToTree(const int previous_in, const int current_atom, const 
   int j = 0;
   for (int i = 0; i < link_candidate_count; i++) {
     const int candidate_atom = nbk.nb12x[i + excl_start];
-    if (candidate_atom != previous_in) {
+    if (candidate_atom != previous_in && cdk.z_numbers[candidate_atom] != 0) {
       branch_atoms[j] = candidate_atom;
       j++;
     }
@@ -214,7 +215,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   std::vector<ullint> tmp_ring_inclusion(atom_count, 0LLU);
   std::vector<int> tmp_ring_atom_bounds(1, 0);
   std::vector<int> tmp_ring_atoms;
-  traceTopologicalRings(nbk, &tmp_ring_inclusion, &tmp_ring_atoms, &tmp_ring_atom_bounds);
+  traceTopologicalRings(nbk, cdk, &tmp_ring_inclusion, &tmp_ring_atoms, &tmp_ring_atom_bounds);
   ring_inclusion.resize(atom_count);
   ring_inclusion.putHost(tmp_ring_inclusion);
   
@@ -490,6 +491,7 @@ std::vector<int> ChemicalFeatures::findPlanarAtoms(const ValenceKit<double> &vk)
 
 //-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
+                                             const ChemicalDetailsKit &cdk,
                                              std::vector<ullint> *tmp_ring_inclusion,
                                              std::vector<int> *tmp_ring_atoms,
                                              std::vector<int> *tmp_ring_atom_bounds) {
@@ -510,19 +512,22 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
   // initiated by some other atom.
   std::vector<bool> atom_touched(atom_count, false);
   for (int i = 0; i < atom_count; i++) {
+    if (cdk.z_numbers[i] == 0) {
+      atom_touched[i] = true;
+    }
     if (atom_touched[i]) {
       continue;
     }
     
     // Initiate the chain
     atom_touched[i] = true;
-    links[0].addToTree(-1, i, 0, nbk);
+    links[0].addToTree(-1, i, 0, nbk, cdk);
     tree_positions[i] = 0;
     int node_count = 1;
     int current_layer = 1;
     int layer_llim = 0;
     int layer_hlim = 1;
-    while(layer_hlim > layer_llim) {
+    while (layer_hlim > layer_llim) {
       const int next_layer_llim = node_count;
       for (int j = layer_llim; j < layer_hlim; j++) {
         const int j_atom = links[j].getAtom();
@@ -534,13 +539,13 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
           // or an earlier one?  If so, this signifies the completion of some loop.  Determine that
           // loop based on the histories of the current atom and the atom it touches.  Otherwise,
           // add the next atom to the chain.
-          if (atom_touched[k_atom]) {
+          if (atom_touched[k_atom] && cdk.z_numbers[k_atom] != 0) {
             markRingAtoms(j_atom, k_atom, tree_positions, node_count, &links, tmp_ring_inclusion,
-                          tmp_ring_atoms, tmp_ring_atom_bounds);
+                          tmp_ring_atoms, tmp_ring_atom_bounds, cdk);
           }
           else {
             atom_touched[k_atom] = true;
-            links[node_count].addToTree(j_atom, k_atom, current_layer, nbk);
+            links[node_count].addToTree(j_atom, k_atom, current_layer, nbk, cdk);
             tree_positions[k_atom] = node_count;
             node_count++;
           }
@@ -564,7 +569,8 @@ void ChemicalFeatures::markRingAtoms(const int j_atom, const int k_atom,
                                      std::vector<BondedNode> *links,
                                      std::vector<ullint> *tmp_ring_inclusion,
                                      std::vector<int> *tmp_ring_atoms,
-                                     std::vector<int> *tmp_ring_atom_bounds) {
+                                     std::vector<int> *tmp_ring_atom_bounds,
+                                     const ChemicalDetailsKit &cdk) {
 
   // Check that the ring has not already been marked
   BondedNode* linkdata = links->data();
@@ -641,7 +647,7 @@ void ChemicalFeatures::markRingAtoms(const int j_atom, const int k_atom,
   // involved and would be inefficient to repeat.
   const int ring_size = j_pivot + k_pivot - 1;
   if (ring_size < max_ring_size && ring_size >= 3) {
-
+    
     // Step through the J history until the pivot point, then backwards through the K history
     // starting at the pivot point.  This will list all atoms in the ring.    
     int n_planar = 0;
@@ -1208,7 +1214,7 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
       if (cdk.z_numbers[nbk.nb12x[j]] == 0) {
         continue;
       }
-      links[n_real][0].addToTree(i, nbk.nb12x[j], 0, nbk);
+      links[n_real][0].addToTree(i, nbk.nb12x[j], 0, nbk, cdk);
       links[n_real][0].addBondOrder(vk, bond_orders);
       atom_touched[n_real][i] = true;
       atom_touched[n_real][nbk.nb12x[j]] = true;
@@ -1243,7 +1249,7 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
               atom_touched[j][m_atom] = true;
               touch_min[j] = std::min(touch_min[j], m_atom);
               touch_max[j] = std::max(touch_max[j], m_atom);
-              links[j][node_count[j]].addToTree(k_atom, m_atom, current_layer, nbk);
+              links[j][node_count[j]].addToTree(k_atom, m_atom, current_layer, nbk, cdk);
               links[j][node_count[j]].addBondOrder(vk, bond_orders);
               tree_positions[j][m_atom] = node_count[j];
               node_count[j] += 1;
@@ -1404,12 +1410,23 @@ void ChemicalFeatures::findHydrogenBondElements(const NonbondedKit<double> &nbk,
                                                 std::vector<int> *tmp_polar_h,
                                                 std::vector<int> *tmp_hb_don,
                                                 std::vector<int> *tmp_hb_acc) {
+  std::vector<bool> polarh_covered(cdk.natom, false);
+  std::vector<bool> donor_covered(cdk.natom, false);
   for (int i = 0; i < cdk.natom; i++) {
-    if (cdk.z_numbers[i] == 1 && nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] == 1) {
-      const int donor_z = cdk.z_numbers[nbk.nb12x[nbk.nb12_bounds[i]]];
-      if (donor_z == 7 || donor_z == 8 || donor_z == 15 || donor_z == 16) {
-        tmp_polar_h->push_back(i);
-        tmp_hb_don->push_back(nbk.nb12x[nbk.nb12_bounds[i]]);
+    if (cdk.z_numbers[i] == 1) {
+      for (int j = nbk.nb12_bounds[i]; j < nbk.nb12_bounds[i + 1]; j++) {
+        const int donor_atom = nbk.nb12x[j];
+        const int donor_z = cdk.z_numbers[donor_atom];
+        if (donor_z == 7 || donor_z == 8 || donor_z == 15 || donor_z == 16) {
+          if (polarh_covered[i] == false) {
+            tmp_polar_h->push_back(i);
+            polarh_covered[i] = true;
+          }
+          if (donor_covered[donor_atom] == false) {
+            tmp_hb_don->push_back(donor_atom);
+            donor_covered[donor_atom] = true;
+          }
+        }
       }
     }
     else if ((cdk.z_numbers[i] ==  7 || cdk.z_numbers[i] ==  8 || cdk.z_numbers[i] == 15 |
