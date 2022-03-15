@@ -5,6 +5,11 @@
 #include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+
+// CHECK
+#include "Parsing/parse.h"
+// END CHECK
+
 #include "Topology/atomgraph_analysis.h"
 #include "UnitTesting/approx.h"
 #include "chemical_features.h"
@@ -22,6 +27,11 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::project;
 using math::roundUp;
+
+// CHECK
+using parse::operator==;
+// END CHECK
+
 using testing::Approx;
 using topology::selectRotatingAtoms;
 using trajectory::CoordinateFrameReader;
@@ -1137,10 +1147,32 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
   std::vector<int> result;
   for (int i = 0; i < atom_count; i++) {
 
+    // CHECK
+    const bool check_this = (cdk.atom_names[i] == char4({'C', '1', '1', ' ' }) &&
+                             cdk.res_names[0] == char4({ 'L', 'I', 'G', ' ' }));
+    if (check_this) {
+      printf("Found atom C11 in LIG.\n");
+    }
+    // END CHECK
+
     // Test whether this atom is a chiral candidate
     if (nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] < 4) {
+
+      // CHECK
+      if (check_this) {
+        printf("  Number of bonds = %d\n", nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i]);
+      }
+      // END CHECK
+      
       continue;
     }
+
+    // CHECK
+    if (check_this) {
+      printf("Check A passes.\n");
+    }
+    // END CHECK
+    
     bool candidate = true;
     int n_hydrogen = 0;
     int n_vs = 0;
@@ -1154,6 +1186,12 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
     if (candidate == false || nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] - n_vs != 4) {
       continue;
     }
+
+    // CHECK
+    if (check_this) {
+      printf("Check B passes.\n");
+    }
+    // END CHECK    
 
     // Initiate the chains
     int n_real = 0;
@@ -1178,7 +1216,13 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
       touch_max[n_real] = std::max(i, nbk.nb12x[j]);
       n_real++;
     }
-    
+
+    // CHECK
+    if (check_this) {
+      printf("  Point C: n_real = %d.\n", n_real);
+    }
+    // END CHECK
+
     // Once a branch beats another, that dominance relationship must be maintained.  Keep a matrix
     // of the dominance relationships (i, j) : 0 = tie, +1 = i beats j, -1 = j beats i.  The matrix
     // will be antisymmetric.
@@ -1219,6 +1263,12 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
         chiral_dominance[ 6] == 0 || chiral_dominance[ 7] == 0 || chiral_dominance[11] == 0) {
       continue;      
     }
+
+    // CHECK
+    if (check_this) {
+      printf("  Check D passes.\n");
+    }
+    // END CHECK
 
     // Give the next chirality check a clean slate.  Use the touch_min and touch_max bounds
     // arrays on the range of atoms that became part of each branch's tree to keep us in O(N)
@@ -1519,6 +1569,58 @@ std::vector<uint> ChemicalFeatures::getHydrogenBondDonorMask() const {
 //-------------------------------------------------------------------------------------------------
 std::vector<uint> ChemicalFeatures::getHydrogenBondAcceptorMask() const {
   return numberSeriesToBitMask(hydrogen_bond_acceptors, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ChemicalFeatures::listChiralCenters(const ChiralOrientation direction) const {
+  std::vector<int> result;
+  const int* chi_ptr = chiral_centers.data();
+  int ncen;
+  switch (direction) {
+  case ChiralOrientation::RECTUS:
+    ncen = 0;
+    for (int i = 0; i < chiral_center_count; i++) {
+      ncen += (chi_ptr[i] < 0);
+    }
+    result.resize(ncen);
+    ncen = 0;
+    for (int i = 0; i < chiral_center_count; i++) {
+      if (chi_ptr[i] < 0) {
+        result[ncen] = 1 - chi_ptr[i];
+        ncen++;
+      }
+    }
+    break;
+  case ChiralOrientation::SINISTER:
+    ncen = 0;
+    for (int i = 0; i < chiral_center_count; i++) {
+      ncen += (chi_ptr[i] > 0);
+    }
+    result.resize(ncen);
+    ncen = 0;
+    for (int i = 0; i < chiral_center_count; i++) {
+      if (chi_ptr[i] > 0) {
+        result[ncen] = chi_ptr[i] - 1;
+        ncen++;
+      }
+    }
+    break;
+  case ChiralOrientation::NONE:
+    ncen = 0;
+    for (int i = 0; i < chiral_center_count; i++) {
+      ncen += (chi_ptr[i] != 0);
+    }
+    result.resize(ncen);
+    ncen = 0;
+    for (int i = 0; i < chiral_center_count; i++) {
+      if (chi_ptr[i] != 0) {
+        result[ncen] = abs(chi_ptr[i]) - 1;
+        ncen++;
+      }
+    }
+    break;
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

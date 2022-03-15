@@ -599,14 +599,6 @@ int IndigoAtomCenter::findPartnerIndex(const int partner_atom_number) const {
 
 //-------------------------------------------------------------------------------------------------
 int IndigoAtomCenter::getBondOrderOfState(const int bond_index, const int state_index) const {
-
-  // CHECK
-  if (state_index < 0 || state_index >= static_cast<int>(states.size())) {
-    printf("Attempting to access index %4d of an array of size %4d.\n", state_index,
-           static_cast<int>(states.size()));
-  }
-  // END CHECK
-  
   return static_cast<int>((states[state_index] >> ((2 * bond_index) + formal_charge_bits)) & 0x3);
 }
   

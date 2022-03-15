@@ -1,4 +1,5 @@
 #include "../../src/Chemistry/chemical_features.h"
+#include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -8,6 +9,11 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 
+// CHECK
+#include "../../src/UnitTesting/stopwatch.h"
+// END CHECK
+
+using omni::chemistry::ChiralOrientation;
 using omni::constants::ExceptionResponse;
 using omni::data_types::int2;
 using omni::diskutil::DrivePathType;
@@ -44,6 +50,8 @@ int main(int argc, char* argv[]) {
   // Additional ligands, with and without water
   const std::string mol3_top_name    = base_chem_name + osc + "lig3_1fsj.top";
   const std::string mol3_crd_name    = base_chem_name + osc + "lig3_1fsj.inpcrd";
+  const std::string drug_top_name    = base_top_name + osc + "drug_example.top";
+  const std::string drug_crd_name    = base_crd_name + osc + "drug_example.inpcrd";
   const std::string drug_vs_top_name = base_top_name + osc + "drug_example_vs.top";
   const std::string drug_vs_crd_name = base_crd_name + osc + "drug_example_vs.inpcrd";
 
@@ -65,11 +73,13 @@ int main(int argc, char* argv[]) {
   
   // Check the existence of all files
   const std::vector<std::string> top_files = { mol1_top_name, mol2_top_name, mol3_top_name,
-                                               drug_vs_top_name, ala_top_name, gly_top_name,
-                                               phe_top_name, trpcage_top_name, ubiquit_top_name };
+                                               drug_top_name, drug_vs_top_name, ala_top_name,
+                                               gly_top_name, phe_top_name, trpcage_top_name,
+                                               ubiquit_top_name };
   const std::vector<std::string> crd_files = { mol1_crd_name, mol2_crd_name, mol3_crd_name,
-                                               drug_vs_crd_name, ala_crd_name, gly_crd_name,
-                                               phe_crd_name, trpcage_crd_name, ubiquit_crd_name };
+                                               drug_crd_name, drug_vs_crd_name, ala_crd_name,
+                                               gly_crd_name, phe_crd_name, trpcage_crd_name,
+                                               ubiquit_crd_name };
   bool files_exist = true;
   const size_t nsys = top_files.size();
   for (size_t i = 0; i < nsys; i++) {
@@ -92,10 +102,10 @@ int main(int argc, char* argv[]) {
   }
   std::vector<int> first_mol_size(nsys);
   std::vector<ChemicalFeatures> sys_chem;
-  sys_chem.reserve(nsys);
   const MapRotatableGroups mapg_yes = MapRotatableGroups::YES;
   const MapRotatableGroups mapg_no  = MapRotatableGroups::NO;
   if (files_exist) {
+    sys_chem.reserve(nsys);
     for (size_t i = 0; i < nsys; i++) {
       const int2 first_mol_lims = sys_ag[i].getMoleculeLimits(0);
       first_mol_size[i] = first_mol_lims.y - first_mol_lims.x;
@@ -103,7 +113,69 @@ int main(int argc, char* argv[]) {
                             (first_mol_size[i] < 120) ? mapg_yes : mapg_no);
     }
   }
-
+  else {
+    sys_chem.resize(nsys);  
+  }
+  std::vector<int> ring_counts(nsys);
+  std::vector<int> fused_ring_counts(nsys);
+  std::vector<int> mutable_ring_counts(nsys);
+  std::vector<int> aromatic_group_counts(nsys);  
+  std::vector<int> polar_h_counts(nsys);
+  std::vector<int> hbond_donor_counts(nsys);
+  std::vector<int> hbond_acceptor_counts(nsys);
+  std::vector<int> chiral_center_counts(nsys);
+  std::vector<int> rotatable_bond_counts(nsys);
+  for (size_t i = 0; i < nsys; i++) {
+    ring_counts[i] = sys_chem[i].getRingCount();
+    fused_ring_counts[i] = sys_chem[i].getFusedRingCount();
+    mutable_ring_counts[i] = sys_chem[i].getRingCount();
+    aromatic_group_counts[i] = sys_chem[i].getAromaticGroupCount();
+    polar_h_counts[i] = sys_chem[i].getPolarHydrogenCount();
+    hbond_donor_counts[i] = sys_chem[i].getHydrogenBondDonorCount();
+    hbond_acceptor_counts[i] = sys_chem[i].getHydrogenBondAcceptorCount();
+    chiral_center_counts[i] = sys_chem[i].getChiralCenterCount();
+    rotatable_bond_counts[i] = sys_chem[i].getRotatableBondCount();
+  }
+  std::vector<int> ring_cnt_ans           = {    1,    1,    4, 1226, 1234,    0,    0,    1, 1567,  966 };
+  std::vector<int> fused_ring_cnt_ans     = {    0,    0,    0,    0,    3,    0,    0,    0,    1,  480 };
+  std::vector<int> mutable_ring_cnt_ans   = {    1,    1,    4, 1226, 1234,    0,    0,    1, 1567,  966 };
+  std::vector<int> aromatic_group_cnt_ans = {    1,    1,    3,    1,    1,    0,    0,    1,    3,    3 };
+  std::vector<int> polar_h_cnt_ans        = {   64,   96,    6,    2,    2,    2,    3,    2,   35,  128 };
+  std::vector<int> hbond_donor_cnt_ans    = {   64,   96,    6,    2,    2,    2,    3,    2,   35,  128 };
+  std::vector<int> hbond_acceptor_cnt_ans = {   64,    1,    7, 1228, 1228,    4,    6,    4, 1614,  681 };
+  std::vector<int> chiral_center_cnt_ans  = {    0,    0,    0,    0,    0,    1,    0,    1,   18,   82 };
+  std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    7,    7,    4,    7,    6,    0,    0 };
+  std::vector<int> trp_cage_lchir = sys_chem[7].listChiralCenters(ChiralOrientation::SINISTER);
+  std::vector<int> trp_cage_dchir = sys_chem[7].listChiralCenters(ChiralOrientation::RECTUS);
+  check(ring_counts, RelationalOperator::EQUAL, ring_cnt_ans, "Overall counts of ring systems do "
+        "not meet expectations.", do_tests);
+  check(fused_ring_counts, RelationalOperator::EQUAL, fused_ring_cnt_ans, "Counts of fused ring "
+        "systems do not meet expectations.", do_tests);
+  check(mutable_ring_counts, RelationalOperator::EQUAL, mutable_ring_cnt_ans, "Counts of mutable "
+        "ring systems do not meet expectations.", do_tests);
+  check(aromatic_group_counts, RelationalOperator::EQUAL, aromatic_group_cnt_ans, "Counts of "
+        "aromatic ring systems do not meet expectations.", do_tests);
+  check(polar_h_counts, RelationalOperator::EQUAL, polar_h_cnt_ans, "Counts of polar hydrogens "
+        "do not meet expectations.", do_tests);
+  
+  // CHECK
+#if 0
+  StopWatch sw;
+  sw.addCategory("Lauren's molecule");
+  sw.addCategory("TrpCage");
+  sw.addCategory("Lig1_C8H8");
+  for (int i = 0; i < 5; i++) {
+    ChemicalFeatures lauren(&sys_ag[2], CoordinateFrameReader(sys_ps[2]), mapg_no);
+    sw.assignTime(1);
+    ChemicalFeatures trppro(&sys_ag[7], CoordinateFrameReader(sys_ps[7]), mapg_no);
+    sw.assignTime(2);
+    ChemicalFeatures ligand(&sys_ag[0], CoordinateFrameReader(sys_ps[0]), mapg_no);
+    sw.assignTime(3);
+  }
+  sw.printResults();
+#endif
+  // END CHECK
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }

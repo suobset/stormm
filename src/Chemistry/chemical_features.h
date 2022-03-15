@@ -250,6 +250,11 @@ public:
   ///        creating new atom masks.
   std::vector<uint> getHydrogenBondAcceptorMask() const;
 
+  /// \brief List the chiral centers in a system, using topological indices.
+  ///
+  /// \param direction  Preferred chiral orientation of the centers to return (D-, L-, or both)
+  std::vector<int> listChiralCenters(ChiralOrientation direction) const;
+  
   /// \brief Return a mask of chiral centers in the system.
   ///
   /// \param direction  Allows one to select R- (D-), S- (L-), or both chiralities for the maks
