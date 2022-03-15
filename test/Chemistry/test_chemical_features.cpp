@@ -90,12 +90,6 @@ int main(int argc, char* argv[]) {
       sys_ps[i].buildFromFile(crd_files[i], CoordinateFileKind::UNKNOWN);
     }
   }
-
-  // CHECK
-#if 0
-  printf("Point A\n");
-  // END CHECK
-
   std::vector<int> first_mol_size(nsys);
   std::vector<ChemicalFeatures> sys_chem;
   sys_chem.reserve(nsys);
@@ -105,20 +99,10 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < nsys; i++) {
       const int2 first_mol_lims = sys_ag[i].getMoleculeLimits(0);
       first_mol_size[i] = first_mol_lims.y - first_mol_lims.x;
-
-      // CHECK
-      printf("Features for %s\n", sys_ag[i].getFileName().c_str());
-      // END CHECK
-      
       sys_chem.emplace_back(&sys_ag[i], CoordinateFrameReader(sys_ps[i]),
                             (first_mol_size[i] < 120) ? mapg_yes : mapg_no);
     }
   }
-
-  // CHECK
-  printf("Point C\n");
-#endif
-  // END CHECK
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -599,6 +599,14 @@ int IndigoAtomCenter::findPartnerIndex(const int partner_atom_number) const {
 
 //-------------------------------------------------------------------------------------------------
 int IndigoAtomCenter::getBondOrderOfState(const int bond_index, const int state_index) const {
+
+  // CHECK
+  if (state_index < 0 || state_index >= static_cast<int>(states.size())) {
+    printf("Attempting to access index %4d of an array of size %4d.\n", state_index,
+           static_cast<int>(states.size()));
+  }
+  // END CHECK
+  
   return static_cast<int>((states[state_index] >> ((2 * bond_index) + formal_charge_bits)) & 0x3);
 }
   
@@ -726,15 +734,15 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     // atoms, whatever state they may be in, are participating in the current fragment structure.
     bool viable = true;
     for (int pos = 0; pos < total_pairs; pos++) {
-      const int atom_i = relevant_pairs[pos].x;
-      const int atom_j = relevant_pairs[pos].y;
-      if (atom_i >= centers_participating || atom_j >= centers_participating) {
-        continue;
-      }
-      const int bond_out_of_i = relevant_pairs[pos].z;
-      const int bond_out_of_j = relevant_pairs[pos].w;
       const int local_atom_i = local_pair_idx[pos].x;
       const int local_atom_j = local_pair_idx[pos].y;
+      if (local_atom_i >= centers_participating || local_atom_j >= centers_participating) {
+        continue;
+      }
+      const int atom_i = relevant_pairs[pos].x;
+      const int atom_j = relevant_pairs[pos].y;
+      const int bond_out_of_i = relevant_pairs[pos].z;
+      const int bond_out_of_j = relevant_pairs[pos].w;
       if (all_centers[atom_i].getBondOrderOfState(bond_out_of_i, settings[local_atom_i]) !=
           all_centers[atom_j].getBondOrderOfState(bond_out_of_j, settings[local_atom_j])) {
         viable = false;
@@ -767,18 +775,21 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
       }
     }
 
-    // Increment the state of the final participating atom, up until the point when there are
-    // no longer any participating 
-    settings[0] += 1;
-    int i = 0;
-    while (settings[i] >= max_settings[i]) {
-      settings[i] = 0;
-      if (i < ccenter_count - 1) {
-        settings[i + 1] += 1;
-      }
-      i++;
-    }
-  } while (sum<int>(settings) < total_options);
+    // Increment the state of the final participating atom, until all of its states are
+    // exhausted.  If the final atom has been incremented past its avaiable states, reduce the
+    // number of participating atoms by one.  Increment the state of the final participating atom
+    // (which was once the next-to-last participating atom).  The next round will determine
+    // whether the fragment state is viable, and roll forward again with a new attempt to add
+    // atoms.
+    int last_participant = centers_participating - 1;
+    settings[last_participant] += 1;
+    while (settings[last_participant] >= max_settings[last_participant] &&
+        centers_participating > 1) {
+      centers_participating--;
+      last_participant--;
+      settings[last_participant] += 1;
+    }    
+  } while (settings[0] < max_settings[0]);
 
   // Sort states by energy, then by charge.  Let the maximum charge of any fragment be +/-8192.
   possible_states = prelim_net_charges.size();
