@@ -53,6 +53,11 @@ bool operator==(const char4 lhs, const char4 rhs) {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool operator!=(const char4 lhs, const char4 rhs) {
+  return (lhs.x != rhs.x || lhs.y != rhs.y || lhs.z != rhs.z || lhs.w != rhs.w);
+}
+
+//-------------------------------------------------------------------------------------------------
 bool verifyNumberFormat(const char* a, const NumberFormat cform, const int read_begin,
                         const int len) {
 

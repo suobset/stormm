@@ -670,8 +670,8 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
   // const representations even of local variables to avoid dereferencing &this.
   std::vector<int> settings(center_count, 0);
   std::vector<int> max_settings(center_count);
-  std::vector<int4> relevant_pairs;
-  std::vector<int2> local_pair_idx;
+  std::vector<int4> tmp_relevant_pairs;
+  std::vector<int2> tmp_local_pair_idx;
   const int ccenter_count = center_count;
   for (int i = 0; i < ccenter_count; i++) {
     const int tc_index = centers_list_in[i];
@@ -703,17 +703,49 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
         // providing their numbers in the overarching IndigoTable.  Its z and w members provide the
         // local bond indices of the aotm centers identified in x and y, respectively, which form
         // the bond between atom centers x and y or between y and x.
-        relevant_pairs.push_back({ tc_index, partner_index, j, reciprocal_j });
+        tmp_relevant_pairs.push_back({ tc_index, partner_index, j, reciprocal_j });
 
         // What is still needed are the local indices of each atom center, within this fragment.
         // Another array stores that information.  Together, these arrays define the potential
         // function for this fragment.
-        local_pair_idx.push_back({ i, local_partner_index });
+        tmp_local_pair_idx.push_back({ i, local_partner_index });
       }
     }
   }
   const int total_options = sum<int>(max_settings) - ccenter_count;
-  const int total_pairs = relevant_pairs.size();
+  const int total_pairs = tmp_relevant_pairs.size();
+
+  // Create a key for all pairs involving a particular local atom index.
+  std::vector<int> relevant_pair_bounds(ccenter_count + 1, 0);
+  for (int i = 0; i < total_pairs; i++) {
+    if (tmp_local_pair_idx[i].x > tmp_local_pair_idx[i].y) {
+      relevant_pair_bounds[tmp_local_pair_idx[i].x] += 1;
+    }
+    else {
+      relevant_pair_bounds[tmp_local_pair_idx[i].y] += 1;
+    }
+  }
+  prefixSumInPlace<int>(&relevant_pair_bounds, PrefixSumType::EXCLUSIVE, "IndigoFragment");
+  std::vector<int4> relevant_pairs(total_pairs);
+  std::vector<int2> local_pair_idx(total_pairs);
+  for (int i = 0; i < total_pairs; i++) {
+    if (tmp_local_pair_idx[i].x > tmp_local_pair_idx[i].y) {
+      const int inc_idx = relevant_pair_bounds[tmp_local_pair_idx[i].x];
+      relevant_pairs[inc_idx] = tmp_relevant_pairs[i];
+      local_pair_idx[inc_idx] = tmp_local_pair_idx[i];
+      relevant_pair_bounds[tmp_local_pair_idx[i].x] = inc_idx + 1;
+    }
+    else {
+      const int inc_idx = relevant_pair_bounds[tmp_local_pair_idx[i].y];
+      relevant_pairs[inc_idx] = tmp_relevant_pairs[i];
+      local_pair_idx[inc_idx] = tmp_local_pair_idx[i];
+      relevant_pair_bounds[tmp_local_pair_idx[i].y] = inc_idx + 1;
+    }
+  }
+  for (int i = ccenter_count; i > 0; i--) {
+    relevant_pair_bounds[i] = relevant_pair_bounds[i - 1];
+  }
+  relevant_pair_bounds[0] = 0;
   
   // Create a vector to run through all states of the fragment.  Accumulate results in
   // preliminary arrays before commiting them to the actual object.
@@ -725,21 +757,21 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     // Test whether this combination of settings is viable.  For each pair, make sure that both
     // atoms, whatever state they may be in, are participating in the current fragment structure.
     bool viable = true;
-    for (int pos = 0; pos < total_pairs; pos++) {
-      const int local_atom_i = local_pair_idx[pos].x;
-      const int local_atom_j = local_pair_idx[pos].y;
-      if (local_atom_i >= centers_participating || local_atom_j >= centers_participating) {
-        continue;
+    if (centers_participating >= 1) {
+      for (int pos = relevant_pair_bounds[centers_participating - 1];
+           pos < relevant_pair_bounds[centers_participating]; pos++) {
+        const int local_atom_i = local_pair_idx[pos].x;
+        const int local_atom_j = local_pair_idx[pos].y;
+        const int atom_i = relevant_pairs[pos].x;
+        const int atom_j = relevant_pairs[pos].y;
+        const int bond_out_of_i = relevant_pairs[pos].z;
+        const int bond_out_of_j = relevant_pairs[pos].w;
+        if (all_centers[atom_i].getBondOrderOfState(bond_out_of_i, settings[local_atom_i]) !=
+            all_centers[atom_j].getBondOrderOfState(bond_out_of_j, settings[local_atom_j])) {
+          viable = false;
+          break;
+        }
       }
-      const int atom_i = relevant_pairs[pos].x;
-      const int atom_j = relevant_pairs[pos].y;
-      const int bond_out_of_i = relevant_pairs[pos].z;
-      const int bond_out_of_j = relevant_pairs[pos].w;
-      if (all_centers[atom_i].getBondOrderOfState(bond_out_of_i, settings[local_atom_i]) !=
-          all_centers[atom_j].getBondOrderOfState(bond_out_of_j, settings[local_atom_j])) {
-        viable = false;
-        break;
-      }      
     }
     if (viable) {
 

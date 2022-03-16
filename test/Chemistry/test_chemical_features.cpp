@@ -3,11 +3,13 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
-#include "../../src/UnitTesting/unit_test.h"
+#include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
+#include "../../src/UnitTesting/unit_test.h"
 
 // CHECK
 #include "../../src/UnitTesting/stopwatch.h"
@@ -16,11 +18,17 @@
 using omni::chemistry::ChiralOrientation;
 using omni::constants::ExceptionResponse;
 using omni::data_types::int2;
+using omni::data_types::char4;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
+using omni::parse::polyNumericVector;
+using omni::parse::NumberFormat;
+using omni::parse::operator!=;
+using omni::parse::operator==;
 using omni::topology::AtomGraph;
+using omni::topology::ChemicalDetailsKit;
 using omni::trajectory::CoordinateFileKind;
 using omni::trajectory::PhaseSpace;
 
@@ -154,8 +162,17 @@ int main(int argc, char* argv[]) {
                                                 18,   82,    0 };
   std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    7,    7,    4,    7,    6,
                                                  0,    0,    0 };
-  std::vector<int> trp_cage_lchir = sys_chem[7].listChiralCenters(ChiralOrientation::SINISTER);
-  std::vector<int> trp_cage_dchir = sys_chem[7].listChiralCenters(ChiralOrientation::RECTUS);
+  std::vector<int> trp_cage_lchir = sys_chem[8].listChiralCenters(ChiralOrientation::SINISTER);
+  std::vector<int> trp_cage_lchir_ans;
+  const ChemicalDetailsKit trp_cdk = sys_ag[8].getChemicalDetailsKit();
+  for (int i = 0; i < trp_cdk.natom; i++) {
+    if ((trp_cdk.atom_names[i] == char4({'C', 'A', ' ', ' '}) &&
+         trp_cdk.res_names[sys_ag[8].getResidueIndex(i)] != char4({'G', 'L', 'Y', ' '})) ||
+        (trp_cdk.atom_names[i] == char4({'C', 'B', ' ', ' '}) &&
+         trp_cdk.res_names[sys_ag[8].getResidueIndex(i)] == char4({'I', 'L', 'E', ' '}))) {
+      trp_cage_lchir_ans.push_back(i);
+    }
+  }
   check(ring_counts, RelationalOperator::EQUAL, ring_cnt_ans, "Overall counts of ring systems do "
         "not meet expectations.", do_tests);
   check(fused_ring_counts, RelationalOperator::EQUAL, fused_ring_cnt_ans, "Counts of fused ring "
@@ -166,9 +183,38 @@ int main(int argc, char* argv[]) {
         "aromatic ring systems do not meet expectations.", do_tests);
   check(polar_h_counts, RelationalOperator::EQUAL, polar_h_cnt_ans, "Counts of polar hydrogens "
         "do not meet expectations.", do_tests);
-  
+  check(trp_cage_lchir_ans, RelationalOperator::EQUAL, trp_cage_lchir, "Chiral center indices for "
+        "L-chiral centers (should be amino acid CA atoms, excluding glycine, plus the isoleucine "
+        "CB atom) do not meet expectations.", do_tests);
+  const std::string fc_name = base_chem_name + osc + "formal_charges.m";
+  const std::string bo_name = base_chem_name + osc + "bond_orders.m";
+  const bool snps_exist = (getDrivePathType(fc_name) == DrivePathType::FILE &&
+                           getDrivePathType(bo_name) == DrivePathType::FILE);
+  const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  if (snps_exist == false) {
+    rtWarn("Snapshot files " + fc_name + " and " + bo_name + " must be accessible in order to "
+           "check formal charge and bond order calculations, respectively.  Check the "
+           "${OMNI_SOURCE} environment variable for validity.  Subsequent tests will be skipped.",
+           "test_chemical_features");
+  }
+  for (size_t i = 0; i < nsys; i++) {
+    snapshot(fc_name, polyNumericVector(sys_chem[i].getFormalCharges()), std::string("fc_") +
+             std::to_string(i), 1.0e-6, "Formal charges computed for the system described by " +
+             sys_ag[i].getFileName() + " do not meed expectations.", oe.takeSnapshot(), 1.0e-8,
+             NumberFormat::STANDARD_REAL,
+             (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+    snapshot(bo_name, polyNumericVector(sys_chem[i].getBondOrders()), std::string("bo_") +
+             std::to_string(i), 1.0e-6, "Bond orders computed for the system described by " +
+             sys_ag[i].getFileName() + " do not meed expectations.", oe.takeSnapshot(), 1.0e-8,
+             NumberFormat::STANDARD_REAL,
+             (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+    check(sum<double>(sys_chem[i].getFormalCharges()), RelationalOperator::EQUAL,
+          Approx(sum<double>(sys_ag[i].getPartialCharge<double>())).margin(1.0e-4), "The sum of "
+          "formal charges computed for " + sys_ag[i].getFileName() + " does not match the sum of "
+          "partial charges given in the topology.", do_tests);
+  }
+
   // CHECK
-#if 0
   StopWatch sw;
   sw.addCategory("Lauren's molecule");
   sw.addCategory("TrpCage");
@@ -185,7 +231,6 @@ int main(int argc, char* argv[]) {
     sw.assignTime(4);
   }
   sw.printResults();
-#endif
   // END CHECK
   
   // Summary evaluation

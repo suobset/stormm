@@ -63,6 +63,12 @@ char4 stringToChar4(const std::string &value);
 /// \param rhs  The second value to compare
 bool operator==(const char4 lhs, const char4 rhs);
 
+/// \brief Overload != to handle two char4 tuples
+///
+/// \param lhs  The first value to compare
+/// \param rhs  The second value to compare
+bool operator!=(const char4 lhs, const char4 rhs);
+
 /// \brief Determine whether a character string can qualify as an integer, real, or char4
 ///
 /// \param a           The character string

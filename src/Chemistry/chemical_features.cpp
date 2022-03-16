@@ -5,11 +5,6 @@
 #include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
-
-// CHECK
-#include "Parsing/parse.h"
-// END CHECK
-
 #include "Topology/atomgraph_analysis.h"
 #include "UnitTesting/approx.h"
 #include "chemical_features.h"
@@ -27,12 +22,6 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::project;
 using math::roundUp;
-
-// CHECK
-using parse::operator==;
-using parse::char4ToString;
-// END CHECK
-
 using testing::Approx;
 using topology::selectRotatingAtoms;
 using trajectory::CoordinateFrameReader;
@@ -1537,17 +1526,17 @@ std::vector<uint> ChemicalFeatures::getAromaticMask(const int min_pi_electrons,
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> ChemicalFeatures::getPolarHydrogenList() const {
-  return polar_hydrogens.readHost();
+  return polar_hydrogens.readHost(0, polar_hydrogen_count);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> ChemicalFeatures::getHydrogenBondDonorList() const {
-  return hydrogen_bond_donors.readHost();
+  return hydrogen_bond_donors.readHost(0, hbond_donor_count);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> ChemicalFeatures::getHydrogenBondAcceptorList() const {
-  return hydrogen_bond_acceptors.readHost();
+  return hydrogen_bond_acceptors.readHost(0, hbond_acceptor_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1649,6 +1638,16 @@ std::vector<uint> ChemicalFeatures::getChiralityMask(const ChiralOrientation dir
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ChemicalFeatures::getFormalCharges() const {
+  return formal_charges.readHost(0, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ChemicalFeatures::getBondOrders() const {
+  return bond_orders.readHost(0, ag_pointer->getBondTermCount());
 }
 
 //-------------------------------------------------------------------------------------------------

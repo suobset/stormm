@@ -254,12 +254,22 @@ public:
   /// \brief List the chiral centers in a system, using topological indices.
   ///
   /// \param direction  Preferred chiral orientation of the centers to return (D-, L-, or both)
-  std::vector<int> listChiralCenters(ChiralOrientation direction) const;
+  std::vector<int> listChiralCenters(ChiralOrientation direction = ChiralOrientation::NONE) const;
   
   /// \brief Return a mask of chiral centers in the system.
   ///
   /// \param direction  Allows one to select R- (D-), S- (L-), or both chiralities for the maks
   std::vector<uint> getChiralityMask(ChiralOrientation direction) const;
+
+  /// \brief Return a vector containing the formal charges on all particles in the system (this
+  ///        includes virtual sites, which will have formal charges of zero since they are not real
+  ///        atoms).
+  std::vector<double> getFormalCharges() const;
+
+  /// \brief Return a vector containing the orders of all bonds in the system (this includes bonds
+  ///        to virtual sites only if they are defined in the topology's connectivity, and such
+  ///        bonds will have order zero).
+  std::vector<double> getBondOrders() const;
 
   /// \brief Get the atom endpoints of a rotatable bond.  The bond root atom is returned in the x
   ///        member of the tuple, the pivot atom (the second atom, closest to atoms that will turn)
