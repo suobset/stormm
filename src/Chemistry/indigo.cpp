@@ -1253,118 +1253,99 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     }
   }
 
-  // Compute the charge contributions of fragments that can only offer one charged state.  This
-  // will determine which charges go to each fragment.
-  std::vector<bool> fixed_charge_fragment(fragment_count);
-  std::vector<int> fragment_minima_bounds(fragment_count + 1, 0);
-  std::vector<int3> fragment_minima;
-  for (int i = 0; i < fragment_count; i++) {
-    const std::vector<int3> fmin = mutable_fragments[i].getChargesAndBestEnergies();
-    fragment_minima.insert(fragment_minima.end(), fmin.begin(), fmin.end());
-    fragment_minima_bounds[i] = fmin.size();
-    fixed_charge_fragment[i] = (fragment_minima_bounds[i] == 1);
-    if (fixed_charge_fragment[i]) {
-      baseline_charge += fmin[0].x;
-    }
+  // CHECK
+  if (atom_count == 304) {
+    printf("Target / baseline charge = %2d / %2d\n", target_charge, baseline_charge);
   }
-  prefixSumInPlace<int>(&fragment_minima_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");
-  for (int i = 0; i < fragment_count; i++) {
-    for (int j = fragment_minima_bounds[i]; j < fragment_minima_bounds[i + 1]; j++) {
-      mutable_fragments[i].cullHigherEnergyStatesByCharge(fragment_minima[j].x);
-    }
-  }
+  // END CHECK
   
-  // Assign types to each fragment with multiple charge states: if there are repeating units,
-  // that will be known
-  std::vector<int> fragment_indices(fragment_count, -1);
-  std::vector<int> unique_fragments;
-  std::vector<int> unique_fragment_examples;
-  std::vector<int> unique_fragment_replicas;
-  int n_unique_fragments = 0;
-  for (int i = 0; i < fragment_count; i++) {
-    if (fragment_indices[i] >= 0 || fixed_charge_fragment[i]) {
-      continue;
-    }
-    fragment_indices[i] = n_unique_fragments;
-    int nreps = 1;
-    for (int j = i + 1; j < fragment_count; j++) {
-      if (fragment_indices[j] >= 0) {
-        continue;
-      }
-      if (mutable_fragments[i].testEquivalence(mutable_fragments[j], real_atom_map, ag_pointer,
-                                               atom_centers)) {
-        fragment_indices[j] = n_unique_fragments;
-        nreps++;
-      }
-    }
-    unique_fragments.push_back(i);
-    unique_fragment_examples.push_back(i);
-    unique_fragment_replicas.push_back(nreps);
-    n_unique_fragments++;
-  }
-
-  // Determine the positive and negative potential of all fragments, the range by which the charge
-  // of the system could be altered off of the baseline by setting all fragments in one direction
-  int positive_budget = 0;
-  int negative_budget = 0;
-  std::vector<int> unique_fragment_qmin(n_unique_fragments);
-  std::vector<int> unique_fragment_qmax(n_unique_fragments);
-  for (int i = 0; i < n_unique_fragments; i++) {
-    const int ifrag = unique_fragment_examples[i];
-    const int tmpq = fragment_minima[fragment_minima_bounds[ifrag]].x;
-    unique_fragment_qmin[i] = tmpq;
-    unique_fragment_qmax[i] = tmpq;
-    for (int j = fragment_minima_bounds[ifrag] + 1; j < fragment_minima_bounds[ifrag + 1]; j++) {
-      unique_fragment_qmin[i] = std::min(unique_fragment_qmin[i], fragment_minima[j].x);
-      unique_fragment_qmax[i] = std::max(unique_fragment_qmax[i], fragment_minima[j].x);
-    }
-    const int nrep = unique_fragment_replicas[i];
-    positive_budget += (unique_fragment_qmax[i] > 0) * (unique_fragment_qmax[i] * nrep);
-    negative_budget += (unique_fragment_qmin[i] < 0) * (unique_fragment_qmin[i] * nrep);
-  }
-  int critical_qsum = target_charge - baseline_charge;
-  if (critical_qsum < negative_budget || critical_qsum > positive_budget) {
-    rtErr("Molecule " + std::to_string(molecule_index + 1) + " of topology " +
-          ag_pointer->getFileName() + " cannot achieve the required charge and still satisfy the "
-          "octet rules.", "IndigoTable");
-  }
-  for (int i = 0; i < n_unique_fragments; i++) {
-    const int ifrag = unique_fragment_examples[i];
-    for (int j = fragment_minima_bounds[ifrag]; j < fragment_minima_bounds[ifrag + 1]; j++) {
-
-      // The focus is now on the jth minimum-energy state of the ith unique fragment with multiple
-      // net charge options.  If this state is selected to be part of the global minimum energy
-      // configuration, what would the consequences be for the positive or negative charge budgets?
-      // If the budgets would shrink beneath the required target, the state is not viable.
-      const int positive_cost = unique_fragment_qmax[i] - fragment_minima[j].x; 
-      const int negative_cost = fragment_minima[j].x - unique_fragment_qmin[i];
-      if (critical_qsum < negative_budget + negative_cost ||
-          critical_qsum > positive_budget - positive_cost) {
-
-        // It is safe to pop states from various fragments represented by this example, as
-        // fragment_minima and fragment_minima_bounds are independent of the order of states
-        // they contain.
-        for (int k = 0; k < fragment_count; k++) {
-          if (fragment_indices[k] == i) {
-            const int n_cull = mutable_fragments[k].cullStatesBearingCharge(fragment_minima[j].x);
-          }
-        }
-      }
-    }
-  }  
-
-  // Proceed to evaluate the consensus state from the available fragments.  Assume that all
-  // states of a fragment bearing the same charge contribute by a Boltzmann-weighted distribution
-  // to the final result.
+  // Make an initial pass to cull fragment states that exceed the ground state energy for any
+  // given charge state.
   std::vector<int> q_options;
   std::vector<int> options_bounds(fragment_count + 1, 0);
   for (int i = 0; i < fragment_count; i++) {
-    const std::vector<int> fragi_q = mutable_fragments[i].getChargeStates();
-    options_bounds[i] = fragi_q.size();
-    q_options.insert(q_options.end(), fragi_q.begin(), fragi_q.end());
+    const std::vector<int> frag_q_states = mutable_fragments[i].getChargeStates();
+    const size_t nqs = frag_q_states.size();
+    q_options.insert(q_options.end(), frag_q_states.begin(), frag_q_states.end());
+    options_bounds[i + 1] = options_bounds[i] + nqs;
+    for (size_t j = 0; j < nqs; j++) {
+      mutable_fragments[i].cullHigherEnergyStatesByCharge(frag_q_states[j]);
+    }
   }
-  const std::vector<int> max_frag_settings(options_bounds.begin(), options_bounds.end() - 1); 
-  prefixSumInPlace<int>(&options_bounds, PrefixSumType::EXCLUSIVE, "IndigoTable");
+
+  // Prepare a guardrail, a pair of bounds indicating the maximum and minimum current charge
+  // that the previously included fragments must have in order to reach the correct total charge
+  // on the molecule.
+  std::vector<int2> q_guardrail(fragment_count);
+  int ncull;
+  do {
+    int cumulative_min = baseline_charge - target_charge;
+    int cumulative_max = baseline_charge - target_charge;
+    for (int i = fragment_count - 1; i >= 0; i--) {
+      int fragment_minq = q_options[options_bounds[i]];
+      int fragment_maxq = q_options[options_bounds[i]];
+      for (int j = options_bounds[i] + 1; j < options_bounds[i + 1]; j++) {
+        fragment_minq = std::min(fragment_minq, q_options[j]);
+        fragment_maxq = std::max(fragment_maxq, q_options[j]);
+      }
+      cumulative_min += fragment_minq;
+      cumulative_max += fragment_maxq;
+      q_guardrail[i].x = cumulative_min;
+      q_guardrail[i].y = cumulative_max;
+    }
+
+    if (atom_count == 304) {
+      printf("Guardrail = [\n");
+      for (int i = 0; i < fragment_count; i++) {
+        printf("  %4d %4d    ", q_guardrail[i].x, q_guardrail[i].y);
+        for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+          printf("%2d ", q_options[j]);
+        }
+        printf("\n");
+      }
+      printf("];\n");
+    }
+    
+    // Loop over all fragments
+    ncull = 0;
+    for (int i = 0; i < fragment_count; i++) {
+      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+        if (q_options[j] < q_guardrail[i].x || q_options[j] > q_guardrail[i].y) {
+          ncull += mutable_fragments[i].cullStatesBearingCharge(q_options[j]);
+
+          // CHECK
+          if (atom_count == 304) {
+            printf("Cull states in fragment %2d bearing charge %2d\n", i, q_options[j]);
+          }
+          // END CHECK
+        }
+      }
+    }
+    if (ncull > 0) {
+      q_options.resize(0);
+      options_bounds[0] = 0;
+      for (int i = 0; i < fragment_count; i++) {
+        const std::vector<int> frag_q_states = mutable_fragments[i].getChargeStates();
+        const size_t nqs = frag_q_states.size();
+        q_options.insert(q_options.end(), frag_q_states.begin(), frag_q_states.end());
+        options_bounds[i + 1] = options_bounds[i] + nqs;
+      }
+    }
+  } while (ncull > 0);
+
+  // CHECK
+  if (atom_count == 304) {
+    printf("Charge states of fragments:\n");
+    for (int i = 0; i < fragment_count; i++) {
+      printf("    %3d : ", i);
+      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+        printf(" %2d", q_options[j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+  }
+  // END CHECK
   
   // Begin to form the state based on atom centers that are not part of any mutable fragment.
   ground_state_formal_charges.resize(atom_count, 0.0);
@@ -1418,23 +1399,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       e_options[j] = weighted_energy;
     }
   }
-
-  // CHECK
-  if (atom_count == 304) {
-    printf("q_options / e_options = [\n");
-    for (int i = 0; i < fragment_count; i++) {
-      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
-        printf("%2d ", q_options[j]);
-      }
-      printf("    ");
-      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
-        printf("%12.2lf ", e_options[j]);
-      }
-      printf(" (max_frag_settings = %d)\n", max_frag_settings[i]);
-    }
-    printf("];\n");
-  }
-  // END CHECK
   
   // Incorporate fragments into the solution, grinding through each viable charge state of each
   // fragment.  As in other parts of this workflow, this is a do... while loop to ensure that it
@@ -1444,23 +1408,37 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   // is rapid.
   double best_score = total_score;
   for (int i = 0; i < fragment_count; i++) {
-    double fragment_max = e_options[options_bounds[i]];
+
+    // CHECK
+    if (i >= static_cast<int>(options_bounds.size()) || i < 0) {
+      printf("Trying to access element %4d of options_bounds, when there are only %4zu "
+             "elements.\n", i, options_bounds.size());
+    }
+    if (options_bounds[i] >= static_cast<int>(e_options.size()) || options_bounds[i] < 0) {
+      printf("Trying to access element %4d of e_options, when there are only %4zu elements.\n",
+             options_bounds[i], e_options.size());
+    }
+    // END CHECK
+
+    double fragment_max = (options_bounds[i] < options_bounds[i + 1]) ?
+                          e_options[options_bounds[i]] : 0.0;
     for (int j = options_bounds[i] + 1; j < options_bounds[i + 1]; j++) {
       fragment_max = std::max(fragment_max, e_options[j]);
     }
     best_score += fragment_max;
   }
-  const int max_frag_setval = options_bounds[fragment_count] - fragment_count;
-
-  // CHECK
-  if (atom_count == 304) {
-    printf("max_frag_setval = %d\n", max_frag_setval);
+  std::vector<int> max_frag_settings(fragment_count);
+  for (int i = 0; i < fragment_count; i++) {
+    max_frag_settings[i] = options_bounds[i + 1] - options_bounds[i];
   }
-  long long int n_tested = 0LL;
-  // END CHECK
-  
+  const int max_frag_setval = options_bounds[fragment_count] - fragment_count;
   std::vector<int> frag_settings(fragment_count, 0);
   std::vector<int> best_settings(fragment_count, 0);
+
+  // CHECK
+  llint n_tested = 0LL;
+  // END CHECK
+  
   if (fragment_count > 0) {
     do {
 
@@ -1487,7 +1465,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       }
 
       // CHECK
-      n_tested++;
       if (atom_count == 304) {
         printf("State = [ ");
         for (int i = 0; i < fragment_count; i++) {

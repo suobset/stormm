@@ -80,6 +80,15 @@ int main(int argc, char* argv[]) {
   // Water boxes
   const std::string tip5p_top_name = base_top_name + osc + "tip5p.top";
   const std::string tip5p_crd_name = base_crd_name + osc + "tip5p.rst";
+
+  // CHECK
+  const std::string trpc_top_name = base_top_name + osc + "trpcage.top";
+  const std::string trpc_crd_name = base_crd_name + osc + "trpcage.inpcrd";
+  AtomGraph trpc_ag(trpc_top_name);
+  PhaseSpace trpc_ps(trpc_crd_name);
+  ChemicalFeatures trpc_chem(&trpc_ag, CoordinateFrameReader(trpc_ps), MapRotatableGroups::YES);
+  exit(1);
+  // END CHECK
   
   // Check the existence of all files
   const std::vector<std::string> top_files = { mol1_top_name, mol2_top_name, mol3_top_name,

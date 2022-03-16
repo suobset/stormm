@@ -115,8 +115,8 @@ public:
   /// \{
   PhaseSpace(int atom_count_in = 0, UnitCellType unit_cell_in = UnitCellType::NONE);
 
-  PhaseSpace(const std::string &file_name_in, CoordinateFileKind file_kind,
-             int frame_number = 0);
+  PhaseSpace(const std::string &file_name_in,
+             CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN, int frame_number = 0);
 
   PhaseSpace(const std::string &file_name_in, CoordinateFileKind file_kind, const AtomGraph &ag, 
              int frame_number = 0);
