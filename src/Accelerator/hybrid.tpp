@@ -536,7 +536,7 @@ size_t Hybrid<T>::putHost(Hybrid<T> *target, const std::vector<T> &values, const
           " zero padding.", "Hybrid", "putHost");
   }
   setPointer(target, offset, actual_count);
-
+  
   // Check that there is data on the host
   if (host_data == nullptr) {
     rtErr("No host data exists in Hybrid object " + std::string(label.name), "Hybrid",

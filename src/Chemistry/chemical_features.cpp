@@ -151,8 +151,9 @@ void BondedNode::wipeRingCompletion() {
 ChemicalFeatures::ChemicalFeatures() :
     atom_count{0}, planar_atom_count{0}, ring_count{0}, fused_ring_count{0},
     twistable_ring_count{0}, conjugated_group_count{0}, aromatic_group_count{0},
-    chiral_center_count{0}, rotatable_bond_count{0}, double_bond_count{0}, triple_bond_count{0},
-    max_ring_size{0}, temperature{0.0}, rotating_groups_mapped{false},
+    polar_hydrogen_count{0}, hbond_donor_count{0}, hbond_acceptor_count{0}, chiral_center_count{0},
+    rotatable_bond_count{0}, double_bond_count{0}, triple_bond_count{0}, max_ring_size{0},
+    temperature{0.0}, rotating_groups_mapped{false},
     planar_centers{HybridKind::POINTER, "chemfe_planarity"},
     ring_inclusion{HybridKind::ARRAY, "chemfe_rings"},
     ring_atom_bounds{HybridKind::POINTER, "chemfe_ring_bounds"},
@@ -180,7 +181,8 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                                    const double temperature_in) :
     atom_count{ag_in->getAtomCount()}, planar_atom_count{0}, ring_count{0}, fused_ring_count{0},
     twistable_ring_count{0}, conjugated_group_count{0}, aromatic_group_count{0},
-    chiral_center_count{0}, rotatable_bond_count{0}, double_bond_count{0}, triple_bond_count{0},
+    polar_hydrogen_count{0}, hbond_donor_count{0}, hbond_acceptor_count{0}, chiral_center_count{0},
+    rotatable_bond_count{0}, double_bond_count{0}, triple_bond_count{0},
     max_ring_size{8 * sizeof(ullint)}, temperature{temperature_in}, rotating_groups_mapped{false},
     planar_centers{HybridKind::POINTER, "chemfe_planarity"},
     ring_inclusion{HybridKind::ARRAY, "chemfe_rings"},
@@ -245,6 +247,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   std::vector<int> tmp_hydrogen_bond_acceptors;
   findHydrogenBondElements(nbk, cdk, &tmp_polar_hydrogens, &tmp_hydrogen_bond_donors,
                            &tmp_hydrogen_bond_acceptors);
+  polar_hydrogen_count = tmp_polar_hydrogens.size();
+  hbond_donor_count = tmp_hydrogen_bond_donors.size();
+  hbond_acceptor_count = tmp_hydrogen_bond_acceptors.size();
   
   // Find chiral centers
   const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
@@ -314,6 +319,9 @@ ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     twistable_ring_count{original.twistable_ring_count},
     conjugated_group_count{original.conjugated_group_count},
     aromatic_group_count{original.aromatic_group_count},
+    polar_hydrogen_count{original.polar_hydrogen_count},
+    hbond_donor_count{original.hbond_donor_count},
+    hbond_acceptor_count{original.hbond_acceptor_count},
     chiral_center_count{original.chiral_center_count},
     rotatable_bond_count{original.rotatable_bond_count},
     double_bond_count{original.double_bond_count},
@@ -353,6 +361,9 @@ ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
     twistable_ring_count{original.twistable_ring_count},
     conjugated_group_count{original.conjugated_group_count},
     aromatic_group_count{original.aromatic_group_count},
+    polar_hydrogen_count{original.polar_hydrogen_count},
+    hbond_donor_count{original.hbond_donor_count},
+    hbond_acceptor_count{original.hbond_acceptor_count},
     chiral_center_count{original.chiral_center_count},
     rotatable_bond_count{original.rotatable_bond_count},
     double_bond_count{original.double_bond_count},
@@ -389,7 +400,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
     return *this;
   }
 
-  // Copy elements of the original
+  // Copy elements of the other object
   atom_count = other.atom_count;
   planar_atom_count = other.planar_atom_count;
   ring_count = other.ring_count;
@@ -397,6 +408,9 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
   twistable_ring_count = other.twistable_ring_count;
   conjugated_group_count = other.conjugated_group_count;
   aromatic_group_count = other.aromatic_group_count;
+  polar_hydrogen_count = other.polar_hydrogen_count;
+  hbond_donor_count = other.hbond_donor_count;
+  hbond_acceptor_count = other.hbond_acceptor_count;
   chiral_center_count = other.chiral_center_count;
   rotatable_bond_count = other.rotatable_bond_count;
   double_bond_count = other.double_bond_count;
@@ -435,13 +449,16 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
     return *this;
   }
 
-  // Copy elements of the original
+  // Copy elements of the other object
   atom_count = other.atom_count;
   planar_atom_count = other.planar_atom_count;
   ring_count = other.ring_count;
   fused_ring_count = other.fused_ring_count;
   twistable_ring_count = other.twistable_ring_count;
   conjugated_group_count = other.conjugated_group_count;
+  polar_hydrogen_count = other.polar_hydrogen_count;
+  hbond_donor_count = other.hbond_donor_count;
+  hbond_acceptor_count = other.hbond_acceptor_count;
   aromatic_group_count = other.aromatic_group_count;
   chiral_center_count = other.chiral_center_count;
   rotatable_bond_count = other.rotatable_bond_count;
@@ -1127,7 +1144,7 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
                                                      const ValenceKit<double> &vk,
                                                      const ChemicalDetailsKit &cdk,
                                                      const CoordinateFrameReader &cfr) const {
-
+  
   // Prepare to construct tree structures for each molecule, similar to what was done above.
   // However, the trees will not trace rings this time.  Rather, they will continue along the path
   // radiating outwards from any given atom which has four unique substituents, trying to determine
@@ -1153,32 +1170,10 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
   std::vector<int> result;
   for (int i = 0; i < atom_count; i++) {
 
-    // CHECK
-    const bool check_this = (cdk.atom_names[i] == char4({'C', '1', '1', ' ' }) &&
-                             cdk.res_names[0] == char4({ 'L', 'I', 'G', ' ' }));
-    if (check_this) {
-      printf("Found atom C11 in LIG.\n");
-    }
-    // END CHECK
-
     // Test whether this atom is a chiral candidate
     if (nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] < 4) {
-
-      // CHECK
-      if (check_this) {
-        printf("  Number of bonds = %d\n", nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i]);
-      }
-      // END CHECK
-      
       continue;
     }
-
-    // CHECK
-    if (check_this) {
-      printf("Check A passes.\n");
-    }
-    // END CHECK
-    
     bool candidate = true;
     int n_hydrogen = 0;
     int n_vs = 0;
@@ -1192,12 +1187,6 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
     if (candidate == false || nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] - n_vs != 4) {
       continue;
     }
-
-    // CHECK
-    if (check_this) {
-      printf("Check B passes.\n");
-    }
-    // END CHECK    
 
     // Initiate the chains
     int n_real = 0;
@@ -1222,12 +1211,6 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
       touch_max[n_real] = std::max(i, nbk.nb12x[j]);
       n_real++;
     }
-
-    // CHECK
-    if (check_this) {
-      printf("  Point C: n_real = %d.\n", n_real);
-    }
-    // END CHECK
 
     // Once a branch beats another, that dominance relationship must be maintained.  Keep a matrix
     // of the dominance relationships (i, j) : 0 = tie, +1 = i beats j, -1 = j beats i.  The matrix
@@ -1269,12 +1252,6 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
         chiral_dominance[ 6] == 0 || chiral_dominance[ 7] == 0 || chiral_dominance[11] == 0) {
       continue;      
     }
-
-    // CHECK
-    if (check_this) {
-      printf("  Check D passes.\n");
-    }
-    // END CHECK
 
     // Give the next chirality check a clean slate.  Use the touch_min and touch_max bounds
     // arrays on the range of atoms that became part of each branch's tree to keep us in O(N)
@@ -1489,17 +1466,17 @@ int ChemicalFeatures::getAromaticGroupCount() const {
 
 //-------------------------------------------------------------------------------------------------
 int ChemicalFeatures::getPolarHydrogenCount() const {
-  return static_cast<int>(polar_hydrogens.size());
+  return polar_hydrogen_count;
 }
 
 //-------------------------------------------------------------------------------------------------
 int ChemicalFeatures::getHydrogenBondDonorCount() const {
-  return static_cast<int>(hydrogen_bond_donors.size());
+  return hbond_donor_count;
 }
 
 //-------------------------------------------------------------------------------------------------
 int ChemicalFeatures::getHydrogenBondAcceptorCount() const {
-  return static_cast<int>(hydrogen_bond_acceptors.size());
+  return hbond_acceptor_count;
 }
 
 //-------------------------------------------------------------------------------------------------

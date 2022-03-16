@@ -776,7 +776,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     int last_participant = centers_participating - 1;
     settings[last_participant] += 1;
     while (settings[last_participant] >= max_settings[last_participant] &&
-        centers_participating > 1) {
+           centers_participating > 1) {
       centers_participating--;
       last_participant--;
       settings[last_participant] += 1;

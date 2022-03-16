@@ -307,6 +307,9 @@ private:
                                ///<   aromatic).
   int conjugated_group_count;  ///< Number of conjugated systems found in the topology
   int aromatic_group_count;    ///< Number of aromatic groups found in the topology
+  int polar_hydrogen_count;    ///< Number of polar hydrogens in the system, across all molecules
+  int hbond_donor_count;       ///< Number of hydrogen bond donors, across all molecules
+  int hbond_acceptor_count;    ///< Number of hydrogen bond acceptors, across all molecules
   int chiral_center_count;     ///< Number of chiral centers in the topology
   int rotatable_bond_count;    ///< Number of fully rotatable single bonds
   int double_bond_count;       ///< Number of detected double bonds

@@ -100,12 +100,6 @@ int main(int argc, char* argv[]) {
       sys_ps[i].buildFromFile(crd_files[i], CoordinateFileKind::UNKNOWN);
     }
   }
-
-  // CHECK
-  printf("There are %d atoms in %s.\n", sys_ag[10].getAtomCount(),
-         sys_ag[10].getFileName().c_str());
-  // END CHECK
-  
   std::vector<int> first_mol_size(nsys);
   std::vector<ChemicalFeatures> sys_chem;
   const MapRotatableGroups mapg_yes = MapRotatableGroups::YES;
@@ -150,11 +144,11 @@ int main(int argc, char* argv[]) {
                                               1567,  486,  216 };
   std::vector<int> aromatic_group_cnt_ans = {    1,    1,    3,    1,    1,    0,    0,    1,
                                                  3,    3,    0 };
-  std::vector<int> polar_h_cnt_ans        = {   64,   96,    6, 2450, 2450,    2,    3,    2,
-                                                35, 1088,  432 };
-  std::vector<int> hbond_donor_cnt_ans    = {   64,   96,    6, 1226, 1226,    2,    3,    2,
+  std::vector<int> polar_h_cnt_ans        = {    0,    0,    6, 2450, 2450,    2,    3,    2,
+                                              3155, 1088,  432 };
+  std::vector<int> hbond_donor_cnt_ans    = {    0,    0,    6, 1226, 1226,    2,    3,    2,
                                                 35,  128,  216 };
-  std::vector<int> hbond_acceptor_cnt_ans = {   64,    1,    7, 1228, 1228,    4,    6,    4,
+  std::vector<int> hbond_acceptor_cnt_ans = {    0,    1,    7, 1228, 1228,    4,    6,    4,
                                               1614,  681,  216 };
   std::vector<int> chiral_center_cnt_ans  = {    0,    0,    0,    1,    1,    1,    0,    1,
                                                 18,   82,    0 };
@@ -179,6 +173,7 @@ int main(int argc, char* argv[]) {
   sw.addCategory("Lauren's molecule");
   sw.addCategory("TrpCage");
   sw.addCategory("Lig1_C8H8");
+  sw.addCategory("Ubiquitin");
   for (int i = 0; i < 5; i++) {
     ChemicalFeatures lauren(&sys_ag[2], CoordinateFrameReader(sys_ps[2]), mapg_no);
     sw.assignTime(1);
@@ -186,6 +181,8 @@ int main(int argc, char* argv[]) {
     sw.assignTime(2);
     ChemicalFeatures ligand(&sys_ag[0], CoordinateFrameReader(sys_ps[0]), mapg_no);
     sw.assignTime(3);
+    ChemicalFeatures ubqpro(&sys_ag[9], CoordinateFrameReader(sys_ps[9]), mapg_no);
+    sw.assignTime(4);
   }
   sw.printResults();
 #endif
