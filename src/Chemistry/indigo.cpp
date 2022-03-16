@@ -670,107 +670,6 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
   // const representations even of local variables to avoid dereferencing &this.
   std::vector<int> settings(center_count, 0);
   std::vector<int> max_settings(center_count);
-  std::vector<int4> relevant_pairs;
-  std::vector<int2> local_pair_idx;
-  const int ccenter_count = center_count;
-  for (int i = 0; i < ccenter_count; i++) {
-    const int tc_index = centers_list_in[i];
-    max_settings[i] = all_centers[tc_index].getStateCount();
-    const int n_partners = all_centers[tc_index].getPartnerCount();
-    for (int j = 0; j < n_partners; j++) {
-      const int partner_index = all_centers[tc_index].getPartner(j);
-
-      // Avoid double-counting pairs by requiring that the second member of the pair come later
-      // in the IndigoTable.
-      if (partner_index < tc_index) {
-        continue;
-      }
-      bool partner_in_fragment = false;
-      int local_partner_index;
-      for (int k = 0; k < ccenter_count; k++) {
-        if (centers_list_in[k] == partner_index) {
-          partner_in_fragment = true;
-          local_partner_index = k;
-          break;
-        }
-      }
-      if (partner_in_fragment) {
-
-        // Find the bond of the partner atom that links back to atom center tc_index
-        const int reciprocal_j = all_centers[partner_index].findPartnerIndex(tc_index);
-
-        // The relevant pairs vector stores the indices of two atom centers in its x and y members,
-        // providing their numbers in the overarching IndigoTable.  Its z and w members provide the
-        // local bond indices of the aotm centers identified in x and y, respectively, which form
-        // the bond between atom centers x and y or between y and x.
-        relevant_pairs.push_back({ tc_index, partner_index, j, reciprocal_j });
-
-        // What is still needed are the local indices of each atom center, within this fragment.
-        // Another array stores that information.  Together, these arrays define the potential
-        // function for this fragment.
-        local_pair_idx.push_back({ i, local_partner_index });
-      }
-    }
-  }
-  const int total_options = sum<int>(max_settings) - ccenter_count;
-  const int total_pairs = relevant_pairs.size();
-
-  // Create a vector to run through all states of the fragment.  Accumulate results in
-  // preliminary arrays before commiting them to the actual object.
-  std::vector<int> prelim_net_charges;
-  std::vector<int> prelim_scores;
-  do {
-
-    // Test whether this combination of settings is viable
-    bool viable = true;
-    for (int pos = 0; pos < total_pairs; pos++) {
-      const int atom_i = relevant_pairs[pos].x;
-      const int atom_j = relevant_pairs[pos].y;
-      const int bond_out_of_i = relevant_pairs[pos].z;
-      const int bond_out_of_j = relevant_pairs[pos].w;
-      const int local_atom_i = local_pair_idx[pos].x;
-      const int local_atom_j = local_pair_idx[pos].y;
-      if (all_centers[atom_i].getBondOrderOfState(bond_out_of_i, settings[local_atom_i]) !=
-          all_centers[atom_j].getBondOrderOfState(bond_out_of_j, settings[local_atom_j])) {
-        viable = false;
-        break;
-      }
-    }
-    if (viable) {
-
-      // Compute the score and net charge of this state, then push those results and the state
-      // itself onto the stack for this fragment.
-      int st_q = 0;
-      int st_score = 0;
-      for (int i = 0; i < ccenter_count; i++) {
-        const int c_idx = centers_list_in[i];
-        const int s_idx = settings[i];
-        st_q += all_centers[c_idx].getCharge(s_idx);
-        st_score += all_centers[c_idx].getScore(s_idx);
-        states_data.push_back(s_idx);
-      }
-      prelim_net_charges.push_back(st_q);
-      prelim_scores.push_back(st_score);
-    }
-
-    // Increment the state
-    settings[0] += 1;
-    int i = 0;
-    while (settings[i] >= max_settings[i]) {
-      settings[i] = 0;
-      if (i < ccenter_count - 1) {
-        settings[i + 1] += 1;
-      }
-      i++;
-    }
-  } while (sum<int>(settings) < total_options);
-#if 0
-  // Map the interconnections among the centers.  Joined pairs of atom centers are stored in the
-  // vector relevant_pairs, which stores the global atom center numbers based on the list of
-  // atom centers specific to this fragment and avoids double-counting the interactions.  Use
-  // const representations even of local variables to avoid dereferencing &this.
-  std::vector<int> settings(center_count, 0);
-  std::vector<int> max_settings(center_count);
   std::vector<int4> tmp_relevant_pairs;
   std::vector<int2> tmp_local_pair_idx;
   const int ccenter_count = center_count;
@@ -915,7 +814,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
       settings[last_participant] += 1;
     }    
   } while (settings[0] < max_settings[0]);
-#endif
+
   // Sort states by energy, then by charge.  Let the maximum charge of any fragment be +/-8192.
   possible_states = prelim_net_charges.size();
   std::vector<longlong2> frag_pkg(possible_states);
@@ -1478,10 +1377,10 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     }
     total_score += addToGroundState(atom_centers[i], 0);
   }
-  
+
   // Obtain Boltzmann-weighted average energies for each fragment's charge state with degenerate
   // solutions.
-  std::vector<int> e_options(options_bounds[fragment_count]);
+  std::vector<double> e_options(options_bounds[fragment_count]);
   for (int i = 0; i < fragment_count; i++) {
     for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
       const int ifrag_q = q_options[j];
@@ -1519,6 +1418,23 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       e_options[j] = weighted_energy;
     }
   }
+
+  // CHECK
+  if (atom_count == 304) {
+    printf("q_options / e_options = [\n");
+    for (int i = 0; i < fragment_count; i++) {
+      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+        printf("%2d ", q_options[j]);
+      }
+      printf("    ");
+      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+        printf("%12.2lf ", e_options[j]);
+      }
+      printf(" (max_frag_settings = %d)\n", max_frag_settings[i]);
+    }
+    printf("];\n");
+  }
+  // END CHECK
   
   // Incorporate fragments into the solution, grinding through each viable charge state of each
   // fragment.  As in other parts of this workflow, this is a do... while loop to ensure that it
@@ -1526,9 +1442,23 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   // energies, this will select the final such state.  This is about the final situation where the
   // code can still run into a combinatorial explosion, but even then calculation of each energy
   // is rapid.
-  bool init = true;
-  double best_score;
+  double best_score = total_score;
+  for (int i = 0; i < fragment_count; i++) {
+    double fragment_max = e_options[options_bounds[i]];
+    for (int j = options_bounds[i] + 1; j < options_bounds[i + 1]; j++) {
+      fragment_max = std::max(fragment_max, e_options[j]);
+    }
+    best_score += fragment_max;
+  }
   const int max_frag_setval = options_bounds[fragment_count] - fragment_count;
+
+  // CHECK
+  if (atom_count == 304) {
+    printf("max_frag_setval = %d\n", max_frag_setval);
+  }
+  long long int n_tested = 0LL;
+  // END CHECK
+  
   std::vector<int> frag_settings(fragment_count, 0);
   std::vector<int> best_settings(fragment_count, 0);
   if (fragment_count > 0) {
@@ -1539,7 +1469,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       for (int i = 0; i < fragment_count; i++) {
         trial_score += e_options[options_bounds[i] + frag_settings[i]];
       }
-      if (init || trial_score < best_score) {
+      if (trial_score < best_score) {
         best_score = trial_score;
         for (int i = 0; i < fragment_count; i++) {
           best_settings[i] = frag_settings[i];
@@ -1555,8 +1485,26 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
           frag_settings[pos + 1] += 1;
         }
       }
+
+      // CHECK
+      n_tested++;
+      if (atom_count == 304) {
+        printf("State = [ ");
+        for (int i = 0; i < fragment_count; i++) {
+          printf("%d ", frag_settings[i]); 
+        }
+        printf("];\n");
+      }
+      // END CHECK
+      
     } while (sum<int>(frag_settings) < max_frag_setval);
   }
+
+  // CHECK
+  if (atom_count == 304) {
+    printf("%lld states were tested.\n", n_tested);
+  }
+  // END CHECK
   
   // Incorporate fragments into the solution with their best detected charge states.  This
   // requires re-working the energetics for the best state.

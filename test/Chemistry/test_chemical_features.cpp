@@ -1,6 +1,7 @@
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
@@ -17,6 +18,7 @@
 
 using omni::chemistry::ChiralOrientation;
 using omni::constants::ExceptionResponse;
+using omni::symbols::amber_ancient_bioq;
 using omni::data_types::int2;
 using omni::data_types::char4;
 using omni::diskutil::DrivePathType;
@@ -80,11 +82,11 @@ int main(int argc, char* argv[]) {
   const std::string tip5p_crd_name = base_crd_name + osc + "tip5p.rst";
   
   // Check the existence of all files
-  const std::vector<std::string> top_files = { mol1_top_name, mol2_top_name, mol2_top_name,
+  const std::vector<std::string> top_files = { mol1_top_name, mol2_top_name, mol3_top_name,
                                                drug_top_name, drug_vs_top_name, ala_top_name,
                                                gly_top_name, phe_top_name, trpcage_top_name,
                                                ubiquit_top_name, tip5p_top_name };
-  const std::vector<std::string> crd_files = { mol1_crd_name, mol2_crd_name, mol2_crd_name,
+  const std::vector<std::string> crd_files = { mol1_crd_name, mol2_crd_name, mol3_crd_name,
                                                drug_crd_name, drug_vs_crd_name, ala_crd_name,
                                                gly_crd_name, phe_crd_name, trpcage_crd_name,
                                                ubiquit_crd_name, tip5p_crd_name };
@@ -104,7 +106,8 @@ int main(int argc, char* argv[]) {
   std::vector<PhaseSpace> sys_ps(nsys);
   if (files_exist) {
     for (size_t i = 0; i < nsys; i++) {
-      sys_ag[i].buildFromPrmtop(top_files[i], ExceptionResponse::SILENT);
+      sys_ag[i].buildFromPrmtop(top_files[i], ExceptionResponse::SILENT, amber_ancient_bioq,
+                                1.2, 2.0, 0.01);
       sys_ps[i].buildFromFile(crd_files[i], CoordinateFileKind::UNKNOWN);
     }
   }
