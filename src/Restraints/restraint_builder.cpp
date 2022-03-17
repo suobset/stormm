@@ -11,6 +11,7 @@
 namespace omni {
 namespace restraints {
 
+using chemistry::ChemicalFeatures;
 using chemistry::MaskTraversalMode;
 using restraints::BoundedRestraint;
 using structure::dihedral_angle;
@@ -54,6 +55,12 @@ FlatBottomPlan::FlatBottomPlan(const double k2_in, const double k3_in, const dou
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint applyDistanceRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                        const FlatBottomPlan fb_init) {
+  return applyDistanceRestraint(ag, atom_i, atom_j, fb_init, fb_init);
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint applyDistanceRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
                                         const FlatBottomPlan fb_init,
                                         const FlatBottomPlan fb_final) {
   return BoundedRestraint(atom_i, atom_j, ag, fb_init.activation_step,
@@ -64,12 +71,25 @@ BoundedRestraint applyDistanceRestraint(const AtomGraph *ag, const int atom_i, c
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint applyAngleRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                     const int atom_k, const FlatBottomPlan fb_init) {
+  return applyAngleRestraint(ag, atom_i, atom_j, atom_k, fb_init, fb_init);
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint applyAngleRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
                                      const int atom_k, const FlatBottomPlan fb_init,
                                      const FlatBottomPlan fb_final) {
   return BoundedRestraint(atom_i, atom_j, atom_k, ag, fb_init.activation_step,
                           fb_final.activation_step, fb_init.k2, fb_init.k3, fb_init.r1, fb_init.r2,
                           fb_init.r3, fb_init.r4, fb_final.k2, fb_final.k3, fb_final.r1,
                           fb_final.r2, fb_final.r3, fb_final.r4);
+}
+
+//-------------------------------------------------------------------------------------------------
+BoundedRestraint applyDihedralRestraint(const AtomGraph *ag, const int atom_i, const int atom_j,
+                                        const int atom_k, const int atom_l,
+                                        const FlatBottomPlan fb_init) {
+  return applyDihedralRestraint(ag, atom_i, atom_j, atom_k, atom_l, fb_init, fb_init);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -102,33 +122,57 @@ void restraintTopologyChecks(const AtomGraph *ag, const CoordinateFrameReader &c
   
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cf,
+applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
                           const AtomMask &mask, const double displacement_penalty,
                           const double displacement_onset, const double displacement_plateau,
                           const double proximity_penalty, const double proximity_onset,
                           const double proximity_plateau) {
-  restraintTopologyChecks(ag, ref_cf, mask);
+  restraintTopologyChecks(ag, ref_cfr, mask);
   
   // Loop over all atoms in the mask and create restraints
-  const int nmasked = mask.getMaskedAtomCount();
+  return applyPositionalRestraints(ag, ref_cfr,  mask.getMaskedAtomList(), displacement_penalty,
+                                   displacement_onset, displacement_plateau, proximity_penalty,
+                                   proximity_onset, proximity_plateau);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                          const std::string &mask, const double displacement_penalty,
+                          const double displacement_onset, const double displacement_plateau,
+                          const double proximity_penalty, const double proximity_onset,
+                          const double proximity_plateau) {
+  ChemicalFeatures chemfe(ag, ref_cfr);
+  return applyPositionalRestraints(ag, ref_cfr, AtomMask(mask, ag, &chemfe, ref_cfr),
+                                   displacement_penalty, displacement_onset, displacement_plateau,
+                                   proximity_penalty, proximity_onset, proximity_plateau);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyPositionalRestraints(const AtomGraph *ag, const CoordinateFrameReader &ref_cfr,
+                          const std::vector<int> &masked_atoms, const double displacement_penalty,
+                          const double displacement_onset, const double displacement_plateau,
+                          const double proximity_penalty, const double proximity_onset,
+                          const double proximity_plateau) {
+  const int nmasked = masked_atoms.size();
   std::vector<BoundedRestraint> result;
   result.reserve(nmasked);
-  const std::vector<int> masked_atoms = mask.getMaskedAtomList();
   for (size_t i = 0; i < nmasked; i++) {
     const int atom_i = masked_atoms[i];
-    const double3 target = { ref_cf.xcrd[atom_i], ref_cf.ycrd[atom_i], ref_cf.zcrd[atom_i] };
+    const double3 target = { ref_cfr.xcrd[atom_i], ref_cfr.ycrd[atom_i], ref_cfr.zcrd[atom_i] };
     result.emplace_back(atom_i, ag, proximity_penalty, displacement_penalty, proximity_plateau,
                         proximity_onset, displacement_onset, displacement_plateau, target);
   }
   return result;
 }
-  
+
 //-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint>
-applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
+applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                        const AtomMask &mask, const double penalty,
                        const double flat_bottom_half_width, const double harmonic_maximum) {
-  restraintTopologyChecks(ag, cframe, mask);
+  restraintTopologyChecks(ag, cfr, mask);
 
   // Loop over the assigned dihedrals of all atoms in the topology.  If there are multiple
   // dihedrals impacting the same set of atoms, they will have been assigned to the same atom, or
@@ -174,7 +218,7 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
           }
         }
       }
-      const double current_value = dihedral_angle(atom_i, atom_j, atom_k, atom_l, cframe);
+      const double current_value = dihedral_angle(atom_i, atom_j, atom_k, atom_l, cfr);
       const double r1 = imageValue(current_value - flat_bottom_half_width - harmonic_width, twopi,
                                    ImagingMethod::MINIMUM_IMAGE);
       const double r2 = imageValue(current_value - flat_bottom_half_width, twopi,
@@ -188,6 +232,16 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cframe,
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                       const std::string &mask, const double penalty,
+                       const double flat_bottom_half_width, const double harmonic_maximum) {
+  ChemicalFeatures chemfe(ag, cfr);
+  return applyHoldingRestraints(ag, cfr, AtomMask(mask, ag, &chemfe, cfr), penalty,
+                                flat_bottom_half_width, harmonic_maximum);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -244,7 +298,11 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
     const int donor_atom = donors[i];
     for (int j = 0; j < nacceptor; j++) {
       const int acceptor_atom = acceptors[j];
-      if (cdk.mol_home[donor_atom] != cdk.mol_home[acceptor_atom]) {
+
+      // Do not apply restraints to self-interactions.  Only apply restraints to atoms on the
+      // same molecule.
+      if (donor_atom == acceptor_atom ||
+          cdk.mol_home[donor_atom] != cdk.mol_home[acceptor_atom]) {
         continue;
       }
       bool excluded = false;
@@ -270,6 +328,14 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const ChemicalFeatures &chemfe,
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<BoundedRestraint>
+applyHydrogenBondPreventors(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+                            const double penalty, const double approach_point) {
+  ChemicalFeatures chemfe(ag, cfr);
+  return applyHydrogenBondPreventors(ag, chemfe, penalty, approach_point);
 }
 
 } // namespace restraints

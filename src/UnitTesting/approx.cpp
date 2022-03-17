@@ -74,8 +74,7 @@ Approx Approx::tol(const double dtol_in) {
 //-------------------------------------------------------------------------------------------------
 bool Approx::test(const double test_value) const {
   if (values.size() != 1) {
-    rtErr("Real-valued comparisons between a vector of size " + std::to_string(values.size()) +
-          " and a scalar (" + std::to_string(test_value) + ") are nonsensical.", "Approx", "test");
+    return false;
   }
   switch (style) {
   case ComparisonType::ABSOLUTE:

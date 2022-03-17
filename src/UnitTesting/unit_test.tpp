@@ -145,6 +145,14 @@ CheckResult check(const std::vector<T> &lhs, const RelationalOperator relationsh
     break;
   }
 
+  // Check that the vector comparison is valid.  Trap this case to protect operations later on
+  // in this function that might require their inputs to be the same length.
+  if (verifyVectorApproxCompatibility(lhs, rhs) == false) {
+    error_edit += "The vectors are of different lengths (" + std::to_string(lhs.size()) + " and " +
+                  std::to_string(rhs.size()) + ").";
+    return check(false, error_message + error_edit, urgency);
+  }
+
   // Pre-compute the relevant deviations
   double max_deviation, mue, rel_deviation, rel_rmse;
   const std::vector<double> dlhs(lhs.begin(), lhs.end());

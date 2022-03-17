@@ -223,7 +223,7 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
     rtErr("At least one atom must be be specified in order to create a bounded restraint.",
           "BoundedRestraint");
   }
-
+  
   // Get the order of the restraint
   order = (atom_i >= 0) + (atom_j >= 0) + (atom_k >= 0) + (atom_l >= 0);
 

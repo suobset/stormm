@@ -105,8 +105,11 @@ private:
 };
 
 /// \brief Check the type and size of vectors for approximate comparisons.  This encapsulates
-///        checks that would have ot be done in several contexts.
-template <typename T> void verifyVectorApproxCompatibility(const std::vector<T> &test_values,
+///        checks that would have to be done in several contexts.
+///
+/// \param test_values  The vector of values to test
+/// \param cr           Approximate object to test against
+template <typename T> bool verifyVectorApproxCompatibility(const std::vector<T> &test_values,
                                                            const Approx &cr);
 
 /// \brief Overload the == operator to accommodate a Approx object and a float or double scalar

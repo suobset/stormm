@@ -24,6 +24,13 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
 
   // Initialize the output
   std::string result;
+
+  // Bail out immediately if the vectors are not the same length
+  if (va.size() != vb.size()) {
+    result += "The vectors are of different sizes (" + std::to_string(va.size()) + " and " +
+              std::to_string(vb.size()) + ").";
+    return result;
+  }
   
   // Different numerical formats (plus char4)
   switch (data_format) {
@@ -117,7 +124,7 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
           }
           result += "Pearson correlation between the vectors is " +
                     realToString(pearson(dva, dvb), 4) + ".";
-          if (n_mismatch < 5) {
+          if (n_mismatch < 16) {
             result += "  Mismatched entries:\n";
             const int ndec = realDecimalPlaces(tol);
             for (int i = 0; i < n_va; i++) {

@@ -315,7 +315,8 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_valence_evaluation \
 	          $(TESTDIR)/bin/test_nonbonded_evaluation \
 	          $(TESTDIR)/bin/test_generalized_born \
-	          $(TESTDIR)/bin/test_neighbor_list
+	          $(TESTDIR)/bin/test_neighbor_list \
+	          $(TESTDIR)/bin/test_restraints
 
 # Test programs using omni.cuda
 OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
@@ -500,10 +501,17 @@ $(TESTDIR)/bin/test_generalized_born : $(LIBDIR)/libomni.so \
 
 # Target: non-bonded neighbor list construction and usage by CPU routines
 $(TESTDIR)/bin/test_neighbor_list : $(LIBDIR)/libomni.so \
-				       $(TESTDIR)/Potential/test_neighbor_list.cpp
+				    $(TESTDIR)/Potential/test_neighbor_list.cpp
 	@echo "[OMNI]  Building test_neighbor_list..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_neighbor_list \
 	  $(TESTDIR)/Potential/test_neighbor_list.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: restraint construction and execution by CPU routines
+$(TESTDIR)/bin/test_restraints : $(LIBDIR)/libomni.so \
+				 $(TESTDIR)/Restraints/test_restraints.cpp
+	@echo "[OMNI]  Building test_restraints..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_restraints \
+	  $(TESTDIR)/Restraints/test_restraints.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: HPC detection
 $(TESTDIR)/bin/test_hpc_status : $(LIBDIR)/libomni_cuda.so \

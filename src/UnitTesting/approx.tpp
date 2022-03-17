@@ -27,7 +27,7 @@ template <typename T> Approx::Approx(const std::vector<T> &values_in, Comparison
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> void verifyVectorApproxCompatibility(const std::vector<T> &test_values,
+template <typename T> bool verifyVectorApproxCompatibility(const std::vector<T> &test_values,
                                                            const Approx &cr) {
 
   // Check that the vector is of an acceptable type
@@ -39,15 +39,14 @@ template <typename T> void verifyVectorApproxCompatibility(const std::vector<T> 
   // Check that vectors are populated and their sizes match
   const size_t nval = cr.size();
   const size_t ntval = test_values.size();
-  if (nval != ntval || nval == 0) {
-    rtErr("Real-valued comparisons between vectors of size " + std::to_string(nval) + " and " +
-          std::to_string(ntval) + " are nonsensical.", "Approx", "test");
-  }
+  return (nval == ntval && nval > 0);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool Approx::test(const std::vector<T> &test_values) const {
-  verifyVectorApproxCompatibility(test_values, *this);
+  if (verifyVectorApproxCompatibility(test_values, *this) == false) {
+    return false;
+  }
   const size_t nval = values.size();
 
   // Promote the test values to double precision to match the reference data type
@@ -119,7 +118,9 @@ template <typename T> bool operator!=(const Approx &cr, const std::vector<T> &tv
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator>(const std::vector<T> &tvec, const Approx &cr) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -133,7 +134,9 @@ template <typename T> bool operator>(const std::vector<T> &tvec, const Approx &c
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator>(const Approx &cr, const std::vector<T> &tvec) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -147,7 +150,9 @@ template <typename T> bool operator>(const Approx &cr, const std::vector<T> &tve
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator<(const std::vector<T> &tvec, const Approx &cr) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -161,7 +166,9 @@ template <typename T> bool operator<(const std::vector<T> &tvec, const Approx &c
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator<(const Approx &cr, const std::vector<T> &tvec) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -175,7 +182,9 @@ template <typename T> bool operator<(const Approx &cr, const std::vector<T> &tve
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator>=(const std::vector<T> &tvec, const Approx &cr) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -189,7 +198,9 @@ template <typename T> bool operator>=(const std::vector<T> &tvec, const Approx &
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator>=(const Approx &cr, const std::vector<T> &tvec) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -203,7 +214,9 @@ template <typename T> bool operator>=(const Approx &cr, const std::vector<T> &tv
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator<=(const std::vector<T> &tvec, const Approx &cr) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();
@@ -217,7 +230,9 @@ template <typename T> bool operator<=(const std::vector<T> &tvec, const Approx &
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> bool operator<=(const Approx &cr, const std::vector<T> &tvec) {
-  verifyVectorApproxCompatibility(tvec, cr);
+  if (verifyVectorApproxCompatibility(tvec, cr) == false) {
+    return false;
+  }
   const size_t npts = tvec.size();
   const std::vector<double> crval = cr.getValues();
   const double cr_margin = cr.getMargin();

@@ -38,14 +38,14 @@ int main(int argc, char* argv[]) {
   check(gray_number.test(9.7), "Approx object fails to perform a real-to-real scalar comparison.");
   Approx gray_vector(std::vector<double>{9.8, 8.1, 8.0, 4.5, 7.3}, ComparisonType::ABSOLUTE,
                      0.011);
-  CHECK_THROWS(gray_vector.test(9.7), "Approx object performs a scalar-to-vector "
-               "comparison without throwing an exception.");
+  check(gray_vector.test(9.7) == false, "A scalar-to-vector approximate comparison was judged "
+        "successful.");
   check(gray_vector.test(std::vector<double>{9.79, 8.11, 7.99, 4.49, 7.31}), "Approx object fails "
         "to pass a correct vector-to-vector comparison.");
   check(gray_vector.test(std::vector<double>{9.79, 8.08, 7.99, 4.49, 7.31}) == false,
         "Approx object fails to reject an unacceptable real vector-to-vector comparison.");
-  CHECK_THROWS(gray_vector.test(std::vector<double>{9.8, 8.1, 8.0}), "Approx object performs a "
-               "comparison on vectors of different lengths without throwing an exception.");
+  check(gray_vector.test(std::vector<double>{9.8, 8.1, 8.0}) == false, "Approx object performs a "
+        "comparison on vectors of different lengths and returns success.");
   check(gray_number, RelationalOperator::GREATER_THAN, 9.4, "Approximate comparison fails to "
         "process a scalar greater-than inequality.");
   check((gray_number > 9.8) == false, "Approximate comparison fails to properly declare a "
@@ -86,16 +86,16 @@ int main(int argc, char* argv[]) {
   check(-90153, RelationalOperator::LT, 90153, "Inferred approximate comparison misses an obvious "
         "comparison of a significant number with its own negative value.");
   const std::vector<double> short_vector = {11.79, 80.08, 71.99, 40.49};
-  CHECK_THROWS(bool test_a = (short_vector > gray_vector), "Approximate comparison processes a "
-               "greater-than comparison of two vectors despite them being of different lengths.");
-  CHECK_THROWS(bool test_b = (short_vector < gray_vector), "Approximate comparison processes a "
-               "less-than comparison of two vectors despite them being of different lengths.");
-  CHECK_THROWS(bool test_c = (short_vector >= gray_vector), "Approximate comparison processes a "
-               "greater-than-or-equal comparison of two vectors despite them being of different "
-               "lengths.");
-  CHECK_THROWS(bool test_d = (short_vector <= gray_vector), "Approximate comparison processes a "
-               "less-than-or-equal comparison of two vectors despite them being of different "
-               "lengths.");
+  check((short_vector > gray_vector) == false, "Approximate comparison processes a greater-than "
+        "comparison of two vectors with different lengths and returns success.");
+  check((short_vector < gray_vector) == false, "Approximate comparison processes a less-than "
+        "comparison of two vectors with two different lengths and returns success.");
+  check((short_vector >= gray_vector) == false, "Approximate comparison processes a "
+        "greater-than-or-equal comparison of two vectors with different lengths, returning "
+        "success.");
+  check((short_vector <= gray_vector) == false, "Approximate comparison processes a "
+        "less-than-or-equal comparison of two vectors, returning success despite them being of "
+        "different lengths.");
   section_timer.assignTime(1);
 
   // Examine file snapshotting by first recording data, then re-reading it.

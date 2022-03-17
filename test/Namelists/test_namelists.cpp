@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
 
   // Section 4
   section("Test the &solvent namelist");
-
+  
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any OMNI app
   section(1);
