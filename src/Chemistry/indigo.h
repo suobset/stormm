@@ -203,6 +203,9 @@ public:
   IndigoFragment(const std::vector<int> &centers_list_in,
                  const std::vector<IndigoAtomCenter> &all_centers);
 
+  /// \brief Get the number of centers in this fragment
+  int getCenterCount() const;
+  
   /// \brief Get the number of states in this fragment
   int getStateCount() const;
   

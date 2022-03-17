@@ -807,8 +807,8 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     // atoms.
     int last_participant = centers_participating - 1;
     settings[last_participant] += 1;
-    while (settings[last_participant] >= max_settings[last_participant] &&
-           centers_participating > 1) {
+    while (centers_participating > 1 &&
+           settings[last_participant] >= max_settings[last_participant]) {
       centers_participating--;
       last_participant--;
       settings[last_participant] += 1;
@@ -836,6 +836,11 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     scores[i] = prelim_scores[fidx];
     states[i] = &sdd_ptr[fidx * ccenter_count];
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+int IndigoFragment::getCenterCount() const {
+  return center_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1254,9 +1259,11 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   }
 
   // CHECK
-  if (atom_count == 304) {
+#if 0
+  if (atom_count == 1185) {
     printf("Target / baseline charge = %2d / %2d\n", target_charge, baseline_charge);
   }
+#endif
   // END CHECK
   
   // Make an initial pass to cull fragment states that exceed the ground state energy for any
@@ -1276,75 +1283,40 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   // Prepare a guardrail, a pair of bounds indicating the maximum and minimum current charge
   // that the previously included fragments must have in order to reach the correct total charge
   // on the molecule.
-  std::vector<int2> q_guardrail(fragment_count);
-  int ncull;
-  do {
-    int cumulative_min = baseline_charge - target_charge;
-    int cumulative_max = baseline_charge - target_charge;
-    for (int i = fragment_count - 1; i >= 0; i--) {
+  std::vector<int2> q_guardrail(fragment_count + 1);
+  int cumulative_min = target_charge - baseline_charge;
+  int cumulative_max = target_charge - baseline_charge;
+  for (int i = fragment_count; i >= 0; i--) {
+    if (i < fragment_count) {
       int fragment_minq = q_options[options_bounds[i]];
       int fragment_maxq = q_options[options_bounds[i]];
       for (int j = options_bounds[i] + 1; j < options_bounds[i + 1]; j++) {
         fragment_minq = std::min(fragment_minq, q_options[j]);
         fragment_maxq = std::max(fragment_maxq, q_options[j]);
       }
-      cumulative_min += fragment_minq;
-      cumulative_max += fragment_maxq;
-      q_guardrail[i].x = cumulative_min;
-      q_guardrail[i].y = cumulative_max;
+      cumulative_min -= fragment_maxq;
+      cumulative_max -= fragment_minq;
     }
+    q_guardrail[i].x = cumulative_min;
+    q_guardrail[i].y = cumulative_max;
+  }
 
-    if (atom_count == 304) {
-      printf("Guardrail = [\n");
-      for (int i = 0; i < fragment_count; i++) {
-        printf("  %4d %4d    ", q_guardrail[i].x, q_guardrail[i].y);
+  // CHECK
+#if 0
+  if (atom_count == 1185) {
+    printf("Guardrail = [\n");
+    for (int i = 0; i < fragment_count + 1; i++) {
+      printf("  %4d %4d    ", q_guardrail[i].x, q_guardrail[i].y);
+      if (i < fragment_count) {
         for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
           printf("%2d ", q_options[j]);
         }
-        printf("\n");
-      }
-      printf("];\n");
-    }
-    
-    // Loop over all fragments
-    ncull = 0;
-    for (int i = 0; i < fragment_count; i++) {
-      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
-        if (q_options[j] < q_guardrail[i].x || q_options[j] > q_guardrail[i].y) {
-          ncull += mutable_fragments[i].cullStatesBearingCharge(q_options[j]);
-
-          // CHECK
-          if (atom_count == 304) {
-            printf("Cull states in fragment %2d bearing charge %2d\n", i, q_options[j]);
-          }
-          // END CHECK
-        }
-      }
-    }
-    if (ncull > 0) {
-      q_options.resize(0);
-      options_bounds[0] = 0;
-      for (int i = 0; i < fragment_count; i++) {
-        const std::vector<int> frag_q_states = mutable_fragments[i].getChargeStates();
-        const size_t nqs = frag_q_states.size();
-        q_options.insert(q_options.end(), frag_q_states.begin(), frag_q_states.end());
-        options_bounds[i + 1] = options_bounds[i] + nqs;
-      }
-    }
-  } while (ncull > 0);
-
-  // CHECK
-  if (atom_count == 304) {
-    printf("Charge states of fragments:\n");
-    for (int i = 0; i < fragment_count; i++) {
-      printf("    %3d : ", i);
-      for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
-        printf(" %2d", q_options[j]);
       }
       printf("\n");
     }
-    printf("\n");
+    printf("];\n");
   }
+#endif
   // END CHECK
   
   // Begin to form the state based on atom centers that are not part of any mutable fragment.
@@ -1359,6 +1331,23 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     total_score += addToGroundState(atom_centers[i], 0);
   }
 
+  // CHECK
+#if 0
+  if (atom_count == 1185) {
+    for (int i = 0; i < fragment_count; i++) {
+      if (mutable_fragments[i].getCenterCount() == 4) {
+        const int nfstate = mutable_fragments[i].getStateCount();
+        printf("There are %4d states for the Arg head group:\n", nfstate);
+        for (int j = 0; j < nfstate; j++) {
+          printf("  %2d %10d\n", mutable_fragments[i].getCharge(j),
+                 mutable_fragments[i].getScore(j));
+        }
+      }
+    }
+  }
+#endif
+  // END CHECK
+  
   // Obtain Boltzmann-weighted average energies for each fragment's charge state with degenerate
   // solutions.
   std::vector<double> e_options(options_bounds[fragment_count]);
@@ -1366,6 +1355,19 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
       const int ifrag_q = q_options[j];
       const std::vector<int2> frag_states = mutable_fragments[i].getStatesBearingCharge(ifrag_q);
+
+      // CHECK
+#if 0
+      if (atom_count == 1185 && ifrag_q == 1 && mutable_fragments[i].getCenterCount() == 4) {
+        const int nstt = frag_states.size();
+        printf("Three states make up the Arg head group +1 form:\n");
+        for (int k = 0; k < nstt; k++) {
+          printf("  nrg %10d  index %2d\n", frag_states[k].x, frag_states[k].y);
+        }
+      }
+#endif
+      // END CHECK
+      
       const int n_degen_state = frag_states.size();
       std::vector<double> frag_state_prob(n_degen_state);
       double frag_state_sum = 0.0;
@@ -1408,20 +1410,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   // is rapid.
   double best_score = total_score;
   for (int i = 0; i < fragment_count; i++) {
-
-    // CHECK
-    if (i >= static_cast<int>(options_bounds.size()) || i < 0) {
-      printf("Trying to access element %4d of options_bounds, when there are only %4zu "
-             "elements.\n", i, options_bounds.size());
-    }
-    if (options_bounds[i] >= static_cast<int>(e_options.size()) || options_bounds[i] < 0) {
-      printf("Trying to access element %4d of e_options, when there are only %4zu elements.\n",
-             options_bounds[i], e_options.size());
-    }
-    // END CHECK
-
-    double fragment_max = (options_bounds[i] < options_bounds[i + 1]) ?
-                          e_options[options_bounds[i]] : 0.0;
+    double fragment_max = e_options[options_bounds[i]];
     for (int j = options_bounds[i] + 1; j < options_bounds[i + 1]; j++) {
       fragment_max = std::max(fragment_max, e_options[j]);
     }
@@ -1436,51 +1425,75 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   std::vector<int> best_settings(fragment_count, 0);
 
   // CHECK
+#if 0
   llint n_tested = 0LL;
+#endif
   // END CHECK
-  
+
+  int frags_participating = 0;
   if (fragment_count > 0) {
     do {
 
-      // Create the state based on these fragment charge settings
-      double trial_score = total_score;
-      for (int i = 0; i < fragment_count; i++) {
-        trial_score += e_options[options_bounds[i] + frag_settings[i]];
+      // The net charge of the fragments determines viability at this point--the running sum
+      // must stay within the guardrails.
+      int acc_charge = 0;      
+      for (size_t i = 0; i < frags_participating; i++) {
+        acc_charge += q_options[options_bounds[i] + frag_settings[i]];
       }
-      if (trial_score < best_score) {
-        best_score = trial_score;
-        for (int i = 0; i < fragment_count; i++) {
-          best_settings[i] = frag_settings[i];
+      if (acc_charge >= q_guardrail[frags_participating].x &&
+          acc_charge <= q_guardrail[frags_participating].y) {
+        if (frags_participating < fragment_count) {
+          frag_settings[frags_participating] = 0;
+          frags_participating++;
+          continue;
         }
-      }
-    
-      // Increment the charge settings for various fragments
-      frag_settings[0] += 1;
-      int pos = 0;
-      while (pos < fragment_count && frag_settings[pos] >= max_frag_settings[pos]) {
-        frag_settings[pos] = 0;
-        if (pos < fragment_count - 1) {
-          frag_settings[pos + 1] += 1;
-        }
-      }
+        else {
 
-      // CHECK
-      if (atom_count == 304) {
-        printf("State = [ ");
-        for (int i = 0; i < fragment_count; i++) {
-          printf("%d ", frag_settings[i]); 
+          // CHECK
+#if 0
+          if (atom_count == 1185) {
+            printf("State = [ ");
+            for (int i = 0; i < fragment_count; i++) {
+              printf("%d ", frag_settings[i]); 
+            }
+            printf("];\n");
+          }
+          n_tested++;
+#endif
+          // END CHECK
+
+          // Compute the final score of this state which gets the correct net charge
+          double trial_score = total_score;
+          for (int i = 0; i < fragment_count; i++) {
+            trial_score += e_options[options_bounds[i] + frag_settings[i]];
+          }
+          if (trial_score < best_score) {
+            best_score = trial_score;
+            for (int i = 0; i < fragment_count; i++) {
+              best_settings[i] = frag_settings[i];
+            }
+          }
         }
-        printf("];\n");
       }
-      // END CHECK
-      
-    } while (sum<int>(frag_settings) < max_frag_setval);
+        
+      // Continue the search                
+      int last_participant = frags_participating - 1;
+      frag_settings[last_participant] += 1;
+      while (frags_participating > 1 &&
+             frag_settings[last_participant] >= max_frag_settings[last_participant]) {
+        frags_participating--;
+        last_participant--;
+        frag_settings[last_participant] += 1;
+      }
+    } while (frag_settings[0] < max_frag_settings[0]);
   }
 
   // CHECK
-  if (atom_count == 304) {
+#if 0
+  if (atom_count == 1185) {
     printf("%lld states were tested.\n", n_tested);
   }
+#endif
   // END CHECK
   
   // Incorporate fragments into the solution with their best detected charge states.  This
@@ -1519,7 +1532,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
 
       // With the probabilities of each state known, evaluate the atomic formal charges and bond
       // orders as a sum of all available states.
-      const std::vector<int2> t_stt = mutable_fragments[i].getState(j);
+      const std::vector<int2> t_stt = mutable_fragments[i].getState(best_states[j].y);
       const int n_center = t_stt.size();
       for (int k = 0; k < n_center; k++) {
         total_score += addToGroundState(atom_centers[t_stt[k].x], t_stt[k].y, j, fs_prob);

@@ -84,10 +84,9 @@ int main(int argc, char* argv[]) {
   // CHECK
   const std::string trpc_top_name = base_top_name + osc + "trpcage.top";
   const std::string trpc_crd_name = base_crd_name + osc + "trpcage.inpcrd";
-  AtomGraph trpc_ag(trpc_top_name);
-  PhaseSpace trpc_ps(trpc_crd_name);
-  ChemicalFeatures trpc_chem(&trpc_ag, CoordinateFrameReader(trpc_ps), MapRotatableGroups::YES);
-  exit(1);
+  AtomGraph ubiq_ag(trpc_top_name);
+  PhaseSpace ubiq_ps(trpc_crd_name);
+  ChemicalFeatures ubiq_chem(&ubiq_ag, CoordinateFrameReader(ubiq_ps), MapRotatableGroups::NO);
   // END CHECK
   
   // Check the existence of all files
