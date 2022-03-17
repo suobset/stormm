@@ -655,7 +655,8 @@ int IndigoAtomCenter::cullByPartners(const std::vector<IndigoAtomCenter> &acen) 
 
 //-------------------------------------------------------------------------------------------------
 IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
-                               const std::vector<IndigoAtomCenter> &all_centers) :
+                               const std::vector<IndigoAtomCenter> &all_centers,
+                               const int score_delta) :
   center_count{static_cast<int>(centers_list_in.size())},
   possible_states{0},
   centers_list{centers_list_in},
@@ -664,6 +665,15 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
   net_charges{},
   scores{}
 {
+  // Keep track of whether viable states with a give charge are stored.  This could be a large
+  // allocation, so track the number of states with a given charge as a vector of int2 tuples:
+  // the number of states bearing charge -k is stored in the kth index's x member, the number of
+  // states bearing charge +k in the kth index's y member.
+  const int2 init_ksbq = { 0, 0 };
+  int known_charge_extent = 0;
+  std::vector<int2> known_states_bearing_charge(known_charge_extent + 1, init_ksbq);
+  std::vector<int2> best_energy_bearing_charge(known_charge_extent + 1, init_ksbq);
+
   // Map the interconnections among the centers.  Joined pairs of atom centers are stored in the
   // vector relevant_pairs, which stores the global atom center numbers based on the list of
   // atom centers specific to this fragment and avoids double-counting the interactions.  Use
@@ -792,10 +802,52 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
           const int s_idx = settings[i];
           st_q += all_centers[c_idx].getCharge(s_idx);
           st_score += all_centers[c_idx].getScore(s_idx);
-          states_data.push_back(s_idx);
         }
-        prelim_net_charges.push_back(st_q);
-        prelim_scores.push_back(st_score);
+
+        // Check if there are any known states with this charge, and if so, whether this
+        // one has an energy that is at all worth tracking based on what is already known.
+        bool push_this = true;
+        const int iabs_st_q = abs(st_q);
+        if (iabs_st_q >= known_charge_extent) {
+          known_states_bearing_charge.resize(iabs_st_q + 1, init_ksbq);
+          best_energy_bearing_charge.resize(iabs_st_q + 1, init_ksbq);
+          known_charge_extent = iabs_st_q;
+        }
+        if (st_q < 0) {
+          if (known_states_bearing_charge[iabs_st_q].x > 0) {
+            if (best_energy_bearing_charge[iabs_st_q].x < st_score - score_delta) {
+              push_this = false;
+            }
+            else if (best_energy_bearing_charge[iabs_st_q].x > st_score) {
+              best_energy_bearing_charge[iabs_st_q].x = st_score;
+            }
+          }
+          else {
+            known_states_bearing_charge[iabs_st_q].x += 1;
+            best_energy_bearing_charge[iabs_st_q].x = st_score;
+          }
+        }
+        else {
+          if (known_states_bearing_charge[iabs_st_q].y > 0) {
+            if (best_energy_bearing_charge[iabs_st_q].y < st_score - score_delta) {
+              push_this = false;
+            }
+            else if (best_energy_bearing_charge[iabs_st_q].y > st_score) {
+              best_energy_bearing_charge[iabs_st_q].y = st_score;
+            }
+          }
+          else {
+            known_states_bearing_charge[iabs_st_q].y += 1;
+            best_energy_bearing_charge[iabs_st_q].y = st_score;
+          }
+        }
+        if (push_this) {
+          for (int i = 0; i < ccenter_count; i++) {
+            states_data.push_back(settings[i]);
+          }
+          prelim_net_charges.push_back(st_q);
+          prelim_scores.push_back(st_score);
+        }
       }
     }
 
@@ -1257,14 +1309,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       baseline_charge += atom_centers[i].getCharge(0);
     }
   }
-
-  // CHECK
-#if 0
-  if (atom_count == 1185) {
-    printf("Target / baseline charge = %2d / %2d\n", target_charge, baseline_charge);
-  }
-#endif
-  // END CHECK
   
   // Make an initial pass to cull fragment states that exceed the ground state energy for any
   // given charge state.
@@ -1300,24 +1344,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     q_guardrail[i].x = cumulative_min;
     q_guardrail[i].y = cumulative_max;
   }
-
-  // CHECK
-#if 0
-  if (atom_count == 1185) {
-    printf("Guardrail = [\n");
-    for (int i = 0; i < fragment_count + 1; i++) {
-      printf("  %4d %4d    ", q_guardrail[i].x, q_guardrail[i].y);
-      if (i < fragment_count) {
-        for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
-          printf("%2d ", q_options[j]);
-        }
-      }
-      printf("\n");
-    }
-    printf("];\n");
-  }
-#endif
-  // END CHECK
   
   // Begin to form the state based on atom centers that are not part of any mutable fragment.
   ground_state_formal_charges.resize(atom_count, 0.0);
@@ -1330,23 +1356,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     }
     total_score += addToGroundState(atom_centers[i], 0);
   }
-
-  // CHECK
-#if 0
-  if (atom_count == 1185) {
-    for (int i = 0; i < fragment_count; i++) {
-      if (mutable_fragments[i].getCenterCount() == 4) {
-        const int nfstate = mutable_fragments[i].getStateCount();
-        printf("There are %4d states for the Arg head group:\n", nfstate);
-        for (int j = 0; j < nfstate; j++) {
-          printf("  %2d %10d\n", mutable_fragments[i].getCharge(j),
-                 mutable_fragments[i].getScore(j));
-        }
-      }
-    }
-  }
-#endif
-  // END CHECK
   
   // Obtain Boltzmann-weighted average energies for each fragment's charge state with degenerate
   // solutions.
@@ -1355,19 +1364,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
       const int ifrag_q = q_options[j];
       const std::vector<int2> frag_states = mutable_fragments[i].getStatesBearingCharge(ifrag_q);
-
-      // CHECK
-#if 0
-      if (atom_count == 1185 && ifrag_q == 1 && mutable_fragments[i].getCenterCount() == 4) {
-        const int nstt = frag_states.size();
-        printf("Three states make up the Arg head group +1 form:\n");
-        for (int k = 0; k < nstt; k++) {
-          printf("  nrg %10d  index %2d\n", frag_states[k].x, frag_states[k].y);
-        }
-      }
-#endif
-      // END CHECK
-      
       const int n_degen_state = frag_states.size();
       std::vector<double> frag_state_prob(n_degen_state);
       double frag_state_sum = 0.0;
@@ -1423,13 +1419,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   const int max_frag_setval = options_bounds[fragment_count] - fragment_count;
   std::vector<int> frag_settings(fragment_count, 0);
   std::vector<int> best_settings(fragment_count, 0);
-
-  // CHECK
-#if 0
-  llint n_tested = 0LL;
-#endif
-  // END CHECK
-
   int frags_participating = 0;
   if (fragment_count > 0) {
     do {
@@ -1448,19 +1437,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
           continue;
         }
         else {
-
-          // CHECK
-#if 0
-          if (atom_count == 1185) {
-            printf("State = [ ");
-            for (int i = 0; i < fragment_count; i++) {
-              printf("%d ", frag_settings[i]); 
-            }
-            printf("];\n");
-          }
-          n_tested++;
-#endif
-          // END CHECK
 
           // Compute the final score of this state which gets the correct net charge
           double trial_score = total_score;
@@ -1487,14 +1463,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       }
     } while (frag_settings[0] < max_frag_settings[0]);
   }
-
-  // CHECK
-#if 0
-  if (atom_count == 1185) {
-    printf("%lld states were tested.\n", n_tested);
-  }
-#endif
-  // END CHECK
   
   // Incorporate fragments into the solution with their best detected charge states.  This
   // requires re-working the energetics for the best state.

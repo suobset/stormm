@@ -25,6 +25,9 @@ constexpr int formal_charge_range   = maximum_formal_charge - minimum_formal_cha
 constexpr int formal_charge_bits    = 4;
 /// \}
 
+/// \brief The maximum energy spacing for Indigo to consider is set at 10 kcal/mol by default.
+constexpr int default_indigo_energy_gap = 3187;
+  
 /// \brief The maximum bond order is a triple bond
 constexpr int maximum_bond_order = 3;
 constexpr int bond_order_range   = maximum_bond_order + 1;
@@ -198,10 +201,14 @@ public:
   ///        whatever connections to other fragments.  The identities of other fragments are not
   ///        determined at the time of construction, but space to store them is allocated.
   ///
-  /// \param idg_tab    
-  /// \param atom_list  Subset of atoms that will make up this fragment
+  /// \param idg_tab
+  /// \param atom_list    Subset of atoms that will make up this fragment
+  /// \param score_delta  The maximum score above some ground state, for a particular charge
+  ///                     increment, to continue catalogging new states.  Other above this
+  ///                     threshold will be ignored.
   IndigoFragment(const std::vector<int> &centers_list_in,
-                 const std::vector<IndigoAtomCenter> &all_centers);
+                 const std::vector<IndigoAtomCenter> &all_centers,
+                 int score_delta = default_indigo_energy_gap);
 
   /// \brief Get the number of centers in this fragment
   int getCenterCount() const;
@@ -269,7 +276,7 @@ public:
   /// \param charge_value  Cull states bearing this net charge with sub-optimal energies
   /// \param score_delta   Threshold at which to cull non-optimal states (default 3187 implies an
   ///                      energy difference of 10 kcal/mol)
-  int cullHigherEnergyStatesByCharge(int charge_value, int score_delta = 3187);
+  int cullHigherEnergyStatesByCharge(int charge_value, int score_delta = default_indigo_energy_gap);
   
 private:
   int center_count;               ///< The number of atoms in this fragment

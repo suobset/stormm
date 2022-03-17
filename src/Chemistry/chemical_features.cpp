@@ -222,24 +222,6 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   // free_electrons arrays can now be allocated.  Lewis structures will be drawn for each unique
   // molecule and copied otherwise, but that requires a list of all unique molecules.
   drawLewisStructures(vk, nbk, cdk);
-
-  // CHECK
-#if 0
-  if (cdk.mol_limits[1] == 1185) {
-    printf("Formal charges = [\n");
-    for (int i = 0; i < cdk.mol_limits[1]; i++) {
-      if (fabs(formal_charges.readHost(i)) < 1.0e-4) {
-        continue;
-      }
-      const char4 atom_name = cdk.atom_names[i];
-      const char4 res_name  = cdk.res_names[ag_pointer->getResidueIndex(i)];
-      printf("  %c%c%c%c  %c%c%c%c  %9.4lf\n", atom_name.x, atom_name.y, atom_name.z, atom_name.w,
-             res_name.x, res_name.y, res_name.z, res_name.w, formal_charges.readHost(i));
-    }
-    printf("];\n");
-  }
-#endif
-  // END CHECK
   
   // Mark all aromatic atoms after dissecting numerous details about atoms in rings.
   std::vector<int> tmp_aromatic_group_bounds(1, 0);

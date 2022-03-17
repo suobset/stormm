@@ -12,10 +12,6 @@
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-// CHECK
-#include "../../src/UnitTesting/stopwatch.h"
-// END CHECK
-
 using omni::chemistry::ChiralOrientation;
 using omni::constants::ExceptionResponse;
 using omni::symbols::amber_ancient_bioq;
@@ -224,25 +220,6 @@ int main(int argc, char* argv[]) {
           "formal charges computed for " + sys_ag[i].getFileName() + " does not match the sum of "
           "partial charges given in the topology.", do_tests);
   }
-
-  // CHECK
-  StopWatch sw;
-  sw.addCategory("Lauren's molecule");
-  sw.addCategory("TrpCage");
-  sw.addCategory("Lig1_C8H8");
-  sw.addCategory("Ubiquitin");
-  for (int i = 0; i < 5; i++) {
-    ChemicalFeatures lauren(&sys_ag[2], CoordinateFrameReader(sys_ps[2]), mapg_no);
-    sw.assignTime(1);
-    ChemicalFeatures trppro(&sys_ag[7], CoordinateFrameReader(sys_ps[7]), mapg_no);
-    sw.assignTime(2);
-    ChemicalFeatures ligand(&sys_ag[0], CoordinateFrameReader(sys_ps[0]), mapg_no);
-    sw.assignTime(3);
-    ChemicalFeatures ubqpro(&sys_ag[9], CoordinateFrameReader(sys_ps[9]), mapg_no);
-    sw.assignTime(4);
-  }
-  sw.printResults();
-  // END CHECK
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
