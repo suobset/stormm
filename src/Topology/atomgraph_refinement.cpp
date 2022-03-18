@@ -126,7 +126,7 @@ void BasicValenceTable::makeAtomAssignments() {
     const int control_atom = dihe_k_atoms[pos];
     const int fill_slot = dihe_assigned_bounds[control_atom];
     dihe_assigned_atoms[ 3 * fill_slot     ] = dihe_i_atoms[pos];
-    dihe_assigned_atoms[(3 * fill_slot) + 1] = dihe_k_atoms[pos];
+    dihe_assigned_atoms[(3 * fill_slot) + 1] = dihe_j_atoms[pos];
     dihe_assigned_atoms[(3 * fill_slot) + 2] = dihe_l_atoms[pos];
     dihe_assigned_index[fill_slot]           = dihe_param_idx[pos];
     dihe_assigned_terms[fill_slot]           = pos;

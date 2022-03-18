@@ -3,6 +3,7 @@
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
+#include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Restraints/bounded_restraint.h"
 #include "../../src/Restraints/restraint_apparatus.h"
@@ -22,6 +23,8 @@ using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::errors::rtWarn;
 using omni::parse::separateText;
+using omni::parse::NumberFormat;
+using omni::parse::polyNumericVector;
 using omni::topology::AtomGraph;
 using omni::trajectory::CoordinateFrameReader;
 using omni::trajectory::PhaseSpace;
@@ -98,6 +101,10 @@ int main(int argc, char* argv[]) {
                              getDrivePathType(gly_lys_crd_name) == DrivePathType::FILE,
                              getDrivePathType(gly_lys_crd_name) == DrivePathType::FILE);
   const TestPriority do_tests = (input_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  const std::string snp_name = oe.getOmniSourcePath() + osc + "test" + osc + "Restraints" + osc +
+                               "rst_output.m";
+  const bool snp_exists = (getDrivePathType(snp_name) == DrivePathType::FILE);
+  const TestPriority do_snps = (snp_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   AtomGraph gy_ag(gly_tyr_top_name, ExceptionResponse::SILENT);
   PhaseSpace gy_ps(gly_tyr_crd_name);
   AtomGraph gk_ag(gly_lys_top_name, ExceptionResponse::SILENT);
@@ -145,8 +152,9 @@ int main(int argc, char* argv[]) {
     gk_hb_k_ans.insert(gk_hb_k_ans.end(), k_elem.begin(), k_elem.end());
     gk_hb_r_ans.insert(gk_hb_r_ans.end(), r_elem.begin(), r_elem.end());
   }
-  std::vector<int> gy_pos_atoms, gk_pos_atoms, gk_hb_atoms;
+  std::vector<int> gy_pos_atoms, gk_pos_atoms, gk_hb_atoms, gy_hold_atoms;
   std::vector<double> gy_pos_k, gk_pos_k, gy_pos_r, gk_pos_r, gk_hb_k, gk_hb_r;
+  std::vector<double> gy_hold_k, gy_hold_r;
   digestRestraintList(gy_pos_rstr, &gy_pos_atoms, &gy_pos_k, &gy_pos_r);
   digestRestraintList(gk_pos_rstr, &gk_pos_atoms, &gk_pos_k, &gk_pos_r);
   digestRestraintList(gk_hb_rstr, &gk_hb_atoms, &gk_hb_k, &gk_hb_r);
@@ -169,60 +177,15 @@ int main(int argc, char* argv[]) {
         "Gly-Lys system do not incorporate the expected stiffnesses.", do_tests);
   check(gk_hb_r, RelationalOperator::EQUAL, gk_hb_r_ans, "Hydrogen bond preventors for the "
         "Gly-Lys system do not incorporate the expected displacements.", do_tests);
-  check(gy_hold_atoms, RelationalOperator::EQUAL, gy_hold_atom_ans, "Holding restraints for the "
-        "Gly-Tyr system were not applied to the expected atoms.", do_tests);
-  check(gy_hold_k, RelationalOperator::EQUAL, gy_hold_k_ans, "Holding restraints for the "
-        "Gly-Tyr system do not incorporate the expected stiffnesses.", do_tests);
-  check(gy_hold_r, RelationalOperator::EQUAL, gy_hold_r_ans, "Holding restraints for the "
-        "Gly-Tyr system do not incorporate the expected displacements.", do_tests);
-
-  // CHECK
-  printf("There are %2zu positional restraints in G-Y.\n", gy_pos_rstr.size());
-  for (size_t i = 0; i < gy_pos_rstr.size(); i++) {
-    const double2 k23i = gy_pos_rstr[i].getInitialStiffness();
-    const double4 ri = gy_pos_rstr[i].getInitialDisplacements();
-    const char4 atom_i = gy_ag.getAtomName(gy_pos_rstr[i].getAtomIndex(1));
-    printf("  %c%c%c%c %2d with k2,3 = [ %9.4lf %9.4lf ] and r1,2,3,4 = [ %9.4lf %9.4lf %9.4lf "
-           "%9.4lf ];\n", atom_i.x, atom_i.y, atom_i.z, atom_i.w, gy_pos_rstr[i].getAtomIndex(1),
-           k23i.x, k23i.y, ri.x, ri.y, ri.z, ri.w);
-  }
-  printf("There are %2zu positional restraints in G-K.\n", gk_pos_rstr.size());
-  for (size_t i = 0; i < gk_pos_rstr.size(); i++) {
-    const double2 k23i = gk_pos_rstr[i].getInitialStiffness();
-    const double4 ri = gk_pos_rstr[i].getInitialDisplacements();
-    const char4 atom_i = gk_ag.getAtomName(gk_pos_rstr[i].getAtomIndex(1));
-    printf("  %c%c%c%c %2d with k2,3 = [ %9.4lf %9.4lf ] and r1,2,3,4 = [ %9.4lf %9.4lf %9.4lf "
-           "%9.4lf ];\n", atom_i.x, atom_i.y, atom_i.z, atom_i.w, gk_pos_rstr[i].getAtomIndex(1),
-           k23i.x, k23i.y, ri.x, ri.y, ri.z, ri.w);
-  }
-  printf("There are %2zu hydrogen bond preventors in G-Y.\n", gk_hb_rstr.size());
-  for (size_t i = 0; i < gk_hb_rstr.size(); i++) {
-    const double2 k23i = gk_hb_rstr[i].getInitialStiffness();
-    const double4 ri = gk_hb_rstr[i].getInitialDisplacements();
-    const char4 atom_i = gk_ag.getAtomName(gk_hb_rstr[i].getAtomIndex(1));
-    const char4 atom_j = gk_ag.getAtomName(gk_hb_rstr[i].getAtomIndex(2));
-    printf("  %c%c%c%c - %c%c%c%c %2d - %2d with k2,3 = [ %9.4lf %9.4lf ] and r1,2,3,4 = [ %9.4lf "
-           "%9.4lf %9.4lf %9.4lf ];\n", atom_i.x, atom_i.y, atom_i.z, atom_i.w, atom_j.x, atom_j.y,
-           atom_j.z, atom_j.w, gk_hb_rstr[i].getAtomIndex(1), gk_hb_rstr[i].getAtomIndex(2),
-           k23i.x, k23i.y, ri.x, ri.y, ri.z, ri.w);
-  }
-  printf("There are %2zu holding restraints in G-Y.\n", gy_hold_rstr.size());
-  for (size_t i = 0; i < gy_hold_rstr.size(); i++) {
-    const double2 k23i = gy_hold_rstr[i].getInitialStiffness();
-    const double4 ri = gy_hold_rstr[i].getInitialDisplacements();
-    const char4 atom_i = gk_ag.getAtomName(gy_hold_rstr[i].getAtomIndex(1));
-    const char4 atom_j = gk_ag.getAtomName(gy_hold_rstr[i].getAtomIndex(2));
-    const char4 atom_k = gk_ag.getAtomName(gy_hold_rstr[i].getAtomIndex(3));
-    const char4 atom_l = gk_ag.getAtomName(gy_hold_rstr[i].getAtomIndex(4));
-    printf("  %c%c%c%c - %c%c%c%c - %c%c%c%c - %c%c%c%c %2d - %2d - %2d - %2d with k2,3 = [ "
-           "%9.4lf %9.4lf ] and r1,2,3,4 = [ %9.4lf %9.4lf %9.4lf %9.4lf ];\n", atom_i.x, atom_i.y,
-           atom_i.z, atom_i.w, atom_j.x, atom_j.y, atom_j.z, atom_j.w, atom_k.x, atom_k.y,
-           atom_k.z, atom_k.w, atom_l.x, atom_l.y, atom_l.z, atom_l.w,
-           gy_hold_rstr[i].getAtomIndex(1), gy_hold_rstr[i].getAtomIndex(2),
-           gy_hold_rstr[i].getAtomIndex(3), gy_hold_rstr[i].getAtomIndex(4),
-           k23i.x, k23i.y, ri.x, ri.y, ri.z, ri.w);
-  }
-  // END CHECK
+  snapshot(snp_name, polyNumericVector(gy_hold_atoms), "gy_hold_indices", NumberFormat::INTEGER,
+           "Holding restraints for the Gly-Tyr system were not applied to the expected atoms.",
+           oe.takeSnapshot(), 1.0e-4, 1.0e-6, PrintSituation::OVERWRITE, do_snps);
+  snapshot(snp_name, polyNumericVector(gy_hold_k), "gy_hold_kval", NumberFormat::STANDARD_REAL,
+           "Holding restraints for the Gly-Tyr system do not incorporate the expected "
+           "stiffnesses.", oe.takeSnapshot(), 1.0e-4, 1.0e-6, PrintSituation::APPEND, do_snps);
+  snapshot(snp_name, polyNumericVector(gy_hold_r), "gy_hold_rval", NumberFormat::STANDARD_REAL,
+           "Holding restraints for the Gly-Tyr system do not incorporate the expected "
+           "displacements.", oe.takeSnapshot(), 1.0e-4, 1.0e-6, PrintSituation::APPEND, do_snps);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

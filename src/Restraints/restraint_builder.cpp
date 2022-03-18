@@ -180,6 +180,7 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
   // dihedrals such that all four atoms are heavy atoms (non-hydrogen) and neither of the central
   // two atoms are one of the chiral centers slated for inversion.
   const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
+  const ChemicalDetailsKit cdk = ag->getChemicalDetailsKit();
   const std::vector<bool> holding_mask = mask.getMask();
   const double harmonic_width = sqrt(harmonic_maximum / penalty);
   std::vector<bool> coverage(vk.ndihe, false);
@@ -199,11 +200,15 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 
       // Mark this combination of four atoms as representative of any similar combinations.  When
       // checking the second of two central atoms, give priority to dihedrals with the lower atom
-      // index in the controlling position.
+      // index in the controlling position.  Skip dihedrals containing hydrogens.
       const int atom_i = vk.dihe_asgn_atoms[3 * j];
       const int atom_j = vk.dihe_asgn_atoms[(3 * j) + 1];
       const int atom_k = i;
       const int atom_l = vk.dihe_asgn_atoms[(3 * j) + 2];
+      if (cdk.z_numbers[atom_i] <= 1 || cdk.z_numbers[atom_j] <= 1 || cdk.z_numbers[atom_k] <= 1 ||
+          cdk.z_numbers[atom_l] <= 1) {
+        continue;
+      }
       for (int k = j; k < vk.dihe_asgn_bounds[i + 1]; k++) {
         if (vk.dihe_asgn_atoms[3 * k] == atom_i && vk.dihe_asgn_atoms[(3 * k) + 1] == atom_j &&
             vk.dihe_asgn_atoms[(3 * k) + 2] == atom_l) {

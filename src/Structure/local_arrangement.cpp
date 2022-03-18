@@ -276,7 +276,7 @@ double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
   cd[0] = rlx;
   cd[1] = rly;
   cd[2] = rlz;
-
+  
   // Compute cross products and then the angle between the planes
   double crabbc[3], crbccd[3], scr[3];
   crossProduct(ab, bc, crabbc);
