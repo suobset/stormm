@@ -15,6 +15,11 @@ using math::matrixMultiply;
 using math::matrixVectorMultiply;
 using structure::imageCoordinates;
 using structure::ImagingMethod;
+
+// CHECK
+using structure::dihedral_angle;
+// END CHECK
+
 using symbols::pi;
 using symbols::twopi;
 using symbols::inverse_twopi;
@@ -1447,7 +1452,7 @@ double3 restraintDelta(const double2 init_k, const double2 final_k, const double
   double dl, du, keq;
   if (dr < r1) {
     dl = r1 - r2;
-    du = k2 * ((dl * dl) + (r1 - dr));
+    du = k2 * ((dl * dl) + (2.0 * dl * (dr - r1)));
     keq = k2;
   }
   else if (dr < r2) {
@@ -1467,7 +1472,7 @@ double3 restraintDelta(const double2 init_k, const double2 final_k, const double
   }
   else {
     dl = r4 - r3;
-    du = k3 * ((dl * dl) + (dr - r4));
+    du = k3 * ((dl * dl) + (2.0 * dl * (dr - r4)));
     keq = k3;
   }
   return { keq, dl, du };
@@ -1505,10 +1510,25 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
 
     // Compute forces
     if (eval_force == EvaluateForce::YES) {
-      const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
-      xfrc[n_atom] += fmag * dx;
-      yfrc[n_atom] += fmag * dy;
-      zfrc[n_atom] += fmag * dz;
+      if (dr < constants::tiny) {
+
+        // The case of positional restraints has a wrinkle when particles are already at their
+        // exact target locations.  The force will likely be zero anyway, but it's possible to
+        // define a positional restraint that forces a particle to be some finite distance away
+        // from the target point, which would imply a non-zero force when the particle is at
+        // the target location.  The proper direction of that force is an arbitrary thing in
+        // such a case, so subdivide it among all three dimensions.
+        const double fmag = 2.0 * rst_eval.x * rst_eval.y / sqrt(3.0);
+        xfrc[n_atom] -= fmag;
+        yfrc[n_atom] -= fmag;
+        zfrc[n_atom] -= fmag;
+      }
+      else {
+        const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
+        xfrc[n_atom] -= fmag * dx;
+        yfrc[n_atom] -= fmag * dy;
+        zfrc[n_atom] -= fmag * dz;
+      }
     }
   }
   for (int pos = 0; pos < rar.nbond; pos++) {
@@ -1591,10 +1611,10 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
     }    
   }
   for (int pos = 0; pos < rar.ndihe; pos++) {
-    const int i_atom = rar.rangl_i_atoms[pos];
-    const int j_atom = rar.rangl_j_atoms[pos];
-    const int k_atom = rar.rangl_k_atoms[pos];
-    const int l_atom = rar.rangl_k_atoms[pos];
+    const int i_atom = rar.rdihe_i_atoms[pos];
+    const int j_atom = rar.rdihe_j_atoms[pos];
+    const int k_atom = rar.rdihe_k_atoms[pos];
+    const int l_atom = rar.rdihe_l_atoms[pos];
 
     // Compute displacements
     double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
@@ -1613,16 +1633,25 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
 
     // Compute cross products and then the angle between the planes
     crossProduct(ab, bc, crabbc);
-    crossProduct(bc, cd, crbccd);
+    crossProduct(bc, cd, crbccd);    
     double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
     costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
                      (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
     crossProduct(crabbc, crbccd, scr);
     costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-    const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
-                                                                              -acos(costheta);
+    double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
+                                                                        -acos(costheta);
     const double2 mixwt = computeRestraintMixture(step_number, rar.rdihe_init_step[pos],
                                                   rar.rdihe_finl_step[pos]);
+
+    // As part of the setup, the restraint has been arranged so that r1, r2, r3, and r4 are
+    // monotonically increasing and span at most two pi radians.  The center of this arrangement
+    // may not be at zero, but will be within the range [-pi, pi).  Image the angle to align with
+    // the center of the restraint displacements r2 and r3.
+    const double midpoint = 0.5 * (mixwt.x * (rar.rdihe_init_r[pos].y + rar.rdihe_init_r[pos].z) +
+                                   mixwt.y * (rar.rdihe_finl_r[pos].y + rar.rdihe_finl_r[pos].z));
+    double midpoint_delta = imageValue(theta - midpoint, twopi, ImagingMethod::MINIMUM_IMAGE);
+    theta += midpoint_delta - (theta - midpoint);
     const double3 rst_eval = restraintDelta(rar.rdihe_init_keq[pos], rar.rdihe_finl_keq[pos],
                                             rar.rdihe_init_r[pos], rar.rdihe_finl_r[pos], mixwt,
                                             theta);
@@ -1653,13 +1682,27 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
         crbccd[i] *= invbcd;
       }
 
-      // Transform the rotational derivatives to cartesian coordinates
+      // Transform the rotational derivatives to Cartesian coordinates
       const double fa = -invab * isinb2;
       const double fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
       const double fb2 = cosc * invbc * isinc2;
       const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
       const double fc2 = cosb * invbc * isinb2;
       const double fd = -invcd * isinc2;
+
+      // CHECK
+#if 0
+      printf(" %2d %2d %2d %2d -> %9.4lf %9.4lf (%9.4lf) at angle %9.4lf\n", i_atom, j_atom,
+             k_atom, l_atom, rst_eval.x, rst_eval.y, rst_eval.z, theta);
+      printf("    ab = [ %9.4lf %9.4lf %9.4lf ];\n", ab[0], ab[1], ab[2]);
+      printf("    bc = [ %9.4lf %9.4lf %9.4lf ];\n", bc[0], bc[1], bc[2]);
+      printf("    cd = [ %9.4lf %9.4lf %9.4lf ];\n", cd[0], cd[1], cd[2]);
+      printf("    invab, invbc, invcd        = %9.4lf %9.4lf %9.4lf\n", invab, invbc, invcd);
+      printf("    cosb, cosc, isinb2, isinc2 = %9.4lf %9.4lf %9.4lf %9.4lf\n", cosb, cosc,
+             isinb2, isinc2);
+#endif
+      // END CHECK
+      
       xfrc[i_atom] += crabbc[0] * fa;
       xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
       xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);

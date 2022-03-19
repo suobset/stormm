@@ -226,6 +226,9 @@ public:
   /// \brief Get an indication of whether this apparatus uses time-dependent restraints
   bool getTimeDependence() const;
 
+  /// \brief Get a pointer to the topology that this restraint collection supplements
+  const AtomGraph* getTopologyPointer() const;
+  
   /// \brief Get a double-precision abstract of this apparatus
   RestraintApparatusDpReader dpData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 

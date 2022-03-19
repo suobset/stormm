@@ -65,10 +65,13 @@ void imageCoordinates(CoordinateFrame *cf, ImagingMethod style);
 ///        function work with double-precision coordinates on the host.
 ///
 /// Overloaded:
+///   - Accept two atom indices and raw pointers to the coordinates and box specifications
 ///   - Accept two atom indices and a CoordinateFrameReader object
 ///   - Accept two atom indices and a CoordinateFrame object
 ///   - Accept two atom indices and a PhaseSpace object
 /// \{
+double distance(int atom_i, int atom_j, const double* xcrd, const double* ycrd, const double* zcrd,
+                const double* umat, const double* invu, UnitCellType unit_cell);
 double distance(int atom_i, int atom_j, const CoordinateFrameReader &cfr);
 double distance(int atom_i, int atom_j, const CoordinateFrame &cf);
 double distance(int atom_i, int atom_j, const PhaseSpace &ps);
@@ -79,10 +82,13 @@ double distance(int atom_i, int atom_j, const PhaseSpace &ps);
 ///        radians.
 ///
 /// Overloaded:
+///   - Accept three atom indices and raw pointers to the coordinates and box specifications
 ///   - Accept three atom indices and a CoordinateFrameReader object
 ///   - Accept three atom indices and a CoordinateFrame object
 ///   - Accept three atom indices and a PhaseSpace object
 /// \{
+double angle(int atom_i, int atom_j, int atom_k, const double* xcrd, const double* ycrd,
+             const double* zcrd, const double* umat, const double* invu, UnitCellType unit_cell);
 double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrameReader &cfr);
 double angle(int atom_i, int atom_j, int atom_k, const CoordinateFrame &cf);
 double angle(int atom_i, int atom_j, int atom_k, const PhaseSpace &ps);
@@ -93,10 +99,14 @@ double angle(int atom_i, int atom_j, int atom_k, const PhaseSpace &ps);
 ///        radians.
 ///
 /// Overloaded:
+///   - Accept four atom indices and raw pointers to the coordinates and box specifications
 ///   - Accept four atom indices and a CoordinateFrameReader object
 ///   - Accept four atom indices and a CoordinateFrame object
 ///   - Accept four atom indices and a PhaseSpace object
 /// \{
+double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const double* xcrd,
+                      const double* ycrd, const double* zcrd, const double* umat,
+                      const double* invu, UnitCellType unit_cell);
 double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
                       const CoordinateFrameReader &cfr);
 double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const CoordinateFrame &cf);

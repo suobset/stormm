@@ -81,7 +81,7 @@ int AtomGraph::getDescriptor(const SanderDescriptor choice) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getResidueLimits() const {
-  return residue_limits.readHost();
+  return residue_limits.readHost(0, residue_count + 1);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -114,8 +114,25 @@ int AtomGraph::getResidueIndex(const int atom_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> AtomGraph::getStructuralAtomNumber() const {
+  return atom_struc_numbers.readHost(0, atom_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> AtomGraph::getStructuralAtomNumber(const int low_index,
+                                                    const int high_index) const {
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getStructuralAtomNumber");
+  return atom_struc_numbers.readHost(low_index, high_index - low_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getStructuralAtomNumber(const int index) const {
+  return atom_struc_numbers.readHost(index);
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getResidueNumber() const {
-  return residue_numbers.readHost();
+  return residue_numbers.readHost(0, residue_count);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -194,12 +194,19 @@ void imageCoordinates(CoordinateFrame *cf, const ImagingMethod style) {
 }
 
 //-------------------------------------------------------------------------------------------------
-double distance(const int atom_i, const int atom_j, const CoordinateFrameReader &cfr) {
-  double dx = cfr.xcrd[atom_j] - cfr.xcrd[atom_i];
-  double dy = cfr.ycrd[atom_j] - cfr.ycrd[atom_i];
-  double dz = cfr.zcrd[atom_j] - cfr.zcrd[atom_i];
-  imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell, ImagingMethod::MINIMUM_IMAGE);
+double distance(const int atom_i, const int atom_j, const double* xcrd, const double* ycrd,
+                const double* zcrd, const double* umat, const double* invu,
+                const UnitCellType unit_cell) {
+  double dx = xcrd[atom_j] - xcrd[atom_i];
+  double dy = ycrd[atom_j] - ycrd[atom_i];
+  double dz = zcrd[atom_j] - zcrd[atom_i];
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   return sqrt((dx * dx) + (dy * dy) + (dz * dz));
+}
+
+//-------------------------------------------------------------------------------------------------
+double distance(const int atom_i, const int atom_j, const CoordinateFrameReader &cfr) {
+  return distance(atom_i, atom_j, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.unit_cell);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -213,19 +220,20 @@ double distance(const int atom_i, const int atom_j, const PhaseSpace &ps) {
 }
 
 //-------------------------------------------------------------------------------------------------
-double angle(const int atom_i, const int atom_j, const int atom_k,
-             const CoordinateFrameReader &cfr) {
+double angle(const int atom_i, const int atom_j, const int atom_k, const double* xcrd,
+             const double* ycrd, const double* zcrd, const double* umat, const double* invu,
+             const UnitCellType unit_cell) {
 
   // Image all three atoms and put the atom J at the origin
-  double rix = cfr.xcrd[atom_i] - cfr.xcrd[atom_j];
-  double riy = cfr.ycrd[atom_i] - cfr.ycrd[atom_j];
-  double riz = cfr.zcrd[atom_i] - cfr.zcrd[atom_j];
-  double rkx = cfr.xcrd[atom_k] - cfr.xcrd[atom_j];
-  double rky = cfr.ycrd[atom_k] - cfr.ycrd[atom_j];
-  double rkz = cfr.zcrd[atom_k] - cfr.zcrd[atom_j];
+  double rix = xcrd[atom_i] - xcrd[atom_j];
+  double riy = ycrd[atom_i] - ycrd[atom_j];
+  double riz = zcrd[atom_i] - zcrd[atom_j];
+  double rkx = xcrd[atom_k] - xcrd[atom_j];
+  double rky = ycrd[atom_k] - ycrd[atom_j];
+  double rkz = zcrd[atom_k] - zcrd[atom_j];
   const ImagingMethod imeth = ImagingMethod::MINIMUM_IMAGE;
-  imageCoordinates(&rix, &riy, &riz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
-  imageCoordinates(&rkx, &rky, &rkz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
+  imageCoordinates(&rix, &riy, &riz, umat, invu, unit_cell, imeth);
+  imageCoordinates(&rkx, &rky, &rkz, umat, invu, unit_cell, imeth);
 
   // Compute the angle, in radians
   const double mgba = (rix * rix) + (riy * riy) + (riz * riz);
@@ -234,6 +242,13 @@ double angle(const int atom_i, const int atom_j, const int atom_k,
   double costheta = ((rix * rkx) + (riy * rky) + (riz * rkz)) * invbabc;
   costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
   return acos(costheta);
+}
+
+//-------------------------------------------------------------------------------------------------
+double angle(const int atom_i, const int atom_j, const int atom_k,
+             const CoordinateFrameReader &cfr) {
+  return angle(atom_i, atom_j, atom_k, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
+               cfr.unit_cell);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -247,23 +262,24 @@ double angle(const int atom_i, const int atom_j, const int atom_k, const PhaseSp
 }
 
 //-------------------------------------------------------------------------------------------------
-double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
-                      const CoordinateFrameReader &cfr) {
+double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const double* xcrd,
+                      const double* ycrd, const double* zcrd, const double* umat,
+                      const double* invu, const UnitCellType unit_cell) {
 
   // Image all four atoms and put atom K at the origin
-  double rix = cfr.xcrd[atom_i] - cfr.xcrd[atom_k];
-  double riy = cfr.ycrd[atom_i] - cfr.ycrd[atom_k];
-  double riz = cfr.zcrd[atom_i] - cfr.zcrd[atom_k];
-  double rjx = cfr.xcrd[atom_j] - cfr.xcrd[atom_k];
-  double rjy = cfr.ycrd[atom_j] - cfr.ycrd[atom_k];
-  double rjz = cfr.zcrd[atom_j] - cfr.zcrd[atom_k];
-  double rlx = cfr.xcrd[atom_l] - cfr.xcrd[atom_k];
-  double rly = cfr.ycrd[atom_l] - cfr.ycrd[atom_k];
-  double rlz = cfr.zcrd[atom_l] - cfr.zcrd[atom_k];
+  double rix = xcrd[atom_i] - xcrd[atom_k];
+  double riy = ycrd[atom_i] - ycrd[atom_k];
+  double riz = zcrd[atom_i] - zcrd[atom_k];
+  double rjx = xcrd[atom_j] - xcrd[atom_k];
+  double rjy = ycrd[atom_j] - ycrd[atom_k];
+  double rjz = zcrd[atom_j] - zcrd[atom_k];
+  double rlx = xcrd[atom_l] - xcrd[atom_k];
+  double rly = ycrd[atom_l] - ycrd[atom_k];
+  double rlz = zcrd[atom_l] - zcrd[atom_k];
   const ImagingMethod imeth = ImagingMethod::MINIMUM_IMAGE;
-  imageCoordinates(&rix, &riy, &riz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
-  imageCoordinates(&rjx, &rjy, &rjz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
-  imageCoordinates(&rlx, &rly, &rlz, cfr.umat, cfr.invu, cfr.unit_cell, imeth);
+  imageCoordinates(&rix, &riy, &riz, umat, invu, unit_cell, imeth);
+  imageCoordinates(&rjx, &rjy, &rjz, umat, invu, unit_cell, imeth);
+  imageCoordinates(&rlx, &rly, &rlz, umat, invu, unit_cell, imeth);
 
   // Compute the dihedral angle, in radians
   double ab[3], bc[3], cd[3];
@@ -289,6 +305,13 @@ double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
   const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
                                                                             -acos(costheta);
   return theta;
+}
+
+//-------------------------------------------------------------------------------------------------
+double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l,
+                      const CoordinateFrameReader &cfr) {
+  return dihedral_angle(atom_i, atom_j, atom_k, atom_l, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat,
+                        cfr.invu, cfr.unit_cell);
 }
 
 //-------------------------------------------------------------------------------------------------

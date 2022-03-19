@@ -187,6 +187,10 @@ int realDecimalPlaces(double value, int limit = 10);
 
 /// \brief Convert a real number to a formatted string.
 ///
+/// Overloaded:
+///   - Provide both format specifiers.  Printing method defaults to %(a).(b)lf.
+///   - Provide just one format specifier (must also provide the printing method)
+///
 /// \param value     The number to convert
 /// \param format_a  First of up to two format specifiers.  If this is given and the second format
 ///                  specifier is blank, it refers to the number of decimal places to print for
@@ -195,11 +199,16 @@ int realDecimalPlaces(double value, int limit = 10);
 /// \param format_b  If given, this will convert the first format specifier into the total width
 ///                  and then specify the number of digits after the decimal.
 /// \param style     Whether to print leading zeros when there is more format space than digits
+/// \{
 std::string realToString(double value, int format_a = free_number_format,
                          int format_b = free_number_format,
                          NumberFormat method = NumberFormat::STANDARD_REAL,
                          NumberPrintStyle = NumberPrintStyle::STANDARD);
 
+std::string realToString(const double value, const int format_a, const NumberFormat method,
+                         const NumberPrintStyle style = NumberPrintStyle::STANDARD);
+/// \}
+  
 /// Convert an integer to a formatted string.
 ///
 /// \param value  The number to convert

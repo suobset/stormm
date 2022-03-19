@@ -224,14 +224,10 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
         }
       }
       const double current_value = dihedral_angle(atom_i, atom_j, atom_k, atom_l, cfr);
-      const double r1 = imageValue(current_value - flat_bottom_half_width - harmonic_width, twopi,
-                                   ImagingMethod::MINIMUM_IMAGE);
-      const double r2 = imageValue(current_value - flat_bottom_half_width, twopi,
-                                   ImagingMethod::MINIMUM_IMAGE);
-      const double r3 = imageValue(current_value + flat_bottom_half_width, twopi,
-                                   ImagingMethod::MINIMUM_IMAGE);
-      const double r4 = imageValue(current_value + flat_bottom_half_width + harmonic_width, twopi,
-                                   ImagingMethod::MINIMUM_IMAGE);
+      const double r1 = current_value - flat_bottom_half_width - harmonic_width;
+      const double r2 = current_value - flat_bottom_half_width;
+      const double r3 = current_value + flat_bottom_half_width;
+      const double r4 = current_value + flat_bottom_half_width + harmonic_width;
       result.push_back(BoundedRestraint(atom_i, atom_j, atom_k, atom_l, ag, penalty, penalty,
                                         r1, r2, r3, r4));
     }

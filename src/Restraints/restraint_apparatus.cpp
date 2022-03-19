@@ -561,6 +561,11 @@ bool RestraintApparatus::getTimeDependence() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const AtomGraph* RestraintApparatus::getTopologyPointer() const {
+  return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
 RestraintApparatusDpReader RestraintApparatus::dpData(const HybridTargetLevel tier) const {
   return RestraintApparatusDpReader(total_restraint_count, position_count, distance_count,
                                     angle_count, dihedral_count, time_based_restraints,
@@ -941,12 +946,12 @@ void RestraintApparatus::populateInternalArrays(const std::vector<BoundedRestrai
     else if (rord == 2) {
       tmp_rbond_i[nbondr]          = rbasis[i].getAtomIndex(1);
       tmp_rbond_j[nbondr]          = rbasis[i].getAtomIndex(2);
-      tmp_rbond_init_step[nanglr]  = rbasis[i].getInitialStep();
-      tmp_rbond_final_step[nanglr] = rbasis[i].getFinalStep();
+      tmp_rbond_init_step[nbondr]  = rbasis[i].getInitialStep();
+      tmp_rbond_final_step[nbondr] = rbasis[i].getFinalStep();
       tmp_rbond_init_keq[nbondr]   = rbasis[i].getInitialStiffness();
       tmp_rbond_final_keq[nbondr]  = rbasis[i].getFinalStiffness();
-      tmp_rbond_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rbond_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      tmp_rbond_init_r[nbondr]     = rbasis[i].getInitialDisplacements();
+      tmp_rbond_final_r[nbondr]    = rbasis[i].getFinalDisplacements();
       nbondr++;
     }
     else if (rord == 3) {
@@ -957,8 +962,8 @@ void RestraintApparatus::populateInternalArrays(const std::vector<BoundedRestrai
       tmp_rangl_final_step[nanglr] = rbasis[i].getFinalStep();
       tmp_rangl_init_keq[nanglr]   = rbasis[i].getInitialStiffness();
       tmp_rangl_final_keq[nanglr]  = rbasis[i].getFinalStiffness();
-      tmp_rangl_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rangl_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      tmp_rangl_init_r[nanglr]     = rbasis[i].getInitialDisplacements();
+      tmp_rangl_final_r[nanglr]    = rbasis[i].getFinalDisplacements();
       nanglr++;
     }
     else if (rord == 4) {
@@ -970,12 +975,12 @@ void RestraintApparatus::populateInternalArrays(const std::vector<BoundedRestrai
       tmp_rdihe_final_step[ndiher] = rbasis[i].getFinalStep();
       tmp_rdihe_init_keq[ndiher]   = rbasis[i].getInitialStiffness();
       tmp_rdihe_final_keq[ndiher]  = rbasis[i].getFinalStiffness();
-      tmp_rdihe_init_r[nposnr]     = rbasis[i].getInitialDisplacements();
-      tmp_rdihe_final_r[nposnr]    = rbasis[i].getFinalDisplacements();
+      tmp_rdihe_init_r[ndiher]     = rbasis[i].getInitialDisplacements();
+      tmp_rdihe_final_r[ndiher]    = rbasis[i].getFinalDisplacements();
       ndiher++;
     }
   }
-  
+
   // Load the integer data into Hybrid objects
   rposn_atoms.putHost(tmp_rposn_i);
   rbond_i_atoms.putHost(tmp_rbond_i);

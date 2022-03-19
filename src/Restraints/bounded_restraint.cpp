@@ -1,4 +1,8 @@
 #include "Chemistry/atommask.h"
+#include "Constants/symbol_values.h"
+#include "Parsing/parse.h"
+#include "Parsing/polynumeric.h"
+#include "Structure/local_arrangement.h"
 #include "bounded_restraint.h"
 
 namespace omni {
@@ -6,6 +10,13 @@ namespace restraints {
 
 using chemistry::AtomMask;
 using chemistry::MaskInputMode;
+using parse::realToString;
+using parse::char4ToString;
+using parse::NumberFormat;
+using structure::imageValue;
+using structure::ImagingMethod;
+using symbols::pi;
+using symbols::twopi;
 
 //-------------------------------------------------------------------------------------------------
 BoundedRestraint::BoundedRestraint(const AtomGraph *ag_in) :
@@ -65,7 +76,7 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
   bool running = true;
   for (int i = 0; i < 4; i++) {
     n_mask_atom[i] = all_masks[i].getMaskedAtomCount();
-    if (n_mask_atom[i] > 1) {
+    if (n_mask_atom[i] > 1 || (all_masks[i].getInputText().size() > 0 && n_mask_atom[i] == 0)) {
       rtErr("Atom mask \"" + all_masks[i].getInputText() + "\" specifies " +
             std::to_string(n_mask_atom[i]) + " atoms in topology " + ag_pointer->getFileName() +
             ".  The mask must specify one and only one atom.", "BoundedRestraint");
@@ -94,6 +105,10 @@ BoundedRestraint::BoundedRestraint(const std::string &mask_i_in, const std::stri
   if (order > 3) {
     atom_l = n_mask_atom[3];
   }
+
+  // Correct the displacment values if necessary
+  checkDisplacementLimits(&initial_r);
+  checkDisplacementLimits(&final_r);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -244,6 +259,10 @@ BoundedRestraint::BoundedRestraint(const int atom_i_in, const int atom_j_in, con
     rtErr("The atom selection " + atom_number_list + " does not fall within the atom indexing of "
           "topology " + ag_pointer->getFileName() + ".", "BoundedRestraint");
   }
+
+  // Correct the displacment values if necessary
+  checkDisplacementLimits(&initial_r);
+  checkDisplacementLimits(&final_r);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -542,15 +561,7 @@ void BoundedRestraint::setTargetSite(const double new_ref_x, const double new_re
 
 //-------------------------------------------------------------------------------------------------
 void BoundedRestraint::setTargetSite(const double3 new_ref_crd) {
-  if (order != 1) {
-    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
-          std::to_string(order) + ".", "BoundedRestraint", "setTargetSite");
-  }
-  if (initial_step != final_step && initial_step != 0) {
-    rtErr("The time-dependence of the restraint forbids use of static parameter setters.  Use "
-          "set(Initial,Final)TargetSite() instead.", "BoundedRestraint", "setTargetSite");
-  }
-  initial_center = { new_ref_crd.x, new_ref_crd.y, new_ref_crd.z };
+  setTargetSite(new_ref_crd.x, new_ref_crd.y, new_ref_crd.z);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -569,15 +580,7 @@ void BoundedRestraint::setInitialTargetSite(const double new_ref_x, const double
 
 //-------------------------------------------------------------------------------------------------
 void BoundedRestraint::setInitialTargetSite(const double3 new_ref_crd) {
-  if (order != 1) {
-    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
-          std::to_string(order) + ".", "BoundedRestraint", "setInitialTargetSite");
-  }
-  if (initial_step == final_step && initial_step == 0) {
-    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
-          "setTargetSite() instead.", "BoundedRestraint", "setInitialTargetSite");
-  }
-  initial_center = { new_ref_crd.x, new_ref_crd.y, new_ref_crd.z };
+  setInitialTargetSite(new_ref_crd.x, new_ref_crd.y, new_ref_crd.z);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -596,16 +599,77 @@ void BoundedRestraint::setFinalTargetSite(const double new_ref_x, const double n
 
 //-------------------------------------------------------------------------------------------------
 void BoundedRestraint::setFinalTargetSite(const double3 new_ref_crd) {
-  if (order != 1) {
-    rtErr("Target sites are only applicable to positional restraints.  This restraint order = " +
-          std::to_string(order) + ".", "BoundedRestraint", "setFinalTargetSite");
-  }
-  if (initial_step == final_step && initial_step == 0) {
-    rtErr("The time-independence of the restraint requires use of static parameter setters.  Use "
-          "setTargetSite() instead.", "BoundedRestraint", "setFinalTargetSite");
-  }
-  final_center = { new_ref_crd.x, new_ref_crd.y, new_ref_crd.z };
+  setFinalTargetSite(new_ref_crd.x, new_ref_crd.y, new_ref_crd.z);
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string BoundedRestraint::reportAtomList() {
+  std::string result;
+  for (int i = 0; i < order; i++) {
+    result += std::to_string(ag_pointer->getStructuralAtomNumber(i)) + " ";
+    result += char4ToString(ag_pointer->getAtomName(i)) + " ";
+    result += char4ToString(ag_pointer->getResidueName(ag_pointer->getResidueIndex(i))) + " ";
+    result += std::to_string(ag_pointer->getResidueNumber(i));
+    if (i < order - 1) {
+      result += ", ";
+    }
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
+void BoundedRestraint::checkDisplacementLimits(double4 *rval) {
+
+  // The parameters r1, r2, r3, and r4 must be monotonically increasing.
+  if (rval->x > rval->y || rval->y > rval->z || rval->z > rval->w) {
+    rtErr("Restraints must operate with monotonically increasing displacement values.  Invalid "
+          "displacements for a restraint between atoms " + reportAtomList() + ": " +
+          realToString(rval->x, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(rval->y, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(rval->z, 4, NumberFormat::STANDARD_REAL) + ", " +
+          realToString(rval->w, 4, NumberFormat::STANDARD_REAL) + ".", "BoundedRestraint",
+          "checkDisplacementLimits");
+  }
+  
+  // The range of r2 to r3 must be within [ 0, pi ) for an angle and [ -pi, pi ) for a dihedral.
+  // The bound r1 and r4 can be set with whatever remaining room exists in the space.
+  if (order == 3 && (rval->y < 0 || rval->z >= pi)) {
+    rtErr("Three-point angle restraints require that r2 and r3 stay within the range [0, pi).  "
+          "Invalid displacements for a restraint between atoms " + reportAtomList() + ": " +
+          "r2 = " + realToString(rval->y, 4, NumberFormat::STANDARD_REAL) + ", " +
+          "r3 = " + realToString(rval->z, 4, NumberFormat::STANDARD_REAL) + ".",
+          "BoundedRestraint", "checkDisplacementLimits");
+  }
+  if (order == 4 && rval->z - rval->y >= twopi) {
+    rtErr("Four-point dihedral angle restraints require that the difference between r2 and r3 stay "
+          "within the range [-pi, pi).  Invalid displacements for a restraint between atoms " +
+          reportAtomList() + ": r2 = " + realToString(rval->y, 4, NumberFormat::STANDARD_REAL) +
+          ", r3 = " + realToString(rval->z, 4, NumberFormat::STANDARD_REAL) + ".",
+          "BoundedRestraint", "checkDisplacementLimits");
+  }
+  if (order == 3) {
+    if (rval->x < 0.0) {
+      rval->x = 0.0;
+    }
+    else if (rval->w >= pi) {
+      rval->w = pi;
+    }
+  }
+  else if (order == 4 && rval->w - rval->x > twopi) {
+    rval->x = rval->y - (0.5 * (twopi - (rval->z - rval->y)));
+    rval->w = rval->z + (0.5 * (twopi - (rval->z - rval->y)));
+  }
+
+  // Ensure that the displacements for a dihedral restraint sit in the range [0, 2*pi) or higher.
+  if (order == 4) {
+    const double midpoint = 0.5 * (rval->y + rval->z);
+    double midpt_copy = imageValue(midpoint, twopi, ImagingMethod::PRIMARY_UNIT_CELL);
+    rval->x += midpt_copy - midpoint;
+    rval->y += midpt_copy - midpoint;
+    rval->z += midpt_copy - midpoint;
+    rval->w += midpt_copy - midpoint;
+  }
+}
+  
 } // namespace restraints
 } // namespace omni

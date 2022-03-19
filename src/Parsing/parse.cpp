@@ -499,6 +499,7 @@ std::string realToString(const double value, const int format_a, const int forma
       }
       else {
         sprintf(buffer, "%.*f", format_a, value);
+
       }
       break;
     case NumberPrintStyle::LEADING_ZEROS:
@@ -515,6 +516,12 @@ std::string realToString(const double value, const int format_a, const int forma
     sprintf(buffer, "%.*f", realDecimalPlaces(value, 8), value);
   }
   return std::string(buffer);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string realToString(const double value, const int format_a, const NumberFormat method,
+                         const NumberPrintStyle style) {
+  return realToString(value, format_a, free_number_format, method, style);
 }
 
 //-------------------------------------------------------------------------------------------------

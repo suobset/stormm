@@ -361,6 +361,16 @@ private:
   
   /// Pointer to the topology for which this restraint applies
   const AtomGraph *ag_pointer;  
+
+  /// \brief Report the list of atoms in this restraint as a string, giving structural atom and
+  ///        residue numbers as well as names from the topology in a format reminiscent of the PDB:
+  ///        [Atom #] [Atom Name] [Residue Name] [Residue #]
+  std::string reportAtomList();
+
+  /// \brief Check the displacements of this restraint, in particular for angle restraints that
+  ///        only apply within a range that the angle could possibly take and for dihedral
+  ///        restraints for which the angle is periodic.
+  void checkDisplacementLimits(double4 *rval);
 };
 
 } // namespace restraints

@@ -364,6 +364,19 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameRead
 /// \param final_step   The final step at which the restraint becomes mature
 double2 computeRestraintMixture(int step_number, int init_step, int final_step);
 
+/// \brief Compute critical elements of the restraining potential: its difference from the target
+///        value that determines some harmonic stiffness penalty, the harmonic penalty stiffness,
+///        and the energy contribution.
+///
+/// \param init_k   Initial stiffness parameters
+/// \param final_k  Final stiffness parameters
+/// \param init_r   Initial displacement parameters
+/// \param final_r  Final displacement parameters
+/// \param mixwt    Pre-calculated mixing factor for combining initial and final parameters
+/// \param dr       The measured value of the restraint coordinate among its participating atoms
+double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
+                       const double4 final_r, const double2 mixwt, double dr);
+
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
 ///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is
 ///        recognized, although there is not the same diversity of time evolution functions in
