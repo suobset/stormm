@@ -426,10 +426,10 @@ $(TESTDIR)/bin/test_amber_prmtop : $(LIBDIR)/libomni.so $(TESTDIR)/Topology/test
 
 # Target: prmtop collating object test program
 $(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libomni.so \
-					  $(TESTDIR)/Topology/test_atomgraph_synthesis.cpp
+					  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp
 	@echo "[OMNI]  Building test_atomgraph_synthesis..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_atomgraph_synthesis \
-	  $(TESTDIR)/Topology/test_atomgraph_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+	  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: trajectory and restart reading program
 $(TESTDIR)/bin/test_amber_coordinates : $(LIBDIR)/libomni.so \

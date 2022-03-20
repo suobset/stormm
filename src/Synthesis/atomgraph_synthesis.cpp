@@ -9,7 +9,7 @@
 #include "atomgraph_synthesis.h"
 
 namespace omni {
-namespace topology {
+namespace synthesis {
 
 using card::HybridKind;
 using math::roundUp;
@@ -20,12 +20,18 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::sum;
 using parse::realToString;
+using topology::accepted_coulomb_constant;
 using testing::Approx;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
-                                       const std::vector<int> topology_indices_in) :
+                                       const std::vector<RestraintApparatus*> &restraints_in,
+                                       const std::vector<int> &topology_indices_in,
+                                       const std::vector<int> &restraint_indices_in,
+                                       const ExceptionResponse policy_in) :
+    policy{policy_in},
     topology_count{static_cast<int>(topologies_in.size())},
+    restraint_network_count{static_cast<int>(restraints_in.size())},
     system_count{static_cast<int>(topology_indices_in.size())},
     total_atoms{0}, total_virtual_sites{0}, total_bond_terms{0}, total_angl_terms{0},
     total_dihe_terms{0}, total_ubrd_terms{0}, total_cimp_terms{0}, total_cmap_terms{0},
@@ -36,7 +42,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
     water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
     topologies{topologies_in},
-    topology_indices{HybridKind::POINTER, "tpsyn_indices"},
+    restraint_networks{restraints_in},
+    topology_indices{HybridKind::POINTER, "tpsyn_top_indices"},
+    restraint_indices{HybridKind::POINTER, "tpsyn_rst_indices"},
     atom_counts{HybridKind::POINTER, "typsyn_atom_counts"},
     residue_counts{HybridKind::POINTER, "typsyn_res_counts"},
     molecule_counts{HybridKind::POINTER, "typsyn_mol_counts"},
@@ -173,8 +181,11 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 {
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
+  const std::vector<int> restraint_index_rebase = checkRestraintList(restraint_indices_in,
+                                                                     topology_index_rebase);
   checkCommonSettings();
-  buildAtomAndTermArrays(topology_indices_in, topology_index_rebase);
+  buildAtomAndTermArrays(topology_indices_in, topology_index_rebase, restraint_indices_in,
+                         restraint_index_rebase);
 
   // Condense valence and charge parameters into compact tables of unique values
   condenseParameterTables();
@@ -184,7 +195,19 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   // Keep a list of the A, B, and possibly C coefficients of each Lennard-Jones type interacting
   // with all other types.
   extendLJMatrices();
+
+  // Restraint data can now be incorporated.
+  linkRestraintNetworks();
 }
+
+//-------------------------------------------------------------------------------------------------
+AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                                       const std::vector<int> &topology_indices_in,
+                                       const ExceptionResponse policy_in) :
+    AtomGraphSynthesis(topologies_in, std::vector<RestraintApparatus*>(1, nullptr),
+                       topology_indices_in, std::vector<int>(topology_indices_in.size(), 0),
+                       policy_in)
+{}
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int>
@@ -193,23 +216,14 @@ AtomGraphSynthesis::checkTopologyList(const std::vector<int> &topology_indices_i
   // Check that no system indexes a topology outside of the given list
   if (maxValue(topology_indices_in) >= topology_count || minValue(topology_indices_in) < 0) {
     rtErr("One or more systems references a topology index outside of the list supplied.",
-          "AtomGraphSynthesis");
+          "AtomGraphSynthesis", "checkTopologyList");
   }
-
+  
   // Check that each topology in the supplied list is being used.  Roll that result into an
   // analysis of the uniqueness of each topology.
   std::vector<bool> topology_unique(topology_count, false);
   for (int i = 0; i < system_count; i++) {
     topology_unique[topology_indices_in[i]] = true;
-  }
-  int n_unused_topology = 0;
-  for (int i = 0; i < topology_count; i++) {
-    n_unused_topology += (topology_unique[i] == false);
-  }
-  if (n_unused_topology > 0) {
-    rtWarn("Out of " + std::to_string(topology_count) + " topologies, " +
-           std::to_string(n_unused_topology) + " are not referenced by any systems in this "
-           "synthesis.", "AtomGraphSynthesis");
   }
 
   // Check that all topologies are, in fact, unique.  Compact the list if necessary and update
@@ -218,13 +232,33 @@ AtomGraphSynthesis::checkTopologyList(const std::vector<int> &topology_indices_i
     if (topology_unique[i]) {
       const int topi_natom = topologies[i]->getAtomCount();
       for (int j = i + 1; j < topology_count; j++) {
-        if (topologies[j]->getAtomCount() == topi_natom &&
+        if (topologies[j] == topologies[i] || topologies[j]->getAtomCount() == topi_natom &&
             topologies[i]->getFileName() == topologies[j]->getFileName()) {
           topology_unique[j] = false;
         }
       }
     }
   }
+
+  // Warn if there are unused topologies
+  int n_unused_topology = 0;
+  for (int i = 0; i < topology_count; i++) {
+    n_unused_topology += (topology_unique[i] == false);
+  }
+  if (n_unused_topology > 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      rtWarn("Out of " + std::to_string(topology_count) + " topologies, " +
+             std::to_string(n_unused_topology) + " are not referenced by any systems in this "
+             "synthesis.", "AtomGraphSynthesis", "checkTopologyList");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Rebase the list of topology indices
   std::vector<int> topology_index_rebase(topology_count, -1);
   int n_unique_top = 0;
   for (int i = 0; i < topology_count; i++) {
@@ -237,15 +271,97 @@ AtomGraphSynthesis::checkTopologyList(const std::vector<int> &topology_indices_i
   topology_count = n_unique_top;
   if (topology_count == 0) {
     rtErr("No topologies were detected to describe " + std::to_string(system_count) + " systems.",
-          "AtomGraphSynthesis");
+          "AtomGraphSynthesis", "checkTopologyList");
   }
   if (system_count == 0) {
     rtErr("No systems making use of any of the " + std::to_string(topology_count) +
-          " topologies were detected.", "AtomGraphSynthesis");
+          " topologies were detected.", "AtomGraphSynthesis", "checkTopologyList");
   }
   return topology_index_rebase;
 }
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices_in,
+                                       const std::vector<int> &topology_indices) {
   
+  // For each system in the synthesis, there is a restraint group and a topology.  Each restraint
+  // group references a topology, to ensure consistency in future applications.  Check that the
+  // restraint apparatus for each system references the same topology as the system itself.
+  // A reference to a restraint apparatus index less than zero implies that the system uses no
+  // restraints.
+  if (maxValue(restraint_indices_in) >= restraint_network_count) {
+    rtErr("One or more systems references a restraint apparatus index outside of the list "
+          "supplied.", "AtomGraphSynthesis", "checkRestraintList");
+  }
+  for (int i = 0; i < system_count; i++) {
+    if (restraint_indices_in[i] < 0 || restraint_networks[restraint_indices_in[i]] == nullptr) {
+      continue;
+    }
+    const AtomGraph* topref = topologies[topology_indices[i]];    
+    const AtomGraph* rstref = restraint_networks[restraint_indices_in[i]]->getTopologyPointer();
+    if (rstref != topref) {
+      rtErr("Mismatch in topologies referenced by the restraint apparatus for system " +
+            std::to_string(i) + " and the system itself.  Atom counts of the topologies are " +
+            std::to_string(rstref->getAtomCount()) + " and " +
+            std::to_string(topref->getAtomCount()) + ".", "AtomGraphSynthesis",
+            "checkRestraintList");
+    }
+  }
+
+  // Create a list of unique restraint apparatuses in use by the AtomGraphSynthesis, analogous
+  // to the list created for topologies.
+  std::vector<bool> network_unique(restraint_network_count, false);
+  for (int i = 0; i < system_count; i++) {
+    network_unique[restraint_indices_in[i]] = true;
+  }
+  for (int i = 0; i < restraint_network_count; i++) {
+    if (network_unique[i]) {
+      for (int j = i + 1; j < restraint_network_count; j++) {
+        if (restraint_networks[j] == restraint_networks[i]) {
+          network_unique[j] = false;
+          continue;
+        }
+      }
+    }
+  }
+  
+  // Warn if there are unused restraint apparatuses
+  int n_unused_network = 0;
+  for (int i = 0; i < restraint_network_count; i++) {
+    n_unused_network += (network_unique[i] == false);
+  }
+  if (n_unused_network > 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+    case ExceptionResponse::WARN:
+      rtWarn("Out of " + std::to_string(restraint_network_count) + " networks, " +
+             std::to_string(n_unused_network) + " are not referenced by any systems in this "
+             "synthesis.", "AtomGraphSynthesis", "checkRestraintList");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Rebase the list of restraint network indices
+  std::vector<int> restraint_index_rebase(restraint_network_count, -1);
+  int n_unique_network = 0;
+  for (int i = 0; i < restraint_network_count; i++) {
+    restraint_index_rebase[i] = n_unique_network;
+    restraint_networks[n_unique_network] = restraint_networks[i];
+    if (network_unique[i]) {
+      n_unique_network++;
+    }
+  }
+  restraint_network_count = n_unique_network;
+  if (restraint_network_count == 0) {
+    rtErr("No restraint apparatuses were detected to describe " + std::to_string(system_count) +
+          " systems.", "AtomGraphSynthesis", "checkRestraintList");
+  }
+  return restraint_index_rebase;
+}
+
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::checkCommonSettings() {
 
@@ -258,45 +374,97 @@ void AtomGraphSynthesis::checkCommonSettings() {
   const Approx appr_dielcon(dielectric_constant, constants::tiny);
   const Approx appr_saltcon(salt_concentration, constants::tiny);
   const Approx appr_coulomb(coulomb_constant, constants::tiny);
+  bool ism_problem  = false;
+  bool diel_problem = false;
+  bool salt_problem = false;
+  bool coul_problem = false;
   for (int i = 1; i < topology_count; i++) {
-    if (topologies[i]->getImplicitSolventModel() != gb_style) {
+    ism_problem =  (ism_problem  || (topologies[i]->getImplicitSolventModel() != gb_style));
+    diel_problem = (diel_problem ||
+                    appr_dielcon.test(topologies[i]->getDielectricConstant()) == false);
+    salt_problem = (salt_problem ||
+                    appr_saltcon.test(topologies[i]->getSaltConcentration()) == false);
+    coul_problem = (coul_problem ||
+                    appr_coulomb.test(topologies[i]->getCoulombConstant()) == false);
+  }
+  if (ism_problem) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
       rtErr("All topologies must have a consistent implicit solvent model setting.  The first, "
-            "set to " + getImplicitSolventModelName(gb_style) + ", does not agree with topology " +
-            std::to_string(i + 1) + ", using " +
-            getImplicitSolventModelName(topologies[i]->getImplicitSolventModel()) + ".",
-            "AtomGraphSynthesis", "checkCommonSettings");
+            "set to " + getImplicitSolventModelName(gb_style) +
+            ", does not agree with subsequent topologies.", "AtomGraphSynthesis",
+            "checkCommonSettings");
+    case ExceptionResponse::WARN:
+      rtWarn("All topologies must have a consistent implicit solvent model setting.  The first, "
+             "set to " + getImplicitSolventModelName(gb_style) +
+             ", will be applied to all systems.", "AtomGraphSynthesis", "checkCommonSettings");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
     }
-    if (appr_dielcon.test(topologies[i]->getDielectricConstant()) == false) {
-      rtErr("All topologies must have a consistent dielectric constant, but values of " +
-            realToString(dielectric_constant) + " and " +
-            realToString(topologies[i]->getDielectricConstant()) + " were found."
+  }
+  if (diel_problem) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("All topologies must have a consistent dielectric constant, but values conflicting "
+            "with the primary system's " + realToString(dielectric_constant) + " were found.",
             "AtomGraphSynthesis", "checkCommonSettings");
+    case ExceptionResponse::WARN:
+      rtWarn("All topologies must have a consistent dielectric constant.  A value of " +
+             realToString(dielectric_constant) + ", taken from the first topology, will be "
+             "applied throughout.", "AtomGraphSynthesis", "checkCommonSettings");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
     }
-    if (appr_saltcon.test(topologies[i]->getSaltConcentration()) == false) {
-      rtErr("All systems must use the same salt concentration.  Values of " +
-            realToString(salt_concentration) + " and " +
-            realToString(topologies[i]->getSaltConcentration()) + " were found.",
+  }
+  if (salt_problem) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("All systems must use the same salt concentration, but values conflicting with the "
+            "primary system's " + realToString(salt_concentration) + " were found.",
             "AtomGraphSynthesis", "checkCommonSettings");
+    case ExceptionResponse::WARN:
+      rtWarn("All systems must use the same salt concentration.  A value of " +
+             realToString(salt_concentration) + ", found in the first topology, will be applied "
+             "throughout.", "AtomGraphSynthesis", "checkCommonSettings");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
     }
-    if (appr_coulomb.test(topologies[i]->getCoulombConstant()) == false) {
+  }
+  if (coul_problem) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
       rtErr("All topologies must make use of the same definitions of physical constants.  "
             "Coulomb's constant is defined as " + realToString(coulomb_constant, 6) +
-            " in the first topology and " + realToString(topologies[i]->getCoulombConstant()) +
-            " in topology " + std::to_string(i + 1) + ".", "AtomGraphSynthesis",
-            "checkCommonSettings");
+            " in the first topology but differently in subsequent topologies.",
+            "AtomGraphSynthesis", "checkCommonSettings");
+    case ExceptionResponse::WARN:
+      rtWarn("All topologies must make use of the same definitions of physical constants.  "
+             "Coulomb's constant is defined as " + realToString(coulomb_constant, 6) +
+             " in the first topology and this definition will be applied throughout.",
+             "AtomGraphSynthesis", "checkCommonSettings");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
     }
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
-                                                const std::vector<int> &topology_index_rebase) {
+                                                const std::vector<int> &topology_index_rebase,
+                                                const std::vector<int> &restraint_indices_in,
+                                                const std::vector<int> &restraint_index_rebase) {
 
   // Allocate memory and set POINTER-kind arrays for the small packets of data
   const int padded_system_count = roundUp(system_count, warp_size_int);
-  int_system_data.resize(34 * padded_system_count);
+  int_system_data.resize(35 * padded_system_count);
   int pivot = 0;
   topology_indices.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  restraint_indices.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   atom_counts.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -367,6 +535,12 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   // Load the topology indexing first
   for (int i = 0; i < system_count; i++) {
     topology_indices.putHost(topology_index_rebase[topology_indices_in[i]], i);
+    if (restraint_indices_in[i] >= 0) {
+      restraint_indices.putHost(restraint_index_rebase[restraint_indices_in[i]], i);
+    }
+    else {
+      restraint_indices.putHost(-1, i);
+    }
   }
 
   // Loop over all systems, fill in the above details, and compute the sizes of various arrays
@@ -1147,6 +1321,10 @@ void AtomGraphSynthesis::extendLJMatrices() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::linkRestraintNetworks() {
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getTopologyCount() const {
   return topology_count;
 }
@@ -1291,5 +1469,5 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
   return pb_radii_sets[index];
 }
   
-} // namespace topology
+} // namespace synthesis
 } // namespace omni

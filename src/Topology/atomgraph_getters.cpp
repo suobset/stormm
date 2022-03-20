@@ -148,7 +148,7 @@ int AtomGraph::getResidueNumber(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getMoleculeLimits() const {
-  return molecule_limits.readHost();
+  return molecule_limits.readHost(0, molecule_count + 1);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -159,7 +159,7 @@ int2 AtomGraph::getMoleculeLimits(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getParticlesPerMolecule() const {
-  std::vector<int> atoms_per_molecule = molecule_limits.readHost();
+  std::vector<int> atoms_per_molecule = molecule_limits.readHost(0, molecule_count + 1);
   for (int i = 0; i < molecule_count; i++) {
     atoms_per_molecule[i] = atoms_per_molecule[i + 1] - atoms_per_molecule[i];
   }
@@ -174,7 +174,7 @@ int AtomGraph::getParticlesPerMolecule(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getAtomicNumber() const {
-  return atomic_numbers.readHost();
+  return atomic_numbers.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -250,7 +250,7 @@ std::vector<uint> AtomGraph::getAtomMobilityMask(const int low_index, const int 
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getMoleculeMembership() const {
-  return molecule_membership.readHost();
+  return molecule_membership.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -267,7 +267,7 @@ int AtomGraph::getMoleculeMembership(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getMoleculeContents() const {
-  return molecule_contents.readHost();
+  return molecule_contents.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -278,7 +278,7 @@ std::vector<int> AtomGraph::getMoleculeContents(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<char4> AtomGraph::getAtomName() const {
-  return atom_names.readHost();
+  return atom_names.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -294,7 +294,7 @@ char4 AtomGraph::getAtomName(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<char4> AtomGraph::getAtomType() const {
-  return atom_types.readHost();
+  return atom_types.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -310,7 +310,7 @@ char4 AtomGraph::getAtomType(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<char4> AtomGraph::getResidueName() const {
-  return residue_names.readHost();
+  return residue_names.readHost(0, residue_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -390,7 +390,7 @@ int AtomGraph::getVirtualSiteCount() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::findVirtualSites() const {
-  return virtual_site_atoms.readHost();
+  return virtual_site_atoms.readHost(0, virtual_site_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -535,7 +535,7 @@ int AtomGraph::getNonrigidParticleCount() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getChargeIndex() const {
-  return charge_indices.readHost();
+  return charge_indices.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -551,7 +551,7 @@ int AtomGraph::getChargeIndex(const int index) const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::getLennardJonesIndex() const {
-  return lennard_jones_indices.readHost();
+  return lennard_jones_indices.readHost(0, atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------

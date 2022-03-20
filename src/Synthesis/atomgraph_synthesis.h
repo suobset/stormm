@@ -3,13 +3,27 @@
 #define OMNI_ATOMGRAPH_SYNTHESIS_H
 
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
+#include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 
 namespace omni {
-namespace topology {
+namespace synthesis {
 
 using card::Hybrid;
-
+using constants::ExceptionResponse;
+using restraints::RestraintApparatus;
+using topology::AtomGraph;
+using topology::ChemicalDetailsKit;
+using topology::ImplicitSolventModel;
+using topology::MassForm;
+using topology::NonbondedKit;
+using topology::SettleSetting;
+using topology::ShakeSetting;
+using topology::UnitCellType;
+using topology::ValenceKit;
+using topology::VirtualSiteKit;
+  
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing
 ///        into another).  Work units covering all systems are laid out in additional, contiguous
@@ -25,13 +39,31 @@ public:
   ///        point to specific topologies and thereby apply to any coordinate sets that also point
   ///        to those topologies.
   ///
-  /// \param topologies_in        List of input topology pointers
-  /// \param topology_indices_in  List of topologies which describe each system that this synthesis
-  ///                             will describe.  This allows a synthesis to describe many copies
-  ///                             of each system in its work units while storing relatively small
-  ///                             amounts of data.
+  /// Overloaded:
+  ///   - Prepare the energy surface with or without restraints
+  ///   
+  /// \param topologies_in         List of input topology pointers
+  /// \param restraints_in         List of input restraint collections
+  /// \param topology_indices_in   Indicators of which topologies describe each system in this
+  ///                              synthesis.  This allows a synthesis to describe many copies
+  ///                              of each system in its work units while storing relatively small
+  ///                              amounts of data.
+  /// \param restraint_indices_in  Indicators of which collections of restraints supplement the
+  ///                              energy surfaces of each system within this synthesis.  Different
+  ///                              sets of restraints allow many systems referencing the same
+  ///                              topology to evolve on different energy surfaces.
+  /// \param policy                Instruction on what to do if questionable input is encountered
+  /// \{
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
-                     const std::vector<int> topology_indices_in);
+                     const std::vector<RestraintApparatus*> &restraints_in,
+                     const std::vector<int> &topology_indices_in,
+                     const std::vector<int> &restraint_indices_in,
+                     ExceptionResponse policy_in = ExceptionResponse::WARN);
+
+  AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
+                     const std::vector<int> &topology_indices_in,
+                     ExceptionResponse policy_in = ExceptionResponse::WARN);
+  /// \}
 
   /// \brief Get the number of unique topologies described by the synthesis
   int getTopologyCount() const;
@@ -120,25 +152,28 @@ private:
 
   // The first member variables pertain to totals across all systems: atoms, potential function
   // terms, and sizes of composite parameter arrays that span all topologies
-  int topology_count;       ///< The number of unique topologies represented in this synthesis
-  int system_count;         ///< Number of independent coordinate sets present in this synthesis
-  int total_atoms;          ///< The total number of atoms, spanning all topologies
-  int total_virtual_sites;  ///< The total number of atoms, spanning all topologies
-  int total_bond_terms;     ///< The total number of bonds, spanning all topologies
-  int total_angl_terms;     ///< The total number of bond angles, spanning all topologies
-  int total_dihe_terms;     ///< The total number of dihedrals, spanning all topologies
-  int total_ubrd_terms;     ///< The total number of Urey-Bradley angles, spanning all topologies
-  int total_cimp_terms;     ///< The total number of CHARMM impropers, spanning all topologies
-  int total_cmap_terms;     ///< The total number of CMAPs, spanning all topologies
-  int total_atom_types;     ///< Total number of unique atom types, spanning all topologies
-  int total_charge_types;   ///< Total number of unique atomic partial charges, spanning all
-                            ///<   topologies
-  int total_bond_params;    ///< Total number of unique bond parameter sets
-  int total_angl_params;    ///< Total number of unique bond angle parameter sets
-  int total_dihe_params;    ///< Total number of unique dihedral parameter sets
-  int total_ubrd_params;    ///< Total number of unique Urey-Bradley angle parameter sets
-  int total_cimp_params;    ///< Total number of unique CHARMM improper parameter sets
-  int total_cmap_surfaces;  ///< Total number of unique CMAP surfaces
+  ExceptionResponse policy;       ///< Indicator of what to do with bad or questionable input
+  int topology_count;             ///< Number of unique topologies represented in this synthesis
+  int restraint_network_count;    ///< Number of unique restraint apparatuses in this synthesis
+  int system_count;               ///< Number of independent coordinate sets described by this
+                                  ///<   synthesis
+  int total_atoms;                ///< Total number of atoms, spanning all topologies
+  int total_virtual_sites;        ///< Total number of atoms, spanning all topologies
+  int total_bond_terms;           ///< Total number of bonds, spanning all topologies
+  int total_angl_terms;           ///< Total number of bond angles, spanning all topologies
+  int total_dihe_terms;           ///< Total number of dihedrals, spanning all topologies
+  int total_ubrd_terms;           ///< Total number of Urey-Bradley angles, spanning all topologies
+  int total_cimp_terms;           ///< Total number of CHARMM impropers, spanning all topologies
+  int total_cmap_terms;           ///< Total number of CMAPs, spanning all topologies
+  int total_atom_types;           ///< Total number of unique atom types, spanning all topologies
+  int total_charge_types;         ///< Total number of unique atomic partial charges, spanning all
+                                  ///<   topologies
+  int total_bond_params;          ///< Total number of unique bond parameter sets
+  int total_angl_params;          ///< Total number of unique bond angle parameter sets
+  int total_dihe_params;          ///< Total number of unique dihedral parameter sets
+  int total_ubrd_params;          ///< Total number of unique Urey-Bradley angle parameter sets
+  int total_cimp_params;          ///< Total number of unique CHARMM improper parameter sets
+  int total_cmap_surfaces;        ///< Total number of unique CMAP surfaces
 
   // The presence of periodic boundaries or an implicit solvent must be common to all systems, as
   // must the cutoff and other run parameters, although these are contained in other data
@@ -170,14 +205,23 @@ private:
   /// any particular requirements of the common GB model in use.
   std::vector<std::string> pb_radii_sets;
 
-  /// An array of pointers to the individual topologies that form the basis of this work plan
-  /// (this array is topology_count in length and accessible only on the host as it is used to
-  /// organize work units, not process the actual energy calculations)
+  /// An array of pointers to the individual topologies that form the basis of this work plan.
+  /// This array is topology_count in length and accessible only on the host as it is used to
+  /// organize work units, not process the actual energy calculations.
   std::vector<AtomGraph*> topologies;
 
+  /// An array of pointers to the individual restraint apparatuses that form the basis of this work
+  /// plan.  This array is restraint_apparatus_count in length and, like the topologies array, is
+  /// only accessible on the host.
+  std::vector<RestraintApparatus*> restraint_networks;
+
   /// An array of indices for the source topologies guiding the motion of each system (this array
-  /// is system_count in length and accessible only on the host to organize work units)
+  /// is system_count in length)
   Hybrid<int> topology_indices;
+
+  /// An array of indices for the restraint collections guiding the motion of each system (this
+  /// array is system_count in length)
+  Hybrid<int> restraint_indices;
   
   // The following arrays are POINTER-kind objects, each directed at a segment of a data array
   // for storing critical topology sizes.  There is one of each of these numbers for every
@@ -479,10 +523,23 @@ private:
   ///        Re-align the list of systems to work with the condensed list of topologies and return
   ///        that result.
   ///
-  /// \param topology_indices_in  List of topologies which describe each system that this synthesis
-  ///                             will describe.
+  /// \param topology_indices_in  List of topologies which describe each system involved in this
+  ///                             synthesis
   std::vector<int> checkTopologyList(const std::vector<int> &topology_indices_in);
 
+  /// \brief Check the central lists of restraint groups and system indices to ensure that the
+  ///        requested synthesis always pairs restraint groups with systems referencing consistent
+  ///        topologies.  Condense the list of restraint groups by weeding out duplicates.
+  ///        Re-align the list of systems to work with the condensed list of restraint groups and
+  ///        return that result.
+  ///
+  /// \param restraint_indices_in  List of restraint apparatuses (groups, collections) which
+  ///                              guide each system in this synthesis
+  /// \param topology_indices_in   List of topologies which describe each system involved in this
+  ///                              synthesis.  Must be supplied in its original, unpruned form.
+  std::vector<int> checkRestraintList(const std::vector<int> &restraint_indices_in,
+                                      const std::vector<int> &topology_indices_in);
+  
   /// \brief Check settings that must be consistent between all topologies in the synthesis.
   void checkCommonSettings();
 
@@ -490,12 +547,18 @@ private:
   ///        interactions, with updated indexing into the synthesis as opposed to any of the
   ///        original topologies, but as of yet without parameter indices.
   ///
-  /// \param topology_indices_in    Original list of system topology indices, oriented towards
-  ///                               the input list of AtomGraph pointers
-  /// \param topology_index_rebase  Re-arrangement of system topology indices meeting the condensed
-  ///                               list of unique topologies created by checkTopologyList()
+  /// \param topology_indices_in     Original list of system topology indices, oriented towards
+  ///                                the input list of AtomGraph pointers
+  /// \param topology_index_rebase   Re-arrangement of system topology indices meeting the condensed
+  ///                                list of unique topologies created by checkTopologyList()
+  /// \param restraint_indices_in    Original list of restraint group indices, oriented towards
+  ///                                the input list of RestraintApparatus pointers
+  /// \param restraint_index_rebase  Re-arrangement of restraint group indices meeting the condensed
+  ///                                list of unique restraints created by checkRestraintList()
   void buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
-                              const std::vector<int> &topology_index_rebase);
+                              const std::vector<int> &topology_index_rebase,
+                              const std::vector<int> &restraint_indices_in,
+                              const std::vector<int> &restraint_index_rebase);
 
   /// \brief Find unique parameters for each of the valence and charge energy components, then
   ///        assign terms indexing atoms in the order of the synthesis to use parameters from
@@ -508,9 +571,14 @@ private:
   ///        process, but if the current topology's tables completely subsume the former topology's
   ///        tables or are completely covered by the current topology's tables it is tractable.
   void extendLJMatrices();
+
+  /// \brief Filter and condense the restraint networks in the same manner as valence terms were
+  ///        condensed (each network comes from a RestraintApparatus object, and is just another
+  ///        name to avoid repeating the type name as the name of an actual variable).
+  void linkRestraintNetworks();
 };
 
-} // namespace topology
+} // namespace synthesis
 } // namespace omni
 
 #endif

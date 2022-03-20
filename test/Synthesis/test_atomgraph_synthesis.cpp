@@ -14,6 +14,7 @@ using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
+using namespace omni::synthesis;
 using namespace omni::topology;
 using namespace omni::testing;
 
@@ -77,7 +78,7 @@ int main(int argc, char* argv[]) {
   const std::vector<AtomGraph*> all_tops = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &trpcage2_ag,
                                              &trpcage3_ag, &nbfix_ag, &ubiquitin_ag, &brbz_vs_ag };
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 7, 7 };
-  AtomGraphSynthesis synth(all_tops, system_ids);
+  AtomGraphSynthesis synth(all_tops, system_ids, ExceptionResponse::SILENT);
 
   // Check various descriptors
   section(1);
