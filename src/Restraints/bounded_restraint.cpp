@@ -373,6 +373,11 @@ BoundedRestraint::BoundedRestraint(const int atom_index, const AtomGraph *ag_in,
 
 //-------------------------------------------------------------------------------------------------
 int BoundedRestraint::getAtomIndex(const int restrained_atom_number) const {
+  if (restrained_atom_number > order) {
+    rtErr("A restraint of order " + std::to_string(order) + " cannot produce a valid atom index "
+          "for participating atom " + std::to_string(restrained_atom_number) + ".",
+          "BoundedRestraint", "getAtomIndex");
+  }
   switch (restrained_atom_number) {
   case 1:
     return atom_i;
@@ -641,11 +646,12 @@ void BoundedRestraint::checkDisplacementLimits(double4 *rval) {
           "BoundedRestraint", "checkDisplacementLimits");
   }
   if (order == 4 && rval->z - rval->y >= twopi) {
-    rtErr("Four-point dihedral angle restraints require that the difference between r2 and r3 stay "
-          "within the range [-pi, pi).  Invalid displacements for a restraint between atoms " +
-          reportAtomList() + ": r2 = " + realToString(rval->y, 4, NumberFormat::STANDARD_REAL) +
-          ", r3 = " + realToString(rval->z, 4, NumberFormat::STANDARD_REAL) + ".",
-          "BoundedRestraint", "checkDisplacementLimits");
+    rtErr("Four-point dihedral angle restraints require that the difference between r2 and r3 "
+          "stay within the range [-pi, pi).  Invalid displacements for a restraint between "
+          "atoms " + reportAtomList() + ": r2 = " +
+          realToString(rval->y, 4, NumberFormat::STANDARD_REAL) + ", r3 = " +
+          realToString(rval->z, 4, NumberFormat::STANDARD_REAL) + ".", "BoundedRestraint",
+          "checkDisplacementLimits");
   }
   if (order == 3) {
     if (rval->x < 0.0) {

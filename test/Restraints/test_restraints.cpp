@@ -267,14 +267,29 @@ int main(int argc, char* argv[]) {
   snapshot(snp_name, polyNumericVector(gy_hold_r), "gy_hold_rval", NumberFormat::STANDARD_REAL,
            "Holding restraints for the Gly-Tyr system do not incorporate the expected "
            "displacements.", oe.takeSnapshot(), 1.0e-4, 1.0e-6, PrintSituation::APPEND, do_snps);
-  CHECK_THROWS_SOFT(BoundedRestraint trick_br(":GLY & @CA", ":GLY & @ C", ":LYS & @ PH",
+  CHECK_THROWS_SOFT(BoundedRestraint trick_br(":GLY & @CA", ":GLY & @C", ":LYS & @PH",
                                               ":LYS & @CA", &gk_ag, &gk_chemfe, gk_cfr, 0, 0,
                                               1.0, 1.0, 0.5, 1.5, 1.6, 2.0, 1.0, 1.0, 0.5, 1.5,
                                               1.6, 2.0), "A four-point dihedral angle restraint "
                     "was created based on a nonsensical atom mask.", do_tests);
+  CHECK_THROWS_SOFT(BoundedRestraint trick_br(":GLY & @CA,C", ":GLY & @C", ":LYS & @N",
+                                              ":LYS & @CA", &gk_ag, &gk_chemfe, gk_cfr, 0, 0,
+                                              1.0, 1.0, 0.5, 1.5, 1.6, 2.0, 1.0, 1.0, 0.5, 1.5,
+                                              1.6, 2.0), "A four-point dihedral angle restraint "
+                    "was created based on an atom mask specifying multiple atoms.", do_tests);
   CHECK_THROWS_SOFT(BoundedRestraint trick_br(-1, -1, -1, -1, &gk_ag, 0, 0, 1.0, 1.0, 0.5, 1.5,
                                               1.6, 2.0, 1.0, 1.0, 0.5, 1.5, 1.6, 2.0),
                     "A restraint was created without a single valid atom.", do_tests);
+  CHECK_THROWS_SOFT(BoundedRestraint trick_br(0, 102, 3, 5, &gk_ag, 0, 0, 1.0, 1.0, 0.5, 1.5,
+                                              1.6, 2.0, 1.0, 1.0, 0.5, 1.5, 1.6, 2.0),
+                    "A restraint was created with an invalid atom index.", do_tests);
+  CHECK_THROWS_SOFT(BoundedRestraint trick_br(0, 1, 3, 5, &gk_ag, 0, 0, 1.0, 1.0, 0.5, 1.5,
+                                              1.1, 2.0, 1.0, 1.0, 0.5, 1.5, 1.6, 2.0),
+                    "A restraint was created with zig-zagging displacment bounds.", do_tests);
+  CHECK_THROWS_SOFT(gy_pos_rstr[2].getAtomIndex(2), "An invalid participating atom index (2) was "
+                    "produced for a positional restraint.", do_tests);
+  CHECK_THROWS_SOFT(gy_hold_rstr[3].getAtomIndex(5), "An invalid participating atom index (5) was "
+                    "produced for a dihedral angle restraint.", do_tests);
 
   // Test the sets of restraints added by each method
   section(2);
@@ -298,6 +313,12 @@ int main(int argc, char* argv[]) {
         do_tests);
   check(gy_ra.getTopologyPointer() == &gy_ag, "The topology pointer returned by a "
         "RestraintApparatus is not a pointer to the original topology.", do_tests);
+  CHECK_THROWS(RestraintApparatus(std::vector<BoundedRestraint>()), "A restraint "
+               "apparatus was created without a valid topology pointer.");
+  std::vector<BoundedRestraint> mixed_system_rstr(gy_pos_rstr.begin(), gy_pos_rstr.end());
+  mixed_system_rstr.insert(mixed_system_rstr.end(), gk_hb_rstr.begin(), gk_hb_rstr.end());
+  CHECK_THROWS(RestraintApparatus gy_test_ra(mixed_system_rstr), "A restraint apparatus was "
+               "created based on restraints with inconsistent topologies.");
 
   // Test the restraint functions with finite difference approximations.  Begin with simple
   // harmonic wells that, while they may have distinct stiffnesses on either side of the minimum,
