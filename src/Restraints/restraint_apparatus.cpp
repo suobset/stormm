@@ -617,6 +617,105 @@ RestraintApparatusSpReader RestraintApparatus::spData(const HybridTargetLevel ti
 }
 
 //-------------------------------------------------------------------------------------------------
+const int* RestraintApparatus::getApplicationStepPointer(const int order,
+                                                         const RestraintStage stage,
+                                                         const HybridTargetLevel tier) const {
+  switch (stage) {
+  case RestraintStage::INITIAL:
+    switch (order) {
+    case 1:
+      return rposn_init_step.data(tier);
+    case 2:
+      return rbond_init_step.data(tier);
+    case 3:
+      return rangl_init_step.data(tier);
+    case 4:
+      return rdihe_init_step.data(tier);
+    }
+    break;
+  case RestraintStage::FINAL:
+    switch (order) {
+    case 1:
+      return rposn_final_step.data(tier);
+    case 2:
+      return rbond_final_step.data(tier);
+    case 3:
+      return rangl_final_step.data(tier);
+    case 4:
+      return rdihe_final_step.data(tier);
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+const double2*
+RestraintApparatus::getHarmonicStiffnessPointer(const int order, const RestraintStage stage,
+                                                const HybridTargetLevel tier) const {
+  switch (stage) {
+  case RestraintStage::INITIAL:
+    switch (order) {
+    case 1:
+      return rposn_init_keq.data(tier);
+    case 2:
+      return rbond_init_keq.data(tier);
+    case 3:
+      return rangl_init_keq.data(tier);
+    case 4:
+      return rdihe_init_keq.data(tier);
+    }
+    break;
+  case RestraintStage::FINAL:
+    switch (order) {
+    case 1:
+      return rposn_final_keq.data(tier);
+    case 2:
+      return rbond_final_keq.data(tier);
+    case 3:
+      return rangl_final_keq.data(tier);
+    case 4:
+      return rdihe_final_keq.data(tier);
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+const double4* RestraintApparatus::getDisplacementPointer(const int order,
+                                                          const RestraintStage stage,
+                                                          const HybridTargetLevel tier) const {
+  switch (stage) {
+  case RestraintStage::INITIAL:
+    switch (order) {
+    case 1:
+      return rposn_init_r.data(tier);
+    case 2:
+      return rbond_init_r.data(tier);
+    case 3:
+      return rangl_init_r.data(tier);
+    case 4:
+      return rdihe_init_r.data(tier);
+    }
+    break;
+  case RestraintStage::FINAL:
+    switch (order) {
+    case 1:
+      return rposn_final_r.data(tier);
+    case 2:
+      return rbond_final_r.data(tier);
+    case 3:
+      return rangl_final_r.data(tier);
+    case 4:
+      return rdihe_final_r.data(tier);
+    }
+    break;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<BoundedRestraint> RestraintApparatus::getRestraintList() const {
 
   // Get the abstract despite the fact that this is a member function--the Hybrid arrays cloister

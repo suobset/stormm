@@ -13,6 +13,8 @@ namespace synthesis {
 using card::Hybrid;
 using constants::ExceptionResponse;
 using restraints::RestraintApparatus;
+using restraints::RestraintApparatusDpReader;
+using restraints::RestraintApparatusSpReader;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using topology::ImplicitSolventModel;
@@ -433,28 +435,143 @@ private:
   // by lists of atoms in the bond work units arrays.  They can be included in the synthesis of
   // AtomGraphs due to their nature as potential terms, whereas the original topologies had to be
   // read from files that did not contain such terms.
-  Hybrid<int> nmr_initial_steps;          ///< Initial steps at which to begin applying each NMR
-                                          ///<   restraint potential
-  Hybrid<int> nmr_final_steps;            ///< Final steps at which to apply the NMR restraint
-                                          ///<    potential
-  Hybrid<int> nmr_increments;             ///< The number of increments over which to modulate NMR
-                                          ///<   restraints
-  Hybrid<double2> nmr_k_initial_values;   ///< Stiffnesses of parabolic components of each half of
-                                          ///<   the NMR restraint potentials at nmr_initial_steps
-  Hybrid<double4> nmr_r_initial_values;   ///< R1 and R2 values for the left-hand side of the NMR
-                                          ///<   restraint potentials at nmr_initial_steps
-  Hybrid<double2> nmr_k_final_values;     ///< Stiffnesses of the parabolic components of each half
-                                          ///<   of the NMR restraint potentials at nmr_final_steps
-  Hybrid<double4> nmr_r_final_values;     ///< R1 and R2 values for the left-hand side of the NMR
-                                          ///<   restraint potentials at nmr_final_steps
-  Hybrid<float2> sp_nmr_k_initial_values; ///< Single precision form of the initial NMR parabolic
-                                          ///<   restraint stiffnesses
-  Hybrid<float4> sp_nmr_r_initial_values; ///< Single precision form of initial NMR displacement
-                                          ///<   demarcations
-  Hybrid<float2> sp_nmr_k_final_values;   ///< Single precision form of the final NMR parabolic
-                                          ///<   restraint stiffnesses
-  Hybrid<float4> sp_nmr_r_final_values;   ///< Single precision form of final NMR displacement
-                                          ///<   demarcations
+  Hybrid<int2> rposn_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
+                                     ///<   applying positional restraints
+  Hybrid<int2> rbond_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
+                                     ///<   applying positional restraints
+  Hybrid<int2> rangl_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
+                                     ///<   applying positional restraints
+  Hybrid<int2> rdihe_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
+                                     ///<   applying positional restraints
+  Hybrid<double2> rposn_init_k;      ///< Initial stiffnesses for time-dependent positional
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double2> rposn_final_k;     ///< Final stiffnesses for time-dependent positional
+                                     ///<   restraints (ignored for time-independent restraints)
+  Hybrid<double4> rposn_init_r;      ///< Initial displacements for time-dependent positional
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double4> rposn_final_r;     ///< Final displacments for time-dependent positional
+                                     ///<   restraints (ignored for time-independent restraints)
+  Hybrid<double2> rposn_init_xy;     ///< Initial X and Y Cartesian coordinates for the target
+                                     ///<   location of time-dependent positional restraints, or
+                                     ///<   the static values of time-independent restraints
+  Hybrid<double> rposn_init_z;       ///< Initial Z Cartesian coordinates for the target
+                                     ///<   location of time-dependent positional restraints, or
+                                     ///<   the static values of time-independent restraints
+  Hybrid<double2> rposn_final_xy;    ///< Final X and Y Cartesian coordinates for the target
+                                     ///<   location of time-dependent positional restraints, or
+                                     ///<   the static values of time-independent restraints
+  Hybrid<double> rposn_final_z;      ///< Final Z Cartesian coordinates for the target location of
+                                     ///<   time-dependent positional restraints, or the static
+                                     ///<   values of time-independent restraints
+  Hybrid<double2> rbond_init_k;      ///< Initial stiffnesses for time-dependent distance
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double2> rbond_final_k;     ///< Final stiffnesses for time-dependent distance restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<double4> rbond_init_r;      ///< Initial displacements for time-dependent distance
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double4> rbond_final_r;     ///< Final displacments for time-dependent distance restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<double2> rangl_init_k;      ///< Initial stiffnesses for time-dependent angle restraints,
+                                     ///<   or the static values of time-independent restraints
+  Hybrid<double2> rangl_final_k;     ///< Final stiffnesses for time-dependent angle restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<double4> rangl_init_r;      ///< Initial displacements for time-dependent angle
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double4> rangl_final_r;     ///< Final displacments for time-dependent angle restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<double2> rdihe_init_k;      ///< Initial stiffnesses for time-dependent dihedral
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double2> rdihe_final_k;     ///< Final stiffnesses for time-dependent dihedral restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<double4> rdihe_init_r;      ///< Initial displacements for time-dependent dihedral
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<double4> rdihe_final_r;     ///< Final displacments for time-dependent dihedral restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<float2> sp_rposn_init_k;    ///< Initial stiffnesses for time-dependent positional
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float2> sp_rposn_final_k;   ///< Final stiffnesses for time-dependent positional
+                                     ///<   restraints (ignored for time-independent restraints)
+  Hybrid<float4> sp_rposn_init_r;    ///< Initial displacements for time-dependent positional
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float4> sp_rposn_final_r;   ///< Final displacments for time-dependent positional
+                                     ///<   restraints (ignored for time-independent restraints)
+  Hybrid<float2> sp_rposn_init_xy;   ///< Initial X and Y Cartesian coordinates for the target
+                                     ///<   location of time-dependent positional restraints, or
+                                     ///<   the static values of time-independent restraints
+  Hybrid<float> sp_rposn_init_z;     ///< Initial Z Cartesian coordinates for the target
+                                     ///<   location of time-dependent positional restraints, or
+                                     ///<   the static values of time-independent restraints
+  Hybrid<float2> sp_rposn_final_xy;  ///< Final X and Y Cartesian coordinates for the target
+                                     ///<   location of time-dependent positional restraints, or
+                                     ///<   the static values of time-independent restraints
+  Hybrid<float> sp_rposn_final_z;    ///< Final Z Cartesian coordinates for the target location of
+                                     ///<   time-dependent positional restraints, or the static
+                                     ///<   values of time-independent restraints
+  Hybrid<float2> sp_rbond_init_k;    ///< Initial stiffnesses for time-dependent distance
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float2> sp_rbond_final_k;   ///< Final stiffnesses for time-dependent distance restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<float4> sp_rbond_init_r;    ///< Initial displacements for time-dependent distance
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float4> sp_rbond_final_r;   ///< Final displacments for time-dependent distance restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<float2> sp_rangl_init_k;    ///< Initial stiffnesses for time-dependent angle restraints,
+                                     ///<   or the static values of time-independent restraints
+  Hybrid<float2> sp_rangl_final_k;   ///< Final stiffnesses for time-dependent angle restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<float4> sp_rangl_init_r;    ///< Initial displacements for time-dependent angle
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float4> sp_rangl_final_r;   ///< Final displacments for time-dependent angle restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<float2> sp_rdihe_init_k;    ///< Initial stiffnesses for time-dependent dihedral
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float2> sp_rdihe_final_k;   ///< Final stiffnesses for time-dependent dihedral restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<float4> sp_rdihe_init_r;    ///< Initial displacements for time-dependent dihedral
+                                     ///<   restraints, or the static values of time-independent
+                                     ///<   restraints
+  Hybrid<float4> sp_rdihe_final_r;   ///< Final displacments for time-dependent dihedral restraints
+                                     ///<   (ignored for time-independent restraints)
+  Hybrid<int2> nmr_int2_data;        ///< Integer information pertianing to (NMR) restraints, i.e.
+                                     ///<   the step counts at which restraints come on and reach
+                                     ///<   their final, mature values.
+  Hybrid<double> nmr_double_data;    ///< Double-precision information pertianing to (NMR)
+                                     ///<   restraints of the kinds delinated above.  The Hybrid
+                                     ///<   objects above are POINTER-kind, targeting arrays like
+                                     ///<   this one.
+  Hybrid<double2> nmr_double2_data;  ///< Double-precision double tuple information pertianing to
+                                     ///<   (NMR) restraints of the kinds delinated above.  The
+                                     ///<   Hybrid objects above are POINTER-kind, targeting arrays
+                                     ///<   like this one.
+  Hybrid<double4> nmr_double4_data;  ///< Double-precision quadruple tuple information pertianing
+                                     ///<   to (NMR) restraints of the kinds delinated above.  The
+                                     ///<   Hybrid objects above are POINTER-kind, targeting arrays
+                                     ///<   like this one.
+  Hybrid<float> nmr_float_data;      ///< Single-precision information pertianing to (NMR)
+                                     ///<   restraints of the kinds delinated above.  The Hybrid
+                                     ///<   objects above are POINTER-kind, targeting arrays like
+                                     ///<   this one.
+  Hybrid<float2> nmr_float2_data;    ///< Single-precision double tuple information pertianing to
+                                     ///<   (NMR) restraints of the kinds delinated above.  The
+                                     ///<   Hybrid objects above are POINTER-kind, targeting arrays
+                                     ///<   like this one.
+  Hybrid<float4> nmr_float4_data;    ///< Single-precision quadruple tuple information pertianing
+                                     ///<   to (NMR) restraints of the kinds delinated above.  The
+                                     ///<   Hybrid objects above are POINTER-kind, targeting arrays
+                                     ///<   like this one.
 
   // Valence work units (VWUs): work units providing instruction sets for the GPU to operate on a
   // continuous, non-rearranged list of atoms and implement all valence terms.  Each VWU pertains
@@ -465,7 +582,7 @@ private:
   // contributed back to the global arrays.
 
   /// A list of atoms that the VWU shall import, with indices into the global array of atoms for
-  /// all systems.  Each VWU may import up to half as many atoms as the kernel blocks have threads,
+  /// all systems.  Each VWU may import up to 3/4 as many atoms as the kernel blocks have threads,
   /// and each VWU takes a stride of that many ints from this array.
   Hybrid<int> atom_imports;
 
@@ -500,23 +617,37 @@ private:
 
   /// Instructions for CMAP interactions.  Each uint2 tuple contains three atom indices in the x
   /// member (bits 1-10, 11-20, and 21-30, plus two more in the y member (bits 1-10 and 11-20).
-  /// The CMAP parameter index is given in the final twelve bits of the y member.
+  /// The CMAP parameter index is given in the final twelve bits of the y member, offering a total
+  /// of 4,096 unique CMAPs that one AtomGraphSynthesis can handle.
   Hybrid<uint2> cmap_instructions;
 
-  /// Instructions for NMR two-body restraints.  Each uint2 tuple contains two atom indices in the
-  /// x member (bits 1-10 and 11-20) followed by the index of the slope / intercept series in the
-  /// y member.
-  Hybrid<uint2> nmr2_instructions;
+  /// Instructions for positional restraints.  Each uint2 tuple contains an atom index (bits 1-10),
+  /// the index of the k(2,3) / r(1,2,3,4) and time dependence series (bits 11-31), and a flag to
+  /// indicate whether the restraint is time-dependent (bit 32) in the x member, followed by the
+  /// index of the target x, y, and z coordinates in the tuple's y member.  32 bits are needed to
+  /// index the target x / y / z parameters in order to provide a sufficiently large set of unique
+  /// restraints.
+  Hybrid<uint2> rposn_instructions;
 
-  /// Instructions for NMR three-body restraints.  Each uint2 tuple contains three atom indices in
-  /// the x member (bits 1-10, 11-20, and 21-30) followed by the index of the slope / intercept
-  /// series in the y member.
-  Hybrid<uint2> nmr3_instructions;
+  /// Instructions for NMR two-body restraints.  Each uint2 tuple contains two atom indices in the
+  /// x member (bits 1-10 and 11-20) followed by a flag to indicate whether the restraint is
+  /// time-dependent (bit 32).  The index of the k(2,3) / r(1,2,3,4) series is stored in the
+  /// tuple's y member.
+  Hybrid<uint2> rbond_instructions;
+
+  /// Instructions for NMR three-body restraints.  Each uint2 tuple contains two atom indices in
+  /// the x member (bits 1-10, 11-20, and 21-30) followed by a flag to indicate whether the
+  /// restraint is time-dependent (bit 32).  The index of the k(2,3) / r(1,2,3,4) series is stored
+  /// in the tuple's y member.
+  Hybrid<uint2> rangl_instructions;
 
   /// Instructions for NMR four-body restraints.  Each uint2 tuple contains three atom indices in
-  /// the x member (bits 1-10, 11-20, and 21-30) followed by a fourth in the y member (bits 1-10)
-  /// and finally the index of the slope / intercept series (bits 11-32).
-  Hybrid<uint2> nmr4_instructions;
+  /// the x member (bits 1-10, 11-20, and 21-30) followed by a flag to indicate whether the
+  /// restraint is time-dependent (bit 32).  The fourth atom index is stored in the y member
+  /// (bits 1-10).  The index of the k(2,3) / r(1,2,3,4) series is stored primarily in the tuple's
+  /// y member (bits 11-32) for a total of 4,194,304 unique dihedral restraint k(2,3) / r(1,2,3,4)
+  /// parameter sets in a single AtomGraphSynthesis.
+  Hybrid<uint2> rdihe_instructions;
 
   /// \brief Check the central lists of topologies and system indices to ensure that the requested
   ///        synthesis is sane.  Condense the list of topologies by weeding out duplicates.
@@ -549,12 +680,14 @@ private:
   ///
   /// \param topology_indices_in     Original list of system topology indices, oriented towards
   ///                                the input list of AtomGraph pointers
-  /// \param topology_index_rebase   Re-arrangement of system topology indices meeting the condensed
-  ///                                list of unique topologies created by checkTopologyList()
+  /// \param topology_index_rebase   Re-arrangement of system topology indices meeting the
+  ///                                condensed list of unique topologies created by
+  ///                                checkTopologyList()
   /// \param restraint_indices_in    Original list of restraint group indices, oriented towards
   ///                                the input list of RestraintApparatus pointers
-  /// \param restraint_index_rebase  Re-arrangement of restraint group indices meeting the condensed
-  ///                                list of unique restraints created by checkRestraintList()
+  /// \param restraint_index_rebase  Re-arrangement of restraint group indices meeting the
+  ///                                condensed list of unique restraints created by
+  ///                                checkRestraintList()
   void buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
                               const std::vector<int> &topology_index_rebase,
                               const std::vector<int> &restraint_indices_in,
@@ -572,10 +705,43 @@ private:
   ///        tables or are completely covered by the current topology's tables it is tractable.
   void extendLJMatrices();
 
+  /// \brief Find unique restraint k(2,3) and r(1,2,3,4) series.  This encapsulates what would
+  ///        otherwise be a lot of repetitious code.
+  ///
+  /// \param order                  Order of the restraint (1 = positional, 2 = bond, ...)
+  /// \param network_table_offsets  Pre-computed table of offsets for each restraint apparatus,
+  ///                               relevant to the particular order of the restraints
+  /// \param synthesis_index        Indices of parameters in each restraint apparatus into the
+  ///                               condensed table of k(2,3) and r(1,2,3,4) parameter sets stored
+  ///                               in the AtomGraphSynthesis (must be pre-allocated to be filled
+  ///                               and returned)
+  /// \param filtered_step_bounds   Initial and final bounds for the set of condensed restraint
+  ///                               parameters.  No pre-allocation is needed.  This will be
+  ///                               assembled and returned.
+  /// \param filtered_init_keq      Initial stiffness constants for the set of condensed restraint
+  ///                               parameters.  No pre-allocation is needed.  This will be
+  ///                               assembled and returned.
+  /// \param filtered_finl_keq      Mature stiffness constants for the set of condensed restraint
+  ///                               parameters.  No pre-allocation is needed.  This will be
+  ///                               assembled and returned.
+  /// \param filtered_init_r        Initial displacement settings for the set of condensed restraint
+  ///                               parameters.  No pre-allocation is needed.  This will be
+  ///                               assembled and returned.
+  /// \param filtered_finl_r        Mature displacement settings for the set of condensed restraint
+  ///                               parameters.  No pre-allocation is needed.  This will be
+  ///                               assembled and returned.
+  int mapUniqueRestraintKRSeries(int order, const std::vector<int> &network_table_offsets,
+                                 std::vector<int> *synthesis_index,
+                                 std::vector<int2> *filtered_step_bounds,
+                                 std::vector<double2> *filtered_init_keq,
+                                 std::vector<double2> *filtered_finl_keq,
+                                 std::vector<double4> *filtered_init_r,
+                                 std::vector<double4> *filtered_finl_r);
+
   /// \brief Filter and condense the restraint networks in the same manner as valence terms were
   ///        condensed (each network comes from a RestraintApparatus object, and is just another
   ///        name to avoid repeating the type name as the name of an actual variable).
-  void linkRestraintNetworks();
+  void condenseRestraintNetworks();
 };
 
 } // namespace synthesis

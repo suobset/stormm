@@ -12,6 +12,14 @@ namespace restraints {
 using card::Hybrid;
 using card::HybridTargetLevel;
 
+/// \brief Enumerate the stages of a restraint's application
+enum class RestraintStage {
+  INITIAL,  ///< The initial stage of restraint application, at which point the initial parameter
+            ///<   set is applied with 100% weight
+  FINAL     ///< The final, mature stage of the restraint, at which point the final parameter
+            ///<   set gets 100% weight after steadily gaining it from the initial parameter set
+};
+  
 /// \brief Double-precision reader abstract for the RestraintApparatus class.  Restraints are very
 ///        detailed things, as reflected in the tedium of this object.
 struct RestraintApparatusDpReader {
@@ -186,7 +194,8 @@ public:
   ///                nonzero length, the topology pointer from the first restraint will be
   ///                preferred, otherwise this must be supplied in order to initialize the const
   ///                member variable ag_pointer)
-  RestraintApparatus(const std::vector<BoundedRestraint> &rbasis, const AtomGraph *ag_in = nullptr);
+  RestraintApparatus(const std::vector<BoundedRestraint> &rbasis,
+                     const AtomGraph *ag_in = nullptr);
 
   /// \brief The copy constructor works like any other object containing POINTER-kind Hybrids.
   ///
@@ -234,6 +243,22 @@ public:
 
   /// \brief Get a single-precision abstract of this apparatus
   RestraintApparatusSpReader spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get an integer pointer into one of the restraint initial or final application step
+  ///        parameter arrays, specified by the order of the restraint.
+  const int* getApplicationStepPointer(int order, RestraintStage stage,
+                                       HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
+  /// \brief Get a double-precision pointer into one of the restraint k(2,3) parameter arrays,
+  ///        specified by the order of the restraint and the initial or final condition.
+  const double2*
+  getHarmonicStiffnessPointer(int order, RestraintStage stage,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get a double-precision pointer into one of the displacement r(1,2,3,4) parameter
+  ///        arrays, specified by the order of the restraint and the initial or final condition.
+  const double4* getDisplacementPointer(int order, RestraintStage stage,
+                                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Produce a vector of all the restraints in this apparatus, essentially the inverse of
   ///        the constructor.

@@ -20,6 +20,7 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::sum;
 using parse::realToString;
+using restraints::RestraintStage;
 using topology::accepted_coulomb_constant;
 using testing::Approx;
   
@@ -158,26 +159,47 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c_sp"},
     sp_lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab_sp"},
     sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
-    nmr_initial_steps{HybridKind::ARRAY, "tpsyn_nmr_init_step"},
-    nmr_final_steps{HybridKind::ARRAY, "tpsyn_nmr_final_step"},
-    nmr_increments{HybridKind::ARRAY, "tpsyn_nmr_inc"},
-    nmr_k_initial_values{HybridKind::ARRAY, "tpsyn_k_init"},
-    nmr_r_initial_values{HybridKind::ARRAY, "tpsyn_r_init"},
-    nmr_k_final_values{HybridKind::ARRAY, "tpsyn_k_final"},
-    nmr_r_final_values{HybridKind::ARRAY, "tpsyn_r_final"},
-    sp_nmr_k_initial_values{HybridKind::ARRAY, "tpsyn_k_init_sp"},
-    sp_nmr_r_initial_values{HybridKind::ARRAY, "tpsyn_r_init_sp"},
-    sp_nmr_k_final_values{HybridKind::ARRAY, "tpsyn_k_final_sp"},
-    sp_nmr_r_final_values{HybridKind::ARRAY, "tpsyn_r_final_sp"},
+    rposn_step_bounds{HybridKind::POINTER, "tpsyn_rposn_steps"},
+    rbond_step_bounds{HybridKind::POINTER, "tpsyn_rbond_steps"},
+    rangl_step_bounds{HybridKind::POINTER, "tpsyn_rangl_steps"},
+    rdihe_step_bounds{HybridKind::POINTER, "tpsyn_rdihe_steps"},
+    rposn_init_k{HybridKind::POINTER, "tpsyn_rposn_init_k"},
+    rposn_final_k{HybridKind::POINTER, "tpsyn_rposn_finl_k"},
+    rposn_init_r{HybridKind::POINTER, "tpsyn_rposn_init_k"},
+    rposn_final_r{HybridKind::POINTER, "tpsyn_rposn_finl_k"},
+    rposn_init_xy{HybridKind::POINTER, "tpsyn_rposn_init_xy"},
+    rposn_init_z{HybridKind::POINTER, "tpsyn_rposn_init_z"},
+    rposn_final_xy{HybridKind::POINTER, "tpsyn_rposn_final_xy"},
+    rposn_final_z{HybridKind::POINTER, "tpsyn_rposn_final_z"},
+    rbond_init_k{HybridKind::POINTER, "tpsyn_rbond_init_k"},
+    rbond_final_k{HybridKind::POINTER, "tpsyn_rbond_finl_k"},
+    rbond_init_r{HybridKind::POINTER, "tpsyn_rbond_init_k"},
+    rbond_final_r{HybridKind::POINTER, "tpsyn_rbond_finl_k"},
+    rangl_init_k{HybridKind::POINTER, "tpsyn_rangl_init_k"},
+    rangl_final_k{HybridKind::POINTER, "tpsyn_rangl_finl_k"},
+    rangl_init_r{HybridKind::POINTER, "tpsyn_rangl_init_k"},
+    rangl_final_r{HybridKind::POINTER, "tpsyn_rangl_finl_k"},
+    rdihe_init_k{HybridKind::POINTER, "tpsyn_rdihe_init_k"},
+    rdihe_final_k{HybridKind::POINTER, "tpsyn_rdihe_finl_k"},
+    rdihe_init_r{HybridKind::POINTER, "tpsyn_rdihe_init_k"},
+    rdihe_final_r{HybridKind::POINTER, "tpsyn_rdihe_finl_k"},
+    nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
+    nmr_double_data{HybridKind::ARRAY, "tpsyn_nmr_dbl_data"},
+    nmr_double2_data{HybridKind::ARRAY, "tpsyn_nmr_dbl2_data"},
+    nmr_double4_data{HybridKind::ARRAY, "tpsyn_nmr_dbl4_data"},
+    nmr_float_data{HybridKind::ARRAY, "tpsyn_nmr_flt_data"},
+    nmr_float2_data{HybridKind::ARRAY, "tpsyn_nmr_flt2_data"},
+    nmr_float4_data{HybridKind::ARRAY, "tpsyn_nmr_flt4_data"},
     atom_imports{HybridKind::ARRAY, "tpsyn_atom_imports"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     bond_instructions{HybridKind::ARRAY, "tpsyn_bond_insr"},
     angl_instructions{HybridKind::ARRAY, "tpsyn_angl_insr"},
     dihe_instructions{HybridKind::ARRAY, "tpsyn_dihe_insr"},
     cmap_instructions{HybridKind::ARRAY, "tpsyn_cmap_insr"},
-    nmr2_instructions{HybridKind::ARRAY, "tpsyn_nmr2_insr"},
-    nmr3_instructions{HybridKind::ARRAY, "tpsyn_nmr3_insr"},
-    nmr4_instructions{HybridKind::ARRAY, "tpsyn_nmr4_insr"}
+    rposn_instructions{HybridKind::ARRAY, "tpsyn_nmr1_insr"},
+    rbond_instructions{HybridKind::ARRAY, "tpsyn_nmr2_insr"},
+    rangl_instructions{HybridKind::ARRAY, "tpsyn_nmr3_insr"},
+    rdihe_instructions{HybridKind::ARRAY, "tpsyn_nmr4_insr"}
 {
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
@@ -197,7 +219,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   extendLJMatrices();
 
   // Restraint data can now be incorporated.
-  linkRestraintNetworks();
+  condenseRestraintNetworks();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -290,6 +312,16 @@ AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices
   // restraint apparatus for each system references the same topology as the system itself.
   // A reference to a restraint apparatus index less than zero implies that the system uses no
   // restraints.
+  if (static_cast<int>(restraint_indices_in.size()) != system_count) {
+    rtErr("A restraint network index must be provided for each system that the synthesis is "
+          "designed to describe, even if the restraint apparatus pointer it indicates is a "
+          "null pointer.  The number of systems in the synthesis is determined by the length of "
+          "the topology index array, so there must be as many indices into a list of restraint "
+          "networks as there are indices into distinct system topologies.  " +
+          std::to_string(static_cast<int>(restraint_indices_in.size())) + " restraint network "
+          "pointer indices were provided for a synthesis that should contain " +
+          std::to_string(system_count) + " systems.", "AtomGraphSynthesis", "checkRestraintList");
+  }
   if (maxValue(restraint_indices_in) >= restraint_network_count) {
     rtErr("One or more systems references a restraint apparatus index outside of the list "
           "supplied.", "AtomGraphSynthesis", "checkRestraintList");
@@ -535,12 +567,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   // Load the topology indexing first
   for (int i = 0; i < system_count; i++) {
     topology_indices.putHost(topology_index_rebase[topology_indices_in[i]], i);
-    if (restraint_indices_in[i] >= 0) {
-      restraint_indices.putHost(restraint_index_rebase[restraint_indices_in[i]], i);
-    }
-    else {
-      restraint_indices.putHost(-1, i);
-    }
+    restraint_indices.putHost(restraint_index_rebase[restraint_indices_in[i]], i);
   }
 
   // Loop over all systems, fill in the above details, and compute the sizes of various arrays
@@ -830,8 +857,6 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> cimp_synthesis_index(cimp_offset, -1);
   std::vector<int> cmap_synthesis_index(cmap_offset, -1);
   std::vector<int> chrg_synthesis_index(chrg_offset, -1);
-  std::vector<double> filtered_chrg;
-  std::vector<float> sp_filtered_chrg;
   std::vector<double> filtered_bond_keq;
   std::vector<double> filtered_bond_leq;
   std::vector<float> sp_filtered_bond_keq;
@@ -858,6 +883,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> filtered_cmap_surf_bounds(1, 0);
   std::vector<double> filtered_cmap_surf;
   std::vector<float> sp_filtered_cmap_surf;
+  std::vector<double> filtered_chrg;
+  std::vector<float> sp_filtered_chrg;
   int n_unique_bond = 0;
   int n_unique_angl = 0;
   int n_unique_dihe = 0;
@@ -1321,7 +1348,323 @@ void AtomGraphSynthesis::extendLJMatrices() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void AtomGraphSynthesis::linkRestraintNetworks() {
+int AtomGraphSynthesis::mapUniqueRestraintKRSeries(const int order,
+                                                   const std::vector<int> &network_table_offsets,
+                                                   std::vector<int> *synthesis_index,
+                                                   std::vector<int2> *filtered_step_bounds,
+                                                   std::vector<double2> *filtered_init_keq,
+                                                   std::vector<double2> *filtered_finl_keq,
+                                                   std::vector<double4> *filtered_init_r,
+                                                   std::vector<double4> *filtered_finl_r) {
+  int n_unique_term = 0;
+  int* synthesis_index_ptr = synthesis_index->data();
+  for (int i = 0; i < restraint_network_count; i++) {
+    const RestraintApparatus* ira_ptr = restraint_networks[i];
+    if (ira_ptr == nullptr) {
+      continue;
+    }
+    const RestraintStage istage = RestraintStage::INITIAL;
+    const RestraintStage fstage = RestraintStage::FINAL;
+    const int* irstr_init_step    = ira_ptr->getApplicationStepPointer(order, istage);
+    const int* irstr_finl_step    = ira_ptr->getApplicationStepPointer(order, fstage);
+    const double2* irstr_init_keq = ira_ptr->getHarmonicStiffnessPointer(order, istage);
+    const double2* irstr_finl_keq = ira_ptr->getHarmonicStiffnessPointer(order, fstage);
+    const double4* irstr_init_r   = ira_ptr->getDisplacementPointer(order, istage);
+    const double4* irstr_finl_r   = ira_ptr->getDisplacementPointer(order, fstage);
+    int jmax;
+    switch (order) {
+    case 1:
+      jmax = ira_ptr->getPositionalRestraintCount();
+      break;
+    case 2:
+      jmax = ira_ptr->getDistanceRestraintCount();
+      break;
+    case 3:
+      jmax = ira_ptr->getAngleRestraintCount();
+      break;
+    case 4:
+      jmax = ira_ptr->getDihedralRestraintCount();
+      break;
+    default:
+      break;
+    }
+    
+    // Seek out unique positional restraints.  This process differs from filtering unique valence
+    // parameters because with the restraints, there is just a list of parameters and atoms to
+    // which they apply, whereas with the valence parameters there were lists of atoms to which
+    // each term applied, a corresponding index into a parameter table, and then the separate
+    // parameter tables.  This process, in contrast, must just loop over all restraints, rather
+    // than all entries in the tables, to determine which have unique parameters.  In many cases,
+    // all restraints will be unique, but the instructions for doing the restraints will have atoms
+    // and a restraint parameter index regardless.
+    for (int j = 0; j < jmax; j++) {
+
+      // Time dependence, and the exact steps at which that time dependence starts, can signify
+      // that both k / r series as well as x / y / z targets are unique.
+      const int ij_init_step = irstr_init_step[j];
+      const int ij_finl_step = irstr_finl_step[j];
+      const bool ij_time_dep = (ij_finl_step == 0);
+
+      // Skip restraints that have already been determined to have a known k / r series
+      if (synthesis_index_ptr[network_table_offsets[i] + j] < 0) {
+        const Approx ij_posn_init_k2(irstr_init_keq[j].x, constants::verytiny);
+        const Approx ij_posn_init_k3(irstr_init_keq[j].y, constants::verytiny);
+        const Approx ij_posn_finl_k2(irstr_finl_keq[j].x, constants::verytiny);
+        const Approx ij_posn_finl_k3(irstr_finl_keq[j].y, constants::verytiny);
+        const Approx ij_posn_init_r1(irstr_init_r[j].x, constants::verytiny);
+        const Approx ij_posn_init_r2(irstr_init_r[j].y, constants::verytiny);
+        const Approx ij_posn_init_r3(irstr_init_r[j].z, constants::verytiny);
+        const Approx ij_posn_init_r4(irstr_init_r[j].w, constants::verytiny);
+        const Approx ij_posn_finl_r1(irstr_finl_r[j].x, constants::verytiny);
+        const Approx ij_posn_finl_r2(irstr_finl_r[j].y, constants::verytiny);
+        const Approx ij_posn_finl_r3(irstr_finl_r[j].z, constants::verytiny);
+        const Approx ij_posn_finl_r4(irstr_finl_r[j].w, constants::verytiny);
+        for (int k = i; k < restraint_network_count; k++) {
+          const RestraintApparatus* kra_ptr = restraint_networks[k];
+          if (kra_ptr == nullptr) {
+            continue;
+          }
+
+          // Another switch to define constants and pointers based on the order of restraint
+          // being handled, this time for the abstract of the kth restraint apparatus
+          const int* krstr_init_step    = kra_ptr->getApplicationStepPointer(order, istage);
+          const int* krstr_finl_step    = kra_ptr->getApplicationStepPointer(order, fstage);
+          const double2* krstr_init_keq = kra_ptr->getHarmonicStiffnessPointer(order, istage);
+          const double2* krstr_finl_keq = kra_ptr->getHarmonicStiffnessPointer(order, fstage);
+          const double4* krstr_init_r   = kra_ptr->getDisplacementPointer(order, istage);
+          const double4* krstr_finl_r   = kra_ptr->getDisplacementPointer(order, fstage);          
+          int mmax;
+          switch (order) {
+          case 1:
+            mmax = kra_ptr->getPositionalRestraintCount();
+            break;
+          case 2:
+            mmax = kra_ptr->getDistanceRestraintCount();
+            break;
+          case 3:
+            mmax = kra_ptr->getAngleRestraintCount();
+            break;
+          case 4:
+            mmax = kra_ptr->getDihedralRestraintCount();
+            break;
+          default:
+            break;
+          }          
+          const int mstart = (k == i) ? j : 0;
+          for (int m = mstart; m < mmax; m++) {
+            if (synthesis_index_ptr[network_table_offsets[k] + m] >= 0) {
+              continue;
+            }
+            const bool km_time_dep = (krstr_finl_step[m] == 0);
+            if (ij_time_dep != km_time_dep) {
+              continue;
+            }
+            if (ij_time_dep) {
+              if (krstr_init_step[m] == ij_init_step &&
+                  krstr_finl_step[m] == ij_finl_step &&
+                  ij_posn_init_k2.test(krstr_init_keq[m].x) &&
+                  ij_posn_init_k3.test(krstr_init_keq[m].y) &&
+                  ij_posn_finl_k2.test(krstr_finl_keq[m].x) &&
+                  ij_posn_finl_k3.test(krstr_finl_keq[m].y) &&
+                  ij_posn_init_r1.test(krstr_init_r[m].x) &&
+                  ij_posn_init_r2.test(krstr_init_r[m].y) &&
+                  ij_posn_init_r3.test(krstr_init_r[m].z) &&
+                  ij_posn_init_r4.test(krstr_init_r[m].w) &&
+                  ij_posn_finl_r1.test(krstr_finl_r[m].x) &&
+                  ij_posn_finl_r2.test(krstr_finl_r[m].y) &&
+                  ij_posn_finl_r3.test(krstr_finl_r[m].z) &&
+                  ij_posn_finl_r4.test(krstr_finl_r[m].w)) {
+                synthesis_index_ptr[network_table_offsets[k] + m] = n_unique_term;
+              }
+            }
+            else {
+              if (ij_posn_init_k2.test(krstr_init_keq[m].x) &&
+                  ij_posn_init_k3.test(krstr_init_keq[m].y) &&
+                  ij_posn_init_r1.test(krstr_init_r[m].x) &&
+                  ij_posn_init_r2.test(krstr_init_r[m].y) &&
+                  ij_posn_init_r3.test(krstr_init_r[m].z) &&
+                  ij_posn_init_r4.test(krstr_init_r[m].w)) {
+                synthesis_index_ptr[network_table_offsets[k] + m] = n_unique_term;
+              }
+            }
+          }
+        }
+
+        // Catalog this unique positional restraint parameter set (the x, y, and z coordinates
+        // are a separate parameter set and will be considered next);
+        filtered_step_bounds->push_back({ij_init_step, ij_finl_step});
+        filtered_init_keq->push_back(irstr_init_keq[j]);
+        filtered_finl_keq->push_back(irstr_finl_keq[j]);
+        filtered_init_r->push_back(irstr_init_r[j]);
+        filtered_finl_r->push_back(irstr_finl_r[j]);
+        n_unique_term++;
+      }
+    }
+  }
+  return n_unique_term;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::condenseRestraintNetworks() {
+
+  // As with topology parameters, compute the numbers of unique positional, distance, angle, and
+  // dihedral angle restraints.  Take the opportunity to compute offsets (starting bounds) for
+  // various sets of terms.  One difference in this implementation is that the restraint apparatus
+  // pointer for any particular network may be the null pointer, indicating that there is no
+  // restraint system in place for that case (or perhaps any cases).
+  int posn_offset = 0;
+  int bond_offset = 0;
+  int angl_offset = 0;
+  int dihe_offset = 0;
+  std::vector<int> network_rposn_table_offsets(restraint_network_count, 0);
+  std::vector<int> network_rbond_table_offsets(restraint_network_count, 0);
+  std::vector<int> network_rangl_table_offsets(restraint_network_count, 0);
+  std::vector<int> network_rdihe_table_offsets(restraint_network_count, 0);
+  for (int i = 0; i < restraint_network_count; i++) {
+    const RestraintApparatus* ra_ptr = restraint_networks[i];
+    network_rposn_table_offsets[i] = posn_offset;
+    network_rbond_table_offsets[i] = bond_offset;
+    network_rangl_table_offsets[i] = angl_offset;
+    network_rdihe_table_offsets[i] = dihe_offset;
+    if (ra_ptr != nullptr) {
+      posn_offset += ra_ptr->getPositionalRestraintCount();
+      bond_offset += ra_ptr->getDistanceRestraintCount();
+      angl_offset += ra_ptr->getAngleRestraintCount();
+      dihe_offset += ra_ptr->getDihedralRestraintCount();
+    }
+  }
+
+  // Create lists of unique parameters for the various types of restraints.
+  std::vector<int> rposn_synthesis_kr_index(posn_offset, -1);  
+  std::vector<int> rposn_synthesis_xyz_index(posn_offset, -1);  
+  std::vector<int> rbond_synthesis_index(bond_offset, -1);
+  std::vector<int> rangl_synthesis_index(angl_offset, -1);
+  std::vector<int> rdihe_synthesis_index(dihe_offset, -1);
+  std::vector<int2> filtered_rposn_step_bounds;
+  std::vector<int2> filtered_rbond_step_bounds;
+  std::vector<int2> filtered_rangl_step_bounds;
+  std::vector<int2> filtered_rdihe_step_bounds;
+  std::vector<double2> filtered_rposn_init_keq;
+  std::vector<double2> filtered_rposn_finl_keq;
+  std::vector<double4> filtered_rposn_init_r;
+  std::vector<double4> filtered_rposn_finl_r;
+  std::vector<double3> filtered_rposn_init_xyz;
+  std::vector<double3> filtered_rposn_finl_xyz;
+  std::vector<double2> filtered_rbond_init_keq;
+  std::vector<double2> filtered_rbond_finl_keq;
+  std::vector<double4> filtered_rbond_init_r;
+  std::vector<double4> filtered_rbond_finl_r;
+  std::vector<double2> filtered_rangl_init_keq;
+  std::vector<double2> filtered_rangl_finl_keq;
+  std::vector<double4> filtered_rangl_init_r;
+  std::vector<double4> filtered_rangl_finl_r;
+  std::vector<double2> filtered_rdihe_init_keq;
+  std::vector<double2> filtered_rdihe_finl_keq;
+  std::vector<double4> filtered_rdihe_init_r;
+  std::vector<double4> filtered_rdihe_finl_r;
+  const int n_unique_posn_kr = mapUniqueRestraintKRSeries(1, network_rposn_table_offsets,
+                                                          &rposn_synthesis_kr_index,
+                                                          &filtered_rposn_step_bounds,
+                                                          &filtered_rposn_init_keq,
+                                                          &filtered_rposn_finl_keq,
+                                                          &filtered_rposn_init_r,
+                                                          &filtered_rposn_finl_r);
+  const int n_unique_bond    = mapUniqueRestraintKRSeries(1, network_rbond_table_offsets,
+                                                          &rbond_synthesis_index,
+                                                          &filtered_rbond_step_bounds,
+                                                          &filtered_rbond_init_keq,
+                                                          &filtered_rbond_finl_keq,
+                                                          &filtered_rbond_init_r,
+                                                          &filtered_rbond_finl_r);
+  const int n_unique_angl    =  mapUniqueRestraintKRSeries(1, network_rangl_table_offsets,
+                                                          &rangl_synthesis_index,
+                                                          &filtered_rangl_step_bounds,
+                                                          &filtered_rangl_init_keq,
+                                                          &filtered_rangl_finl_keq,
+                                                          &filtered_rangl_init_r,
+                                                          &filtered_rangl_finl_r);
+  const int n_unique_dihe    =  mapUniqueRestraintKRSeries(1, network_rdihe_table_offsets,
+                                                          &rdihe_synthesis_index,
+                                                          &filtered_rdihe_step_bounds,
+                                                          &filtered_rdihe_init_keq,
+                                                          &filtered_rdihe_finl_keq,
+                                                          &filtered_rdihe_init_r,
+                                                          &filtered_rdihe_finl_r);
+
+  // Seek out unique positional restraint x, y, and z targets.  This process differs from
+  // filtering unique valence parameters because with the restraints, there is just a list of
+  // parameters and atoms to which they apply, whereas with the valence parameters there were
+  // lists of atoms to which each term applied, a corresponding index into a parameter table,
+  // and then the separate parameter tables.  This process, in contrast, must just loop over all
+  // restraints, rather than all entries in the tables, to determine which have unique
+  // parameters.  In many cases, all restraints will be unique, but the instructions for doing
+  // the restraints will have atoms and a restraint parameter index regardless.
+  int n_unique_posn_xyz = 0;
+  for (int i = 0; i < restraint_network_count; i++) {
+    const RestraintApparatus* ira_ptr = restraint_networks[i];
+    if (ira_ptr == nullptr) {
+      continue;
+    }
+    const RestraintApparatusDpReader irar_dp = ira_ptr->dpData();
+    for (int j = 0; j < irar_dp.nposn; j++) {
+
+      // Skip restraints that have been determined to have unique x / y / z targets.  This
+      if (rposn_synthesis_xyz_index[network_rposn_table_offsets[i] + j] < 0) {
+        const int ij_init_step = irar_dp.rposn_init_step[j];
+        const int ij_finl_step = irar_dp.rposn_finl_step[j];
+        const bool ij_time_dep = (ij_finl_step == 0);
+        const Approx ij_posn_init_x(irar_dp.rposn_init_xy[j].x, constants::verytiny);
+        const Approx ij_posn_init_y(irar_dp.rposn_init_xy[j].y, constants::verytiny);
+        const Approx ij_posn_init_z(irar_dp.rposn_init_z[j],    constants::verytiny);
+        const Approx ij_posn_finl_x(irar_dp.rposn_finl_xy[j].x, constants::verytiny);
+        const Approx ij_posn_finl_y(irar_dp.rposn_finl_xy[j].y, constants::verytiny);
+        const Approx ij_posn_finl_z(irar_dp.rposn_finl_z[j],    constants::verytiny);
+        for (int k = i; k < restraint_network_count; k++) {
+          const RestraintApparatus* kra_ptr = restraint_networks[k];
+          if (kra_ptr == nullptr) {
+            continue;
+          }
+          const RestraintApparatusDpReader krar_dp = kra_ptr->dpData();
+          const int mstart = (k == i) ? j : 0;
+          for (int m = mstart; m < krar_dp.nposn; m++) {
+            if (rposn_synthesis_kr_index[network_rposn_table_offsets[k] + m] >= 0) {
+              continue;
+            }
+            const bool km_time_dep = (krar_dp.rposn_finl_step[m] == 0);
+            if (ij_time_dep != km_time_dep) {
+              continue;
+            }
+            if (ij_time_dep) {
+              if (krar_dp.rposn_init_step[m] == ij_init_step &&
+                  krar_dp.rposn_finl_step[m] == ij_finl_step &&
+                  ij_posn_init_x.test(krar_dp.rposn_init_xy[m].x) &&
+                  ij_posn_init_y.test(krar_dp.rposn_init_xy[m].y) &&
+                  ij_posn_init_z.test(krar_dp.rposn_init_z[m]) &&
+                  ij_posn_finl_x.test(krar_dp.rposn_finl_xy[m].x) &&
+                  ij_posn_finl_y.test(krar_dp.rposn_finl_xy[m].y) &&
+                  ij_posn_finl_z.test(krar_dp.rposn_finl_z[m])) {
+                rposn_synthesis_xyz_index[network_rposn_table_offsets[k] + m] = n_unique_posn_xyz;
+              }
+            }
+            else {
+              if (ij_posn_init_x.test(krar_dp.rposn_init_xy[m].x) &&
+                  ij_posn_init_y.test(krar_dp.rposn_init_xy[m].y) &&
+                  ij_posn_init_z.test(krar_dp.rposn_init_z[m])) {
+                rposn_synthesis_xyz_index[network_rposn_table_offsets[k] + m] = n_unique_posn_xyz;
+              }
+            }
+          }
+        }
+
+        // Catalog this unique positional restraint target coordinate set
+        filtered_rposn_init_xyz.push_back({irar_dp.rposn_init_xy[j].x, irar_dp.rposn_init_xy[j].y,
+                                           irar_dp.rposn_init_z[j]});
+        filtered_rposn_finl_xyz.push_back({irar_dp.rposn_finl_xy[j].x, irar_dp.rposn_finl_xy[j].y,
+                                           irar_dp.rposn_finl_z[j]});
+        n_unique_posn_xyz++;
+      }
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
