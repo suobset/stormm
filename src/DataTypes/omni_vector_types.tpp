@@ -143,5 +143,67 @@ template <typename T> float4 vtConv4f(const T rhs) {
            static_cast<float>(rhs.w) };
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<double2> vtConv2(const std::vector<T> &rhs) {
+  const size_t nelem = rhs.size();
+  std::vector<double2> result(nelem);
+  for (size_t i = 0; i < nelem; i++) {
+    result[i] = { rhs[i].x, rhs[i].y };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<double3> vtConv3(const std::vector<T> &rhs) {
+  const size_t nelem = rhs.size();
+  std::vector<double3> result(nelem);
+  for (size_t i = 0; i < nelem; i++) {
+    result[i] = { rhs[i].x, rhs[i].y, rhs[i].z };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<double4> vtConv4(const std::vector<T> &rhs) {
+  const size_t nelem = rhs.size();
+  std::vector<double4> result(nelem);
+  for (size_t i = 0; i < nelem; i++) {
+    result[i] = { rhs[i].x, rhs[i].y, rhs[i].z, rhs[i].w };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<float2> vtConv2f(const std::vector<T> &rhs) {
+  const size_t nelem = rhs.size();
+  std::vector<float2> result(nelem);
+  for (size_t i = 0; i < nelem; i++) {
+    result[i] = { static_cast<float>(rhs[i].x), static_cast<float>(rhs[i].y) };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<float3> vtConv3f(const std::vector<T> &rhs) {
+  const size_t nelem = rhs.size();
+  std::vector<float3> result(nelem);
+  for (size_t i = 0; i < nelem; i++) {
+    result[i] = { static_cast<float>(rhs[i].x), static_cast<float>(rhs[i].y),
+                  static_cast<float>(rhs[i].z) };
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<float4> vtConv4f(const std::vector<T> &rhs) {
+  const size_t nelem = rhs.size();
+  std::vector<float4> result(nelem);
+  for (size_t i = 0; i < nelem; i++) {
+    result[i] = { static_cast<float>(rhs[i].x), static_cast<float>(rhs[i].y),
+                  static_cast<float>(rhs[i].z), static_cast<float>(rhs[i].w) };
+  }
+  return result;
+}
+
 } // namespace data_types
 } // namespace omni

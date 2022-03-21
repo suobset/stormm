@@ -4,6 +4,7 @@
 
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "DataTypes/omni_vector_types.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 

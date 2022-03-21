@@ -5,11 +5,11 @@
 #include <cstddef>
 #include <typeinfo>
 #include <typeindex>
-#include "Reporting/error_format.h"
-
+#include <vector>
 #ifdef OMNI_USE_HPC
 #include <vector_types.h>
 #endif
+#include "Reporting/error_format.h"
 
 namespace omni {
 namespace data_types {
@@ -257,7 +257,7 @@ template <typename T> int getHpcVectorTypeSize();
 /// \brief Produce a platform-independent name by which to identify one of the scalar data types.
 template <typename T> std::string getOmniHpcVectorTypeName();
 
-/// \brief Provide options for selected vector type conversions:
+/// \brief Provide options for selected vector type conversions, and vector forms thereof:
 ///        double(2,3,4) <--> float(2,3,4), double(2,3,4) <-- int(2,3,4),
 ///        double(2,3,4) <-- uint(2,3,4), double(2,3,4) <-- llint(2,3,4),
 ///        double(2,3,4) <-- ullint(2,3,4), float(2,3,4) <-- int(2,3,4),
@@ -274,6 +274,12 @@ template <typename T> double4 vtConv4(const T rhs);
 template <typename T> float2 vtConv2f(const T rhs);
 template <typename T> float3 vtConv3f(const T rhs);
 template <typename T> float4 vtConv4f(const T rhs);
+template <typename T> std::vector<double2> vtConv2(const std::vector<T> &rhs);
+template <typename T> std::vector<double3> vtConv3(const std::vector<T> &rhs);
+template <typename T> std::vector<double4> vtConv4(const std::vector<T> &rhs);
+template <typename T> std::vector<float2> vtConv2f(const std::vector<T> &rhs);
+template <typename T> std::vector<float3> vtConv3f(const std::vector<T> &rhs);
+template <typename T> std::vector<float4> vtConv4f(const std::vector<T> &rhs);
 /// \}
   
 } // namespace data_types

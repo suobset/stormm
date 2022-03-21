@@ -183,6 +183,26 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rdihe_final_k{HybridKind::POINTER, "tpsyn_rdihe_finl_k"},
     rdihe_init_r{HybridKind::POINTER, "tpsyn_rdihe_init_k"},
     rdihe_final_r{HybridKind::POINTER, "tpsyn_rdihe_finl_k"},
+    sp_rposn_init_k{HybridKind::POINTER, "tpsynf_rposn_init_k"},
+    sp_rposn_final_k{HybridKind::POINTER, "tpsynf_rposn_finl_k"},
+    sp_rposn_init_r{HybridKind::POINTER, "tpsynf_rposn_init_k"},
+    sp_rposn_final_r{HybridKind::POINTER, "tpsynf_rposn_finl_k"},
+    sp_rposn_init_xy{HybridKind::POINTER, "tpsynf_rposn_init_xy"},
+    sp_rposn_init_z{HybridKind::POINTER, "tpsynf_rposn_init_z"},
+    sp_rposn_final_xy{HybridKind::POINTER, "tpsynf_rposn_final_xy"},
+    sp_rposn_final_z{HybridKind::POINTER, "tpsynf_rposn_final_z"},
+    sp_rbond_init_k{HybridKind::POINTER, "tpsynf_rbond_init_k"},
+    sp_rbond_final_k{HybridKind::POINTER, "tpsynf_rbond_finl_k"},
+    sp_rbond_init_r{HybridKind::POINTER, "tpsynf_rbond_init_k"},
+    sp_rbond_final_r{HybridKind::POINTER, "tpsynf_rbond_finl_k"},
+    sp_rangl_init_k{HybridKind::POINTER, "tpsynf_rangl_init_k"},
+    sp_rangl_final_k{HybridKind::POINTER, "tpsynf_rangl_finl_k"},
+    sp_rangl_init_r{HybridKind::POINTER, "tpsynf_rangl_init_k"},
+    sp_rangl_final_r{HybridKind::POINTER, "tpsynf_rangl_finl_k"},
+    sp_rdihe_init_k{HybridKind::POINTER, "tpsynf_rdihe_init_k"},
+    sp_rdihe_final_k{HybridKind::POINTER, "tpsynf_rdihe_finl_k"},
+    sp_rdihe_init_r{HybridKind::POINTER, "tpsynf_rdihe_init_k"},
+    sp_rdihe_final_r{HybridKind::POINTER, "tpsynf_rdihe_finl_k"},
     nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
     nmr_double_data{HybridKind::ARRAY, "tpsyn_nmr_dbl_data"},
     nmr_double2_data{HybridKind::ARRAY, "tpsyn_nmr_dbl2_data"},
@@ -1540,28 +1560,18 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   std::vector<int> rbond_synthesis_index(bond_offset, -1);
   std::vector<int> rangl_synthesis_index(angl_offset, -1);
   std::vector<int> rdihe_synthesis_index(dihe_offset, -1);
-  std::vector<int2> filtered_rposn_step_bounds;
-  std::vector<int2> filtered_rbond_step_bounds;
-  std::vector<int2> filtered_rangl_step_bounds;
-  std::vector<int2> filtered_rdihe_step_bounds;
-  std::vector<double2> filtered_rposn_init_keq;
-  std::vector<double2> filtered_rposn_finl_keq;
-  std::vector<double4> filtered_rposn_init_r;
-  std::vector<double4> filtered_rposn_finl_r;
-  std::vector<double3> filtered_rposn_init_xyz;
-  std::vector<double3> filtered_rposn_finl_xyz;
-  std::vector<double2> filtered_rbond_init_keq;
-  std::vector<double2> filtered_rbond_finl_keq;
-  std::vector<double4> filtered_rbond_init_r;
-  std::vector<double4> filtered_rbond_finl_r;
-  std::vector<double2> filtered_rangl_init_keq;
-  std::vector<double2> filtered_rangl_finl_keq;
-  std::vector<double4> filtered_rangl_init_r;
-  std::vector<double4> filtered_rangl_finl_r;
-  std::vector<double2> filtered_rdihe_init_keq;
-  std::vector<double2> filtered_rdihe_finl_keq;
-  std::vector<double4> filtered_rdihe_init_r;
-  std::vector<double4> filtered_rdihe_finl_r;
+  std::vector<int2> filtered_rposn_step_bounds, filtered_rbond_step_bounds;
+  std::vector<int2> filtered_rangl_step_bounds, filtered_rdihe_step_bounds;
+  std::vector<double2> filtered_rposn_init_keq, filtered_rposn_finl_keq;
+  std::vector<double4> filtered_rposn_init_r, filtered_rposn_finl_r;
+  std::vector<double2> filtered_rposn_init_xy, filtered_rposn_finl_xy;
+  std::vector<double> filtered_rposn_init_z, filtered_rposn_finl_z;
+  std::vector<double2> filtered_rbond_init_keq, filtered_rbond_finl_keq;
+  std::vector<double4> filtered_rbond_init_r, filtered_rbond_finl_r;
+  std::vector<double2> filtered_rangl_init_keq, filtered_rangl_finl_keq;
+  std::vector<double4> filtered_rangl_init_r, filtered_rangl_finl_r;
+  std::vector<double2> filtered_rdihe_init_keq, filtered_rdihe_finl_keq;
+  std::vector<double4> filtered_rdihe_init_r, filtered_rdihe_finl_r;
   const int n_unique_posn_kr = mapUniqueRestraintKRSeries(1, network_rposn_table_offsets,
                                                           &rposn_synthesis_kr_index,
                                                           &filtered_rposn_step_bounds,
@@ -1635,9 +1645,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
               continue;
             }
             if (ij_time_dep) {
-              if (krar_dp.rposn_init_step[m] == ij_init_step &&
-                  krar_dp.rposn_finl_step[m] == ij_finl_step &&
-                  ij_posn_init_x.test(krar_dp.rposn_init_xy[m].x) &&
+              if (ij_posn_init_x.test(krar_dp.rposn_init_xy[m].x) &&
                   ij_posn_init_y.test(krar_dp.rposn_init_xy[m].y) &&
                   ij_posn_init_z.test(krar_dp.rposn_init_z[m]) &&
                   ij_posn_finl_x.test(krar_dp.rposn_finl_xy[m].x) &&
@@ -1657,14 +1665,102 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
         }
 
         // Catalog this unique positional restraint target coordinate set
-        filtered_rposn_init_xyz.push_back({irar_dp.rposn_init_xy[j].x, irar_dp.rposn_init_xy[j].y,
-                                           irar_dp.rposn_init_z[j]});
-        filtered_rposn_finl_xyz.push_back({irar_dp.rposn_finl_xy[j].x, irar_dp.rposn_finl_xy[j].y,
-                                           irar_dp.rposn_finl_z[j]});
+        filtered_rposn_init_xy.push_back({irar_dp.rposn_init_xy[j].x, irar_dp.rposn_init_xy[j].y});
+        filtered_rposn_init_z.push_back(irar_dp.rposn_init_z[j]);
+        filtered_rposn_finl_xy.push_back({irar_dp.rposn_finl_xy[j].x, irar_dp.rposn_finl_xy[j].y});
+        filtered_rposn_finl_z.push_back(irar_dp.rposn_finl_z[j]);
         n_unique_posn_xyz++;
       }
     }
   }
+
+  // Resize the Hybrid arrays, set pointers, and fill Hybrid objects in the AtomGraphSynthesis
+  const size_t i2c = roundUp(n_unique_posn_kr, warp_size_int) +
+                     roundUp(n_unique_bond, warp_size_int) +
+                     roundUp(n_unique_angl, warp_size_int) +
+                     roundUp(n_unique_dihe, warp_size_int);
+  nmr_int2_data.resize(i2c);
+  nmr_double_data.resize(2 * roundUp(n_unique_posn_xyz, warp_size_int));
+  nmr_double2_data.resize(2 * (i2c + n_unique_posn_xyz));
+  nmr_double4_data.resize(2 * i2c);
+  nmr_float_data.resize(2 * roundUp(n_unique_posn_xyz, warp_size_int));
+  nmr_float2_data.resize(2 * (i2c + n_unique_posn_xyz));
+  nmr_float4_data.resize(2 * i2c);
+  size_t ic = 0LLU;
+  ic = rposn_step_bounds.putHost(&nmr_int2_data, filtered_rposn_step_bounds, ic, warp_size_zu);
+  ic = rbond_step_bounds.putHost(&nmr_int2_data, filtered_rbond_step_bounds, ic, warp_size_zu);
+  ic = rangl_step_bounds.putHost(&nmr_int2_data, filtered_rangl_step_bounds, ic, warp_size_zu);
+  ic = rdihe_step_bounds.putHost(&nmr_int2_data, filtered_rdihe_step_bounds, ic, warp_size_zu);
+  ic = 0LLU;
+  ic = rposn_init_z.putHost(&nmr_double_data, filtered_rposn_init_z, ic, warp_size_zu);
+  ic = rposn_final_z.putHost(&nmr_double_data, filtered_rposn_finl_z, ic, warp_size_zu);
+  ic = 0LLU;
+  ic = rposn_init_k.putHost(&nmr_double2_data, filtered_rposn_init_keq, ic, warp_size_zu);
+  ic = rposn_final_k.putHost(&nmr_double2_data, filtered_rposn_finl_keq, ic, warp_size_zu);
+  ic = rposn_init_xy.putHost(&nmr_double2_data, filtered_rposn_init_xy, ic, warp_size_zu);
+  ic = rposn_final_xy.putHost(&nmr_double2_data, filtered_rposn_finl_xy, ic, warp_size_zu);
+  ic = rbond_init_k.putHost(&nmr_double2_data, filtered_rbond_init_keq, ic, warp_size_zu);
+  ic = rbond_final_k.putHost(&nmr_double2_data, filtered_rbond_finl_keq, ic, warp_size_zu);
+  ic = rangl_init_k.putHost(&nmr_double2_data, filtered_rangl_init_keq, ic, warp_size_zu);
+  ic = rangl_final_k.putHost(&nmr_double2_data, filtered_rangl_finl_keq, ic, warp_size_zu);
+  ic = rdihe_init_k.putHost(&nmr_double2_data, filtered_rdihe_init_keq, ic, warp_size_zu);
+  ic = rdihe_final_k.putHost(&nmr_double2_data, filtered_rdihe_finl_keq, ic, warp_size_zu);
+  ic = 0LLU;
+  ic = rposn_init_r.putHost(&nmr_double4_data, filtered_rposn_init_r, ic, warp_size_zu);
+  ic = rposn_final_r.putHost(&nmr_double4_data, filtered_rposn_finl_r, ic, warp_size_zu);  
+  ic = rbond_init_r.putHost(&nmr_double4_data, filtered_rbond_init_r, ic, warp_size_zu);
+  ic = rbond_final_r.putHost(&nmr_double4_data, filtered_rbond_finl_r, ic, warp_size_zu);
+  ic = rangl_init_r.putHost(&nmr_double4_data, filtered_rangl_init_r, ic, warp_size_zu);
+  ic = rangl_final_r.putHost(&nmr_double4_data, filtered_rangl_finl_r, ic, warp_size_zu);
+  ic = rdihe_init_r.putHost(&nmr_double4_data, filtered_rdihe_init_r, ic, warp_size_zu);
+  ic = rdihe_final_r.putHost(&nmr_double4_data, filtered_rdihe_finl_r, ic, warp_size_zu);
+
+  // Create temporary arrays for floating-point data
+  const std::vector<float> spfil_rposn_init_z(filtered_rposn_init_z.begin(),
+                                              filtered_rposn_init_z.end());
+  const std::vector<float> spfil_rposn_finl_z(filtered_rposn_finl_z.begin(),
+                                              filtered_rposn_finl_z.end());
+  const std::vector<float2> spfil_rposn_init_xy = vtConv2f(filtered_rposn_init_xy);
+  const std::vector<float2> spfil_rposn_finl_xy = vtConv2f(filtered_rposn_finl_xy);
+  const std::vector<float2> spfil_rposn_init_keq = vtConv2f(filtered_rposn_init_keq);
+  const std::vector<float2> spfil_rposn_finl_keq = vtConv2f(filtered_rposn_finl_keq);
+  const std::vector<float2> spfil_rbond_init_keq = vtConv2f(filtered_rbond_init_keq);
+  const std::vector<float2> spfil_rbond_finl_keq = vtConv2f(filtered_rbond_finl_keq);
+  const std::vector<float2> spfil_rangl_init_keq = vtConv2f(filtered_rangl_init_keq);
+  const std::vector<float2> spfil_rangl_finl_keq = vtConv2f(filtered_rangl_finl_keq);
+  const std::vector<float2> spfil_rdihe_init_keq = vtConv2f(filtered_rdihe_init_keq);
+  const std::vector<float2> spfil_rdihe_finl_keq = vtConv2f(filtered_rdihe_finl_keq);
+  const std::vector<float4> spfil_rposn_init_r = vtConv4f(filtered_rposn_init_r);
+  const std::vector<float4> spfil_rposn_finl_r = vtConv4f(filtered_rposn_finl_r);
+  const std::vector<float4> spfil_rbond_init_r = vtConv4f(filtered_rbond_init_r);
+  const std::vector<float4> spfil_rbond_finl_r = vtConv4f(filtered_rbond_finl_r);
+  const std::vector<float4> spfil_rangl_init_r = vtConv4f(filtered_rangl_init_r);
+  const std::vector<float4> spfil_rangl_finl_r = vtConv4f(filtered_rangl_finl_r);
+  const std::vector<float4> spfil_rdihe_init_r = vtConv4f(filtered_rdihe_init_r);
+  const std::vector<float4> spfil_rdihe_finl_r = vtConv4f(filtered_rdihe_finl_r);
+  ic = 0LLU;
+  ic = sp_rposn_init_z.putHost(&nmr_float_data, spfil_rposn_init_z, ic, warp_size_zu);
+  ic = sp_rposn_final_z.putHost(&nmr_float_data, spfil_rposn_finl_z, ic, warp_size_zu);
+  ic = 0LLU;
+  ic = sp_rposn_init_k.putHost(&nmr_float2_data, spfil_rposn_init_keq, ic, warp_size_zu);
+  ic = sp_rposn_final_k.putHost(&nmr_float2_data, spfil_rposn_finl_keq, ic, warp_size_zu);
+  ic = sp_rposn_init_xy.putHost(&nmr_float2_data, spfil_rposn_init_xy, ic, warp_size_zu);
+  ic = sp_rposn_final_xy.putHost(&nmr_float2_data, spfil_rposn_finl_xy, ic, warp_size_zu);
+  ic = sp_rbond_init_k.putHost(&nmr_float2_data, spfil_rbond_init_keq, ic, warp_size_zu);
+  ic = sp_rbond_final_k.putHost(&nmr_float2_data, spfil_rbond_finl_keq, ic, warp_size_zu);
+  ic = sp_rangl_init_k.putHost(&nmr_float2_data, spfil_rangl_init_keq, ic, warp_size_zu);
+  ic = sp_rangl_final_k.putHost(&nmr_float2_data, spfil_rangl_finl_keq, ic, warp_size_zu);
+  ic = sp_rdihe_init_k.putHost(&nmr_float2_data, spfil_rdihe_init_keq, ic, warp_size_zu);
+  ic = sp_rdihe_final_k.putHost(&nmr_float2_data, spfil_rdihe_finl_keq, ic, warp_size_zu);
+  ic = 0LLU;
+  ic = sp_rposn_init_r.putHost(&nmr_float4_data, spfil_rposn_init_r, ic, warp_size_zu);
+  ic = sp_rposn_final_r.putHost(&nmr_float4_data, spfil_rposn_finl_r, ic, warp_size_zu);  
+  ic = sp_rbond_init_r.putHost(&nmr_float4_data, spfil_rbond_init_r, ic, warp_size_zu);
+  ic = sp_rbond_final_r.putHost(&nmr_float4_data, spfil_rbond_finl_r, ic, warp_size_zu);
+  ic = sp_rangl_init_r.putHost(&nmr_float4_data, spfil_rangl_init_r, ic, warp_size_zu);
+  ic = sp_rangl_final_r.putHost(&nmr_float4_data, spfil_rangl_finl_r, ic, warp_size_zu);
+  ic = sp_rdihe_init_r.putHost(&nmr_float4_data, spfil_rdihe_init_r, ic, warp_size_zu);
+  ic = sp_rdihe_final_r.putHost(&nmr_float4_data, spfil_rdihe_finl_r, ic, warp_size_zu);
 }
 
 //-------------------------------------------------------------------------------------------------
