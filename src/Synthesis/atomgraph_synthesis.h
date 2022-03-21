@@ -177,7 +177,11 @@ private:
   int total_ubrd_params;          ///< Total number of unique Urey-Bradley angle parameter sets
   int total_cimp_params;          ///< Total number of unique CHARMM improper parameter sets
   int total_cmap_surfaces;        ///< Total number of unique CMAP surfaces
-
+  int total_position_restraints;  ///< Total number of positional restraints
+  int total_distance_restraints;  ///< Total number of distance restraints
+  int total_angle_restraints;     ///< Total number of angle restraints
+  int total_dihedral_restraints;  ///< Total number of dihedral restraints
+  
   // The presence of periodic boundaries or an implicit solvent must be common to all systems, as
   // must the cutoff and other run parameters, although these are contained in other data
   // structres.  If an implicit solvent model is in effect, its parameters are taken as common to
@@ -249,14 +253,21 @@ private:
                                        ///<   rather than the original topologies
 
   // Valence term and off-center particle quantities
-  Hybrid<int> ubrd_term_counts;     ///< Total number of Urey-Bradley angle stretch terms
-  Hybrid<int> cimp_term_counts;     ///< Total number of CHARMM impropers
-  Hybrid<int> cmap_term_counts;     ///< Total number of CMAP terms
-  Hybrid<int> bond_term_counts;     ///< Total numbers of bonded interactions
-  Hybrid<int> angl_term_counts;     ///< Total numbers of bond angle interactions
-  Hybrid<int> dihe_term_counts;     ///< Total numbers of dihedral cosine terms
-  Hybrid<int> virtual_site_counts;  ///< Number of v-sites / extra points out of all atoms
+  Hybrid<int> ubrd_term_counts;     ///< Number of Urey-Bradley angle stretch terms in each system
+  Hybrid<int> cimp_term_counts;     ///< Number of CHARMM impropers in each system
+  Hybrid<int> cmap_term_counts;     ///< Number of CMAP terms in each system
+  Hybrid<int> bond_term_counts;     ///< Numbers of bonded interactions in each system
+  Hybrid<int> angl_term_counts;     ///< Numbers of bond angle interactions in each system
+  Hybrid<int> dihe_term_counts;     ///< Numbers of dihedral cosine terms in each system
+  Hybrid<int> virtual_site_counts;  ///< Number of virtual sites / extra points out of all atoms
+                                    ///<   per system
 
+  // Restraint tallies for each system
+  Hybrid<int> posn_restraint_counts;  ///< Number of positional restraints per system
+  Hybrid<int> bond_restraint_counts;  ///< Number of distance restraints per system
+  Hybrid<int> angl_restraint_counts;  ///< Number of three-point angle restraints per system
+  Hybrid<int> dihe_restraint_counts;  ///< Number of four-point dihedral restraints per system
+  
   // Information relevant to non-bonded calculations
   Hybrid<int> atom_type_counts;        ///< Number of distinct Lennard-Jones types in each system
   Hybrid<int> total_exclusion_counts;  ///< Total number of non-bonded exclusions, including 1-4
@@ -299,6 +310,14 @@ private:
   Hybrid<int> dihe_term_offsets;          ///< Dihedral term parameter index lists
   Hybrid<int> virtual_site_offsets;       ///< Starting indices for each system's virtual site
                                           ///<   descriptor lists
+  Hybrid<int> posn_restraint_offsets;     ///< Starting indices for each system's positional
+                                          ///<   restraints
+  Hybrid<int> bond_restraint_offsets;     ///< Starting indices for each system's distance
+                                          ///<   restraints
+  Hybrid<int> angl_restraint_offsets;     ///< Starting indices for each system's three-point angle
+                                          ///<   restraints
+  Hybrid<int> dihe_restraint_offsets;     ///< Starting indices for each system's four-point
+                                          ///<   dihedral angle restraints
   Hybrid<int> nb_exclusion_offsets;       ///< Starting indices for unified nonbonded exclusion
                                           ///<   lists
   Hybrid<int> lennard_jones_abc_offsets;  ///< Starting indices for each system's relevant
@@ -432,9 +451,9 @@ private:
                                                 ///<  tables covering all systems (single
                                                 ///<   precision)
   
-  // NMR restraint term details: these function exactly like other parameter sets and are indexed
-  // by lists of atoms in the bond work units arrays.  They can be included in the synthesis of
-  // AtomGraphs due to their nature as potential terms, whereas the original topologies had to be
+  // NMR restraint terms and details: these function exactly like other parameter sets and are
+  // indexed by lists of atoms in the bond work units arrays.  They can be included in the synthesis
+  // of AtomGraphs due to their nature as potential terms, whereas the original topologies had to be
   // read from files that did not contain such terms.
   Hybrid<int2> rposn_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
                                      ///<   applying positional restraints
@@ -574,6 +593,29 @@ private:
                                      ///<   Hybrid objects above are POINTER-kind, targeting arrays
                                      ///<   like this one.
 
+  // Restraint indexing arrays, offering atom indices in the concatenated atom and restraint
+  // parameter arrays of the synthesis.
+  Hybrid<int> rposn_atoms;          ///< Atom indices involved in positional restraints
+  Hybrid<int> rposn_kr_param_idx;   ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                    ///<   positional restraint
+  Hybrid<int> rposn_xyz_param_idx;  ///< Restraint parameters for the target positions in each
+                                    ///<   positional restraint
+  Hybrid<int> rbond_i_atoms;        ///< Atom I indices involved in distance restraints
+  Hybrid<int> rbond_j_atoms;        ///< Atom J indices involved in distance restraints
+  Hybrid<int> rbond_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                    ///<   distance restraint
+  Hybrid<int> rangl_i_atoms;        ///< Atom I indices involved in angle restraints
+  Hybrid<int> rangl_j_atoms;        ///< Atom J indices involved in angle restraints
+  Hybrid<int> rangl_k_atoms;        ///< Atom K indices involved in angle restraints
+  Hybrid<int> rangl_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                    ///<   three-point angle restraint
+  Hybrid<int> rdihe_i_atoms;        ///< Atom I indices involved in dihedral restraints
+  Hybrid<int> rdihe_j_atoms;        ///< Atom J indices involved in dihedral restraints
+  Hybrid<int> rdihe_k_atoms;        ///< Atom K indices involved in dihedral restraints
+  Hybrid<int> rdihe_l_atoms;        ///< Atom L indices involved in dihedral restraints
+  Hybrid<int> rdihe_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                    ///<   four-point dihedral angle restraint
+  
   // Valence work units (VWUs): work units providing instruction sets for the GPU to operate on a
   // continuous, non-rearranged list of atoms and implement all valence terms.  Each VWU pertains
   // to one and only one individual topology from the list and each topology will have at least one

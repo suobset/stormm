@@ -38,47 +38,56 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     total_dihe_terms{0}, total_ubrd_terms{0}, total_cimp_terms{0}, total_cmap_terms{0},
     total_atom_types{0}, total_charge_types{0}, total_bond_params{0}, total_angl_params{0},
     total_dihe_params{0}, total_ubrd_params{0}, total_cimp_params{0}, total_cmap_surfaces{0},
-    periodic_box_class{UnitCellType::NONE}, gb_style{ImplicitSolventModel::NONE},
-    dielectric_constant{1.0}, salt_concentration{0.0}, coulomb_constant{accepted_coulomb_constant},
-    use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
-    water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
+    total_position_restraints{0}, total_distance_restraints{0}, total_angle_restraints{0},
+    total_dihedral_restraints{0}, periodic_box_class{UnitCellType::NONE},
+    gb_style{ImplicitSolventModel::NONE}, dielectric_constant{1.0}, salt_concentration{0.0},
+    coulomb_constant{accepted_coulomb_constant}, use_bond_constraints{ShakeSetting::OFF},
+    use_settle{SettleSetting::OFF}, water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
     topologies{topologies_in},
     restraint_networks{restraints_in},
     topology_indices{HybridKind::POINTER, "tpsyn_top_indices"},
     restraint_indices{HybridKind::POINTER, "tpsyn_rst_indices"},
-    atom_counts{HybridKind::POINTER, "typsyn_atom_counts"},
-    residue_counts{HybridKind::POINTER, "typsyn_res_counts"},
-    molecule_counts{HybridKind::POINTER, "typsyn_mol_counts"},
-    largest_residue_sizes{HybridKind::POINTER, "typsyn_max_res"},
-    last_solute_residues{HybridKind::POINTER, "typsyn_last_sol_res"},
-    last_solute_atoms{HybridKind::POINTER, "typsyn_last_sol_atm"},
-    first_solvent_molecules{HybridKind::POINTER, "typsyn_1st_solv_mol"},
-    ubrd_term_counts{HybridKind::POINTER, "typsyn_ubrd_counts"},
-    cimp_term_counts{HybridKind::POINTER, "typsyn_cimp_counts"},
-    cmap_term_counts{HybridKind::POINTER, "typsyn_cmap_counts"},
-    bond_term_counts{HybridKind::POINTER, "typsyn_bond_counts"},
-    angl_term_counts{HybridKind::POINTER, "typsyn_angl_counts"},
-    dihe_term_counts{HybridKind::POINTER, "typsyn_dihe_counts"},
-    virtual_site_counts{HybridKind::POINTER, "typsyn_vsite_counts"},
-    atom_type_counts{HybridKind::POINTER, "typsyn_atype_counts"},
-    total_exclusion_counts{HybridKind::POINTER, "typsyn_excl_counts"},
-    rigid_water_counts{HybridKind::POINTER, "typsyn_rwat_counts"},
-    bond_constraint_counts{HybridKind::POINTER, "typsyn_bcnst_counts"},
-    degrees_of_freedom{HybridKind::POINTER, "typsyn_deg_freedom"},
-    nonrigid_particle_counts{HybridKind::POINTER, "typsyn_n_nonrigid"},
-    atom_offsets{HybridKind::POINTER, "typsyn_atom_offsets"},
-    atom_bit_offsets{HybridKind::POINTER, "typsyn_abit_offsets"},
-    residue_offsets{HybridKind::POINTER, "typsyn_res_offsets"},
-    molecule_offsets{HybridKind::POINTER, "typsyn_res_offsets"},
-    ubrd_term_offsets{HybridKind::POINTER, "typsyn_ubrd_offset"},
-    cimp_term_offsets{HybridKind::POINTER, "typsyn_cimp_offset"},
-    cmap_term_offsets{HybridKind::POINTER, "typsyn_cmap_offset"},
-    bond_term_offsets{HybridKind::POINTER, "typsyn_bond_offset"},
-    angl_term_offsets{HybridKind::POINTER, "typsyn_angl_offset"},
-    dihe_term_offsets{HybridKind::POINTER, "typsyn_dihe_offset"},
-    virtual_site_offsets{HybridKind::POINTER, "typsyn_vsite_offset"},
-    nb_exclusion_offsets{HybridKind::POINTER, "typsyn_nbexcl_offset"},
-    lennard_jones_abc_offsets{HybridKind::POINTER, "typsyn_ljtable_offset"},
+    atom_counts{HybridKind::POINTER, "tpsyn_atom_counts"},
+    residue_counts{HybridKind::POINTER, "tpsyn_res_counts"},
+    molecule_counts{HybridKind::POINTER, "tpsyn_mol_counts"},
+    largest_residue_sizes{HybridKind::POINTER, "tpsyn_max_res"},
+    last_solute_residues{HybridKind::POINTER, "tpsyn_last_sol_res"},
+    last_solute_atoms{HybridKind::POINTER, "tpsyn_last_sol_atm"},
+    first_solvent_molecules{HybridKind::POINTER, "tpsyn_1st_solv_mol"},
+    ubrd_term_counts{HybridKind::POINTER, "tpsyn_ubrd_counts"},
+    cimp_term_counts{HybridKind::POINTER, "tpsyn_cimp_counts"},
+    cmap_term_counts{HybridKind::POINTER, "tpsyn_cmap_counts"},
+    bond_term_counts{HybridKind::POINTER, "tpsyn_bond_counts"},
+    angl_term_counts{HybridKind::POINTER, "tpsyn_angl_counts"},
+    dihe_term_counts{HybridKind::POINTER, "tpsyn_dihe_counts"},
+    virtual_site_counts{HybridKind::POINTER, "tpsyn_vsite_counts"},
+    posn_restraint_counts{HybridKind::POINTER, "tpsyn_rposn_counts"},
+    bond_restraint_counts{HybridKind::POINTER, "tpsyn_rbond_counts"},
+    angl_restraint_counts{HybridKind::POINTER, "tpsyn_rangl_counts"},
+    dihe_restraint_counts{HybridKind::POINTER, "tpsyn_rdihe_counts"},
+    atom_type_counts{HybridKind::POINTER, "tpsyn_atype_counts"},
+    total_exclusion_counts{HybridKind::POINTER, "tpsyn_excl_counts"},
+    rigid_water_counts{HybridKind::POINTER, "tpsyn_rwat_counts"},
+    bond_constraint_counts{HybridKind::POINTER, "tpsyn_bcnst_counts"},
+    degrees_of_freedom{HybridKind::POINTER, "tpsyn_deg_freedom"},
+    nonrigid_particle_counts{HybridKind::POINTER, "tpsyn_n_nonrigid"},
+    atom_offsets{HybridKind::POINTER, "tpsyn_atom_offsets"},
+    atom_bit_offsets{HybridKind::POINTER, "tpsyn_abit_offsets"},
+    residue_offsets{HybridKind::POINTER, "tpsyn_res_offsets"},
+    molecule_offsets{HybridKind::POINTER, "tpsyn_res_offsets"},
+    ubrd_term_offsets{HybridKind::POINTER, "tpsyn_ubrd_offset"},
+    cimp_term_offsets{HybridKind::POINTER, "tpsyn_cimp_offset"},
+    cmap_term_offsets{HybridKind::POINTER, "tpsyn_cmap_offset"},
+    bond_term_offsets{HybridKind::POINTER, "tpsyn_bond_offset"},
+    angl_term_offsets{HybridKind::POINTER, "tpsyn_angl_offset"},
+    dihe_term_offsets{HybridKind::POINTER, "tpsyn_dihe_offset"},
+    virtual_site_offsets{HybridKind::POINTER, "tpsyn_vsite_offset"},
+    posn_restraint_offsets{HybridKind::POINTER, "tpsyn_rposn_offset"},
+    bond_restraint_offsets{HybridKind::POINTER, "tpsyn_rbond_offset"},
+    angl_restraint_offsets{HybridKind::POINTER, "tpsyn_rangl_offset"},
+    dihe_restraint_offsets{HybridKind::POINTER, "tpsyn_rdihe_offset"},
+    nb_exclusion_offsets{HybridKind::POINTER, "tpsyn_nbexcl_offset"},
+    lennard_jones_abc_offsets{HybridKind::POINTER, "tpsyn_ljtable_offset"},
     int_system_data{HybridKind::ARRAY, "tpsyn_int_data"},
     residue_limits{HybridKind::ARRAY, "tpsyn_res_lims"},
     atom_struc_numbers{HybridKind::ARRAY, "tpsyn_atom_struc_nums"},
@@ -210,6 +219,21 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nmr_float_data{HybridKind::ARRAY, "tpsyn_nmr_flt_data"},
     nmr_float2_data{HybridKind::ARRAY, "tpsyn_nmr_flt2_data"},
     nmr_float4_data{HybridKind::ARRAY, "tpsyn_nmr_flt4_data"},
+    rposn_atoms{HybridKind::ARRAY, "tpsyn_rposn_at"},
+    rposn_kr_param_idx{HybridKind::ARRAY, "tpsyn_rposn_kr_idx"},
+    rposn_xyz_param_idx{HybridKind::ARRAY, "tpsyn_rposn_xyz_idx"},
+    rbond_i_atoms{HybridKind::ARRAY, "tpsyn_rbond_iat"},
+    rbond_j_atoms{HybridKind::ARRAY, "tpsyn_rbond_jat"},
+    rbond_param_idx{HybridKind::ARRAY, "tpsyn_rbond_param"},
+    rangl_i_atoms{HybridKind::ARRAY, "tpsyn_rangl_iat"},
+    rangl_j_atoms{HybridKind::ARRAY, "tpsyn_rangl_jat"},
+    rangl_k_atoms{HybridKind::ARRAY, "tpsyn_rangl_kat"},
+    rangl_param_idx{HybridKind::ARRAY, "tpsyn_rangl_param"},
+    rdihe_i_atoms{HybridKind::ARRAY, "tpsyn_rdihe_iat"},
+    rdihe_j_atoms{HybridKind::ARRAY, "tpsyn_rdihe_jat"},
+    rdihe_k_atoms{HybridKind::ARRAY, "tpsyn_rdihe_kat"},
+    rdihe_l_atoms{HybridKind::ARRAY, "tpsyn_rdihe_lat"},
+    rdihe_param_idx{HybridKind::ARRAY, "tpsyn_rdihe_param"},
     atom_imports{HybridKind::ARRAY, "tpsyn_atom_imports"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     bond_instructions{HybridKind::ARRAY, "tpsyn_bond_insr"},
@@ -512,7 +536,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate memory and set POINTER-kind arrays for the small packets of data
   const int padded_system_count = roundUp(system_count, warp_size_int);
-  int_system_data.resize(35 * padded_system_count);
+  int_system_data.resize(43 * padded_system_count);
   int pivot = 0;
   topology_indices.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -545,6 +569,14 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   dihe_term_counts.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   virtual_site_counts.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  posn_restraint_counts.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  bond_restraint_counts.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  angl_restraint_counts.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  dihe_restraint_counts.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   atom_type_counts.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -580,6 +612,14 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   pivot += padded_system_count;
   virtual_site_offsets.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
+  posn_restraint_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  bond_restraint_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  angl_restraint_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  dihe_restraint_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
   nb_exclusion_offsets.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   lennard_jones_abc_offsets.setPointer(&int_system_data, pivot, system_count);
@@ -591,6 +631,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   }
 
   // Loop over all systems, fill in the above details, and compute the sizes of various arrays
+  // for topological valence terms, virtual sites, exclusions, and restraints
   int atom_offset = 0;
   int abit_offset = 0;
   int resi_offset = 0;
@@ -603,12 +644,17 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   int dihe_offset = 0;
   int vste_offset = 0;
   int excl_offset = 0;
+  int rposn_offset = 0;
+  int rbond_offset = 0;
+  int rangl_offset = 0;
+  int rdihe_offset = 0;
   for (int i = 0; i < system_count; i++) {
     const AtomGraph* ag_ptr = topologies[topology_indices.readHost(i)];
-    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
-    const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
+    const RestraintApparatus* ra_ptr     = restraint_networks[restraint_indices.readHost(i)];
+    const ChemicalDetailsKit cdk         = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk       = ag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> vk          = ag_ptr->getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> vsk     = ag_ptr->getDoublePrecisionVirtualSiteKit();
     atom_counts.putHost(cdk.natom, i);
     total_atoms += cdk.natom;
     virtual_site_counts.putHost(ag_ptr->getVirtualSiteCount(), i);
@@ -664,6 +710,25 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     dihe_offset += roundUp(vk.ndihe, warp_size_int);
     nb_exclusion_offsets.putHost(excl_offset, i);
     excl_offset += roundUp(ag_ptr->getTotalExclusions(), warp_size_int);
+    if (ra_ptr != nullptr) {
+      const RestraintApparatusDpReader rar = ra_ptr->dpData();
+      posn_restraint_counts.putHost(rar.nposn, i);
+      bond_restraint_counts.putHost(rar.nbond, i);
+      angl_restraint_counts.putHost(rar.nangl, i);
+      dihe_restraint_counts.putHost(rar.ndihe, i);
+      total_position_restraints += rar.nposn;
+      total_distance_restraints += rar.nbond;
+      total_angle_restraints    += rar.nangl;
+      total_dihedral_restraints += rar.ndihe;
+      rposn_offset += roundUp(rar.nposn, warp_size_int);
+      posn_restraint_offsets.putHost(rposn_offset, i);
+      rbond_offset += roundUp(rar.nbond, warp_size_int);
+      bond_restraint_offsets.putHost(rbond_offset, i);
+      rangl_offset += roundUp(rar.nangl, warp_size_int);
+      angl_restraint_offsets.putHost(rangl_offset, i);
+      rdihe_offset += roundUp(rar.ndihe, warp_size_int);
+      dihe_restraint_offsets.putHost(rdihe_offset, i);
+    }
   }
 
   // Allocate detailed arrays for each descriptor, then collate all topologies.  This
@@ -811,6 +876,53 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       dihe_j_atoms.putHost(vk.dihe_j_atoms[pos] + synth_atom_base, synth_dihe_offset + pos);
       dihe_k_atoms.putHost(vk.dihe_k_atoms[pos] + synth_atom_base, synth_dihe_offset + pos);
       dihe_l_atoms.putHost(vk.dihe_l_atoms[pos] + synth_atom_base, synth_dihe_offset + pos);
+    }
+  }
+
+  // Fill in the restraint term indexing arrays
+  rposn_atoms.resize(rposn_offset);
+  rposn_kr_param_idx.resize(rposn_offset);
+  rposn_xyz_param_idx.resize(rposn_offset);
+  rbond_i_atoms.resize(rbond_offset);
+  rbond_j_atoms.resize(rbond_offset);
+  rbond_param_idx.resize(rbond_offset);
+  rangl_i_atoms.resize(rangl_offset);
+  rangl_j_atoms.resize(rangl_offset);
+  rangl_k_atoms.resize(rangl_offset);
+  rangl_param_idx.resize(rangl_offset);
+  rdihe_i_atoms.resize(rdihe_offset);
+  rdihe_j_atoms.resize(rdihe_offset);
+  rdihe_k_atoms.resize(rdihe_offset);
+  rdihe_l_atoms.resize(rdihe_offset);
+  rdihe_param_idx.resize(rdihe_offset);
+  for (int sysid = 0; sysid < system_count; sysid++) {
+    const RestraintApparatus* ra_ptr = restraint_networks[restraint_indices.readHost(sysid)];
+    if (ra_ptr == nullptr) {
+      continue;
+    }
+    const RestraintApparatusDpReader rar = ra_ptr->dpData();
+    const int synth_atom_base = atom_offsets.readHost(sysid);
+    const int synth_rposn_offset = posn_restraint_offsets.readHost(sysid);
+    const int synth_rbond_offset = bond_restraint_offsets.readHost(sysid);
+    const int synth_rangl_offset = angl_restraint_offsets.readHost(sysid);
+    const int synth_rdihe_offset = dihe_restraint_offsets.readHost(sysid);
+    for (int pos = 0; pos < rar.nposn; pos++) {
+      rposn_atoms.putHost(rar.rposn_atoms[pos] + synth_atom_base, synth_rposn_offset + pos);
+    }
+    for (int pos = 0; pos < rar.nbond; pos++) {
+      rbond_i_atoms.putHost(rar.rbond_i_atoms[pos] + synth_atom_base, synth_rbond_offset + pos);
+      rbond_j_atoms.putHost(rar.rbond_j_atoms[pos] + synth_atom_base, synth_rbond_offset + pos);
+    }
+    for (int pos = 0; pos < rar.nangl; pos++) {
+      rangl_i_atoms.putHost(rar.rangl_i_atoms[pos] + synth_atom_base, synth_rangl_offset + pos);
+      rangl_j_atoms.putHost(rar.rangl_j_atoms[pos] + synth_atom_base, synth_rangl_offset + pos);
+      rangl_k_atoms.putHost(rar.rangl_k_atoms[pos] + synth_atom_base, synth_rangl_offset + pos);
+    }
+    for (int pos = 0; pos < rar.ndihe; pos++) {
+      rdihe_i_atoms.putHost(rar.rdihe_i_atoms[pos] + synth_atom_base, synth_rdihe_offset + pos);
+      rdihe_j_atoms.putHost(rar.rdihe_j_atoms[pos] + synth_atom_base, synth_rdihe_offset + pos);
+      rdihe_k_atoms.putHost(rar.rdihe_k_atoms[pos] + synth_atom_base, synth_rdihe_offset + pos);
+      rdihe_l_atoms.putHost(rar.rdihe_l_atoms[pos] + synth_atom_base, synth_rdihe_offset + pos);
     }
   }
 }
