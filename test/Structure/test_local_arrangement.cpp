@@ -695,7 +695,7 @@ int main(int argc, char* argv[]) {
   check(dihedral_angle(20, 9, 10, 11, drug_cf), RelationalOperator::EQUAL,
         Approx(-1.6233704738).margin(small), "The dihedral made by four atoms in a drug molecule "
         "is not computed correctly.");
-
+  
   // Check the placement of virtual sites, frame type by frame type.  Scramble and recover the
   // virtual site locations, then place the entire system back in the primary unit cell and
   // check the geometries.

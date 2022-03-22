@@ -1166,6 +1166,10 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
     vst.frame_dim3[n_unique_frames]  = vst.frame_dim3[i];
     n_unique_frames++;
   }
+  vst.frame_types.resize(n_unique_frames);
+  vst.frame_dim1.resize(n_unique_frames);
+  vst.frame_dim2.resize(n_unique_frames);
+  vst.frame_dim3.resize(n_unique_frames);
   
   return vst;
 }

@@ -437,7 +437,8 @@ int AtomGraph::getVirtualSiteIndex(const int atom_index, const ExceptionResponse
 
 //-------------------------------------------------------------------------------------------------
 VirtualSiteKind AtomGraph::getVirtualSiteFrameType(const int index) const {
-  return static_cast<VirtualSiteKind>(virtual_site_frame_types.readHost(index));
+  const int vs_pidx = virtual_site_parameter_indices.readHost(index);
+  return static_cast<VirtualSiteKind>(virtual_site_frame_types.readHost(vs_pidx));
 }
 
 //-------------------------------------------------------------------------------------------------
