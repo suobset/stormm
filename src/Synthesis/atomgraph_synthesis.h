@@ -150,7 +150,15 @@ public:
   std::vector<std::string> getPBRadiiSet(int low_limit, int high_limit) const;
   std::string getPBRadiiSet(int index) const;
   /// \}
-  
+
+#ifdef OMNI_USE_HPC
+  /// \brief Upload the object
+  void upload();
+
+  /// \brief Download the object
+  void download();
+#endif
+
 private:
 
   // The first member variables pertain to totals across all systems: atoms, potential function
@@ -327,7 +335,8 @@ private:
   Hybrid<int> int_system_data;          
 
   // Maps of each system and its distinguishable parts.  From here onwards, the AtomGraphSynthesis
-  // keeps ARRAY-kind Hybrid Object member variables, with their own data.  As above, many of the
+  // keeps a combination of POINTER-kind and ARRAY-kind Hybrid Object member variables, whatever is
+  // most convenient for grouping and storing data as it is produced.  As above, many of the
   // names match what is in the AtomGraph object.  The arrays are laid out such that each system's
   // details occur in one contiguous stretch, padded by blank elements up to a multiple of the
   // HPC warp size.  Some of these arrays are indices themselves, but will still need a bounds
@@ -345,7 +354,7 @@ private:
   Hybrid<int> molecule_limits;            ///< Atomic indices marking the boundaries of molecules
                                           ///<   in the molecule_contents array
   Hybrid<int> atomic_numbers;             ///< Atomic numbers for atoms in all systems
-  Hybrid<uint> mobile_atoms;              ///< Atom mobility masks for each system
+  Hybrid<int> mobile_atoms;               ///< Atom mobility masks for each system
   Hybrid<int> molecule_membership;        ///< Distinct molecules, indexed from 0 for each system,
                                           ///<   indicating molecules to which each atom belongs
   Hybrid<int> molecule_contents;          ///< Indices of atoms making up each molecule, starting
@@ -360,16 +369,25 @@ private:
   Hybrid<char4> atom_names;               ///< Four letter names of all atoms, i.e. PDB names
   Hybrid<char4> atom_types;               ///< Four letter names of all atom types, i.e. CT
   Hybrid<char4> residue_names;            ///< Four letter names of all residues, i.e. PDB names
-
-  // CHARMM valence term details
+  Hybrid<int> chem_int_data;              ///< Chemistry-related integer data
+  Hybrid<double> chem_double_data;        ///< Chemistry-related double-precision data
+  Hybrid<float> chem_float_data;          ///< Chemistry-related single-precision data
+  Hybrid<char4> chem_char4_data;          ///< Chemistry-related char4 data
+  
+  // CHARMM and basic force field valence term details.  Each of these objects points into one of
+  // the data arrays at the bottom of the section.
   Hybrid<double> ubrd_stiffnesses;      ///< Stiffness constant of each Urey-Bradley stretch
   Hybrid<double> ubrd_equilibria;       ///< Equilibrium length of each Urey-Bradley stretch
   Hybrid<double> cimp_stiffnesses;      ///< CHARMM impropers are harmonic, too!
   Hybrid<double> cimp_phase_angles;     ///< The "equilibria" for CHARMM impropers
   Hybrid<int> cmap_surface_dimensions;  ///< Dimensions for every unique CMAP surface
   Hybrid<int> cmap_surface_bounds;      ///< Bounds array for every unique CMAP surface
+  Hybrid<int> cmap_patch_bounds;        ///< Bounds array for CMAP patches
   Hybrid<double> cmap_surfaces;         ///< Concatenated, column-major format matrices for
                                         ///<   every CMAP surface term
+  Hybrid<double> cmap_patches;          ///< Concatenated, column-major format matrices for each
+                                        ///<   CMAP aggregated patch representation.  See the
+                                        ///<   description in Topology/atomgraph.h.
   Hybrid<float> sp_ubrd_stiffnesses;    ///< Stiffness constant of each Urey-Bradley stretch,
                                         ///<   in single precision
   Hybrid<float> sp_ubrd_equilibria;     ///< Equilibrium length of each Urey-Bradley stretch,
@@ -378,6 +396,9 @@ private:
   Hybrid<float> sp_cimp_phase_angles;   ///< The "equilibria" for CHARMM impropers
   Hybrid<float> sp_cmap_surfaces;       ///< Concatenated, column-major format matrices for every
                                         ///<   CMAP surface term, in single precision
+  Hybrid<float> sp_cmap_patches;        ///< Concatenated, column-major format matrices for each
+                                        ///<   CMAP aggregated patch representation in single
+                                        ///<   precision (see description in Topology/atomgraph.h).
 
   // Basic force field valence term details
   Hybrid<double> bond_stiffnesses;      ///< Stiffness of each bond stretch, kcal/mol-A^2
@@ -394,36 +415,42 @@ private:
   Hybrid<float> sp_dihe_amplitudes;     ///< Amplitudes of torsion cosine terms (single precision)
   Hybrid<float> sp_dihe_periodicities;  ///< Periodicities of torsion terms (single precision)
   Hybrid<float> sp_dihe_phase_angles;   ///< Phase angles of torsion terms (single precision)
+  Hybrid<double> valparam_double_data;  ///< Valence parameter double-pecision data
+  Hybrid<float> valparam_float_data;    ///< Valence parameter single-pecision data
+  Hybrid<int> valparam_int_data;        ///< Valence parameter integer data (for CMAP sizes and
+                                        ///<   bounds)
   
   // Valence term indexing arrays, all of them indexing atoms in the synthesis list, updated from
   // the indexing in their original topologies and parameters in the condensed tables of the
-  // synthesis.
-  Hybrid<int> ubrd_i_atoms;    ///< Urey-Bradley I atoms
-  Hybrid<int> ubrd_k_atoms;    ///< Urey-Bradley K atoms
-  Hybrid<int> ubrd_param_idx;  ///< Urey-Bradley parameter indices
-  Hybrid<int> cimp_i_atoms;    ///< CHARMM improper I atoms
-  Hybrid<int> cimp_j_atoms;    ///< CHARMM improper J atoms
-  Hybrid<int> cimp_k_atoms;    ///< CHARMM improper K atoms (the center atom of the quartet)
-  Hybrid<int> cimp_l_atoms;    ///< CHARMM improper L atoms
-  Hybrid<int> cimp_param_idx;  ///< CHARMM improper parameter indices
-  Hybrid<int> cmap_i_atoms;    ///< Correction map I atoms
-  Hybrid<int> cmap_j_atoms;    ///< Correction map J atoms
-  Hybrid<int> cmap_k_atoms;    ///< Correction map K atoms
-  Hybrid<int> cmap_l_atoms;    ///< Correction map L atoms
-  Hybrid<int> cmap_m_atoms;    ///< Correction map M atoms
-  Hybrid<int> cmap_param_idx;  ///< CMAP surface indices
-  Hybrid<int> bond_i_atoms;    ///< Harmonic bond I atoms
-  Hybrid<int> bond_j_atoms;    ///< Harmonic bond J atoms
-  Hybrid<int> bond_param_idx;  ///< Bond parameter indices
-  Hybrid<int> angl_i_atoms;    ///< Harmonic angle I atoms
-  Hybrid<int> angl_j_atoms;    ///< Harmonic angle J atoms
-  Hybrid<int> angl_k_atoms;    ///< Harmonic angle K atoms
-  Hybrid<int> angl_param_idx;  ///< Bond angle parameter indices
-  Hybrid<int> dihe_i_atoms;    ///< Cosine-based dihedral (proper or improper) I atoms
-  Hybrid<int> dihe_j_atoms;    ///< Cosine-based dihedral (proper or improper) J atoms
-  Hybrid<int> dihe_k_atoms;    ///< Cosine-based dihedral (proper or improper) K atoms
-  Hybrid<int> dihe_l_atoms;    ///< Cosine-based dihedral (proper or improper) L atoms
-  Hybrid<int> dihe_param_idx;  ///< Cosine-based dihedral parameter indices
+  // synthesis.  All of the following arrays are POINTER-kind objects targeting valence_int_data.
+  Hybrid<int> ubrd_i_atoms;      ///< Urey-Bradley I atoms
+  Hybrid<int> ubrd_k_atoms;      ///< Urey-Bradley K atoms
+  Hybrid<int> ubrd_param_idx;    ///< Urey-Bradley parameter indices
+  Hybrid<int> cimp_i_atoms;      ///< CHARMM improper I atoms
+  Hybrid<int> cimp_j_atoms;      ///< CHARMM improper J atoms
+  Hybrid<int> cimp_k_atoms;      ///< CHARMM improper K atoms (the center atom of the quartet)
+  Hybrid<int> cimp_l_atoms;      ///< CHARMM improper L atoms
+  Hybrid<int> cimp_param_idx;    ///< CHARMM improper parameter indices
+  Hybrid<int> cmap_i_atoms;      ///< Correction map I atoms
+  Hybrid<int> cmap_j_atoms;      ///< Correction map J atoms
+  Hybrid<int> cmap_k_atoms;      ///< Correction map K atoms
+  Hybrid<int> cmap_l_atoms;      ///< Correction map L atoms
+  Hybrid<int> cmap_m_atoms;      ///< Correction map M atoms
+  Hybrid<int> cmap_param_idx;    ///< CMAP surface indices
+  Hybrid<int> bond_i_atoms;      ///< Harmonic bond I atoms
+  Hybrid<int> bond_j_atoms;      ///< Harmonic bond J atoms
+  Hybrid<int> bond_param_idx;    ///< Bond parameter indices
+  Hybrid<int> angl_i_atoms;      ///< Harmonic angle I atoms
+  Hybrid<int> angl_j_atoms;      ///< Harmonic angle J atoms
+  Hybrid<int> angl_k_atoms;      ///< Harmonic angle K atoms
+  Hybrid<int> angl_param_idx;    ///< Bond angle parameter indices
+  Hybrid<int> dihe_i_atoms;      ///< Cosine-based dihedral (proper or improper) I atoms
+  Hybrid<int> dihe_j_atoms;      ///< Cosine-based dihedral (proper or improper) J atoms
+  Hybrid<int> dihe_k_atoms;      ///< Cosine-based dihedral (proper or improper) K atoms
+  Hybrid<int> dihe_l_atoms;      ///< Cosine-based dihedral (proper or improper) L atoms
+  Hybrid<int> dihe_param_idx;    ///< Cosine-based dihedral parameter indices
+  Hybrid<int> valence_int_data;  ///< Array targeted by the preceding POINTER-kind hybrid objects
+                                 ///<   in this section
 
   // Non-bonded parameter indexing and van-der Waals tables
   Hybrid<int> charge_indices;                   ///< Atomic charge indices, 0 to
@@ -594,7 +621,9 @@ private:
                                      ///<   like this one.
 
   // Restraint indexing arrays, offering atom indices in the concatenated atom and restraint
-  // parameter arrays of the synthesis.
+  // parameter arrays of the synthesis.  The Hybrid objects in this section are POINTER-kind
+  // objects targeting the nmr_int_data array, much like the parameters in the preceding section
+  // target nmr_[type]_data.
   Hybrid<int> rposn_atoms;          ///< Atom indices involved in positional restraints
   Hybrid<int> rposn_kr_param_idx;   ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
                                     ///<   positional restraint
@@ -615,6 +644,7 @@ private:
   Hybrid<int> rdihe_l_atoms;        ///< Atom L indices involved in dihedral restraints
   Hybrid<int> rdihe_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
                                     ///<   four-point dihedral angle restraint
+  Hybrid<int> nmr_int_data;         ///< Array targeted by POINTER-kind objects in this section
   
   // Valence work units (VWUs): work units providing instruction sets for the GPU to operate on a
   // continuous, non-rearranged list of atoms and implement all valence terms.  Each VWU pertains
@@ -692,6 +722,9 @@ private:
   /// parameter sets in a single AtomGraphSynthesis.
   Hybrid<uint2> rdihe_instructions;
 
+  /// Collected array of all instructions
+  Hybrid<uint2> insr_uint2_data;
+  
   /// \brief Check the central lists of topologies and system indices to ensure that the requested
   ///        synthesis is sane.  Condense the list of topologies by weeding out duplicates.
   ///        Re-align the list of systems to work with the condensed list of topologies and return

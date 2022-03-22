@@ -294,8 +294,8 @@ struct CmapAccessories {
   std::vector<double> phi_derivatives;      ///< First derivatives along the CMAP's first axis
   std::vector<double> psi_derivatives;      ///< First derivatives along the CMAP's second axis
   std::vector<double> phi_psi_derivatives;  ///< Cross derivatives at all grid points
-  std::vector<int> patch_matrix_bounds;     ///< Bounds of each 16-element patch in the
-                                            ///<   patch_matrix_form array
+  std::vector<int> patch_matrix_bounds;     ///< Bounds of each map's 16-element patch series in
+                                            ///<   the patch_matrix_form array
   std::vector<double> patch_matrix_form;    ///< Interlaced, inflated array of CMAP surface values
                                             ///<   and derivatives
                                             ///< The rank 4, square coefficients matrix

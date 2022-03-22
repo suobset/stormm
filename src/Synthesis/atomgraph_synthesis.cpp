@@ -6,6 +6,7 @@
 #include "UnitTesting/approx.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Topology/atomgraph_refinement.h"
 #include "atomgraph_synthesis.h"
 
 namespace omni {
@@ -22,6 +23,8 @@ using math::sum;
 using parse::realToString;
 using restraints::RestraintStage;
 using topology::accepted_coulomb_constant;
+using topology::CmapAccessories;
+using topology::ComputeCmapDerivatives;
 using testing::Approx;
   
 //-------------------------------------------------------------------------------------------------
@@ -89,75 +92,86 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nb_exclusion_offsets{HybridKind::POINTER, "tpsyn_nbexcl_offset"},
     lennard_jones_abc_offsets{HybridKind::POINTER, "tpsyn_ljtable_offset"},
     int_system_data{HybridKind::ARRAY, "tpsyn_int_data"},
-    residue_limits{HybridKind::ARRAY, "tpsyn_res_lims"},
-    atom_struc_numbers{HybridKind::ARRAY, "tpsyn_atom_struc_nums"},
-    residue_numbers{HybridKind::ARRAY, "tpsyn_res_numbers"},
-    molecule_limits{HybridKind::ARRAY, "tpsyn_mol_limits"},
-    atomic_numbers{HybridKind::ARRAY, "tpsyn_znum"},
-    mobile_atoms{HybridKind::ARRAY, "tpsyn_belly"},
-    molecule_membership{HybridKind::ARRAY, "tpsyn_molnum"},
-    molecule_contents{HybridKind::ARRAY, "tpsyn_mol_contents"},
-    atomic_charges{HybridKind::ARRAY, "tpsyn_atomq"},
-    atomic_masses{HybridKind::ARRAY, "tpsyn_mass"},
-    inverse_atomic_masses{HybridKind::ARRAY, "tpsyn_invmass"},
-    sp_atomic_charges{HybridKind::ARRAY, "tpsyn_atomq_sp"},
-    sp_atomic_masses{HybridKind::ARRAY, "tpsyn_mass_sp"},
-    sp_inverse_atomic_masses{HybridKind::ARRAY, "tpsyn_invmass_sp"},
-    atom_names{HybridKind::ARRAY, "tpsyn_atom_names"},
-    atom_types{HybridKind::ARRAY, "tpsyn_atom_types"},
-    residue_names{HybridKind::ARRAY, "tpsyn_res_names"},
-    ubrd_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff"},
-    ubrd_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil"},
-    cimp_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff"},
-    cimp_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil"},
-    cmap_surface_dimensions{HybridKind::ARRAY, "tpsyn_cmap_dims"},
-    cmap_surface_bounds{HybridKind::ARRAY, "tpsyn_cmap_bounds"},
-    cmap_surfaces{HybridKind::ARRAY, "tpsyn_cmap_surf"},
-    sp_ubrd_stiffnesses{HybridKind::ARRAY, "tpsyn_ub_stiff_sp"},
-    sp_ubrd_equilibria{HybridKind::ARRAY, "tpsyn_ub_equil_sp"},
-    sp_cimp_stiffnesses{HybridKind::ARRAY, "tpsyn_cimp_stiff_sp"},
-    sp_cimp_phase_angles{HybridKind::ARRAY, "tpsyn_cimp_equil_sp"},
-    sp_cmap_surfaces{HybridKind::ARRAY, "tpsyn_cmap_surf_sp"},
-    bond_stiffnesses{HybridKind::ARRAY, "tpsyn_bondk"},
-    bond_equilibria{HybridKind::ARRAY, "tpsyn_bondl0"},
-    angl_stiffnesses{HybridKind::ARRAY, "tpsyn_anglk"},
-    angl_equilibria{HybridKind::ARRAY, "tpsyn_anglt0"},
-    dihe_amplitudes{HybridKind::ARRAY, "tpsyn_dihek"},
-    dihe_periodicities{HybridKind::ARRAY, "tpsyn_dihen"},
-    dihe_phase_angles{HybridKind::ARRAY, "tpsyn_dihepsi"},
-    sp_bond_stiffnesses{HybridKind::ARRAY, "tpsyn_bondk_sp"},
-    sp_bond_equilibria{HybridKind::ARRAY, "tpsyn_bondl0_sp"},
-    sp_angl_stiffnesses{HybridKind::ARRAY, "tpsyn_anglk_sp"},
-    sp_angl_equilibria{HybridKind::ARRAY, "tpsyn_anglt0_sp"},
-    sp_dihe_amplitudes{HybridKind::ARRAY, "tpsyn_dihek_sp"},
-    sp_dihe_periodicities{HybridKind::ARRAY, "tpsyn_dihen_sp"},
-    sp_dihe_phase_angles{HybridKind::ARRAY, "tpsyn_dihepsi_sp"},
-    ubrd_i_atoms{HybridKind::ARRAY, "tpsyn_ubrd_i"},
-    ubrd_k_atoms{HybridKind::ARRAY, "tpsyn_ubrd_k"},
-    ubrd_param_idx{HybridKind::ARRAY, "tpsyn_ubrd_idx"},
-    cimp_i_atoms{HybridKind::ARRAY, "tpsyn_cimp_i"},
-    cimp_j_atoms{HybridKind::ARRAY, "tpsyn_cimp_j"},
-    cimp_k_atoms{HybridKind::ARRAY, "tpsyn_cimp_k"},
-    cimp_l_atoms{HybridKind::ARRAY, "tpsyn_cimp_l"},
-    cimp_param_idx{HybridKind::ARRAY, "tpsyn_cimp_idx"},
-    cmap_i_atoms{HybridKind::ARRAY, "tpsyn_cmap_i"},
-    cmap_j_atoms{HybridKind::ARRAY, "tpsyn_cmap_j"},
-    cmap_k_atoms{HybridKind::ARRAY, "tpsyn_cmap_k"},
-    cmap_l_atoms{HybridKind::ARRAY, "tpsyn_cmap_l"},
-    cmap_m_atoms{HybridKind::ARRAY, "tpsyn_cmap_m"},
-    cmap_param_idx{HybridKind::ARRAY, "tpsyn_cmap_idx"},
-    bond_i_atoms{HybridKind::ARRAY, "tpsyn_bond_i"},
-    bond_j_atoms{HybridKind::ARRAY, "tpsyn_bond_j"},
-    bond_param_idx{HybridKind::ARRAY, "tpsyn_bond_idx"},
-    angl_i_atoms{HybridKind::ARRAY, "tpsyn_angl_i"},
-    angl_j_atoms{HybridKind::ARRAY, "tpsyn_angl_j"},
-    angl_k_atoms{HybridKind::ARRAY, "tpsyn_angl_k"},
-    angl_param_idx{HybridKind::ARRAY, "tpsyn_angl_idx"},
-    dihe_i_atoms{HybridKind::ARRAY, "tpsyn_dihe_i"},
-    dihe_j_atoms{HybridKind::ARRAY, "tpsyn_dihe_j"},
-    dihe_k_atoms{HybridKind::ARRAY, "tpsyn_dihe_k"},
-    dihe_l_atoms{HybridKind::ARRAY, "tpsyn_dihe_l"},
-    dihe_param_idx{HybridKind::ARRAY, "tpsyn_dihe_idx"},
+    residue_limits{HybridKind::POINTER, "tpsyn_res_lims"},
+    atom_struc_numbers{HybridKind::POINTER, "tpsyn_atom_struc_nums"},
+    residue_numbers{HybridKind::POINTER, "tpsyn_res_numbers"},
+    molecule_limits{HybridKind::POINTER, "tpsyn_mol_limits"},
+    atomic_numbers{HybridKind::POINTER, "tpsyn_znum"},
+    mobile_atoms{HybridKind::POINTER, "tpsyn_belly"},
+    molecule_membership{HybridKind::POINTER, "tpsyn_molnum"},
+    molecule_contents{HybridKind::POINTER, "tpsyn_mol_contents"},
+    atomic_charges{HybridKind::POINTER, "tpsyn_atomq"},
+    atomic_masses{HybridKind::POINTER, "tpsyn_mass"},
+    inverse_atomic_masses{HybridKind::POINTER, "tpsyn_invmass"},
+    sp_atomic_charges{HybridKind::POINTER, "tpsyn_atomq_sp"},
+    sp_atomic_masses{HybridKind::POINTER, "tpsyn_mass_sp"},
+    sp_inverse_atomic_masses{HybridKind::POINTER, "tpsyn_invmass_sp"},
+    atom_names{HybridKind::POINTER, "tpsyn_atom_names"},
+    atom_types{HybridKind::POINTER, "tpsyn_atom_types"},
+    residue_names{HybridKind::POINTER, "tpsyn_res_names"},
+    chem_int_data{HybridKind::ARRAY, "tpsyn_chem_ints"},
+    chem_double_data{HybridKind::ARRAY, "tpsyn_chem_doubles"},
+    chem_float_data{HybridKind::ARRAY, "tpsyn_chem_floats"},
+    chem_char4_data{HybridKind::ARRAY, "tpsyn_chem_char4s"},
+    ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff"},
+    ubrd_equilibria{HybridKind::POINTER, "tpsyn_ub_equil"},
+    cimp_stiffnesses{HybridKind::POINTER, "tpsyn_cimp_stiff"},
+    cimp_phase_angles{HybridKind::POINTER, "tpsyn_cimp_equil"},
+    cmap_surface_dimensions{HybridKind::POINTER, "tpsyn_cmap_dims"},
+    cmap_surface_bounds{HybridKind::POINTER, "tpsyn_cmap_bounds"},
+    cmap_patch_bounds{HybridKind::POINTER, "tpsyn_cmpatch_bounds"},
+    cmap_surfaces{HybridKind::POINTER, "tpsyn_cmap_surf"},
+    cmap_patches{HybridKind::POINTER, "tpsyn_cmap_patch"},
+    sp_ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff_sp"},
+    sp_ubrd_equilibria{HybridKind::POINTER, "tpsyn_ub_equil_sp"},
+    sp_cimp_stiffnesses{HybridKind::POINTER, "tpsyn_cimp_stiff_sp"},
+    sp_cimp_phase_angles{HybridKind::POINTER, "tpsyn_cimp_equil_sp"},
+    sp_cmap_surfaces{HybridKind::POINTER, "tpsyn_cmap_surf_sp"},
+    sp_cmap_patches{HybridKind::POINTER, "tpsyn_cmap_patch_sp"},
+    bond_stiffnesses{HybridKind::POINTER, "tpsyn_bondk"},
+    bond_equilibria{HybridKind::POINTER, "tpsyn_bondl0"},
+    angl_stiffnesses{HybridKind::POINTER, "tpsyn_anglk"},
+    angl_equilibria{HybridKind::POINTER, "tpsyn_anglt0"},
+    dihe_amplitudes{HybridKind::POINTER, "tpsyn_dihek"},
+    dihe_periodicities{HybridKind::POINTER, "tpsyn_dihen"},
+    dihe_phase_angles{HybridKind::POINTER, "tpsyn_dihepsi"},
+    sp_bond_stiffnesses{HybridKind::POINTER, "tpsyn_bondk_sp"},
+    sp_bond_equilibria{HybridKind::POINTER, "tpsyn_bondl0_sp"},
+    sp_angl_stiffnesses{HybridKind::POINTER, "tpsyn_anglk_sp"},
+    sp_angl_equilibria{HybridKind::POINTER, "tpsyn_anglt0_sp"},
+    sp_dihe_amplitudes{HybridKind::POINTER, "tpsyn_dihek_sp"},
+    sp_dihe_periodicities{HybridKind::POINTER, "tpsyn_dihen_sp"},
+    sp_dihe_phase_angles{HybridKind::POINTER, "tpsyn_dihepsi_sp"},
+    valparam_double_data{HybridKind::ARRAY, "tpsyn_vparm_dbl"},
+    valparam_float_data{HybridKind::ARRAY, "tpsyn_vparm_flt"},
+    valparam_int_data{HybridKind::ARRAY, "tpsyn_vparm_int"},
+    ubrd_i_atoms{HybridKind::POINTER, "tpsyn_ubrd_i"},
+    ubrd_k_atoms{HybridKind::POINTER, "tpsyn_ubrd_k"},
+    ubrd_param_idx{HybridKind::POINTER, "tpsyn_ubrd_idx"},
+    cimp_i_atoms{HybridKind::POINTER, "tpsyn_cimp_i"},
+    cimp_j_atoms{HybridKind::POINTER, "tpsyn_cimp_j"},
+    cimp_k_atoms{HybridKind::POINTER, "tpsyn_cimp_k"},
+    cimp_l_atoms{HybridKind::POINTER, "tpsyn_cimp_l"},
+    cimp_param_idx{HybridKind::POINTER, "tpsyn_cimp_idx"},
+    cmap_i_atoms{HybridKind::POINTER, "tpsyn_cmap_i"},
+    cmap_j_atoms{HybridKind::POINTER, "tpsyn_cmap_j"},
+    cmap_k_atoms{HybridKind::POINTER, "tpsyn_cmap_k"},
+    cmap_l_atoms{HybridKind::POINTER, "tpsyn_cmap_l"},
+    cmap_m_atoms{HybridKind::POINTER, "tpsyn_cmap_m"},
+    cmap_param_idx{HybridKind::POINTER, "tpsyn_cmap_idx"},
+    bond_i_atoms{HybridKind::POINTER, "tpsyn_bond_i"},
+    bond_j_atoms{HybridKind::POINTER, "tpsyn_bond_j"},
+    bond_param_idx{HybridKind::POINTER, "tpsyn_bond_idx"},
+    angl_i_atoms{HybridKind::POINTER, "tpsyn_angl_i"},
+    angl_j_atoms{HybridKind::POINTER, "tpsyn_angl_j"},
+    angl_k_atoms{HybridKind::POINTER, "tpsyn_angl_k"},
+    angl_param_idx{HybridKind::POINTER, "tpsyn_angl_idx"},
+    dihe_i_atoms{HybridKind::POINTER, "tpsyn_dihe_i"},
+    dihe_j_atoms{HybridKind::POINTER, "tpsyn_dihe_j"},
+    dihe_k_atoms{HybridKind::POINTER, "tpsyn_dihe_k"},
+    dihe_l_atoms{HybridKind::POINTER, "tpsyn_dihe_l"},
+    dihe_param_idx{HybridKind::POINTER, "tpsyn_dihe_idx"},
+    valence_int_data{HybridKind::ARRAY, "tpsyn_val_ints"},
     charge_indices{HybridKind::ARRAY, "tpsyn_q_idx"},
     lennard_jones_indices{HybridKind::ARRAY, "tpsyn_lj_idx"},
     lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab"},
@@ -219,31 +233,33 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nmr_float_data{HybridKind::ARRAY, "tpsyn_nmr_flt_data"},
     nmr_float2_data{HybridKind::ARRAY, "tpsyn_nmr_flt2_data"},
     nmr_float4_data{HybridKind::ARRAY, "tpsyn_nmr_flt4_data"},
-    rposn_atoms{HybridKind::ARRAY, "tpsyn_rposn_at"},
-    rposn_kr_param_idx{HybridKind::ARRAY, "tpsyn_rposn_kr_idx"},
-    rposn_xyz_param_idx{HybridKind::ARRAY, "tpsyn_rposn_xyz_idx"},
-    rbond_i_atoms{HybridKind::ARRAY, "tpsyn_rbond_iat"},
-    rbond_j_atoms{HybridKind::ARRAY, "tpsyn_rbond_jat"},
-    rbond_param_idx{HybridKind::ARRAY, "tpsyn_rbond_param"},
-    rangl_i_atoms{HybridKind::ARRAY, "tpsyn_rangl_iat"},
-    rangl_j_atoms{HybridKind::ARRAY, "tpsyn_rangl_jat"},
-    rangl_k_atoms{HybridKind::ARRAY, "tpsyn_rangl_kat"},
-    rangl_param_idx{HybridKind::ARRAY, "tpsyn_rangl_param"},
-    rdihe_i_atoms{HybridKind::ARRAY, "tpsyn_rdihe_iat"},
-    rdihe_j_atoms{HybridKind::ARRAY, "tpsyn_rdihe_jat"},
-    rdihe_k_atoms{HybridKind::ARRAY, "tpsyn_rdihe_kat"},
-    rdihe_l_atoms{HybridKind::ARRAY, "tpsyn_rdihe_lat"},
-    rdihe_param_idx{HybridKind::ARRAY, "tpsyn_rdihe_param"},
+    rposn_atoms{HybridKind::POINTER, "tpsyn_rposn_at"},
+    rposn_kr_param_idx{HybridKind::POINTER, "tpsyn_rposn_kr_idx"},
+    rposn_xyz_param_idx{HybridKind::POINTER, "tpsyn_rposn_xyz_idx"},
+    rbond_i_atoms{HybridKind::POINTER, "tpsyn_rbond_iat"},
+    rbond_j_atoms{HybridKind::POINTER, "tpsyn_rbond_jat"},
+    rbond_param_idx{HybridKind::POINTER, "tpsyn_rbond_param"},
+    rangl_i_atoms{HybridKind::POINTER, "tpsyn_rangl_iat"},
+    rangl_j_atoms{HybridKind::POINTER, "tpsyn_rangl_jat"},
+    rangl_k_atoms{HybridKind::POINTER, "tpsyn_rangl_kat"},
+    rangl_param_idx{HybridKind::POINTER, "tpsyn_rangl_param"},
+    rdihe_i_atoms{HybridKind::POINTER, "tpsyn_rdihe_iat"},
+    rdihe_j_atoms{HybridKind::POINTER, "tpsyn_rdihe_jat"},
+    rdihe_k_atoms{HybridKind::POINTER, "tpsyn_rdihe_kat"},
+    rdihe_l_atoms{HybridKind::POINTER, "tpsyn_rdihe_lat"},
+    rdihe_param_idx{HybridKind::POINTER, "tpsyn_rdihe_param"},
+    nmr_int_data{HybridKind::ARRAY, "tpsyn_nmr_ints"},
     atom_imports{HybridKind::ARRAY, "tpsyn_atom_imports"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
-    bond_instructions{HybridKind::ARRAY, "tpsyn_bond_insr"},
-    angl_instructions{HybridKind::ARRAY, "tpsyn_angl_insr"},
-    dihe_instructions{HybridKind::ARRAY, "tpsyn_dihe_insr"},
-    cmap_instructions{HybridKind::ARRAY, "tpsyn_cmap_insr"},
-    rposn_instructions{HybridKind::ARRAY, "tpsyn_nmr1_insr"},
-    rbond_instructions{HybridKind::ARRAY, "tpsyn_nmr2_insr"},
-    rangl_instructions{HybridKind::ARRAY, "tpsyn_nmr3_insr"},
-    rdihe_instructions{HybridKind::ARRAY, "tpsyn_nmr4_insr"}
+    bond_instructions{HybridKind::POINTER, "tpsyn_bond_insr"},
+    angl_instructions{HybridKind::POINTER, "tpsyn_angl_insr"},
+    dihe_instructions{HybridKind::POINTER, "tpsyn_dihe_insr"},
+    cmap_instructions{HybridKind::POINTER, "tpsyn_cmap_insr"},
+    rposn_instructions{HybridKind::POINTER, "tpsyn_nmr1_insr"},
+    rbond_instructions{HybridKind::POINTER, "tpsyn_nmr2_insr"},
+    rangl_instructions{HybridKind::POINTER, "tpsyn_nmr3_insr"},
+    rdihe_instructions{HybridKind::POINTER, "tpsyn_nmr4_insr"},
+    insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data"}
 {
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
@@ -733,23 +749,44 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate detailed arrays for each descriptor, then collate all topologies.  This
   // fills the "atom and residue details" arrays listed in atomgraph_synthesis.h.
-  residue_limits.resize(resi_offset);
-  atom_struc_numbers.resize(atom_offset);
-  residue_numbers.resize(resi_offset);
-  molecule_limits.resize(mole_offset);
-  atomic_numbers.resize(atom_offset);
-  mobile_atoms.resize(atom_offset);
-  molecule_membership.resize(atom_offset);
-  molecule_contents.resize(atom_offset);
-  atomic_charges.resize(atom_offset);
-  atomic_masses.resize(atom_offset);
-  inverse_atomic_masses.resize(atom_offset);
-  sp_atomic_charges.resize(atom_offset);
-  sp_atomic_masses.resize(atom_offset);
-  sp_inverse_atomic_masses.resize(atom_offset);
-  atom_names.resize(atom_offset);
-  atom_types.resize(atom_offset);
-  residue_names.resize(resi_offset);
+  chem_int_data.resize(resi_offset + mole_offset + (6 * atom_offset));
+  chem_double_data.resize(3 * atom_offset);
+  chem_float_data.resize(3 * atom_offset);
+  chem_char4_data.resize(resi_offset + (2 * atom_offset));
+  pivot = 0;
+  residue_limits.setPointer(&chem_int_data, pivot, resi_offset);
+  pivot += resi_offset;
+  atom_struc_numbers.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  residue_numbers.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  molecule_limits.setPointer(&chem_int_data, pivot, mole_offset);
+  pivot += mole_offset;
+  atomic_numbers.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  mobile_atoms.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  molecule_membership.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  molecule_contents.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot = 0;
+  atomic_charges.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  atomic_masses.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  inverse_atomic_masses.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot = 0;
+  sp_atomic_charges.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_atomic_masses.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_inverse_atomic_masses.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot = 0;
+  atom_names.setPointer(&chem_char4_data, pivot, atom_offset);
+  pivot += atom_offset;
+  atom_types.setPointer(&chem_char4_data, pivot, atom_offset);
+  pivot += atom_offset;
+  residue_names.setPointer(&chem_char4_data, pivot, resi_offset);
 
   // Fill the above atom and residue descriptor arrays
   int* residue_limits_ptr      = residue_limits.data();
@@ -780,6 +817,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     }
     for (int j = 0; j < cdk.natom; j++) {
       atom_struc_numbers_ptr[synth_atom_base + j] = cdk.atom_numbers[j];
+      residue_numbers_ptr[synth_residue_base + j] = cdk.res_numbers[j];
       atomic_numbers_ptr[synth_atom_base + j] = cdk.z_numbers[j];
       molecule_membership_ptr[synth_atom_base + j] = cdk.mol_home[j] + synth_molecule_base;
       molecule_contents_ptr[synth_atom_base + j] = cdk.mol_contents[j] + synth_atom_base;
@@ -791,7 +829,6 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       atom_names_ptr[synth_atom_base + j].w = cdk.atom_names[j].w;
     }
     for (int j = 0; j < cdk.nres; j++) {
-      residue_numbers_ptr[synth_residue_base + j] = cdk.res_numbers[j];
       residue_names_ptr[synth_residue_base + j].x = cdk.res_names[j].x;
       residue_names_ptr[synth_residue_base + j].y = cdk.res_names[j].y;
       residue_names_ptr[synth_residue_base + j].z = cdk.res_names[j].z;
@@ -800,9 +837,9 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     for (int j = 0; j < cdk.nmol + 1; j++) {
       molecule_limits_ptr[synth_molecule_base + j] = cdk.mol_limits[j] + synth_atom_base;
     }
-    const int uint_bits = sizeof(uint) * 8;
-    mobile_atoms.putHost(ag_ptr->getAtomMobilityMask(), synth_bit_base,
-                         (cdk.natom + uint_bits - 1) / uint_bits);
+    const std::vector<bool> atom_mobility = ag_ptr->getAtomMobility();
+    const std::vector<int> iatom_mobility(atom_mobility.begin(), atom_mobility.end());
+    mobile_atoms.putHost(iatom_mobility, synth_atom_base, cdk.natom);
     atomic_masses.putHost(ag_ptr->getAtomicMass<double>(MassForm::ORDINARY), synth_atom_base,
                           cdk.natom);
     inverse_atomic_masses.putHost(ag_ptr->getAtomicMass<double>(MassForm::INVERSE),
@@ -815,26 +852,60 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   }
 
   // Fill in the valence term atom indexing arrays.
-  ubrd_i_atoms.resize(ubrd_offset);
-  ubrd_k_atoms.resize(ubrd_offset);
-  cimp_i_atoms.resize(cimp_offset);
-  cimp_j_atoms.resize(cimp_offset);
-  cimp_k_atoms.resize(cimp_offset);
-  cimp_l_atoms.resize(cimp_offset);
-  cmap_i_atoms.resize(cmap_offset);
-  cmap_j_atoms.resize(cmap_offset);
-  cmap_k_atoms.resize(cmap_offset);
-  cmap_l_atoms.resize(cmap_offset);
-  cmap_m_atoms.resize(cmap_offset);
-  bond_i_atoms.resize(bond_offset);
-  bond_j_atoms.resize(bond_offset);
-  angl_i_atoms.resize(angl_offset);
-  angl_j_atoms.resize(angl_offset);
-  angl_k_atoms.resize(angl_offset);
-  dihe_i_atoms.resize(dihe_offset);
-  dihe_j_atoms.resize(dihe_offset);
-  dihe_k_atoms.resize(dihe_offset);
-  dihe_l_atoms.resize(dihe_offset);
+  valence_int_data.resize((3 * ubrd_offset) + (5 * cimp_offset) + (6 * cmap_offset) +
+                          (3 * bond_offset) + (4 * angl_offset) + (5 * dihe_offset));
+  pivot = 0;
+  ubrd_i_atoms.setPointer(&valence_int_data, pivot, ubrd_offset);
+  pivot += ubrd_offset;
+  ubrd_k_atoms.setPointer(&valence_int_data, pivot, ubrd_offset);
+  pivot += ubrd_offset;
+  ubrd_param_idx.setPointer(&valence_int_data, pivot, ubrd_offset);
+  pivot += ubrd_offset;
+  cimp_i_atoms.setPointer(&valence_int_data, pivot, cimp_offset);
+  pivot += cimp_offset;
+  cimp_j_atoms.setPointer(&valence_int_data, pivot, cimp_offset);
+  pivot += cimp_offset;
+  cimp_k_atoms.setPointer(&valence_int_data, pivot, cimp_offset);
+  pivot += cimp_offset;
+  cimp_l_atoms.setPointer(&valence_int_data, pivot, cimp_offset);
+  pivot += cimp_offset;
+  cimp_param_idx.setPointer(&valence_int_data, pivot, cimp_offset);
+  pivot += cimp_offset;
+  cmap_i_atoms.setPointer(&valence_int_data, pivot, cmap_offset);
+  pivot += cmap_offset;
+  cmap_j_atoms.setPointer(&valence_int_data, pivot, cmap_offset);
+  pivot += cmap_offset;
+  cmap_k_atoms.setPointer(&valence_int_data, pivot, cmap_offset);
+  pivot += cmap_offset;
+  cmap_l_atoms.setPointer(&valence_int_data, pivot, cmap_offset);
+  pivot += cmap_offset;
+  cmap_m_atoms.setPointer(&valence_int_data, pivot, cmap_offset);
+  pivot += cmap_offset;
+  cmap_param_idx.setPointer(&valence_int_data, pivot, cmap_offset);
+  pivot += cmap_offset;
+  bond_i_atoms.setPointer(&valence_int_data, pivot, bond_offset);
+  pivot += bond_offset;
+  bond_j_atoms.setPointer(&valence_int_data, pivot, bond_offset);
+  pivot += bond_offset;
+  bond_param_idx.setPointer(&valence_int_data, pivot, bond_offset);
+  pivot += bond_offset;
+  angl_i_atoms.setPointer(&valence_int_data, pivot, angl_offset);
+  pivot += angl_offset;
+  angl_j_atoms.setPointer(&valence_int_data, pivot, angl_offset);
+  pivot += angl_offset;
+  angl_k_atoms.setPointer(&valence_int_data, pivot, angl_offset);
+  pivot += angl_offset;
+  angl_param_idx.setPointer(&valence_int_data, pivot, angl_offset);
+  pivot += angl_offset;
+  dihe_i_atoms.setPointer(&valence_int_data, pivot, dihe_offset);
+  pivot += dihe_offset;
+  dihe_j_atoms.setPointer(&valence_int_data, pivot, dihe_offset);
+  pivot += dihe_offset;
+  dihe_k_atoms.setPointer(&valence_int_data, pivot, dihe_offset);
+  pivot += dihe_offset;
+  dihe_l_atoms.setPointer(&valence_int_data, pivot, dihe_offset);
+  pivot += dihe_offset;
+  dihe_param_idx.setPointer(&valence_int_data, pivot, dihe_offset);
   for (int sysid = 0; sysid < system_count; sysid++) {
     const AtomGraph* ag_ptr = topologies[topology_indices.readHost(sysid)];
     const ValenceKit<double> vk = ag_ptr->getDoublePrecisionValenceKit();
@@ -880,21 +951,38 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   }
 
   // Fill in the restraint term indexing arrays
-  rposn_atoms.resize(rposn_offset);
-  rposn_kr_param_idx.resize(rposn_offset);
-  rposn_xyz_param_idx.resize(rposn_offset);
-  rbond_i_atoms.resize(rbond_offset);
-  rbond_j_atoms.resize(rbond_offset);
-  rbond_param_idx.resize(rbond_offset);
-  rangl_i_atoms.resize(rangl_offset);
-  rangl_j_atoms.resize(rangl_offset);
-  rangl_k_atoms.resize(rangl_offset);
-  rangl_param_idx.resize(rangl_offset);
-  rdihe_i_atoms.resize(rdihe_offset);
-  rdihe_j_atoms.resize(rdihe_offset);
-  rdihe_k_atoms.resize(rdihe_offset);
-  rdihe_l_atoms.resize(rdihe_offset);
-  rdihe_param_idx.resize(rdihe_offset);
+  nmr_int_data.resize((3 * rposn_offset) + (3 * rbond_offset) + (4 * rangl_offset) +
+                      (5 * rdihe_offset));
+  pivot = 0;
+  rposn_atoms.setPointer(&nmr_int_data, pivot, rposn_offset);
+  pivot += rposn_offset;
+  rposn_kr_param_idx.setPointer(&nmr_int_data, pivot, rposn_offset);
+  pivot += rposn_offset;
+  rposn_xyz_param_idx.setPointer(&nmr_int_data, pivot, rposn_offset);
+  pivot += rposn_offset;
+  rbond_i_atoms.setPointer(&nmr_int_data, pivot, rbond_offset);
+  pivot += rbond_offset;
+  rbond_j_atoms.setPointer(&nmr_int_data, pivot, rbond_offset);
+  pivot += rbond_offset;
+  rbond_param_idx.setPointer(&nmr_int_data, pivot, rbond_offset);
+  pivot += rbond_offset;
+  rangl_i_atoms.setPointer(&nmr_int_data, pivot, rangl_offset);
+  pivot += rangl_offset;
+  rangl_j_atoms.setPointer(&nmr_int_data, pivot, rangl_offset);
+  pivot += rangl_offset;
+  rangl_k_atoms.setPointer(&nmr_int_data, pivot, rangl_offset);
+  pivot += rangl_offset;
+  rangl_param_idx.setPointer(&nmr_int_data, pivot, rangl_offset);
+  pivot += rangl_offset;
+  rdihe_i_atoms.setPointer(&nmr_int_data, pivot, rdihe_offset);
+  pivot += rdihe_offset;
+  rdihe_j_atoms.setPointer(&nmr_int_data, pivot, rdihe_offset);
+  pivot += rdihe_offset;
+  rdihe_k_atoms.setPointer(&nmr_int_data, pivot, rdihe_offset);
+  pivot += rdihe_offset;
+  rdihe_l_atoms.setPointer(&nmr_int_data, pivot, rdihe_offset);
+  pivot += rdihe_offset;
+  rdihe_param_idx.setPointer(&nmr_int_data, pivot, rdihe_offset);
   for (int sysid = 0; sysid < system_count; sysid++) {
     const RestraintApparatus* ra_ptr = restraint_networks[restraint_indices.readHost(sysid)];
     if (ra_ptr == nullptr) {
@@ -1088,7 +1176,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       n_unique_angl++;
     }
 
-    // Seek out unique angle parameters
+    // Seek out unique dihedral parameters
     for (int j = 0; j < i_vk.ndihe_param; j++) {
       if (dihe_synthesis_index[topology_dihe_table_offsets[i] + j] >= 0) {
         continue;
@@ -1239,6 +1327,11 @@ void AtomGraphSynthesis::condenseParameterTables() {
     }
   }
 
+  // Post-process the condensed array of CMAP surfaces into patches
+  const CmapAccessories cmap_digest = ComputeCmapDerivatives(n_unique_cmap, filtered_cmap_dim,
+                                                             filtered_cmap_surf_bounds,
+                                                             filtered_cmap_surf);
+  
   // Record synthesis parameters found thus far.  Pad the relevant ARRAY-kind Hybrid objects in
   // case some developer tries to have all lanes of a warp access an element.
   total_bond_params   = n_unique_bond;
@@ -1248,58 +1341,57 @@ void AtomGraphSynthesis::condenseParameterTables() {
   total_cimp_params   = n_unique_cimp;
   total_cmap_surfaces = n_unique_cmap;
   total_charge_types  = n_unique_chrg;
-  bond_stiffnesses.resize(roundUp(total_bond_params, warp_size_int));
-  bond_equilibria.resize(roundUp(total_bond_params, warp_size_int));
-  angl_stiffnesses.resize(roundUp(total_angl_params, warp_size_int));
-  angl_equilibria.resize(roundUp(total_angl_params, warp_size_int));
-  dihe_amplitudes.resize(roundUp(total_dihe_params, warp_size_int));
-  dihe_periodicities.resize(roundUp(total_dihe_params, warp_size_int));
-  dihe_phase_angles.resize(roundUp(total_dihe_params, warp_size_int));
-  sp_bond_stiffnesses.resize(roundUp(total_bond_params, warp_size_int));
-  sp_bond_equilibria.resize(roundUp(total_bond_params, warp_size_int));
-  sp_angl_stiffnesses.resize(roundUp(total_angl_params, warp_size_int));
-  sp_angl_equilibria.resize(roundUp(total_angl_params, warp_size_int));
-  sp_dihe_amplitudes.resize(roundUp(total_dihe_params, warp_size_int));
-  sp_dihe_periodicities.resize(roundUp(total_dihe_params, warp_size_int));
-  sp_dihe_phase_angles.resize(roundUp(total_dihe_params, warp_size_int));
-  ubrd_stiffnesses.resize(roundUp(total_ubrd_params, warp_size_int));
-  ubrd_equilibria.resize(roundUp(total_ubrd_params, warp_size_int));
-  cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
-  cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
-  cmap_surface_dimensions.resize(roundUp(total_cmap_surfaces, warp_size_int));
-  cmap_surface_bounds.resize(roundUp(total_cmap_surfaces + 1, warp_size_int));
-  cmap_surfaces.resize(roundUp(filtered_cmap_surf.size(), warp_size_zu));
-  sp_ubrd_stiffnesses.resize(roundUp(total_ubrd_params, warp_size_int));
-  sp_ubrd_equilibria.resize(roundUp(total_ubrd_params, warp_size_int));
-  sp_cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
-  sp_cimp_stiffnesses.resize(roundUp(total_cimp_params, warp_size_int));
-  sp_cmap_surfaces.resize(roundUp(sp_filtered_cmap_surf.size(), warp_size_zu));
-  bond_stiffnesses.putHost(filtered_bond_keq);
-  bond_equilibria.putHost(filtered_bond_leq);
-  angl_stiffnesses.putHost(filtered_angl_keq);
-  angl_equilibria.putHost(filtered_angl_theta);
-  dihe_amplitudes.putHost(filtered_dihe_amp);
-  dihe_periodicities.putHost(filtered_dihe_freq);
-  dihe_phase_angles.putHost(filtered_dihe_phi);
-  sp_bond_stiffnesses.putHost(sp_filtered_bond_keq);
-  sp_bond_equilibria.putHost(sp_filtered_bond_leq);
-  sp_angl_stiffnesses.putHost(sp_filtered_angl_keq);
-  sp_angl_equilibria.putHost(sp_filtered_angl_theta);
-  sp_dihe_amplitudes.putHost(sp_filtered_dihe_amp);
-  sp_dihe_periodicities.putHost(sp_filtered_dihe_freq);
-  sp_dihe_phase_angles.putHost(sp_filtered_dihe_phi);
-  ubrd_stiffnesses.putHost(filtered_ubrd_keq);
-  ubrd_equilibria.putHost(filtered_ubrd_leq);
-  cimp_stiffnesses.putHost(filtered_cimp_keq);
-  cimp_phase_angles.putHost(filtered_cimp_phi);
-  cmap_surface_dimensions.putHost(filtered_cmap_dim);
-  cmap_surface_bounds.putHost(filtered_cmap_surf_bounds);
-  cmap_surfaces.putHost(filtered_cmap_surf);
-  sp_ubrd_stiffnesses.putHost(sp_filtered_ubrd_keq);
-  sp_ubrd_equilibria.putHost(sp_filtered_ubrd_leq);
-  sp_cimp_stiffnesses.putHost(sp_filtered_cimp_keq);
-  sp_cimp_phase_angles.putHost(sp_filtered_cimp_phi);
-  sp_cmap_surfaces.putHost(sp_filtered_cmap_surf);
+  const int rn_space = (2 * roundUp(total_bond_params, warp_size_int)) +
+                       (2 * roundUp(total_angl_params, warp_size_int)) +
+                       (3 * roundUp(total_dihe_params, warp_size_int)) +
+                       (2 * roundUp(total_ubrd_params, warp_size_int)) +
+                       (2 * roundUp(total_cimp_params, warp_size_int)) +
+                       roundUp(static_cast<int>(filtered_cmap_surf.size()), warp_size_int) +
+                       roundUp(static_cast<int>(cmap_digest.patch_matrix_form.size()),
+                               warp_size_int);
+  valparam_double_data.resize(rn_space);
+  valparam_float_data.resize(rn_space);
+  valparam_int_data.resize(roundUp(total_cmap_surfaces, warp_size_int) +
+                           (2 * roundUp(total_cmap_surfaces + 1, warp_size_int)));
+  size_t ic = 0LLU;
+  ic = bond_stiffnesses.putHost(&valparam_double_data, filtered_bond_keq, ic, warp_size_zu);
+  ic = bond_equilibria.putHost(&valparam_double_data, filtered_bond_leq, ic, warp_size_zu);
+  ic = angl_stiffnesses.putHost(&valparam_double_data, filtered_angl_keq, ic, warp_size_zu);
+  ic = angl_equilibria.putHost(&valparam_double_data, filtered_angl_theta, ic, warp_size_zu);
+  ic = dihe_amplitudes.putHost(&valparam_double_data, filtered_dihe_amp, ic, warp_size_zu);
+  ic = dihe_periodicities.putHost(&valparam_double_data, filtered_dihe_freq, ic, warp_size_zu);
+  ic = dihe_phase_angles.putHost(&valparam_double_data, filtered_dihe_phi, ic, warp_size_zu);
+  ic = ubrd_stiffnesses.putHost(&valparam_double_data, filtered_ubrd_keq, ic, warp_size_zu);
+  ic = ubrd_equilibria.putHost(&valparam_double_data, filtered_ubrd_leq, ic, warp_size_zu);
+  ic = cimp_stiffnesses.putHost(&valparam_double_data, filtered_cimp_keq, ic, warp_size_zu);
+  ic = cimp_phase_angles.putHost(&valparam_double_data, filtered_cimp_phi, ic, warp_size_zu);
+  ic = cmap_surfaces.putHost(&valparam_double_data, filtered_cmap_surf, ic, warp_size_zu);
+  ic = cmap_patches.putHost(&valparam_double_data, cmap_digest.patch_matrix_form, ic,
+                            warp_size_zu);
+  ic = 0LLU;
+  ic = sp_bond_stiffnesses.putHost(&valparam_float_data, sp_filtered_bond_keq, ic, warp_size_zu);
+  ic = sp_bond_equilibria.putHost(&valparam_float_data, sp_filtered_bond_leq, ic, warp_size_zu);
+  ic = sp_angl_stiffnesses.putHost(&valparam_float_data, sp_filtered_angl_keq, ic, warp_size_zu);
+  ic = sp_angl_equilibria.putHost(&valparam_float_data, sp_filtered_angl_theta, ic, warp_size_zu);
+  ic = sp_dihe_amplitudes.putHost(&valparam_float_data, sp_filtered_dihe_amp, ic, warp_size_zu);
+  ic = sp_dihe_periodicities.putHost(&valparam_float_data, sp_filtered_dihe_freq, ic,
+                                     warp_size_zu);
+  ic = sp_dihe_phase_angles.putHost(&valparam_float_data, sp_filtered_dihe_phi, ic, warp_size_zu);
+  ic = sp_ubrd_stiffnesses.putHost(&valparam_float_data, sp_filtered_ubrd_keq, ic, warp_size_zu);
+  ic = sp_ubrd_equilibria.putHost(&valparam_float_data, sp_filtered_ubrd_leq, ic, warp_size_zu);
+  ic = sp_cimp_stiffnesses.putHost(&valparam_float_data, sp_filtered_cimp_keq, ic, warp_size_zu);
+  ic = sp_cimp_phase_angles.putHost(&valparam_float_data, sp_filtered_cimp_phi, ic, warp_size_zu);
+  ic = sp_cmap_surfaces.putHost(&valparam_float_data, sp_filtered_cmap_surf, ic, warp_size_zu);
+  ic = sp_cmap_patches.putHost(&valparam_float_data,
+                               std::vector<float>(cmap_digest.patch_matrix_form.begin(),
+                                                  cmap_digest.patch_matrix_form.end()), ic,
+                               warp_size_zu);
+  ic = 0LLU;
+  ic = cmap_surface_dimensions.putHost(&valparam_int_data, filtered_cmap_dim, ic, warp_size_zu);
+  ic = cmap_surface_bounds.putHost(&valparam_int_data, filtered_cmap_surf_bounds, ic,
+                                   warp_size_zu);
+  ic = cmap_patch_bounds.putHost(&valparam_int_data, cmap_digest.patch_matrix_bounds, ic,
+                                 warp_size_zu);
 
   // Lay out the tables for valence and charge parameter indexing within the synthesis
   const int scm1 = system_count - 1;
@@ -1698,14 +1790,14 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
                                                           &filtered_rbond_finl_keq,
                                                           &filtered_rbond_init_r,
                                                           &filtered_rbond_finl_r);
-  const int n_unique_angl    =  mapUniqueRestraintKRSeries(1, network_rangl_table_offsets,
+  const int n_unique_angl    = mapUniqueRestraintKRSeries(1, network_rangl_table_offsets,
                                                           &rangl_synthesis_index,
                                                           &filtered_rangl_step_bounds,
                                                           &filtered_rangl_init_keq,
                                                           &filtered_rangl_finl_keq,
                                                           &filtered_rangl_init_r,
                                                           &filtered_rangl_finl_r);
-  const int n_unique_dihe    =  mapUniqueRestraintKRSeries(1, network_rdihe_table_offsets,
+  const int n_unique_dihe    = mapUniqueRestraintKRSeries(1, network_rdihe_table_offsets,
                                                           &rdihe_synthesis_index,
                                                           &filtered_rdihe_step_bounds,
                                                           &filtered_rdihe_init_keq,
@@ -1827,7 +1919,10 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = rdihe_init_r.putHost(&nmr_double4_data, filtered_rdihe_init_r, ic, warp_size_zu);
   ic = rdihe_final_r.putHost(&nmr_double4_data, filtered_rdihe_finl_r, ic, warp_size_zu);
 
-  // Create temporary arrays for floating-point data
+  // Create temporary arrays for floating-point data.  This is done more in line with what happens
+  // in an AtomGraph, with each POINTER-kind Hybrid object targeting a handful of larger arrays.
+  // The likelihood that most simulations will have few to no restraints makes it advantageous to
+  // condense these arrays as much as possible.
   const std::vector<float> spfil_rposn_init_z(filtered_rposn_init_z.begin(),
                                               filtered_rposn_init_z.end());
   const std::vector<float> spfil_rposn_finl_z(filtered_rposn_finl_z.begin(),
@@ -1873,6 +1968,8 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = sp_rangl_final_r.putHost(&nmr_float4_data, spfil_rangl_finl_r, ic, warp_size_zu);
   ic = sp_rdihe_init_r.putHost(&nmr_float4_data, spfil_rdihe_init_r, ic, warp_size_zu);
   ic = sp_rdihe_final_r.putHost(&nmr_float4_data, spfil_rdihe_finl_r, ic, warp_size_zu);
+
+  // L
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2019,6 +2116,76 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
   }
   return pb_radii_sets[index];
 }
-  
+
+#ifdef OMNI_USE_HPC
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::upload() {
+  int_system_data.upload();
+  chem_int_data.upload();
+  chem_double_data.upload();
+  chem_float_data.upload();
+  chem_char4_data.upload();
+  valparam_double_data.upload();
+  valparam_float_data.upload();
+  valparam_int_data.upload();
+  valence_int_data.upload();
+  charge_indices.upload();
+  lennard_jones_indices.upload();
+  lennard_jones_ab_coeff.upload();
+  lennard_jones_c_coeff.upload();
+  lennard_jones_14_ab_coeff.upload();
+  lennard_jones_14_c_coeff.upload();
+  sp_lennard_jones_ab_coeff.upload();
+  sp_lennard_jones_c_coeff.upload();
+  sp_lennard_jones_14_ab_coeff.upload();
+  sp_lennard_jones_14_c_coeff.upload();
+  nmr_int2_data.upload();
+  nmr_double_data.upload();
+  nmr_double2_data.upload();
+  nmr_double4_data.upload();
+  nmr_float_data.upload();
+  nmr_float2_data.upload();
+  nmr_float4_data.upload();
+  nmr_int_data.upload();
+  atom_imports.upload();
+  vwu_instruction_sets.upload();
+  insr_uint2_data.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::download() {
+  int_system_data.download();
+  chem_int_data.download();
+  chem_double_data.download();
+  chem_float_data.download();
+  chem_char4_data.download();
+  valparam_double_data.download();
+  valparam_float_data.download();
+  valparam_int_data.download();
+  valence_int_data.download();
+  charge_indices.download();
+  lennard_jones_indices.download();
+  lennard_jones_ab_coeff.download();
+  lennard_jones_c_coeff.download();
+  lennard_jones_14_ab_coeff.download();
+  lennard_jones_14_c_coeff.download();
+  sp_lennard_jones_ab_coeff.download();
+  sp_lennard_jones_c_coeff.download();
+  sp_lennard_jones_14_ab_coeff.download();
+  sp_lennard_jones_14_c_coeff.download();
+  nmr_int2_data.download();
+  nmr_double_data.download();
+  nmr_double2_data.download();
+  nmr_double4_data.download();
+  nmr_float_data.download();
+  nmr_float2_data.download();
+  nmr_float4_data.download();
+  nmr_int_data.download();
+  atom_imports.download();
+  vwu_instruction_sets.download();
+  insr_uint2_data.download();
+}
+#endif
+
 } // namespace synthesis
 } // namespace omni
