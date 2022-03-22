@@ -17,18 +17,18 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
                        const VirtualSiteKit<double> &vsk) {
   for (int i = 0; i < vsk.nsite; i++) {
     const int vsite_atom  = vsk.vs_atoms[i];
-    const int param_idx = vsk.vs_param_idx[i];
     const int parent_atom = vsk.frame1_idx[i];
     const int frame2_atom = vsk.frame2_idx[i];
+    const int param_idx = vsk.vs_param_idx[i];
     const ImagingMethod minimum_image = ImagingMethod::MINIMUM_IMAGE;
-    switch (static_cast<VirtualSiteKind>(vsk.vs_types[i])) {
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[param_idx])) {
     case VirtualSiteKind::FLEX_2:
       {
         double dx = xcrd[frame2_atom] - xcrd[parent_atom];
         double dy = ycrd[frame2_atom] - ycrd[parent_atom];
         double dz = zcrd[frame2_atom] - zcrd[parent_atom];
         imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, minimum_image);
-        const double p_f2_factor = vsk.dim1[i];
+        const double p_f2_factor = vsk.dim1[param_idx];
         xcrd[vsite_atom] = xcrd[parent_atom] + (p_f2_factor * dx);
         ycrd[vsite_atom] = ycrd[parent_atom] + (p_f2_factor * dy);
         zcrd[vsite_atom] = zcrd[parent_atom] + (p_f2_factor * dz);
@@ -41,7 +41,7 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         double dz = zcrd[frame2_atom] - zcrd[parent_atom];
         imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, minimum_image);
         const double invr = 1.0 / sqrt((dx * dx) + (dy * dy) + (dz * dz));
-        const double p_vs_distance = vsk.dim1[i];
+        const double p_vs_distance = vsk.dim1[param_idx];
         xcrd[vsite_atom] = xcrd[parent_atom] + (p_vs_distance * dx * invr);
         ycrd[vsite_atom] = ycrd[parent_atom] + (p_vs_distance * dy * invr);
         zcrd[vsite_atom] = zcrd[parent_atom] + (p_vs_distance * dz * invr);
@@ -58,8 +58,8 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         double dz3 = zcrd[frame3_atom] - zcrd[parent_atom];
         imageCoordinates(&dx2, &dy2, &dz2, umat, invu, unit_cell, minimum_image);
         imageCoordinates(&dx3, &dy3, &dz3, umat, invu, unit_cell, minimum_image);
-        const double p_f2_factor = vsk.dim1[i];
-        const double p_f3_factor = vsk.dim2[i];
+        const double p_f2_factor = vsk.dim1[param_idx];
+        const double p_f3_factor = vsk.dim2[param_idx];
         xcrd[vsite_atom] = xcrd[parent_atom] + (p_f2_factor * dx2) + (p_f3_factor * dx3);
         ycrd[vsite_atom] = ycrd[parent_atom] + (p_f2_factor * dy2) + (p_f3_factor * dy3);
         zcrd[vsite_atom] = zcrd[parent_atom] + (p_f2_factor * dz2) + (p_f3_factor * dz3);
@@ -72,7 +72,7 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         double dy23 = ycrd[frame3_atom] - ycrd[frame2_atom];
         double dz23 = zcrd[frame3_atom] - zcrd[frame2_atom];
         imageCoordinates(&dx23, &dy23, &dz23, umat, invu, unit_cell, minimum_image);
-        const double f2_f3_factor  = vsk.dim2[i];
+        const double f2_f3_factor  = vsk.dim2[param_idx];
         const double x_midpoint = xcrd[frame2_atom] + (f2_f3_factor * dx23);
         const double y_midpoint = ycrd[frame2_atom] + (f2_f3_factor * dy23);
         const double z_midpoint = zcrd[frame2_atom] + (f2_f3_factor * dz23);
@@ -81,7 +81,7 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         double dzm = z_midpoint - zcrd[parent_atom];
         imageCoordinates(&dxm, &dym, &dzm, umat, invu, unit_cell, minimum_image);
         const double invr = 1.0 / sqrt((dxm * dxm) + (dym * dym) + (dzm * dzm));
-        const double p_vs_distance = vsk.dim1[i];
+        const double p_vs_distance = vsk.dim1[param_idx];
         xcrd[vsite_atom] = xcrd[parent_atom] + (p_vs_distance * dxm * invr);
         ycrd[vsite_atom] = ycrd[parent_atom] + (p_vs_distance * dym * invr);
         zcrd[vsite_atom] = zcrd[parent_atom] + (p_vs_distance * dzm * invr);
@@ -119,8 +119,8 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         const double invr_t = 1.0 / sqrt((f23_t_pf2[0] * f23_t_pf2[0]) +
                                          (f23_t_pf2[1] * f23_t_pf2[1]) +
                                          (f23_t_pf2[2] * f23_t_pf2[2]));
-        const double p_f2_factor = vsk.dim1[i] * cos(vsk.dim2[i]) * invr_p_f2;
-        const double t_factor    = vsk.dim1[i] * sin(vsk.dim2[i]) * invr_t;
+        const double p_f2_factor = vsk.dim1[param_idx] * cos(vsk.dim2[param_idx]) * invr_p_f2;
+        const double t_factor    = vsk.dim1[param_idx] * sin(vsk.dim2[param_idx]) * invr_t;
         xcrd[vsite_atom] = xcrd[parent_atom] + (p_f2_factor * p_f2[0]) + (t_factor * f23_t_pf2[0]);
         ycrd[vsite_atom] = ycrd[parent_atom] + (p_f2_factor * p_f2[1]) + (t_factor * f23_t_pf2[1]);
         zcrd[vsite_atom] = zcrd[parent_atom] + (p_f2_factor * p_f2[2]) + (t_factor * f23_t_pf2[2]);
@@ -139,9 +139,9 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         imageCoordinates(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell, minimum_image);
         imageCoordinates(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell, minimum_image);
         crossProduct(p_f2, p_f3, pf2_x_pf3);
-        const double pf2_factor = vsk.dim1[i];
-        const double pf3_factor = vsk.dim2[i];
-        const double cr_factor = vsk.dim3[i];
+        const double pf2_factor = vsk.dim1[param_idx];
+        const double pf3_factor = vsk.dim2[param_idx];
+        const double cr_factor  = vsk.dim3[param_idx];
         xcrd[vsite_atom] = xcrd[parent_atom] + (pf2_factor * p_f2[0]) + (pf3_factor * p_f3[0]) +
                            (cr_factor * pf2_x_pf3[0]);
         ycrd[vsite_atom] = ycrd[parent_atom] + (pf2_factor * p_f2[1]) + (pf3_factor * p_f3[1]) +
@@ -167,8 +167,8 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         imageCoordinates(&p_f2[0], &p_f2[1], &p_f2[2], umat, invu, unit_cell, minimum_image);
         imageCoordinates(&p_f3[0], &p_f3[1], &p_f3[2], umat, invu, unit_cell, minimum_image);
         imageCoordinates(&p_f4[0], &p_f4[1], &p_f4[2], umat, invu, unit_cell, minimum_image);
-        const double pf3_factor = vsk.dim1[i];
-        const double pf4_factor = vsk.dim2[i];
+        const double pf3_factor = vsk.dim1[param_idx];
+        const double pf4_factor = vsk.dim2[param_idx];
         pf3_m_pf2[0] = (pf3_factor * p_f3[0]) - p_f2[0];
         pf3_m_pf2[1] = (pf3_factor * p_f3[1]) - p_f2[1];
         pf3_m_pf2[2] = (pf3_factor * p_f3[2]) - p_f2[2];
@@ -176,8 +176,9 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
         pf4_m_pf2[1] = (pf4_factor * p_f4[1]) - p_f2[1];
         pf4_m_pf2[2] = (pf4_factor * p_f4[2]) - p_f2[2];
         crossProduct(pf3_m_pf2, pf4_m_pf2, p_vs);
-        const double pvs_factor = vsk.dim3[i] / sqrt((p_vs[0] * p_vs[0]) + (p_vs[1] * p_vs[1]) +
-                                                     (p_vs[2] * p_vs[2]));
+        const double pvs_factor = vsk.dim3[param_idx] /
+                                  sqrt((p_vs[0] * p_vs[0]) + (p_vs[1] * p_vs[1]) +
+                                       (p_vs[2] * p_vs[2]));
         xcrd[vsite_atom] = xcrd[parent_atom] + (pvs_factor * p_vs[0]);
         ycrd[vsite_atom] = ycrd[parent_atom] + (pvs_factor * p_vs[1]);
         zcrd[vsite_atom] = zcrd[parent_atom] + (pvs_factor * p_vs[2]);
@@ -234,15 +235,16 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
     const int vsite_atom = vsk.vs_atoms[i];
     const int parent_atom  = vsk.frame1_idx[i];
     const int frame2_atom  = vsk.frame2_idx[i];
+    const int pidx = vsk.vs_param_idx[i];
     const ImagingMethod minimum_image = ImagingMethod::MINIMUM_IMAGE;
 
     // Copy the force on the virtual site into its own vector.  This will be needed in all
     // subsequent force transmissions.
     const double vs_frc[3] = { psw.xfrc[vsite_atom], psw.yfrc[vsite_atom], psw.zfrc[vsite_atom] };
-    switch (static_cast<VirtualSiteKind>(vsk.vs_types[i])) {
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[pidx])) {
     case VirtualSiteKind::FLEX_2:
       {
-        const double p_f2_factor = vsk.dim1[i];
+        const double p_f2_factor = vsk.dim1[pidx];
         psw.xfrc[parent_atom] += (1.0 - p_f2_factor) * psw.xfrc[vsite_atom];
         psw.yfrc[parent_atom] += (1.0 - p_f2_factor) * psw.yfrc[vsite_atom];
         psw.zfrc[parent_atom] += (1.0 - p_f2_factor) * psw.zfrc[vsite_atom];
@@ -272,7 +274,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
         // according to the distance between the parent atom and the virtual site (normalized by
         // the distance between the two frame atoms).
         project(vs_frc, p_vs, vs_frc_proj, 3);
-        const double p_vs_distance = vsk.dim1[i];
+        const double p_vs_distance = vsk.dim1[pidx];
         for (int j = 0; j < 3; j++) {
           force_partition[j] = invr_p_f2 * p_vs_distance * (vs_frc[j] - vs_frc_proj[j]);
         }
@@ -287,8 +289,8 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
     case VirtualSiteKind::FLEX_3:
       {
         const int frame3_atom  = vsk.frame3_idx[i];
-        const double p_f2_factor = vsk.dim1[i];
-        const double p_f3_factor = vsk.dim2[i];
+        const double p_f2_factor = vsk.dim1[pidx];
+        const double p_f3_factor = vsk.dim2[pidx];
         psw.xfrc[parent_atom] += (1.0 - p_f2_factor - p_f3_factor) * vs_frc[0];
         psw.yfrc[parent_atom] += (1.0 - p_f2_factor - p_f3_factor) * vs_frc[1];
         psw.zfrc[parent_atom] += (1.0 - p_f2_factor - p_f3_factor) * vs_frc[2];
@@ -315,7 +317,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
         p_vs[2] = psw.zcrd[vsite_atom] - psw.zcrd[parent_atom];
         imageCoordinates(&p_vs[0], &p_vs[1], &p_vs[2], psw.umat, psw.invu, psw.unit_cell,
                          minimum_image);
-        const double f2_f3_factor  = vsk.dim2[i];
+        const double f2_f3_factor  = vsk.dim2[pidx];
         p_mid[0] = psw.xcrd[frame2_atom] - psw.xcrd[parent_atom] + (f2_f3_factor * f2_f3[0]);
         p_mid[1] = psw.ycrd[frame2_atom] - psw.ycrd[parent_atom] + (f2_f3_factor * f2_f3[1]);
         p_mid[2] = psw.zcrd[frame2_atom] - psw.zcrd[parent_atom] + (f2_f3_factor * f2_f3[2]);
@@ -329,7 +331,7 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
         // the FIXED_2 frame type.  The force on the midpoint is subsequently distributed, akin
         // to the FLEX_2 type, between atoms 2 and 3.
         project(vs_frc, p_vs, vs_frc_proj, 3);
-        const double p_vs_distance = vsk.dim1[i];
+        const double p_vs_distance = vsk.dim1[pidx];
         const double invr_p_mid = 1.0 / sqrt((p_mid[0] * p_mid[0]) + (p_mid[1] * p_mid[1]) +
                                              (p_mid[2] * p_mid[2]));
         for (int j = 0; j < 3; j++) {
@@ -373,8 +375,8 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
         const double invr_t = sqrt(invr2_t);
         const double f1fac  = dot(p_f2, vs_frc, 3) * invr2_p_f2;
         const double f2fac  = dot(f23_t_pf2, vs_frc, 3) * invr2_t;
-        const double p_f2_factor = vsk.dim1[i] * cos(vsk.dim2[i]) * invr_p_f2;
-        const double t_factor    = vsk.dim1[i] * sin(vsk.dim2[i]) * invr_t;
+        const double p_f2_factor = vsk.dim1[pidx] * cos(vsk.dim2[pidx]) * invr_p_f2;
+        const double t_factor    = vsk.dim1[pidx] * sin(vsk.dim2[pidx]) * invr_t;
         const double abbcOabab = dot(p_f2, f2_f3, 3) * invr2_p_f2;
         for (int j = 0; j < 3; j++) {
           F1[j] = vs_frc[j] - (f1fac * p_f2[j]);
@@ -402,18 +404,24 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
       {
         const int frame3_atom  = vsk.frame3_idx[i];
         double p_f2[3], p_f3[3], partition_f2[3], partition_f3[3];
-        const double mf2_01 = vsk.dim3[i] * (psw.zcrd[frame3_atom] - psw.zcrd[parent_atom]);
-        const double mf2_02 = vsk.dim3[i] * (psw.ycrd[frame3_atom] - psw.ycrd[parent_atom]);
-        const double mf2_12 = vsk.dim3[i] * (psw.xcrd[frame3_atom] - psw.xcrd[parent_atom]);
-        partition_f2[0] = ( vsk.dim1[i] * vs_frc[0]) - (mf2_01 * vs_frc[1]) + (mf2_02 * vs_frc[2]);
-        partition_f2[1] = ( mf2_01 * vs_frc[0]) + (vsk.dim1[i] * vs_frc[1]) - (mf2_12 * vs_frc[2]);
-        partition_f2[2] = (-mf2_02 * vs_frc[0]) + (mf2_12 * vs_frc[1]) + (vsk.dim1[i] * vs_frc[2]);
-        const double mf3_01 = vsk.dim3[i] * (psw.zcrd[frame2_atom] - psw.zcrd[parent_atom]);
-        const double mf3_02 = vsk.dim3[i] * (psw.ycrd[frame2_atom] - psw.ycrd[parent_atom]);
-        const double mf3_12 = vsk.dim3[i] * (psw.xcrd[frame2_atom] - psw.xcrd[parent_atom]);
-        partition_f3[0] = ( vsk.dim2[i] * vs_frc[0]) + (mf3_01 * vs_frc[1]) - (mf3_02 * vs_frc[2]);
-        partition_f3[1] = (-mf3_01 * vs_frc[0]) + (vsk.dim2[i] * vs_frc[1]) + (mf3_12 * vs_frc[2]);
-        partition_f3[2] = ( mf3_02 * vs_frc[0]) - (mf3_12 * vs_frc[1]) + (vsk.dim2[i] * vs_frc[2]);
+        const double mf2_01 = vsk.dim3[pidx] * (psw.zcrd[frame3_atom] - psw.zcrd[parent_atom]);
+        const double mf2_02 = vsk.dim3[pidx] * (psw.ycrd[frame3_atom] - psw.ycrd[parent_atom]);
+        const double mf2_12 = vsk.dim3[pidx] * (psw.xcrd[frame3_atom] - psw.xcrd[parent_atom]);
+        partition_f2[0] = ( vsk.dim1[pidx] * vs_frc[0]) - (mf2_01 * vs_frc[1]) +
+                          (mf2_02 * vs_frc[2]);
+        partition_f2[1] = ( mf2_01 * vs_frc[0]) + (vsk.dim1[pidx] * vs_frc[1]) -
+                          (mf2_12 * vs_frc[2]);
+        partition_f2[2] = (-mf2_02 * vs_frc[0]) + (mf2_12 * vs_frc[1]) +
+                          (vsk.dim1[pidx] * vs_frc[2]);
+        const double mf3_01 = vsk.dim3[pidx] * (psw.zcrd[frame2_atom] - psw.zcrd[parent_atom]);
+        const double mf3_02 = vsk.dim3[pidx] * (psw.ycrd[frame2_atom] - psw.ycrd[parent_atom]);
+        const double mf3_12 = vsk.dim3[pidx] * (psw.xcrd[frame2_atom] - psw.xcrd[parent_atom]);
+        partition_f3[0] = ( vsk.dim2[pidx] * vs_frc[0]) + (mf3_01 * vs_frc[1]) -
+                          (mf3_02 * vs_frc[2]);
+        partition_f3[1] = (-mf3_01 * vs_frc[0]) + (vsk.dim2[pidx] * vs_frc[1]) +
+                          (mf3_12 * vs_frc[2]);
+        partition_f3[2] = ( mf3_02 * vs_frc[0]) - (mf3_12 * vs_frc[1]) +
+                          (vsk.dim2[pidx] * vs_frc[2]);
         psw.xfrc[parent_atom] += vs_frc[0] - partition_f2[0] - partition_f3[0];
         psw.yfrc[parent_atom] += vs_frc[1] - partition_f2[1] - partition_f3[1];
         psw.zfrc[parent_atom] += vs_frc[2] - partition_f2[2] - partition_f3[2];
@@ -433,21 +441,21 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
         p_f2[0] = psw.xcrd[frame2_atom] -  psw.xcrd[parent_atom];
         p_f2[1] = psw.ycrd[frame2_atom] -  psw.ycrd[parent_atom];
         p_f2[2] = psw.zcrd[frame2_atom] -  psw.zcrd[parent_atom];
-        rj_f3[0] = (vsk.dim1[i] * (psw.xcrd[frame3_atom] - psw.xcrd[parent_atom])) - p_f2[0];
-        rj_f3[1] = (vsk.dim1[i] * (psw.ycrd[frame3_atom] - psw.ycrd[parent_atom])) - p_f2[1];
-        rj_f3[2] = (vsk.dim1[i] * (psw.zcrd[frame3_atom] - psw.zcrd[parent_atom])) - p_f2[2];
-        rj_f4[0] = (vsk.dim2[i] * (psw.xcrd[frame4_atom] - psw.xcrd[parent_atom])) - p_f2[0];
-        rj_f4[1] = (vsk.dim2[i] * (psw.ycrd[frame4_atom] - psw.ycrd[parent_atom])) - p_f2[1];
-        rj_f4[2] = (vsk.dim2[i] * (psw.zcrd[frame4_atom] - psw.zcrd[parent_atom])) - p_f2[2];
+        rj_f3[0] = (vsk.dim1[pidx] * (psw.xcrd[frame3_atom] - psw.xcrd[parent_atom])) - p_f2[0];
+        rj_f3[1] = (vsk.dim1[pidx] * (psw.ycrd[frame3_atom] - psw.ycrd[parent_atom])) - p_f2[1];
+        rj_f3[2] = (vsk.dim1[pidx] * (psw.zcrd[frame3_atom] - psw.zcrd[parent_atom])) - p_f2[2];
+        rj_f4[0] = (vsk.dim2[pidx] * (psw.xcrd[frame4_atom] - psw.xcrd[parent_atom])) - p_f2[0];
+        rj_f4[1] = (vsk.dim2[pidx] * (psw.ycrd[frame4_atom] - psw.ycrd[parent_atom])) - p_f2[1];
+        rj_f4[2] = (vsk.dim2[pidx] * (psw.zcrd[frame4_atom] - psw.zcrd[parent_atom])) - p_f2[2];
         rj_f34[0] = rj_f4[0] - rj_f3[0];
         rj_f34[1] = rj_f4[1] - rj_f3[1];
         rj_f34[2] = rj_f4[2] - rj_f3[2];
         crossProduct(rj_f3, rj_f4, rm);
         const double invr2_rm = 1.0 / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2]));
         const double invr_rm  = sqrt(invr2_rm);
-        const double cfx = vsk.dim3[i] * invr_rm * vs_frc[0];
-        const double cfy = vsk.dim3[i] * invr_rm * vs_frc[1];
-        const double cfz = vsk.dim3[i] * invr_rm * vs_frc[2];
+        const double cfx = vsk.dim3[pidx] * invr_rm * vs_frc[0];
+        const double cfy = vsk.dim3[pidx] * invr_rm * vs_frc[1];
+        const double cfz = vsk.dim3[pidx] * invr_rm * vs_frc[2];
         crossProduct(rm, rj_f34, rt);
         rt[0] *= invr2_rm;
         rt[1] *= invr2_rm;
@@ -458,24 +466,24 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk
                 ( (rj_f34[0] - (rm[2] * rt[1])) * cfz);
         fb[2] = ((rj_f34[1] - (rm[0] * rt[2])) * cfx) - ((rj_f34[0] + (rm[1] * rt[2])) * cfy) -
                 (rm[2] * rt[2] * cfz);
-        rt[0] = ((rj_f4[1] * rm[2]) - (rj_f4[2] * rm[1])) * invr2_rm * vsk.dim1[i];
-        rt[1] = ((rj_f4[2] * rm[0]) - (rj_f4[0] * rm[2])) * invr2_rm * vsk.dim1[i];
-        rt[2] = ((rj_f4[0] * rm[1]) - (rj_f4[1] * rm[0])) * invr2_rm * vsk.dim1[i];
-        fc[0] = (-rm[0] * rt[0] * cfx) - (((vsk.dim1[i] * rj_f4[2]) + (rm[1] * rt[0])) * cfy) +
-                (((vsk.dim1[i] * rj_f4[1]) - (rm[2] * rt[0])) * cfz);
-        fc[1] = (((vsk.dim1[i] * rj_f4[2]) - (rm[0] * rt[1])) * cfx) - (rm[1] * rt[1] * cfy) -
-                (((vsk.dim1[i] * rj_f4[0]) + (rm[2] * rt[1])) * cfz);
-        fc[2] = (-((vsk.dim1[i] * rj_f4[1]) + (rm[0] * rt[2])) * cfx) +
-                (((vsk.dim1[i] * rj_f4[0]) - (rm[1] * rt[2])) * cfy) - (rm[2] * rt[2] * cfz);
-        rt[0] = ((rm[1] * rj_f3[2]) - (rm[2] * rj_f3[1])) * invr2_rm * vsk.dim2[i];
-        rt[1] = ((rm[2] * rj_f3[0]) - (rm[0] * rj_f3[2])) * invr2_rm * vsk.dim2[i];
-        rt[2] = ((rm[0] * rj_f3[1]) - (rm[1] * rj_f3[0])) * invr2_rm * vsk.dim2[i];
-        fd[0] = (-rm[0] * rt[0] * cfx) + (((vsk.dim2[i] * rj_f3[2]) - (rm[1] * rt[0])) * cfy) -
-                (((vsk.dim2[i] * rj_f3[1]) + (rm[2] * rt[0])) * cfz);
-        fd[1] = (-((vsk.dim2[i] * rj_f3[2]) + (rm[0] * rt[1])) * cfx) - (rm[1] * rt[1] * cfy) +
-                (((vsk.dim2[i] * rj_f3[0]) - (rm[2] * rt[1])) * cfz);
-        fd[2] = (((vsk.dim2[i] * rj_f3[1]) - (rm[0] * rt[2])) * cfx) +
-                (-((vsk.dim2[i] * rj_f3[0]) + (rm[1] * rt[2])) * cfy) - (rm[2] * rt[2] * cfz);
+        rt[0] = ((rj_f4[1] * rm[2]) - (rj_f4[2] * rm[1])) * invr2_rm * vsk.dim1[pidx];
+        rt[1] = ((rj_f4[2] * rm[0]) - (rj_f4[0] * rm[2])) * invr2_rm * vsk.dim1[pidx];
+        rt[2] = ((rj_f4[0] * rm[1]) - (rj_f4[1] * rm[0])) * invr2_rm * vsk.dim1[pidx];
+        fc[0] = (-rm[0] * rt[0] * cfx) - (((vsk.dim1[pidx] * rj_f4[2]) + (rm[1] * rt[0])) * cfy) +
+                (((vsk.dim1[pidx] * rj_f4[1]) - (rm[2] * rt[0])) * cfz);
+        fc[1] = (((vsk.dim1[pidx] * rj_f4[2]) - (rm[0] * rt[1])) * cfx) - (rm[1] * rt[1] * cfy) -
+                (((vsk.dim1[pidx] * rj_f4[0]) + (rm[2] * rt[1])) * cfz);
+        fc[2] = (-((vsk.dim1[pidx] * rj_f4[1]) + (rm[0] * rt[2])) * cfx) +
+                (((vsk.dim1[pidx] * rj_f4[0]) - (rm[1] * rt[2])) * cfy) - (rm[2] * rt[2] * cfz);
+        rt[0] = ((rm[1] * rj_f3[2]) - (rm[2] * rj_f3[1])) * invr2_rm * vsk.dim2[pidx];
+        rt[1] = ((rm[2] * rj_f3[0]) - (rm[0] * rj_f3[2])) * invr2_rm * vsk.dim2[pidx];
+        rt[2] = ((rm[0] * rj_f3[1]) - (rm[1] * rj_f3[0])) * invr2_rm * vsk.dim2[pidx];
+        fd[0] = (-rm[0] * rt[0] * cfx) + (((vsk.dim2[pidx] * rj_f3[2]) - (rm[1] * rt[0])) * cfy) -
+                (((vsk.dim2[pidx] * rj_f3[1]) + (rm[2] * rt[0])) * cfz);
+        fd[1] = (-((vsk.dim2[pidx] * rj_f3[2]) + (rm[0] * rt[1])) * cfx) - (rm[1] * rt[1] * cfy) +
+                (((vsk.dim2[pidx] * rj_f3[0]) - (rm[2] * rt[1])) * cfz);
+        fd[2] = (((vsk.dim2[pidx] * rj_f3[1]) - (rm[0] * rt[2])) * cfx) +
+                (-((vsk.dim2[pidx] * rj_f3[0]) + (rm[1] * rt[2])) * cfy) - (rm[2] * rt[2] * cfz);
         psw.xfrc[parent_atom] += vs_frc[0] - fb[0] - fc[0] - fd[0];
         psw.yfrc[parent_atom] += vs_frc[1] - fb[1] - fc[1] - fd[1];
         psw.zfrc[parent_atom] += vs_frc[2] - fb[2] - fc[2] - fd[2];

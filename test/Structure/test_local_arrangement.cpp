@@ -127,6 +127,7 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
     const int vsite_atom = vsk.vs_atoms[i];
     const int parent_atom = vsk.frame1_idx[i];
     const int frame2_atom = vsk.frame2_idx[i];
+    const int param_idx = vsk.vs_param_idx[i];
     const std::vector<double> p_vs = { psr.xcrd[vsite_atom] - psr.xcrd[parent_atom],
                                        psr.ycrd[vsite_atom] - psr.ycrd[parent_atom],
                                        psr.zcrd[vsite_atom] - psr.zcrd[parent_atom] };
@@ -140,7 +141,7 @@ void checkVirtualSiteMetrics(const PhaseSpace &ps, const AtomGraph &ag,
     int frame3_atom, frame4_atom;
     double p_f3_distance, p_f4_distance;
     std::vector<double> p_f3(3), p_f4(3);
-    const VirtualSiteKind kind = static_cast<VirtualSiteKind>(vsk.vs_types[i]);
+    const VirtualSiteKind kind = static_cast<VirtualSiteKind>(vsk.vs_types[param_idx]);
 
     // Get details of the the third frame atom
     switch (kind) {

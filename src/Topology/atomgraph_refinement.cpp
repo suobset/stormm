@@ -1160,9 +1160,13 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
         coverage[j] = true;
       }
     }
+    vst.frame_types[n_unique_frames] = frtype;
+    vst.frame_dim1[n_unique_frames]  = vst.frame_dim1[i];
+    vst.frame_dim2[n_unique_frames]  = vst.frame_dim2[i];
+    vst.frame_dim3[n_unique_frames]  = vst.frame_dim3[i];
     n_unique_frames++;
   }
-
+  
   return vst;
 }
 
