@@ -47,9 +47,9 @@ private:
                                   ///<   topology)
 
   // The following are all readable as column-format matrices, the value of element (y, k)
-  // indicating the index of the kth work unit (W.U.) containing atom I, J, ..., M in bond / angle /
-  // ... / CMAP term y.  Most atoms will be present in only one work unit.  The number of rows in
-  // each matrix is the number of bond / angle / ... / CMAP terms.
+  // indicating the index of the kth work unit (W.U.) containing atom I, J, ..., M in bond /
+  // angle / ... / CMAP term y.  Most atoms will be present in only one work unit.  The number of
+  // rows in each matrix is the number of bond / angle / ... / CMAP terms.
   std::vector<int> bond_i_presence;  ///< Indices of W.U.'s containing atom I of each bond
   std::vector<int> bond_j_presence;  ///< Indices of W.U.'s containing atom J of each bond
   std::vector<int> angl_i_presence;  ///< Indices of W.U.'s containing atom I of each bond angle
@@ -80,20 +80,20 @@ private:
   std::vector<int> vs_presence;      ///< Indices of W.U.'s containing each virtual site
   std::vector<int> vsf1_presence;    ///< Indices of W.U.'s containing the first frame atom of each
                                      ///<   virtual site (the "parent" atom)
-  std::vector<int> vsf2_presence;    ///< Indices of W.U.'s containing the second frame atom of each
-                                     ///<   virtual site
+  std::vector<int> vsf2_presence;    ///< Indices of W.U.'s containing the second frame atom of
+                                     ///<   each virtual site
   std::vector<int> vsf3_presence;    ///< Indices of W.U.'s containing the third frame atom of each
                                      ///<   virtual site
-  std::vector<int> vsf4_presence;    ///< Indices of W.U.'s containing the fourth frame atom of each
-                                     ///<   virtual site
+  std::vector<int> vsf4_presence;    ///< Indices of W.U.'s containing the fourth frame atom of
+                                     ///<   each virtual site
 
   // The following arrays are again to be interpreted as matrices, with a number of rows equal to
   // the number of atoms in constrained groups or the total number of fast waters.  The work unit
-  // noted in element (y, k) indicates that the yth constrained atom is present the work unit (W.U.)
-  // with the stated index.  The group constraints bounds array will be needed to determine whether
-  // a particular constrained group is completely present in one work unit or another.
-  std::vector<int> cnst_n_presence;  ///< Indices of W.U.'s containing the nth constrained atom from
-                                     ///<   the list of all atoms in constrained groups
+  // noted in element (y, k) indicates that the yth constrained atom is present the work unit
+  // (W.U.) with the stated index.  The group constraints bounds array will be needed to determine
+  // whether a particular constrained group is completely present in one work unit or another.
+  std::vector<int> cnst_n_presence;  ///< Indices of W.U.'s containing the nth constrained atom
+                                     ///<   from the list of all atoms in constrained groups
   std::vector<int> sett_ox_presence; ///< Indices of W.U.'s containing the oxygen atom of a
                                      ///<   particular SETTLE group
   std::vector<int> sett_h1_presence; ///< Indices of W.U.'s containing the oxygen atom of a
@@ -170,7 +170,8 @@ private:
   std::vector<int> rposn_affector_bounds; ///< Bounds array for rposn_affector_list
   std::vector<int> rbond_affector_list;   ///< List of all bond restraints affecting any atom
   std::vector<int> rbond_affector_bounds; ///< Bounds array for rbond_affector_list
-  std::vector<int> rangl_affector_list;   ///< List of all three-point restraints affecting any atom
+  std::vector<int> rangl_affector_list;   ///< List of all three-point restraints affecting any
+                                          ///<   atom
   std::vector<int> rangl_affector_bounds; ///< Bounds array for rangl_affector_list
   std::vector<int> rdihe_affector_list;   ///< List of all four-point restraints affecting any atom
   std::vector<int> rdihe_affector_bounds; ///< Bounds array for rdihe_affector_list
@@ -182,8 +183,8 @@ private:
   std::vector<int> work_unit_presence;          ///< Lists of the work units in which each atom is
                                                 ///<   found.  This is a column-format matrix with
                                                 ///<   atom_count rows and a number of columns
-                                                ///<   expanded as needed to accommodate the largest
-                                                ///<   entry in work_unit_assignments.
+                                                ///<   expanded as needed to accommodate the
+                                                ///<   largest entry in work_unit_assignments.
 
   /// \brief Allocate the necessary space for this work unit
   ///
@@ -208,7 +209,12 @@ private:
 /// \brief An object to collect the components of a valence work unit (which will also track frozen
 ///        atoms to implement coordinate updates, velocity updates, and constraints).  While the
 ///        work unit is encoded in the AtomGraphSynthesis object, the assembly is best done by a
-///        dedicated object with plenty of its own methods.
+///        dedicated object with plenty of its own methods operating on a single topology
+///        (AtomGraph).  All systems in the AtomGraphSynthesis are designed to function
+///        independently of one another--the only difference is that they have consensus tables of
+///        most parameters and differen atom indexing.  Translating a valence work unit into a
+///        list of instructions within an AtomGraphSynthesis is therefore a critical member
+///        function of this class.
 class ValenceWorkUnit {
 public:
 
@@ -219,24 +225,137 @@ public:
   ///        a maximum number of atoms has been accumulated in order to process as many related
   ///        valence terms as possible.
   ///
-  /// \param ag         Topology to work from
-  /// \param seed_atom  The first atom to incorporate into the work unit.  Subsequent atoms will
-  ///                   be either bonded in some chain to the seed, retracing previous topological
-  ///                   indices whereby previous work units left some atoms behind, or jumping
-  ///                   forward to the next new molecule.
-  /// \param max_atoms  The maximum number of atoms to accumulate in the work unit
-  ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, int seed_atom,
-                  int max_atoms = 768);
+  /// \param ag_in          Pointer to the topology to work from
+  /// \param vdel_in        Valence delegator managing the creation of this valence work unit
+  /// \param list_index_in  Index of this unit in a larger list (the unit should remember its own
+  ///                       index number, for the purposes of coordinating with other work units)
+  /// \param seed_atom_in  The first atom to incorporate into the work unit.  Subsequent atoms will
+  ///                      be either bonded in some chain to the seed, retracing previous
+  ///                      topological indices whereby previous work units left some atoms behind,
+  ///                      or jumping forward to the next new molecule.
+  /// \param max_atoms_in  The maximum number of atoms to accumulate in the work unit
+  ValenceWorkUnit(const AtomGraph *ag_in, ValenceDelegator *vdel_in, int list_index_in,
+                  int seed_atom_in, int max_atoms_in = 768);
+
+  /// \brief Get the number of atoms currently involved in this work unit.
+  int getAtomCount() const;
+
+  /// \brief Get the list index of this work unit.
+  int getListIndex() const;
+
+  /// \brief Get the minimum topological atom index of any used by this work unit.
+  int getMinAtomIndex() const;
+
+  /// \brief Get the maximum topological atom index of any used by this work unit.
+  int getMaxAtomIndex() const;
   
-  /// \brief Add a new atom to a work unit
+  /// \brief Get the maximum atom count that this work unit can hold.
+  int getMaxAtoms() const;
+
+  /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
+  ValenceDelegator* getDelegatorPointer();
+
+  /// \brief Get the pointer to the topology for which this work unit applies.
+  const AtomGraph* getTopologyPointer() const;
   
+  /// \brief Set the list index of this work unit, in the event that the list of work units for
+  ///        a particular topology needs to be re-ordered.
+  ///
+  /// \param list_index_in  The new list index for the work unit
+  void setListIndex(int list_index_in);
+  
+  /// \brief Add a new atom to a work unit.  This will update the associated ValenceDelegator and
+  ///        all assignments therein.
+  ///
+  /// \param atom_index  Index of the atom of interest
+  /// \param 
+  void addNewAtom(const int atom_index, const ValenceKit<double> &vk,
+                  const VirtualSiteKit<double> &vsk, const ConstraintKit &cnsk,
+                  const RestraintApparatusDpReader &rstk);
   
 private:
-  int atom_count;
-  int max_atom_index;
-  int min_atom_index;
-  std::vector<int> atom_import_list;
+  int atom_count;                     ///< Number of atoms in the work unit
+  int bond_term_count;                ///< Number of bond terms in the work unit
+  int angl_term_count;                ///< Number of angle terms in the work unit
+  int dihe_term_count;                ///< Number of cosine-based dihedral terms in the work unit
+  int ubrd_term_count;                ///< Number of Urey-Bradley terms in the work unit
+  int cimp_term_count;                ///< Number of CHARMM harmonic improper dihedral terms in
+                                      ///<   the work unit
+  int cmap_term_count;                ///< Number of CMAP terms in the work unit
+  int vste_count;                     ///< Number of virtual sites managed by this work unit
+  int cnst_group_count;               ///< Number of SHAKE or RATTLE groups managed by this work
+                                      ///<   unit (excludes SETTLE-constrained waters)
+  int sett_group_count;               ///< Number of SETTLE-constrained rigid waters managed by
+                                      ///<   this work unit
+  int rposn_term_count;               ///< Number of positional restraints handled by this work
+                                      ///<   unit
+  int rbond_term_count;               ///< Number of distance restraints handled by this work unit
+  int rangl_term_count;               ///< Number of angle restraints handled by this work unit
+  int rdihe_term_count;               ///< Number of dihedral restraints handled by this work unit
+  int list_index;                     ///< Index of the work unit in a larger list of similar
+                                      ///<   objects coordinating to cover an entire topology
+  int min_atom_index;                 ///< Lowest topological index of any imported atom
+  int max_atom_index;                 ///< Highest topological index of any imported atom
+  int atom_limit;                     ///< Largest number of atoms that this work unit can hold
+  std::vector<int> atom_import_list;  ///< The list of imported atoms, indicating indices into the
+                                      ///<   original topology.  The position of each atom in this
+                                      ///<   list indicates its local index within the work unit,
+                                      ///<   as referenced by subsequent ????_(i,j,k,...)_atoms
+                                      ///<   arrays.
+  std::vector<int> bond_term_list;    ///< List of harmonic bonds for which this work unit is
+                                      ///<   responsible (more than one work unit may be tasked
+                                      ///<   with computing any of the relevant energy terms.
+                                      ///<   One and only one work unit will be tasked with moving
+                                      ///<   each (mobile) atom.  If an atom is not mobile, no
+                                      ///<   work unit will be tasked with moving it and terms
+                                      ///<   pertaining to it may or may not be computed.
+  std::vector<int> angl_term_list;    ///< List of harmonic angle terms to be computed by this
+                                      ///<   work unit, indexed into the original topology
+  std::vector<int> dihe_term_list;    ///< List of cosine-based dihedral terms to be computed by
+                                      ///<   this work unit, indexed into the original topology
+  std::vector<int> ubrd_term_list;    ///< List of Urey-Bradley harmonic angle terms to be computed
+                                      ///<   by this work unit, indexed into the original topology
+  std::vector<int> cimp_term_list;    ///< List of CHARMM harmonic improper dihedral terms to be
+                                      ///<   computed by this work unit
+  std::vector<int> cmap_term_list;    ///< List of CMAP terms to be computed by this work unit
+  std::vector<int> bond_i_atoms;      ///< List of I atoms in each harmonic bond computed by this
+                                      ///<   work unit, tracking the order in bond_term_list but
+                                      ///<   indicating the local indices of imported atoms
+  std::vector<int> bond_j_atoms;      ///< List of J atoms in each harmonic bond computed by this
+                                      ///<   work unit, indicating local atom indices
+  std::vector<int> bond_param_idx;    ///< List of parameter indices for each bond term to be
+                                      ///<   computed by this work unit, referencing the original
+                                      ///<   topology's parameter set.
+  std::vector<int> angl_i_atoms;      ///< List of local indices for I atoms in each angle term
+  std::vector<int> angl_j_atoms;      ///< List of local indices for J atoms in each angle term
+  std::vector<int> angl_k_atoms;      ///< List of local indices for K atoms in each angle term
+  std::vector<int> angl_param_idx;    ///< Parameter indices for each angle term, referencing the
+                                      ///<   original topology
+  std::vector<int> dihe_i_atoms;      ///< Local indices for I atoms in each dihedral term
+  std::vector<int> dihe_j_atoms;      ///< Local indices for J atoms in each dihedral term
+  std::vector<int> dihe_k_atoms;      ///< Local indices for K atoms in each dihedral term
+  std::vector<int> dihe_l_atoms;      ///< Local indices for L atoms in each dihedral term
+  std::vector<int> dihe_param_idx;    ///< Parameter indices for each cosine dihedral term computed
+                                      ///<   by this work unit, referencing the original topology
+  std::vector<int> ubrd_i_atoms;      ///< Local indices for I atoms in each Urey-Bradley term
+  std::vector<int> ubrd_k_atoms;      ///< Local indices for K atoms in each Urey-Bradley term
+  std::vector<int> ubrd_param_idx;    ///< Parameter indices for each Urey-Bradley angle term
+  std::vector<int> cimp_i_atoms;      ///< Local indices for I atoms in each CHARMM improper term
+  std::vector<int> cimp_j_atoms;      ///< Local indices for J atoms in each CHARMM improper term
+  std::vector<int> cimp_k_atoms;      ///< Local indices for K atoms in each CHARMM improper term
+  std::vector<int> cimp_l_atoms;      ///< Local indices for L atoms in each CHARMM improper term
+  std::vector<int> cimp_param_idx;    ///< Parameter indices for each CHARMM improper term computed
+                                      ///<   by this work unit
+  std::vector<int> cmap_i_atoms;      ///< Local indices for I atoms in each CMAP term
+  std::vector<int> cmap_j_atoms;      ///< Local indices for J atoms in each CMAP term
+  std::vector<int> cmap_k_atoms;      ///< Local indices for K atoms in each CMAP term
+  std::vector<int> cmap_l_atoms;      ///< Local indices for L atoms in each CMAP term
+  std::vector<int> cmap_m_atoms;      ///< Local indices for M atoms in each CMAP term
+  std::vector<int> cmap_surf_idx;     ///< Parameter indices for each CMAP surface term computed
+                                      ///<   by this work unit
   
+  ValenceDelegator *vdel_pointer;     ///< Pointer to a delegator managing this object's creation
+  const AtomGraph *ag_pointer;        ///< Pointer to the topology to which this object pertains
 };
 
 } // namespace topology

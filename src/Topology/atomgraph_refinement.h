@@ -239,6 +239,10 @@ struct VirtualSiteTable {
   std::vector<int> frame2_atoms;    ///< Second frame atoms
   std::vector<int> frame3_atoms;    ///< Third frame atoms (for some sites)
   std::vector<int> frame4_atoms;    ///< Fourth frame atoms (for the most complex frame type)
+  std::vector<int> param_idx;       ///< Parameter indices indicating the set of frame dimensions
+                                    ///<   controlling this particular site (this is part of a
+                                    ///<   broader effort to cut down on memory bandwidth
+                                    ///<   requirements)
   std::vector<double> frame_dim1;   ///< First frame dimension, i.e. distance from VS to parent
   std::vector<double> frame_dim2;   ///< Second frame dimension
   std::vector<double> frame_dim3;   ///< Third frame dimension

@@ -460,21 +460,74 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
   rdihe_affector_bounds[0] = 0;
 }
 
-
 //-------------------------------------------------------------------------------------------------
-ValenceWorkUnit::ValenceWorkUnit(const AtomGraph &ag, ValenceDelegator *vdel, const int seed_atom,
-                                 const int max_atoms) :
-    atom_count{ag.getAtomCount()},
-    atom_import_list{}
-{}
-
-//-------------------------------------------------------------------------------------------------
-#if 0
-ValenceWorkUnit::addNewAtom(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
-                            const ConstraintKit<double> &cnsk, const RestraintKit<double> &rstk) {
+ValenceWorkUnit::ValenceWorkUnit(const AtomGraph *ag_in, ValenceDelegator *vdel_in,
+                                 const int list_index_in, const int seed_atom_in,
+                                 const int max_atoms_in) :
+    atom_count{0}, bond_term_count{0}, angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0},
+    cimp_term_count{0}, cmap_term_count{0}, vste_count{0}, cnst_group_count{0},
+    sett_group_count{0}, rposn_term_count{0}, rbond_term_count{0}, rangl_term_count{0},
+    rdihe_term_count{0}, list_index{list_index_in}, min_atom_index{-1}, max_atom_index{-1},
+    atom_limit{max_atoms_in}, atom_import_list{}, bond_term_list{}, angl_term_list{},
+    dihe_term_list{}, ubrd_term_list{}, cimp_term_list{}, cmap_term_list{}, bond_i_atoms{},
+    bond_j_atoms{}, bond_param_idx{}, angl_i_atoms{}, angl_j_atoms{}, angl_k_atoms{},
+    angl_param_idx{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{},
+    dihe_param_idx{}, ubrd_i_atoms{}, ubrd_k_atoms{}, ubrd_param_idx{}, cimp_i_atoms{},
+    cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{}, cimp_param_idx{}, cmap_i_atoms{},
+    cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{}, vdel_pointer{vdel_in},
+    ag_pointer{ag_in}
+{
+  // Starting with the seed atom, branch out and add new atoms until approaching the maximum
+  // allowed number of atoms.
 
 }
-#endif
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getAtomCount() const {
+  return atom_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getListIndex() const {
+  return list_index;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getMinAtomIndex() const {
+  return min_atom_index;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getMaxAtomIndex() const {
+  return max_atom_index;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getMaxAtoms() const {
+  return atom_limit;
+}
+
+//-------------------------------------------------------------------------------------------------
+ValenceDelegator* ValenceWorkUnit::getDelegatorPointer() {
+  return vdel_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* ValenceWorkUnit::getTopologyPointer() const {
+  return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::setListIndex(const int list_index_in) {
+  list_index = list_index_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::addNewAtom(const int atom_index, const ValenceKit<double> &vk,
+                                 const VirtualSiteKit<double> &vsk, const ConstraintKit &cnsk,
+                                 const RestraintApparatusDpReader &rstk) {
+  
+}
 
 } // namespace topology
 } // namespace omni

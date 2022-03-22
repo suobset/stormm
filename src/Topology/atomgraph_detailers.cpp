@@ -96,7 +96,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                       6 * roundUp(bond_term_count, warp_size_int) +
                       8 * roundUp(angl_term_count, warp_size_int) +
                      11 * roundUp(dihe_term_count, warp_size_int) +
-                      6 * roundUp(virtual_site_count, warp_size_int) +
+                      7 * roundUp(virtual_site_count, warp_size_int) +
                      roundUp(total_exclusions, warp_size_int) +
                       3 * roundUp(inferred_14_attenuations, warp_size_int) +
                      roundUp<int>(all_nb_excl.nb11_excl_list.size(), warp_size_int) +
@@ -217,6 +217,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   ic = virtual_site_frame2_atoms.putHost(&int_data, vsite_table.frame2_atoms, ic, warp_size_zu);
   ic = virtual_site_frame3_atoms.putHost(&int_data, vsite_table.frame3_atoms, ic, warp_size_zu);
   ic = virtual_site_frame4_atoms.putHost(&int_data, vsite_table.frame4_atoms, ic, warp_size_zu);
+  ic = virtual_site_parameter_indices.putHost(&int_data, vsite_table.param_idx, ic, warp_size_zu);
   ic = charge_indices.putHost(&int_data, tmp_charge_indices, ic, warp_size_zu);
   ic = lennard_jones_indices.putHost(&int_data, tmp_lennard_jones_indices, ic, warp_size_zu);
   ic = atom_exclusion_bounds.putHost(&int_data, cond_excl.atom_excl_bounds, ic, warp_size_zu);

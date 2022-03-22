@@ -166,6 +166,7 @@ AtomGraph::AtomGraph() :
     virtual_site_frame2_atoms{HybridKind::POINTER, "tp_vsfr2"},
     virtual_site_frame3_atoms{HybridKind::POINTER, "tp_vsfr3"},
     virtual_site_frame4_atoms{HybridKind::POINTER, "tp_vsfr4"},
+    virtual_site_parameter_indices{HybridKind::POINTER, "tp_vs_parm_idx"},
     virtual_site_frame_dim1{HybridKind::POINTER, "tp_vsdim1"},
     virtual_site_frame_dim2{HybridKind::POINTER, "tp_vsdim2"},
     virtual_site_frame_dim3{HybridKind::POINTER, "tp_vsdim3"},
@@ -763,6 +764,7 @@ void AtomGraph::rebasePointers() {
   virtual_site_frame2_atoms.swapTarget(&int_data);
   virtual_site_frame3_atoms.swapTarget(&int_data);
   virtual_site_frame4_atoms.swapTarget(&int_data);
+  virtual_site_parameter_indices.swapTarget(&int_data);
   charge_indices.swapTarget(&int_data);
   lennard_jones_indices.swapTarget(&int_data);
   atom_exclusion_bounds.swapTarget(&int_data);
@@ -1052,6 +1054,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     virtual_site_frame2_atoms{original.virtual_site_frame2_atoms},
     virtual_site_frame3_atoms{original.virtual_site_frame3_atoms},
     virtual_site_frame4_atoms{original.virtual_site_frame4_atoms},
+    virtual_site_parameter_indices{original.virtual_site_parameter_indices},
     virtual_site_frame_dim1{original.virtual_site_frame_dim1},
     virtual_site_frame_dim2{original.virtual_site_frame_dim2},
     virtual_site_frame_dim3{original.virtual_site_frame_dim3},
@@ -1345,6 +1348,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   virtual_site_frame2_atoms = other.virtual_site_frame2_atoms;
   virtual_site_frame3_atoms = other.virtual_site_frame3_atoms;
   virtual_site_frame4_atoms = other.virtual_site_frame4_atoms;
+  virtual_site_parameter_indices = other.virtual_site_parameter_indices;
   virtual_site_frame_dim1 = other.virtual_site_frame_dim1;
   virtual_site_frame_dim2 = other.virtual_site_frame_dim2;
   virtual_site_frame_dim3 = other.virtual_site_frame_dim3;
@@ -1620,6 +1624,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     virtual_site_frame2_atoms{std::move(original.virtual_site_frame2_atoms)},
     virtual_site_frame3_atoms{std::move(original.virtual_site_frame3_atoms)},
     virtual_site_frame4_atoms{std::move(original.virtual_site_frame4_atoms)},
+    virtual_site_parameter_indices{std::move(original.virtual_site_parameter_indices)},
     virtual_site_frame_dim1{std::move(original.virtual_site_frame_dim1)},
     virtual_site_frame_dim2{std::move(original.virtual_site_frame_dim2)},
     virtual_site_frame_dim3{std::move(original.virtual_site_frame_dim3)},
@@ -1907,6 +1912,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   virtual_site_frame2_atoms = std::move(other.virtual_site_frame2_atoms);
   virtual_site_frame3_atoms = std::move(other.virtual_site_frame3_atoms);
   virtual_site_frame4_atoms = std::move(other.virtual_site_frame4_atoms);
+  virtual_site_parameter_indices = std::move(other.virtual_site_parameter_indices);
   virtual_site_frame_dim1 = std::move(other.virtual_site_frame_dim1);
   virtual_site_frame_dim2 = std::move(other.virtual_site_frame_dim2);
   virtual_site_frame_dim3 = std::move(other.virtual_site_frame_dim3);

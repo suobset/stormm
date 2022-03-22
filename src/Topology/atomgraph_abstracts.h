@@ -411,9 +411,10 @@ template <typename T> struct VirtualSiteKit {
 
   /// \brief The constructor follows other abstracts and is produced based on pointers from an
   ///        AtomGraph object.
-  VirtualSiteKit(int nsite_in, const int* vs_atoms_in, const int* vs_types_in,
-                 const int* frame1_idx_in, const int* frame2_idx_in, const int* frame3_idx_in,
-                 const int* frame4_idx_in, const T* dim1_in, const T* dim2_in, const T* dim3_in);
+  VirtualSiteKit(int nsite_in, const int* vs_atoms_in, const int* frame1_idx_in,
+                 const int* frame2_idx_in, const int* frame3_idx_in, const int* frame4_idx_in,
+                 const int* vs_param_idx_in, const int* vs_types_in, const T* dim1_in,
+                 const T* dim2_in, const T* dim3_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -422,16 +423,19 @@ template <typename T> struct VirtualSiteKit {
   VirtualSiteKit(VirtualSiteKit &&other) = default;
   /// \}
   
-  const int nsite;        ///< The number of virtual sites in the topology
-  const int* vs_atoms;    ///< Topological indicies of frame atoms
-  const int* vs_types;    ///< Virtual site frame types
-  const int* frame1_idx;  ///< Topological indices of frame atom 1 (the parent atom)
-  const int* frame2_idx;  ///< Topological indices of frame atom 2
-  const int* frame3_idx;  ///< Topological indices of frame atom 3
-  const int* frame4_idx;  ///< Topological indices of frame atom 4
-  const T* dim1;          ///< Frame dimension 1
-  const T* dim2;          ///< Frame dimension 2
-  const T* dim3;          ///< Frame dimension 3
+  const int nsite;          ///< The number of virtual sites in the topology
+  const int* vs_atoms;      ///< Topological indicies of frame atoms
+  const int* frame1_idx;    ///< Topological indices of frame atom 1 (the parent atom)
+  const int* frame2_idx;    ///< Topological indices of frame atom 2
+  const int* frame3_idx;    ///< Topological indices of frame atom 3
+  const int* frame4_idx;    ///< Topological indices of frame atom 4
+  const int* vs_param_idx;  ///< Parameter indices for each virtual site, offering the correct
+                            ///<   elements of vs_types, dim1, dim2, and dim3 to access in order
+                            ///<   to understand the frame
+  const int* vs_types;      ///< Virtual site frame types
+  const T* dim1;            ///< Frame dimension 1
+  const T* dim2;            ///< Frame dimension 2
+  const T* dim3;            ///< Frame dimension 3
 };
 
 /// \brief Information needed to manage constraint groups.  This additional abstract is needed

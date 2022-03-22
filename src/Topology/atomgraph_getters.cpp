@@ -803,11 +803,12 @@ ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(HybridTargetLevel tier) cons
 VirtualSiteKit<double>
 AtomGraph::getDoublePrecisionVirtualSiteKit(const HybridTargetLevel tier) const {
   return VirtualSiteKit<double>(virtual_site_count, virtual_site_atoms.data(tier),
-                                virtual_site_frame_types.data(tier),
                                 virtual_site_frame1_atoms.data(tier),
                                 virtual_site_frame2_atoms.data(tier),
                                 virtual_site_frame3_atoms.data(tier),
                                 virtual_site_frame4_atoms.data(tier),
+                                virtual_site_parameter_indices.data(tier),
+                                virtual_site_frame_types.data(tier),
                                 virtual_site_frame_dim1.data(tier),
                                 virtual_site_frame_dim2.data(tier),
                                 virtual_site_frame_dim3.data(tier));
@@ -817,11 +818,12 @@ AtomGraph::getDoublePrecisionVirtualSiteKit(const HybridTargetLevel tier) const 
 VirtualSiteKit<float>
 AtomGraph::getSinglePrecisionVirtualSiteKit(const HybridTargetLevel tier) const {
   return VirtualSiteKit<float>(virtual_site_count, virtual_site_atoms.data(tier),
-                               virtual_site_frame_types.data(tier),
                                virtual_site_frame1_atoms.data(tier),
                                virtual_site_frame2_atoms.data(tier),
                                virtual_site_frame3_atoms.data(tier),
                                virtual_site_frame4_atoms.data(tier),
+                               virtual_site_parameter_indices.data(tier),
+                               virtual_site_frame_types.data(tier),
                                sp_virtual_site_frame_dim1.data(tier),
                                sp_virtual_site_frame_dim2.data(tier),
                                sp_virtual_site_frame_dim3.data(tier));

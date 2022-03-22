@@ -283,7 +283,7 @@ CondensedExclusions::CondensedExclusions(const int natom_in, const int total_exc
 //-------------------------------------------------------------------------------------------------
 VirtualSiteTable::VirtualSiteTable() :
     vs_count{0}, vs_numbers{}, vs_atoms{}, frame_types{}, frame1_atoms{}, frame2_atoms{},
-    frame3_atoms{}, frame4_atoms{}, frame_dim1{}, frame_dim2{}, frame_dim3{}  
+    frame3_atoms{}, frame4_atoms{}, param_idx{}, frame_dim1{}, frame_dim2{}, frame_dim3{}  
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -298,6 +298,7 @@ VirtualSiteTable::VirtualSiteTable(const int natom_in, const int vs_count_in) :
   frame2_atoms.resize(vs_count_in);
   frame3_atoms.resize(vs_count_in);
   frame4_atoms.resize(vs_count_in);
+  param_idx.resize(vs_count_in);
   frame_dim1.resize(vs_count_in);
   frame_dim2.resize(vs_count_in);
   frame_dim3.resize(vs_count_in);
@@ -1138,6 +1139,28 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
       }
     }
     pos++;
+  }
+
+  // Condense the tables of frame type and dimensions.  Assign each virtual site a parameter
+  // index.
+  int n_unique_frames = 0;
+  std::vector<bool> coverage(vst.vs_count, false);
+  for (int i = 0; i < vst.vs_count; i++) {
+    if (coverage[i]) {
+      continue;
+    }
+    const int frtype = vst.frame_types[i];
+    const Approx dim1a(vst.frame_dim1[i], constants::tiny);
+    const Approx dim2a(vst.frame_dim2[i], constants::tiny);
+    const Approx dim3a(vst.frame_dim3[i], constants::tiny);
+    for (int j = i; j < vst.vs_count; j++) {
+      if (vst.frame_types[j] == frtype && dim1a.test(vst.frame_dim1[j]) &&
+          dim2a.test(vst.frame_dim2[j]) && dim3a.test(vst.frame_dim3[j])) {
+        vst.param_idx[j] = n_unique_frames;
+        coverage[j] = true;
+      }
+    }
+    n_unique_frames++;
   }
 
   return vst;

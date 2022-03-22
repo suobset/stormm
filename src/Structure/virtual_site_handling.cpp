@@ -17,6 +17,7 @@ void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* u
                        const VirtualSiteKit<double> &vsk) {
   for (int i = 0; i < vsk.nsite; i++) {
     const int vsite_atom  = vsk.vs_atoms[i];
+    const int param_idx = vsk.vs_param_idx[i];
     const int parent_atom = vsk.frame1_idx[i];
     const int frame2_atom = vsk.frame2_idx[i];
     const ImagingMethod minimum_image = ImagingMethod::MINIMUM_IMAGE;

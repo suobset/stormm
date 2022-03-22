@@ -1198,19 +1198,22 @@ private:
                                          ///<   dihe_assigned_index above.
 
   // Information relevant to virtual site placement
-  int virtual_site_count;                   ///< Number of v-sites / extra points out of all atoms
-  Hybrid<int> virtual_site_atoms;           ///< List of atoms which are massless virtual sites
-  Hybrid<int> virtual_site_frame_types;     ///< Frame types for each virtual site
-  Hybrid<int> virtual_site_frame1_atoms;    ///< Parent atoms (frame I) for each virtual site
-  Hybrid<int> virtual_site_frame2_atoms;    ///< Frame atom 2 for each virtual site
-  Hybrid<int> virtual_site_frame3_atoms;    ///< Frame atom 3 (optional) for each virtual site
-  Hybrid<int> virtual_site_frame4_atoms;    ///< Frame atom 4 (optional) for each virtual site
-  Hybrid<double> virtual_site_frame_dim1;   ///< First frame dimension for each v-site
-  Hybrid<double> virtual_site_frame_dim2;   ///< Second (optional) frame dimension for each v-site
-  Hybrid<double> virtual_site_frame_dim3;   ///< Third (optional) frame dimension for each v-site
-  Hybrid<float> sp_virtual_site_frame_dim1; ///< First frame dimension (single precision)
-  Hybrid<float> sp_virtual_site_frame_dim2; ///< Second frame dimension (single precision)
-  Hybrid<float> sp_virtual_site_frame_dim3; ///< Third frame dimension (single precision)
+  int virtual_site_count;                      ///< Number of v-sites / extra points
+  Hybrid<int> virtual_site_atoms;              ///< List of atoms which are massless virtual sites
+  Hybrid<int> virtual_site_frame_types;        ///< Frame types for each virtual site
+  Hybrid<int> virtual_site_frame1_atoms;       ///< Parent atoms (frame I) for each virtual site
+  Hybrid<int> virtual_site_frame2_atoms;       ///< Frame atom 2 for each virtual site
+  Hybrid<int> virtual_site_frame3_atoms;       ///< Frame atom 3 (optional) for each virtual site
+  Hybrid<int> virtual_site_frame4_atoms;       ///< Frame atom 4 (optional) for each virtual site
+  Hybrid<int> virtual_site_parameter_indices;  ///< Parameter indices for virtual sites, indicating
+  Hybrid<double> virtual_site_frame_dim1;      ///< First frame dimension for each v-site
+  Hybrid<double> virtual_site_frame_dim2;      ///< Second (optional) frame dimension for each
+                                               ///<   v-site
+  Hybrid<double> virtual_site_frame_dim3;      ///< Third (optional) frame dimension for each
+                                               ///<   v-site
+  Hybrid<float> sp_virtual_site_frame_dim1;    ///< First frame dimension (single precision)
+  Hybrid<float> sp_virtual_site_frame_dim2;    ///< Second frame dimension (single precision)
+  Hybrid<float> sp_virtual_site_frame_dim3;    ///< Third frame dimension (single precision)
 
   // Relevant information for the non-bonded calculation
   int charge_type_count;                 ///< Number of distinct atomic partial charges
