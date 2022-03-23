@@ -411,7 +411,7 @@ template <typename T> struct VirtualSiteKit {
 
   /// \brief The constructor follows other abstracts and is produced based on pointers from an
   ///        AtomGraph object.
-  VirtualSiteKit(int nsite_in, const int* vs_atoms_in, const int* frame1_idx_in,
+  VirtualSiteKit(int nsite_in, int nframe_set_in, const int* vs_atoms_in, const int* frame1_idx_in,
                  const int* frame2_idx_in, const int* frame3_idx_in, const int* frame4_idx_in,
                  const int* vs_param_idx_in, const int* vs_types_in, const T* dim1_in,
                  const T* dim2_in, const T* dim3_in);
@@ -422,8 +422,9 @@ template <typename T> struct VirtualSiteKit {
   VirtualSiteKit(const VirtualSiteKit &original) = default;
   VirtualSiteKit(VirtualSiteKit &&other) = default;
   /// \}
-  
+
   const int nsite;          ///< The number of virtual sites in the topology
+  const int nframe_set;     ///< The number of unique frame parameter sets in the topology
   const int* vs_atoms;      ///< Topological indicies of frame atoms
   const int* frame1_idx;    ///< Topological indices of frame atom 1 (the parent atom)
   const int* frame2_idx;    ///< Topological indices of frame atom 2

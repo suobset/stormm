@@ -1083,11 +1083,13 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
                              default_elec14_screening, default_vdw14_screening);
   attenuated_14_type_count = attn_parm.total_14_sets;
 
-  // Create vectors for virtual site frame indexing and dimensions
+  // Create vectors for virtual site frame indexing and dimensions.  Glean the number of unique
+  // virtual site frames from the result.
   VirtualSiteTable vsite_table = listVirtualSites(virtual_site_count, source,
                                                   tmp_masses, basic_vtable, tmp_bond_equilibria,
                                                   tmp_atom_types, tmp_atom_names,
                                                   vsite_custom_frames, vsite_custom_details);
+  virtual_site_parameter_set_count = vsite_table.frame_dim1.size();
 
   // Check the largest residue--it may have changed given the virtual site placement
   largest_residue_size = reviewLargestResidue(tmp_residue_limits, largest_residue_size, policy);

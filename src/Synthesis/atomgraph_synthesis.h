@@ -185,6 +185,8 @@ private:
   int total_ubrd_params;          ///< Total number of unique Urey-Bradley angle parameter sets
   int total_cimp_params;          ///< Total number of unique CHARMM improper parameter sets
   int total_cmap_surfaces;        ///< Total number of unique CMAP surfaces
+  int total_vste_params;          ///< Total number of unique virtual site frames, across all
+                                  ///<   systems
   int total_position_restraints;  ///< Total number of positional restraints
   int total_distance_restraints;  ///< Total number of distance restraints
   int total_angle_restraints;     ///< Total number of angle restraints
@@ -454,9 +456,12 @@ private:
 
   // Non-bonded parameter indexing and van-der Waals tables
   Hybrid<int> charge_indices;                   ///< Atomic charge indices, 0 to
-                                                ///<   charge_type_count - 1
+                                                ///<   charge_type_count - 1, pointed to target
+                                                ///<   chem_int_data as a convenient and sensible
+                                                ///<   way to keep the data stored
   Hybrid<int> lennard_jones_indices;            ///< Lennard-Jones indices, 0 to
-                                                ///<   atom_type_count - 1
+                                                ///<   atom_type_count - 1, pointed to target
+                                                ///<   chem_int_data
   Hybrid<double2> lennard_jones_ab_coeff;       ///< Lennard-Jones A and B coefficients, a series
                                                 ///<   of tables covering all systems
   Hybrid<double> lennard_jones_c_coeff;         ///< Lennard-Jones C coefficients, a series of
@@ -479,9 +484,9 @@ private:
                                                 ///<   precision)
   
   // NMR restraint terms and details: these function exactly like other parameter sets and are
-  // indexed by lists of atoms in the bond work units arrays.  They can be included in the synthesis
-  // of AtomGraphs due to their nature as potential terms, whereas the original topologies had to be
-  // read from files that did not contain such terms.
+  // indexed by lists of atoms in the bond work units arrays.  They can be included in the
+  // synthesis of AtomGraphs due to their nature as potential terms, whereas the original
+  // topologies had to be read from files that did not contain such terms.
   Hybrid<int2> rposn_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
                                      ///<   applying positional restraints
   Hybrid<int2> rbond_step_bounds;    ///< Initial (x member) and final (y member) step numbers for
@@ -645,6 +650,40 @@ private:
   Hybrid<int> rdihe_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
                                     ///<   four-point dihedral angle restraint
   Hybrid<int> nmr_int_data;         ///< Array targeted by POINTER-kind objects in this section
+
+  // Virtual site details: virtual sites are considered parameters, which like valence terms apply
+  // to a small group of atoms and index into a table of parameters including the frame type and
+  // up to three dimensional measurements.
+  Hybrid<double4> virtual_site_parameters;    ///< Frame types for each virtual site parameter set
+                                              ///<   (w member) plus up to three dimensions for
+                                              ///<   each frame (stored in the x, y, and z members,
+                                              ///<   respectively).  This array spans all unique
+                                              ///<   frame types across all systems in the
+                                              ///<   synthesis.  The frame type, an integer, is
+                                              ///<   stored as a double-precision real, which for
+                                              ///<   integers of this size is exact.
+  Hybrid<float4> sp_virtual_site_parameters;  ///< Single-precision version of the virtual site
+                                              ///<   frame specifications.
+  Hybrid<int> virtual_site_atoms;             ///< Indices of virtual sites in the concatenated
+                                              ///<   list of all atoms, taken from their original
+                                              ///<   topological orders plus the system offset.
+                                              ///<   There are as many entries in this array, and
+                                              ///<   the frame atom indexing arrays that follow,
+                                              ///<   as there are virtual sites in all systems of
+                                              ///<   the synthesis.  This is at least as large,
+                                              ///<   and probably much greater, than the length of
+                                              ///<   the preceding frame type and dimension arrays.
+  Hybrid<int> virtual_site_frame1_atoms;      ///< Frame 1 (parent) atoms for each virtual site,
+                                              ///<   using a similar indexing scheme as above.
+  Hybrid<int> virtual_site_frame2_atoms;      ///< Frame 2 atoms for each virtual site
+  Hybrid<int> virtual_site_frame3_atoms;      ///< Frame 3 atoms for each virtual site
+  Hybrid<int> virtual_site_frame4_atoms;      ///< Frame 4 atoms for each virtual site
+  Hybrid<int> virtual_site_parameter_indices; ///< Parameter indices for each virtual site,
+                                              ///<   indexing into the frame type and dimension
+                                              ///<   arrays above.
+  Hybrid<int> vsite_int_data;                 ///< Virtual site integer data, storing virtual site
+                                              ///<   and frame atom indices as well as virtual
+                                              ///<   site parameter sets, but not frame types
   
   // Valence work units (VWUs): work units providing instruction sets for the GPU to operate on a
   // continuous, non-rearranged list of atoms and implement all valence terms.  Each VWU pertains

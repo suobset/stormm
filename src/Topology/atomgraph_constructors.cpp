@@ -159,7 +159,7 @@ AtomGraph::AtomGraph() :
     dihe_assigned_mods{HybridKind::POINTER, "tp_dihe_asmods"},
 
     // Information relevant to virtual site placement
-    virtual_site_count{0},
+    virtual_site_count{0}, virtual_site_parameter_set_count{0},
     virtual_site_atoms{HybridKind::POINTER, "tp_vsidx"},
     virtual_site_frame_types{HybridKind::POINTER, "tp_vsfrm"},
     virtual_site_frame1_atoms{HybridKind::POINTER, "tp_vsfr1"},
@@ -1048,6 +1048,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     angl_assigned_mods{original.angl_assigned_mods},
     dihe_assigned_mods{original.dihe_assigned_mods},
     virtual_site_count{original.virtual_site_count},
+    virtual_site_parameter_set_count{original.virtual_site_parameter_set_count},
     virtual_site_atoms{original.virtual_site_atoms},
     virtual_site_frame_types{original.virtual_site_frame_types},
     virtual_site_frame1_atoms{original.virtual_site_frame1_atoms},
@@ -1342,6 +1343,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   angl_assigned_mods = other.angl_assigned_mods;
   dihe_assigned_mods = other.dihe_assigned_mods;
   virtual_site_count = other.virtual_site_count;
+  virtual_site_parameter_set_count = other.virtual_site_parameter_set_count;
   virtual_site_atoms = other.virtual_site_atoms;
   virtual_site_frame_types = other.virtual_site_frame_types;
   virtual_site_frame1_atoms = other.virtual_site_frame1_atoms;
@@ -1618,6 +1620,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     angl_assigned_mods{std::move(original.angl_assigned_mods)},
     dihe_assigned_mods{std::move(original.dihe_assigned_mods)},
     virtual_site_count{original.virtual_site_count},
+    virtual_site_parameter_set_count{original.virtual_site_parameter_set_count},
     virtual_site_atoms{std::move(original.virtual_site_atoms)},
     virtual_site_frame_types{std::move(original.virtual_site_frame_types)},
     virtual_site_frame1_atoms{std::move(original.virtual_site_frame1_atoms)},
@@ -1905,7 +1908,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   bond_assigned_mods = std::move(other.bond_assigned_mods);
   angl_assigned_mods = std::move(other.angl_assigned_mods);
   dihe_assigned_mods = std::move(other.dihe_assigned_mods);
-  virtual_site_count = std::move(other.virtual_site_count);
+  virtual_site_count = other.virtual_site_count;
+  virtual_site_parameter_set_count = other.virtual_site_parameter_set_count;
   virtual_site_atoms = std::move(other.virtual_site_atoms);
   virtual_site_frame_types = std::move(other.virtual_site_frame_types);
   virtual_site_frame1_atoms = std::move(other.virtual_site_frame1_atoms);

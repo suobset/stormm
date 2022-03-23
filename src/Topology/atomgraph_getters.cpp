@@ -389,6 +389,11 @@ int AtomGraph::getVirtualSiteCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraph::getVirtualSiteParameterSetCount() const {
+  return virtual_site_parameter_set_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<int> AtomGraph::findVirtualSites() const {
   return virtual_site_atoms.readHost(0, virtual_site_count);
 }
@@ -803,7 +808,8 @@ ChemicalDetailsKit AtomGraph::getChemicalDetailsKit(HybridTargetLevel tier) cons
 //-------------------------------------------------------------------------------------------------
 VirtualSiteKit<double>
 AtomGraph::getDoublePrecisionVirtualSiteKit(const HybridTargetLevel tier) const {
-  return VirtualSiteKit<double>(virtual_site_count, virtual_site_atoms.data(tier),
+  return VirtualSiteKit<double>(virtual_site_count, virtual_site_parameter_set_count,
+                                virtual_site_atoms.data(tier),
                                 virtual_site_frame1_atoms.data(tier),
                                 virtual_site_frame2_atoms.data(tier),
                                 virtual_site_frame3_atoms.data(tier),
@@ -818,7 +824,8 @@ AtomGraph::getDoublePrecisionVirtualSiteKit(const HybridTargetLevel tier) const 
 //-------------------------------------------------------------------------------------------------
 VirtualSiteKit<float>
 AtomGraph::getSinglePrecisionVirtualSiteKit(const HybridTargetLevel tier) const {
-  return VirtualSiteKit<float>(virtual_site_count, virtual_site_atoms.data(tier),
+  return VirtualSiteKit<float>(virtual_site_count, virtual_site_parameter_set_count,
+                               virtual_site_atoms.data(tier),
                                virtual_site_frame1_atoms.data(tier),
                                virtual_site_frame2_atoms.data(tier),
                                virtual_site_frame3_atoms.data(tier),

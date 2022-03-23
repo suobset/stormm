@@ -589,6 +589,11 @@ public:
   /// \brief Get the number of virtual sites in the system
   int getVirtualSiteCount() const;
 
+  /// \brief Get the number of unique virtual site frames in the system.  For example, a system of
+  ///        1024 TIP-4P waters would have one unique frame, applied to 1024 different groups of
+  ///        atoms.
+  int getVirtualSiteParameterSetCount() const;
+  
   /// \brief Get a list of the general topological indices of one or more virtual sites.
   ///
   /// Overloaded:
@@ -1199,6 +1204,9 @@ private:
 
   // Information relevant to virtual site placement
   int virtual_site_count;                      ///< Number of v-sites / extra points
+  int virtual_site_parameter_set_count;        ///< Number of parameter sets describing unique
+                                               ///<   virtual site frames (the length of
+                                               ///<   virtual_site_frame_dim1 and related arrays)
   Hybrid<int> virtual_site_atoms;              ///< List of atoms which are massless virtual sites
   Hybrid<int> virtual_site_frame_types;        ///< Frame types for each virtual site
   Hybrid<int> virtual_site_frame1_atoms;       ///< Parent atoms (frame I) for each virtual site
@@ -1206,6 +1214,11 @@ private:
   Hybrid<int> virtual_site_frame3_atoms;       ///< Frame atom 3 (optional) for each virtual site
   Hybrid<int> virtual_site_frame4_atoms;       ///< Frame atom 4 (optional) for each virtual site
   Hybrid<int> virtual_site_parameter_indices;  ///< Parameter indices for virtual sites, indicating
+                                               ///<   the frame type and the values of up to three
+                                               ///<   dimensional measurements.  Virtual sites
+                                               ///<   operate much like valence parameters: each
+                                               ///<   has a unique set of two to four frame atoms
+                                               ///<   and references a set of parameters.
   Hybrid<double> virtual_site_frame_dim1;      ///< First frame dimension for each v-site
   Hybrid<double> virtual_site_frame_dim2;      ///< Second (optional) frame dimension for each
                                                ///<   v-site

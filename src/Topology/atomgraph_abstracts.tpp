@@ -121,14 +121,16 @@ ImplicitSolventKit<T>::ImplicitSolventKit(int natom_in, ImplicitSolventModel igb
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-VirtualSiteKit<T>::VirtualSiteKit(const int nsite_in, const int* vs_atoms_in,
-                                  const int* frame1_idx_in, const int* frame2_idx_in,
-                                  const int* frame3_idx_in, const int* frame4_idx_in,
-                                  const int* vs_param_idx_in, const int* vs_types_in,
-                                  const T* dim1_in, const T* dim2_in, const T* dim3_in) :
-    nsite{nsite_in}, vs_atoms{vs_atoms_in}, frame1_idx{frame1_idx_in}, frame2_idx{frame2_idx_in},
-    frame3_idx{frame3_idx_in}, frame4_idx{frame4_idx_in}, vs_param_idx{vs_param_idx_in},
-    vs_types{vs_types_in}, dim1{dim1_in}, dim2{dim2_in}, dim3{dim3_in}
+VirtualSiteKit<T>::VirtualSiteKit(const int nsite_in, const int nframe_set_in,
+                                  const int* vs_atoms_in, const int* frame1_idx_in,
+                                  const int* frame2_idx_in, const int* frame3_idx_in,
+                                  const int* frame4_idx_in, const int* vs_param_idx_in,
+                                  const int* vs_types_in, const T* dim1_in, const T* dim2_in,
+                                  const T* dim3_in) :
+    nsite{nsite_in}, nframe_set{nframe_set_in}, vs_atoms{vs_atoms_in}, frame1_idx{frame1_idx_in},
+    frame2_idx{frame2_idx_in}, frame3_idx{frame3_idx_in}, frame4_idx{frame4_idx_in},
+    vs_param_idx{vs_param_idx_in}, vs_types{vs_types_in}, dim1{dim1_in}, dim2{dim2_in},
+    dim3{dim3_in}
 {}
 
 } // namespace topology

@@ -172,8 +172,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     dihe_l_atoms{HybridKind::POINTER, "tpsyn_dihe_l"},
     dihe_param_idx{HybridKind::POINTER, "tpsyn_dihe_idx"},
     valence_int_data{HybridKind::ARRAY, "tpsyn_val_ints"},
-    charge_indices{HybridKind::ARRAY, "tpsyn_q_idx"},
-    lennard_jones_indices{HybridKind::ARRAY, "tpsyn_lj_idx"},
+    charge_indices{HybridKind::POINTER, "tpsyn_q_idx"},
+    lennard_jones_indices{HybridKind::POINTER, "tpsyn_lj_idx"},
     lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab"},
     lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c"},
     lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab"},
@@ -249,6 +249,15 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rdihe_l_atoms{HybridKind::POINTER, "tpsyn_rdihe_lat"},
     rdihe_param_idx{HybridKind::POINTER, "tpsyn_rdihe_param"},
     nmr_int_data{HybridKind::ARRAY, "tpsyn_nmr_ints"},
+    virtual_site_parameters{HybridKind::ARRAY, "tpsyn_vs_params"},
+    sp_virtual_site_parameters{HybridKind::ARRAY, "tpsynf_vs_params"},
+    virtual_site_atoms{HybridKind::POINTER, "tpsyn_vs_atoms"},
+    virtual_site_frame1_atoms{HybridKind::POINTER, "tpsyn_vs_frame1"},
+    virtual_site_frame2_atoms{HybridKind::POINTER, "tpsyn_vs_frame2"},
+    virtual_site_frame3_atoms{HybridKind::POINTER, "tpsyn_vs_frame3"},
+    virtual_site_frame4_atoms{HybridKind::POINTER, "tpsyn_vs_frame4"},
+    virtual_site_parameter_indices{HybridKind::POINTER, "tpsyn_vs_param_idx"},
+    vsite_int_data{HybridKind::ARRAY, "tpsyn_vsite_ints"},
     atom_imports{HybridKind::ARRAY, "tpsyn_atom_imports"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     bond_instructions{HybridKind::POINTER, "tpsyn_bond_insr"},
@@ -670,11 +679,11 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     const ChemicalDetailsKit cdk         = ag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> nbk       = ag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> vk          = ag_ptr->getDoublePrecisionValenceKit();
-    const VirtualSiteKit<double> vsk     = ag_ptr->getDoublePrecisionVirtualSiteKit();
+    const int nvsite = ag_ptr->getVirtualSiteCount();
     atom_counts.putHost(cdk.natom, i);
     total_atoms += cdk.natom;
-    virtual_site_counts.putHost(ag_ptr->getVirtualSiteCount(), i);
-    total_virtual_sites += vsk.nsite;
+    virtual_site_counts.putHost(nvsite, i);
+    total_virtual_sites += nvsite;
     residue_counts.putHost(cdk.nres, i);
     molecule_counts.putHost(cdk.nmol, i);
     largest_residue_sizes.putHost(ag_ptr->getLargestResidueSize(), i);
@@ -707,7 +716,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     atom_bit_offsets.putHost(abit_offset, i);
     abit_offset += roundUp((cdk.natom + uint_bits - 1) / uint_bits, warp_size_int);
     virtual_site_offsets.putHost(vste_offset, i);
-    vste_offset += roundUp(ag_ptr->getVirtualSiteCount(), warp_size_int);
+    vste_offset += roundUp(nvsite, warp_size_int);
     residue_offsets.putHost(resi_offset, i);
     resi_offset += roundUp(cdk.nres + 1, warp_size_int);
     molecule_offsets.putHost(mole_offset, i);
@@ -749,7 +758,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate detailed arrays for each descriptor, then collate all topologies.  This
   // fills the "atom and residue details" arrays listed in atomgraph_synthesis.h.
-  chem_int_data.resize(resi_offset + mole_offset + (6 * atom_offset));
+  chem_int_data.resize(resi_offset + mole_offset + (8 * atom_offset));
   chem_double_data.resize(3 * atom_offset);
   chem_float_data.resize(3 * atom_offset);
   chem_char4_data.resize(resi_offset + (2 * atom_offset));
@@ -769,6 +778,10 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   molecule_membership.setPointer(&chem_int_data, pivot, atom_offset);
   pivot += atom_offset;
   molecule_contents.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  charge_indices.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  lennard_jones_indices.setPointer(&chem_int_data, pivot, atom_offset);
   pivot = 0;
   atomic_charges.setPointer(&chem_double_data, pivot, atom_offset);
   pivot += atom_offset;
@@ -807,7 +820,6 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
     const NonbondedKit<float> nbk_sp = ag_ptr->getSinglePrecisionNonbondedKit();
     const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
-    const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
     const int synth_bit_base = atom_bit_offsets.readHost(i);
     const int synth_atom_base = atom_offsets.readHost(i);
     const int synth_residue_base = residue_offsets.readHost(i);
@@ -1013,13 +1025,45 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       rdihe_l_atoms.putHost(rar.rdihe_l_atoms[pos] + synth_atom_base, synth_rdihe_offset + pos);
     }
   }
+
+  // Fill in the virtual site indexing arrays
+  vsite_int_data.resize(6 * vste_offset);
+  pivot = 0;
+  virtual_site_atoms.setPointer(&vsite_int_data, pivot, vste_offset);
+  pivot += vste_offset;
+  virtual_site_frame1_atoms.setPointer(&vsite_int_data, pivot, vste_offset);
+  pivot += vste_offset;
+  virtual_site_frame2_atoms.setPointer(&vsite_int_data, pivot, vste_offset);
+  pivot += vste_offset;
+  virtual_site_frame3_atoms.setPointer(&vsite_int_data, pivot, vste_offset);
+  pivot += vste_offset;
+  virtual_site_frame4_atoms.setPointer(&vsite_int_data, pivot, vste_offset);
+  pivot += vste_offset;
+  virtual_site_parameter_indices.setPointer(&vsite_int_data, pivot, vste_offset);
+  pivot += vste_offset;
+  for (int sysid = 0; sysid < system_count; sysid++) {
+    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(sysid)];
+    const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
+    const int synth_atom_base = atom_offsets.readHost(sysid);
+    const int synth_vste_offset = virtual_site_offsets.readHost(sysid);
+    for (int pos = 0; pos < vsk.nsite; pos++) {
+      virtual_site_atoms.putHost(vsk.vs_atoms[pos], synth_vste_offset + pos);
+      virtual_site_frame1_atoms.putHost(vsk.frame1_idx[pos], synth_vste_offset + pos);
+      virtual_site_frame2_atoms.putHost(vsk.frame2_idx[pos], synth_vste_offset + pos);
+      virtual_site_frame3_atoms.putHost(vsk.frame3_idx[pos], synth_vste_offset + pos);
+      virtual_site_frame4_atoms.putHost(vsk.frame4_idx[pos], synth_vste_offset + pos);
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::condenseParameterTables() {
 
   // Compute the numbers of unique parameters.  Take the opportunity to compute offsets (starting
-  // bounds) for various sets of terms.
+  // bounds) for various sets of terms.  While similar to arrays like bond_term_offsets already
+  // stored in the AtomGraphSynthesis, these arrays pertain to term offsets for a list of unique
+  // topologies, not a list of all systems (which could include multiple coordinate sets
+  // referencing a single topology).
   int bond_offset = 0;
   int angl_offset = 0;
   int dihe_offset = 0;
@@ -1027,6 +1071,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int cimp_offset = 0;
   int cmap_offset = 0;
   int chrg_offset = 0;
+  int vste_offset = 0;
   std::vector<int> topology_bond_table_offsets(topology_count);
   std::vector<int> topology_angl_table_offsets(topology_count);
   std::vector<int> topology_dihe_table_offsets(topology_count);
@@ -1034,9 +1079,9 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> topology_cimp_table_offsets(topology_count);
   std::vector<int> topology_cmap_table_offsets(topology_count);
   std::vector<int> topology_chrg_table_offsets(topology_count);
+  std::vector<int> topology_vste_table_offsets(topology_count);
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* ag_ptr = topologies[i];
-    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
@@ -1047,6 +1092,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     topology_cimp_table_offsets[i] = cimp_offset;
     topology_cmap_table_offsets[i] = cmap_offset;
     topology_chrg_table_offsets[i] = chrg_offset;
+    topology_vste_table_offsets[i] = vste_offset;
     bond_offset += vk.nbond;
     angl_offset += vk.nangl;
     dihe_offset += vk.ndihe;
@@ -1054,6 +1100,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     cimp_offset += vk.ncimp;
     cmap_offset += vk.ncmap;
     chrg_offset += nbk.natom;
+    vste_offset += vsk.nsite;
   }
 
   // Pre-compute some quantities relating to CMAPs that will help distinguish these gargantuan
@@ -1077,6 +1124,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> cimp_synthesis_index(cimp_offset, -1);
   std::vector<int> cmap_synthesis_index(cmap_offset, -1);
   std::vector<int> chrg_synthesis_index(chrg_offset, -1);
+  std::vector<int> vste_synthesis_index(vste_offset, -1);
   std::vector<double> filtered_bond_keq;
   std::vector<double> filtered_bond_leq;
   std::vector<float> sp_filtered_bond_keq;
@@ -1105,6 +1153,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<float> sp_filtered_cmap_surf;
   std::vector<double> filtered_chrg;
   std::vector<float> sp_filtered_chrg;
+  std::vector<double4> filtered_vste_params;
+  std::vector<float4> sp_filtered_vste_params;
   int n_unique_bond = 0;
   int n_unique_angl = 0;
   int n_unique_dihe = 0;
@@ -1112,13 +1162,16 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int n_unique_cimp = 0;
   int n_unique_cmap = 0;
   int n_unique_chrg = 0;
+  int n_unique_vste = 0;
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* iag_ptr = topologies[i];
-    const ChemicalDetailsKit i_cdk     = iag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
-    const NonbondedKit<float> i_nbk_sp = iag_ptr->getSinglePrecisionNonbondedKit();
-    const ValenceKit<float> i_vk_sp    = iag_ptr->getSinglePrecisionValenceKit();
+    const ChemicalDetailsKit i_cdk       = iag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> i_nbk     = iag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> i_vk        = iag_ptr->getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> i_vsk   = iag_ptr->getDoublePrecisionVirtualSiteKit();
+    const NonbondedKit<float> i_nbk_sp   = iag_ptr->getSinglePrecisionNonbondedKit();
+    const ValenceKit<float> i_vk_sp      = iag_ptr->getSinglePrecisionValenceKit();
+    const VirtualSiteKit<float> i_vsk_sp = iag_ptr->getSinglePrecisionVirtualSiteKit();
 
     // Seek out unique bond parameters
     for (int j = 0; j < i_vk.nbond_param; j++) {
@@ -1310,7 +1363,6 @@ void AtomGraphSynthesis::condenseParameterTables() {
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
         const NonbondedKit<double> k_nbk   = kag_ptr->getDoublePrecisionNonbondedKit();
-        const NonbondedKit<float> k_nbk_sp = kag_ptr->getSinglePrecisionNonbondedKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_nbk.n_q_types; m++) {
           if (chrg_synthesis_index[topology_chrg_table_offsets[k] + m] < 0 &&
@@ -1324,6 +1376,36 @@ void AtomGraphSynthesis::condenseParameterTables() {
       filtered_chrg.push_back(i_nbk.q_parameter[j]);
       sp_filtered_chrg.push_back(i_nbk_sp.q_parameter[j]);
       n_unique_chrg++;
+    }
+
+    // Seek out unique virtual site frames
+    for (int j = 0; j < i_vsk.nframe_set; j++) {
+      if (vste_synthesis_index[topology_vste_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const int ij_frame_type = i_vsk.vs_types[j];
+      const Approx ij_dim1(i_vsk.dim1[j], constants::verytiny);
+      const Approx ij_dim2(i_vsk.dim2[j], constants::verytiny);
+      const Approx ij_dim3(i_vsk.dim3[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const VirtualSiteKit<double> k_vsk    = kag_ptr->getDoublePrecisionVirtualSiteKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vsk.nframe_set; m++) {
+          if (vste_synthesis_index[topology_vste_table_offsets[k] + m] < 0 &&
+              ij_frame_type == k_vsk.vs_types[m] && ij_dim1.test(k_vsk.dim1[m]) &&
+              ij_dim2.test(k_vsk.dim2[m]) && ij_dim3.test(k_vsk.dim3[m])) {
+            vste_synthesis_index[topology_vste_table_offsets[k] + m] = n_unique_vste;
+          }
+        }
+      }
+
+      // Catalog this unique virtual site frame and increment the counter
+      filtered_vste_params.push_back({ i_vsk.dim1[j], i_vsk.dim2[j],
+                                       i_vsk.dim3[j], static_cast<double>(ij_frame_type) });
+      sp_filtered_vste_params.push_back({ i_vsk_sp.dim1[j], i_vsk_sp.dim2[j],
+                                          i_vsk_sp.dim3[j], static_cast<float>(ij_frame_type) });
+      n_unique_vste++;
     }
   }
 
@@ -1341,6 +1423,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   total_cimp_params   = n_unique_cimp;
   total_cmap_surfaces = n_unique_cmap;
   total_charge_types  = n_unique_chrg;
+  total_vste_params   = n_unique_vste;
   const int rn_space = (2 * roundUp(total_bond_params, warp_size_int)) +
                        (2 * roundUp(total_angl_params, warp_size_int)) +
                        (3 * roundUp(total_dihe_params, warp_size_int)) +
@@ -1393,16 +1476,6 @@ void AtomGraphSynthesis::condenseParameterTables() {
   ic = cmap_patch_bounds.putHost(&valparam_int_data, cmap_digest.patch_matrix_bounds, ic,
                                  warp_size_zu);
 
-  // Lay out the tables for valence and charge parameter indexing within the synthesis
-  const int scm1 = system_count - 1;
-  ubrd_param_idx.resize(ubrd_term_offsets.readHost(scm1) + ubrd_term_counts.readHost(scm1));
-  cimp_param_idx.resize(cimp_term_offsets.readHost(scm1) + cimp_term_counts.readHost(scm1));
-  cmap_param_idx.resize(cmap_term_offsets.readHost(scm1) + cmap_term_counts.readHost(scm1));
-  bond_param_idx.resize(bond_term_offsets.readHost(scm1) + bond_term_counts.readHost(scm1));
-  angl_param_idx.resize(angl_term_offsets.readHost(scm1) + angl_term_counts.readHost(scm1));
-  dihe_param_idx.resize(dihe_term_offsets.readHost(scm1) + dihe_term_counts.readHost(scm1));
-  charge_indices.resize(atom_offsets.readHost(scm1) + atom_counts.readHost(scm1));
-                        
   // Loop back over all systems and copy the known mapping of individual topologies to the
   // synthesis as a whole
   for (int i = 0; i < system_count; i++) {
@@ -2129,8 +2202,6 @@ void AtomGraphSynthesis::upload() {
   valparam_float_data.upload();
   valparam_int_data.upload();
   valence_int_data.upload();
-  charge_indices.upload();
-  lennard_jones_indices.upload();
   lennard_jones_ab_coeff.upload();
   lennard_jones_c_coeff.upload();
   lennard_jones_14_ab_coeff.upload();
@@ -2163,8 +2234,6 @@ void AtomGraphSynthesis::download() {
   valparam_float_data.download();
   valparam_int_data.download();
   valence_int_data.download();
-  charge_indices.download();
-  lennard_jones_indices.download();
   lennard_jones_ab_coeff.download();
   lennard_jones_c_coeff.download();
   lennard_jones_14_ab_coeff.download();
