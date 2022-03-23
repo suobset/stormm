@@ -1482,6 +1482,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     const AtomGraph* iag_ptr = topologies[topology_indices.readHost(i)];
     const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> i_vsk = iag_ptr->getDoublePrecisionVirtualSiteKit();
     const int tp_index = topology_indices.readHost(i);
     const int ag_bond_table_offset = topology_bond_table_offsets[tp_index];
     const int ag_angl_table_offset = topology_angl_table_offsets[tp_index];
@@ -1489,6 +1490,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     const int ag_ubrd_table_offset = topology_ubrd_table_offsets[tp_index];
     const int ag_cimp_table_offset = topology_cimp_table_offsets[tp_index];
     const int ag_cmap_table_offset = topology_cmap_table_offsets[tp_index];
+    const int ag_vste_table_offset = topology_vste_table_offsets[tp_index];
     const int ag_chrg_table_offset = topology_chrg_table_offsets[tp_index];
     const int synth_bond_table_offset = bond_term_offsets.readHost(i);
     const int synth_angl_table_offset = angl_term_offsets.readHost(i);
@@ -1496,6 +1498,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     const int synth_ubrd_table_offset = ubrd_term_offsets.readHost(i);
     const int synth_cimp_table_offset = cimp_term_offsets.readHost(i);
     const int synth_cmap_table_offset = cmap_term_offsets.readHost(i);
+    const int synth_vste_table_offset = virtual_site_offsets.readHost(i);
     const int synth_atom_offset = atom_offsets.readHost(i);
     for (int j = 0; j < i_vk.nbond; j++) {
       bond_param_idx.putHost(bond_synthesis_index[ag_bond_table_offset + j],
@@ -1524,6 +1527,10 @@ void AtomGraphSynthesis::condenseParameterTables() {
     for (int j = 0; j < i_nbk.natom; j++) {
       charge_indices.putHost(chrg_synthesis_index[ag_chrg_table_offset + j],
                              synth_atom_offset + j);
+    }
+    for (int j = 0; j < i_vsk.nsite; j++) {
+      virtual_site_parameter_indices.putHost(vste_synthesis_index[ag_vste_table_offset + j],
+                                             synth_vste_table_offset + j);
     }
   }
 }
@@ -1914,7 +1921,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
           const RestraintApparatusDpReader krar_dp = kra_ptr->dpData();
           const int mstart = (k == i) ? j : 0;
           for (int m = mstart; m < krar_dp.nposn; m++) {
-            if (rposn_synthesis_kr_index[network_rposn_table_offsets[k] + m] >= 0) {
+            if (rposn_synthesis_xyz_index[network_rposn_table_offsets[k] + m] >= 0) {
               continue;
             }
             const bool km_time_dep = (krar_dp.rposn_finl_step[m] == 0);
@@ -2042,7 +2049,42 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = sp_rdihe_init_r.putHost(&nmr_float4_data, spfil_rdihe_init_r, ic, warp_size_zu);
   ic = sp_rdihe_final_r.putHost(&nmr_float4_data, spfil_rdihe_finl_r, ic, warp_size_zu);
 
-  // L
+  // With the restraint parameter tables assembled, mark the restraints for each system in
+  // terms of the synthesis tables.
+  for (int sysid = 0; sysid < system_count; sysid++) {
+    const int ra_index = restraint_indices.readHost(sysid);
+    const RestraintApparatus* ra_ptr = restraint_networks[ra_index];
+    if (ra_ptr == nullptr) {
+      continue;
+    }
+    const RestraintApparatusDpReader rar = ra_ptr->dpData();
+    const int ra_posn_table_offset = network_rposn_table_offsets[ra_index];
+    const int ra_bond_table_offset = network_rbond_table_offsets[ra_index];
+    const int ra_angl_table_offset = network_rangl_table_offsets[ra_index];
+    const int ra_dihe_table_offset = network_rdihe_table_offsets[ra_index];
+    const int synth_posn_table_offset = posn_restraint_offsets.readHost(sysid);
+    const int synth_bond_table_offset = bond_restraint_offsets.readHost(sysid);
+    const int synth_angl_table_offset = angl_restraint_offsets.readHost(sysid);
+    const int synth_dihe_table_offset = dihe_restraint_offsets.readHost(sysid);
+    for (int j = 0; j < rar.nposn; j++) {
+      rposn_kr_param_idx.putHost(rposn_synthesis_kr_index[ra_posn_table_offset + j],
+                                 synth_posn_table_offset + j);
+      rposn_xyz_param_idx.putHost(rposn_synthesis_xyz_index[ra_posn_table_offset + j],
+                                  synth_posn_table_offset + j);
+    }
+    for (int j = 0; j < rar.nbond; j++) {
+      rbond_param_idx.putHost(rbond_synthesis_index[ra_bond_table_offset + j],
+                              synth_bond_table_offset + j);
+    }
+    for (int j = 0; j < rar.nangl; j++) {
+      rangl_param_idx.putHost(rangl_synthesis_index[ra_angl_table_offset + j],
+                              synth_angl_table_offset + j);
+    }
+    for (int j = 0; j < rar.ndihe; j++) {
+      rdihe_param_idx.putHost(rdihe_synthesis_index[ra_dihe_table_offset + j],
+                              synth_dihe_table_offset + j);
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2218,6 +2260,9 @@ void AtomGraphSynthesis::upload() {
   nmr_float2_data.upload();
   nmr_float4_data.upload();
   nmr_int_data.upload();
+  virtual_site_parameters.upload();
+  sp_virtual_site_parameters.upload();
+  vsite_int_data.upload();
   atom_imports.upload();
   vwu_instruction_sets.upload();
   insr_uint2_data.upload();
@@ -2250,6 +2295,9 @@ void AtomGraphSynthesis::download() {
   nmr_float2_data.download();
   nmr_float4_data.download();
   nmr_int_data.download();
+  virtual_site_parameters.download();
+  sp_virtual_site_parameters.download();
+  vsite_int_data.download();
   atom_imports.download();
   vwu_instruction_sets.download();
   insr_uint2_data.download();

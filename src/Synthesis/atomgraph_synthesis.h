@@ -791,7 +791,8 @@ private:
 
   /// \brief Lay down arrays that will hold each system's atoms and terms: particles and
   ///        interactions, with updated indexing into the synthesis as opposed to any of the
-  ///        original topologies, but as of yet without parameter indices.
+  ///        original topologies, but as of yet without parameter indices.  This routine handles
+  ///        valence terms, restraints, and virtual sites.
   ///
   /// \param topology_indices_in     Original list of system topology indices, oriented towards
   ///                                the input list of AtomGraph pointers
@@ -808,9 +809,9 @@ private:
                               const std::vector<int> &restraint_indices_in,
                               const std::vector<int> &restraint_index_rebase);
 
-  /// \brief Find unique parameters for each of the valence and charge energy components, then
-  ///        assign terms indexing atoms in the order of the synthesis to use parameters from
-  ///        consensus tables.
+  /// \brief Find unique parameters for each of the valence energy components, charges, and
+  ///        virtual site frames.  Then, assign terms indexing atoms in the order of the synthesis
+  ///        to use parameters from consensus tables.
   void condenseParameterTables();
   
   /// \brief Extend the Lennard-Jones tables with a specific Lennard-Jones atom type, including
@@ -839,9 +840,9 @@ private:
   /// \param filtered_finl_keq      Mature stiffness constants for the set of condensed restraint
   ///                               parameters.  No pre-allocation is needed.  This will be
   ///                               assembled and returned.
-  /// \param filtered_init_r        Initial displacement settings for the set of condensed restraint
-  ///                               parameters.  No pre-allocation is needed.  This will be
-  ///                               assembled and returned.
+  /// \param filtered_init_r        Initial displacement settings for the set of condensed
+  ///                               restraint parameters.  No pre-allocation is needed.  This will
+  ///                               be assembled and returned.
   /// \param filtered_finl_r        Mature displacement settings for the set of condensed restraint
   ///                               parameters.  No pre-allocation is needed.  This will be
   ///                               assembled and returned.
