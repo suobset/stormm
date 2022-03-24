@@ -47,6 +47,7 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 ///        streamlined data structures and GPU execution.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -103,6 +104,7 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 ///        complex routines involving streamlined data structures and GPU execution.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -113,11 +115,25 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 /// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
+/// \param umat          Box space transformation matrix
+/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
+                          const double* zcrd, const double* umat, const double* invu,
+                          UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          ScoreCard *ecard, EvaluateForce eval_force, int system_index);
+
 double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
                           

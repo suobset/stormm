@@ -125,8 +125,11 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
-double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
-                          const EvaluateForce eval_force, const int system_index) {
+double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
+                          const double* zcrd, const double* umat, const double* invu,
+                          const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          ScoreCard *ecard, const EvaluateForce eval_force,
+                          const int system_index) {
 
   // As in the bond interaction computation above, use two accumulators.  The full double-precision
   // result will be returned if there is interest in comparing to the fixed-precision accumulation.
@@ -151,18 +154,14 @@ double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Sco
     const double theta0 = vk.angl_theta[param_idx];
 
     // Compute displacements
-    ba[0] = psw.xcrd[i_atom] - psw.xcrd[j_atom];
-    ba[1] = psw.ycrd[i_atom] - psw.ycrd[j_atom];
-    ba[2] = psw.zcrd[i_atom] - psw.zcrd[j_atom];
-    bc[0] = psw.xcrd[k_atom] - psw.xcrd[j_atom];
-    bc[1] = psw.ycrd[k_atom] - psw.ycrd[j_atom];
-    bc[2] = psw.zcrd[k_atom] - psw.zcrd[j_atom];
-    if (psw.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&ba[0], &ba[1], &ba[2], psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      imageCoordinates(&bc[0], &bc[1], &bc[2], psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
+    ba[0] = xcrd[i_atom] - xcrd[j_atom];
+    ba[1] = ycrd[i_atom] - ycrd[j_atom];
+    ba[2] = zcrd[i_atom] - zcrd[j_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+    imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
 
     // On to the angle force computation
     const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
@@ -187,15 +186,15 @@ double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Sco
         adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
         cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
       }
-      psw.xfrc[i_atom] -= adf[0];
-      psw.yfrc[i_atom] -= adf[1];
-      psw.zfrc[i_atom] -= adf[2];
-      psw.xfrc[j_atom] += adf[0] + cdf[0];
-      psw.yfrc[j_atom] += adf[1] + cdf[1];
-      psw.zfrc[j_atom] += adf[2] + cdf[2];
-      psw.xfrc[k_atom] -= cdf[0];
-      psw.yfrc[k_atom] -= cdf[1];
-      psw.zfrc[k_atom] -= cdf[2];
+      xfrc[i_atom] -= adf[0];
+      yfrc[i_atom] -= adf[1];
+      zfrc[i_atom] -= adf[2];
+      xfrc[j_atom] += adf[0] + cdf[0];
+      yfrc[j_atom] += adf[1] + cdf[1];
+      zfrc[j_atom] += adf[2] + cdf[2];
+      xfrc[k_atom] -= cdf[0];
+      yfrc[k_atom] -= cdf[1];
+      zfrc[k_atom] -= cdf[2];
     }
   }
 
@@ -204,6 +203,14 @@ double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Sco
 
   // Return the double-precision angle energy sum, if of interest
   return angl_energy;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index) {
+  return evaluateAngleTerms(vk, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                            psw.xfrc, psw.yfrc, psw.zfrc, ecard, eval_force, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -223,50 +230,8 @@ double evaluateAngleTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
 //-------------------------------------------------------------------------------------------------
 double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, const int system_index) {
-  double angl_energy = 0.0;
-  llint angl_acc = 0LL;
-  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
-
-  // Accumulate results by looping over all angle bending terms.
-  double ba[3], bc[3];
-  for (int pos = 0; pos < vk.nangl; pos++) {
-
-    // Get parameters for an angle between atoms i, j, and k
-    const int i_atom = vk.angl_i_atoms[pos];
-    const int j_atom = vk.angl_j_atoms[pos];
-    const int k_atom = vk.angl_k_atoms[pos];
-    const int param_idx = vk.angl_param_idx[pos];
-    const double keq = vk.angl_keq[param_idx];
-    const double theta0 = vk.angl_theta[param_idx];
-
-    // Compute displacements
-    ba[0] = cfr.xcrd[i_atom] - cfr.xcrd[j_atom];
-    ba[1] = cfr.ycrd[i_atom] - cfr.ycrd[j_atom];
-    ba[2] = cfr.zcrd[i_atom] - cfr.zcrd[j_atom];
-    bc[0] = cfr.xcrd[k_atom] - cfr.xcrd[j_atom];
-    bc[1] = cfr.ycrd[k_atom] - cfr.ycrd[j_atom];
-    bc[2] = cfr.zcrd[k_atom] - cfr.zcrd[j_atom];
-    if (cfr.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&ba[0], &ba[1], &ba[2], cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      imageCoordinates(&bc[0], &bc[1], &bc[2], cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
-
-    // On to the angle force computation
-    const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
-    const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
-    const double invbabc = 1.0 / sqrt(mgba * mgbc);
-    double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
-    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-    const double theta = acos(costheta);
-    const double dtheta = theta - theta0;
-    const double du = keq * dtheta * dtheta;
-    angl_energy += du;
-    angl_acc += static_cast<llint>(round(du * nrg_scale_factor));
-  }
-  ecard->contribute(StateVariable::ANGLE, angl_acc, system_index);
-  return angl_energy;
+  return evaluateAngleTerms(vk, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.unit_cell,
+                            nullptr, nullptr, nullptr, ecard, EvaluateForce::NO, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
