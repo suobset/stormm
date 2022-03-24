@@ -15,11 +15,6 @@ using math::matrixMultiply;
 using math::matrixVectorMultiply;
 using structure::imageCoordinates;
 using structure::ImagingMethod;
-
-// CHECK
-using structure::dihedral_angle;
-// END CHECK
-
 using symbols::pi;
 using symbols::twopi;
 using symbols::inverse_twopi;
@@ -27,8 +22,11 @@ using topology::TorsionKind;
 using topology::UnitCellType;
 
 //-------------------------------------------------------------------------------------------------
-double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
-                         const EvaluateForce eval_force, const int system_index) {
+double evaluateBondTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
+                         const double* zcrd, const double* umat, const double* invu,
+                         const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                         ScoreCard *ecard, const EvaluateForce eval_force,
+                         const int system_index) {
 
   // Use two accumulators: one, a standard double-precision accumulator and the other a
   // fixed-precision long long integer with discretization at the global energy scaling factor
@@ -44,11 +42,10 @@ double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Scor
     const int param_idx = vk.bond_param_idx[pos];
     const double keq = vk.bond_keq[param_idx];
     const double leq = fabs(vk.bond_leq[param_idx]);
-    double dx = psw.xcrd[j_atom] - psw.xcrd[i_atom];
-    double dy = psw.ycrd[j_atom] - psw.ycrd[i_atom];
-    double dz = psw.zcrd[j_atom] - psw.zcrd[i_atom];
-    imageCoordinates(&dx, &dy, &dz, psw.umat, psw.invu, psw.unit_cell,
-                     ImagingMethod::MINIMUM_IMAGE);
+    double dx = xcrd[j_atom] - xcrd[i_atom];
+    double dy = ycrd[j_atom] - ycrd[i_atom];
+    double dz = zcrd[j_atom] - zcrd[i_atom];
+    imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
     const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
     const double dl = dr - leq;
     const double du = keq * dl * dl;
@@ -61,12 +58,12 @@ double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Scor
       const double fmag_dx = fmag * dx;
       const double fmag_dy = fmag * dy;
       const double fmag_dz = fmag * dz;
-      psw.xfrc[i_atom] += fmag_dx;
-      psw.yfrc[i_atom] += fmag_dy;
-      psw.zfrc[i_atom] += fmag_dz;
-      psw.xfrc[j_atom] -= fmag_dx;
-      psw.yfrc[j_atom] -= fmag_dy;
-      psw.zfrc[j_atom] -= fmag_dz;
+      xfrc[i_atom] += fmag_dx;
+      yfrc[i_atom] += fmag_dy;
+      zfrc[i_atom] += fmag_dz;
+      xfrc[j_atom] -= fmag_dx;
+      yfrc[j_atom] -= fmag_dy;
+      zfrc[j_atom] -= fmag_dz;
     }
   }
 
@@ -75,6 +72,13 @@ double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, Scor
 
   // Return the double-precision bond energy sum, if of interest
   return bond_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                         const EvaluateForce eval_force, const int system_index) {
+  return evaluateBondTerms(vk, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                           psw.xfrc, psw.yfrc, psw.zfrc, ecard, eval_force, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -98,30 +102,8 @@ double evaluateBondTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
 //-------------------------------------------------------------------------------------------------
 double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                          ScoreCard *ecard, const int system_index) {
-  double bond_energy = 0.0;
-  llint bond_acc = 0LL;
-  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
-
-  // Accumulate the results (energy in both precision models)
-  for (int pos = 0; pos < vk.nbond; pos++) {
-    const int i_atom = vk.bond_i_atoms[pos];
-    const int j_atom = vk.bond_j_atoms[pos];
-    const int param_idx = vk.bond_param_idx[pos];
-    const double keq = vk.bond_keq[param_idx];
-    const double leq = fabs(vk.bond_leq[param_idx]);
-    double dx = cfr.xcrd[j_atom] - cfr.xcrd[i_atom];
-    double dy = cfr.ycrd[j_atom] - cfr.ycrd[i_atom];
-    double dz = cfr.zcrd[j_atom] - cfr.zcrd[i_atom];
-    imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell,
-                     ImagingMethod::MINIMUM_IMAGE);
-    const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-    const double dl = dr - leq;
-    const double du = keq * dl * dl;
-    bond_energy += du;
-    bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
-  }
-  ecard->contribute(StateVariable::BOND, bond_acc, system_index);
-  return bond_energy;
+  return evaluateBondTerms(vk, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.unit_cell,
+                           nullptr, nullptr, nullptr, ecard, EvaluateForce::NO, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1689,20 +1671,6 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
       const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
       const double fc2 = cosb * invbc * isinb2;
       const double fd = -invcd * isinc2;
-
-      // CHECK
-#if 0
-      printf(" %2d %2d %2d %2d -> %9.4lf %9.4lf (%9.4lf) at angle %9.4lf\n", i_atom, j_atom,
-             k_atom, l_atom, rst_eval.x, rst_eval.y, rst_eval.z, theta);
-      printf("    ab = [ %9.4lf %9.4lf %9.4lf ];\n", ab[0], ab[1], ab[2]);
-      printf("    bc = [ %9.4lf %9.4lf %9.4lf ];\n", bc[0], bc[1], bc[2]);
-      printf("    cd = [ %9.4lf %9.4lf %9.4lf ];\n", cd[0], cd[1], cd[2]);
-      printf("    invab, invbc, invcd        = %9.4lf %9.4lf %9.4lf\n", invab, invbc, invcd);
-      printf("    cosb, cosc, isinb2, isinc2 = %9.4lf %9.4lf %9.4lf %9.4lf\n", cosb, cosc,
-             isinb2, isinc2);
-#endif
-      // END CHECK
-      
       xfrc[i_atom] += crabbc[0] * fa;
       xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
       xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
