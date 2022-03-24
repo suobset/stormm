@@ -192,7 +192,7 @@ AtomGraph::AtomGraph() :
     nb14_exclusion_bounds{HybridKind::POINTER, "tp_nnb14"},
     nb14_exclusion_list{HybridKind::POINTER, "tp_nb14_excl"},
     infr14_i_atoms{HybridKind::POINTER, "tp_inferred14_i"},
-    infr14_j_atoms{HybridKind::POINTER, "tp_inferred14_j"},
+    infr14_l_atoms{HybridKind::POINTER, "tp_inferred14_j"},
     infr14_parameter_indices{HybridKind::POINTER, "tp_inferred14_param"},
     neck_gb_indices{HybridKind::POINTER, "tp_gbneck_idx"},
     charge_parameters{HybridKind::POINTER, "tp_qparam"},
@@ -778,7 +778,7 @@ void AtomGraph::rebasePointers() {
   nb14_exclusion_bounds.swapTarget(&int_data);
   nb14_exclusion_list.swapTarget(&int_data);
   infr14_i_atoms.swapTarget(&int_data);
-  infr14_j_atoms.swapTarget(&int_data);
+  infr14_l_atoms.swapTarget(&int_data);
   infr14_parameter_indices.swapTarget(&int_data);
   neck_gb_indices.swapTarget(&int_data);
   constraint_group_atoms.swapTarget(&int_data);
@@ -1086,7 +1086,7 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     nb14_exclusion_bounds{original.nb14_exclusion_bounds},
     nb14_exclusion_list{original.nb14_exclusion_list},
     infr14_i_atoms{original.infr14_i_atoms},
-    infr14_j_atoms{original.infr14_j_atoms},
+    infr14_l_atoms{original.infr14_l_atoms},
     infr14_parameter_indices{original.infr14_parameter_indices},
     neck_gb_indices{original.neck_gb_indices},
     charge_parameters{original.charge_parameters},
@@ -1381,7 +1381,7 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   nb14_exclusion_bounds = other.nb14_exclusion_bounds;
   nb14_exclusion_list = other.nb14_exclusion_list;
   infr14_i_atoms = other.infr14_i_atoms;
-  infr14_j_atoms = other.infr14_j_atoms;
+  infr14_l_atoms = other.infr14_l_atoms;
   infr14_parameter_indices = other.infr14_parameter_indices;
   neck_gb_indices = other.neck_gb_indices;
   charge_parameters = other.charge_parameters;
@@ -1658,7 +1658,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     nb14_exclusion_bounds{std::move(original.nb14_exclusion_bounds)},
     nb14_exclusion_list{std::move(original.nb14_exclusion_list)},
     infr14_i_atoms{std::move(original.infr14_i_atoms)},
-    infr14_j_atoms{std::move(original.infr14_j_atoms)},
+    infr14_l_atoms{std::move(original.infr14_l_atoms)},
     infr14_parameter_indices{std::move(original.infr14_parameter_indices)},
     neck_gb_indices{std::move(original.neck_gb_indices)},
     charge_parameters{std::move(original.charge_parameters)},
@@ -1947,7 +1947,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   nb14_exclusion_bounds = std::move(other.nb14_exclusion_bounds);
   nb14_exclusion_list = std::move(other.nb14_exclusion_list);
   infr14_i_atoms = std::move(other.infr14_i_atoms);
-  infr14_j_atoms = std::move(other.infr14_j_atoms);
+  infr14_l_atoms = std::move(other.infr14_l_atoms);
   infr14_parameter_indices = std::move(other.infr14_parameter_indices);
   neck_gb_indices = std::move(other.neck_gb_indices);
   charge_parameters = std::move(other.charge_parameters);

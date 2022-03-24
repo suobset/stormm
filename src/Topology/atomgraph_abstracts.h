@@ -107,7 +107,7 @@ template <typename T> struct ValenceKit {
                       const int* dihe_j_atoms_in, const int* dihe_k_atoms_in,
                       const int* dihe_l_atoms_in, const int* dihe_param_idx_in,
                       const int* dihe14_param_idx_in, const char4* dihe_modifiers_in,
-                      const int* infr14_i_atoms_in, const int* infr14_j_atoms_in,
+                      const int* infr14_i_atoms_in, const int* infr14_l_atoms_in,
                       const int* infr14_param_idx_in, const int* ubrd_i_atoms_in,
                       const int* ubrd_k_atoms_in, const int* ubrd_param_idx_in,
                       const int* cimp_i_atoms_in, const int* cimp_j_atoms_in,
@@ -198,7 +198,7 @@ template <typename T> struct ValenceKit {
   const int* infr14_i_atoms;    ///< Inferred 1:4 interactions' I atoms.  These cannot be handled
                                 ///<   directly by any dihedrals and so must be treated as separate
                                 ///<   terms.
-  const int* infr14_j_atoms;    ///< Inferred 1:4 interactions' J atoms
+  const int* infr14_l_atoms;    ///< Inferred 1:4 interactions' J atoms
   const int* infr14_param_idx;  ///< Indices into the arrays of 1:4 attenuation parameters for the
                                 ///<   set of 1:4 interactions with inferred parameters
   const int* ubrd_i_atoms;      ///< First atoms in each Urey-Bradley harmonic angle interaction

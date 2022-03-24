@@ -231,7 +231,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   ic = nb14_exclusion_bounds.putHost(&int_data, all_nb_excl.nb14_excl_bounds, ic, warp_size_zu);
   ic = nb14_exclusion_list.putHost(&int_data, all_nb_excl.nb14_excl_list, ic, warp_size_zu);
   ic = infr14_i_atoms.putHost(&int_data, tmp_inferred_14_i_atoms, ic, warp_size_zu);
-  ic = infr14_j_atoms.putHost(&int_data, tmp_inferred_14_j_atoms, ic, warp_size_zu);
+  ic = infr14_l_atoms.putHost(&int_data, tmp_inferred_14_j_atoms, ic, warp_size_zu);
   ic = infr14_parameter_indices.putHost(&int_data, tmp_inferred_14_param_idx, ic, warp_size_zu);
   ic = neck_gb_indices.putHost(&int_data, tmp_neck_gb_indices, ic, warp_size_zu);
   ic = constraint_group_atoms.putHost(&int_data, std::vector<int>(2 * hydro_spacing.x, -1), ic,

@@ -939,6 +939,52 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
+double2 evaluateAttenuated14Pair(const int i_atom, const int j_atom, const int attn_idx,
+                                 const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                 const double* xcrd, const double* ycrd, const double* zcrd,
+                                 const double* umat, const double* invu,
+                                 const UnitCellType unit_cell, double* xfrc, double* yfrc,
+                                 double* zfrc, const EvaluateForce eval_elec_force,
+                                 const EvaluateForce eval_vdw_force) {
+  const int ilj_t = nbk.lj_idx[i_atom];
+  const int jlj_t = nbk.lj_idx[j_atom];
+  double dx = xcrd[j_atom] - xcrd[i_atom];
+  double dy = ycrd[j_atom] - ycrd[i_atom];
+  double dz = zcrd[j_atom] - zcrd[i_atom];
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+  const double invr = sqrt(invr2);
+  const double invr4 = invr2 * invr2;
+  const double ele_scale = vk.attn14_elec[attn_idx];
+  const double vdw_scale = vk.attn14_vdw[attn_idx];
+  const double qiqj = (nbk.coulomb_constant * nbk.charge[i_atom] * nbk.charge[j_atom]) /
+                      ele_scale;
+  const double lja = nbk.lja_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
+  const double ljb = nbk.ljb_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
+  const double ele_contrib = qiqj * invr;
+  const double vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
+
+  // Evaluate the force, if requested
+  if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
+    double fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) : 0.0;
+    if (eval_vdw_force == EvaluateForce::YES) {
+      fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+    }
+    const double fmag_dx = fmag * dx;
+    const double fmag_dy = fmag * dy;
+    const double fmag_dz = fmag * dz;
+    xfrc[i_atom] += fmag_dx;
+    yfrc[i_atom] += fmag_dy;
+    zfrc[i_atom] += fmag_dz;
+    xfrc[j_atom] -= fmag_dx;
+    yfrc[j_atom] -= fmag_dy;
+    zfrc[j_atom] -= fmag_dz;
+  }
+
+  return { ele_contrib, vdw_contrib };
+}
+  
+//-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const double* xcrd, const double* ycrd, const double* zcrd,
                                   const double* umat, const double* invu,
@@ -951,7 +997,7 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
   double ele_energy = 0.0;
   llint ele_acc = 0LL;
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
-
+  
   // Accumulate results in both electrostatic and van-der Waals (here, Lennard-Jones) energies by
   // looping over all 1:4 interactions.  The two 1:4 "non-bonded" energy components will be
   // combined into a tuple to return the single-threaded double-precision results.  Not only are
@@ -968,49 +1014,31 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
     if (attn_idx == 0) {
       continue;
     }
-    const int i_atom = vk.dihe_i_atoms[pos];
-    const int j_atom = vk.dihe_l_atoms[pos];
-    const int ilj_t = nbk.lj_idx[i_atom];
-    const int jlj_t = nbk.lj_idx[j_atom];
-    double dx = xcrd[j_atom] - xcrd[i_atom];
-    double dy = ycrd[j_atom] - ycrd[i_atom];
-    double dz = zcrd[j_atom] - zcrd[i_atom];
-    if (unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
-    const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
-    const double invr = sqrt(invr2);
-    const double invr4 = invr2 * invr2;
-    const double ele_scale = vk.attn14_elec[attn_idx];
-    const double vdw_scale = vk.attn14_vdw[attn_idx];
-    const double qiqj = (nbk.coulomb_constant * nbk.charge[i_atom] * nbk.charge[j_atom]) /
-                        ele_scale;
-    const double lja = nbk.lja_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
-    const double ljb = nbk.ljb_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
-    const double ele_contrib = qiqj * invr;
-    const double vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
-    ele_energy += ele_contrib;
-    vdw_energy += vdw_contrib;
-    ele_acc += static_cast<llint>(round(ele_contrib * nrg_scale_factor));
-    vdw_acc += static_cast<llint>(round(vdw_contrib * nrg_scale_factor));
+    const double2 uc = evaluateAttenuated14Pair(vk.dihe_i_atoms[pos], vk.dihe_l_atoms[pos],
+                                                attn_idx, vk, nbk, xcrd, ycrd, zcrd, umat, invu,
+                                                unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
+                                                eval_vdw_force);
+    ele_energy += uc.x;
+    vdw_energy += uc.y;
+    ele_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
+    vdw_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+  }
 
-    // Evaluate the force, if requested
-    if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
-      double fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) : 0.0;
-      if (eval_vdw_force == EvaluateForce::YES) {
-        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
-      }
-      const double fmag_dx = fmag * dx;
-      const double fmag_dy = fmag * dy;
-      const double fmag_dz = fmag * dz;
-      xfrc[i_atom] += fmag_dx;
-      yfrc[i_atom] += fmag_dy;
-      zfrc[i_atom] += fmag_dz;
-      xfrc[j_atom] -= fmag_dx;
-      yfrc[j_atom] -= fmag_dy;
-      zfrc[j_atom] -= fmag_dz;
+  // Evaluate additional, inferred 1:4 attenuated interactions.  These occur between virtual sites
+  // V and other atoms or virtual sites that are 1:4 to the parent atoms of V.
+  for (int pos = 0; pos < vk.ninfr14; pos++) {
+    const int attn_idx = vk.infr14_param_idx[pos];
+    if (attn_idx == 0) {
+      continue;
     }
+    const double2 uc = evaluateAttenuated14Pair(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos],
+                                                attn_idx, vk, nbk, xcrd, ycrd, zcrd, umat, invu,
+                                                unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
+                                                eval_vdw_force);
+    ele_energy += uc.x;
+    vdw_energy += uc.y;
+    ele_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
+    vdw_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
   }
 
   // Contribute results

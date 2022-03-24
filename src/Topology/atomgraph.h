@@ -1277,12 +1277,13 @@ private:
   Hybrid<int> nb14_exclusion_list;       ///< Non-bonded 1:4 exclusions (separated by three bonds)
   Hybrid<int> infr14_i_atoms;            ///< First atoms in 1:4 attenuated pair interactions with
                                          ///<   inferred screening factors
-  Hybrid<int> infr14_j_atoms;            ///< Second atoms in 1:4 attenuated pair interactions with
+  Hybrid<int> infr14_l_atoms;            ///< Second atoms in 1:4 attenuated pair interactions with
                                          ///<   inferred screening factors
   Hybrid<int> infr14_parameter_indices;  ///< Parameter indices of dihedral interactions guiding
                                          ///<   1:4 exclusions with inferred attenuations (this
-                                         ///<   index goes into an array of up to 32 unique pairs
-                                         ///<   of 1:4 scaling factors).
+                                         ///<   index goes into a pair of arrays of up to 32 unique
+                                         ///<   pairs of 1:4 scaling factors, the same as indexed
+                                         ///<   by dihe14_parameter_indices).
   Hybrid<int> neck_gb_indices;           ///< Indicies into separation and maximum value parameter
                                          ///<   tables for Mongan's "neck" GB implementations
   Hybrid<double> charge_parameters;      ///< Atomic partial charges, condensed to a list of unique
