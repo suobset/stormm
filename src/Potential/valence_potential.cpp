@@ -939,7 +939,7 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateAttenuated14Pair(const int i_atom, const int j_atom, const int attn_idx,
+double2 evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
                                  const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                  const double* xcrd, const double* ycrd, const double* zcrd,
                                  const double* umat, const double* invu,
@@ -947,17 +947,17 @@ double2 evaluateAttenuated14Pair(const int i_atom, const int j_atom, const int a
                                  double* zfrc, const EvaluateForce eval_elec_force,
                                  const EvaluateForce eval_vdw_force) {
   const int ilj_t = nbk.lj_idx[i_atom];
-  const int jlj_t = nbk.lj_idx[j_atom];
-  double dx = xcrd[j_atom] - xcrd[i_atom];
-  double dy = ycrd[j_atom] - ycrd[i_atom];
-  double dz = zcrd[j_atom] - zcrd[i_atom];
+  const int jlj_t = nbk.lj_idx[l_atom];
+  double dx = xcrd[l_atom] - xcrd[i_atom];
+  double dy = ycrd[l_atom] - ycrd[i_atom];
+  double dz = zcrd[l_atom] - zcrd[i_atom];
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
   const double invr = sqrt(invr2);
   const double invr4 = invr2 * invr2;
   const double ele_scale = vk.attn14_elec[attn_idx];
   const double vdw_scale = vk.attn14_vdw[attn_idx];
-  const double qiqj = (nbk.coulomb_constant * nbk.charge[i_atom] * nbk.charge[j_atom]) /
+  const double qiqj = (nbk.coulomb_constant * nbk.charge[i_atom] * nbk.charge[l_atom]) /
                       ele_scale;
   const double lja = nbk.lja_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
   const double ljb = nbk.ljb_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
@@ -976,9 +976,9 @@ double2 evaluateAttenuated14Pair(const int i_atom, const int j_atom, const int a
     xfrc[i_atom] += fmag_dx;
     yfrc[i_atom] += fmag_dy;
     zfrc[i_atom] += fmag_dz;
-    xfrc[j_atom] -= fmag_dx;
-    yfrc[j_atom] -= fmag_dy;
-    zfrc[j_atom] -= fmag_dz;
+    xfrc[l_atom] -= fmag_dx;
+    yfrc[l_atom] -= fmag_dy;
+    zfrc[l_atom] -= fmag_dz;
   }
 
   return { ele_contrib, vdw_contrib };

@@ -402,6 +402,34 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
                          int system_index = 0);
 /// \}
 
+/// \brief Evaluate a 1:4 pair interaction according to a pair of attenuation factors for
+///        electrostatic and van-der Waals interactions.  Both dihedral-bound and inferred
+///        1:4 pairs can be evaluated with this one routine.
+///
+/// \param i_atom           The first atom in the pair
+/// \param l_atom           The second atom in the pair
+/// \param attn_idx         The attenuation index into arrays of electrostatic and van-der Waals
+///                         scaling factors
+/// \param vk               Valence parameters abstract from the system topology
+/// \param nbk              Non-bonded parameters abstract from the system topology
+/// \param xcrd             Cartesian X coordinates of all particles
+/// \param ycrd             Cartesian Y coordinates of all particles
+/// \param zcrd             Cartesian Z coordinates of all particles
+/// \param xfrc             Cartesian X forces acting on all particles
+/// \param yfrc             Cartesian X forces acting on all particles
+/// \param zfrc             Cartesian X forces acting on all particles
+/// \param umat             Box space transformation matrix
+/// \param invu             Inverse transformation, fractional coordinates back to real space
+/// \param unit_cell        The unit cell type, i.e. triclinic
+/// \param eval_elec_force  Flag to have electrostatic forces evaluated
+/// \param eval_vdw_force   Flag to have van-der Waals (Lennard-Jones) forces evaluated
+double2 evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, ValenceKit<double> vk,
+                                 const NonbondedKit<double> nbk, const double* xcrd,
+                                 const double* ycrd, const double* zcrd, const double* umat,
+                                 const double* invu, UnitCellType unit_cell, double* xfrc,
+                                 double* yfrc, double* zfrc, EvaluateForce eval_elec_force,
+                                 EvaluateForce eval_vdw_force);
+
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
 ///        bookkeeping to make it performant, but the result is straightforward and this reference
 ///        routine will work from that setup.
