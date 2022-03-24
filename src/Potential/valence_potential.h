@@ -163,6 +163,7 @@ double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 ///        to the fixed-precision accumulators in the energy tracking object.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -220,6 +221,7 @@ double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrameReader &
 ///        compared to the result obtained with fixed-precision accumulation.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -230,11 +232,26 @@ double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrameReader &
 /// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
+/// \param umat          Box space transformation matrix
+/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const double* xcrd,
+                                const double* ycrd, const double* zcrd, const double* umat,
+                                const double* invu, const UnitCellType unit_cell, double* xfrc,
+                                double* yfrc, double* zfrc, ScoreCard *ecard,
+                                const EvaluateForce eval_force, const int system_index);
+
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                 ScoreCard *ecard, EvaluateForce eval_force, int system_index = 0);
 
@@ -263,6 +280,7 @@ double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader
 ///        result in fixed-precision accumulation.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -273,11 +291,26 @@ double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader
 /// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
+/// \param umat          Box space transformation matrix
+/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const double* xcrd,
+                                   const double* ycrd, const double* zcrd, const double* umat,
+                                   const double* invu, const UnitCellType unit_cell, double* xfrc,
+                                   double* yfrc, double* zfrc, ScoreCard *ecard,
+                                   const EvaluateForce eval_force, const int system_index);
+
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                    ScoreCard *ecard, EvaluateForce eval_force,
                                    int system_index = 0);
@@ -306,6 +339,7 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 ///        for comparison to fixed-precision results.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -316,11 +350,26 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 /// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
+/// \param umat          Box space transformation matrix
+/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
+                         const double* zcrd, const double* umat, const double* invu,
+                         const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                         ScoreCard *ecard, const EvaluateForce eval_force,
+                         const int system_index);
+
 double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                          EvaluateForce eval_force, int system_index = 0);
 
