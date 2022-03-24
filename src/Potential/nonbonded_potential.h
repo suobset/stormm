@@ -16,6 +16,7 @@ namespace energy {
 using topology::AtomGraph;
 using topology::ImplicitSolventKit;
 using topology::NonbondedKit;
+using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
@@ -27,7 +28,8 @@ using namespace generalized_born_defaults;
 ///        imaging considerations (isolated boundary conditions).
 ///
 /// Overloaded:
-///   - Pass the original topology by pointer or by reference,
+///   - Operate on raw pointers for the coordinates, box transformations, and forces
+///   - Pass the original topology by pointer or by reference
 ///   - Pass the non-bonded parameter kit by value
 ///   - Evaluate based on a PhaseSpace object, with the option to compute forces
 ///   - Evaluate energy only, based on a CoordinateFrame abstract
@@ -37,11 +39,31 @@ using namespace generalized_born_defaults;
 /// \param se            Exclusion mask providing bits for all atom pairs
 /// \param ps            Coordinates and force accumulators (modified by this function)
 /// \param psw           Coordinates and force accumulators (modified by this function)
+/// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
+/// \param umat          Box space transformation matrix
+/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
+                                const double* xcrd, const double* ycrd, const double* zcrd,
+                                const double* umat, const double* invu,
+                                UnitCellType unit_cell, double* xfrc, double* yfrc,
+                                double* zfrc, ScoreCard *ecard,
+                                EvaluateForce eval_elec_force = EvaluateForce::NO,
+                                EvaluateForce eval_vdw_force = EvaluateForce::NO,
+                                int system_index = 0);
+
 double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
                                 PhaseSpaceWriter psw, ScoreCard *ecard,
                                 EvaluateForce eval_elec_force = EvaluateForce::NO,
@@ -80,6 +102,7 @@ double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &
 ///        applied in computation of the radii or evaluation of the energy and forces)
 ///
 /// Overloaded:
+///   - Operate on raw pointers for the coordinates, box transformations, and forces
 ///   - Pass the original topology by pointer or by reference,
 ///   - Pass the non-bonded parameter kit by value
 ///   - Evaluate based on a PhaseSpace object, with the option to compute forces
@@ -90,6 +113,17 @@ double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &
 /// \param ngb_tables    "Neck" Generalized Born tables from some pre-loaded cache of constants
 /// \param ps            Coordinates and force accumulators (modified by this function)
 /// \param psw           Coordinates and force accumulators (modified by this function)
+/// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd          Cartesian X coordinates of all particles
+/// \param ycrd          Cartesian Y coordinates of all particles
+/// \param zcrd          Cartesian Z coordinates of all particles
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
+/// \param umat          Box space transformation matrix
+/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -98,40 +132,53 @@ double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
+                                     const double* xcrd, const double* ycrd, const double* zcrd,
+                                     const double* umat, const double* invu,
+                                     UnitCellType unit_cell, double* xfrc, double* yfrc,
+                                     double* zfrc, ScoreCard *ecard,
+                                     EvaluateForce eval_force = EvaluateForce::NO,
+                                     int system_index = 0);
+
+double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
+                                     const ImplicitSolventKit<double> isk,
+                                     const NeckGeneralizedBornTable &ngb_tables,
                                      PhaseSpaceWriter psw, ScoreCard *ecard,
-                                     const EvaluateForce eval_force, const int system_index);
+                                     EvaluateForce eval_force = EvaluateForce::NO,
+                                     int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
                                      const NeckGeneralizedBornTable &ngb_tables, PhaseSpace *ps,
-                                     ScoreCard *ecard, const EvaluateForce eval_force,
-                                     const int system_index);
+                                     ScoreCard *ecard,
+                                     EvaluateForce eval_force = EvaluateForce::NO,
+                                     int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
                                      const NeckGeneralizedBornTable &ngb_tables, PhaseSpace *ps,
-                                     ScoreCard *ecard, const EvaluateForce eval_force,
-                                     const int system_index);
+                                     ScoreCard *ecard,
+                                     EvaluateForce eval_force = EvaluateForce::NO,
+                                     int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameReader cfr, ScoreCard *ecard,
-                                     const int system_index);
+                                     int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameWriter &cfw, ScoreCard *ecard,
-                                     const int system_index);
+                                     int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                     const int system_index);
+                                     int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                     const int system_index);
+                                     int system_index = 0);
 /// \}
 
 } // namespace energy

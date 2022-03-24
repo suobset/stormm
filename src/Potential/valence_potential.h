@@ -75,7 +75,8 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 double evaluateBondTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                          const double* zcrd, const double* umat, const double* invu,
                          UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                         ScoreCard *ecard, EvaluateForce eval_force, int system_index);
+                         ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
+                         int system_index = 0);
   
 double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -132,7 +133,8 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                           const double* zcrd, const double* umat, const double* invu,
                           UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                          ScoreCard *ecard, EvaluateForce eval_force, int system_index);
+                          ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
+                          int system_index = 0);
 
 double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -191,7 +193,8 @@ double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                               const double* zcrd, const double* umat, const double* invu,
                               UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                              ScoreCard *ecard, EvaluateForce eval_force, int system_index);
+                              ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
+                              int system_index = 0);
 
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                               EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -250,16 +253,20 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const double* xcrd,
                                 const double* ycrd, const double* zcrd, const double* umat,
                                 const double* invu, const UnitCellType unit_cell, double* xfrc,
                                 double* yfrc, double* zfrc, ScoreCard *ecard,
-                                const EvaluateForce eval_force, const int system_index);
+                                EvaluateForce eval_force = EvaluateForce::NO,
+                                int system_index = 0);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
-                                ScoreCard *ecard, EvaluateForce eval_force, int system_index = 0);
+                                ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
+                                int system_index = 0);
 
 double evaluateUreyBradleyTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                EvaluateForce eval_force, int system_index = 0);
+                                EvaluateForce eval_force = EvaluateForce::NO,
+                                int system_index = 0);
 
 double evaluateUreyBradleyTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                                EvaluateForce eval_force, int system_index = 0);
+                                EvaluateForce eval_force = EvaluateForce::NO,
+                                int system_index = 0);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                                 ScoreCard *ecard, int system_index = 0);
@@ -307,19 +314,22 @@ double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader
 /// \{
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const double* xcrd,
                                    const double* ycrd, const double* zcrd, const double* umat,
-                                   const double* invu, const UnitCellType unit_cell, double* xfrc,
+                                   const double* invu, UnitCellType unit_cell, double* xfrc,
                                    double* yfrc, double* zfrc, ScoreCard *ecard,
-                                   const EvaluateForce eval_force, const int system_index);
+                                   EvaluateForce eval_force = EvaluateForce::NO,
+                                   int system_index = 0);
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
-                                   ScoreCard *ecard, EvaluateForce eval_force,
+                                   ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
                                    int system_index = 0);
 
 double evaluateCharmmImproperTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                   EvaluateForce eval_force, int system_index = 0);
+                                   EvaluateForce eval_force = EvaluateForce::NO,
+                                   int system_index = 0);
 
 double evaluateCharmmImproperTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                                   EvaluateForce eval_force, int system_index = 0);
+                                   EvaluateForce eval_force = EvaluateForce::NO,
+                                   int system_index = 0);
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                                    ScoreCard *ecard, int system_index = 0);
@@ -366,18 +376,18 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 /// \{
 double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                          const double* zcrd, const double* umat, const double* invu,
-                         const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                         ScoreCard *ecard, const EvaluateForce eval_force,
-                         const int system_index);
+                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                         ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
+                         int system_index = 0);
 
 double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
-                         EvaluateForce eval_force, int system_index = 0);
+                         EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
 double evaluateCmapTerms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                         EvaluateForce eval_force, int system_index = 0);
+                         EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
 double evaluateCmapTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                         EvaluateForce eval_force, int system_index = 0);
+                         EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
 
 double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                          ScoreCard *ecard, int system_index = 0);
@@ -429,22 +439,26 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const double* xcrd, const double* ycrd, const double* zcrd,
                                   const double* umat, const double* invu,
-                                  const UnitCellType unit_cell, double* xfrc, double* yfrc,
+                                  UnitCellType unit_cell, double* xfrc, double* yfrc,
                                   double* zfrc, ScoreCard *ecard,
-                                  const EvaluateForce eval_elec_force,
-                                  const EvaluateForce eval_vdw_force, const int system_index);
+                                  EvaluateForce eval_elec_force = EvaluateForce::NO,
+                                  EvaluateForce eval_vdw_force = EvaluateForce::NO,
+                                  int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
-                                  EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                  EvaluateForce eval_elec_force = EvaluateForce::NO,
+                                  EvaluateForce eval_vdw_force = EvaluateForce::NO,
                                   int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph &ag, PhaseSpace *ps, ScoreCard *ecard,
-                                  EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                  EvaluateForce eval_elec_force = EvaluateForce::NO,
+                                  EvaluateForce eval_vdw_force = EvaluateForce::NO,
                                   int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
-                                  EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                  EvaluateForce eval_elec_force = EvaluateForce::NO,
+                                  EvaluateForce eval_vdw_force = EvaluateForce::NO,
                                   int system_index = 0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
