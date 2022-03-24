@@ -253,8 +253,11 @@ double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
-                              const EvaluateForce eval_force, const int system_index) {
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
+                              const double* zcrd, const double* umat, const double* invu,
+                              const UnitCellType unit_cell, double* xfrc, double* yfrc,
+                              double* zfrc, ScoreCard *ecard, const EvaluateForce eval_force,
+                              const int system_index) {
   double2 dihe_energy = { 0.0, 0.0 };
   llint proper_acc   = 0LL;
   llint improper_acc = 0LL;
@@ -276,23 +279,18 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
     const TorsionKind kind = static_cast<TorsionKind>(vk.dihe_modifiers[pos].w);
 
     // Compute displacements
-    ab[0] = psw.xcrd[j_atom] - psw.xcrd[i_atom];
-    ab[1] = psw.ycrd[j_atom] - psw.ycrd[i_atom];
-    ab[2] = psw.zcrd[j_atom] - psw.zcrd[i_atom];
-    bc[0] = psw.xcrd[k_atom] - psw.xcrd[j_atom];
-    bc[1] = psw.ycrd[k_atom] - psw.ycrd[j_atom];
-    bc[2] = psw.zcrd[k_atom] - psw.zcrd[j_atom];
-    cd[0] = psw.xcrd[l_atom] - psw.xcrd[k_atom];
-    cd[1] = psw.ycrd[l_atom] - psw.ycrd[k_atom];
-    cd[2] = psw.zcrd[l_atom] - psw.zcrd[k_atom];
-    if (psw.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&ab[0], &ab[1], &ab[2], psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      imageCoordinates(&bc[0], &bc[1], &bc[2], psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      imageCoordinates(&cd[0], &cd[1], &cd[2], psw.umat, psw.invu, psw.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
+    ab[0] = xcrd[j_atom] - xcrd[i_atom];
+    ab[1] = ycrd[j_atom] - ycrd[i_atom];
+    ab[2] = zcrd[j_atom] - zcrd[i_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+    cd[0] = xcrd[l_atom] - xcrd[k_atom];
+    cd[1] = ycrd[l_atom] - ycrd[k_atom];
+    cd[2] = zcrd[l_atom] - zcrd[k_atom];
+    imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
 
     // Compute cross products and then the angle between the planes
     crossProduct(ab, bc, crabbc);
@@ -350,18 +348,18 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
       const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
       const double fc2 = cosb * invbc * isinb2;
       const double fd = -invcd * isinc2;
-      psw.xfrc[i_atom] += crabbc[0] * fa;
-      psw.xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
-      psw.xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
-      psw.xfrc[l_atom] -= fd * crbccd[0];
-      psw.yfrc[i_atom] += crabbc[1] * fa;
-      psw.yfrc[j_atom] += (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
-      psw.yfrc[k_atom] += (fc2 * crabbc[1]) - (fc1 * crbccd[1]);
-      psw.yfrc[l_atom] -= fd * crbccd[1];
-      psw.zfrc[i_atom] += crabbc[2] * fa;
-      psw.zfrc[j_atom] += (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
-      psw.zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
-      psw.zfrc[l_atom] -= fd * crbccd[2];
+      xfrc[i_atom] += crabbc[0] * fa;
+      xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
+      xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
+      xfrc[l_atom] -= fd * crbccd[0];
+      yfrc[i_atom] += crabbc[1] * fa;
+      yfrc[j_atom] += (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
+      yfrc[k_atom] += (fc2 * crabbc[1]) - (fc1 * crbccd[1]);
+      yfrc[l_atom] -= fd * crbccd[1];
+      zfrc[i_atom] += crabbc[2] * fa;
+      zfrc[j_atom] += (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
+      zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
+      zfrc[l_atom] -= fd * crbccd[2];
     }
   }
 
@@ -371,6 +369,13 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
 
   // Return the double-precision dihedral energy sum, if of interest
   return dihe_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
+                              const EvaluateForce eval_force, const int system_index) {
+  return evaluateDihedralTerms(vk, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                               psw.xfrc, psw.yfrc, psw.zfrc, ecard, eval_force, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -390,81 +395,8 @@ double2 evaluateDihedralTerms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ec
 //-------------------------------------------------------------------------------------------------
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameReader cfr,
                               ScoreCard *ecard, const int system_index) {
-
-  // Unpack the topology and initialize the energy result
-  double2 dihe_energy = { 0.0, 0.0 };
-  llint proper_acc   = 0LL;
-  llint improper_acc = 0LL;
-  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
-
-  // Accumulate results by looping over all dihedral terms.
-  double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
-  for (int pos = 0; pos < vk.ndihe; pos++) {
-
-    // Get parameters for an angle between atoms i, j, and k
-    const int i_atom = vk.dihe_i_atoms[pos];
-    const int j_atom = vk.dihe_j_atoms[pos];
-    const int k_atom = vk.dihe_k_atoms[pos];
-    const int l_atom = vk.dihe_l_atoms[pos];
-    const int param_idx = vk.dihe_param_idx[pos];
-    const double ampl = vk.dihe_amp[param_idx];
-    const double freq = vk.dihe_freq[param_idx];
-    const double phi  = vk.dihe_phi[param_idx];
-    const TorsionKind kind = static_cast<TorsionKind>(vk.dihe_modifiers[pos].w);
-
-    // Compute displacements
-    ab[0] = cfr.xcrd[j_atom] - cfr.xcrd[i_atom];
-    ab[1] = cfr.ycrd[j_atom] - cfr.ycrd[i_atom];
-    ab[2] = cfr.zcrd[j_atom] - cfr.zcrd[i_atom];
-    bc[0] = cfr.xcrd[k_atom] - cfr.xcrd[j_atom];
-    bc[1] = cfr.ycrd[k_atom] - cfr.ycrd[j_atom];
-    bc[2] = cfr.zcrd[k_atom] - cfr.zcrd[j_atom];
-    cd[0] = cfr.xcrd[l_atom] - cfr.xcrd[k_atom];
-    cd[1] = cfr.ycrd[l_atom] - cfr.ycrd[k_atom];
-    cd[2] = cfr.zcrd[l_atom] - cfr.zcrd[k_atom];
-    if (cfr.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&ab[0], &ab[1], &ab[2], cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      imageCoordinates(&bc[0], &bc[1], &bc[2], cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      imageCoordinates(&cd[0], &cd[1], &cd[2], cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
-
-    // Compute cross products and then the angle between the planes
-    crossProduct(ab, bc, crabbc);
-    crossProduct(bc, cd, crbccd);
-    double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
-    costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
-                     (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
-    crossProduct(crabbc, crbccd, scr);
-    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-    const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
-                                                                              -acos(costheta);
-    const double sangle = freq * theta - phi;
-
-    // Contribute the result to the correct pile: proper or improper
-    const double contrib = ampl * (1.0 + cos(sangle));
-    switch (kind) {
-    case TorsionKind::PROPER:
-    case TorsionKind::PROPER_NO_14:
-      dihe_energy.x += contrib;
-      proper_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
-      break;
-    case TorsionKind::IMPROPER:
-    case TorsionKind::IMPROPER_NO_14:
-      dihe_energy.y += ampl * (1.0 + cos(sangle));
-      improper_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
-      break;
-    }
-  }
-
-  // Contribute results
-  ecard->contribute(StateVariable::PROPER_DIHEDRAL, proper_acc, system_index);
-  ecard->contribute(StateVariable::IMPROPER_DIHEDRAL, improper_acc, system_index);
-
-  // Return the double-precision dihedral energy sum, if of interest
-  return dihe_energy;
+  return evaluateDihedralTerms(vk, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu, cfr.unit_cell,
+                               nullptr, nullptr, nullptr, ecard, EvaluateForce::NO, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
