@@ -397,6 +397,7 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
 ///        routine will work from that setup.
 ///
 /// Overloaded:
+///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
@@ -410,12 +411,29 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
 ///                        function)
 /// \param cfr             Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw             Coordinates of all particles, plus box dimensions (if needed)
+/// \param xcrd             Cartesian X coordinates of all particles
+/// \param ycrd             Cartesian Y coordinates of all particles
+/// \param zcrd             Cartesian Z coordinates of all particles
+/// \param xfrc             Cartesian X forces acting on all particles
+/// \param yfrc             Cartesian X forces acting on all particles
+/// \param zfrc             Cartesian X forces acting on all particles
+/// \param umat             Box space transformation matrix
+/// \param invu             Inverse transformation, fractional coordinates back to real space
+/// \param unit_cell        The unit cell type, i.e. triclinic
 /// \param ecard            Energy components and other state variables (volume, temperature, etc.)
 ///                         (modified by this function)
 /// \param eval_elec_force  Flag to have electrostatic forces evaluated
 /// \param eval_vdw_force   Flag to have van-der Waals (Lennard-Jones) forces evaluated
 /// \param system_index     Index of the system to which this energy contributes
 /// \{
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  const double* xcrd, const double* ycrd, const double* zcrd,
+                                  const double* umat, const double* invu,
+                                  const UnitCellType unit_cell, double* xfrc, double* yfrc,
+                                  double* zfrc, ScoreCard *ecard,
+                                  const EvaluateForce eval_elec_force,
+                                  const EvaluateForce eval_vdw_force, const int system_index);
+
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
                                   EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,

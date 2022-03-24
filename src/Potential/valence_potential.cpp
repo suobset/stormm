@@ -940,7 +940,10 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
-                                  PhaseSpaceWriter psw, ScoreCard *ecard,
+                                  const double* xcrd, const double* ycrd, const double* zcrd,
+                                  const double* umat, const double* invu,
+                                  const UnitCellType unit_cell, double* xfrc, double* yfrc,
+                                  double* zfrc, ScoreCard *ecard,
                                   const EvaluateForce eval_elec_force,
                                   const EvaluateForce eval_vdw_force, const int system_index) {
   double vdw_energy = 0.0;
@@ -969,11 +972,11 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
     const int j_atom = vk.dihe_l_atoms[pos];
     const int ilj_t = nbk.lj_idx[i_atom];
     const int jlj_t = nbk.lj_idx[j_atom];
-    double dx = psw.xcrd[j_atom] - psw.xcrd[i_atom];
-    double dy = psw.ycrd[j_atom] - psw.ycrd[i_atom];
-    double dz = psw.zcrd[j_atom] - psw.zcrd[i_atom];
-    if (psw.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, psw.umat, psw.invu, psw.unit_cell,
+    double dx = xcrd[j_atom] - xcrd[i_atom];
+    double dy = ycrd[j_atom] - ycrd[i_atom];
+    double dz = zcrd[j_atom] - zcrd[i_atom];
+    if (unit_cell != UnitCellType::NONE) {
+      imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell,
                        ImagingMethod::MINIMUM_IMAGE);
     }
     const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
@@ -1001,12 +1004,12 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
       const double fmag_dx = fmag * dx;
       const double fmag_dy = fmag * dy;
       const double fmag_dz = fmag * dz;
-      psw.xfrc[i_atom] += fmag_dx;
-      psw.yfrc[i_atom] += fmag_dy;
-      psw.zfrc[i_atom] += fmag_dz;
-      psw.xfrc[j_atom] -= fmag_dx;
-      psw.yfrc[j_atom] -= fmag_dy;
-      psw.zfrc[j_atom] -= fmag_dz;
+      xfrc[i_atom] += fmag_dx;
+      yfrc[i_atom] += fmag_dy;
+      zfrc[i_atom] += fmag_dz;
+      xfrc[j_atom] -= fmag_dx;
+      yfrc[j_atom] -= fmag_dy;
+      zfrc[j_atom] -= fmag_dz;
     }
   }
 
@@ -1016,6 +1019,16 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
 
   // Return the double-precision energy sums, if of interest
   return { ele_energy, vdw_energy };
+}
+
+//-------------------------------------------------------------------------------------------------
+double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                  PhaseSpaceWriter psw, ScoreCard *ecard,
+                                  const EvaluateForce eval_elec_force,
+                                  const EvaluateForce eval_vdw_force, const int system_index) {
+  return evaluateAttenuated14Terms(vk, nbk, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
+                                   psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, ecard,
+                                   eval_elec_force, eval_vdw_force, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1040,62 +1053,9 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, PhaseSpace *ps, ScoreCard
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const CoordinateFrameReader cfr, ScoreCard *ecard,
                                   const int system_index) {
-  double vdw_energy = 0.0;
-  llint vdw_acc = 0LL;
-  double ele_energy = 0.0;
-  llint ele_acc = 0LL;
-  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
-
-  // Accumulate results in both electrostatic and van-der Waals (here, Lennard-Jones) energies by
-  // looping over all 1:4 interactions.  The two 1:4 "non-bonded" energy components will be
-  // combined into a tuple to return the single-threaded double-precision results.  Not only are
-  // there two energies to accumulate, there are two possible sources of 1:4 interactions.  Start
-  // with dihedrals that control 1:4 pairs between their I and L atoms.
-  for (int pos = 0; pos < vk.ndihe; pos++) {
-
-    // The zero index points to a pair interaction with zero electrostatic and zero Lennard-Jones
-    // strength (full attenuation, a complete exclusion).  This is most often the case in dihedrals
-    // that are part of a larger cosine series affecting the same atoms (only one of the dihedrals
-    // will carry the responsibility of computing the I and L atom 1:4 interaction).  Another case
-    // in which it can happen is dihedrals on either side of a six-membered ring.
-    const int attn_idx = vk.dihe14_param_idx[pos];
-    if (attn_idx == 0) {
-      continue;
-    }
-    const int i_atom = vk.dihe_i_atoms[pos];
-    const int j_atom = vk.dihe_l_atoms[pos];
-    const int ilj_t = nbk.lj_idx[i_atom];
-    const int jlj_t = nbk.lj_idx[j_atom];
-    double dx = cfr.xcrd[j_atom] - cfr.xcrd[i_atom];
-    double dy = cfr.ycrd[j_atom] - cfr.ycrd[i_atom];
-    double dz = cfr.zcrd[j_atom] - cfr.zcrd[i_atom];
-    if (cfr.unit_cell != UnitCellType::NONE) {
-      imageCoordinates(&dx, &dy, &dz, cfr.umat, cfr.invu, cfr.unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-    }
-    const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
-    const double invr = sqrt(invr2);
-    const double invr4 = invr2 * invr2;
-    const double ele_scale = vk.attn14_elec[attn_idx];
-    const double vdw_scale = vk.attn14_vdw[attn_idx];
-    const double qiqj = (nbk.coulomb_constant * nbk.charge[i_atom] * nbk.charge[j_atom]) /
-                        ele_scale;
-    const double lja = nbk.lja_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
-    const double ljb = nbk.ljb_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
-    const double ele_contrib = qiqj * invr;
-    const double vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
-    ele_energy += ele_contrib;
-    vdw_energy += vdw_contrib;
-    ele_acc += static_cast<llint>(round(ele_contrib * nrg_scale_factor));
-    vdw_acc += static_cast<llint>(round(vdw_contrib * nrg_scale_factor));
-  }
-
-  // Contribute results
-  ecard->contribute(StateVariable::ELECTROSTATIC_ONE_FOUR, ele_acc, system_index);
-  ecard->contribute(StateVariable::VDW_ONE_FOUR, vdw_acc, system_index);
-
-  // Return the double-precision energy sums, if of interest
-  return { ele_energy, vdw_energy };  
+  return evaluateAttenuated14Terms(vk, nbk, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
+                                   cfr.unit_cell, nullptr, nullptr, nullptr, ecard,
+                                   EvaluateForce::NO, EvaluateForce::NO, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
