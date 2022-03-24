@@ -71,7 +71,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 	         $(SRCDIR)/Topology/atomgraph_refinement.cpp \
-	         $(SRCDIR)/Topology/topology_bounds_checks.cpp \
+	         $(SRCDIR)/Topology/topology_util.cpp \
 	         $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	         $(SRCDIR)/Trajectory/barostat.cpp \
 	         $(SRCDIR)/Trajectory/coordinateframe.cpp \
@@ -162,7 +162,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Topology/atomgraph_analysis.h \
 		   $(SRCDIR)/Topology/atomgraph_enumerators.h \
 		   $(SRCDIR)/Topology/atomgraph_refinement.h \
-		   $(SRCDIR)/Topology/topology_bounds_checks.h \
+		   $(SRCDIR)/Topology/topology_util.h \
 		   $(SRCDIR)/Trajectory/amber_ascii.h \
 		   $(SRCDIR)/Trajectory/barostat.h \
 		   $(SRCDIR)/Trajectory/coordinateframe.h \
@@ -259,7 +259,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Topology/atomgraph_analysis.o \
 		$(SRCDIR)/Topology/atomgraph_enumerators.o \
 		$(SRCDIR)/Topology/atomgraph_refinement.o \
-		$(SRCDIR)/Topology/topology_bounds_checks.o \
+		$(SRCDIR)/Topology/topology_util.o \
 		$(SRCDIR)/Trajectory/amber_ascii.o \
 		$(SRCDIR)/Trajectory/barostat.o \
 		$(SRCDIR)/Trajectory/coordinateframe.o \

@@ -811,7 +811,8 @@ private:
 
   /// \brief Find unique parameters for each of the valence energy components, charges, and
   ///        virtual site frames.  Then, assign terms indexing atoms in the order of the synthesis
-  ///        to use parameters from consensus tables.
+  ///        to use parameters from consensus tables.  This routine handles valence terms, virtual
+  ///        sites, and charge interactions.
   void condenseParameterTables();
   
   /// \brief Extend the Lennard-Jones tables with a specific Lennard-Jones atom type, including

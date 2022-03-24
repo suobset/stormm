@@ -4,7 +4,7 @@
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
-#include "topology_bounds_checks.h"
+#include "topology_util.h"
 
 namespace omni {
 namespace topology {

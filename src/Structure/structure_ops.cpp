@@ -1,4 +1,4 @@
-#include "Topology/topology_bounds_checks.h"
+#include "Topology/topology_util.h"
 #include "structure_ops.h"
 
 namespace omni {
