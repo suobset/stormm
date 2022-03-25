@@ -16,6 +16,7 @@
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
@@ -36,7 +37,6 @@ using omni::restraints::applyHydrogenBondPreventors;
 using omni::restraints::applyPositionalRestraints;
 using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
-using omni::synthesis::SystemCache;
 using namespace omni::numerics;
 using namespace omni::synthesis;
 using namespace omni::trajectory;
@@ -254,16 +254,20 @@ int main(int argc, char* argv[]) {
         "fidelity to the original than expected.", do_tests);
 
   // Prepare valence work units for the array of topologies
+  std::vector<RestraintApparatus> ra_vec;
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
     const AtomGraph *ag_i = sysc.getTopologyPointer(i);
     const PhaseSpace &ps_i = sysc.getCoordinateReference(i);
     const CoordinateFrameReader cfr_i(ps_i);
     const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
     const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, &chemfe_i, cfr_i);
-    RestraintApparatus ra_i(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
-    ra_i.addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
+    ra_vec.emplace_back(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
+    ra_vec[i].addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }
-       
+  for (int i = 0; i < sysc.getTopologyCount(); i++) {
+    buildValenceWorkUnits(sysc.getTopologyPointer(i), &ra_vec[i]);
+  }
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

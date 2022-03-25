@@ -348,6 +348,137 @@ CmapAccessories::CmapAccessories(const std::vector<int> &cmap_dimensions_in) :
 }
 
 //-------------------------------------------------------------------------------------------------
+ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
+                                 const std::vector<double> &atomic_mass,
+                                 const std::vector<int> &mol_limits,
+                                 const std::vector<int> &mol_contents,
+                                 const std::vector<int> &mol_home,
+                                 const BasicValenceTable &bvt, const Map1234 &all_nb_excl,
+                                 const std::vector<double> &bond_equilibria,
+                                 const std::vector<double> &angl_equilibria) :
+    cnst_group_count{0}, settle_group_count{0}, cnst_group_parameter_count{0},
+    settle_parameter_count{0}, cnst_group_list{}, cnst_group_bounds{}, cnst_group_param_idx{},
+    settle_ox_atoms{}, settle_h1_atoms{}, settle_h2_atoms{}, settle_param_idx{},
+    cnst_parameter_list{}, cnst_parameter_bounds{}, settle_mox{}, settle_mh{}, settle_rocm{},
+    settle_rhcm{}
+{
+  const int natom = atomic_numbers.size();
+  const int nmol = static_cast<int>(mol_limits.size()) - 1;
+  
+  // Loop over all molecules, identifying suitable candidates for SETTLE groups
+  std::vector<bool> settle_ready_atoms(natom, false);
+  std::vector<bool> settle_ready_mols(nmol, false);
+  std::vector<int2> real_populations(3);
+  for (int i = 0; i < nmol; i++) {
+    int n_real_atoms = 0;
+    int n_distinct_z = 0;
+    for (int j = mol_limits[i]; j < mol_limits[i + 1]; j++) {
+      const int j_znum = atomic_numbers[mol_contents[j]];
+      if (j_znum > 0) {
+        n_real_atoms++;
+        if (n_real_atoms <= 3) {
+          bool identity_found = false;
+          for (int k = 0; k < n_distinct_z; k++) {
+            if (real_populations[k].x == j_znum) {
+              real_populations[k].y += 1;
+              identity_found = true;
+            }
+          }
+          if (identity_found == false) {
+            real_populations[n_distinct_z].x = j_znum;
+            real_populations[n_distinct_z].y = 1;
+            n_distinct_z++;
+          }
+        }
+      }
+    }
+
+    // This is a SETTLE-capable group if there are three real atoms and two distinct Z numbers.
+    if (n_real_atoms == 3 && n_distinct_z == 2) {
+      settle_ready_mols[i] = true;
+      for (int j = mol_limits[i]; j < mol_limits[i + 1]; j++) {
+        settle_ready_atoms[mol_contents[j]] = true;
+      }
+    }
+  }
+
+  // Loop over all bonds, identifying those that bond to hydrogen and within SETTLE candidates.
+  // The differential_bonds vector stores, for every molecule, the number of bonds between two
+  // atoms of different atomic numbers.  The sum is only relevant for SETTLE-capable molecules as
+  // identified in the settle_ready_mols vector, but if settle_ready_mols[k] is TRUE and
+  // differential_bonds[k] == 2, then molecule k is suitable for SETTLE.
+  std::vector<int> differential_bonds(nmol, 0);
+  for (int pos = 0; pos < bvt.total_bonds; pos++) {
+    const int iatom = bvt.bond_i_atoms[pos];
+    const int jatom = bvt.bond_j_atoms[pos];
+    if (settle_ready_atoms[iatom] && settle_ready_atoms[jatom]) {
+      if (mol_home[iatom] != mol_home[jatom]) {
+        rtErr("Bond " + std::to_string(pos) + " between atoms " + std::to_string(iatom) + " and " +
+              std::to_string(jatom) + " was detected to span two molecules, " +
+              std::to_string(mol_home[iatom]) + " and " + std::to_string(mol_home[jatom]) + ".",
+              "ConstraintTable");
+      }
+      differential_bonds[mol_home[iatom]] += (atomic_numbers[iatom] != atomic_numbers[jatom]);
+    }
+    else if (settle_ready_atoms[iatom] && settle_ready_atoms[jatom] == false) {
+      rtErr("Inconsistent SETTLE readiness was detected in two bonded atoms.  This should not be "
+            "possible, as SETTLE readiness is applied to an antire molecule and bonds only exist "
+            "within a molecule.", "ConstraintTable");
+    }
+  }
+  int nsett = 0;
+  for (int i = 0; i < nmol; i++) {
+    nsett += (settle_ready_mols[i] && differential_bonds[i] == 2);
+  }
+  settle_group_count = nsett;
+  settle_ox_atoms.resize(nsett);
+  settle_h1_atoms.resize(nsett);
+  settle_h2_atoms.resize(nsett);
+  nsett = 0;
+  for (int i = 0; i < nmol; i++) {
+    if (settle_ready_mols[i] && differential_bonds[i] == 2) {
+      int real_atom_idx[3];
+      int real_atom_znum[3];
+      int n_real_found = 0;
+      for (int j = mol_limits[i]; j < mol_limits[i + 1]; j++) {
+        if (atomic_numbers[mol_contents[j]] > 0) {
+          real_atom_idx[n_real_found] = mol_contents[j];
+          real_atom_znum[n_real_found] = atomic_numbers[mol_contents[j]];
+          n_real_found++;
+        }
+      }
+      if (n_real_found != 3) {
+        rtErr("Expected 3 real atoms in molecule " + std::to_string(i) + ", found " +
+              std::to_string(n_real_found) + ".", "ConstraintTable");
+      }
+
+      // Find the pair of "hydrogen" atoms as a guide
+      if (real_atom_znum[0] == real_atom_znum[1]) {
+        settle_ox_atoms[nsett] = real_atom_idx[2];
+        settle_h1_atoms[nsett] = std::min(real_atom_idx[0], real_atom_idx[1]);
+        settle_h2_atoms[nsett] = std::max(real_atom_idx[0], real_atom_idx[1]);
+      }
+      else if (real_atom_znum[0] == real_atom_znum[2]) {
+        settle_ox_atoms[nsett] = real_atom_idx[1];
+        settle_h1_atoms[nsett] = std::min(real_atom_idx[0], real_atom_idx[2]);
+        settle_h2_atoms[nsett] = std::max(real_atom_idx[0], real_atom_idx[2]);        
+      }
+      else if (real_atom_znum[1] == real_atom_znum[2]) {
+        settle_ox_atoms[nsett] = real_atom_idx[0];
+        settle_h1_atoms[nsett] = std::min(real_atom_idx[1], real_atom_idx[2]);
+        settle_h2_atoms[nsett] = std::max(real_atom_idx[1], real_atom_idx[2]);        
+      }
+      else {
+        rtErr("Expected two atoms of identical mass and one of a different mass among " +
+              std::to_string(real_atom_idx[0]) + ", " + std::to_string(real_atom_idx[1]) +
+              ", and " + std::to_string(real_atom_idx[2]) + ".", "ConstraintTable");
+      }
+    }
+  }
+  
+}
+
+//-------------------------------------------------------------------------------------------------
 void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_parameters,
                    std::vector<int> *tmp_charge_indices, int *q_param_count,
                    const double rounding_tol, const double charge_discretization,
@@ -2302,7 +2433,8 @@ std::vector<int> matchExtendedName(const char4* overflow_names, const int n_over
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 estimateConstraintCapacity(const std::vector<int> &z_numbers, const std::vector<int> res_lims,
+int2 estimateConstraintCapacity(const std::vector<int> &z_numbers,
+                                const std::vector<int> &res_lims,
                                 const std::vector<int> &bond_atom_i,
                                 const std::vector<int> &bond_atom_j) {
 
@@ -2333,6 +2465,113 @@ int2 estimateConstraintCapacity(const std::vector<int> &z_numbers, const std::ve
     n_fast_waters += (n_oxygen == 1 && n_hydrogen == 2 && n_other == 0);
   }
   return { n_with_hydrogen, n_fast_waters };
+}
+
+//-------------------------------------------------------------------------------------------------
+double4 getSettleParameters(const int ox_idx, const int h1_idx, const int h2_idx,
+                            const std::vector<double> &atomic_mass,
+                            const BasicValenceTable &bvt,
+                            const std::vector<double> &bond_equilibria,
+                            const std::vector<double> &angl_equilibria) {
+
+  // Find the mass of the oxygen and of the two hydrogens
+  const double ox_mass = atomic_mass[ox_idx];
+  const double hd_mass = atomic_mass[h1_idx];
+  if (fabs(atomic_mass[h1_idx] - atomic_mass[h2_idx]) > constants::small) {
+    rtErr("Masses of atoms " + std::to_string(h1_idx) + " and " + std::to_string(h2_idx) +
+          "must agree in order to apply the SETTLE algorithm.  Their masses come to " +
+          realToString(atomic_mass[h1_idx], 4, NumberFormat::STANDARD_REAL) + " and " +
+          realToString(atomic_mass[h2_idx], 4, NumberFormat::STANDARD_REAL) + ".",
+          "getSettleParameters");
+  }
+
+  // Seek out the H-H and O-H distances based on the known equilibrium bond and angle parameters
+  double oh1_dist, oh2_dist, hh_dist;
+  bool oh1_found = false;
+  bool oh2_found = false;
+  bool hh_found = false;
+  for (int i = bvt.bond_assigned_bounds[ox_idx]; i < bvt.bond_assigned_bounds[ox_idx + 1]; i++) {
+    if (bvt.bond_assigned_atoms[i] == h1_idx) {
+      oh1_found = true;
+      oh1_dist = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[i]]];
+    }
+    else if (bvt.bond_assigned_atoms[i] == h2_idx) {
+      oh2_found = true;
+      oh2_dist = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[i]]];
+    }
+  }
+  for (int i = bvt.bond_assigned_bounds[h1_idx]; i < bvt.bond_assigned_bounds[h1_idx + 1]; i++) {
+    if (bvt.bond_assigned_atoms[i] == ox_idx) {
+      oh1_found = true;
+      oh1_dist = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[i]]];
+    }
+    else if (bvt.bond_assigned_atoms[i] == h2_idx) {
+      hh_found = true;
+      hh_dist = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[i]]];
+    }    
+  }
+  for (int i = bvt.bond_assigned_bounds[h2_idx]; i < bvt.bond_assigned_bounds[h2_idx + 1]; i++) {
+    if (bvt.bond_assigned_atoms[i] == h1_idx) {
+      hh_found = true;
+      hh_dist = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[i]]];
+    }
+    else if (bvt.bond_assigned_atoms[i] == ox_idx) {
+      oh2_found = true;
+      oh2_dist = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[i]]];
+    }
+  }
+  if (oh1_found == false || oh2_found == false) {
+    rtErr("Bond parameters were not found to link oxygen atom " + std::to_string(ox_idx) +
+          " with hydrogens " + std::to_string(h1_idx) + " and " + std::to_string(h2_idx) + ".",
+          "getSettleParameters");
+  }
+  if (hh_found == false) {
+
+    // Search for an H-O-H angle in order to determine the H-H equilibrium distance.
+    bool hoh_found = false;
+    double hoh_theta;
+    for (int i = bvt.angl_assigned_bounds[ox_idx]; i < bvt.angl_assigned_bounds[ox_idx + 1]; i++) {
+      if ((bvt.angl_assigned_atoms[(2 * i)    ] == h1_idx &&
+           bvt.angl_assigned_atoms[(2 * i) + 1] == h2_idx) ||
+          (bvt.angl_assigned_atoms[(2 * i)    ] == h2_idx &&
+           bvt.angl_assigned_atoms[(2 * i) + 1] == h1_idx)) {
+        hoh_found = true;
+        hoh_theta = angl_equilibria[bvt.angl_param_idx[bvt.angl_assigned_terms[i]]];
+      }
+    }
+    if (hoh_found) {
+      hh_dist = 2.0 * oh1_dist * sin(0.5 * hoh_theta);
+    }
+    else {
+      rtErr("No angle parameter was found between oxygen atom " + std::to_string(ox_idx) +
+            " and hydrogen atoms " + std::to_string(h1_idx) + " and " + std::to_string(h2_idx) +
+            ".  In lieu of a bond between the hydrogens, this angle is required to determine an "
+            "equilibrium geometry.", "getSettleParameters");
+    }
+  }
+
+  // With O-H1, O-H2, and H-H distances known, construct the equilibrium geometry (with the oxygen
+  // positioned at the origin and the H-O-H bisector along the x axis with the molecule in the
+  // xy plane in order to determine a center of geometry and then the critical distances of the
+  // oxygen and each hydrogen to the center of mass.
+  if (fabs(oh1_dist - oh2_dist) > constants::small) {
+    rtErr("The distance between oxygen " + std::to_string(ox_idx) + " and hydrogens " +
+          std::to_string(h1_idx) + " and " + std::to_string(h2_idx) + " must be identical in "
+          "order to apply SETTLE.", "getSettleParameters");
+  }
+  const double hoh_half = asin(0.5 * hh_dist / oh1_dist);
+  const double h1x = oh1_dist * cos(hoh_half);
+  const double h1y = oh1_dist * sin(hoh_half);
+  const double h2x = oh1_dist * cos(hoh_half);
+  const double h2y = -oh1_dist * sin(hoh_half);
+  const double total_mass = (2.0 * hd_mass) + ox_mass;
+  const double cmx = hd_mass * (h1x + h2x) / total_mass;
+
+  // The y dimension center of mass is zero
+  const double h_cm = sqrt(((h1x - cmx) * (h1x - cmx)) + (h1y * h1y));
+
+  // Return the SETTLE parameter tuple
+  return { ox_mass, hd_mass, cmx, h_cm };
 }
 
 } // namespace topology

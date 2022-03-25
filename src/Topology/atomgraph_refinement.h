@@ -314,7 +314,101 @@ struct CmapAccessories {
                                             ///<   grid segment in contiguous stretches of 16
                                             ///<   numbers.
 };
-  
+
+/// \brief Obtain SETTLE parameters for a particular water arrangement.  This will be repeated for
+///        all SETTLE candidates, to collect an array of parameters for the SETTLE procedure if
+///        necessary and treat different groups with the appropriate parameter set.  The SETTLE
+///        parameters are returned as a double-precision real tuple of four numbers: the mass
+///        of the oxygen (x member), mass of either hydrogen (y member), distance between the
+///        oxygen atom and the center of mass of the constrained system (z member), and the
+///        distance of either hydrogen to the center of mass (w member, the equilibrium geometry
+///        must be an Isosceles triangle).
+///
+/// \param ox_idx           Topological index of the oxygen atom
+/// \param h1_idx           Topological index of the first hydrogen atom
+/// \param h2_idx           Topological index of the second hydrogen atom
+/// \param atomic_mass      Masses of all atoms in the topology
+/// \param bvt              Connectivity information from which to obtain parameter indices into
+///                         the bond and angle equilibrium value arrays
+/// \param bond_equilibria  Equilibrium lengths of all harmonic bond parameters
+/// \param angl_equilibria  Equilibrium lengths of all harmonic angle parameters
+double4 getSettleParameters(int ox_idx, int h1_idx, int h2_idx,
+                            const std::vector<double> &atomic_mass,
+                            const BasicValenceTable &bvt, const Map1234 &all_nb_excl,
+                            const std::vector<double> &bond_equilibria,
+                            const std::vector<double> &angl_equilibria);
+
+/// \brief Unguarded struct to hold the results of a constraint analysis.  Constraint groups as
+///        well as fast, rigid waters will be selected.  All atoms that might participate in
+///        constraints will be selected and drawn into groups; whether those groups are applied
+///        is a matter for input parameters to decide further on in the program.
+struct ConstraintTable {
+
+  /// \brief The constructor handles all allocations based on its input arguments.
+  ///
+  /// \param atomic_numbers   Atomic numbers of all atoms in the system (0 for virtual sites)
+  /// \param atomic_mass      Masses of all atoms, in atomic mass units (Daltons)
+  /// \param mol_limits       Starting an ending bounds for reading the contents of each molecule
+  ///                         in mol_contents
+  /// \param mol_contents     Topological atom indices indicating the contents of each molecule
+  /// \param mol_home         Molecules to which each atom belongs, the kth element of the array
+  ///                         being the molecule home of atom k in the topology
+  /// \param all_nb_excl      Connectivity information can be inferred by examining the 1:2
+  ///                         exclusion information, which is reflexive within this object (if
+  ///                         atom j excludes atom i, then atom i also excludes atom j)
+  /// \param bond_equilibria  Equilibrium lengths of all harmonic bond parameters
+  /// \param angl_equilibria  Equilibrium lengths of all harmonic angle parameters
+  ConstraintTable(const std::vector<int> &atomic_numbers, const std::vector<double> &atomic_mass,
+                  const std::vector<int> &mol_limits, const std::vector<int> &mol_contents,
+                  const std::vector<int> &mol_home, const BasicValenceTable &bvt,
+                  const Map1234 &all_nb_excl, const std::vector<double> &bond_equilibria,
+                  const std::vector<double> &angl_equilibria);
+
+  int cnst_group_count;                   ///< Number of constraint groups found
+  int settle_group_count;                 ///< Number of SETTLE-suitable fast rigid waters found
+  int cnst_group_parameter_count;         ///< Number of unique constraint group parameters sets.
+                                          ///<   A constraint group parameter set consists of the
+                                          ///<   masses of every atom and the bond lengths between
+                                          ///<   the central atom and each of its subsidiary
+                                          ///<   hydrogens, in order.  Every constraint group of
+                                          ///<   unique size, i.e. one central atom with three
+                                          ///<   subsidiaries, will have at least one unique
+                                          ///<   parameter set.
+  int settle_parameter_count;             ///< Number of unique SETTLE parameter sets (a SETTLE
+                                          ///<   parameter set consists of the masses of "oxygen"
+                                          ///<   and "hydrogen" atoms plus the bond lengths between
+                                          ///<   any pair of the three atoms--five numbers in all)
+  std::vector<int> cnst_group_list;       ///< Concatenated list of atoms in all constraint groups
+  std::vector<int> cnst_group_bounds;     ///< Bounds array for cnst_group_list
+  std::vector<int> cnst_group_param_idx;  ///< Indices into the list of constraint group parameter
+                                          ///<   sets for each constraint group
+  std::vector<int> settle_ox_atoms;       ///< Topological indices of "oxygen" atoms in SETTLE
+                                          ///<   groups (this can also include other residues that
+                                          ///<   match the "one heavy atom, two symmetric light
+                                          ///<   atoms" shape requirements of the SETTLE algorithm)
+  std::vector<int> settle_h1_atoms;       ///< Topological indices of the first "hydrogen" atoms in
+                                          ///<   SETTLE groups
+  std::vector<int> settle_h2_atoms;       ///< Topological indices of the second "hydrogen" atoms
+                                          ///<   in SETTLE groups
+  std::vector<int> settle_param_idx;      ///< Indices into the lists of SETTLE constraint group
+                                          ///<   parameter sets
+
+  /// Parameters for constraint groups--each stretch of the array is one parameter set, with
+  /// demarcations provided by the following bounds array.
+  std::vector<double> cnst_parameter_list;
+
+  /// Bounds array for constraint_group_parameters
+  std::vector<double> cnst_parameter_bounds;
+
+  // Settle parameter sets
+  std::vector<double> settle_mox;   ///< Mass of the "oxygen" atoms in SETTLE groups
+  std::vector<double> settle_mh;    ///< Mass of the "hydrogen" atoms in SETTLE groups
+  std::vector<double> settle_rocm;  ///< Constrained distance between the "oxygen" and the
+                                    ///<   properly constrained system's center of mass
+  std::vector<double> settle_rhcm;  ///< Constrained distance between each "hydrogen" atom and the
+                                    ///<   properly constrained system's center of mass
+};
+
 /// \brief Unguarded struct to handle 1:4 attenuated interactions that are not explicitly
 ///        handled by the short-ranged non-bond scaling parameters of some dihedral linking the
 ///        atoms
@@ -703,7 +797,8 @@ std::vector<int> matchExtendedName(const char4* overflow_names, int n_overflow,
 /// \param res_lims     Residue limits (for finding fast rigid waters)
 /// \param bond_atom_i  First atoms of each known bond
 /// \param bond_atom_j  Second atoms of each known bond
-int2 estimateConstraintCapacity(const std::vector<int> &z_numbers, const std::vector<int> res_lims,
+int2 estimateConstraintCapacity(const std::vector<int> &z_numbers,
+                                const std::vector<int> &res_lims,
                                 const std::vector<int> &bond_atom_i,
                                 const std::vector<int> &bond_atom_j);
 

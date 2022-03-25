@@ -12,35 +12,49 @@ using topology::markAffectorAtoms;
   
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintApparatus *ra_in) :
-    atom_count{0}, bond_i_presence{}, bond_j_presence{}, angl_i_presence{}, angl_j_presence{},
-    angl_k_presence{}, dihe_i_presence{}, dihe_j_presence{}, dihe_k_presence{}, dihe_l_presence{},
-    ubrd_i_presence{}, ubrd_k_presence{}, cimp_i_presence{}, cimp_j_presence{}, cimp_k_presence{},
-    cimp_l_presence{}, cmap_i_presence{}, cmap_j_presence{}, cmap_k_presence{}, cmap_l_presence{},
-    cmap_m_presence{}, vs_presence{}, vsf1_presence{}, vsf2_presence{}, vsf3_presence{},
-    vsf4_presence{}, cnst_n_presence{}, sett_ox_presence{}, sett_h1_presence{}, sett_h2_presence{},
-    rposn_i_presence{}, rbond_i_presence{}, rbond_j_presence{}, rangl_i_presence{},
-    rangl_j_presence{}, rangl_k_presence{}, rdihe_i_presence{}, rdihe_j_presence{},
-    rdihe_k_presence{}, rdihe_l_presence{}, bond_affector_list{}, bond_affector_bounds{},
-    angl_affector_list{}, angl_affector_bounds{}, dihe_affector_list{}, dihe_affector_bounds{},
-    ubrd_affector_list{}, ubrd_affector_bounds{}, cimp_affector_list{}, cimp_affector_bounds{},
-    cmap_affector_list{}, cmap_affector_bounds{}, vste_affector_list{}, vste_affector_bounds{},
-    cnst_affector_list{}, cnst_affector_bounds{}, sett_affector_list{}, sett_affector_bounds{},
-    work_unit_assignment_count{}, work_unit_presence{}, ag_pointer{ag_in}, ra_pointer{ra_in}
+    atom_count{ag_in->getAtomCount()},
+    first_unassigned_atom{0}, max_presence_allocation{2},
+    bond_affector_list{}, bond_affector_bounds{}, angl_affector_list{}, angl_affector_bounds{},
+    dihe_affector_list{}, dihe_affector_bounds{}, ubrd_affector_list{}, ubrd_affector_bounds{},
+    cimp_affector_list{}, cimp_affector_bounds{}, cmap_affector_list{}, cmap_affector_bounds{},
+    vste_affector_list{}, vste_affector_bounds{}, cnst_affector_list{}, cnst_affector_bounds{},
+    sett_affector_list{}, sett_affector_bounds{}, work_unit_assignment_count{},
+    work_unit_presence{}, ag_pointer{ag_in}, ra_pointer{ra_in}
 {
   // Get relevant abstracts
   const ValenceKit<double> vk = ag_in->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_in->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit cnk = ag_in->getConstraintKit();
   const RestraintApparatusDpReader rar = ra_in->dpData();
-
+  
   // Allocate and fill the arrays
   allocate();
   fillAffectorArrays(vk, vsk, cnk, rar);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markAtomAddition(const int vwu_index, const int atom_index) {
+int ValenceDelegator::getAtomAssignmentCount(const int atom_index) const {
+  return work_unit_assignment_count[atom_index];
+}
 
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getFirstUnassignedAtom() const {
+  return first_unassigned_atom;
+}
+  
+//-------------------------------------------------------------------------------------------------
+void ValenceDelegator::markAtomAddition(const int vwu_index, const int atom_index) {
+  const int current_work_unit_assignments = work_unit_assignment_count[atom_index];
+  if (current_work_unit_assignments == max_presence_allocation) {
+    max_presence_allocation += 1;
+    work_unit_presence.resize(atom_count * max_presence_allocation);
+  }
+  work_unit_presence[(current_work_unit_assignments * atom_count) + atom_index] = vwu_index;
+  work_unit_assignment_count[atom_index] = current_work_unit_assignments + 1;
+  while (first_unassigned_atom < atom_count &&
+         work_unit_assignment_count[first_unassigned_atom] > 0) {
+    first_unassigned_atom += 1;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -113,53 +127,6 @@ void ValenceDelegator::markVirtualSiteAddition(const int vwu_index, const int vs
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceDelegator::resizePresenceArrays(const int n_units) {
-  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
-  const ConstraintKit cnk = ag_pointer->getConstraintKit();
-  const RestraintApparatusDpReader rar = ra_pointer->dpData();
-  bond_i_presence.resize(n_units * vk.nbond, -1);
-  bond_j_presence.resize(n_units * vk.nbond, -1);
-  angl_i_presence.resize(n_units * vk.nangl, -1);
-  angl_j_presence.resize(n_units * vk.nangl, -1);
-  angl_k_presence.resize(n_units * vk.nangl, -1);
-  dihe_i_presence.resize(n_units * vk.ndihe, -1);
-  dihe_j_presence.resize(n_units * vk.ndihe, -1);
-  dihe_k_presence.resize(n_units * vk.ndihe, -1);
-  dihe_l_presence.resize(n_units * vk.ndihe, -1);
-  ubrd_i_presence.resize(n_units * vk.nubrd, -1);
-  ubrd_k_presence.resize(n_units * vk.nubrd, -1);
-  cimp_i_presence.resize(n_units * vk.ncimp, -1);
-  cimp_j_presence.resize(n_units * vk.ncimp, -1);
-  cimp_k_presence.resize(n_units * vk.ncimp, -1);
-  cimp_l_presence.resize(n_units * vk.ncimp, -1);
-  cmap_i_presence.resize(n_units * vk.ncmap, -1);
-  cmap_j_presence.resize(n_units * vk.ncmap, -1);
-  cmap_k_presence.resize(n_units * vk.ncmap, -1);
-  cmap_l_presence.resize(n_units * vk.ncmap, -1);
-  cmap_m_presence.resize(n_units * vk.ncmap, -1);
-  vs_presence.resize(n_units * vsk.nsite, -1);
-  vsf1_presence.resize(n_units * vsk.nsite, -1);
-  vsf2_presence.resize(n_units * vsk.nsite, -1);
-  vsf3_presence.resize(n_units * vsk.nsite, -1);
-  vsf4_presence.resize(n_units * vsk.nsite, -1);
-  cnst_n_presence.resize(n_units * cnk.group_bounds[cnk.ngroup], -1);
-  sett_ox_presence.resize(n_units * cnk.nsettle, -1);
-  sett_h1_presence.resize(n_units * cnk.nsettle, -1);
-  sett_h2_presence.resize(n_units * cnk.nsettle, -1);
-  rposn_i_presence.resize(n_units * rar.nposn, -1);
-  rbond_i_presence.resize(n_units * rar.nbond, -1);
-  rbond_j_presence.resize(n_units * rar.nbond, -1);
-  rangl_i_presence.resize(n_units * rar.nangl, -1);
-  rangl_j_presence.resize(n_units * rar.nangl, -1);
-  rangl_k_presence.resize(n_units * rar.nangl, -1);
-  rdihe_i_presence.resize(n_units * rar.ndihe, -1);
-  rdihe_j_presence.resize(n_units * rar.ndihe, -1);
-  rdihe_k_presence.resize(n_units * rar.ndihe, -1);
-  rdihe_l_presence.resize(n_units * rar.ndihe, -1);
-}
-  
-//-------------------------------------------------------------------------------------------------
 void ValenceDelegator::allocate() {
  
   // Allocate memory as needed
@@ -167,8 +134,6 @@ void ValenceDelegator::allocate() {
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit cnk = ag_pointer->getConstraintKit();
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
-  resizePresenceArrays(2);
-  atom_count = vk.natom;
   bond_affector_list.resize(2 * vk.nbond);
   bond_affector_bounds.resize(atom_count + 1, 0);
   angl_affector_list.resize(3 * vk.nangl);
@@ -183,12 +148,18 @@ void ValenceDelegator::allocate() {
   cmap_affector_bounds.resize(atom_count + 1, 0);
   vste_affector_list.resize(4 * vsk.nsite);
   vste_affector_bounds.resize(atom_count + 1, 0);
+
+  // CHECK
+  printf("  allocate C\n");
+  printf("  cnk.ngroup = %d\n", cnk.ngroup);
+  // END CHECK
+
   cnst_affector_list.resize(2 * cnk.group_bounds[cnk.ngroup], -1);
   cnst_affector_bounds.resize(atom_count + 1, 0);
   sett_affector_list.resize(3 * cnk.nsettle);
   sett_affector_bounds.resize(atom_count + 1, 0);
   work_unit_assignment_count.resize(atom_count, 0);
-  work_unit_presence.resize(2 * atom_count, 0);
+  work_unit_presence.resize(max_presence_allocation * atom_count);
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -339,28 +310,77 @@ ValenceWorkUnit::ValenceWorkUnit(const AtomGraph *ag_in, const RestraintApparatu
     vsite_frame2_atoms{}, vsite_frame3_atoms{}, vsite_frame4_atoms{}, vdel_pointer{vdel_in},
     ag_pointer{ag_in}, ra_pointer{ra_in}
 {
+  // Check the atom bounds
+  if (atom_limit < minimum_valence_work_unit_atoms ||
+      atom_limit > maximum_valence_work_unit_atoms) {
+    const std::string err_msg = (atom_limit < minimum_valence_work_unit_atoms) ?
+                                "is too small to make effective work units." :
+                                "could lead to work units that do not fit in HPC resources.";
+    rtErr("The maximum allowed number of atoms should be between " +
+          std::to_string(minimum_valence_work_unit_atoms) + " and " +
+          std::to_string(maximum_valence_work_unit_atoms) + ".  A value of " +
+          std::to_string(atom_limit) + err_msg, "ValenceWorkUnit");
+  }
+
+  // Reserve space for atoms
+  atom_import_list.reserve(atom_limit);
+  
   // Unpack the original topology
   ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
-
-  // Reserve space in various terms
+  NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
   
   // Starting with the seed atom, branch out and add new atoms until approaching the maximum
   // allowed number of atoms.  If the atom is part of some molecule that can all be accommodated
   // by the one work unit, include all atoms.
+  std::vector<int> candidate_additions(1, seed_atom_in);
+  std::vector<int> growth_points;
+  growth_points.reserve(32);
+  candidate_additions.reserve(32);
   const int mol_idx = cdk.mol_home[seed_atom_in];
   if (cdk.mol_limits[mol_idx + 1] - cdk.mol_limits[mol_idx] < atom_limit) {
     for (int i = cdk.mol_limits[mol_idx]; i < cdk.mol_limits[mol_idx + 1]; i++) {
       addNewAtom(i);
     }
   }
-  else {
-    addNewAtom(seed_atom_in);
-    while (atom_count < atom_limit - 32) {
 
+  // Proceed to add atoms layer by layer in the current molecule, or if that has been totally
+  // covered, jump to the next molecule and continue the process.
+  int ncandidate = candidate_additions.size();
+  while (ncandidate > 0 && atom_count + ncandidate < atom_limit) {
+
+    // Transfer candidate atoms to become growth points.  In construction, valence work units
+    // do not overlap.  Atoms included in some previous work unit do not become candidates.
+    growth_points.resize(0);
+    for (int i = 0; i < ncandidate; i++) {
+      addNewAtom(candidate_additions[i]);
+      growth_points.push_back(candidate_additions[i]);
     }
-  }
-  if (atom_count < atom_limit - 32) {
+    candidate_additions.resize(0);
 
+    // Loop over the growth points and determine new candidate atoms.  During construction,
+    // valence work units do not overlap.  Atoms included in some previous work unit do not
+    // become new candidates.
+    const int ngrow = growth_points.size();
+    for (int i = 0; i < ngrow; i++) {
+      const int grow_atom = growth_points[i];
+      for (int j = nbk.nb12_bounds[grow_atom]; j < nbk.nb12_bounds[grow_atom + 1]; j++) {
+        if (vdel_pointer->getAtomAssignmentCount(nbk.nb12x[j]) == 0) {
+          candidate_additions.push_back(nbk.nb12x[j]);
+        }
+      }
+    }
+    ncandidate = candidate_additions.size();
+
+    // If no candidate molecules have yet been found, try jumping to the first unassigned
+    // atom.  In all likelihood, this will be on another molecule.  That will be the seed for the
+    // next round of additions.
+    if (ncandidate == 0) {
+      const int fua_atom = vdel_pointer->getFirstUnassignedAtom();
+      if (fua_atom < cdk.natom) {
+        candidate_additions.push_back(fua_atom);
+        ncandidate = 1;
+      }
+    }
   }
 }
 
@@ -405,6 +425,11 @@ const RestraintApparatus* ValenceWorkUnit::getRestraintApparatusPointer() const 
 }
 
 //-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getImportedAtom(const int index) const {
+  return atom_import_list[index];
+}
+
+//-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::setListIndex(const int list_index_in) {
   list_index = list_index_in;
 }
@@ -426,6 +451,7 @@ void ValenceWorkUnit::addNewAtom(const int atom_index) {
 
   // Add the new atom to the list of atom imports.
   atom_import_list.push_back(atom_index);
+  atom_count += 1;
 
   // Check the appropriate boxes in the delegator.
   vdel_pointer->markAtomAddition(list_index, atom_index);  
@@ -509,5 +535,58 @@ void ValenceWorkUnit::addNewVirtualSite(const int vsite_index) {
   vdel_pointer->markVirtualSiteAddition(list_index, vsite_index);
 }
 
-} // namespace topology
+//-------------------------------------------------------------------------------------------------
+std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
+                                                   const RestraintApparatus *ra,
+                                                   const int max_atoms_per_vwu) {
+  // CHECK
+  printf("Point A\n");
+  // END CHECK
+
+  ValenceDelegator vdel(ag, ra);
+  std::vector<ValenceWorkUnit> result;
+
+  // CHECK
+  printf("Point B\n");
+  // END CHECK
+  
+  // Spread atoms over all work units
+  while (vdel.getFirstUnassignedAtom() < ag->getAtomCount()) {
+
+    // CHECK
+    printf("  FUA = %d\n", vdel.getFirstUnassignedAtom());
+    // END CHECK
+    
+    const int n_units = result.size();
+    result.emplace_back(ag, ra, &vdel, n_units, vdel.getFirstUnassignedAtom(), max_atoms_per_vwu);
+  }
+
+  // CHECK
+  printf("Point C\n");
+  // END CHECK
+
+  // CHECK
+  for (size_t i = 0; i < result.size(); i++) {
+    printf("Work unit %4zu has %3d atoms:\n", i, result[i].getAtomCount());
+    int k = 0;
+    for (int j = 0; j < result[i].getAtomCount(); j++) {
+      printf(" %5d", result[i].getImportedAtom(j));
+      if (k == 16) {
+        printf("\n");
+        k = 0;
+      }
+    }
+  }
+  // END CHECK
+  
+  // Shift atoms between work units in an effort to conserve bonding within any particular work
+  // unit.
+
+  // Assign one and only one unit to move each atom.  By construction, the ValenceWorkUnit objects
+  // will have a modicum of extra space to store additional atoms.
+  
+  return result;
+}
+
+} // namespace synthesis
 } // namespace omni

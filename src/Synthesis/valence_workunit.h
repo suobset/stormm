@@ -17,6 +17,14 @@ using topology::AtomGraph;
 using topology::ConstraintKit;
 using topology::ValenceKit;
 using topology::VirtualSiteKit;
+
+/// \brief The minimium value for the atom limit in a valence work unit--there should be no need
+///        to force the size below 128, which was the maximum size in pmemd.cuda.
+constexpr int minimum_valence_work_unit_atoms = 128;
+
+/// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
+///        of __shared__ memory in a block of 1024 threads might need to be stretched.
+constexpr int maximum_valence_work_unit_atoms = 768;
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or
@@ -34,6 +42,14 @@ public:
   /// \param ra_in  Pointer to the complete collection of restraints applicable to the system
   ValenceDelegator(const AtomGraph *ag_in, const RestraintApparatus *ra_in = nullptr);
 
+  /// \brief Get the number of work units to which a particular atom is (currently) assigned.
+  ///
+  /// \param atom_index  The atom of interest, as indexed in the original topology
+  int getAtomAssignmentCount(int atom_index) const;
+
+  /// \brief Get the index of the first unassigned atom in the topology.
+  int getFirstUnassignedAtom() const;
+  
   /// \brief Mark the addition of an atom to a specific ValenceWorkUnit.
   ///
   /// \param vwu_index   Index of the ValenceWorkUnit receiving the new atom
@@ -130,86 +146,10 @@ public:
 private:
   int atom_count;                 ///< The number of atoms in the system overall (taken from the
                                   ///<   topology)
+  int first_unassigned_atom;      ///< The first atom index with no current work unit assignments
+  int max_presence_allocation;    ///< The allocation size for the maximum number of work units
+                                  ///<   to which any atom can be assigned.
 
-  // The following are all readable as column-format matrices, the value of element (y, k)
-  // indicating the index of the kth work unit (W.U.) containing atom I, J, ..., M in bond /
-  // angle / ... / CMAP term y.  Most atoms will be present in only one work unit.  The number of
-  // rows in each matrix is the number of bond / angle / ... / CMAP terms.
-  std::vector<int> bond_i_presence;  ///< Indices of W.U.'s containing atom I of each bond
-  std::vector<int> bond_j_presence;  ///< Indices of W.U.'s containing atom J of each bond
-  std::vector<int> angl_i_presence;  ///< Indices of W.U.'s containing atom I of each bond angle
-  std::vector<int> angl_j_presence;  ///< Indices of W.U.'s containing atom J of each bond angle
-  std::vector<int> angl_k_presence;  ///< Indices of W.U.'s containing atom K of each bond angle
-  std::vector<int> dihe_i_presence;  ///< Indices of W.U.'s containing atom I of each dihedral
-  std::vector<int> dihe_j_presence;  ///< Indices of W.U.'s containing atom J of each dihedral
-  std::vector<int> dihe_k_presence;  ///< Indices of W.U.'s containing atom K of each dihedral
-  std::vector<int> dihe_l_presence;  ///< Indices of W.U.'s containing atom L of each dihedral
-  std::vector<int> ubrd_i_presence;  ///< Indices of W.U.'s containing atom I of each Urey-Bradley
-  std::vector<int> ubrd_k_presence;  ///< Indices of W.U.'s containing atom K of each Urey-Bradley
-  std::vector<int> cimp_i_presence;  ///< Indices of W.U.'s containing atom I of each
-                                     ///<   CHARMM improper dihedral
-  std::vector<int> cimp_j_presence;  ///< Indices of W.U.'s containing atom J of each
-                                     ///<   CHARMM improper dihedral
-  std::vector<int> cimp_k_presence;  ///< Indices of W.U.'s containing atom K of each
-                                     ///<   CHARMM improper dihedral
-  std::vector<int> cimp_l_presence;  ///< Indices of W.U.'s containing atom L of each
-                                     ///<   CHARMM improper dihedral
-  std::vector<int> cmap_i_presence;  ///< Indices of W.U.'s containing atom I of each CMAP term
-  std::vector<int> cmap_j_presence;  ///< Indices of W.U.'s containing atom J of each CMAP term
-  std::vector<int> cmap_k_presence;  ///< Indices of W.U.'s containing atom K of each CMAP term
-  std::vector<int> cmap_l_presence;  ///< Indices of W.U.'s containing atom L of each CMAP term
-  std::vector<int> cmap_m_presence;  ///< Indices of W.U.'s containing atom M of each CMAP term
-
-  // The work unit noted in element (y, k) of the following array indicates that the yth virtual
-  // site or one of its frame atoms is present the work unit (W.U.) with the stated index.
-  std::vector<int> vs_presence;      ///< Indices of W.U.'s containing each virtual site
-  std::vector<int> vsf1_presence;    ///< Indices of W.U.'s containing the first frame atom of each
-                                     ///<   virtual site (the "parent" atom)
-  std::vector<int> vsf2_presence;    ///< Indices of W.U.'s containing the second frame atom of
-                                     ///<   each virtual site
-  std::vector<int> vsf3_presence;    ///< Indices of W.U.'s containing the third frame atom of each
-                                     ///<   virtual site
-  std::vector<int> vsf4_presence;    ///< Indices of W.U.'s containing the fourth frame atom of
-                                     ///<   each virtual site
-
-  // The following arrays are again to be interpreted as matrices, with a number of rows equal to
-  // the number of atoms in constrained groups or the total number of fast waters.  The work unit
-  // noted in element (y, k) indicates that the yth constrained atom is present the work unit
-  // (W.U.) with the stated index.  The group constraints bounds array will be needed to determine
-  // whether a particular constrained group is completely present in one work unit or another.
-  std::vector<int> cnst_n_presence;  ///< Indices of W.U.'s containing the nth constrained atom
-                                     ///<   from the list of all atoms in constrained groups
-  std::vector<int> sett_ox_presence; ///< Indices of W.U.'s containing the oxygen atom of a
-                                     ///<   particular SETTLE group
-  std::vector<int> sett_h1_presence; ///< Indices of W.U.'s containing the oxygen atom of a
-                                     ///<   particular SETTLE group
-  std::vector<int> sett_h2_presence; ///< Indices of W.U.'s containing the oxygen atom of a
-                                     ///<   particular SETTLE group
-
-  // The following arrays are matrices, with a number of rows equal to the number of each type of
-  // restraint.  The work unit noted in element (y, k) indicates that the atom in some restraint of
-  // the member name-implied type is present the the work unit (W.U.) with the stated index.
-  std::vector<int> rposn_i_presence; ///< Indices of W.U.'s containing specific atoms subject to
-                                     ///<   positional restraints
-  std::vector<int> rbond_i_presence; ///< Indices of W.U.'s containing the first atom of each
-                                     ///<   distance restraint
-  std::vector<int> rbond_j_presence; ///< Indices of W.U.'s containing the second atom of each
-                                     ///<   distance restraint
-  std::vector<int> rangl_i_presence; ///< Indices of W.U.'s containing the first atom of each
-                                     ///<   three-point angle restraint
-  std::vector<int> rangl_j_presence; ///< Indices of W.U.'s containing the second atom of each
-                                     ///<   three-point angle restraint
-  std::vector<int> rangl_k_presence; ///< Indices of W.U.'s containing the third atom of each
-                                     ///<   three-point angle restraint
-  std::vector<int> rdihe_i_presence; ///< Indices of W.U.'s containing the first atom of each
-                                     ///<   four-point dihedral angle restraint
-  std::vector<int> rdihe_j_presence; ///< Indices of W.U.'s containing the second atom of each
-                                     ///<   four-point dihedral angle restraint
-  std::vector<int> rdihe_k_presence; ///< Indices of W.U.'s containing the third atom of each
-                                     ///<   four-point dihedral angle restraint
-  std::vector<int> rdihe_l_presence; ///< Indices of W.U.'s containing the fourth atom of each
-                                     ///<   four-point dihedral angle restraint
-  
   // The following lists are quick to construct and contain a double-, triple-, or even a
   // quintuple-counting of all information in the topology's own "atom assignment" arrays for the
   // same valence terms.  Is there a better way?
@@ -359,6 +299,11 @@ public:
 
   /// \brief Get a pointer to the restraint collection for which this work unit applies.
   const RestraintApparatus* getRestraintApparatusPointer() const;
+
+  /// \brief Get the topological index of one of the work unit's imported atoms.
+  ///
+  /// \param index  The local index of the imported atom of interest
+  int getImportedAtom(int index) const;
   
   /// \brief Set the list index of this work unit, in the event that the list of work units for
   ///        a particular topology needs to be re-ordered.
@@ -593,6 +538,14 @@ private:
   const RestraintApparatus *ra_pointer;  ///< Pointer to the restraint apparatus to which this
                                          ///<   object pertains
 };
+
+/// \brief Build a series of valence work units to cover a topology.
+///
+/// \param ag  The topology of interest
+/// \param ra  Restraints linked to the topology
+std::vector<ValenceWorkUnit>
+buildValenceWorkUnits(const AtomGraph *ag, const RestraintApparatus *ra,
+                      int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
 
 } // namespace topology
 } // namespace omni
