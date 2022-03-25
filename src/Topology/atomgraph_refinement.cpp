@@ -349,18 +349,17 @@ CmapAccessories::CmapAccessories(const std::vector<int> &cmap_dimensions_in) :
 
 //-------------------------------------------------------------------------------------------------
 ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
-                                 const std::vector<double> &atomic_mass,
+                                 const std::vector<double> &atomic_masses,
                                  const std::vector<int> &mol_limits,
                                  const std::vector<int> &mol_contents,
                                  const std::vector<int> &mol_home,
                                  const BasicValenceTable &bvt, const Map1234 &all_nb_excl,
                                  const std::vector<double> &bond_equilibria,
                                  const std::vector<double> &angl_equilibria) :
-    cnst_group_count{0}, settle_group_count{0}, cnst_group_parameter_count{0},
+    cnst_group_count{0}, settle_group_count{0}, cnst_parameter_count{0},
     settle_parameter_count{0}, cnst_group_list{}, cnst_group_bounds{}, cnst_group_param_idx{},
     settle_ox_atoms{}, settle_h1_atoms{}, settle_h2_atoms{}, settle_param_idx{},
-    cnst_parameter_list{}, cnst_parameter_bounds{}, settle_mox{}, settle_mh{}, settle_rocm{},
-    settle_rhcm{}
+    cnst_parameter_list{}, cnst_parameter_bounds{}, settle_measurements{}
 {
   const int natom = atomic_numbers.size();
   const int nmol = static_cast<int>(mol_limits.size()) - 1;
@@ -394,10 +393,16 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
     }
 
     // This is a SETTLE-capable group if there are three real atoms and two distinct Z numbers.
+    // Otherwise, mark this molecule as not subject to SETTLE.
     if (n_real_atoms == 3 && n_distinct_z == 2) {
       settle_ready_mols[i] = true;
       for (int j = mol_limits[i]; j < mol_limits[i + 1]; j++) {
         settle_ready_atoms[mol_contents[j]] = true;
+      }
+    }
+    else {
+      for (int j = mol_limits[i]; j < mol_limits[i + 1]; j++) {
+        settle_ready_atoms[mol_contents[j]] = false;
       }
     }
   }
@@ -434,6 +439,7 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
   settle_ox_atoms.resize(nsett);
   settle_h1_atoms.resize(nsett);
   settle_h2_atoms.resize(nsett);
+  settle_param_idx.resize(nsett);
   nsett = 0;
   for (int i = 0; i < nmol; i++) {
     if (settle_ready_mols[i] && differential_bonds[i] == 2) {
@@ -473,9 +479,148 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
               std::to_string(real_atom_idx[0]) + ", " + std::to_string(real_atom_idx[1]) +
               ", and " + std::to_string(real_atom_idx[2]) + ".", "ConstraintTable");
       }
+      const SettleParm stt_pre = getSettleParameters(settle_ox_atoms[nsett],
+                                                     settle_h1_atoms[nsett],
+                                                     settle_h2_atoms[nsett], atomic_masses, bvt,
+                                                     bond_equilibria, angl_equilibria);
+      bool parmset_found = false;
+      for (int j = 0; j < settle_parameter_count; j++) {
+        if (fabs(settle_measurements[j].mormt - stt_pre.mormt) < constants::tiny &&
+            fabs(settle_measurements[j].mhrmt - stt_pre.mhrmt) < constants::tiny &&
+            fabs(settle_measurements[j].ra - stt_pre.ra) < constants::tiny &&
+            fabs(settle_measurements[j].rc - stt_pre.rc) < constants::tiny) {
+          settle_param_idx[nsett] = j;
+          parmset_found = true;
+        }
+      }
+      if (parmset_found == false) {
+        settle_param_idx[nsett] = settle_parameter_count;
+        settle_measurements.push_back(stt_pre);
+        settle_parameter_count += 1;
+      }
+      nsett++;
     }
   }
-  
+
+  // Loop over all molecules, identifying constraint groups with one or more hydrogen atoms bound
+  // to a heavier atom.  Expend the settle_ready_atoms array to record other hydrogens as they
+  // are incorporated into constraint groups.
+  std::vector<int> tmp_cnst_list(8);
+  std::vector<double2> tmp_cnst_parm(8);
+  std::vector<bool> tmp_cnst_made(8);
+  cnst_parameter_bounds.push_back(0);
+  cnst_group_bounds.push_back(0);
+  int n_available_hydrogen = 0;
+  int ngrp = 0;
+  for (int i = 0; i < natom; i++) {
+    n_available_hydrogen += (settle_ready_atoms[i] == false && atomic_numbers[i] == 1);
+  }
+  cnst_group_list.reserve(2 * n_available_hydrogen);
+  cnst_group_param_idx.reserve(n_available_hydrogen);
+  for (int i = 0; i < natom; i++) {
+    if (settle_ready_atoms[i] || atomic_numbers[i] != 1) {
+      continue;
+    }
+
+    // This is a hydrogen with no constraint or SETTLE group.  Find its parent atom.
+    settle_ready_atoms[i] = true;
+    int n_heavy = 0;
+    int heavy_atom_idx;
+    for (int j = all_nb_excl.nb12_excl_bounds[i]; j < all_nb_excl.nb12_excl_bounds[i + 1]; j++) {
+      if (atomic_numbers[all_nb_excl.nb12_excl_list[j]] >= 1) {
+        n_heavy++;
+        heavy_atom_idx = all_nb_excl.nb12_excl_list[j];
+      }
+    }
+
+    // There is a possibility of simulations having free hydrogen atoms.  It would be strange,
+    // but not against the rules of the simulation.  Just let it be.  Do not attempt to constrain
+    // bonds to hydrogen if more than one heavy atom (or more than one other atom) is
+    // participating, however.  That is for SETTLE, and in other situations the behavior will
+    // remain undefined by this implementation.
+    if (n_heavy != 1) {
+      continue;
+    }
+
+    // Form the constraint group.
+    tmp_cnst_list.resize(0);
+    tmp_cnst_list.push_back(heavy_atom_idx);
+    for (int j = all_nb_excl.nb12_excl_bounds[heavy_atom_idx];
+         j < all_nb_excl.nb12_excl_bounds[heavy_atom_idx + 1]; j++) {
+      if (settle_ready_atoms[i] == false && atomic_numbers[all_nb_excl.nb12_excl_list[j]] == 1) {
+        tmp_cnst_list.push_back(all_nb_excl.nb12_excl_list[j]);
+      }      
+    }
+    const int group_size = tmp_cnst_list.size();
+    cnst_group_bounds.push_back(cnst_group_bounds[ngrp] + group_size);
+    for (int j = 0; j < group_size; j++) {
+      cnst_group_list.push_back(tmp_cnst_list[j]);
+    }
+
+    // Make the parameter set for the constraint group.
+    tmp_cnst_made.resize(group_size);
+    tmp_cnst_parm.resize(group_size);
+    for (int j = 0; j < group_size; j++) {
+      tmp_cnst_made[j] = false;
+      tmp_cnst_parm[j].x = 1.0 / atomic_masses[tmp_cnst_list[j]];
+    }
+    tmp_cnst_parm[0].y = 0.0;
+    tmp_cnst_made[0] = true;
+    const int catom = tmp_cnst_list[0];
+    for (int j = bvt.bond_assigned_bounds[catom]; j < bvt.bond_assigned_bounds[catom + 1]; j++) {
+      const int other_atom = bvt.bond_assigned_atoms[j];
+      if (atomic_numbers[other_atom] == 1) {
+        for (int k = 1; k < group_size; k++) {
+          if (other_atom == tmp_cnst_list[k]) {
+            tmp_cnst_parm[k].y = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+            tmp_cnst_made[k] = true;
+          }
+        }
+      }
+    }
+    for (int j = 1; j < group_size; j++) {
+      if (tmp_cnst_made[j]) {
+        continue;
+      }
+      const int jatom = tmp_cnst_list[j];
+      for (int k = bvt.bond_assigned_bounds[jatom]; k < bvt.bond_assigned_bounds[jatom + 1]; k++) {
+        if (bvt.bond_assigned_atoms[k] == catom) {
+          tmp_cnst_parm[k].y = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[k]]];
+          tmp_cnst_made[k] = true;
+        }
+      }
+    }
+
+    // Check whether these parameters are unique
+    bool parmset_found = false;
+    for (int j = 0; j < cnst_parameter_count; j++) {
+      if (cnst_parameter_bounds[j + 1] - cnst_parameter_bounds[j] != group_size) {
+        continue;
+      }
+      const int joffset = cnst_parameter_bounds[j];
+      bool match = true;
+      for (int k = 0; k < group_size; k++) {
+        const double xdiff = fabs(tmp_cnst_parm[k].x - cnst_parameter_list[joffset + k].x);
+        const double ydiff = fabs(tmp_cnst_parm[k].y - cnst_parameter_list[joffset + k].y);
+        match = (match && xdiff < constants::tiny && ydiff < constants::tiny);
+      }
+      if (match) {
+        parmset_found = true;
+        cnst_group_param_idx.push_back(j);
+      }
+    }
+    if (parmset_found == false) {
+      cnst_group_param_idx[ngrp] = cnst_parameter_count;
+      cnst_parameter_bounds.push_back(cnst_parameter_bounds[cnst_parameter_count] + group_size);
+      for (int j = 0; j < group_size; j++) {
+        cnst_parameter_list.push_back(tmp_cnst_parm[j]);
+      }
+      cnst_parameter_count += 1;
+    }
+
+    // Increment the number of constraint groups
+    ngrp++;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2468,11 +2613,11 @@ int2 estimateConstraintCapacity(const std::vector<int> &z_numbers,
 }
 
 //-------------------------------------------------------------------------------------------------
-double4 getSettleParameters(const int ox_idx, const int h1_idx, const int h2_idx,
-                            const std::vector<double> &atomic_mass,
-                            const BasicValenceTable &bvt,
-                            const std::vector<double> &bond_equilibria,
-                            const std::vector<double> &angl_equilibria) {
+SettleParm getSettleParameters(const int ox_idx, const int h1_idx, const int h2_idx,
+                               const std::vector<double> &atomic_mass,
+                               const BasicValenceTable &bvt,
+                               const std::vector<double> &bond_equilibria,
+                               const std::vector<double> &angl_equilibria) {
 
   // Find the mass of the oxygen and of the two hydrogens
   const double ox_mass = atomic_mass[ox_idx];
@@ -2559,19 +2704,11 @@ double4 getSettleParameters(const int ox_idx, const int h1_idx, const int h2_idx
           std::to_string(h1_idx) + " and " + std::to_string(h2_idx) + " must be identical in "
           "order to apply SETTLE.", "getSettleParameters");
   }
-  const double hoh_half = asin(0.5 * hh_dist / oh1_dist);
-  const double h1x = oh1_dist * cos(hoh_half);
-  const double h1y = oh1_dist * sin(hoh_half);
-  const double h2x = oh1_dist * cos(hoh_half);
-  const double h2y = -oh1_dist * sin(hoh_half);
-  const double total_mass = (2.0 * hd_mass) + ox_mass;
-  const double cmx = hd_mass * (h1x + h2x) / total_mass;
-
-  // The y dimension center of mass is zero
-  const double h_cm = sqrt(((h1x - cmx) * (h1x - cmx)) + (h1y * h1y));
-
-  // Return the SETTLE parameter tuple
-  return { ox_mass, hd_mass, cmx, h_cm };
+  const double inv_total_mass = 1.0 / (ox_mass + (2.0 * hd_mass));
+  const double t1 = 0.5 * ox_mass / hd_mass;
+  const double rc = 0.5 * hh_dist;
+  const double ra = sqrt((oh1_dist * oh1_dist) - (rc * rc)) / (1.0 + t1);
+  return { ox_mass * inv_total_mass, hd_mass * inv_total_mass, ra, t1 * ra, rc, 1.0 / ra };
 }
 
 } // namespace topology

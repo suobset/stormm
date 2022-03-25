@@ -1164,10 +1164,13 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   // on how the system will move.  Allocate a bitmask for all atoms to be mobile by default.
   const int mobile_atom_mask_size = roundUp<int>(atom_count / (sizeof(int) * 8), warp_size_int);
   const std::vector<int> tmp_mobile_atoms(mobile_atom_mask_size, -1);
-
+  
   // Constraints are not yet known, but allocate space for any foreseeable constraint model (up to
   // and including all bonds to hydrogen, including those on water molecules, and all fast waters)
   // so that the topology does not have to be re-allocated later.
+  const ConstraintTable csnt_table(tmp_atomic_numbers, tmp_masses, tmp_molecule_limits,
+                                   tmp_molecule_contents, tmp_molecule_membership, basic_vtable,
+                                   all_nb_excl, tmp_bond_equilibria, tmp_angl_equilibria);
   const int2 hydro_spacing = estimateConstraintCapacity(tmp_atomic_numbers, tmp_residue_limits,
                                                         basic_vtable.bond_i_atoms,
                                                         basic_vtable.bond_j_atoms);

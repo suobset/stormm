@@ -315,28 +315,18 @@ struct CmapAccessories {
                                             ///<   numbers.
 };
 
-/// \brief Obtain SETTLE parameters for a particular water arrangement.  This will be repeated for
-///        all SETTLE candidates, to collect an array of parameters for the SETTLE procedure if
-///        necessary and treat different groups with the appropriate parameter set.  The SETTLE
-///        parameters are returned as a double-precision real tuple of four numbers: the mass
-///        of the oxygen (x member), mass of either hydrogen (y member), distance between the
-///        oxygen atom and the center of mass of the constrained system (z member), and the
-///        distance of either hydrogen to the center of mass (w member, the equilibrium geometry
-///        must be an Isosceles triangle).
-///
-/// \param ox_idx           Topological index of the oxygen atom
-/// \param h1_idx           Topological index of the first hydrogen atom
-/// \param h2_idx           Topological index of the second hydrogen atom
-/// \param atomic_mass      Masses of all atoms in the topology
-/// \param bvt              Connectivity information from which to obtain parameter indices into
-///                         the bond and angle equilibrium value arrays
-/// \param bond_equilibria  Equilibrium lengths of all harmonic bond parameters
-/// \param angl_equilibria  Equilibrium lengths of all harmonic angle parameters
-double4 getSettleParameters(int ox_idx, int h1_idx, int h2_idx,
-                            const std::vector<double> &atomic_mass,
-                            const BasicValenceTable &bvt, const Map1234 &all_nb_excl,
-                            const std::vector<double> &bond_equilibria,
-                            const std::vector<double> &angl_equilibria);
+/// \brief Encapsulate the six derived parameters for SETTLE computations.  A vector of these
+///        structs will be accumulated into a ConstraintTable for any given topology, enumerating
+///        each distinct SETTLE-suitable molecule.  In GPU implementations the information will be
+///        held by two- and four-tuples.
+struct SettleParm {
+  double mormt;  ///< Proportional mass of the "oxygen" atoms in SETTLE groups
+  double mhrmt;  ///< Proportional mass of "hydrogen" atoms in SETTLE groups
+  double ra;     ///< Internal distance measurement of each SETTLE group
+  double rb;     ///< Internal distance measurement of each SETTLE group
+  double rc;     ///< Internal distance measurement of each SETTLE group
+  double invra;  ///< Inverse of ra in each SETTLE group
+};
 
 /// \brief Unguarded struct to hold the results of a constraint analysis.  Constraint groups as
 ///        well as fast, rigid waters will be selected.  All atoms that might participate in
@@ -358,7 +348,7 @@ struct ConstraintTable {
   ///                         atom j excludes atom i, then atom i also excludes atom j)
   /// \param bond_equilibria  Equilibrium lengths of all harmonic bond parameters
   /// \param angl_equilibria  Equilibrium lengths of all harmonic angle parameters
-  ConstraintTable(const std::vector<int> &atomic_numbers, const std::vector<double> &atomic_mass,
+  ConstraintTable(const std::vector<int> &atomic_numbers, const std::vector<double> &atomic_masses,
                   const std::vector<int> &mol_limits, const std::vector<int> &mol_contents,
                   const std::vector<int> &mol_home, const BasicValenceTable &bvt,
                   const Map1234 &all_nb_excl, const std::vector<double> &bond_equilibria,
@@ -366,7 +356,7 @@ struct ConstraintTable {
 
   int cnst_group_count;                   ///< Number of constraint groups found
   int settle_group_count;                 ///< Number of SETTLE-suitable fast rigid waters found
-  int cnst_group_parameter_count;         ///< Number of unique constraint group parameters sets.
+  int cnst_parameter_count;               ///< Number of unique constraint group parameters sets.
                                           ///<   A constraint group parameter set consists of the
                                           ///<   masses of every atom and the bond lengths between
                                           ///<   the central atom and each of its subsidiary
@@ -394,19 +384,18 @@ struct ConstraintTable {
                                           ///<   parameter sets
 
   /// Parameters for constraint groups--each stretch of the array is one parameter set, with
-  /// demarcations provided by the following bounds array.
-  std::vector<double> cnst_parameter_list;
+  /// demarcations provided by the following bounds array.  Each tuple encodes an inverse atom
+  /// mass in the x member and a target bond length in the y member.  The order of these tuples
+  /// follows the order of atoms in each constraint group: central heavy atom, followed by a
+  /// series of bound hydrogen atoms.  The bond length assigned to the central heavy atom is
+  /// meaningless.
+  std::vector<double2> cnst_parameter_list;
 
   /// Bounds array for constraint_group_parameters
   std::vector<double> cnst_parameter_bounds;
 
   // Settle parameter sets
-  std::vector<double> settle_mox;   ///< Mass of the "oxygen" atoms in SETTLE groups
-  std::vector<double> settle_mh;    ///< Mass of the "hydrogen" atoms in SETTLE groups
-  std::vector<double> settle_rocm;  ///< Constrained distance between the "oxygen" and the
-                                    ///<   properly constrained system's center of mass
-  std::vector<double> settle_rhcm;  ///< Constrained distance between each "hydrogen" atom and the
-                                    ///<   properly constrained system's center of mass
+  std::vector<SettleParm> settle_measurements;
 };
 
 /// \brief Unguarded struct to handle 1:4 attenuated interactions that are not explicitly
@@ -801,6 +790,29 @@ int2 estimateConstraintCapacity(const std::vector<int> &z_numbers,
                                 const std::vector<int> &res_lims,
                                 const std::vector<int> &bond_atom_i,
                                 const std::vector<int> &bond_atom_j);
+
+/// \brief Obtain SETTLE parameters for a particular water arrangement.  This will be repeated for
+///        all SETTLE candidates, to collect an array of parameters for the SETTLE procedure if
+///        necessary and treat different groups with the appropriate parameter set.  The SETTLE
+///        parameters are returned as a double-precision real tuple of four numbers: the mass
+///        of the oxygen (x member), mass of either hydrogen (y member), distance between the
+///        oxygen atom and the center of mass of the constrained system (z member), and the
+///        distance of either hydrogen to the center of mass (w member, the equilibrium geometry
+///        must be an Isosceles triangle).
+///
+/// \param ox_idx           Topological index of the oxygen atom
+/// \param h1_idx           Topological index of the first hydrogen atom
+/// \param h2_idx           Topological index of the second hydrogen atom
+/// \param atomic_mass      Masses of all atoms in the topology
+/// \param bvt              Connectivity information from which to obtain parameter indices into
+///                         the bond and angle equilibrium value arrays
+/// \param bond_equilibria  Equilibrium lengths of all harmonic bond parameters
+/// \param angl_equilibria  Equilibrium lengths of all harmonic angle parameters
+SettleParm getSettleParameters(int ox_idx, int h1_idx, int h2_idx,
+                               const std::vector<double> &atomic_masses,
+                               const BasicValenceTable &bvt,
+                               const std::vector<double> &bond_equilibria,
+                               const std::vector<double> &angl_equilibria);
 
 } // namespace topology
 } // namespace omni
