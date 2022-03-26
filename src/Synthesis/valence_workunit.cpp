@@ -24,7 +24,7 @@ ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintAppara
   // Get relevant abstracts
   const ValenceKit<double> vk = ag_in->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_in->getDoublePrecisionVirtualSiteKit();
-  const ConstraintKit cnk = ag_in->getConstraintKit();
+  const ConstraintKit<double> cnk = ag_in->getDoublePrecisionConstraintKit();
   const RestraintApparatusDpReader rar = ra_in->dpData();
   
   // Allocate and fill the arrays
@@ -132,7 +132,7 @@ void ValenceDelegator::allocate() {
   // Allocate memory as needed
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
-  const ConstraintKit cnk = ag_pointer->getConstraintKit();
+  const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
   bond_affector_list.resize(2 * vk.nbond);
   bond_affector_bounds.resize(atom_count + 1, 0);
@@ -165,7 +165,7 @@ void ValenceDelegator::allocate() {
 //-------------------------------------------------------------------------------------------------
 void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
                                           const VirtualSiteKit<double> &vsk,
-                                          const ConstraintKit &cnk,
+                                          const ConstraintKit<double> &cnk,
                                           const RestraintApparatusDpReader &rar) {
 
   // Pass through the topology, filling out the valence term affector arrays and the virtual site

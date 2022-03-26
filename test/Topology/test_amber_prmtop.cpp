@@ -556,6 +556,9 @@ int main(int argc, char* argv[]) {
         "in the Trp-cage system (isolated boundary conditions) did not produce complete "
         "agreement when computing residue indices for individual atoms versus taking the "
         "limit-based result en masse.");
+  trpcage.setWaterResidueName("WAT");
+  check(trpcage.getWaterResidueName(), RelationalOperator::EQUAL, std::string("WAT "),
+        "A topology's water residue name was not updated as expected.");
 
   // Check valence term details
   section(2);
@@ -680,11 +683,6 @@ int main(int argc, char* argv[]) {
                                                    &all_top_stack[10], &all_top_stack[11],
                                                    &all_top_stack[12], &all_top_stack[13],
                                                    &all_top_stack[14] };
-#if 0
-  const std::vector<AtomGraph*> all_topologies = { &tip3p, &tip4p, &tip4p_error, &tip5p, &trpcage,
-                                                   &trpcage_water, &trpcage_noz, &brbz, &brbz_vs,
-                                                   &dhfr, &camp, &dna, &rna, &ubiquitin, &drug };
-#endif
   const std::vector<int> molecule_count_answer = { 256, 256, 256, 216, 1, 1561, 1, 1, 1, 1, 1173,
                                                    2, 1185, 481, 1225 };
   check(integerAGProp(all_topologies, all_top_exist, IntInfoCode::MOLECULE_COUNT),

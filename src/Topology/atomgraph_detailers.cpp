@@ -79,7 +79,7 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                                  const CharmmValenceTable &charmm_vtable,
                                  const AttenuationParameterSet &attn_parm,
                                  const VirtualSiteTable &vsite_table,
-                                 const Map1234 &all_nb_excl, const int2 hydro_spacing) {
+                                 const Map1234 &all_nb_excl, const ConstraintTable &cnst_table) {
 
   // Allocate the Hybrid ARRAY-kind objects based on the compiled data
   size_t int_items = roundUp<int>(tmp_desc.size(), warp_size_int) +
@@ -103,9 +103,11 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                      roundUp<int>(all_nb_excl.nb12_excl_list.size(), warp_size_int) +
                      roundUp<int>(all_nb_excl.nb13_excl_list.size(), warp_size_int) +
                      roundUp<int>(all_nb_excl.nb14_excl_list.size(), warp_size_int) +
-                     roundUp(hydro_spacing.x * 2, warp_size_int) +
-                     roundUp(hydro_spacing.x + 1, warp_size_int) +
-                      3 * roundUp(hydro_spacing.y, warp_size_int);
+                      4 * roundUp(cnst_table.settle_group_count, warp_size_int) +
+                     roundUp(cnst_table.cnst_group_list.size(), warp_size_zu) +
+                     roundUp(cnst_table.cnst_group_count + 1, warp_size_int) +
+                     roundUp(cnst_table.cnst_group_count, warp_size_int) +
+                     roundUp(cnst_table.cnst_parameter_count + 1, warp_size_int);
   size_t double_items =  9 * roundUp(atom_count, warp_size_int) +
                          2 * roundUp(urey_bradley_parameter_count, warp_size_int) +
                          2 * roundUp(charmm_impr_parameter_count, warp_size_int) +
@@ -118,7 +120,8 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
                          2 * roundUp(atom_type_count, warp_size_int) +
                          roundUp(charge_type_count,  warp_size_int) +
                          2 * roundUp(attenuated_14_type_count, warp_size_int) +
-                         2 * roundUp(hydro_spacing.x, warp_size_int);
+                         6 * roundUp(cnst_table.settle_parameter_count, warp_size_int) +
+                         2 * roundUp(cnst_table.cnst_parameter_list.size(), warp_size_zu);
   size_t float_items = double_items;
   size_t char4_items = 4 * roundUp(atom_count, warp_size_int) +
                        roundUp(residue_count, warp_size_int) +
@@ -234,16 +237,16 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   ic = infr14_l_atoms.putHost(&int_data, tmp_inferred_14_j_atoms, ic, warp_size_zu);
   ic = infr14_parameter_indices.putHost(&int_data, tmp_inferred_14_param_idx, ic, warp_size_zu);
   ic = neck_gb_indices.putHost(&int_data, tmp_neck_gb_indices, ic, warp_size_zu);
-  ic = constraint_group_atoms.putHost(&int_data, std::vector<int>(2 * hydro_spacing.x, -1), ic,
-                                      warp_size_zu);
-  ic = constraint_group_bounds.putHost(&int_data, std::vector<int>(hydro_spacing.x + 1, -1), ic,
-                                       warp_size_zu);
-  ic = settle_oxygen_atoms.putHost(&int_data, std::vector<int>(hydro_spacing.y, -1), ic,
-                                   warp_size_zu);
-  ic = settle_hydro1_atoms.putHost(&int_data, std::vector<int>(hydro_spacing.y, -1), ic,
-                                   warp_size_zu);
-  ic = settle_hydro2_atoms.putHost(&int_data, std::vector<int>(hydro_spacing.y, -1), ic,
-                                   warp_size_zu);
+  ic = settle_oxygen_atoms.putHost(&int_data, cnst_table.settle_ox_atoms, ic, warp_size_zu);
+  ic = settle_hydro1_atoms.putHost(&int_data, cnst_table.settle_h1_atoms, ic, warp_size_zu);
+  ic = settle_hydro2_atoms.putHost(&int_data, cnst_table.settle_h2_atoms, ic, warp_size_zu);
+  ic = settle_parameter_indices.putHost(&int_data, cnst_table.settle_param_idx, ic, warp_size_zu);
+  ic = constraint_group_atoms.putHost(&int_data, cnst_table.cnst_group_list, ic, warp_size_zu);
+  ic = constraint_group_bounds.putHost(&int_data, cnst_table.cnst_group_bounds, ic, warp_size_zu);
+  ic = constraint_parameter_bounds.putHost(&int_data, cnst_table.cnst_parameter_bounds, ic,
+                                           warp_size_zu);
+  ic = constraint_parameter_indices.putHost(&int_data, cnst_table.cnst_group_param_idx, ic,
+                                            warp_size_zu);
   ic = tree_joining_info.putHost(&int_data, tmp_tree_joining_info, ic, warp_size_zu);
   ic = last_rotator_info.putHost(&int_data, tmp_last_rotator_info, ic, warp_size_zu);
 
@@ -294,10 +297,53 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   dc = gb_alpha_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
   dc = gb_beta_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
   dc = gb_gamma_parameters.putHost(&double_data, tmp_gb_coef, dc, warp_size_zu);
-  dc = constraint_group_targets.putHost(&double_data, std::vector<double>(hydro_spacing.x, 0.0),
-                                        dc, warp_size_zu);
-  dc = constraint_group_inv_masses.putHost(&double_data, std::vector<double>(hydro_spacing.x, 0.0),
-                                           dc, warp_size_zu);
+
+  // Parse the SETTLE and constraint group parameters into arrays of simpler reals.
+  std::vector<double> tmp_settle_mormt(cnst_table.settle_parameter_count);
+  std::vector<double> tmp_settle_mhrmt(cnst_table.settle_parameter_count);
+  std::vector<double> tmp_settle_ra(cnst_table.settle_parameter_count);
+  std::vector<double> tmp_settle_rb(cnst_table.settle_parameter_count);
+  std::vector<double> tmp_settle_rc(cnst_table.settle_parameter_count);
+  std::vector<double> tmp_settle_invra(cnst_table.settle_parameter_count);
+  std::vector<float> sp_tmp_settle_mormt(cnst_table.settle_parameter_count);
+  std::vector<float> sp_tmp_settle_mhrmt(cnst_table.settle_parameter_count);
+  std::vector<float> sp_tmp_settle_ra(cnst_table.settle_parameter_count);
+  std::vector<float> sp_tmp_settle_rb(cnst_table.settle_parameter_count);
+  std::vector<float> sp_tmp_settle_rc(cnst_table.settle_parameter_count);
+  std::vector<float> sp_tmp_settle_invra(cnst_table.settle_parameter_count);
+  for (int i = 0; i < cnst_table.settle_parameter_count; i++) {
+    tmp_settle_mormt[i]    = cnst_table.settle_measurements[i].mormt;
+    tmp_settle_mhrmt[i]    = cnst_table.settle_measurements[i].mhrmt;
+    tmp_settle_ra[i]       = cnst_table.settle_measurements[i].ra;
+    tmp_settle_rb[i]       = cnst_table.settle_measurements[i].rb;
+    tmp_settle_rc[i]       = cnst_table.settle_measurements[i].rc;
+    tmp_settle_invra[i]    = cnst_table.settle_measurements[i].invra;
+    sp_tmp_settle_mormt[i] = cnst_table.settle_measurements[i].mormt;
+    sp_tmp_settle_mhrmt[i] = cnst_table.settle_measurements[i].mhrmt;
+    sp_tmp_settle_ra[i]    = cnst_table.settle_measurements[i].ra;
+    sp_tmp_settle_rb[i]    = cnst_table.settle_measurements[i].rb;
+    sp_tmp_settle_rc[i]    = cnst_table.settle_measurements[i].rc;
+    sp_tmp_settle_invra[i] = cnst_table.settle_measurements[i].invra;
+  }
+  const int ncnst_val = cnst_table.cnst_parameter_list.size();
+  std::vector<double> tmp_cnst_inv_masses(ncnst_val);
+  std::vector<double> tmp_cnst_target_lengths(ncnst_val);
+  std::vector<float> sp_tmp_cnst_inv_masses(ncnst_val);
+  std::vector<float> sp_tmp_cnst_target_lengths(ncnst_val);
+  for (int i = 0; i < cnst_table.cnst_parameter_count; i++) {
+    tmp_cnst_inv_masses[i]        = cnst_table.cnst_parameter_list[i].x;
+    tmp_cnst_target_lengths[i]    = cnst_table.cnst_parameter_list[i].y;
+    sp_tmp_cnst_inv_masses[i]     = cnst_table.cnst_parameter_list[i].x;
+    sp_tmp_cnst_target_lengths[i] = cnst_table.cnst_parameter_list[i].y;
+  }
+  dc = settle_mormt.putHost(&double_data, tmp_settle_mormt, dc, warp_size_zu);
+  dc = settle_mhrmt.putHost(&double_data, tmp_settle_mhrmt, dc, warp_size_zu);
+  dc = settle_ra.putHost(&double_data, tmp_settle_ra, dc, warp_size_zu);
+  dc = settle_rb.putHost(&double_data, tmp_settle_rb, dc, warp_size_zu);
+  dc = settle_rc.putHost(&double_data, tmp_settle_rc, dc, warp_size_zu);
+  dc = settle_invra.putHost(&double_data, tmp_settle_invra, dc, warp_size_zu);  
+  dc = constraint_inverse_masses.putHost(&double_data, tmp_cnst_inv_masses, dc, warp_size_zu);
+  dc = constraint_target_lengths.putHost(&double_data, tmp_cnst_target_lengths, dc, warp_size_zu);
   dc = solty_info.putHost(&double_data, tmp_solty_info, dc, warp_size_zu);
   dc = hbond_a_values.putHost(&double_data, tmp_hbond_a_values, dc, warp_size_zu);
   dc = hbond_b_values.putHost(&double_data, tmp_hbond_b_values, dc, warp_size_zu);
@@ -411,7 +457,16 @@ void AtomGraph::loadHybridArrays(const std::vector<int> &tmp_desc,
   fc = sp_gb_alpha_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
   fc = sp_gb_beta_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
   fc = sp_gb_gamma_parameters.putHost(&float_data, sp_tmp_gb_coef, fc, warp_size_zu);
-
+  fc = sp_settle_mormt.putHost(&float_data, sp_tmp_settle_mormt, fc, warp_size_zu);
+  fc = sp_settle_mhrmt.putHost(&float_data, sp_tmp_settle_mhrmt, fc, warp_size_zu);
+  fc = sp_settle_ra.putHost(&float_data, sp_tmp_settle_ra, fc, warp_size_zu);
+  fc = sp_settle_rb.putHost(&float_data, sp_tmp_settle_rb, fc, warp_size_zu);
+  fc = sp_settle_rc.putHost(&float_data, sp_tmp_settle_rc, fc, warp_size_zu);
+  fc = sp_settle_invra.putHost(&float_data, sp_tmp_settle_invra, fc, warp_size_zu);
+  fc = sp_constraint_inverse_masses.putHost(&float_data, sp_tmp_cnst_inv_masses, fc, warp_size_zu);
+  fc = sp_constraint_target_lengths.putHost(&float_data, sp_tmp_cnst_target_lengths, fc,
+                                            warp_size_zu);
+  
   // Do the same for char4 Hybrid POINTER-kind objects
   size_t c4c = atom_names.putHost(&char4_data, tmp_atom_names, 0, warp_size_zu);
   c4c = atom_types.putHost(&char4_data, tmp_atom_types, c4c, warp_size_zu);
@@ -1146,7 +1201,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
     tmp_solvent_pointers = iAmberPrmtopData(fmem, lstart, dfmt[0].x, dfmt[0].z, 3);
     last_solute_residue = tmp_solvent_pointers[0] - 1;
     last_solute_atom = (last_solute_residue == -1) ?
-      -1 : tmp_residue_limits[last_solute_residue + 1] - 1;
+                       -1 : tmp_residue_limits[last_solute_residue + 1] - 1;
     first_solvent_molecule = tmp_solvent_pointers[2] - 1;
 
     // Read the numbers of atoms per molecule
@@ -1168,12 +1223,13 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   // Constraints are not yet known, but allocate space for any foreseeable constraint model (up to
   // and including all bonds to hydrogen, including those on water molecules, and all fast waters)
   // so that the topology does not have to be re-allocated later.
-  const ConstraintTable csnt_table(tmp_atomic_numbers, tmp_masses, tmp_molecule_limits,
+  const ConstraintTable cnst_table(tmp_atomic_numbers, tmp_masses, tmp_molecule_limits,
                                    tmp_molecule_contents, tmp_molecule_membership, basic_vtable,
                                    all_nb_excl, tmp_bond_equilibria, tmp_angl_equilibria);
-  const int2 hydro_spacing = estimateConstraintCapacity(tmp_atomic_numbers, tmp_residue_limits,
-                                                        basic_vtable.bond_i_atoms,
-                                                        basic_vtable.bond_j_atoms);
+  settle_group_count = cnst_table.settle_group_count;
+  constraint_group_count = cnst_table.cnst_group_count;
+  settle_parameter_count = cnst_table.settle_parameter_count;
+  constraint_parameter_count = cnst_table.cnst_parameter_count;
   
   // Transfer data from the CPU-bound std::vectors and unguarded structs into HPC-capable Hybrid
   // objects.
@@ -1193,7 +1249,7 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
                    tmp_hbond_a_values, tmp_hbond_b_values, tmp_hbond_cutoffs, tmp_atom_names,
                    tmp_atom_types, tmp_residue_names, tmp_tree_symbols, cmap_table,
                    cond_excl, basic_vtable, charmm_vtable, attn_parm, vsite_table, all_nb_excl,
-                   hydro_spacing);
+                   cnst_table);
 }
 
 } // namespace topology

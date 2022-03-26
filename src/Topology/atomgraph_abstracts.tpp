@@ -133,5 +133,28 @@ VirtualSiteKit<T>::VirtualSiteKit(const int nsite_in, const int nframe_set_in,
     dim3{dim3_in}
 {}
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+ConstraintKit<T>::ConstraintKit(const int nsettle_in, const int nsett_param_in,
+                                const int ngroup_in, const int ncnst_param_in,
+                                const int* settle_ox_atoms_in, const int* settle_h1_atoms_in,
+                                const int* settle_h2_atoms_in, const int* settle_param_idx_in,
+                                const int* group_list_in, const int* group_bounds_in,
+                                const int* group_param_idx_in, const int* group_param_bounds_in,
+                                const T* settle_mormt_in, const T* settle_mhrmt_in,
+                                const T* settle_ra_in, const T* settle_rb_in,
+                                const T* settle_rc_in, const T* settle_invra_in,
+                                const T* group_lengths_in, const T* group_inv_masses_in) :
+    nsettle{nsettle_in}, nsett_param{nsett_param_in}, ngroup{ngroup_in},
+    ncnst_param{ncnst_param_in}, settle_ox_atoms{settle_ox_atoms_in},
+    settle_h1_atoms{settle_h1_atoms_in}, settle_h2_atoms{settle_h2_atoms_in},
+    settle_param_idx{settle_param_idx_in}, group_list{group_list_in},
+    group_bounds{group_bounds_in}, group_param_idx{group_param_idx_in},
+    group_param_bounds{group_param_bounds_in}, settle_mormt{settle_mormt_in},
+    settle_mhrmt{settle_mhrmt_in}, settle_ra{settle_ra_in}, settle_rb{settle_rb_in},
+    settle_rc{settle_rc_in}, settle_invra{settle_invra_in}, group_lengths{group_lengths_in},
+    group_inv_masses{group_inv_masses_in}
+{}
+
 } // namespace topology
 } // namespace omni

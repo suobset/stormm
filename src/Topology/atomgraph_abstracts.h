@@ -411,10 +411,11 @@ template <typename T> struct VirtualSiteKit {
 
   /// \brief The constructor follows other abstracts and is produced based on pointers from an
   ///        AtomGraph object.
-  VirtualSiteKit(int nsite_in, int nframe_set_in, const int* vs_atoms_in, const int* frame1_idx_in,
-                 const int* frame2_idx_in, const int* frame3_idx_in, const int* frame4_idx_in,
-                 const int* vs_param_idx_in, const int* vs_types_in, const T* dim1_in,
-                 const T* dim2_in, const T* dim3_in);
+  explicit VirtualSiteKit(int nsite_in, int nframe_set_in, const int* vs_atoms_in,
+                          const int* frame1_idx_in, const int* frame2_idx_in,
+                          const int* frame3_idx_in, const int* frame4_idx_in,
+                          const int* vs_param_idx_in, const int* vs_types_in, const T* dim1_in,
+                          const T* dim2_in, const T* dim3_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -442,14 +443,19 @@ template <typename T> struct VirtualSiteKit {
 /// \brief Information needed to manage constraint groups.  This additional abstract is needed
 ///        due to the way that some collections of rigid bonds all connect to the same atom, and
 ///        because analytic SETTLE constraints are a thing.
-struct ConstraintKit {
+template <typename T> struct ConstraintKit {
 
   /// \brief The constructor follows other abstracts and is produced based on pointers from an
   ///        AtomGraph object.
-  ConstraintKit(int ngroup_in, int nsettle_in, const int* group_list_in,
-                const int* group_bounds_in, const double* group_targets_in,
-                const double* group_inv_masses_in, const int* settle_ox_atoms_in,
-                const int* settle_h1_atoms_in, const int* settle_h2_atoms_in);
+  explicit ConstraintKit(const int nsettle_in, const int nsett_param_in, const int ngroup_in,
+                         const int ncnst_param_in, const int* settle_ox_atoms_in,
+                         const int* settle_h1_atoms_in, const int* settle_h2_atoms_in,
+                         const int* settle_param_idx_in, const int* group_list_in,
+                         const int* group_bounds_in, const int* group_param_idx_in,
+                         const int* group_param_bounds_in, const T* settle_mormt_in,
+                         const T* settle_mhrmt_in, const T* settle_ra_in, const T* settle_rb_in,
+                         const T* settle_rc_in, const T* settle_invra_in,
+                         const T* group_lengths_in, const T* group_inv_masses_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -458,8 +464,14 @@ struct ConstraintKit {
   ConstraintKit(ConstraintKit &&other) = default;
   /// \}
   
+  const int nsettle;              ///< Number of SETTLE (analytic) constrained groups of bonds.
+  const int nsett_param;          ///< The number of distinct SETTLE parameter sets
   const int ngroup;               ///< Number of "hub and spoke" constrained groups of bonds.
-  const int nsettle;              ///< Number of SETTLE (analytic) constrained groups of bonds.  
+  const int ncnst_param;          ///< The number of distinct constraint group parameter sets
+  const int* settle_ox_atoms;     ///< Central 'oxygen' atoms for analytic SETTLE constraints
+  const int* settle_h1_atoms;     ///< First 'hydrogen' atoms for analytic SETTLE constraints
+  const int* settle_h2_atoms;     ///< Second 'hydrogen' atoms for analytic SETTLE constraints
+  const int* settle_param_idx;    ///< Parameter set indices for each SETLLE group
   const int* group_list;          ///< List of all atoms involved in "hub and spoke" constraint
                                   ///<   groups. In each group, the central atom, to which all
                                   ///<   others bind, is listed first.  It is the first atom of
@@ -468,11 +480,21 @@ struct ConstraintKit {
   const int* group_bounds;        ///< Bounds array for group_list above.  Every segment of
                                   ///<   group_list will be at least two atoms, and generally two
                                   ///<   to five atoms.
-  const double* group_targets;    ///< Bond length targets for the group atoms
-  const double* group_inv_masses; ///< Inverse masses for the particles in each group
-  const int* settle_ox_atoms;     ///< Central 'oxygen' atoms for analytic SETTLE constraints
-  const int* settle_h1_atoms;     ///< First 'hydrogen' atoms for analytic SETTLE constraints
-  const int* settle_h2_atoms;     ///< Second 'hydrogen' atoms for analytic SETTLE constraints
+  const int* group_param_idx;     ///< Parameters array for each constraint group.  To reference
+                                  ///<   parameter set k is an instruction to access indices k and
+                                  ///<   k + 1 from the group_param_bounds array, read the
+                                  ///<   group_lengths and group_inv_masses arrays between those
+                                  ///<   limits, and apply the lengths and inverse masses to each
+                                  ///<   particle in the group.
+  const int* group_param_bounds;  ///< Bounds array for the constraint group parameter arrays below
+  const T* settle_mormt;          ///< Proportional mass of "oxygen" in SETTLE systems
+  const T* settle_mhrmt;          ///< Proportional mass of "hydrogen" in SETTLE systems
+  const T* settle_ra;             ///< Internal distance measurement of SETTLE groups
+  const T* settle_rb;             ///< Internal distance measurement of SETTLE groups
+  const T* settle_rc;             ///< Internal distance measurement of SETTLE groups
+  const T* settle_invra;          ///< Internal distance measurement of SETTLE groups
+  const T* group_lengths;         ///< Bond length targets for the group atoms
+  const T* group_inv_masses;      ///< Inverse masses for the particles in each group
 };
 
 } // namespace topology

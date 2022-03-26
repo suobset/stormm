@@ -11,6 +11,7 @@ namespace topology {
 
 using parse::CaseSensitivity;
 using parse::char4ToString;
+using parse::stringToChar4;
 using parse::strncmpCased;
 using namespace generalized_born_defaults;
 
@@ -548,6 +549,20 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
     }
     break;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setWaterResidueName(const char4 new_name) {
+  water_residue_name = new_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setWaterResidueName(const std::string &new_name) {
+  if (new_name.size() > 4) {
+    rtErr("The proposed water model name (" + new_name + ") cannot contain more than four "
+          "characters.", "AtomGraph", "setWaterResidueName");
+  }
+  water_residue_name = stringToChar4(new_name);
 }
 
 } // namespace topology

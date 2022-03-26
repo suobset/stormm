@@ -230,16 +230,33 @@ AtomGraph::AtomGraph() :
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
     use_perturbation_info{PerturbationSetting::OFF}, use_solvent_cap_option{SolventCapSetting::ON},
     use_polarization{PolarizationSetting::ON}, water_residue_name{' ', ' ', ' ', ' '},
-    bond_constraint_mask{""}, bond_constraint_omit_mask{""}, rigid_water_count{0},
-    bond_constraint_count{0}, constraint_group_count{0}, degrees_of_freedom{0},
-    nonrigid_particle_count{0},
-    constraint_group_atoms{HybridKind::POINTER, "tp_cnst_atoms"},
-    constraint_group_bounds{HybridKind::POINTER, "tp_cnst_bounds"},
+    bond_constraint_mask{""}, bond_constraint_omit_mask{""}, bond_constraint_count{0},
+    nonrigid_particle_count{0}, degrees_of_freedom{0}, settle_group_count{0},
+    settle_parameter_count{0}, constraint_group_count{0}, constraint_parameter_count{0},
     settle_oxygen_atoms{HybridKind::POINTER, "tp_settle_ox"},
     settle_hydro1_atoms{HybridKind::POINTER, "tp_settle_h1"},
     settle_hydro2_atoms{HybridKind::POINTER, "tp_settle_h2"},
-    constraint_group_targets{HybridKind::POINTER, "tp_cnst_targets"},
-    constraint_group_inv_masses{HybridKind::POINTER, "tp_cnst_invms"},
+    settle_parameter_indices{HybridKind::POINTER, "tp_sett_param_idx"},
+    constraint_group_atoms{HybridKind::POINTER, "tp_cnst_atoms"},
+    constraint_group_bounds{HybridKind::POINTER, "tp_cnst_bounds"},
+    constraint_parameter_indices{HybridKind::POINTER, "tp_cnst_param_idx"},
+    constraint_parameter_bounds{HybridKind::POINTER, "tp_cnst_param_bnds"},
+    settle_mormt{HybridKind::POINTER, "tp_cnst_sett_mormt"},
+    settle_mhrmt{HybridKind::POINTER, "tp_cnst_sett_mhrmt"},
+    settle_ra{HybridKind::POINTER, "tp_cnst_sett_ra"},
+    settle_rb{HybridKind::POINTER, "tp_cnst_sett_rb"},
+    settle_rc{HybridKind::POINTER, "tp_cnst_sett_rc"},
+    settle_invra{HybridKind::POINTER, "tp_cnst_sett_invra"},
+    constraint_inverse_masses{HybridKind::POINTER, "tp_cnst_invms"},
+    constraint_target_lengths{HybridKind::POINTER, "tp_cnst_targets"},
+    sp_settle_mormt{HybridKind::POINTER, "tp_cnst_sett_mormt"},
+    sp_settle_mhrmt{HybridKind::POINTER, "tp_cnst_sett_mhrmt"},
+    sp_settle_ra{HybridKind::POINTER, "tp_cnst_sett_ra"},
+    sp_settle_rb{HybridKind::POINTER, "tp_cnst_sett_rb"},
+    sp_settle_rc{HybridKind::POINTER, "tp_cnst_sett_rc"},
+    sp_settle_invra{HybridKind::POINTER, "tp_cnst_sett_invra"},
+    sp_constraint_inverse_masses{HybridKind::POINTER, "tp_cnst_invms"},
+    sp_constraint_target_lengths{HybridKind::POINTER, "tp_cnst_targets"},
 
     // Overflow name keys
     atom_overflow_names{HybridKind::POINTER, "atom_name_xtkey"},
@@ -693,17 +710,30 @@ AtomGraph::AtomGraph(const AtomGraph &original, const std::vector<int> &atom_sub
 
 //-------------------------------------------------------------------------------------------------
 void AtomGraph::rebasePointers() {
-  
-  // Repair the integer data POINTER-kind Hybrids first.
+
+  // Repair counts of atoms, residues, and other parts of the system
   descriptors.swapTarget(&int_data);
   residue_limits.swapTarget(&int_data);
   atom_struc_numbers.swapTarget(&int_data);
   residue_numbers.swapTarget(&int_data);
   molecule_limits.swapTarget(&int_data);
+
+  // Atom and residue details
   atomic_numbers.swapTarget(&int_data);
   mobile_atoms.swapTarget(&int_data);
   molecule_membership.swapTarget(&int_data);
   molecule_contents.swapTarget(&int_data);
+  atomic_charges.swapTarget(&double_data);
+  atomic_masses.swapTarget(&double_data);
+  inverse_atomic_masses.swapTarget(&double_data);
+  sp_atomic_charges.swapTarget(&float_data);
+  sp_atomic_masses.swapTarget(&float_data);
+  sp_inverse_atomic_masses.swapTarget(&float_data);
+  atom_names.swapTarget(&char4_data);
+  atom_types.swapTarget(&char4_data);
+  residue_names.swapTarget(&char4_data);
+
+  // CHARMM force field family parameters
   urey_bradley_i_atoms.swapTarget(&int_data);
   urey_bradley_k_atoms.swapTarget(&int_data);
   urey_bradley_parameter_indices.swapTarget(&int_data);
@@ -733,6 +763,40 @@ void AtomGraph::rebasePointers() {
   cmap_assigned_index.swapTarget(&int_data);
   cmap_assigned_terms.swapTarget(&int_data);
   cmap_assigned_bounds.swapTarget(&int_data);
+  urey_bradley_stiffnesses.swapTarget(&double_data);
+  urey_bradley_equilibria.swapTarget(&double_data);
+  charmm_impr_stiffnesses.swapTarget(&double_data);
+  charmm_impr_phase_angles.swapTarget(&double_data);
+  cmap_surfaces.swapTarget(&double_data);
+  cmap_phi_derivatives.swapTarget(&double_data);
+  cmap_psi_derivatives.swapTarget(&double_data);
+  cmap_phi_psi_derivatives.swapTarget(&double_data);
+  cmap_patches.swapTarget(&double_data);
+  sp_urey_bradley_stiffnesses.swapTarget(&float_data);
+  sp_urey_bradley_equilibria.swapTarget(&float_data);
+  sp_charmm_impr_stiffnesses.swapTarget(&float_data);
+  sp_charmm_impr_phase_angles.swapTarget(&float_data);
+  sp_cmap_surfaces.swapTarget(&float_data);
+  sp_cmap_phi_derivatives.swapTarget(&float_data);
+  sp_cmap_psi_derivatives.swapTarget(&float_data);
+  sp_cmap_phi_psi_derivatives.swapTarget(&float_data);
+  sp_cmap_patches.swapTarget(&float_data);
+
+  // Repair pointers relevant to the basic force field bonded terms
+  bond_stiffnesses.swapTarget(&double_data);
+  bond_equilibria.swapTarget(&double_data);
+  angl_stiffnesses.swapTarget(&double_data);
+  angl_equilibria.swapTarget(&double_data);
+  dihe_amplitudes.swapTarget(&double_data);
+  dihe_periodicities.swapTarget(&double_data);
+  dihe_phase_angles.swapTarget(&double_data);
+  sp_bond_stiffnesses.swapTarget(&float_data);
+  sp_bond_equilibria.swapTarget(&float_data);
+  sp_angl_stiffnesses.swapTarget(&float_data);
+  sp_angl_equilibria.swapTarget(&float_data);
+  sp_dihe_amplitudes.swapTarget(&float_data);
+  sp_dihe_periodicities.swapTarget(&float_data);
+  sp_dihe_phase_angles.swapTarget(&float_data);
   bond_i_atoms.swapTarget(&int_data);
   bond_j_atoms.swapTarget(&int_data);
   bond_parameter_indices.swapTarget(&int_data);
@@ -758,6 +822,14 @@ void AtomGraph::rebasePointers() {
   dihe_assigned_index.swapTarget(&int_data);
   dihe_assigned_terms.swapTarget(&int_data);
   dihe_assigned_bounds.swapTarget(&int_data);
+  bond_modifiers.swapTarget(&char4_data);
+  angl_modifiers.swapTarget(&char4_data);
+  dihe_modifiers.swapTarget(&char4_data);
+  bond_assigned_mods.swapTarget(&char4_data);
+  angl_assigned_mods.swapTarget(&char4_data);
+  dihe_assigned_mods.swapTarget(&char4_data);
+
+  // Repair pointers relevant to virtual site placement
   virtual_site_atoms.swapTarget(&int_data);
   virtual_site_frame_types.swapTarget(&int_data);
   virtual_site_frame1_atoms.swapTarget(&int_data);
@@ -765,6 +837,14 @@ void AtomGraph::rebasePointers() {
   virtual_site_frame3_atoms.swapTarget(&int_data);
   virtual_site_frame4_atoms.swapTarget(&int_data);
   virtual_site_parameter_indices.swapTarget(&int_data);
+  virtual_site_frame_dim1.swapTarget(&double_data);
+  virtual_site_frame_dim2.swapTarget(&double_data);
+  virtual_site_frame_dim3.swapTarget(&double_data);
+  sp_virtual_site_frame_dim1.swapTarget(&float_data);
+  sp_virtual_site_frame_dim2.swapTarget(&float_data);
+  sp_virtual_site_frame_dim3.swapTarget(&float_data);
+
+  // Repair pointers relevant to the non-bonded calculation
   charge_indices.swapTarget(&int_data);
   lennard_jones_indices.swapTarget(&int_data);
   atom_exclusion_bounds.swapTarget(&int_data);
@@ -781,37 +861,6 @@ void AtomGraph::rebasePointers() {
   infr14_l_atoms.swapTarget(&int_data);
   infr14_parameter_indices.swapTarget(&int_data);
   neck_gb_indices.swapTarget(&int_data);
-  constraint_group_atoms.swapTarget(&int_data);
-  constraint_group_bounds.swapTarget(&int_data);
-  settle_oxygen_atoms.swapTarget(&int_data);
-  settle_hydro1_atoms.swapTarget(&int_data);
-  settle_hydro2_atoms.swapTarget(&int_data);
-  tree_joining_info.swapTarget(&int_data);
-  last_rotator_info.swapTarget(&int_data);
-
-  // Repair the double-precision real POINTER-kind Hybrid objects
-  atomic_charges.swapTarget(&double_data);
-  atomic_masses.swapTarget(&double_data);
-  inverse_atomic_masses.swapTarget(&double_data);
-  urey_bradley_stiffnesses.swapTarget(&double_data);
-  urey_bradley_equilibria.swapTarget(&double_data);
-  charmm_impr_stiffnesses.swapTarget(&double_data);
-  charmm_impr_phase_angles.swapTarget(&double_data);
-  cmap_surfaces.swapTarget(&double_data);
-  cmap_phi_derivatives.swapTarget(&double_data);
-  cmap_psi_derivatives.swapTarget(&double_data);
-  cmap_phi_psi_derivatives.swapTarget(&double_data);
-  cmap_patches.swapTarget(&double_data);
-  bond_stiffnesses.swapTarget(&double_data);
-  bond_equilibria.swapTarget(&double_data);
-  angl_stiffnesses.swapTarget(&double_data);
-  angl_equilibria.swapTarget(&double_data);
-  dihe_amplitudes.swapTarget(&double_data);
-  dihe_periodicities.swapTarget(&double_data);
-  dihe_phase_angles.swapTarget(&double_data);
-  virtual_site_frame_dim1.swapTarget(&double_data);
-  virtual_site_frame_dim2.swapTarget(&double_data);
-  virtual_site_frame_dim3.swapTarget(&double_data);
   charge_parameters.swapTarget(&double_data);
   lj_a_values.swapTarget(&double_data);
   lj_b_values.swapTarget(&double_data);
@@ -827,36 +876,6 @@ void AtomGraph::rebasePointers() {
   gb_alpha_parameters.swapTarget(&double_data);
   gb_beta_parameters.swapTarget(&double_data);
   gb_gamma_parameters.swapTarget(&double_data);
-  constraint_group_targets.swapTarget(&double_data);
-  constraint_group_inv_masses.swapTarget(&double_data);
-  solty_info.swapTarget(&double_data);
-  hbond_a_values.swapTarget(&double_data);
-  hbond_b_values.swapTarget(&double_data);
-  hbond_cutoffs.swapTarget(&double_data);
-
-  // Repair the single-precision real POINTER-kind Hybrid objects
-  sp_atomic_charges.swapTarget(&float_data);
-  sp_atomic_masses.swapTarget(&float_data);
-  sp_inverse_atomic_masses.swapTarget(&float_data);
-  sp_urey_bradley_stiffnesses.swapTarget(&float_data);
-  sp_urey_bradley_equilibria.swapTarget(&float_data);
-  sp_charmm_impr_stiffnesses.swapTarget(&float_data);
-  sp_charmm_impr_phase_angles.swapTarget(&float_data);
-  sp_cmap_surfaces.swapTarget(&float_data);
-  sp_cmap_phi_derivatives.swapTarget(&float_data);
-  sp_cmap_psi_derivatives.swapTarget(&float_data);
-  sp_cmap_phi_psi_derivatives.swapTarget(&float_data);
-  sp_cmap_patches.swapTarget(&float_data);
-  sp_bond_stiffnesses.swapTarget(&float_data);
-  sp_bond_equilibria.swapTarget(&float_data);
-  sp_angl_stiffnesses.swapTarget(&float_data);
-  sp_angl_equilibria.swapTarget(&float_data);
-  sp_dihe_amplitudes.swapTarget(&float_data);
-  sp_dihe_periodicities.swapTarget(&float_data);
-  sp_dihe_phase_angles.swapTarget(&float_data);
-  sp_virtual_site_frame_dim1.swapTarget(&float_data);
-  sp_virtual_site_frame_dim2.swapTarget(&float_data);
-  sp_virtual_site_frame_dim3.swapTarget(&float_data);
   sp_charge_parameters.swapTarget(&float_data);
   sp_lj_a_values.swapTarget(&float_data);
   sp_lj_b_values.swapTarget(&float_data);
@@ -873,29 +892,58 @@ void AtomGraph::rebasePointers() {
   sp_gb_beta_parameters.swapTarget(&float_data);
   sp_gb_gamma_parameters.swapTarget(&float_data);
 
-  // Repair the char4 POINTER-kind Hybrid objects
-  atom_names.swapTarget(&char4_data);
-  atom_types.swapTarget(&char4_data);
-  residue_names.swapTarget(&char4_data);
-  bond_modifiers.swapTarget(&char4_data);
-  angl_modifiers.swapTarget(&char4_data);
-  dihe_modifiers.swapTarget(&char4_data);
-  bond_assigned_mods.swapTarget(&char4_data);
-  angl_assigned_mods.swapTarget(&char4_data);
-  dihe_assigned_mods.swapTarget(&char4_data);
+  // Repair pointers relevant to the MD propagation algorithm (constraints)
+  settle_oxygen_atoms.swapTarget(&int_data);
+  settle_hydro1_atoms.swapTarget(&int_data);
+  settle_hydro2_atoms.swapTarget(&int_data);
+  settle_parameter_indices.swapTarget(&int_data);
+  constraint_group_atoms.swapTarget(&int_data);
+  constraint_group_bounds.swapTarget(&int_data);
+  constraint_parameter_indices.swapTarget(&int_data);
+  constraint_parameter_bounds.swapTarget(&int_data);
+  settle_mormt.swapTarget(&double_data);
+  settle_mhrmt.swapTarget(&double_data);
+  settle_ra.swapTarget(&double_data);
+  settle_rb.swapTarget(&double_data);
+  settle_rc.swapTarget(&double_data);
+  settle_invra.swapTarget(&double_data);
+  constraint_inverse_masses.swapTarget(&double_data);
+  constraint_target_lengths.swapTarget(&double_data);
+  sp_settle_mormt.swapTarget(&float_data);
+  sp_settle_mhrmt.swapTarget(&float_data);
+  sp_settle_ra.swapTarget(&float_data);
+  sp_settle_rb.swapTarget(&float_data);
+  sp_settle_rc.swapTarget(&float_data);
+  sp_settle_invra.swapTarget(&float_data);
+  sp_constraint_inverse_masses.swapTarget(&float_data);
+  sp_constraint_target_lengths.swapTarget(&float_data);
+
+  // Repair overflow name pointers
   atom_overflow_names.swapTarget(&char4_data);
   atom_overflow_types.swapTarget(&char4_data);
   residue_overflow_names.swapTarget(&char4_data);
+
+  // Repair information to unused pointers
+  tree_joining_info.swapTarget(&int_data);
+  last_rotator_info.swapTarget(&int_data);
+  solty_info.swapTarget(&double_data);
+  hbond_a_values.swapTarget(&double_data);
+  hbond_b_values.swapTarget(&double_data);
+  hbond_cutoffs.swapTarget(&double_data);
   tree_symbols.swapTarget(&char4_data);
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(const AtomGraph &original) :
+
+    // General information
     version_stamp{},
     date{original.date},
     title{original.title},
     source{original.source},
     force_fields{original.force_fields},
+
+    // Counts of atoms, residues, and other parts of the system
     atom_count{original.atom_count},
     residue_count{original.residue_count},
     molecule_count{original.molecule_count},
@@ -911,6 +959,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     atom_struc_numbers{original.atom_struc_numbers},
     residue_numbers{original.residue_numbers},
     molecule_limits{original.molecule_limits},
+
+    // Atom and residue details
     atomic_numbers{original.atomic_numbers},
     mobile_atoms{original.mobile_atoms},
     molecule_membership{original.molecule_membership},
@@ -924,6 +974,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     atom_names{original.atom_names},
     atom_types{original.atom_types},
     residue_names{original.residue_names},
+
+    // CHARMM force field family parameters
     urey_bradley_term_count{original.urey_bradley_term_count},
     charmm_impr_term_count{original.charmm_impr_term_count},
     cmap_term_count{original.cmap_term_count},
@@ -983,6 +1035,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     sp_cmap_psi_derivatives{original.sp_cmap_psi_derivatives},
     sp_cmap_phi_psi_derivatives{original.sp_cmap_phi_psi_derivatives},
     sp_cmap_patches{original.sp_cmap_patches},
+
+    // Relevant information for the bonded calculation
     bond_term_with_hydrogen{original.bond_term_with_hydrogen},
     angl_term_with_hydrogen{original.angl_term_with_hydrogen},
     dihe_term_with_hydrogen{original.dihe_term_with_hydrogen},
@@ -1047,6 +1101,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     bond_assigned_mods{original.bond_assigned_mods},
     angl_assigned_mods{original.angl_assigned_mods},
     dihe_assigned_mods{original.dihe_assigned_mods},
+
+    // Information relevant to virtual site placement
     virtual_site_count{original.virtual_site_count},
     virtual_site_parameter_set_count{original.virtual_site_parameter_set_count},
     virtual_site_atoms{original.virtual_site_atoms},
@@ -1062,6 +1118,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     sp_virtual_site_frame_dim1{original.sp_virtual_site_frame_dim1},
     sp_virtual_site_frame_dim2{original.sp_virtual_site_frame_dim2},
     sp_virtual_site_frame_dim3{original.sp_virtual_site_frame_dim3},
+
+    // Relevant information for the non-bonded calculation
     charge_type_count{original.charge_type_count},
     atom_type_count{original.atom_type_count},
     total_exclusions{original.total_exclusions},
@@ -1119,6 +1177,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     sp_gb_alpha_parameters{original.sp_gb_alpha_parameters},
     sp_gb_beta_parameters{original.sp_gb_beta_parameters},
     sp_gb_gamma_parameters{original.sp_gb_gamma_parameters},
+
+    // MD propagation algorithm directives (including constraints)
     use_bond_constraints{original.use_bond_constraints},
     use_settle{original.use_settle},
     use_perturbation_info{original.use_perturbation_info},
@@ -1127,21 +1187,44 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     water_residue_name{original.water_residue_name},
     bond_constraint_mask{original.bond_constraint_mask},
     bond_constraint_omit_mask{original.bond_constraint_omit_mask},
-    rigid_water_count{original.rigid_water_count},
     bond_constraint_count{original.bond_constraint_count},
-    constraint_group_count{original.constraint_group_count},
-    degrees_of_freedom{original.degrees_of_freedom},
     nonrigid_particle_count{original.nonrigid_particle_count},
-    constraint_group_atoms{original.constraint_group_atoms},
-    constraint_group_bounds{original.constraint_group_bounds},
+    degrees_of_freedom{original.degrees_of_freedom},
+    settle_group_count{original.settle_group_count},
+    settle_parameter_count{original.settle_parameter_count},
+    constraint_group_count{original.constraint_group_count},
+    constraint_parameter_count{original.constraint_parameter_count},
     settle_oxygen_atoms{original.settle_oxygen_atoms},
     settle_hydro1_atoms{original.settle_hydro1_atoms},
     settle_hydro2_atoms{original.settle_hydro2_atoms},
-    constraint_group_targets{original.constraint_group_targets},
-    constraint_group_inv_masses{original.constraint_group_inv_masses},
+    settle_parameter_indices{original.settle_parameter_indices},
+    constraint_group_atoms{original.constraint_group_atoms},
+    constraint_group_bounds{original.constraint_group_bounds},
+    constraint_parameter_indices{original.constraint_parameter_indices},
+    constraint_parameter_bounds{original.constraint_parameter_bounds},
+    settle_mormt{original.settle_mormt},
+    settle_mhrmt{original.settle_mhrmt},
+    settle_ra{original.settle_ra},
+    settle_rb{original.settle_rb},
+    settle_rc{original.settle_rc},
+    settle_invra{original.settle_invra},
+    constraint_inverse_masses{original.constraint_inverse_masses},
+    constraint_target_lengths{original.constraint_target_lengths},
+    sp_settle_mormt{original.sp_settle_mormt},
+    sp_settle_mhrmt{original.sp_settle_mhrmt},
+    sp_settle_ra{original.sp_settle_ra},
+    sp_settle_rb{original.sp_settle_rb},
+    sp_settle_rc{original.sp_settle_rc},
+    sp_settle_invra{original.sp_settle_invra},
+    sp_constraint_inverse_masses{original.sp_constraint_inverse_masses},
+    sp_constraint_target_lengths{original.sp_constraint_target_lengths},
+
+    // Overflow name keys
     atom_overflow_names{original.atom_overflow_names},
     atom_overflow_types{original.atom_overflow_types},
     residue_overflow_names{original.residue_overflow_names},
+
+    // Information currently unused
     unused_nhparm{original.unused_nhparm},
     unused_nparm{original.unused_nparm},
     unused_natyp{original.unused_natyp},
@@ -1156,6 +1239,8 @@ AtomGraph::AtomGraph(const AtomGraph &original) :
     hbond_b_values{original.hbond_b_values},
     hbond_cutoffs{original.hbond_cutoffs},
     tree_symbols{original.tree_symbols},
+
+    // Copy Hybrid data
     int_data{original.int_data},
     double_data{original.double_data},
     float_data{original.float_data},
@@ -1191,6 +1276,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   title = other.title;
   source = other.source;
   force_fields = other.force_fields;
+
+  // Copy counts of atoms, residues, and other parts of the system
   atom_count = other.atom_count;
   residue_count = other.residue_count;
   molecule_count = other.molecule_count;
@@ -1206,6 +1293,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   atom_struc_numbers = other.atom_struc_numbers;
   residue_numbers = other.residue_numbers;
   molecule_limits = other.molecule_limits;
+
+  // Copy atom and residue details
   atomic_numbers = other.atomic_numbers;
   mobile_atoms = other.mobile_atoms;
   molecule_membership = other.molecule_membership;
@@ -1219,6 +1308,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   atom_names = other.atom_names;
   atom_types = other.atom_types;
   residue_names = other.residue_names;
+
+  // Copy CHARMM force field family parameters
   urey_bradley_term_count = other.urey_bradley_term_count;
   charmm_impr_term_count = other.charmm_impr_term_count;
   cmap_term_count = other.cmap_term_count;
@@ -1278,6 +1369,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   sp_cmap_psi_derivatives = other.sp_cmap_psi_derivatives;
   sp_cmap_phi_psi_derivatives = other.sp_cmap_phi_psi_derivatives;
   sp_cmap_patches = other.sp_cmap_patches;
+
+  // Copy relevant information for the bonded calculation
   bond_term_with_hydrogen = other.bond_term_with_hydrogen;
   angl_term_with_hydrogen = other.angl_term_with_hydrogen;
   dihe_term_with_hydrogen = other.dihe_term_with_hydrogen;
@@ -1342,6 +1435,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   bond_assigned_mods = other.bond_assigned_mods;
   angl_assigned_mods = other.angl_assigned_mods;
   dihe_assigned_mods = other.dihe_assigned_mods;
+
+  // Copy information relevant to virtual site placement
   virtual_site_count = other.virtual_site_count;
   virtual_site_parameter_set_count = other.virtual_site_parameter_set_count;
   virtual_site_atoms = other.virtual_site_atoms;
@@ -1357,6 +1452,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   sp_virtual_site_frame_dim1 = other.sp_virtual_site_frame_dim1;
   sp_virtual_site_frame_dim2 = other.sp_virtual_site_frame_dim2;
   sp_virtual_site_frame_dim3 = other.sp_virtual_site_frame_dim3;
+
+  // Copy relevant information for the non-bonded calculation
   charge_type_count = other.charge_type_count;
   atom_type_count = other.atom_type_count;
   total_exclusions = other.total_exclusions;
@@ -1414,6 +1511,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   sp_gb_alpha_parameters = other.sp_gb_alpha_parameters;
   sp_gb_beta_parameters = other.sp_gb_beta_parameters;
   sp_gb_gamma_parameters = other.sp_gb_gamma_parameters;
+
+  // Copy MD propagation algorithm directives
   use_bond_constraints = other.use_bond_constraints;
   use_settle = other.use_settle;
   use_perturbation_info = other.use_perturbation_info;
@@ -1422,21 +1521,44 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   water_residue_name = other.water_residue_name;
   bond_constraint_mask = other.bond_constraint_mask;
   bond_constraint_omit_mask = other.bond_constraint_omit_mask;
-  rigid_water_count = other.rigid_water_count;
   bond_constraint_count = other.bond_constraint_count;
-  constraint_group_count = other.constraint_group_count;
-  degrees_of_freedom = other.degrees_of_freedom;
   nonrigid_particle_count = other.nonrigid_particle_count;
-  constraint_group_atoms = other.constraint_group_atoms;
-  constraint_group_bounds = other.constraint_group_bounds;
+  degrees_of_freedom = other.degrees_of_freedom;
+  settle_group_count = other.settle_group_count;
+  settle_parameter_count = other.settle_parameter_count;
+  constraint_group_count = other.constraint_group_count;
+  constraint_parameter_count = other.constraint_parameter_count;
   settle_oxygen_atoms = other.settle_oxygen_atoms;
   settle_hydro1_atoms = other.settle_hydro1_atoms;
   settle_hydro2_atoms = other.settle_hydro2_atoms;
-  constraint_group_targets = other.constraint_group_targets;
-  constraint_group_inv_masses = other.constraint_group_inv_masses;
+  settle_parameter_indices = other.settle_parameter_indices;
+  constraint_group_atoms = other.constraint_group_atoms;
+  constraint_group_bounds = other.constraint_group_bounds;
+  constraint_parameter_indices = other.constraint_parameter_indices;
+  constraint_parameter_bounds = other.constraint_parameter_bounds;
+  settle_mormt = other.settle_mormt;
+  settle_mhrmt = other.settle_mhrmt;
+  settle_ra = other.settle_ra;
+  settle_rb = other.settle_rb;
+  settle_rc = other.settle_rc;
+  settle_invra = other.settle_invra;
+  constraint_inverse_masses = other.constraint_inverse_masses;
+  constraint_target_lengths = other.constraint_target_lengths;
+  sp_settle_mormt = other.sp_settle_mormt;
+  sp_settle_mhrmt = other.sp_settle_mhrmt;
+  sp_settle_ra = other.sp_settle_ra;
+  sp_settle_rb = other.sp_settle_rb;
+  sp_settle_rc = other.sp_settle_rc;
+  sp_settle_invra = other.sp_settle_invra;
+  sp_constraint_inverse_masses = other.sp_constraint_inverse_masses;
+  sp_constraint_target_lengths = other.sp_constraint_target_lengths;
+
+  // Copy overflow name keys
   atom_overflow_names = other.atom_overflow_names;
   atom_overflow_types = other.atom_overflow_types;
   residue_overflow_names = other.residue_overflow_names;
+
+  // Copy information currently unused
   unused_nhparm = other.unused_nhparm;
   unused_nparm = other.unused_nparm;
   unused_natyp = other.unused_natyp;
@@ -1451,6 +1573,8 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
   hbond_b_values = other.hbond_b_values;
   hbond_cutoffs = other.hbond_cutoffs;
   tree_symbols = other.tree_symbols;
+
+  // Copy Hybrid data structures
   int_data = other.int_data;
   double_data = other.double_data;
   float_data = other.float_data;
@@ -1463,11 +1587,15 @@ AtomGraph& AtomGraph::operator=(const AtomGraph &other) {
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph::AtomGraph(AtomGraph &&original) :
+
+    // General information
     version_stamp{},
     date{original.date},
     title{std::move(original.title)},
     source{std::move(original.source)},
     force_fields{std::move(original.force_fields)},
+
+    // Move or copy counts of atoms, residues, and other parts of the system
     atom_count{original.atom_count},
     residue_count{original.residue_count},
     molecule_count{original.molecule_count},
@@ -1483,6 +1611,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     atom_struc_numbers{std::move(original.atom_struc_numbers)},
     residue_numbers{std::move(original.residue_numbers)},
     molecule_limits{std::move(original.molecule_limits)},
+
+    // Move atom and residue details
     atomic_numbers{std::move(original.atomic_numbers)},
     mobile_atoms{std::move(original.mobile_atoms)},
     molecule_membership{std::move(original.molecule_membership)},
@@ -1496,6 +1626,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     atom_names{std::move(original.atom_names)},
     atom_types{std::move(original.atom_types)},
     residue_names{std::move(original.residue_names)},
+
+    // Move CHARMM force field family parameters
     urey_bradley_term_count{original.urey_bradley_term_count},
     charmm_impr_term_count{original.charmm_impr_term_count},
     cmap_term_count{original.cmap_term_count},
@@ -1555,6 +1687,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     sp_cmap_psi_derivatives{std::move(original.sp_cmap_psi_derivatives)},
     sp_cmap_phi_psi_derivatives{std::move(original.sp_cmap_phi_psi_derivatives)},
     sp_cmap_patches{std::move(original.sp_cmap_patches)},
+
+    // Move information relevant to the basic force field valence terms
     bond_term_with_hydrogen{original.bond_term_with_hydrogen},
     angl_term_with_hydrogen{original.angl_term_with_hydrogen},
     dihe_term_with_hydrogen{original.dihe_term_with_hydrogen},
@@ -1619,6 +1753,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     bond_assigned_mods{std::move(original.bond_assigned_mods)},
     angl_assigned_mods{std::move(original.angl_assigned_mods)},
     dihe_assigned_mods{std::move(original.dihe_assigned_mods)},
+
+    // Move information relevant to virtual site handling
     virtual_site_count{original.virtual_site_count},
     virtual_site_parameter_set_count{original.virtual_site_parameter_set_count},
     virtual_site_atoms{std::move(original.virtual_site_atoms)},
@@ -1634,6 +1770,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     sp_virtual_site_frame_dim1{std::move(original.sp_virtual_site_frame_dim1)},
     sp_virtual_site_frame_dim2{std::move(original.sp_virtual_site_frame_dim2)},
     sp_virtual_site_frame_dim3{std::move(original.sp_virtual_site_frame_dim3)},
+
+    // Move information relevant to the non-bonded calculation
     charge_type_count{original.charge_type_count},
     atom_type_count{original.atom_type_count},
     total_exclusions{original.total_exclusions},
@@ -1691,6 +1829,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     sp_gb_alpha_parameters{std::move(original.sp_gb_alpha_parameters)},
     sp_gb_beta_parameters{std::move(original.sp_gb_beta_parameters)},
     sp_gb_gamma_parameters{std::move(original.sp_gb_gamma_parameters)},
+
+    // Move information relevant to constraints and propagation of the MD algorithm
     use_bond_constraints{original.use_bond_constraints},
     use_settle{original.use_settle},
     use_perturbation_info{original.use_perturbation_info},
@@ -1699,21 +1839,44 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     water_residue_name{original.water_residue_name},
     bond_constraint_mask{std::move(original.bond_constraint_mask)},
     bond_constraint_omit_mask{std::move(original.bond_constraint_omit_mask)},
-    rigid_water_count{original.rigid_water_count},
     bond_constraint_count{original.bond_constraint_count},
-    constraint_group_count{original.constraint_group_count},
-    degrees_of_freedom{original.degrees_of_freedom},
     nonrigid_particle_count{original.nonrigid_particle_count},
-    constraint_group_atoms{std::move(original.constraint_group_atoms)},
-    constraint_group_bounds{std::move(original.constraint_group_bounds)},
+    degrees_of_freedom{original.degrees_of_freedom},
+    settle_group_count{original.settle_group_count},
+    settle_parameter_count{original.settle_parameter_count},
+    constraint_group_count{original.constraint_group_count},
+    constraint_parameter_count{original.constraint_parameter_count},
     settle_oxygen_atoms{std::move(original.settle_oxygen_atoms)},
     settle_hydro1_atoms{std::move(original.settle_hydro1_atoms)},
     settle_hydro2_atoms{std::move(original.settle_hydro2_atoms)},
-    constraint_group_targets{std::move(original.constraint_group_targets)},
-    constraint_group_inv_masses{std::move(original.constraint_group_inv_masses)},
+    settle_parameter_indices{std::move(original.settle_parameter_indices)},
+    constraint_group_atoms{std::move(original.constraint_group_atoms)},
+    constraint_group_bounds{std::move(original.constraint_group_bounds)},
+    constraint_parameter_indices{std::move(original.constraint_parameter_indices)},
+    constraint_parameter_bounds{std::move(original.constraint_parameter_bounds)},
+    settle_mormt{std::move(original.settle_mormt)},
+    settle_mhrmt{std::move(original.settle_mhrmt)},
+    settle_ra{std::move(original.settle_ra)},
+    settle_rb{std::move(original.settle_rb)},
+    settle_rc{std::move(original.settle_rc)},
+    settle_invra{std::move(original.settle_invra)},
+    constraint_inverse_masses{std::move(original.constraint_inverse_masses)},
+    constraint_target_lengths{std::move(original.constraint_target_lengths)},
+    sp_settle_mormt{std::move(original.sp_settle_mormt)},
+    sp_settle_mhrmt{std::move(original.sp_settle_mhrmt)},
+    sp_settle_ra{std::move(original.sp_settle_ra)},
+    sp_settle_rb{std::move(original.sp_settle_rb)},
+    sp_settle_rc{std::move(original.sp_settle_rc)},
+    sp_settle_invra{std::move(original.sp_settle_invra)},
+    sp_constraint_inverse_masses{std::move(original.sp_constraint_inverse_masses)},
+    sp_constraint_target_lengths{std::move(original.sp_constraint_target_lengths)},
+
+    // Move overflow name keys
     atom_overflow_names{std::move(original.atom_overflow_names)},
     atom_overflow_types{std::move(original.atom_overflow_types)},
     residue_overflow_names{std::move(original.residue_overflow_names)},
+
+    // Move unused information
     unused_nhparm{original.unused_nhparm},
     unused_nparm{original.unused_nparm},
     unused_natyp{original.unused_natyp},
@@ -1728,6 +1891,8 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
     hbond_b_values{std::move(original.hbond_b_values)},
     hbond_cutoffs{std::move(original.hbond_cutoffs)},
     tree_symbols{std::move(original.tree_symbols)},
+
+    // Move the Hybrid data storage arrays
     int_data{std::move(original.int_data)},
     double_data{std::move(original.double_data)},
     float_data{std::move(original.float_data)},
@@ -1748,7 +1913,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
     return *this;
   }
 
-  // Copy or move the elements of the original, as appropriate
+  // Copy or move the general elements of the original, as appropriate
   const int nvst_char = strlen(other.version_stamp);
   for (int i = 0; i < nvst_char; i++) {
     version_stamp[i] = other.version_stamp[i];
@@ -1757,6 +1922,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   title = std::move(other.title);
   source = std::move(other.source);
   force_fields = std::move(other.force_fields);
+
+  // Copy or move counts of atoms, residues, and other parts of the system
   atom_count = other.atom_count;
   residue_count = other.residue_count;
   molecule_count = other.molecule_count;
@@ -1772,6 +1939,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   atom_struc_numbers = std::move(other.atom_struc_numbers);
   residue_numbers = std::move(other.residue_numbers);
   molecule_limits = std::move(other.molecule_limits);
+
+  // Copy or move atom and residue details
   atomic_numbers = std::move(other.atomic_numbers);
   mobile_atoms = std::move(other.mobile_atoms);
   molecule_membership = std::move(other.molecule_membership);
@@ -1785,6 +1954,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   atom_names = std::move(other.atom_names);
   atom_types = std::move(other.atom_types);
   residue_names = std::move(other.residue_names);
+
+  // Copy or move CHARMM force field family parameters
   urey_bradley_term_count = other.urey_bradley_term_count;
   charmm_impr_term_count = other.charmm_impr_term_count;
   cmap_term_count = other.cmap_term_count;
@@ -1844,6 +2015,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   sp_cmap_psi_derivatives = std::move(other.sp_cmap_psi_derivatives);
   sp_cmap_phi_psi_derivatives = std::move(other.sp_cmap_phi_psi_derivatives);
   sp_cmap_patches = std::move(other.sp_cmap_patches);
+
+  // Copy or move information relevant to basic force field valence terms
   bond_term_with_hydrogen = other.bond_term_with_hydrogen;
   angl_term_with_hydrogen = other.angl_term_with_hydrogen;
   dihe_term_with_hydrogen = other.dihe_term_with_hydrogen;
@@ -1908,6 +2081,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   bond_assigned_mods = std::move(other.bond_assigned_mods);
   angl_assigned_mods = std::move(other.angl_assigned_mods);
   dihe_assigned_mods = std::move(other.dihe_assigned_mods);
+
+  // Copy or move information relevant to virtual site handling
   virtual_site_count = other.virtual_site_count;
   virtual_site_parameter_set_count = other.virtual_site_parameter_set_count;
   virtual_site_atoms = std::move(other.virtual_site_atoms);
@@ -1923,6 +2098,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   sp_virtual_site_frame_dim1 = std::move(other.sp_virtual_site_frame_dim1);
   sp_virtual_site_frame_dim2 = std::move(other.sp_virtual_site_frame_dim2);
   sp_virtual_site_frame_dim3 = std::move(other.sp_virtual_site_frame_dim3);
+
+  // Copy or move information relevant to the non-bonded calculation
   charge_type_count = other.charge_type_count;
   atom_type_count = other.atom_type_count;
   total_exclusions = other.total_exclusions;
@@ -1980,7 +2157,9 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   sp_gb_alpha_parameters = std::move(other.sp_gb_alpha_parameters);
   sp_gb_beta_parameters = std::move(other.sp_gb_beta_parameters);
   sp_gb_gamma_parameters = std::move(other.sp_gb_gamma_parameters);
-  use_bond_constraints = std::move(other.use_bond_constraints);
+
+  // Copy or move information relevant to constraints and propagation of the MD algorithm
+  use_bond_constraints = other.use_bond_constraints;
   use_settle = other.use_settle;
   use_perturbation_info = other.use_perturbation_info;
   use_solvent_cap_option = other.use_solvent_cap_option;
@@ -1988,21 +2167,44 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   water_residue_name = other.water_residue_name;
   bond_constraint_mask = std::move(other.bond_constraint_mask);
   bond_constraint_omit_mask = std::move(other.bond_constraint_omit_mask);
-  rigid_water_count = other.rigid_water_count;
   bond_constraint_count = other.bond_constraint_count;
-  constraint_group_count = other.constraint_group_count;
-  degrees_of_freedom = other.degrees_of_freedom;
   nonrigid_particle_count = other.nonrigid_particle_count;
-  constraint_group_atoms = std::move(other.constraint_group_atoms);
-  constraint_group_bounds = std::move(other.constraint_group_bounds);
+  degrees_of_freedom = other.degrees_of_freedom;
+  settle_group_count = other.settle_group_count;
+  settle_parameter_count = other.settle_parameter_count;
+  constraint_group_count = other.constraint_group_count;
+  constraint_parameter_count = other.constraint_parameter_count;
   settle_oxygen_atoms = std::move(other.settle_oxygen_atoms);
   settle_hydro1_atoms = std::move(other.settle_hydro1_atoms);
   settle_hydro2_atoms = std::move(other.settle_hydro2_atoms);
-  constraint_group_targets = std::move(other.constraint_group_targets);
-  constraint_group_inv_masses = std::move(other.constraint_group_inv_masses);
+  settle_parameter_indices = std::move(other.settle_parameter_indices);
+  constraint_group_atoms = std::move(other.constraint_group_atoms);
+  constraint_group_bounds = std::move(other.constraint_group_bounds);
+  constraint_parameter_indices = std::move(other.constraint_parameter_indices);
+  constraint_parameter_bounds = std::move(other.constraint_parameter_bounds);
+  settle_mormt = std::move(other.settle_mormt);
+  settle_mhrmt = std::move(other.settle_mhrmt);
+  settle_ra = std::move(other.settle_ra);
+  settle_rb = std::move(other.settle_rb);
+  settle_rc = std::move(other.settle_rc);
+  settle_invra = std::move(other.settle_invra);
+  constraint_inverse_masses = std::move(other.constraint_inverse_masses);
+  constraint_target_lengths = std::move(other.constraint_target_lengths);
+  sp_settle_mormt = std::move(other.sp_settle_mormt);
+  sp_settle_mhrmt = std::move(other.sp_settle_mhrmt);
+  sp_settle_ra = std::move(other.sp_settle_ra);
+  sp_settle_rb = std::move(other.sp_settle_rb);
+  sp_settle_rc = std::move(other.sp_settle_rc);
+  sp_settle_invra = std::move(other.sp_settle_invra);
+  sp_constraint_inverse_masses = std::move(other.sp_constraint_inverse_masses);
+  sp_constraint_target_lengths = std::move(other.sp_constraint_target_lengths);
+
+  // Move overflow name keys
   atom_overflow_names = std::move(other.atom_overflow_names);
   atom_overflow_types = std::move(other.atom_overflow_types);
   residue_overflow_names = std::move(other.residue_overflow_names);
+
+  // Copy or move unused information
   unused_nhparm = other.unused_nhparm;
   unused_nparm = other.unused_nparm;
   unused_natyp = other.unused_natyp;
@@ -2017,6 +2219,8 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   hbond_b_values = std::move(other.hbond_b_values);
   hbond_cutoffs = std::move(other.hbond_cutoffs);
   tree_symbols = std::move(other.tree_symbols);
+
+  // Move the Hybrid data storage arrays
   int_data = std::move(other.int_data);
   double_data = std::move(other.double_data);
   float_data = std::move(other.float_data);

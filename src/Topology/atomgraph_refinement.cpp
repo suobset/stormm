@@ -621,6 +621,7 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
     // Increment the number of constraint groups
     ngrp++;
   }
+  cnst_group_count = ngrp;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2575,41 +2576,6 @@ std::vector<int> matchExtendedName(const char4* overflow_names, const int n_over
     }
   }
   return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-int2 estimateConstraintCapacity(const std::vector<int> &z_numbers,
-                                const std::vector<int> &res_lims,
-                                const std::vector<int> &bond_atom_i,
-                                const std::vector<int> &bond_atom_j) {
-
-  // Search for all bonds that include hydrogen (this is a known quantity in Amber topologies, but
-  // for generality and to prevent adding dependencies on the way in which prior lists were
-  // constructed, search all bonds and reference the atomis' Z numbers)
-  const size_t nbond = bond_atom_i.size();
-  int n_with_hydrogen = 0;
-  for (size_t pos = 0; pos < nbond; pos++) {
-    n_with_hydrogen += (z_numbers[bond_atom_i[pos]] == 1 || z_numbers[bond_atom_j[pos]] == 1);
-  }
-
-  // Search for all fast water molecules.  Check for one oxygen atom and two hydrogens.  Other
-  // groups with one atom at mass M1 and two other at mass M2 could enter into the SETTLE
-  // framework, but restrict the search to waters for practical purposes.
-  const size_t nres = res_lims.size() - 1LLU;
-  int n_fast_waters = 0;
-  for (size_t i = 0; i < nres; i++) {
-    int n_oxygen = 0;
-    int n_hydrogen = 0;
-    int n_other = 0;
-    for (int j = res_lims[i]; j < res_lims[i + 1]; j++) {
-      const int atomz = z_numbers[j];
-      n_oxygen   += (atomz == 8);
-      n_hydrogen += (atomz == 1);
-      n_other    += (atomz != 1 && atomz != 8 && atomz != 0);
-    }
-    n_fast_waters += (n_oxygen == 1 && n_hydrogen == 2 && n_other == 0);
-  }
-  return { n_with_hydrogen, n_fast_waters };
 }
 
 //-------------------------------------------------------------------------------------------------

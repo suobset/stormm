@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <climits>
 #include "Math/vector_ops.h"
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 #include "topology_util.h"
@@ -12,6 +13,7 @@ namespace topology {
 using card::HybridTargetLevel;
 using math::findBin;
 using math::locateValue;
+using parse::char4ToString;
   
 //-------------------------------------------------------------------------------------------------
 std::string AtomGraph::getFileName() const {
@@ -510,8 +512,26 @@ std::string AtomGraph::getPBRadiiSet() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::string AtomGraph::getWaterResidueName() const {
+  return char4ToString(water_residue_name);
+}
+  
+//-------------------------------------------------------------------------------------------------
 int AtomGraph::getRigidWaterCount() const {
-  return rigid_water_count;
+  int result = 0;
+  const int* ox_ptr = settle_oxygen_atoms.data();
+  const int* h1_ptr = settle_hydro1_atoms.data();
+  const int* h2_ptr = settle_hydro2_atoms.data();
+  const int* zn_ptr = atomic_numbers.data();
+  for (int i = 0; i < settle_group_count; i++) {
+    result += (zn_ptr[ox_ptr[i]] == 8 && zn_ptr[h1_ptr[i]] == 1 && zn_ptr[h2_ptr[i]] == 1);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraph::getSettleGroupCount() const {
+  return settle_group_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -838,12 +858,38 @@ AtomGraph::getSinglePrecisionVirtualSiteKit(const HybridTargetLevel tier) const 
 }
 
 //-------------------------------------------------------------------------------------------------
-ConstraintKit AtomGraph::getConstraintKit(const HybridTargetLevel tier) const {
-  return ConstraintKit(constraint_group_count, rigid_water_count,
-                       constraint_group_atoms.data(tier),
-                       constraint_group_bounds.data(tier), constraint_group_targets.data(tier),
-                       constraint_group_inv_masses.data(tier), settle_oxygen_atoms.data(tier),
-                       settle_hydro1_atoms.data(tier), settle_hydro2_atoms.data(tier));
+ConstraintKit<double>
+AtomGraph::getDoublePrecisionConstraintKit(const HybridTargetLevel tier) const {
+  return ConstraintKit<double>(settle_group_count, settle_parameter_count, constraint_group_count,
+                               constraint_parameter_count, settle_oxygen_atoms.data(tier),
+                               settle_hydro1_atoms.data(tier), settle_hydro2_atoms.data(tier),
+                               settle_parameter_indices.data(tier),
+                               constraint_group_atoms.data(tier),
+                               constraint_group_bounds.data(tier),
+                               constraint_parameter_indices.data(tier),
+                               constraint_parameter_bounds.data(tier),
+                               settle_mormt.data(tier), settle_mhrmt.data(tier),
+                               settle_ra.data(tier), settle_rb.data(tier), settle_rc.data(tier),
+                               settle_invra.data(tier), constraint_inverse_masses.data(tier),
+                               constraint_target_lengths.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+ConstraintKit<float>
+AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
+  return ConstraintKit<float>(settle_group_count, settle_parameter_count, constraint_group_count,
+                              constraint_parameter_count, settle_oxygen_atoms.data(tier),
+                              settle_hydro1_atoms.data(tier), settle_hydro2_atoms.data(tier),
+                              settle_parameter_indices.data(tier),
+                              constraint_group_atoms.data(tier),
+                              constraint_group_bounds.data(tier),
+                              constraint_parameter_indices.data(tier),
+                              constraint_parameter_bounds.data(tier),
+                              sp_settle_mormt.data(tier), sp_settle_mhrmt.data(tier),
+                              sp_settle_ra.data(tier), sp_settle_rb.data(tier),
+                              sp_settle_rc.data(tier), sp_settle_invra.data(tier),
+                              sp_constraint_inverse_masses.data(tier),
+                              sp_constraint_target_lengths.data(tier));
 }
 
 } // namespace topology

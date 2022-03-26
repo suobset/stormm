@@ -175,7 +175,7 @@ public:
                         const CharmmValenceTable &charmm_vtable,
                         const AttenuationParameterSet &attn_parm,
                         const VirtualSiteTable &vsite_table,
-                        const Map1234 &all_nb_excl, const int2 hydro_spacing);
+                        const Map1234 &all_nb_excl, const ConstraintTable &cnst_table);
   
   /// \brief Build an AtomGraph form a file.  This is called by the general-purpose constructor
   ///        or also by the developer after instantiating an empty object.
@@ -672,8 +672,15 @@ public:
   /// \brief Get the PB Radii set
   std::string getPBRadiiSet() const;
 
-  /// \brief Get the number of rigid waters in the system
+  /// \brief Get the water residue name
+  std::string getWaterResidueName() const;
+  
+  /// \brief Get the number of rigid waters in the system.  This will check through the SETTLE
+  ///        groups and confirm the number that are, by their chemistry, water.
   int getRigidWaterCount() const;
+
+  /// \brief Get the number of SETTLE groups in the system
+  int getSettleGroupCount() const;
 
   /// \brief Get the number of bond constraints
   int getBondConstraintCount() const;
@@ -892,11 +899,22 @@ public:
   VirtualSiteKit<float>
   getSinglePrecisionVirtualSiteKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-  /// \brief Get an abstract for managing constraints.  In floating-point representation, this is
-  ///        only available as a double-precision object.
+  /// \brief Get an abstract for managing constraints based on double-precision parameters.
   ///
   /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
-  ConstraintKit getConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  ConstraintKit<double>
+  getDoublePrecisionConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get an abstract for managing constraints based on single-precision parameters.
+  ///        While the overall implementation for constraints cannot be implemented entirely in
+  ///        single precision, having the underlying parameters in this form is not, in principle,
+  ///        a drvier of energy drift.  It will simply set the system into a slightly different
+  ///        geometry, which is probably still closer to the double-precision result than many
+  ///        cycles of SHAKE or RATTLE would get it anyway.
+  ///
+  /// \param tier  Indicator of whether pointers should target the CPU or the GPU layer
+  ConstraintKit<float>
+  getSinglePrecisionConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 #ifdef OMNI_USE_HPC
   /// \brief Push all data to the device
@@ -925,9 +943,21 @@ public:
                                double saltcon_in = 0.0,
                                AtomicRadiusSet radii_set = AtomicRadiusSet::NONE,
                                ExceptionResponse policy = ExceptionResponse::WARN);
+
+  /// \brief Set the name of the water residue
+  ///
+  /// Overloaded:
+  ///   - Set the name based on a char4 (the native representation in the topology)
+  ///   - Set the name based on up to four characters from a string
+  ///
+  /// \param new_name  The new water residue name to use
+  /// \{
+  void setWaterResidueName(const char4 new_name);
+  void setWaterResidueName(const std::string &new_name);
+  /// \}
   
 private:
-
+  
   // Title, version, and date stamps found in this topology
   char version_stamp[16];  ///< Version stamp for the program creating the topology
   tm date;                 ///< Date on which the topology was first created
@@ -1336,18 +1366,35 @@ private:
   std::string bond_constraint_mask;           ///< Atoms involved in bond length constraints
   std::string bond_constraint_omit_mask;      ///< Atoms to be excluded from bond length
                                               ///<   constraints
-  int rigid_water_count;                      ///< Number of rigid water molecules subject to
-                                              ///<   SETTLE
   int bond_constraint_count;                  ///< Bonds with lengths constrained by SHAKE or
                                               ///<   RATTLE.  This is more for informative
                                               ///<   purposes, as groups of constrained bonds which
                                               ///<   connect at the same central atom are handled
                                               ///<   as their own individual objects.
-  int constraint_group_count;                 ///< Number of groups of constrained bonds
-  int degrees_of_freedom;                     ///< Total degrees of freedom, 3N - 6 - constraints
   int nonrigid_particle_count;                ///< A rigid water is one non-rigid particle.  A
                                               ///<   protein with N atoms and no bond length
                                               ///<   constraints is N particles.
+  int degrees_of_freedom;                     ///< Total degrees of freedom, 3N - 6 - constraints
+  int settle_group_count;                     ///< Number of rigid water molecules, or other
+                                              ///<   molecules with the right features, subject to
+                                              ///<   SETTLE
+  int settle_parameter_count;                 ///< The number of unique SETTLE parameter sets in
+                                              ///<   the topology (there is probably only one, but
+                                              ///<   there could be more if some water is made of
+                                              ///<   isotopes or there is some other triangular,
+                                              ///<   rigid molecule).
+  int constraint_group_count;                 ///< Number of groups of constrained bond groups
+  int constraint_parameter_count;             ///< Number of unique constraint group parameter sets
+                                              ///<   (each constraint group will reference one set
+                                              ///<   of the appropriate size, but there could be
+                                              ///<   multiple groups that use the exact same
+                                              ///<   sequence of parameters)
+  Hybrid<int> settle_oxygen_atoms;            ///< List of oxygen atoms involved in fast waters
+  Hybrid<int> settle_hydro1_atoms;            ///< First hydrogen atoms involved in fast waters
+  Hybrid<int> settle_hydro2_atoms;            ///< Second hydrogen atoms involved in fast waters
+  Hybrid<int> settle_parameter_indices;       ///< Indices into a list of (perhaps more than one)
+                                              ///<   set of SETTLE parameters for each
+                                              ///<   SETTLE-suitable molecule in the system
   Hybrid<int> constraint_group_atoms;         ///< List of all atoms involved in constraint groups.
                                               ///<   In each group, the central atom, to which all
                                               ///<   others bind, is listed first.  It is the first
@@ -1359,11 +1406,36 @@ private:
   Hybrid<int> constraint_group_bounds;        ///< Bounds array for the constrained group atoms,
                                               ///<   length constraint_group_count + 1 to provide
                                               ///<   the limits on the final group.
-  Hybrid<int> settle_oxygen_atoms;            ///< List of oxygen atoms involved in fast waters
-  Hybrid<int> settle_hydro1_atoms;            ///< First hydrogen atoms involved in fast waters
-  Hybrid<int> settle_hydro2_atoms;            ///< Second hydrogen atoms involved in fast waters
-  Hybrid<double> constraint_group_targets;    ///< Target lengths for constrained bonds
-  Hybrid<double> constraint_group_inv_masses; ///< Inverse masses for atoms of constrained groups
+  Hybrid<int> constraint_parameter_indices;   ///< Parameter indices for each constraint group.
+                                              ///<   This is tricky: the index indicates an element
+                                              ///<   of the bounds array to read, and the size of
+                                              ///<   some constraint group k is then indicated by
+                                              ///<   constraint_parameter_bounds[k + 1] -
+                                              ///<   constraint_parameter_bounds[k].  There are
+                                              ///<   then a mass and a target length for every
+                                              ///<   atom in the constraint group, given in
+                                              ///<   constraint_inverse_masses and
+                                              ///<   constraint_target_lengths, respectively.
+  Hybrid<int> constraint_parameter_bounds;    ///< Bounds array for constraint_inverse_masses and
+                                              ///<   constraint_target_lengths below
+  Hybrid<double> settle_mormt;                ///< Proportional mass of "oxygen" in SETTLE systems
+  Hybrid<double> settle_mhrmt;                ///< Proportional mass of "hydrogen" in SETTLE
+                                              ///<   systems
+  Hybrid<double> settle_ra;                   ///< Internal distance measurement of SETTLE groups
+  Hybrid<double> settle_rb;                   ///< Internal distance measurement of SETTLE groups
+  Hybrid<double> settle_rc;                   ///< Internal distance measurement of SETTLE groups
+  Hybrid<double> settle_invra;                ///< Internal distance measurement of SETTLE groups
+  Hybrid<double> constraint_inverse_masses;   ///< Inverse masses for atoms of constrained groups
+  Hybrid<double> constraint_target_lengths;   ///< Target lengths for constrained bonds
+  Hybrid<float> sp_settle_mormt;              ///< Proportional mass of "oxygen" in SETTLE systems
+  Hybrid<float> sp_settle_mhrmt;              ///< Proportional mass of "hydrogen" in SETTLE
+                                              ///<   systems
+  Hybrid<float> sp_settle_ra;                 ///< Internal distance measurement of SETTLE groups
+  Hybrid<float> sp_settle_rb;                 ///< Internal distance measurement of SETTLE groups
+  Hybrid<float> sp_settle_rc;                 ///< Internal distance measurement of SETTLE groups
+  Hybrid<float> sp_settle_invra;              ///< Internal distance measurement of SETTLE groups
+  Hybrid<float> sp_constraint_inverse_masses; ///< Inverse masses for atoms of constrained groups
+  Hybrid<float> sp_constraint_target_lengths; ///< Target lengths for constrained bonds
 
   // Atom, atom type, and residue name overflow keys
   Hybrid<char4> atom_overflow_names;    ///< Codified names of atoms which were too long

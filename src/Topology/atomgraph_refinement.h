@@ -392,7 +392,7 @@ struct ConstraintTable {
   std::vector<double2> cnst_parameter_list;
 
   /// Bounds array for constraint_group_parameters
-  std::vector<double> cnst_parameter_bounds;
+  std::vector<int> cnst_parameter_bounds;
 
   // Settle parameter sets
   std::vector<SettleParm> settle_measurements;
@@ -772,24 +772,6 @@ int reviewLargestResidue(const std::vector<int> residue_limits, int current_lr_s
 std::vector<int> matchExtendedName(const char4* overflow_names, int n_overflow,
                                    const std::string &query,
                                    const std::vector<WildCardKind> &wildcards = {});
-
-/// \brief Estimate the maximum memory capacity that might be needed to store constraints for any
-///        layout of bonds to hydrogen.  This will direct additional storage space in the
-///        topology's int and double Hybrid arrays, as well as the targeting of POINTER-kind
-///        Hybrid objects for the respective details.  The result is returned as an integer tuple,
-///        with the maximum possible number of bond groups containing hydrogen in the first member,
-///        which implies a maximum total size (of all of those bonds were their own group), and
-///        the number of identifiable water molecules in the second member.
-///
-/// \param z_numbers    Atomic numbers of all atoms in the system (also provides the total atom
-///                     count)
-/// \param res_lims     Residue limits (for finding fast rigid waters)
-/// \param bond_atom_i  First atoms of each known bond
-/// \param bond_atom_j  Second atoms of each known bond
-int2 estimateConstraintCapacity(const std::vector<int> &z_numbers,
-                                const std::vector<int> &res_lims,
-                                const std::vector<int> &bond_atom_i,
-                                const std::vector<int> &bond_atom_j);
 
 /// \brief Obtain SETTLE parameters for a particular water arrangement.  This will be repeated for
 ///        all SETTLE candidates, to collect an array of parameters for the SETTLE procedure if
