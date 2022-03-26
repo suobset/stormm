@@ -79,11 +79,13 @@ void affectorBoundsContribution(const int item_count, const int* atoms_from_the_
 //-------------------------------------------------------------------------------------------------
 void affectorListAssembly(const int item_count, const int* atoms_from_the_item,
                           int *bounds_ptr, int* list_ptr) {
-  for (int pos; pos < item_count; pos++) {
-    const int atmi = atoms_from_the_item[pos];
-    const int list_idx = bounds_ptr[atmi];
-    list_ptr[list_idx] = pos;
-    bounds_ptr[atmi] = list_idx + 1;
+  if (atoms_from_the_item != nullptr) {
+    for (int pos = 0; pos < item_count; pos++) {
+      const int atmi = atoms_from_the_item[pos];
+      const int list_idx = bounds_ptr[atmi];
+      list_ptr[list_idx] = pos;
+      bounds_ptr[atmi] = list_idx + 1;
+    }
   }
 }
 
@@ -96,9 +98,9 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
   const int natom = affector_bounds->size() - 1;
   int* bounds_ptr = affector_bounds->data();
   for (int i = 0; i <= natom; i++) {
-    bounds_ptr = 0;
+    bounds_ptr[i] = 0;
   }
-
+  
   // Loop over all I, J, K, L, and M atoms, depending on what is available
   affectorBoundsContribution(item_count, i_atoms, bounds_ptr);
   affectorBoundsContribution(item_count, j_atoms, bounds_ptr);

@@ -146,18 +146,20 @@ void ValenceDelegator::allocate() {
   cimp_affector_bounds.resize(atom_count + 1, 0);
   cmap_affector_list.resize(5 * vk.ncmap);
   cmap_affector_bounds.resize(atom_count + 1, 0);
+  rposn_affector_list.resize(rar.nposn);
+  rposn_affector_bounds.resize(atom_count + 1, 0);
+  rbond_affector_list.resize(2 * rar.nbond);
+  rbond_affector_bounds.resize(atom_count + 1, 0);
+  rangl_affector_list.resize(3 * rar.nangl);
+  rangl_affector_bounds.resize(atom_count + 1, 0);
+  rdihe_affector_list.resize(4 * rar.ndihe);
+  rdihe_affector_bounds.resize(atom_count + 1, 0);
   vste_affector_list.resize(4 * vsk.nsite);
   vste_affector_bounds.resize(atom_count + 1, 0);
-
-  // CHECK
-  printf("  allocate C\n");
-  printf("  cnk.ngroup = %d\n", cnk.ngroup);
-  // END CHECK
-
-  cnst_affector_list.resize(2 * cnk.group_bounds[cnk.ngroup], -1);
-  cnst_affector_bounds.resize(atom_count + 1, 0);
   sett_affector_list.resize(3 * cnk.nsettle);
   sett_affector_bounds.resize(atom_count + 1, 0);
+  cnst_affector_list.resize(cnk.group_bounds[cnk.ngroup], -1);
+  cnst_affector_bounds.resize(atom_count + 1, 0);  
   work_unit_assignment_count.resize(atom_count, 0);
   work_unit_presence.resize(max_presence_allocation * atom_count);
 }
@@ -340,6 +342,11 @@ ValenceWorkUnit::ValenceWorkUnit(const AtomGraph *ag_in, const RestraintApparatu
   if (cdk.mol_limits[mol_idx + 1] - cdk.mol_limits[mol_idx] < atom_limit) {
     for (int i = cdk.mol_limits[mol_idx]; i < cdk.mol_limits[mol_idx + 1]; i++) {
       addNewAtom(i);
+    }
+    candidate_additions.resize(0);
+    const int fua_atom = vdel_pointer->getFirstUnassignedAtom();
+    if (fua_atom < cdk.natom) {
+      candidate_additions.push_back(fua_atom);
     }
   }
 
@@ -539,44 +546,33 @@ void ValenceWorkUnit::addNewVirtualSite(const int vsite_index) {
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
                                                    const RestraintApparatus *ra,
                                                    const int max_atoms_per_vwu) {
-  // CHECK
-  printf("Point A\n");
-  // END CHECK
-
   ValenceDelegator vdel(ag, ra);
   std::vector<ValenceWorkUnit> result;
-
-  // CHECK
-  printf("Point B\n");
-  // END CHECK
   
   // Spread atoms over all work units
   while (vdel.getFirstUnassignedAtom() < ag->getAtomCount()) {
-
-    // CHECK
-    printf("  FUA = %d\n", vdel.getFirstUnassignedAtom());
-    // END CHECK
-    
     const int n_units = result.size();
     result.emplace_back(ag, ra, &vdel, n_units, vdel.getFirstUnassignedAtom(), max_atoms_per_vwu);
   }
 
   // CHECK
-  printf("Point C\n");
-  // END CHECK
-
-  // CHECK
+#if 0
   for (size_t i = 0; i < result.size(); i++) {
     printf("Work unit %4zu has %3d atoms:\n", i, result[i].getAtomCount());
     int k = 0;
     for (int j = 0; j < result[i].getAtomCount(); j++) {
       printf(" %5d", result[i].getImportedAtom(j));
+      k++;
       if (k == 16) {
         printf("\n");
         k = 0;
       }
     }
+    if (k > 0) {
+      printf("\n");
+    }
   }
+#endif
   // END CHECK
   
   // Shift atoms between work units in an effort to conserve bonding within any particular work
