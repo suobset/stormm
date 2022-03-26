@@ -194,6 +194,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Potential/scorecard.tpp \
 		 $(SRCDIR)/Topology/atomgraph.tpp \
 		 $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
+		 $(SRCDIR)/Topology/topology_util.tpp \
 		 $(SRCDIR)/UnitTesting/approx.tpp \
 		 $(SRCDIR)/UnitTesting/unit_test.tpp
 

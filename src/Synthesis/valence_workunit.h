@@ -49,7 +49,72 @@ public:
 
   /// \brief Get the index of the first unassigned atom in the topology.
   int getFirstUnassignedAtom() const;
+
+  /// \brief Get a list of bonds affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getBondAffectors(int atom_index) const;
   
+  /// \brief Get a list of harmonic angle terms affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getAngleAffectors(int atom_index) const;
+
+  /// \brief Get a list of cosine-based dihedrals affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getDihedralAffectors(int atom_index) const;
+  
+  /// \brief Get a list of Urey-Bradley harmonic angles affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getUreyBradleyAffectors(int atom_index) const;
+  
+  /// \brief Get a list of CHARMM improper dihedral terms affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getCharmmImproperAffectors(int atom_index) const;
+  
+  /// \brief Get a list of CMAP terms affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getCmapAffectors(int atom_index) const;
+  
+  /// \brief Get a list of positional restraints affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getPositionalRestraintAffectors(int atom_index) const;
+  
+  /// \brief Get a list of distance restraints affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getDistanceRestraintAffectors(int atom_index) const;
+
+  /// \brief Get a list of three-point angle restraints affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getAngleRestraintAffectors(int atom_index) const;
+
+  /// \brief Get a list of four-point dihedral restraints affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getDihedralRestraintAffectors(int atom_index) const;
+
+  /// \brief Get a list of SETTLE constraint groups affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getSettleGroupAffectors(int atom_index) const;
+
+  /// \brief Get a list of SHAKE or RATTLE constraint groups affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getConstraintGroupAffectors(int atom_index) const;
+
+  /// \brief Get a list of virtual sites affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getVirtualSiteAffectors(int atom_index) const;
+
   /// \brief Mark the addition of an atom to a specific ValenceWorkUnit.
   ///
   /// \param vwu_index   Index of the ValenceWorkUnit receiving the new atom
@@ -191,25 +256,27 @@ private:
   // Positional restraints apply to a single atom, but multiple restraints could still, in theory,
   // restrain a single atom to a ring or other confined region of space.  A bounds array is still
   // necessary.  Other restraints affect multiple atoms and map like their valence term analogs.
-  std::vector<int> rposn_affector_list;   ///< List of all positional restraints affecting any atom
-  std::vector<int> rposn_affector_bounds; ///< Bounds array for rposn_affector_list
-  std::vector<int> rbond_affector_list;   ///< List of all bond restraints affecting any atom
-  std::vector<int> rbond_affector_bounds; ///< Bounds array for rbond_affector_list
-  std::vector<int> rangl_affector_list;   ///< List of all three-point restraints affecting any
-                                          ///<   atom
-  std::vector<int> rangl_affector_bounds; ///< Bounds array for rangl_affector_list
-  std::vector<int> rdihe_affector_list;   ///< List of all four-point restraints affecting any atom
-  std::vector<int> rdihe_affector_bounds; ///< Bounds array for rdihe_affector_list
-  
+  std::vector<int> rposn_affector_list;    ///< List of positional restraints affecting any atom
+  std::vector<int> rposn_affector_bounds;  ///< Bounds array for rposn_affector_list
+  std::vector<int> rbond_affector_list;    ///< List of bond restraints affecting any atom
+  std::vector<int> rbond_affector_bounds;  ///< Bounds array for rbond_affector_list
+  std::vector<int> rangl_affector_list;    ///< List of three-point restraints affecting any atom
+  std::vector<int> rangl_affector_bounds;  ///< Bounds array for rangl_affector_list
+  std::vector<int> rdihe_affector_list;    ///< List of four-point restraints affecting any atom
+  std::vector<int> rdihe_affector_bounds;  ///< Bounds array for rdihe_affector_list
+
   // Individual atoms must leave a record of their whereabouts in the valence work units for rapid
   // retrieval of their locations
   std::vector<int> work_unit_assignment_count;  ///< The numbers of work units in which each atom
                                                 ///<   can be found
   std::vector<int> work_unit_presence;          ///< Lists of the work units in which each atom is
                                                 ///<   found.  This is a column-format matrix with
-                                                ///<   atom_count rows and a number of columns
+                                                ///<   atom_count columns and a number of rows
                                                 ///<   expanded as needed to accommodate the
                                                 ///<   largest entry in work_unit_assignments.
+  std::vector<int> assigned_update_work_units;  ///< List indices for the work units assigned to
+                                                ///<   update (and log) each atom's position and
+                                                ///<   velocity in the master coordinate set
 
   /// Pointers to the original topology and restraint apparatus that formed this object
   const AtomGraph *ag_pointer;
@@ -403,6 +470,22 @@ public:
   ///
   /// \param vsite_index  The index of the virtual site to add
   void addNewVirtualSite(int vsite_index);
+
+  /// \brief Assign atom update responsibilities to a work unit, subject to the stipulations that
+  ///        no other work unit has been assigned to update the atom's position and velocity, and
+  ///        that the work unit has all of the atoms needed to compute the forces that will affect
+  ///        the atom itself.  If the atom is part of a constraint group, the work unit must also
+  ///        have all atoms needed to compute forces on other atoms in the constraint group, and
+  ///        if the atom is a virtual site the work unit will also need to have all frame atoms
+  ///        plus whatever atoms are needed to compute forces on them.  This function will scan
+  ///        over all atoms in the work unit as it is found, checking that the criteria are met.
+  ///
+  /// \param vk   Valence term abstract from the original topology
+  /// \param rar  Restraint apparatus abstract
+  /// \param cnk  Constraint group abstract from the original topology
+  /// \param vsk  Virtual site abstract from the original topology
+  void assignUpdateTasks(const ValenceKit<double> &vk, const RestraintApparatusDpReader &rar,
+                         const ConstraintKit<double> &cnk, const VirtualSiteKit<double> &vsk);
   
 private:
   int atom_count;                     ///< Number of atoms in the work unit

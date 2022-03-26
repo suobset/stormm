@@ -9,6 +9,7 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using topology::VirtualSiteKind;
 using topology::markAffectorAtoms;
+using topology::extractBoundedListEntries;
   
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintApparatus *ra_in) :
@@ -41,16 +42,94 @@ int ValenceDelegator::getAtomAssignmentCount(const int atom_index) const {
 int ValenceDelegator::getFirstUnassignedAtom() const {
   return first_unassigned_atom;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getBondAffectors(const int atom_index) const {
+  return extractBoundedListEntries(bond_affector_list, bond_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getAngleAffectors(const int atom_index) const {
+  return extractBoundedListEntries(angl_affector_list, angl_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getDihedralAffectors(const int atom_index) const {
+  return extractBoundedListEntries(dihe_affector_list, dihe_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getUreyBradleyAffectors(const int atom_index) const {
+  return extractBoundedListEntries(ubrd_affector_list, ubrd_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getCharmmImproperAffectors(const int atom_index) const {
+  return extractBoundedListEntries(cimp_affector_list, cimp_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getCmapAffectors(const int atom_index) const {
+  return extractBoundedListEntries(cmap_affector_list, cmap_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getPositionalRestraintAffectors(const int atom_index) const {
+  return extractBoundedListEntries(rposn_affector_list, rposn_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getDistanceRestraintAffectors(const int atom_index) const {
+  return extractBoundedListEntries(rbond_affector_list, rbond_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getAngleRestraintAffectors(const int atom_index) const {
+  return extractBoundedListEntries(rangl_affector_list, rangl_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getDihedralRestraintAffectors(const int atom_index) const {
+  return extractBoundedListEntries(rdihe_affector_list, rdihe_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getSettleGroupAffectors(const int atom_index) const {
+  return extractBoundedListEntries(sett_affector_list, sett_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getConstraintGroupAffectors(const int atom_index) const {
+  return extractBoundedListEntries(cnst_affector_list, cnst_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getVirtualSiteAffectors(const int atom_index) const {
+  return extractBoundedListEntries(vste_affector_list, vste_affector_bounds, atom_index);
+}
+
 //-------------------------------------------------------------------------------------------------
 void ValenceDelegator::markAtomAddition(const int vwu_index, const int atom_index) {
-  const int current_work_unit_assignments = work_unit_assignment_count[atom_index];
-  if (current_work_unit_assignments == max_presence_allocation) {
+  const int atom_wua = work_unit_assignment_count[atom_index];
+
+  // If necessary, resize and repaginate the record of which work units each atom takes part in
+  if (atom_wua == max_presence_allocation) {
+    work_unit_presence.resize(atom_count * (max_presence_allocation + 1));
+    for (int i = atom_count - 1; i >= 0; i++) {
+      const int new_offset = (max_presence_allocation + 1) * i;
+      const int old_offset = max_presence_allocation * i;
+      for (int j = 0; j < max_presence_allocation; j++) {
+        work_unit_presence[new_offset + j] = work_unit_presence[old_offset + j];
+      }
+    }
     max_presence_allocation += 1;
-    work_unit_presence.resize(atom_count * max_presence_allocation);
   }
-  work_unit_presence[(current_work_unit_assignments * atom_count) + atom_index] = vwu_index;
-  work_unit_assignment_count[atom_index] = current_work_unit_assignments + 1;
+
+  // Mark the new work unit to which the indexed atom has been assigned
+  work_unit_presence[(max_presence_allocation * atom_index) + atom_wua] = vwu_index;
+  work_unit_assignment_count[atom_index] = atom_wua + 1;
+
+  // Update the first unassigned atom, if appropriate
   while (first_unassigned_atom < atom_count &&
          work_unit_assignment_count[first_unassigned_atom] > 0) {
     first_unassigned_atom += 1;
@@ -290,7 +369,7 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
   vste_affector_bounds[0] = 0;
   cnst_affector_bounds[0] = 0;
 }
-
+  
 //-------------------------------------------------------------------------------------------------
 ValenceWorkUnit::ValenceWorkUnit(const AtomGraph *ag_in, const RestraintApparatus *ra_in,
                                  ValenceDelegator *vdel_in, const int list_index_in,
@@ -543,6 +622,34 @@ void ValenceWorkUnit::addNewVirtualSite(const int vsite_index) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
+                                        const RestraintApparatusDpReader &rar,
+                                        const ConstraintKit<double> &cnk,
+                                        const VirtualSiteKit<double> &vsk) {
+  std::vector<int> required_atoms(64);
+  for (int i = 0; i < atom_count; i++) {
+
+    // Accumulate a list of atoms to check for.  Scan valence terms, restraints, constraints, and
+    // virtual sites.
+    required_atoms.resize(0);
+    const int atomi = atom_import_list[i];
+    const std::vector<int> relevant_bonds = vdel_pointer->getBondAffectors(atomi);
+    for (int j = 0; j < relevant_bonds.size(); j++) {
+      const int bond_term_index = relevant_bonds[j];
+      required_atoms.push_back(vk.bond_i_atoms[bond_term_index]);
+      required_atoms.push_back(vk.bond_j_atoms[bond_term_index]);
+    }
+    const std::vector<int> relevant_angls = vdel_pointer->getBondAffectors(atomi);
+    for (int j = 0; j < relevant_angls.size(); j++) {
+      const int angl_term_index = relevant_angls[j];
+      required_atoms.push_back(vk.angl_i_atoms[angl_term_index]);
+      required_atoms.push_back(vk.angl_j_atoms[angl_term_index]);
+      required_atoms.push_back(vk.angl_k_atoms[angl_term_index]);
+    }
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
                                                    const RestraintApparatus *ra,
                                                    const int max_atoms_per_vwu) {
@@ -556,7 +663,6 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
   }
 
   // CHECK
-#if 0
   for (size_t i = 0; i < result.size(); i++) {
     printf("Work unit %4zu has %3d atoms:\n", i, result[i].getAtomCount());
     int k = 0;
@@ -572,14 +678,40 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
       printf("\n");
     }
   }
-#endif
   // END CHECK
   
   // Shift atoms between work units in an effort to conserve bonding within any particular work
   // unit.
 
-  // Assign one and only one unit to move each atom.  By construction, the ValenceWorkUnit objects
-  // will have a modicum of extra space to store additional atoms.
+  // Assign one and only one unit to log the moves to each atom, including updating the positions
+  // of constrained atoms and virtual sites.  By construction, the ValenceWorkUnit objects will
+  // have a modicum of extra space to store additional atoms.  In order to determine the position
+  // of an atom that is part of a constraint group, the work unit must possess and move all atoms
+  // in the constraint group.  Likewise, in order to place a virtual site, the work unit must have
+  // current locations of all frame atoms for the virtual site in their updated positions.  In
+  // order to move any atom, all forces on that atom must be known.  The hierarchy is therefore:
+  //
+  // Atom to move and log
+  //  - Atoms that contribute directly to forces on the atom to move
+  //  - Other atoms in constraint group
+  //     - Atoms that contribute to forces on the constraint group atoms
+  //  - Frame atoms, if the atom is a virtual site
+  //     - Atoms that contribute to forces on the frame atoms
+  //
+  // Atom A can contribute to forces on some other atom B by being part of a valence term, NMR
+  // restraint, or a virtual site frame that also involves B.  The hierarchy cannot chain
+  // indefinitely, as only one cycle of force computation (including transmission from a virtual
+  // site) can occur before moving atoms.
+  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
+  const RestraintApparatusDpReader rar = ra->dpData();
+  const ConstraintKit<double> cnk = ag->getDoublePrecisionConstraintKit();
+  const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+  const int vwu_count = result.size();
+  for (int i = 0; i < vwu_count; i++) {
+    const int natom = result[i].getAtomCount();
+    result[i].assignUpdateTasks(vk, rar, cnk, vsk);
+  }
+  
   
   return result;
 }

@@ -2,7 +2,9 @@
 #ifndef OMNI_TOPOLOGY_BOUNDS_CHECKS_H
 #define OMNI_TOPOLOGY_BOUNDS_CHECKS_H
 
+#include <string>
 #include <vector>
+#include "Reporting/error_format.h"
 
 namespace omni {
 namespace topology {
@@ -114,7 +116,19 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
                        const int* k_atoms = nullptr, const int* l_atoms = nullptr,
                        const int* m_atoms = nullptr);
 
+/// \brief Extract a series of numbers from a bounded list, based on a single index.  Return the
+///        result as a std::vector of integers.
+///
+/// \param va         The original list of entries with demarcations given in va_bounds
+/// \param va_bounds  Bounds array for va
+/// \param index      Index of the bin of interest (checked against the size of va_bounds)
+template <typename T> std::vector<T> extractBoundedListEntries(const std::vector<T> &va,
+                                                               const std::vector<int> &va_bounds,
+                                                               int index);
+  
 } // namespace topology
 } // namespace omni
+
+#include "topology_util.tpp"
 
 #endif
