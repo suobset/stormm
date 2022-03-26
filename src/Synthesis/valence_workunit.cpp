@@ -281,6 +281,7 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::NONE:
       break;
     case VirtualSiteKind::FLEX_3:
     case VirtualSiteKind::FIXED_3:
@@ -291,8 +292,6 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
     case VirtualSiteKind::FIXED_4:
       vste_affector_bounds[vsk.frame3_idx[pos]] += 1;
       vste_affector_bounds[vsk.frame4_idx[pos]] += 1;
-      break;
-    case VirtualSiteKind::NONE:
       break;
     }
   }
@@ -320,6 +319,7 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[vsk.vs_param_idx[pos]])) {
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::NONE:
       break;
     case VirtualSiteKind::FLEX_3:
     case VirtualSiteKind::FIXED_3:
@@ -343,8 +343,6 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
         vste_affector_bounds[frame3_atom] += 1;
         vste_affector_bounds[frame4_atom] += 1;
       }
-      break;
-    case VirtualSiteKind::NONE:
       break;
     }
   }
@@ -634,17 +632,123 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
     required_atoms.resize(0);
     const int atomi = atom_import_list[i];
     const std::vector<int> relevant_bonds = vdel_pointer->getBondAffectors(atomi);
-    for (int j = 0; j < relevant_bonds.size(); j++) {
+    const int nbond = relevant_bonds.size();
+    for (int j = 0; j < nbond; j++) {
       const int bond_term_index = relevant_bonds[j];
       required_atoms.push_back(vk.bond_i_atoms[bond_term_index]);
       required_atoms.push_back(vk.bond_j_atoms[bond_term_index]);
     }
-    const std::vector<int> relevant_angls = vdel_pointer->getBondAffectors(atomi);
-    for (int j = 0; j < relevant_angls.size(); j++) {
+    const std::vector<int> relevant_angls = vdel_pointer->getAngleAffectors(atomi);
+    const int nangl = relevant_angls.size();
+    for (int j = 0; j < nangl; j++) {
       const int angl_term_index = relevant_angls[j];
       required_atoms.push_back(vk.angl_i_atoms[angl_term_index]);
       required_atoms.push_back(vk.angl_j_atoms[angl_term_index]);
       required_atoms.push_back(vk.angl_k_atoms[angl_term_index]);
+    }
+    const std::vector<int> relevant_dihes = vdel_pointer->getDihedralAffectors(atomi);
+    const int ndihe = relevant_dihes.size();
+    for (int j = 0; j < ndihe; j++) {
+      const int dihe_term_index = relevant_dihes[j];
+      required_atoms.push_back(vk.dihe_i_atoms[dihe_term_index]);
+      required_atoms.push_back(vk.dihe_j_atoms[dihe_term_index]);
+      required_atoms.push_back(vk.dihe_k_atoms[dihe_term_index]);
+      required_atoms.push_back(vk.dihe_l_atoms[dihe_term_index]);
+    }
+    const std::vector<int> relevant_ubrds = vdel_pointer->getUreyBradleyAffectors(atomi);
+    const int nubrd = relevant_ubrds.size();
+    for (int j = 0; j < nubrd; j++) {
+      const int ubrd_term_index = relevant_ubrds[j];
+      required_atoms.push_back(vk.ubrd_i_atoms[ubrd_term_index]);
+      required_atoms.push_back(vk.ubrd_k_atoms[ubrd_term_index]);
+    }
+    const std::vector<int> relevant_cimps = vdel_pointer->getCharmmImproperAffectors(atomi);
+    const int ncimp = relevant_cimps.size();
+    for (int j = 0; j < ncimp; j++) {
+      const int cimp_term_index = relevant_cimps[j];
+      required_atoms.push_back(vk.cimp_i_atoms[cimp_term_index]);
+      required_atoms.push_back(vk.cimp_j_atoms[cimp_term_index]);
+      required_atoms.push_back(vk.cimp_k_atoms[cimp_term_index]);
+      required_atoms.push_back(vk.cimp_l_atoms[cimp_term_index]);
+    }
+    const std::vector<int> relevant_cmaps = vdel_pointer->getCmapAffectors(atomi);
+    const int ncmap = relevant_cmaps.size();
+    for (int j = 0; j < ncmap; j++) {
+      const int cmap_term_index = relevant_cmaps[j];
+      required_atoms.push_back(vk.cmap_i_atoms[cmap_term_index]);
+      required_atoms.push_back(vk.cmap_j_atoms[cmap_term_index]);
+      required_atoms.push_back(vk.cmap_k_atoms[cmap_term_index]);
+      required_atoms.push_back(vk.cmap_l_atoms[cmap_term_index]);
+      required_atoms.push_back(vk.cmap_m_atoms[cmap_term_index]);
+    }
+    const std::vector<int> relevant_rposn = vdel_pointer->getPositionalRestraintAffectors(atomi);
+    const int nrposn = relevant_rposn.size();
+    for (int j = 0; j < nrposn; j++) {
+      const int rposn_term_index = relevant_rposn[j];
+      required_atoms.push_back(rar.rposn_atoms[rposn_term_index]);
+    }
+    const std::vector<int> relevant_rbond = vdel_pointer->getDistanceRestraintAffectors(atomi);
+    const int nrbond = relevant_rbond.size();
+    for (int j = 0; j < nrbond; j++) {
+      const int rbond_term_index = relevant_rbond[j];
+      required_atoms.push_back(rar.rbond_i_atoms[rbond_term_index]);
+      required_atoms.push_back(rar.rbond_j_atoms[rbond_term_index]);
+    }
+    const std::vector<int> relevant_rangl = vdel_pointer->getAngleRestraintAffectors(atomi);
+    const int nrangl = relevant_rangl.size();
+    for (int j = 0; j < nrangl; j++) {
+      const int rangl_term_index = relevant_rangl[j];
+      required_atoms.push_back(rar.rangl_i_atoms[rangl_term_index]);
+      required_atoms.push_back(rar.rangl_j_atoms[rangl_term_index]);
+      required_atoms.push_back(rar.rangl_k_atoms[rangl_term_index]);
+    }
+    const std::vector<int> relevant_rdihe = vdel_pointer->getDihedralRestraintAffectors(atomi);
+    const int nrdihe = relevant_rdihe.size();
+    for (int j = 0; j < nrdihe; j++) {
+      const int rdihe_term_index = relevant_rdihe[j];
+      required_atoms.push_back(rar.rdihe_i_atoms[rdihe_term_index]);
+      required_atoms.push_back(rar.rdihe_j_atoms[rdihe_term_index]);
+      required_atoms.push_back(rar.rdihe_k_atoms[rdihe_term_index]);
+      required_atoms.push_back(rar.rdihe_l_atoms[rdihe_term_index]);
+    }
+    const std::vector<int> relevant_setts = vdel_pointer->getSettleGroupAffectors(atomi);
+    const int nsett = relevant_setts.size();
+    for (int j = 0; j < nsett; j++) {
+      const int sett_index = relevant_setts[j];
+      required_atoms.push_back(cnk.settle_ox_atoms[sett_index]);
+      required_atoms.push_back(cnk.settle_h1_atoms[sett_index]);
+      required_atoms.push_back(cnk.settle_h2_atoms[sett_index]);
+    }
+    const std::vector<int> relevant_cnsts = vdel_pointer->getConstraintGroupAffectors(atomi);
+    const int ncnst = relevant_cnsts.size();
+    for (int j = 0; j < ncnst; j++) {
+      const int cnst_index = relevant_cnsts[j];
+      for (int k = cnk.group_bounds[cnst_index]; k < cnk.group_bounds[cnst_index + 1]; k++) {
+        required_atoms.push_back(cnk.group_list[k]);
+      }
+    }
+    const std::vector<int> relevant_vstes = vdel_pointer->getVirtualSiteAffectors(atomi);
+    const int nvsite = relevant_vstes.size();
+    for (int j = 0; j < nvsite; j++) {
+      const int vste_index = relevant_vstes[j];
+      required_atoms.push_back(vsk.frame1_idx[vste_index]);
+      required_atoms.push_back(vsk.frame2_idx[vste_index]);
+      switch (static_cast<VirtualSiteKind>(vsk.vs_types[vste_index])) {
+      case VirtualSiteKind::FLEX_2:
+      case VirtualSiteKind::FIXED_2:
+      case VirtualSiteKind::NONE:
+        break;
+      case VirtualSiteKind::FLEX_3:
+      case VirtualSiteKind::FIXED_3:
+      case VirtualSiteKind::FAD_3:
+      case VirtualSiteKind::OUT_3:
+        required_atoms.push_back(vsk.frame3_idx[vste_index]);
+        break;
+      case VirtualSiteKind::FIXED_4:
+        required_atoms.push_back(vsk.frame3_idx[vste_index]);
+        required_atoms.push_back(vsk.frame4_idx[vste_index]);
+        break;
+      }
     }
   }
 }
