@@ -25,6 +25,12 @@ constexpr int minimum_valence_work_unit_atoms = 128;
 /// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
 ///        of __shared__ memory in a block of 1024 threads might need to be stretched.
 constexpr int maximum_valence_work_unit_atoms = 768;
+
+/// \brief The maximum tolerated number of recursive calls to various atom searching functions.
+///        The halo region needed to determine the correct movement of any given atom cannot chain
+///        indefinitely.  A value of 2 should permit all the recursive calls that might be needed,
+///        but allow more to let whatever erroneous pattern become clear for debugging purposes.
+constexpr int max_atom_search_stacks = 8;
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or
@@ -79,7 +85,12 @@ public:
   ///
   /// param atom_index  Topological index of the atom of interest
   std::vector<int> getCmapAffectors(int atom_index) const;
-  
+
+  /// \brief Get a list of inferred 1:4 attenuated non-bonded interactions affecting a given atom.
+  ///
+  /// param atom_index  Topological index of the atom of interest
+  std::vector<int> getInferred14Affectors(int atom_index) const;
+
   /// \brief Get a list of positional restraints affecting a given atom.
   ///
   /// param atom_index  Topological index of the atom of interest
@@ -230,6 +241,13 @@ private:
   std::vector<int> cimp_affector_bounds;  ///< Bounds array for cimp_affector_list
   std::vector<int> cmap_affector_list;    ///< List of all CMAP terms affecting a given atom
   std::vector<int> cmap_affector_bounds;  ///< Bounds array for cmap_affector_list
+  std::vector<int> infr_affector_list;    ///< List of all inferred attenuated 1:4 interactions
+                                          ///<   affecting a given atom (dihedral-linked attenuated
+                                          ///<   1:4 interactions, while relevant to the energy
+                                          ///<  surface, do not imply new atoms to consider outside
+                                          ///<   of the dihedrals that own them), and new, relevant
+                                          ///<   atoms are what these lists are all about).
+  std::vector<int> infr_affector_bounds;  ///< Bounds array for cmap_affector_list
 
   // The virtual site affector arrays will be pre-allcoated to hold virtual sites with up to four
   // frame atoms apiece.
@@ -470,6 +488,40 @@ public:
   ///
   /// \param vsite_index  The index of the virtual site to add
   void addNewVirtualSite(int vsite_index);
+
+  /// \brief Find all partners of a given atom such that the work unit will be able to correctly
+  ///        evaluate the force need to move the atom.  This implies other atoms that participate
+  ///        in any valence terms, inferred 1:4 interactions, or restraints involving the atom, as
+  ///        well as other atoms which participate in a virtual site frame with which the atom of
+  ///        interest is involved.  If the atom of interest is one of the frame atoms to a virtual
+  ///        site, the relevant atoms also include any atoms involved in valence interactions
+  ///        (i.e. inferred non-bonded 1:4 interactions) with the virtual site itself.
+  ///
+  /// \param atom_idx      Topological index of the atom of interest
+  /// \param vk            Valence term details from the original topology
+  /// \param rar           Restraint information pertaining to the system
+  /// \param vsk           Virtual site abstract from the original topology
+  /// \param caller_stack  Cumulative stack indicaing previous recursive calls.  If this gets too
+  ///                      long, it will trigger a runtime error.
+  std::vector<int> findForcePartners(int atom_idx, const ValenceKit<double> &vk,
+                                     const RestraintApparatusDpReader &rar,
+                                     const VirtualSiteKit<double> &vsk,
+                                     const std::vector<int> &caller_stack = {});
+  
+  /// \brief Find all partners of a given atom such that the work unit will be able to correctly
+  ///        move the atom.  This implies all other participants in any constraint group that
+  ///        includes the atom, or (if the atom is a virtual site) all frame atoms and any
+  ///        constraint groups which they participate in.  The returned list provides indices of
+  ///        atoms as they are found in the original topology.  It is pruned to remove duplicates.
+  ///
+  /// \param atom_idx      Topological index of the atom of interest
+  /// \param cnk           Constraint group abstract from the original topology
+  /// \param vsk           Virtual site abstract from the original topology
+  /// \param caller_stack  Cumulative stack indicaing previous recursive calls.  If this gets too
+  ///                      long, it will trigger a runtime error.
+  std::vector<int> findMovementPartners(int atom_idx, const ConstraintKit<double> &cnk,
+                                        const VirtualSiteKit<double> &vsk,
+                                        const std::vector<int> &caller_stack = {});
 
   /// \brief Assign atom update responsibilities to a work unit, subject to the stipulations that
   ///        no other work unit has been assigned to update the atom's position and velocity, and

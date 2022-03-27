@@ -985,5 +985,26 @@ template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &v
   return locateValue(value, vdata.data(), vdata.size(), format);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<T> reduceUniqueValues(const std::vector<T> &va) {
+  std::vector<T> result(va);
+  reduceUniqueValues(&result);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void reduceUniqueValues(std::vector<T> *va) {
+  std::sort(va->begin(), va->end(), [](T a, T b) { return a < b; });
+  size_t nunique = 0LLU;
+  const size_t nval = va->size();
+  T* va_ptr = va->data();
+  for (size_t i = 0; i < nval; i++) {
+    va_ptr[nunique] = va_ptr[i];
+    nunique += (i == 0LLU || va_ptr[i] != va_ptr[i - 1LLU]);
+  }
+  va->resize(nunique);
+  va->shrink_to_fit();
+}
+
 } // namespace math
 } // namespace omni

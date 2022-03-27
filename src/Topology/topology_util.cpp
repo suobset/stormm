@@ -1,14 +1,18 @@
 #include <string>
 #include "Math/summation.h"
+#include "Math/vector_ops.h"
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "topology_util.h"
 
 namespace omni {
 namespace topology {
 
+using math::findBin;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
-
+using parse::char4ToString;
+  
 //-------------------------------------------------------------------------------------------------
 void atomValidityCheck(const int index, const int max_atoms, const char* class_caller,
                        const char* method_caller) {
@@ -125,5 +129,23 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
   bounds_ptr[0] = 0;
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetailsKit &cdk) {
+  std::string result;
+  const size_t natom = atom_list.size(); 
+  for (size_t i = 0; i < natom; i++) {
+    const int atom_idx = atom_list[i];
+    const int res_idx = findBin(cdk.res_limits, atom_idx, cdk.nres);
+    result += std::to_string(cdk.atom_numbers[atom_idx]) + " " +
+              char4ToString(cdk.atom_names[atom_idx]) + " " +
+              char4ToString(cdk.res_names[res_idx]) + " " +
+              std::to_string(cdk.res_numbers[atom_idx]);
+    if (i < natom - 1LLU) {
+      result += ", ";
+    }
+  }
+  return result;
 }
-}
+  
+} // namespace topology
+} // namespace omni

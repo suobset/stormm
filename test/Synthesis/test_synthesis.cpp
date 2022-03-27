@@ -264,10 +264,11 @@ int main(int argc, char* argv[]) {
     ra_vec.emplace_back(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
     ra_vec[i].addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }
+#if 0
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
     buildValenceWorkUnits(sysc.getTopologyPointer(i), &ra_vec[i]);
   }
-
+#endif
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

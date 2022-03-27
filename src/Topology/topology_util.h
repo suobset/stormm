@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "Reporting/error_format.h"
+#include "atomgraph_abstracts.h"
 
 namespace omni {
 namespace topology {
@@ -125,7 +126,15 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
 template <typename T> std::vector<T> extractBoundedListEntries(const std::vector<T> &va,
                                                                const std::vector<int> &va_bounds,
                                                                int index);
-  
+
+/// \brief Make a human-readable list of atoms based on a topology and a vector of indices,
+///        providing atom numbers and name as well as residue numbers and names.  This is useful,
+///        in particular, when printing error messages to the user.
+///
+/// \param atom_list  Topological indices for the atoms of interest
+/// \param cdk        Chemical details abstract for the topology of interest
+std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetailsKit &cdk);
+
 } // namespace topology
 } // namespace omni
 

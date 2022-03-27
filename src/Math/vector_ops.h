@@ -492,6 +492,20 @@ template <typename T> size_t locateValue(const Approx &value, const Hybrid<T> &v
                                          const DataOrder format = DataOrder::NONE);
 /// \}
 
+/// \brief Find the unique entries in a vector.  The result will be returned in ascending order.
+///        This will only operate on a Standard Template Library vector.
+///
+/// Overloaded:
+///   - Perform an in-place operation on the vector, shrinking its size and changing its content
+///     into the result
+///   - Perform an out-of-place operation on the vector, leaving the original data unchanged.
+///
+/// \param va  The vector to sort
+/// \{
+template <typename T> std::vector<T> reduceUniqueValues(const std::vector<T> &va);
+template <typename T> void reduceUniqueValues(std::vector<T> *va);
+/// \}
+
 } // namespace math
 } // namespace omni
 

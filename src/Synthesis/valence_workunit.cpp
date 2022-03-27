@@ -1,15 +1,23 @@
+#include <algorithm>
 #include "Math/summation.h"
+#include "Math/vector_ops.h"
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
+
+// CHECK
+#include "Parsing/parse.h"
+// END CHECK
 
 namespace omni {
 namespace synthesis {
 
 using math::prefixSumInPlace;
 using math::PrefixSumType;
+using math::reduceUniqueValues;
 using topology::VirtualSiteKind;
 using topology::markAffectorAtoms;
 using topology::extractBoundedListEntries;
+using topology::writeAtomList;
   
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintApparatus *ra_in) :
@@ -18,9 +26,9 @@ ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintAppara
     bond_affector_list{}, bond_affector_bounds{}, angl_affector_list{}, angl_affector_bounds{},
     dihe_affector_list{}, dihe_affector_bounds{}, ubrd_affector_list{}, ubrd_affector_bounds{},
     cimp_affector_list{}, cimp_affector_bounds{}, cmap_affector_list{}, cmap_affector_bounds{},
-    vste_affector_list{}, vste_affector_bounds{}, cnst_affector_list{}, cnst_affector_bounds{},
-    sett_affector_list{}, sett_affector_bounds{}, work_unit_assignment_count{},
-    work_unit_presence{}, ag_pointer{ag_in}, ra_pointer{ra_in}
+    infr_affector_list{}, infr_affector_bounds{}, vste_affector_list{}, vste_affector_bounds{},
+    cnst_affector_list{}, cnst_affector_bounds{}, sett_affector_list{}, sett_affector_bounds{},
+    work_unit_assignment_count{}, work_unit_presence{}, ag_pointer{ag_in}, ra_pointer{ra_in}
 {
   // Get relevant abstracts
   const ValenceKit<double> vk = ag_in->getDoublePrecisionValenceKit();
@@ -71,6 +79,11 @@ std::vector<int> ValenceDelegator::getCharmmImproperAffectors(const int atom_ind
 //-------------------------------------------------------------------------------------------------
 std::vector<int> ValenceDelegator::getCmapAffectors(const int atom_index) const {
   return extractBoundedListEntries(cmap_affector_list, cmap_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getInferred14Affectors(const int atom_index) const {
+  return extractBoundedListEntries(infr_affector_list, infr_affector_bounds, atom_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -225,6 +238,8 @@ void ValenceDelegator::allocate() {
   cimp_affector_bounds.resize(atom_count + 1, 0);
   cmap_affector_list.resize(5 * vk.ncmap);
   cmap_affector_bounds.resize(atom_count + 1, 0);
+  infr_affector_list.resize(2 * vk.ninfr14);
+  infr_affector_bounds.resize(atom_count + 1, 0);
   rposn_affector_list.resize(rar.nposn);
   rposn_affector_bounds.resize(atom_count + 1, 0);
   rbond_affector_list.resize(2 * rar.nbond);
@@ -233,7 +248,7 @@ void ValenceDelegator::allocate() {
   rangl_affector_bounds.resize(atom_count + 1, 0);
   rdihe_affector_list.resize(4 * rar.ndihe);
   rdihe_affector_bounds.resize(atom_count + 1, 0);
-  vste_affector_list.resize(4 * vsk.nsite);
+  vste_affector_list.resize(5 * vsk.nsite);
   vste_affector_bounds.resize(atom_count + 1, 0);
   sett_affector_list.resize(3 * cnk.nsettle);
   sett_affector_bounds.resize(atom_count + 1, 0);
@@ -263,6 +278,8 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
                     vk.cimp_j_atoms, vk.cimp_k_atoms, vk.cimp_l_atoms);
   markAffectorAtoms(&cmap_affector_bounds, &cmap_affector_list, vk.ncmap, vk.cmap_i_atoms,
                     vk.cmap_j_atoms, vk.cmap_k_atoms, vk.cmap_l_atoms, vk.cmap_m_atoms);
+  markAffectorAtoms(&infr_affector_bounds, &infr_affector_list, vk.ninfr14, vk.infr14_i_atoms,
+                    vk.infr14_l_atoms);
   markAffectorAtoms(&sett_affector_bounds, &sett_affector_list, cnk.nsettle, cnk.settle_ox_atoms,
                     cnk.settle_h1_atoms, cnk.settle_h2_atoms);
   markAffectorAtoms(&rposn_affector_bounds, &rposn_affector_list, rar.nposn, rar.rposn_atoms);
@@ -276,6 +293,11 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
   // Virtual sites can contain -1 in the atom arrays and therefore cannot go through the
   // general procedure.  Best to handle them with a filter over the frame type, anyway.
   for (int pos = 0; pos < vsk.nsite; pos++) {
+
+    // There will be a minimum of two frame atoms, but the virtual site itself is part of the
+    // "term" that puts forces on particles.  The non-bonded forces thus far determined to act
+    // on the virtual site trasmit onto as many as four frame atoms.
+    vste_affector_bounds[vsk.vs_atoms[pos]] += 1;
     vste_affector_bounds[vsk.frame1_idx[pos]] += 1;
     vste_affector_bounds[vsk.frame2_idx[pos]] += 1;
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
@@ -308,14 +330,18 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
 
   // Finish up the virtual site mapping
   for (int pos = 0; pos < vsk.nsite; pos++) {
+    const int virtual_atom = vsk.vs_atoms[pos];
     const int parent_atom = vsk.frame1_idx[pos];
     const int frame2_atom = vsk.frame2_idx[pos];
+    const int list_vs_idx = vste_affector_bounds[virtual_atom];
     const int list_p_idx  = vste_affector_bounds[parent_atom];
     const int list_f2_idx = vste_affector_bounds[frame2_atom];
+    vste_affector_list[list_vs_idx] = pos;
     vste_affector_list[list_p_idx ] = pos;
     vste_affector_list[list_f2_idx] = pos;
-    vste_affector_bounds[parent_atom] += 1;
-    vste_affector_bounds[frame2_atom] += 1;
+    vste_affector_bounds[virtual_atom] += 1;
+    vste_affector_bounds[parent_atom]  += 1;
+    vste_affector_bounds[frame2_atom]  += 1;
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[vsk.vs_param_idx[pos]])) {
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::FIXED_2:
@@ -620,6 +646,266 @@ void ValenceWorkUnit::addNewVirtualSite(const int vsite_index) {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::findForcePartners(const int atom_idx,
+                                                    const ValenceKit<double> &vk,
+                                                    const RestraintApparatusDpReader &rar,
+                                                    const VirtualSiteKit<double> &vsk,
+                                                    const std::vector<int> &caller_stack) {
+  std::vector<int> result(64);
+
+  // Form a new call stack from the input.  Check that the call stack has not grown too large,
+  // as this might indicate an infinite loop and some nonsensical feature of the topology.
+  std::vector<int> updated_caller_stack(caller_stack);
+  updated_caller_stack.push_back(atom_idx);
+  if (updated_caller_stack.size() > max_atom_search_stacks) {
+    const std::string atom_list = writeAtomList(updated_caller_stack,
+                                                ag_pointer->getChemicalDetailsKit());
+    rtErr("Call stack for finding force partners is too deep.  This likely indicates that, "
+          "somehow, a virtual site in the topology is including itself as one of its frame atoms "
+          "or some similar paradox.  Calls include atoms " + atom_list + ".", "findForcePartners");
+  }
+  
+  // Push the atom itself onto the list first.  Even if there are no interactions, having the
+  // atom is, by definition, critical to evaluating its movement.
+  result.push_back(atom_idx);
+
+  // Puhs atoms relevant to all valence force field terms onto the list.
+  const std::vector<int> relevant_bonds = vdel_pointer->getBondAffectors(atom_idx);
+  const int nbond = relevant_bonds.size();
+  for (int i = 0; i < nbond; i++) {
+    const int bond_term_index = relevant_bonds[i];
+    result.push_back(vk.bond_i_atoms[bond_term_index]);
+    result.push_back(vk.bond_j_atoms[bond_term_index]);
+  }
+  const std::vector<int> relevant_angls = vdel_pointer->getAngleAffectors(atom_idx);
+  const int nangl = relevant_angls.size();
+  for (int i = 0; i < nangl; i++) {
+    const int angl_term_index = relevant_angls[i];
+    result.push_back(vk.angl_i_atoms[angl_term_index]);
+    result.push_back(vk.angl_j_atoms[angl_term_index]);
+    result.push_back(vk.angl_k_atoms[angl_term_index]);
+  }
+  const std::vector<int> relevant_dihes = vdel_pointer->getDihedralAffectors(atom_idx);
+  const int ndihe = relevant_dihes.size();
+  for (int i = 0; i < ndihe; i++) {
+    const int dihe_term_index = relevant_dihes[i];
+    result.push_back(vk.dihe_i_atoms[dihe_term_index]);
+    result.push_back(vk.dihe_j_atoms[dihe_term_index]);
+    result.push_back(vk.dihe_k_atoms[dihe_term_index]);
+    result.push_back(vk.dihe_l_atoms[dihe_term_index]);
+  }
+  const std::vector<int> relevant_ubrds = vdel_pointer->getUreyBradleyAffectors(atom_idx);
+  const int nubrd = relevant_ubrds.size();
+  for (int i = 0; i < nubrd; i++) {
+    const int ubrd_term_index = relevant_ubrds[i];
+    result.push_back(vk.ubrd_i_atoms[ubrd_term_index]);
+    result.push_back(vk.ubrd_k_atoms[ubrd_term_index]);
+  }
+  const std::vector<int> relevant_cimps = vdel_pointer->getCharmmImproperAffectors(atom_idx);
+  const int ncimp = relevant_cimps.size();
+  for (int i = 0; i < ncimp; i++) {
+    const int cimp_term_index = relevant_cimps[i];
+    result.push_back(vk.cimp_i_atoms[cimp_term_index]);
+    result.push_back(vk.cimp_j_atoms[cimp_term_index]);
+    result.push_back(vk.cimp_k_atoms[cimp_term_index]);
+    result.push_back(vk.cimp_l_atoms[cimp_term_index]);
+  }
+  const std::vector<int> relevant_cmaps = vdel_pointer->getCmapAffectors(atom_idx);
+  const int ncmap = relevant_cmaps.size();
+  for (int i = 0; i < ncmap; i++) {
+    const int cmap_term_index = relevant_cmaps[i];
+    result.push_back(vk.cmap_i_atoms[cmap_term_index]);
+    result.push_back(vk.cmap_j_atoms[cmap_term_index]);
+    result.push_back(vk.cmap_k_atoms[cmap_term_index]);
+    result.push_back(vk.cmap_l_atoms[cmap_term_index]);
+    result.push_back(vk.cmap_m_atoms[cmap_term_index]);
+  }
+
+  // Most 1:4 attenuated interactions are implicitly covered by dihedral interactions to which
+  // they can be linked.  Most virtual sites will have additional 1:4 attenuated interactions
+  // that are not covered by dihedral interactions, as the virtual sites do not typically
+  // participate in dihedral terms.  Push these onto the list.
+  const std::vector<int> relevant_infrs = vdel_pointer->getInferred14Affectors(atom_idx);
+  const int ninfr = relevant_infrs.size();
+  for (int i = 0; i < ninfr; i++) {
+    const int infr_term_index = relevant_infrs[i];
+    result.push_back(vk.infr14_i_atoms[infr_term_index]);
+    result.push_back(vk.infr14_l_atoms[infr_term_index]);
+  }
+
+  // Push atoms relevant to NMR restraints onto the list.
+  const std::vector<int> relevant_rposn = vdel_pointer->getPositionalRestraintAffectors(atom_idx);
+  const int nrposn = relevant_rposn.size();
+  for (int i = 0; i < nrposn; i++) {
+    const int rposn_term_index = relevant_rposn[i];
+    result.push_back(rar.rposn_atoms[rposn_term_index]);
+  }
+  const std::vector<int> relevant_rbond = vdel_pointer->getDistanceRestraintAffectors(atom_idx);
+  const int nrbond = relevant_rbond.size();
+  for (int i = 0; i < nrbond; i++) {
+    const int rbond_term_index = relevant_rbond[i];
+    result.push_back(rar.rbond_i_atoms[rbond_term_index]);
+    result.push_back(rar.rbond_j_atoms[rbond_term_index]);
+  }
+  const std::vector<int> relevant_rangl = vdel_pointer->getAngleRestraintAffectors(atom_idx);
+  const int nrangl = relevant_rangl.size();
+  for (int i = 0; i < nrangl; i++) {
+    const int rangl_term_index = relevant_rangl[i];
+    result.push_back(rar.rangl_i_atoms[rangl_term_index]);
+    result.push_back(rar.rangl_j_atoms[rangl_term_index]);
+    result.push_back(rar.rangl_k_atoms[rangl_term_index]);
+  }
+  const std::vector<int> relevant_rdihe = vdel_pointer->getDihedralRestraintAffectors(atom_idx);
+  const int nrdihe = relevant_rdihe.size();
+  for (int i = 0; i < nrdihe; i++) {
+    const int rdihe_term_index = relevant_rdihe[i];
+    result.push_back(rar.rdihe_i_atoms[rdihe_term_index]);
+    result.push_back(rar.rdihe_j_atoms[rdihe_term_index]);
+    result.push_back(rar.rdihe_k_atoms[rdihe_term_index]);
+    result.push_back(rar.rdihe_l_atoms[rdihe_term_index]);
+  }
+
+  // Virtual sites transfer the non-bonded forces they have accumuated (including contributions
+  // from attenuated 1:4 non-bonded interactions, possibly standard valence terms if the force
+  // field is very abstract) to their frame atoms.  The virtual site, all of its frame atoms, and
+  // any atoms making interactions with the virtual site must therefore be included.
+  const std::vector<int> relevant_vstes = vdel_pointer->getVirtualSiteAffectors(atom_idx);
+  const int nvsite = relevant_vstes.size();
+  for (int i = 0; i < nvsite; i++) {
+    const int vste_index = relevant_vstes[i];
+
+    // If the virtual site is atom_idx, then the primary and inferred 1:4 interactions have already
+    // been counted in the work above.  This part of the step can be skipped, and since the atom
+    // itself has already been added to the list of relevant atoms, it is not necessary to add it
+    // again.  If the virtual site is not atom_idx, this step will cover adding the virtual site
+    // itself to the list of relevant atoms.
+    const int vs_idx = vsk.vs_atoms[vste_index];
+    if (vs_idx != atom_idx) {
+      const std::vector<int> tmpv = findForcePartners(vs_idx, vk, rar, vsk, updated_caller_stack);
+      result.insert(result.end(), tmpv.begin(), tmpv.end());
+    }
+
+    // Regardless of whether atoms relevant to additional interactions to the virtual site were
+    // included, the frame atoms must be added to the list of relevant atoms so that it is known
+    // how forces from the virtual site will be split up, some of which will land upon atom_idx
+    // if atom_idx was not the virtual site itself.
+    result.push_back(vsk.frame1_idx[vste_index]);
+    result.push_back(vsk.frame2_idx[vste_index]);
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[vste_index])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::NONE:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      result.push_back(vsk.frame3_idx[vste_index]);
+      break;
+    case VirtualSiteKind::FIXED_4:
+      result.push_back(vsk.frame3_idx[vste_index]);
+      result.push_back(vsk.frame4_idx[vste_index]);
+      break;
+    }
+  }
+    
+  // Sort the list of required atoms and prune duplicate entries
+  reduceUniqueValues(&result);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::findMovementPartners(const int atom_idx,
+                                                       const ConstraintKit<double> &cnk,
+                                                       const VirtualSiteKit<double> &vsk,
+                                                       const std::vector<int> &caller_stack) {
+  std::vector<int> result(64);
+
+  // Form a new call stack from the input.  Check that the call stack has not grown too large,
+  // as this might indicate an infinite loop and some nonsensical feature of the topology.
+  std::vector<int> updated_caller_stack(caller_stack);
+  updated_caller_stack.push_back(atom_idx);
+  if (updated_caller_stack.size() > max_atom_search_stacks) {
+    const std::string atom_list = writeAtomList(updated_caller_stack,
+                                                ag_pointer->getChemicalDetailsKit());
+    rtErr("Call stack for finding movement partners is too deep.  This likely indicates that, "
+          "somehow, a constraint group and virtual site in the topology are interacting in a "
+          "way that creates a paradox.  Calls include atoms " + atom_list + ".",
+          "findMovementPartners");
+  }
+
+  // The movement partners must necessarily include the atom itself, even if there are no
+  // constraint or virtual sites affecting it.
+  result.push_back(atom_idx);
+
+  // If the atom is a virtual site, then all of its frame atoms are likewise required to move
+  // before its new position can be determined.  Furthermore, any constraint groups which they
+  // are a part of must be included.  Use a recursive call to sweep up the frame atoms'
+  // constraint groups.
+  if (ag_pointer->getAtomicNumber(atom_idx) == 0) {
+
+    // Find the precise virtual site frame index to include only those atoms
+    const std::vector<int> relevant_vstes = vdel_pointer->getVirtualSiteAffectors(atom_idx);
+    const int nvsite = relevant_vstes.size();
+    for (int i = 0; i < nvsite; i++) {
+      const int vste_idx = relevant_vstes[i];
+      if (vsk.vs_atoms[vste_idx] == atom_idx) {
+        const std::vector<int> tmp1 = findMovementPartners(vsk.frame1_idx[vste_idx], cnk, vsk);
+        result.insert(result.end(), tmp1.begin(), tmp1.end());
+        const std::vector<int> tmp2 = findMovementPartners(vsk.frame2_idx[vste_idx], cnk, vsk);
+        result.insert(result.end(), tmp2.begin(), tmp2.end());
+        switch (static_cast<VirtualSiteKind>(vsk.vs_types[vste_idx])) {
+        case VirtualSiteKind::FLEX_2:
+        case VirtualSiteKind::FIXED_2:
+        case VirtualSiteKind::NONE:
+          break;
+        case VirtualSiteKind::FLEX_3:
+        case VirtualSiteKind::FIXED_3:
+        case VirtualSiteKind::FAD_3:
+        case VirtualSiteKind::OUT_3:
+          {
+            const std::vector<int> tmp3 = findMovementPartners(vsk.frame3_idx[vste_idx], cnk, vsk);
+            result.insert(result.end(), tmp3.begin(), tmp3.end());
+          }
+          break;
+        case VirtualSiteKind::FIXED_4:
+          {
+            const std::vector<int> tmp3 = findMovementPartners(vsk.frame3_idx[vste_idx], cnk, vsk);
+            result.insert(result.end(), tmp3.begin(), tmp3.end());
+            const std::vector<int> tmp4 = findMovementPartners(vsk.frame4_idx[vste_idx], cnk, vsk);
+            result.insert(result.end(), tmp4.begin(), tmp4.end());
+          }
+          break;
+        }
+      }
+    }
+  }
+  
+  // Any constraint groups that affect the atom must have all of their atoms moved along
+  // with the atom.
+  const std::vector<int> relevant_setts = vdel_pointer->getSettleGroupAffectors(atom_idx);
+  const int nsett = relevant_setts.size();
+  for (int i = 0; i < nsett; i++) {
+    const int sett_index = relevant_setts[i];
+    result.push_back(cnk.settle_ox_atoms[sett_index]);
+    result.push_back(cnk.settle_h1_atoms[sett_index]);
+    result.push_back(cnk.settle_h2_atoms[sett_index]);
+  }
+  const std::vector<int> relevant_cnsts = vdel_pointer->getConstraintGroupAffectors(atom_idx);
+  const int ncnst = relevant_cnsts.size();
+  for (int i = 0; i < ncnst; i++) {
+    const int cnst_index = relevant_cnsts[i];
+    for (int j = cnk.group_bounds[cnst_index]; j < cnk.group_bounds[cnst_index + 1]; j++) {
+      result.push_back(cnk.group_list[j]);
+    }
+  }
+
+  // Sort the list of required atoms and prune duplicate entries
+  reduceUniqueValues(&result);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
                                         const RestraintApparatusDpReader &rar,
                                         const ConstraintKit<double> &cnk,
@@ -631,126 +917,32 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
     // virtual sites.
     required_atoms.resize(0);
     const int atomi = atom_import_list[i];
-    const std::vector<int> relevant_bonds = vdel_pointer->getBondAffectors(atomi);
-    const int nbond = relevant_bonds.size();
-    for (int j = 0; j < nbond; j++) {
-      const int bond_term_index = relevant_bonds[j];
-      required_atoms.push_back(vk.bond_i_atoms[bond_term_index]);
-      required_atoms.push_back(vk.bond_j_atoms[bond_term_index]);
+
+    // Check that all frame atoms are included in the required update list
+    std::vector<int> move_req = findMovementPartners(atomi, cnk, vsk);
+    reduceUniqueValues(&move_req);
+
+    // CHECK
+    printf("Movement partners for atom %4d %4.4s:\n", atomi,
+           parse::char4ToString(ag_pointer->getAtomName(atomi)).c_str());
+    printf("  %s\n", writeAtomList(move_req, ag_pointer->getChemicalDetailsKit()).c_str());
+    // END CHECK
+
+    std::vector<int> force_req;
+    const size_t nmove = move_req.size();
+    for (size_t j = 0; j < nmove; j++) {
+      const std::vector<int> tmpj = findForcePartners(move_req[j], vk, rar, vsk);
+      force_req.insert(force_req.end(), tmpj.begin(), tmpj.end());
     }
-    const std::vector<int> relevant_angls = vdel_pointer->getAngleAffectors(atomi);
-    const int nangl = relevant_angls.size();
-    for (int j = 0; j < nangl; j++) {
-      const int angl_term_index = relevant_angls[j];
-      required_atoms.push_back(vk.angl_i_atoms[angl_term_index]);
-      required_atoms.push_back(vk.angl_j_atoms[angl_term_index]);
-      required_atoms.push_back(vk.angl_k_atoms[angl_term_index]);
-    }
-    const std::vector<int> relevant_dihes = vdel_pointer->getDihedralAffectors(atomi);
-    const int ndihe = relevant_dihes.size();
-    for (int j = 0; j < ndihe; j++) {
-      const int dihe_term_index = relevant_dihes[j];
-      required_atoms.push_back(vk.dihe_i_atoms[dihe_term_index]);
-      required_atoms.push_back(vk.dihe_j_atoms[dihe_term_index]);
-      required_atoms.push_back(vk.dihe_k_atoms[dihe_term_index]);
-      required_atoms.push_back(vk.dihe_l_atoms[dihe_term_index]);
-    }
-    const std::vector<int> relevant_ubrds = vdel_pointer->getUreyBradleyAffectors(atomi);
-    const int nubrd = relevant_ubrds.size();
-    for (int j = 0; j < nubrd; j++) {
-      const int ubrd_term_index = relevant_ubrds[j];
-      required_atoms.push_back(vk.ubrd_i_atoms[ubrd_term_index]);
-      required_atoms.push_back(vk.ubrd_k_atoms[ubrd_term_index]);
-    }
-    const std::vector<int> relevant_cimps = vdel_pointer->getCharmmImproperAffectors(atomi);
-    const int ncimp = relevant_cimps.size();
-    for (int j = 0; j < ncimp; j++) {
-      const int cimp_term_index = relevant_cimps[j];
-      required_atoms.push_back(vk.cimp_i_atoms[cimp_term_index]);
-      required_atoms.push_back(vk.cimp_j_atoms[cimp_term_index]);
-      required_atoms.push_back(vk.cimp_k_atoms[cimp_term_index]);
-      required_atoms.push_back(vk.cimp_l_atoms[cimp_term_index]);
-    }
-    const std::vector<int> relevant_cmaps = vdel_pointer->getCmapAffectors(atomi);
-    const int ncmap = relevant_cmaps.size();
-    for (int j = 0; j < ncmap; j++) {
-      const int cmap_term_index = relevant_cmaps[j];
-      required_atoms.push_back(vk.cmap_i_atoms[cmap_term_index]);
-      required_atoms.push_back(vk.cmap_j_atoms[cmap_term_index]);
-      required_atoms.push_back(vk.cmap_k_atoms[cmap_term_index]);
-      required_atoms.push_back(vk.cmap_l_atoms[cmap_term_index]);
-      required_atoms.push_back(vk.cmap_m_atoms[cmap_term_index]);
-    }
-    const std::vector<int> relevant_rposn = vdel_pointer->getPositionalRestraintAffectors(atomi);
-    const int nrposn = relevant_rposn.size();
-    for (int j = 0; j < nrposn; j++) {
-      const int rposn_term_index = relevant_rposn[j];
-      required_atoms.push_back(rar.rposn_atoms[rposn_term_index]);
-    }
-    const std::vector<int> relevant_rbond = vdel_pointer->getDistanceRestraintAffectors(atomi);
-    const int nrbond = relevant_rbond.size();
-    for (int j = 0; j < nrbond; j++) {
-      const int rbond_term_index = relevant_rbond[j];
-      required_atoms.push_back(rar.rbond_i_atoms[rbond_term_index]);
-      required_atoms.push_back(rar.rbond_j_atoms[rbond_term_index]);
-    }
-    const std::vector<int> relevant_rangl = vdel_pointer->getAngleRestraintAffectors(atomi);
-    const int nrangl = relevant_rangl.size();
-    for (int j = 0; j < nrangl; j++) {
-      const int rangl_term_index = relevant_rangl[j];
-      required_atoms.push_back(rar.rangl_i_atoms[rangl_term_index]);
-      required_atoms.push_back(rar.rangl_j_atoms[rangl_term_index]);
-      required_atoms.push_back(rar.rangl_k_atoms[rangl_term_index]);
-    }
-    const std::vector<int> relevant_rdihe = vdel_pointer->getDihedralRestraintAffectors(atomi);
-    const int nrdihe = relevant_rdihe.size();
-    for (int j = 0; j < nrdihe; j++) {
-      const int rdihe_term_index = relevant_rdihe[j];
-      required_atoms.push_back(rar.rdihe_i_atoms[rdihe_term_index]);
-      required_atoms.push_back(rar.rdihe_j_atoms[rdihe_term_index]);
-      required_atoms.push_back(rar.rdihe_k_atoms[rdihe_term_index]);
-      required_atoms.push_back(rar.rdihe_l_atoms[rdihe_term_index]);
-    }
-    const std::vector<int> relevant_setts = vdel_pointer->getSettleGroupAffectors(atomi);
-    const int nsett = relevant_setts.size();
-    for (int j = 0; j < nsett; j++) {
-      const int sett_index = relevant_setts[j];
-      required_atoms.push_back(cnk.settle_ox_atoms[sett_index]);
-      required_atoms.push_back(cnk.settle_h1_atoms[sett_index]);
-      required_atoms.push_back(cnk.settle_h2_atoms[sett_index]);
-    }
-    const std::vector<int> relevant_cnsts = vdel_pointer->getConstraintGroupAffectors(atomi);
-    const int ncnst = relevant_cnsts.size();
-    for (int j = 0; j < ncnst; j++) {
-      const int cnst_index = relevant_cnsts[j];
-      for (int k = cnk.group_bounds[cnst_index]; k < cnk.group_bounds[cnst_index + 1]; k++) {
-        required_atoms.push_back(cnk.group_list[k]);
-      }
-    }
-    const std::vector<int> relevant_vstes = vdel_pointer->getVirtualSiteAffectors(atomi);
-    const int nvsite = relevant_vstes.size();
-    for (int j = 0; j < nvsite; j++) {
-      const int vste_index = relevant_vstes[j];
-      required_atoms.push_back(vsk.frame1_idx[vste_index]);
-      required_atoms.push_back(vsk.frame2_idx[vste_index]);
-      switch (static_cast<VirtualSiteKind>(vsk.vs_types[vste_index])) {
-      case VirtualSiteKind::FLEX_2:
-      case VirtualSiteKind::FIXED_2:
-      case VirtualSiteKind::NONE:
-        break;
-      case VirtualSiteKind::FLEX_3:
-      case VirtualSiteKind::FIXED_3:
-      case VirtualSiteKind::FAD_3:
-      case VirtualSiteKind::OUT_3:
-        required_atoms.push_back(vsk.frame3_idx[vste_index]);
-        break;
-      case VirtualSiteKind::FIXED_4:
-        required_atoms.push_back(vsk.frame3_idx[vste_index]);
-        required_atoms.push_back(vsk.frame4_idx[vste_index]);
-        break;
-      }
-    }
+    reduceUniqueValues(&force_req);
+
+    // CHECK
+    printf("  -> Force partners for atom %4d %4.4s:\n", atomi,
+           parse::char4ToString(ag_pointer->getAtomName(atomi)).c_str());
+    printf("      %s\n", writeAtomList(force_req, ag_pointer->getChemicalDetailsKit()).c_str());
+    // END CHECK    
   }
+  
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -814,8 +1006,7 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
   for (int i = 0; i < vwu_count; i++) {
     const int natom = result[i].getAtomCount();
     result[i].assignUpdateTasks(vk, rar, cnk, vsk);
-  }
-  
+  }  
   
   return result;
 }
