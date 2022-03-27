@@ -532,7 +532,7 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
         heavy_atom_idx = all_nb_excl.nb12_excl_list[j];
       }
     }
-
+    
     // There is a possibility of simulations having free hydrogen atoms.  It would be strange,
     // but not against the rules of the simulation.  Just let it be.  Do not attempt to constrain
     // bonds to hydrogen if more than one heavy atom (or more than one other atom) is
@@ -545,11 +545,14 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
     // Form the constraint group.
     tmp_cnst_list.resize(0);
     tmp_cnst_list.push_back(heavy_atom_idx);
+    tmp_cnst_list.push_back(i);
     for (int j = all_nb_excl.nb12_excl_bounds[heavy_atom_idx];
          j < all_nb_excl.nb12_excl_bounds[heavy_atom_idx + 1]; j++) {
-      if (settle_ready_atoms[i] == false && atomic_numbers[all_nb_excl.nb12_excl_list[j]] == 1) {
+      if (settle_ready_atoms[all_nb_excl.nb12_excl_list[j]] == false &&
+          atomic_numbers[all_nb_excl.nb12_excl_list[j]] == 1) {
         tmp_cnst_list.push_back(all_nb_excl.nb12_excl_list[j]);
-      }      
+        settle_ready_atoms[all_nb_excl.nb12_excl_list[j]] = true;
+      }
     }
     const int group_size = tmp_cnst_list.size();
     cnst_group_bounds.push_back(cnst_group_bounds[ngrp] + group_size);
@@ -585,8 +588,8 @@ ConstraintTable::ConstraintTable(const std::vector<int> &atomic_numbers,
       const int jatom = tmp_cnst_list[j];
       for (int k = bvt.bond_assigned_bounds[jatom]; k < bvt.bond_assigned_bounds[jatom + 1]; k++) {
         if (bvt.bond_assigned_atoms[k] == catom) {
-          tmp_cnst_parm[k].y = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[k]]];
-          tmp_cnst_made[k] = true;
+          tmp_cnst_parm[j].y = bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[k]]];
+          tmp_cnst_made[j] = true;
         }
       }
     }

@@ -688,6 +688,11 @@ public:
   /// \brief Get the total number of constrained groups
   int getConstraintGroupCount() const;
 
+  /// \brief Get the atoms of a single constraint group
+  ///
+  /// \param index  The index of the constraint group within the topology
+  std::vector<int> getConstraintGroupAtoms(int index) const;
+  
   /// \brief Get the total size of the constrained group atoms list
   int getConstraintGroupTotalSize() const;
   

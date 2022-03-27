@@ -651,7 +651,8 @@ std::vector<int> ValenceWorkUnit::findForcePartners(const int atom_idx,
                                                     const RestraintApparatusDpReader &rar,
                                                     const VirtualSiteKit<double> &vsk,
                                                     const std::vector<int> &caller_stack) {
-  std::vector<int> result(64);
+  std::vector<int> result;
+  result.reserve(64);
 
   // Form a new call stack from the input.  Check that the call stack has not grown too large,
   // as this might indicate an infinite loop and some nonsensical feature of the topology.
@@ -819,8 +820,9 @@ std::vector<int> ValenceWorkUnit::findMovementPartners(const int atom_idx,
                                                        const ConstraintKit<double> &cnk,
                                                        const VirtualSiteKit<double> &vsk,
                                                        const std::vector<int> &caller_stack) {
-  std::vector<int> result(64);
-
+  std::vector<int> result;
+  result.reserve(64);
+  
   // Form a new call stack from the input.  Check that the call stack has not grown too large,
   // as this might indicate an infinite loop and some nonsensical feature of the topology.
   std::vector<int> updated_caller_stack(caller_stack);
@@ -901,7 +903,7 @@ std::vector<int> ValenceWorkUnit::findMovementPartners(const int atom_idx,
   }
 
   // Sort the list of required atoms and prune duplicate entries
-  reduceUniqueValues(&result);
+  reduceUniqueValues(&result);  
   return result;
 }
 
@@ -921,13 +923,6 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
     // Check that all frame atoms are included in the required update list
     std::vector<int> move_req = findMovementPartners(atomi, cnk, vsk);
     reduceUniqueValues(&move_req);
-
-    // CHECK
-    printf("Movement partners for atom %4d %4.4s:\n", atomi,
-           parse::char4ToString(ag_pointer->getAtomName(atomi)).c_str());
-    printf("  %s\n", writeAtomList(move_req, ag_pointer->getChemicalDetailsKit()).c_str());
-    // END CHECK
-
     std::vector<int> force_req;
     const size_t nmove = move_req.size();
     for (size_t j = 0; j < nmove; j++) {
@@ -935,14 +930,7 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
       force_req.insert(force_req.end(), tmpj.begin(), tmpj.end());
     }
     reduceUniqueValues(&force_req);
-
-    // CHECK
-    printf("  -> Force partners for atom %4d %4.4s:\n", atomi,
-           parse::char4ToString(ag_pointer->getAtomName(atomi)).c_str());
-    printf("      %s\n", writeAtomList(force_req, ag_pointer->getChemicalDetailsKit()).c_str());
-    // END CHECK    
   }
-  
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -957,24 +945,6 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
     const int n_units = result.size();
     result.emplace_back(ag, ra, &vdel, n_units, vdel.getFirstUnassignedAtom(), max_atoms_per_vwu);
   }
-
-  // CHECK
-  for (size_t i = 0; i < result.size(); i++) {
-    printf("Work unit %4zu has %3d atoms:\n", i, result[i].getAtomCount());
-    int k = 0;
-    for (int j = 0; j < result[i].getAtomCount(); j++) {
-      printf(" %5d", result[i].getImportedAtom(j));
-      k++;
-      if (k == 16) {
-        printf("\n");
-        k = 0;
-      }
-    }
-    if (k > 0) {
-      printf("\n");
-    }
-  }
-  // END CHECK
   
   // Shift atoms between work units in an effort to conserve bonding within any particular work
   // unit.

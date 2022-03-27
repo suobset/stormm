@@ -545,6 +545,21 @@ int AtomGraph::getConstraintGroupCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> AtomGraph::getConstraintGroupAtoms(const int index) const {
+  if (index < 0 || index >= constraint_group_count) {
+    rtErr("Constraint group index " + std::to_string(index) + " is invalid for a topology with " +
+          std::to_string(constraint_group_count) + " constraint groups.", "AtomGraph",
+          "getConstraintGroupAtoms");
+  }
+  std::vector<int> result;
+  const int hlim = constraint_group_bounds.readHost(index + 1);
+  for (int i = constraint_group_bounds.readHost(index); i < hlim; i++) {
+    result.push_back(constraint_group_atoms.readHost(i));
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraph::getConstraintGroupTotalSize() const {
   return constraint_group_bounds.readHost(constraint_group_count);
 }

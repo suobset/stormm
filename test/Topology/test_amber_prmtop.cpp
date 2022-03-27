@@ -45,7 +45,9 @@ enum class IntInfoCode {
   SUM_CIMP_INDICES,           // Compute the sum of up to 100 CHARMM improper atom indices
   SUM_CMAP_INDICES,           // Compute the sum of up to 100 CMAP atom I, J, K, L, and M indices
   CHARGE_TYPE_COUNT,          // Show the number of unique charges detected
-  VIRTUAL_SITE_FRAME_SUM      // Show the sum of virtual site frame atom indices
+  VIRTUAL_SITE_FRAME_SUM,     // Show the sum of virtual site frame atom indices
+  CONSTRAINT_GROUP_COUNT,     // Show the number of constraint group
+  CONSTRAINT_GROUP_SUM        // Show a sum invovling atom indices of constraint groups
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -240,9 +242,7 @@ std::vector<int> integerAGProp(const std::vector<AtomGraph*> &topols, const bool
       }
       break;
     case IntInfoCode::CHARGE_TYPE_COUNT:
-      {
-        result[i] = topols[i]->getChargeTypeCount();
-      }
+      result[i] = topols[i]->getChargeTypeCount();
       break;
     case IntInfoCode::VIRTUAL_SITE_FRAME_SUM:
       {
@@ -255,6 +255,19 @@ std::vector<int> integerAGProp(const std::vector<AtomGraph*> &topols, const bool
               fsum += topols[i]->getVirtualSiteFrameAtom(j, k) - parent_atom_idx;
             }
           }
+        }
+        result[i] = fsum;
+      }
+      break;
+    case IntInfoCode::CONSTRAINT_GROUP_COUNT:
+      result[i] = topols[i]->getConstraintGroupCount();
+      break;
+    case IntInfoCode::CONSTRAINT_GROUP_SUM:
+      {
+        const int ngrp = topols[i]->getConstraintGroupCount();
+        int fsum = 0;
+        for (int j = 0; j < ngrp; j++) {
+          fsum += sum<int>(topols[i]->getConstraintGroupAtoms(j)) * (1 - (2 * (fsum >= 0)));
         }
         result[i] = fsum;
       }
@@ -421,7 +434,7 @@ int main(int argc, char* argv[]) {
 
   // The temporary directory will not be needed.  Results will be compared against snapshots.
   TestEnvironment oe(argc, argv);
-
+  
   // Section 1
   section("Atomic details");
 
@@ -787,6 +800,16 @@ int main(int argc, char* argv[]) {
   check(integerAGProp(all_topologies, all_top_exist, IntInfoCode::VIRTUAL_SITE_FRAME_SUM),
         RelationalOperator::EQUAL, vs_frame_sum_answer, "Virtual site frame sum was not computed "
         "as expected.", top_check);
+  const std::vector<int> cnst_grp_count_answer = { 0, 0, 0, 0, 96, 96, 96, 5, 5, 790, 9, 164,
+                                                   184, 366, 18 };
+  check(integerAGProp(all_topologies, all_top_exist, IntInfoCode::CONSTRAINT_GROUP_COUNT),
+        RelationalOperator::EQUAL, cnst_grp_count_answer, "Constraint group counts did not match "
+        "the expected results.", top_check);
+  const std::vector<int> cnst_grp_sum_answer = { 0, 0, 0, 0, 165, 165, 165, -9, -9, 1538, -5,
+                                                 -366, -894, 445, -103 };
+  check(integerAGProp(all_topologies, all_top_exist, IntInfoCode::CONSTRAINT_GROUP_SUM),
+        RelationalOperator::EQUAL, cnst_grp_sum_answer, "Constraint group sums did not match the "
+        "expected results.", top_check);
   section(4);
   const std::vector<double> first_mol_mass = {    18.016,    18.016,    18.016,    18.016,
                                                 2170.450,  2170.450,  2170.450,   157.000,
