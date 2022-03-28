@@ -461,25 +461,10 @@ int main(int argc, char* argv[]) {
   const TestPriority do_dhfr = (dhfr_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   AtomGraph dhfr_ag  = (dhfr_exists) ? AtomGraph(dhfr_top_name, ExceptionResponse::SILENT) :
                                        AtomGraph();
-
-  // CHECK
-  printf("There are %d atoms in DHFR.\n", dhfr_ag.getAtomCount());
-  // END CHECK
-  
   PhaseSpace dhfr_ps = (dhfr_exists) ? PhaseSpace(dhfr_crd_name) : PhaseSpace();
   const CoordinateFrameReader dhfr_cfr(dhfr_ps);
-
-  // CHECK
-  printf("Build DHFR positional restraints...\n");
-  // END CHECK
-
   const std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&dhfr_ag, dhfr_cfr,
                                                                             "@N,CA,C,O", 1.4);
-
-  // CHECK
-  printf("There are %zu DHFR positional restraints.\n", bkbn_rstr.size());
-  // END CHECK
-  
   RestraintApparatus dhfr_ra_i(bkbn_rstr);
   ValenceDelegator dhfr_vdel(&dhfr_ag, &dhfr_ra_i);
   const std::vector<ValenceWorkUnit> dhfr_vwu = buildValenceWorkUnits(&dhfr_vdel);

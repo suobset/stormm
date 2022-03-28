@@ -1033,6 +1033,7 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
     }
 
     // CHECK
+#if 0
     printf("There are %2d atoms yet to import in work unit %2d:\n", n_atoms_needed, list_index);
     printf("   ");
     for (int i = 0; i < n_atoms_needed; i++) {
@@ -1043,6 +1044,7 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
       printf(" %4d", unique_rc[i].x);
     }
     printf("\n");
+#endif
     // END CHECK
 
   }
