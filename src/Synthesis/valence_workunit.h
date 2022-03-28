@@ -352,8 +352,14 @@ public:
   ValenceWorkUnit(ValenceDelegator *vdel_in, int list_index_in, int seed_atom_in,
                   int max_atoms_in = 768);
 
-  /// \brief Get the number of atoms currently involved in this work unit.
-  int getAtomCount() const;
+  /// \brief Get the number of atoms currently imported into this work unit.
+  int getImportedAtomCount() const;
+
+  /// \brief Get the number of atoms currently set to be moved by this work unit.
+  int getMovedAtomCount() const;
+
+  /// \brief Get the number of atoms currently set to be updated by this work unit.
+  int getUpdatedAtomCount() const;
 
   /// \brief Get the list index of this work unit.
   int getListIndex() const;
@@ -404,6 +410,11 @@ public:
   /// \brief Add a new atom to the list of updates that a work unit shall perform.  The atom must
   ///        already be part of the atom import list.
   void addNewAtomUpdate(const int atom_index);
+
+  /// \brief Create the move list for atoms in the work unit.  Any atom that the work unit is
+  ///        responsible for updating must be moved by the work unit, but also any atom sharing a
+  ///        constraint group with one of the atoms which is on the official update list.
+  void makeAtomMoveList();
   
   /// \brief Add a new harmonic bond term to the work unit.  Record the fact in the associated
   ///        delegator.
@@ -485,29 +496,28 @@ public:
   void addNewVirtualSite(int vsite_index);
 
 private:
-  int atom_count;        ///< Number of atoms in the work unit
-  int bond_term_count;   ///< Number of bond terms in the work unit
-  int angl_term_count;   ///< Number of angle terms in the work unit
-  int dihe_term_count;   ///< Number of cosine-based dihedral terms in the work unit
-  int ubrd_term_count;   ///< Number of Urey-Bradley terms in the work unit
-  int cimp_term_count;   ///< Number of CHARMM harmonic improper dihedral terms in
-                         ///<   the work unit
-  int cmap_term_count;   ///< Number of CMAP terms in the work unit
-  int rposn_term_count;  ///< Number of positional restraints handled by this work
-                         ///<   unit
-  int rbond_term_count;  ///< Number of distance restraints handled by this work unit
-  int rangl_term_count;  ///< Number of angle restraints handled by this work unit
-  int rdihe_term_count;  ///< Number of dihedral restraints handled by this work unit
-  int cnst_group_count;  ///< Number of SHAKE or RATTLE groups managed by this work
-                         ///<   unit (excludes SETTLE-constrained waters)
-  int sett_group_count;  ///< Number of SETTLE-constrained rigid waters managed by
-                         ///<   this work unit
-  int vste_count;        ///< Number of virtual sites managed by this work unit
-  int list_index;        ///< Index of the work unit in a larger list of similar
-                         ///<   objects coordinating to cover an entire topology
-  int min_atom_index;    ///< Lowest topological index of any imported atom
-  int max_atom_index;    ///< Highest topological index of any imported atom
-  int atom_limit;        ///< Largest number of atoms that this work unit can hold
+  int imported_atom_count;  ///< Number of atoms imported by the work unit
+  int moved_atom_count;     ///< Number of atoms moved by the work unit
+  int updated_atom_count;   ///< Number of atoms updated by the work unit
+  int bond_term_count;      ///< Number of bond terms in the work unit
+  int angl_term_count;      ///< Number of angle terms in the work unit
+  int dihe_term_count;      ///< Number of cosine-based dihedral terms in the work unit
+  int ubrd_term_count;      ///< Number of Urey-Bradley terms in the work unit
+  int cimp_term_count;      ///< Number of CHARMM harmonic improper dihedral terms in the work unit
+  int cmap_term_count;      ///< Number of CMAP terms in the work unit
+  int rposn_term_count;     ///< Number of positional restraints handled by this work unit
+  int rbond_term_count;     ///< Number of distance restraints handled by this work unit
+  int rangl_term_count;     ///< Number of angle restraints handled by this work unit
+  int rdihe_term_count;     ///< Number of dihedral restraints handled by this work unit
+  int cnst_group_count;     ///< Number of SHAKE or RATTLE groups managed by this work
+                            ///<   unit (excludes SETTLE-constrained waters)
+  int sett_group_count;     ///< Number of SETTLE-constrained rigid waters managed by the work unit
+  int vste_count;           ///< Number of virtual sites managed by this work unit
+  int list_index;           ///< Index of the work unit in a larger list of similar
+                            ///<   objects coordinating to cover an entire topology
+  int min_atom_index;       ///< Lowest topological index of any imported atom
+  int max_atom_index;       ///< Highest topological index of any imported atom
+  int atom_limit;           ///< Largest number of atoms that this work unit can hold
 
   /// The list of imported atoms, indicating indices into the original topology.  The position of
   /// each atom in this list indicates its local index within the work unit, as referenced by

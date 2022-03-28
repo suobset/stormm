@@ -5,10 +5,6 @@
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
-// CHECK
-#include "Parsing/parse.h"
-// END CHECK
-
 namespace omni {
 namespace synthesis {
 
@@ -401,15 +397,6 @@ void ValenceDelegator::markAtomAddition(const int vwu_index, const int atom_inde
   
   // If necessary, resize and repaginate the record of which work units each atom takes part in
   if (atom_wua == max_presence_allocation) {
-
-    // CHECK
-    printf("Atom %4d is present in %d work units: [ ", atom_index, atom_wua);
-    for (int i = 0; i < atom_wua; i++) {
-      printf("%2d ", work_unit_presence[(atom_index * max_presence_allocation) + i]);
-    }
-    printf("];\n");
-    // END CHECK
-    
     work_unit_presence.resize(atom_count * (max_presence_allocation + 1));
     for (int i = atom_count - 1; i >= 0; i--) {
       const int new_offset = (max_presence_allocation + 1) * i;
@@ -690,20 +677,21 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
 //-------------------------------------------------------------------------------------------------
 ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index_in,
                                  const int seed_atom_in, const int max_atoms_in) :
-    atom_count{0}, bond_term_count{0}, angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0},
-    cimp_term_count{0}, cmap_term_count{0}, rposn_term_count{0}, rbond_term_count{0},
-    rangl_term_count{0}, rdihe_term_count{0}, cnst_group_count{0}, sett_group_count{0},
-    vste_count{0}, list_index{list_index_in}, min_atom_index{-1}, max_atom_index{-1},
-    atom_limit{max_atoms_in}, atom_import_list{}, bond_term_list{}, angl_term_list{},
-    dihe_term_list{}, ubrd_term_list{}, cimp_term_list{}, cmap_term_list{}, bond_i_atoms{},
-    bond_j_atoms{}, angl_i_atoms{}, angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{},
-    dihe_k_atoms{}, dihe_l_atoms{}, ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{},
-    cimp_k_atoms{}, cimp_l_atoms{}, cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{},
-    cmap_m_atoms{}, rposn_term_list{}, rbond_term_list{}, rangl_term_list{}, rdihe_term_list{},
-    rposn_atoms{}, rbond_i_atoms{}, rbond_j_atoms{}, rangl_i_atoms{}, rangl_j_atoms{},
-    rangl_k_atoms{}, rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{}, rdihe_l_atoms{},
-    cnst_group_list{}, sett_group_list{}, cnst_group_atoms{}, cnst_group_bounds{}, sett_ox_atoms{},
-    sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{}, vsite_atoms{}, vsite_parent_atoms{},
+    imported_atom_count{0}, moved_atom_count{0}, updated_atom_count{0}, bond_term_count{0},
+    angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0}, cimp_term_count{0},
+    cmap_term_count{0}, rposn_term_count{0}, rbond_term_count{0}, rangl_term_count{0},
+    rdihe_term_count{0}, cnst_group_count{0}, sett_group_count{0}, vste_count{0},
+    list_index{list_index_in}, min_atom_index{-1}, max_atom_index{-1}, atom_limit{max_atoms_in},
+    atom_import_list{}, bond_term_list{}, angl_term_list{}, dihe_term_list{}, ubrd_term_list{},
+    cimp_term_list{}, cmap_term_list{}, bond_i_atoms{}, bond_j_atoms{}, angl_i_atoms{},
+    angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{},
+    ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{},
+    cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
+    rposn_term_list{}, rbond_term_list{}, rangl_term_list{}, rdihe_term_list{}, rposn_atoms{},
+    rbond_i_atoms{}, rbond_j_atoms{}, rangl_i_atoms{}, rangl_j_atoms{}, rangl_k_atoms{},
+    rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{}, rdihe_l_atoms{}, cnst_group_list{},
+    sett_group_list{}, cnst_group_atoms{}, cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{},
+    sett_h2_atoms{}, virtual_site_list{}, vsite_atoms{}, vsite_parent_atoms{},
     vsite_frame2_atoms{}, vsite_frame3_atoms{}, vsite_frame4_atoms{}, vdel_pointer{vdel_in},
     ag_pointer{vdel_in->getTopologyPointer()}, ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
@@ -741,7 +729,11 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
   // Proceed to add atoms layer by layer in the current molecule, or if that has been totally
   // covered, jump to the next molecule and continue the process.
   int ncandidate = candidate_additions.size();
-  while (ncandidate > 0 && atom_count + ncandidate < atom_limit - default_vwu_halo_padding) {
+  bool capacity_reached = false;
+  while (ncandidate > 0 && capacity_reached == false) {
+
+    // A single successful addition is needed to prove that the capacity has not yet been reached.
+    capacity_reached = true;
 
     // Transfer candidate atoms to become growth points.  In construction, valence work units
     // do not overlap.  Atoms included in some previous work unit do not become candidates.
@@ -759,7 +751,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
           n_new_atoms++;
         }
       }
-      if (atom_count + n_new_atoms < atom_limit) {
+      if (imported_atom_count + n_new_atoms < atom_limit) {
 
         // The candidate atom will be part of its own dependencies list.
         for (int j = 0; j < ndeps; j++) {
@@ -767,6 +759,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
         }
         growth_points.push_back(candidate_additions[i]);
         addNewAtomUpdate(candidate_additions[i]);
+        capacity_reached = false;
       }
     }
     candidate_additions.resize(0);
@@ -799,8 +792,18 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
 }
 
 //-------------------------------------------------------------------------------------------------
-int ValenceWorkUnit::getAtomCount() const {
-  return atom_count;
+int ValenceWorkUnit::getImportedAtomCount() const {
+  return imported_atom_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getMovedAtomCount() const {
+  return moved_atom_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getUpdatedAtomCount() const {
+  return updated_atom_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -850,12 +853,12 @@ void ValenceWorkUnit::setListIndex(const int list_index_in) {
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::setAtomLimit(const int new_limit) {
-  if (new_limit < atom_count) {
+  if (new_limit < imported_atom_count) {
     rtErr("The atom limit cannot be set below the number of atoms currently in a work unit.  "
           "ValenceWorkUnit " + std::to_string(list_index) + " serving topology " +
-          ag_pointer->getFileName() + " contains " + std::to_string(atom_count) + " atoms and "
-          "cannot reduce its limit to " + std::to_string(new_limit) + ".", "ValenceWorkUnit",
-          "setAtomLimit");
+          ag_pointer->getFileName() + " contains " + std::to_string(imported_atom_count) +
+          " atoms and cannot reduce its limit to " + std::to_string(new_limit) + ".",
+          "ValenceWorkUnit", "setAtomLimit");
   }
   atom_limit = new_limit;
 }
@@ -870,7 +873,7 @@ void ValenceWorkUnit::addNewAtomImport(const int atom_index) {
   
   // Add the new atom to the list of atom imports.
   atom_import_list.push_back(atom_index);
-  atom_count += 1;
+  imported_atom_count += 1;
 
   // Check the appropriate boxes in the delegator.
   vdel_pointer->markAtomAddition(list_index, atom_index);  
@@ -889,7 +892,21 @@ void ValenceWorkUnit::addNewAtomUpdate(const int atom_index) {
   // Check the appropriate boxes in the delegator.
   if (vdel_pointer->setUpdateWorkUnit(atom_index, list_index)) {
     atom_update_list.push_back(atom_index);
+    updated_atom_count += 1;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::makeAtomMoveList() {
+  std::vector<int> required_atoms;
+  for (int i = 0; i < updated_atom_count; i++) {
+
+    // The list of movement partners comprises the particle itself.
+    const std::vector<int> tmpv = vdel_pointer->findMovementPartners(atom_update_list[i]);
+    required_atoms.insert(required_atoms.end(), required_atoms.begin(), required_atoms.end());
+  }
+  atom_move_list = reduceUniqueValues(required_atoms);
+  moved_atom_count = atom_move_list.size();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -982,14 +999,6 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
                                                    const int max_atoms_per_vwu) {
   std::vector<ValenceWorkUnit> result;
-  
-  // Spread atoms over all work units
-  const AtomGraph *ag_ptr = vdel->getTopologyPointer();
-  const RestraintApparatus *ra_ptr = vdel->getRestraintApparatusPointer();
-  while (vdel->getFirstUnassignedAtom() < ag_ptr->getAtomCount()) {
-    const int n_units = result.size();
-    result.emplace_back(vdel, n_units, vdel->getFirstUnassignedAtom(), max_atoms_per_vwu);
-  }
 
   // Assign one and only one unit to log the moves to each atom, including updating the positions
   // of constrained atoms and virtual sites.  By construction, the ValenceWorkUnit objects will
@@ -1010,6 +1019,25 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   // restraint, or a virtual site frame that also involves B.  The hierarchy cannot chain
   // indefinitely, as only one cycle of force computation (including transmission from a virtual
   // site) can occur before moving atoms.
+  const AtomGraph *ag_ptr = vdel->getTopologyPointer();
+  const RestraintApparatus *ra_ptr = vdel->getRestraintApparatusPointer();
+  while (vdel->getFirstUnassignedAtom() < ag_ptr->getAtomCount()) {
+    const int n_units = result.size();
+    result.emplace_back(vdel, n_units, vdel->getFirstUnassignedAtom(), max_atoms_per_vwu);
+  }
+
+  // Loop once more over the update list and construct the atom movement list.  The movement list
+  // is a superset of all the atoms that the work unit will update, and the import list is a
+  // superset of the movement list.
+  const int nvwu = result.size();
+  for (int i = 0; i < nvwu; i++) {
+    result[i].makeAtomMoveList();
+  }
+  
+  // With the atom update assignments of each work unit known and the import list furnishing any
+  // additional required dependencies (halo atoms), the task is now to loop over all updates and
+  // trace back the force terms that must be computed.
+
   return result;
 }
 
