@@ -1299,7 +1299,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     }
   }
   fragment_count = mutable_fragments.size();
-  
+
   // Compute the charge of all fixed atom centers
   int target_charge = round(sum<double>(ag_pointer->getPartialCharge<double>(mol_limits.x,
                                                                              mol_limits.y)));
@@ -1397,11 +1397,11 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       e_options[j] = weighted_energy;
     }
   }
-  
+
   // Incorporate fragments into the solution, grinding through each viable charge state of each
   // fragment.  As in other parts of this workflow, this is a do... while loop to ensure that it
   // executes at least once.  If there are many degenerate states of the system with equal
-  // energies, this will select the final such state.  This is about the final situation where the
+  // energies, this will select the first such state.  This is about the final situation where the
   // code can still run into a combinatorial explosion, but even then calculation of each energy
   // is rapid.
   double best_score = total_score;
@@ -1413,6 +1413,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     best_score += fragment_max;
   }
   std::vector<int> max_frag_settings(fragment_count);
+  std::vector<bool> fragments_culled(options_bounds[fragment_count], false);
   for (int i = 0; i < fragment_count; i++) {
     max_frag_settings[i] = options_bounds[i + 1] - options_bounds[i];
   }
@@ -1448,6 +1449,88 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
             for (int i = 0; i < fragment_count; i++) {
               best_settings[i] = frag_settings[i];
             }
+
+            // With this new best score in hand, look at each state which has multiple options
+            // for the charge state: if it were to take a different state, is there some
+            // compensatory move which could result in as low an energy?  Loop over all residues,
+            // testing the possible alternative states, and eliminating those which cannot be
+            // changed to result in a lower energy.  Make any changes that are noted to be
+            // unambiguously good.
+            std::vector<int4> good_swaps;
+            for (int i = 0; i < fragment_count; i++) {
+              const int i_best_option_idx = options_bounds[i] + best_settings[i];
+              const double i_e_best = e_options[i_best_option_idx];
+              const int i_q_best = q_options[i_best_option_idx];
+              for (int j = 0; j < max_frag_settings[i]; j++) {
+                const int i_option_idx = options_bounds[i] + j;
+                if (j == best_settings[i] || fragments_culled[i_option_idx]) {
+                  continue;
+                }
+
+                // Compute the difference in energy, and the consequence for charge
+                const int i_delta_q = q_options[i_option_idx] - i_q_best;
+                const double i_delta_e = e_options[i_option_idx] - i_e_best;
+
+                // The question is now whether taking delta_q at the energetic price of delta_e
+                // is reasonable.  Search all other fragments--is there some way to compensate for
+                // the change in charge?
+                bool seek_balance_q = true;
+                int k = 0;
+                while (k < fragment_count && seek_balance_q) {
+                  if (k == i) {
+                    k++;
+                    continue;
+                  }
+                  const int k_best_option_idx = options_bounds[k] + best_settings[k];
+                  const double k_e_best = e_options[k_best_option_idx];
+                  const int k_q_best = q_options[k_best_option_idx];
+                  for (int m = 0; m < max_frag_settings[k]; m++) {
+                    const int k_option_idx = options_bounds[k] + m;
+                    if (m == best_settings[k] || fragments_culled[k_option_idx]) {
+                      continue;
+                    }
+                    const int k_delta_q = q_options[k_option_idx] - k_q_best;
+                    if (k_delta_q + i_delta_q == 0) {
+
+                      // The charges are equal, so the net energy had better be negative or the
+                      // charge counterbalance is not viable against the best energy thus far.
+                      const double k_delta_e = e_options[options_bounds[k] + m] - k_e_best;
+                      if (i_delta_e + k_delta_e < 0.0) {
+                        good_swaps.push_back({i, j, k, m});
+                        seek_balance_q = false;
+                        break;
+                      }
+                    }
+                    else if (k_delta_q * i_delta_q < 0) {
+
+                      // The charges are counterbalanced, but with the net change not being zero
+                      // the result is ambiguous.  The alternative is viable for now.
+                      seek_balance_q = false;
+                      break;
+                    }
+                  }
+                  k++;
+                }
+                if (seek_balance_q) {
+
+                  // No viable fragment was found to counterbalance the charge change in a way
+                  // that could possibly lower the energy.  The alternative state of fragment i
+                  // is not viable.
+                  fragments_culled[i_option_idx] = true;
+                }
+              }
+            }
+            const size_t n_swaps = good_swaps.size();
+            for (size_t pos = 0; pos < n_swaps; pos++) {
+              const int ifrag = good_swaps[pos].x;
+              best_score -= e_options[options_bounds[ifrag] + best_settings[ifrag]];
+              best_score += e_options[options_bounds[ifrag] + good_swaps[pos].y];
+              const int kfrag = good_swaps[pos].z;
+              best_score -= e_options[options_bounds[kfrag] + best_settings[kfrag]];
+              best_score += e_options[options_bounds[kfrag] + good_swaps[pos].w];
+              best_settings[ifrag] = good_swaps[pos].y;
+              best_settings[kfrag] = good_swaps[pos].w;
+            }
           }
         }
       }
@@ -1455,15 +1538,25 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
       // Continue the search                
       int last_participant = frags_participating - 1;
       frag_settings[last_participant] += 1;
+      while (frag_settings[last_participant] < max_frag_settings[last_participant] &&
+             fragments_culled[options_bounds[last_participant] +
+                              frag_settings[last_participant]]) {
+        frag_settings[last_participant] += 1;
+      }
       while (frags_participating > 1 &&
              frag_settings[last_participant] >= max_frag_settings[last_participant]) {
         frags_participating--;
         last_participant--;
         frag_settings[last_participant] += 1;
+        while (frag_settings[last_participant] < max_frag_settings[last_participant] &&
+               fragments_culled[options_bounds[last_participant] +
+                                frag_settings[last_participant]]) {
+          frag_settings[last_participant] += 1;
+        }
       }
     } while (frag_settings[0] < max_frag_settings[0]);
   }
-  
+
   // Incorporate fragments into the solution with their best detected charge states.  This
   // requires re-working the energetics for the best state.
   for (int i = 0; i < fragment_count; i++) {

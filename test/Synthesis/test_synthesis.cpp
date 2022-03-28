@@ -1,13 +1,16 @@
 #include <string>
 #include <vector>
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/Chemistry/atommask.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
-#include "../../src/Accelerator/hybrid.h"
+#include "../../src/DataTypes/mixed_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/vector_ops.h"
+#include "../../src/Math/sorting.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Random/random.h"
@@ -17,6 +20,8 @@
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/valence_workunit.h"
+#include "../../src/Topology/atomgraph_abstracts.h"
+#include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
@@ -25,11 +30,14 @@ using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::MapRotatableGroups;
 using omni::constants::ExceptionResponse;
 using omni::constants::verytiny;
+using omni::data_types::ValueWithCounter;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::openOutputFile;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
+using omni::math::reduceUniqueValues;
+using omni::math::UniqueValueHandling;
 using omni::namelist::FilesControls;
 using omni::parse::TextFile;
 using omni::random::Xoroshiro128pGenerator;
@@ -41,7 +49,155 @@ using namespace omni::numerics;
 using namespace omni::synthesis;
 using namespace omni::trajectory;
 using namespace omni::testing;
+using namespace omni::topology;
 
+//-------------------------------------------------------------------------------------------------
+// Accumulate contributing atoms base on a series of force terms.
+//
+// Arguments:
+//   item_count:   The number of energy terms of some type, the trusted length of {i,j,...}_atoms
+//   result:       Array of all atoms that influence any one atom (accumulated and returned)
+//   i_atoms:      The first list of atoms associated with whatever energy term
+//   j_atoms:      The second list of atoms associated with whatever energy term
+//   k_atoms:      The third list of atoms associated with whatever energy term
+//   l_atoms:      The fourth list of atoms associated with whatever energy term
+//   m_atoms:      The fifth list of atoms associated with whatever energy term
+//-------------------------------------------------------------------------------------------------
+void accumulateContributingAtoms(const int item_count, std::vector<std::vector<int>> *result,
+                                 const int* i_atoms, const int* j_atoms = nullptr,
+                                 const int* k_atoms = nullptr, const int* l_atoms = nullptr,
+                                 const int* m_atoms = nullptr) {
+  std::vector<int>* result_data = result->data();
+  for (int pos = 0; pos < item_count; pos++) {
+    std::vector<int> atom_list;
+    atom_list.push_back(i_atoms[pos]);
+    int order = 1;
+    if (j_atoms != nullptr) {
+      atom_list.push_back(j_atoms[pos]);
+      order++;
+    }
+    if (k_atoms != nullptr) {
+      atom_list.push_back(k_atoms[pos]);
+      order++;
+    }
+    if (l_atoms != nullptr) {
+      atom_list.push_back(l_atoms[pos]);
+      order++;
+    }
+    if (m_atoms != nullptr) {
+      atom_list.push_back(m_atoms[pos]);
+      order++;
+    }
+    for (int i = 0; i < order - 1; i++) {
+      for (int j = i + 1; j < order; j++) {
+        result_data[atom_list[i]].push_back(atom_list[j]);
+        result_data[atom_list[j]].push_back(atom_list[i]);
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Determine a list of all atoms that contribute to forces on any particular atom through valence
+// terms, restraints, or virtual sites.  This is done by looping over all topology terms and
+// restraints while extending lists pertaining to each atom of the topology.
+//
+// Arguments:
+//   ag:      The system topology
+//   ra:      The system restraint apparatus, a sort of supplemental energy surface
+//-------------------------------------------------------------------------------------------------
+std::vector<std::vector<int>> getAtomForceContributors(const AtomGraph &ag,
+                                                       const RestraintApparatus &ra) {
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
+  const RestraintApparatusDpReader rar = ra.dpData();
+
+  // Initialize the result.  Every atom list includes the atom itself.
+  std::vector<std::vector<int>> result(vk.natom, std::vector<int>());
+  for (int i = 0; i < vk.natom; i++) {
+    result[i].push_back(i);
+  }
+  accumulateContributingAtoms(vk.nbond, &result, vk.bond_i_atoms, vk.bond_j_atoms);
+  accumulateContributingAtoms(vk.nangl, &result, vk.angl_i_atoms, vk.angl_j_atoms,
+                              vk.angl_k_atoms);
+  accumulateContributingAtoms(vk.ndihe, &result, vk.dihe_i_atoms, vk.dihe_j_atoms, vk.dihe_k_atoms,
+                              vk.dihe_l_atoms);
+  accumulateContributingAtoms(vk.nubrd, &result, vk.ubrd_i_atoms, vk.ubrd_k_atoms);
+  accumulateContributingAtoms(vk.ncimp, &result, vk.cimp_i_atoms, vk.cimp_j_atoms, vk.cimp_k_atoms,
+                              vk.cimp_l_atoms);
+  accumulateContributingAtoms(vk.ncmap, &result, vk.cmap_i_atoms, vk.cmap_j_atoms, vk.cmap_k_atoms,
+                              vk.cmap_l_atoms, vk.cmap_m_atoms);
+  accumulateContributingAtoms(vk.ninfr14, &result, vk.infr14_i_atoms, vk.infr14_l_atoms);
+  accumulateContributingAtoms(rar.nposn, &result, rar.rposn_atoms);
+  accumulateContributingAtoms(rar.nbond, &result, rar.rbond_i_atoms, rar.rbond_j_atoms);
+  accumulateContributingAtoms(rar.nangl, &result, rar.rangl_i_atoms, rar.rangl_j_atoms,
+                              rar.rangl_k_atoms);
+  accumulateContributingAtoms(rar.ndihe, &result, rar.rdihe_i_atoms, rar.rdihe_j_atoms,
+                              rar.rdihe_k_atoms, rar.rdihe_l_atoms);
+
+  // All atoms of each virtual site frame should be included with every atom of the frame
+  for (int pos = 0; pos < vsk.nsite; pos++) {
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      accumulateContributingAtoms(1, &result, &vsk.frame1_idx[pos], &vsk.frame2_idx[pos]);
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      accumulateContributingAtoms(1, &result, &vsk.frame1_idx[pos], &vsk.frame2_idx[pos],
+                                  &vsk.frame3_idx[pos]);
+      break;
+    case VirtualSiteKind::FIXED_4:
+      accumulateContributingAtoms(1, &result, &vsk.frame1_idx[pos], &vsk.frame2_idx[pos],
+                                  &vsk.frame3_idx[pos], &vsk.frame4_idx[pos]);
+      break;
+    case VirtualSiteKind::NONE:
+      break;
+    }
+  }
+
+  // Finally, all atoms that contribute to forces on any virtual site should be included with
+  // every frame atom.
+  for (int pos = 0; pos < vsk.nsite; pos++) {
+    const int vatom = vsk.vs_atoms[pos];
+    result[vsk.frame1_idx[pos]].insert(result[vsk.frame1_idx[pos]].end(),
+                                       result[vatom].begin(), result[vatom].end());
+    result[vsk.frame2_idx[pos]].insert(result[vsk.frame2_idx[pos]].end(),
+                                       result[vatom].begin(), result[vatom].end());
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      result[vsk.frame3_idx[pos]].insert(result[vsk.frame3_idx[pos]].end(),
+                                         result[vatom].begin(), result[vatom].end());
+      break;
+    case VirtualSiteKind::FIXED_4:
+      result[vsk.frame3_idx[pos]].insert(result[vsk.frame3_idx[pos]].end(),
+                                         result[vatom].begin(), result[vatom].end());
+      result[vsk.frame4_idx[pos]].insert(result[vsk.frame4_idx[pos]].end(),
+                                         result[vatom].begin(), result[vatom].end());
+      break;
+    case VirtualSiteKind::NONE:
+      break;
+    }
+  }
+
+  // Reduce each vector to unique values and return the result
+  for (int i = 0; i < vk.natom; i++) {
+    reduceUniqueValues(&result[i]);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Main
+//-------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
@@ -145,6 +301,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Make a PhaseSpaceSynthesis the meticulous way
+  section(2);
   std::vector<PhaseSpace>  psv = { tip3p_ps, tip4p_ps, trpcage_ps, tip3p_ps, tip4p_ps,
                                    tip3p_ps, tip3p_ps, tip4p_ps, trpcage_ps };
   const std::vector<AtomGraph*> agv = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &tip3p_ag, &tip4p_ag,
@@ -254,6 +411,7 @@ int main(int argc, char* argv[]) {
         "fidelity to the original than expected.", do_tests);
 
   // Prepare valence work units for the array of topologies
+  section(3);
   std::vector<RestraintApparatus> ra_vec;
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
     const AtomGraph *ag_i = sysc.getTopologyPointer(i);
@@ -264,9 +422,67 @@ int main(int argc, char* argv[]) {
     ra_vec.emplace_back(applyHydrogenBondPreventors(ag_i, chemfe_i, 64.0, 3.1));
     ra_vec[i].addRestraints(applyPositionalRestraints(ag_i, cfr_i, bkbn_i, 16.0));
   }
+  bool force_partner_counts_match = true;
+  bool force_partners_match = true;
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
-    buildValenceWorkUnits(sysc.getTopologyPointer(i), &ra_vec[i]);
+    ValenceDelegator vdel(sysc.getTopologyPointer(i), &ra_vec[i]);
+    const std::vector<ValenceWorkUnit> vwu_i = buildValenceWorkUnits(&vdel);
+    const AtomGraph &ag_i = sysc.getTopologyReference(i);
+    const std::vector<std::vector<int>> fcontrib = getAtomForceContributors(ag_i, ra_vec[i]);
+    const ValenceKit<double> vk = ag_i.getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> vsk = ag_i.getDoublePrecisionVirtualSiteKit();
+    for (int j = 0; j < vk.natom; j++) {
+      const std::vector<int> vwu_deps = vwu_i[0].findForcePartners(j, vk, ra_vec[i].dpData(), vsk);
+      force_partner_counts_match = (force_partner_counts_match &&
+                                    vwu_deps.size() == fcontrib[j].size());
+      const std::vector<ValueWithCounter<int>> missing_dependencies =
+        findUnmatchedValues(vwu_deps, fcontrib[j], UniqueValueHandling::CONFIRM_ALL_COPIES);
+      force_partners_match = (missing_dependencies.size() == 0LLU);
+    }
   }
+  check(force_partner_counts_match, "The counts of force-relevant partners in ValenceWorkUnit "
+        "objects made for a series of amino acid dipeptides do not agree with numbers computed "
+        "through an alternative method.", do_tests);
+  check(force_partners_match, "Lists of force-relevant partners in ValenceWorkUnit objects made "
+        "for a series of amino acid dipeptides do not agree with those assembled through an "
+        "alternative method.", do_tests);
+
+  // Read a larger topology that will be forced to split its contents among several work units
+  const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
+  const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
+  const bool dhfr_exists = (getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
+                            getDrivePathType(dhfr_crd_name) == DrivePathType::FILE);
+  if (dhfr_exists == false) {
+    rtWarn("The topology and input coordinates for the DHFR system appear to be missing.  Check "
+           "the ${OMNI_SOURCE} variable (currently " + oe.getOmniSourcePath() + ") to make sure "
+           "that ${OMNI_SOURCE}/test/Topology/dhfr_cmap.top and "
+           "${OMNI_SOURCE}/test/Trajectory/dhfr_cmap.inpcrd are valid paths.", "test_synthesis");
+  }
+  const TestPriority do_dhfr = (dhfr_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  AtomGraph dhfr_ag  = (dhfr_exists) ? AtomGraph(dhfr_top_name, ExceptionResponse::SILENT) :
+                                       AtomGraph();
+
+  // CHECK
+  printf("There are %d atoms in DHFR.\n", dhfr_ag.getAtomCount());
+  // END CHECK
+  
+  PhaseSpace dhfr_ps = (dhfr_exists) ? PhaseSpace(dhfr_crd_name) : PhaseSpace();
+  const CoordinateFrameReader dhfr_cfr(dhfr_ps);
+
+  // CHECK
+  printf("Build DHFR positional restraints...\n");
+  // END CHECK
+
+  const std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&dhfr_ag, dhfr_cfr,
+                                                                            "@N,CA,C,O", 1.4);
+
+  // CHECK
+  printf("There are %zu DHFR positional restraints.\n", bkbn_rstr.size());
+  // END CHECK
+  
+  RestraintApparatus dhfr_ra_i(bkbn_rstr);
+  ValenceDelegator dhfr_vdel(&dhfr_ag, &dhfr_ra_i);
+  const std::vector<ValenceWorkUnit> dhfr_vwu = buildValenceWorkUnits(&dhfr_vdel);
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

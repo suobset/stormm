@@ -1006,5 +1006,91 @@ template <typename T> void reduceUniqueValues(std::vector<T> *va) {
   va->shrink_to_fit();
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<ValueWithCounter<T>>
+findUnmatchedValues(const std::vector<T> &va, const std::vector<T> &vb,
+                    const UniqueValueHandling check_repeats) {
+  std::vector<T> va_copy(va);
+  std::vector<T> vb_copy(vb);
+  std::sort(va_copy.begin(), va_copy.end(), [](T a, T b) { return a < b; });
+  std::sort(vb_copy.begin(), vb_copy.end(), [](T a, T b) { return a < b; });
+  std::vector<ValueWithCounter<T>> unique_a;
+  std::vector<ValueWithCounter<T>> unique_b;
+  const size_t length_a = va.size();
+  const size_t length_b = vb.size();
+  for (size_t i = 0; i < length_a; i++) {
+    if (i == 0 || va_copy[i - 1] != va_copy[i]) {
+      unique_a.push_back({va_copy[i], 1});
+    }
+    else {
+      unique_a[unique_a.size() - 1LLU].count += 1;
+    }
+  }
+  for (size_t i = 0; i < length_b; i++) {
+    if (i == 0 || vb_copy[i - 1] != vb_copy[i]) {
+      unique_b.push_back({vb_copy[i], 1});
+    }
+    else {
+      unique_b[unique_b.size() - 1LLU].count += 1;
+    }
+  }
+  const size_t nua = unique_a.size();
+  const size_t nub = unique_b.size();
+  size_t min_j = 0;
+  std::vector<ValueWithCounter<T>> result;
+  const bool counts_matter = (check_repeats == UniqueValueHandling::CONFIRM_ALL_COPIES);
+  for (size_t i = 0; i < nua; i++) {
+    const T aval = unique_a[i].value;
+    const int acount = unique_a[i].count;
+    bool found = false;
+    for (size_t j = min_j; j < nub; j++) {
+      if (unique_b[j].value == aval) {
+        min_j += (j == min_j);
+        if (counts_matter && unique_b[j].count != acount) {
+          result.push_back({aval, acount - unique_b[j].count});
+        }
+        found = true;
+      }
+    }
+    if (! found) {
+      result.push_back({aval, acount});
+    }
+  }
+  min_j = 0;
+  for (size_t i = 0; i < nub; i++) {
+    const T bval = unique_b[i].value;
+    const int bcount = unique_b[i].count;
+    bool found = false;
+    for (size_t j = min_j; j < nua; j++) {
+      if (unique_a[j].value == bval) {
+        min_j += (j == min_j);
+        found = true;
+      }
+    }
+    if (! found) {
+      result.push_back({bval, -bcount});
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<ValueWithCounter<T>>
+findUnmatchedValues(const T* va, const T* vb, const size_t length_a, const size_t length_b,
+                    const UniqueValueHandling check_repeats) {
+  std::vector<T> tva(length_a);
+  std::vector<T> tvb(length_b);
+  return findUnmatchedValues(tva, tvb, check_repeats);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> std::vector<ValueWithCounter<T>>
+findUnmatchedValues(const Hybrid<T> &va, const Hybrid<T> &vb,
+                    const UniqueValueHandling check_repeats) {
+  std::vector<T> tva = va.readHost();
+  std::vector<T> tvb = vb.readHost();
+  return findUnmatchedValues(tva, tvb, check_repeats);
+}
+
 } // namespace math
 } // namespace omni

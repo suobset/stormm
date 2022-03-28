@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "Math/statistics.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Topology/topology_util.h"
@@ -11,6 +12,8 @@
 namespace omni {
 namespace synthesis {
 
+using math::DataOrder;
+using math::locateValue;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::reduceUniqueValues;
@@ -28,7 +31,8 @@ ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintAppara
     cimp_affector_list{}, cimp_affector_bounds{}, cmap_affector_list{}, cmap_affector_bounds{},
     infr_affector_list{}, infr_affector_bounds{}, vste_affector_list{}, vste_affector_bounds{},
     cnst_affector_list{}, cnst_affector_bounds{}, sett_affector_list{}, sett_affector_bounds{},
-    work_unit_assignment_count{}, work_unit_presence{}, ag_pointer{ag_in}, ra_pointer{ra_in}
+    work_unit_assignment_count{}, work_unit_presence{}, assigned_update_work_units{},
+    ag_pointer{ag_in}, ra_pointer{ra_in}
 {
   // Get relevant abstracts
   const ValenceKit<double> vk = ag_in->getDoublePrecisionValenceKit();
@@ -119,6 +123,31 @@ std::vector<int> ValenceDelegator::getConstraintGroupAffectors(const int atom_in
 //-------------------------------------------------------------------------------------------------
 std::vector<int> ValenceDelegator::getVirtualSiteAffectors(const int atom_index) const {
   return extractBoundedListEntries(vste_affector_list, vste_affector_bounds, atom_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getUpdateWorkUnit(const int atom_index) const {
+  return assigned_update_work_units[atom_index];
+}
+  
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* ValenceDelegator::getTopologyPointer() const {
+  return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+const RestraintApparatus* ValenceDelegator::getRestraintApparatusPointer() const {
+  return ra_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ValenceDelegator::checkPresence(const int atom_index, const int vwu_index) const {
+  bool result = false;
+  const int offset = atom_index * max_presence_allocation;
+  for (int i = 0; i < work_unit_assignment_count[atom_index]; i++) {
+    result = (result || work_unit_presence[offset + i] == vwu_index);
+  }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -219,6 +248,11 @@ void ValenceDelegator::markVirtualSiteAddition(const int vwu_index, const int vs
 }
 
 //-------------------------------------------------------------------------------------------------
+bool ValenceDelegator::setUpdateWorkUnit(const int atom_index, const int vwu_index) {
+  assigned_update_work_units[atom_index] = vwu_index;
+}
+
+//-------------------------------------------------------------------------------------------------
 void ValenceDelegator::allocate() {
  
   // Allocate memory as needed
@@ -256,6 +290,7 @@ void ValenceDelegator::allocate() {
   cnst_affector_bounds.resize(atom_count + 1, 0);  
   work_unit_assignment_count.resize(atom_count, 0);
   work_unit_presence.resize(max_presence_allocation * atom_count);
+  assigned_update_work_units.resize(atom_count, -1);
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -395,8 +430,7 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
 }
   
 //-------------------------------------------------------------------------------------------------
-ValenceWorkUnit::ValenceWorkUnit(const AtomGraph *ag_in, const RestraintApparatus *ra_in,
-                                 ValenceDelegator *vdel_in, const int list_index_in,
+ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index_in,
                                  const int seed_atom_in, const int max_atoms_in) :
     atom_count{0}, bond_term_count{0}, angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0},
     cimp_term_count{0}, cmap_term_count{0}, rposn_term_count{0}, rbond_term_count{0},
@@ -413,7 +447,7 @@ ValenceWorkUnit::ValenceWorkUnit(const AtomGraph *ag_in, const RestraintApparatu
     cnst_group_list{}, sett_group_list{}, cnst_group_atoms{}, cnst_group_bounds{}, sett_ox_atoms{},
     sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{}, vsite_atoms{}, vsite_parent_atoms{},
     vsite_frame2_atoms{}, vsite_frame3_atoms{}, vsite_frame4_atoms{}, vdel_pointer{vdel_in},
-    ag_pointer{ag_in}, ra_pointer{ra_in}
+    ag_pointer{vdel_in->getTopologyPointer()}, ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
   // Check the atom bounds
   if (atom_limit < minimum_valence_work_unit_atoms ||
@@ -650,7 +684,7 @@ std::vector<int> ValenceWorkUnit::findForcePartners(const int atom_idx,
                                                     const ValenceKit<double> &vk,
                                                     const RestraintApparatusDpReader &rar,
                                                     const VirtualSiteKit<double> &vsk,
-                                                    const std::vector<int> &caller_stack) {
+                                                    const std::vector<int> &caller_stack) const {
   std::vector<int> result;
   result.reserve(64);
 
@@ -816,10 +850,10 @@ std::vector<int> ValenceWorkUnit::findForcePartners(const int atom_idx,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> ValenceWorkUnit::findMovementPartners(const int atom_idx,
-                                                       const ConstraintKit<double> &cnk,
-                                                       const VirtualSiteKit<double> &vsk,
-                                                       const std::vector<int> &caller_stack) {
+std::vector<int>
+ValenceWorkUnit::findMovementPartners(const int atom_idx, const ConstraintKit<double> &cnk,
+                                      const VirtualSiteKit<double> &vsk,
+                                      const std::vector<int> &caller_stack) const {
   std::vector<int> result;
   result.reserve(64);
   
@@ -913,23 +947,104 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
                                         const ConstraintKit<double> &cnk,
                                         const VirtualSiteKit<double> &vsk) {
   std::vector<int> required_atoms(64);
+  std::vector<int> atom_requests;
+  atom_requests.reserve(32);
+  std::vector<int> atom_request_bounds(atom_count + 1, 0);
+  atom_update_list.reserve(atom_count);
   for (int i = 0; i < atom_count; i++) {
+    const int atomi = atom_import_list[i];
+
+    // Cycle if this atom is already scheduled for update by some other work unit
+    if (vdel_pointer->getUpdateWorkUnit(atomi) >= 0) {
+      atom_request_bounds[i + 1] = atom_requests.size();
+      continue;
+    }
 
     // Accumulate a list of atoms to check for.  Scan valence terms, restraints, constraints, and
     // virtual sites.
     required_atoms.resize(0);
-    const int atomi = atom_import_list[i];
 
-    // Check that all frame atoms are included in the required update list
+    // Accumulate a list of all atoms which must be moved in order to know the correct position
+    // of this one.
     std::vector<int> move_req = findMovementPartners(atomi, cnk, vsk);
-    reduceUniqueValues(&move_req);
-    std::vector<int> force_req;
     const size_t nmove = move_req.size();
     for (size_t j = 0; j < nmove; j++) {
       const std::vector<int> tmpj = findForcePartners(move_req[j], vk, rar, vsk);
-      force_req.insert(force_req.end(), tmpj.begin(), tmpj.end());
+      required_atoms.insert(required_atoms.end(), tmpj.begin(), tmpj.end());
     }
-    reduceUniqueValues(&force_req);
+    reduceUniqueValues(&required_atoms);
+
+    // Check that each of the required atoms is present in this work unit.  Assemble a list of
+    // required atoms if it is not.
+    const size_t nreq = required_atoms.size();
+    for (size_t j = 0; j < nreq; j++) {
+      if (vdel_pointer->checkPresence(required_atoms[j], list_index) == false) {
+        atom_requests.push_back(required_atoms[j]);
+      }
+    }
+
+    // Record the request bounds for the ith atom.  The atom requests array will likely contain
+    // duplicates, but these bounds permit an analysis of what is needed in order to make update
+    // of the ith atom possible.
+    atom_request_bounds[i + 1] = atom_requests.size();
+  }
+
+  // Get a list of the unique atom requests
+  const std::vector<int> unique_requests = reduceUniqueValues(atom_requests);
+  
+  // If the number of unique requested atoms can fit within the import size limits of this work
+  // unit, mark all atoms in the current list for movement and update and add the requests to the
+  // list of imports.
+  const int n_atoms_needed = unique_requests.size();
+  if (atom_count + n_atoms_needed < atom_limit) {
+    for (int i = 0; i < atom_count; i++) {
+      if (vdel_pointer->setUpdateWorkUnit(atom_import_list[i], list_index)) {
+        atom_update_list.push_back(atom_import_list[i]);
+      }
+    }
+    for (int i = 0; i < n_atoms_needed; i++) {
+      addNewAtom(unique_requests[i]);
+    }
+  }
+  else {
+
+    // Scan over all atoms and set this unit as the update work unit for those that have no atom
+    // requests (this means that the present import list is sufficient to prepare all force
+    // computations and other movements in order to move and update these atoms).
+    for (int i = 0; i < atom_count; i++) {
+      if (atom_request_bounds[i + 1] == atom_request_bounds[i] &&
+          vdel_pointer->setUpdateWorkUnit(atom_import_list[i], list_index)) {
+        atom_update_list.push_back(atom_import_list[i]);
+      }
+    }
+
+    // Work with whatever remaining space to add as many atoms as possible to the list of
+    // moving atoms.  Use the array of unique requests to determine which are the most important.
+    int addition_threshold = 1;
+    std::vector<bool> atom_request_fulfilled(atom_request_bounds[atom_count], false);
+    const int all_request_count = atom_request_bounds[atom_count];
+    std::vector<int2> unique_rc(n_atoms_needed);
+    for (int i = 0; i < n_atoms_needed; i++) {
+      unique_rc[i].x = 0;
+      unique_rc[i].y = unique_requests[i];
+    }
+    for (int i = 0; i < all_request_count; i++) {
+      unique_rc[locateValue(unique_requests, atom_requests[i], DataOrder::ASCENDING)].x += 1;
+    }
+
+    // CHECK
+    printf("There are %2d atoms yet to import in work unit %2d:\n", n_atoms_needed, list_index);
+    printf("   ");
+    for (int i = 0; i < n_atoms_needed; i++) {
+      printf(" %4d", unique_rc[i].y);
+    }
+    printf("\n   ");
+    for (int i = 0; i < n_atoms_needed; i++) {
+      printf(" %4d", unique_rc[i].x);
+    }
+    printf("\n");
+    // END CHECK
+
   }
 }
   
@@ -938,12 +1053,20 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
                                                    const RestraintApparatus *ra,
                                                    const int max_atoms_per_vwu) {
   ValenceDelegator vdel(ag, ra);
+  return buildValenceWorkUnits(&vdel, max_atoms_per_vwu);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
+                                                   const int max_atoms_per_vwu) {
   std::vector<ValenceWorkUnit> result;
-  
+
   // Spread atoms over all work units
-  while (vdel.getFirstUnassignedAtom() < ag->getAtomCount()) {
+  const AtomGraph *ag_ptr = vdel->getTopologyPointer();
+  const RestraintApparatus *ra_ptr = vdel->getRestraintApparatusPointer();
+  while (vdel->getFirstUnassignedAtom() < ag_ptr->getAtomCount()) {
     const int n_units = result.size();
-    result.emplace_back(ag, ra, &vdel, n_units, vdel.getFirstUnassignedAtom(), max_atoms_per_vwu);
+    result.emplace_back(vdel, n_units, vdel->getFirstUnassignedAtom(), max_atoms_per_vwu);
   }
   
   // Shift atoms between work units in an effort to conserve bonding within any particular work
@@ -968,10 +1091,10 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
   // restraint, or a virtual site frame that also involves B.  The hierarchy cannot chain
   // indefinitely, as only one cycle of force computation (including transmission from a virtual
   // site) can occur before moving atoms.
-  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
-  const RestraintApparatusDpReader rar = ra->dpData();
-  const ConstraintKit<double> cnk = ag->getDoublePrecisionConstraintKit();
-  const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+  const ValenceKit<double> vk = ag_ptr->getDoublePrecisionValenceKit();
+  const RestraintApparatusDpReader rar = ra_ptr->dpData();
+  const ConstraintKit<double> cnk = ag_ptr->getDoublePrecisionConstraintKit();
+  const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
   const int vwu_count = result.size();
   for (int i = 0; i < vwu_count; i++) {
     const int natom = result[i].getAtomCount();

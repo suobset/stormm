@@ -12,11 +12,18 @@ struct CombineIDp {
   double y;
 };
 
+/// \brief a templated, combined type for tagging any data type with an associated integer count
+template <typename T> struct ValueWithCounter {
+  T value;
+  int count;
+};
+  
 } // namespace data_types
 } // namespace omni
 
 namespace omni {
 using data_types::CombineIDp;
+using data_types::ValueWithCounter;
 }
 
 #endif

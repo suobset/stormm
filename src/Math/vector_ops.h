@@ -10,10 +10,12 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "DataTypes/mixed_types.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
+#include "sorting.h"
 #include "statistics.h"
 
 namespace omni {
@@ -27,6 +29,7 @@ using data_types::isFloatingPointScalarType;
 using data_types::isScalarType;
 using data_types::isSignedIntegralScalarType;
 using data_types::isUnsignedIntegralScalarType;
+using data_types::ValueWithCounter;
 using testing::Approx;
   
 /// \brief Check that two vectors of the same data type are compatible for various arithmetic
@@ -506,6 +509,43 @@ template <typename T> std::vector<T> reduceUniqueValues(const std::vector<T> &va
 template <typename T> void reduceUniqueValues(std::vector<T> *va);
 /// \}
 
+/// \brief Find the unique elements of one vector that are not present in another.  Options are
+///        provided to search for replaceable or separate copies of each value.  The function will
+///        proceed by making Standard Template Library vectors of the unique values in each array
+///        as it finds them and keeping tallies of the number of unique copies of each value that
+///        it finds.  The returned vector will show the unique unmatched values, coupled with a
+///        positive count if the unique value is present some number of times in the first vector
+///        but not in the second, or a negative count if the unique value is present some number
+///        of times in the second vector but not the first.
+///
+/// Overloaded:
+///   - Operate on Standard Template Library vectors
+///   - Operate on C-style arrays (copied internally to std::vectors for sorting, the original
+///     data will be unchanged)
+///   - Operate on a pair of Hybrid objects (copied internally to std::vectors for sorting, the
+///     original data will be unchanged)
+///   
+/// \param va             Search for elements of va that are not present in vb
+/// \param vb             Search for elements of vb that are not present in va
+/// \param length_a       The length of va, if va is a C-style array
+/// \param length_b       The length of vb, if vb is a C-style array
+/// \param check_repeats  Indication of whether to check that the same numbers of copies of each
+///                       unique value are present in both arrays, or to simply verify that each
+///                       unique value is covered at least once by both arrays
+/// \{
+template <typename T> std::vector<ValueWithCounter<T>>
+findUnmatchedValues(const std::vector<T> &va, const std::vector<T> &vb,
+                    UniqueValueHandling check_repeats = UniqueValueHandling::UNIQUE_VALUES_ONLY);
+
+template <typename T> std::vector<ValueWithCounter<T>>
+findUnmatchedValues(const T* va, const T* vb, size_t length_a, size_t length_b,
+                    UniqueValueHandling check_repeats = UniqueValueHandling::UNIQUE_VALUES_ONLY);
+
+template <typename T> std::vector<ValueWithCounter<T>>
+findUnmatchedValues(const Hybrid<T> &va, const Hybrid<T> &vb,
+                    UniqueValueHandling check_repeats = UniqueValueHandling::UNIQUE_VALUES_ONLY);
+/// \}
+  
 } // namespace math
 } // namespace omni
 

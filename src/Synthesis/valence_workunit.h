@@ -58,73 +58,91 @@ public:
 
   /// \brief Get a list of bonds affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getBondAffectors(int atom_index) const;
   
   /// \brief Get a list of harmonic angle terms affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getAngleAffectors(int atom_index) const;
 
   /// \brief Get a list of cosine-based dihedrals affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getDihedralAffectors(int atom_index) const;
   
   /// \brief Get a list of Urey-Bradley harmonic angles affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getUreyBradleyAffectors(int atom_index) const;
   
   /// \brief Get a list of CHARMM improper dihedral terms affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getCharmmImproperAffectors(int atom_index) const;
   
   /// \brief Get a list of CMAP terms affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getCmapAffectors(int atom_index) const;
 
   /// \brief Get a list of inferred 1:4 attenuated non-bonded interactions affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getInferred14Affectors(int atom_index) const;
 
   /// \brief Get a list of positional restraints affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getPositionalRestraintAffectors(int atom_index) const;
   
   /// \brief Get a list of distance restraints affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getDistanceRestraintAffectors(int atom_index) const;
 
   /// \brief Get a list of three-point angle restraints affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getAngleRestraintAffectors(int atom_index) const;
 
   /// \brief Get a list of four-point dihedral restraints affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getDihedralRestraintAffectors(int atom_index) const;
 
   /// \brief Get a list of SETTLE constraint groups affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getSettleGroupAffectors(int atom_index) const;
 
   /// \brief Get a list of SHAKE or RATTLE constraint groups affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getConstraintGroupAffectors(int atom_index) const;
 
   /// \brief Get a list of virtual sites affecting a given atom.
   ///
-  /// param atom_index  Topological index of the atom of interest
+  /// \param atom_index  Topological index of the atom of interest
   std::vector<int> getVirtualSiteAffectors(int atom_index) const;
+  
+  /// \brief Get the work unit currently assigned to update an atom's position and velocity.
+  ///        The value of -1 signifies that no work unit has yet been assigned to handle the atom.
+  ///
+  /// \param atom_index  Topological index of the atom of interest
+  int getUpdateWorkUnit(int atom_index) const;
+
+  /// \brief Get a pointer to the topology that this delegator was built for.
+  const AtomGraph* getTopologyPointer() const;
+  
+  /// \brief Get a pointer to the topology that this delegator was built for.
+  const RestraintApparatus* getRestraintApparatusPointer() const;
+    
+  /// \brief Check that an atom is present in a particular work unit.
+  ///
+  /// \param atom_index  The topological index of the atom of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool checkPresence(int atom_index, int vwu_index) const;
 
   /// \brief Mark the addition of an atom to a specific ValenceWorkUnit.
   ///
@@ -219,6 +237,14 @@ public:
   ///                     topology's list of virtual sites (not its list of atoms)
   void markVirtualSiteAddition(int vwu_index, int vsite_index);
 
+  /// \brief Mark the updates (position, velocity) of a particular atom in the topology as the
+  ///        responsibility of a particular work unit in the list.  Returns TRUE if the assignment
+  ///        is successful, or FALSE if the assignment has already been made to some work unit.
+  ///
+  /// \param atom_index  The topological index of the atom of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing  
+  bool setUpdateWorkUnit(int atom_index, int vwu_index);
+  
 private:
   int atom_count;                 ///< The number of atoms in the system overall (taken from the
                                   ///<   topology)
@@ -347,8 +373,6 @@ public:
   ///        a maximum number of atoms has been accumulated in order to process as many related
   ///        valence terms as possible.
   ///
-  /// \param ag_in          Pointer to the topology to work from
-  /// \param ra_in          Pointer to the collection of restraints applicable to the topology
   /// \param vdel_in        Valence delegator managing the creation of this valence work unit
   /// \param list_index_in  Index of this unit in a larger list (the unit should remember its own
   ///                       index number, for the purposes of coordinating with other work units)
@@ -357,8 +381,7 @@ public:
   ///                       topological indices whereby previous work units left some atoms
   ///                       behind, or jumping forward to the next new molecule.
   /// \param max_atoms_in   The maximum number of atoms to accumulate in the work unit
-  ValenceWorkUnit(const AtomGraph *ag_in, const RestraintApparatus *ra_in,
-                  ValenceDelegator *vdel_in, int list_index_in, int seed_atom_in,
+  ValenceWorkUnit(ValenceDelegator *vdel_in, int list_index_in, int seed_atom_in,
                   int max_atoms_in = 768);
 
   /// \brief Get the number of atoms currently involved in this work unit.
@@ -506,7 +529,7 @@ public:
   std::vector<int> findForcePartners(int atom_idx, const ValenceKit<double> &vk,
                                      const RestraintApparatusDpReader &rar,
                                      const VirtualSiteKit<double> &vsk,
-                                     const std::vector<int> &caller_stack = {});
+                                     const std::vector<int> &caller_stack = {}) const;
   
   /// \brief Find all partners of a given atom such that the work unit will be able to correctly
   ///        move the atom.  This implies all other participants in any constraint group that
@@ -521,7 +544,7 @@ public:
   ///                      long, it will trigger a runtime error.
   std::vector<int> findMovementPartners(int atom_idx, const ConstraintKit<double> &cnk,
                                         const VirtualSiteKit<double> &vsk,
-                                        const std::vector<int> &caller_stack = {});
+                                        const std::vector<int> &caller_stack = {}) const;
 
   /// \brief Assign atom update responsibilities to a work unit, subject to the stipulations that
   ///        no other work unit has been assigned to update the atom's position and velocity, and
@@ -540,34 +563,44 @@ public:
                          const ConstraintKit<double> &cnk, const VirtualSiteKit<double> &vsk);
   
 private:
-  int atom_count;                     ///< Number of atoms in the work unit
-  int bond_term_count;                ///< Number of bond terms in the work unit
-  int angl_term_count;                ///< Number of angle terms in the work unit
-  int dihe_term_count;                ///< Number of cosine-based dihedral terms in the work unit
-  int ubrd_term_count;                ///< Number of Urey-Bradley terms in the work unit
-  int cimp_term_count;                ///< Number of CHARMM harmonic improper dihedral terms in
-                                      ///<   the work unit
-  int cmap_term_count;                ///< Number of CMAP terms in the work unit
-  int rposn_term_count;               ///< Number of positional restraints handled by this work
-                                      ///<   unit
-  int rbond_term_count;               ///< Number of distance restraints handled by this work unit
-  int rangl_term_count;               ///< Number of angle restraints handled by this work unit
-  int rdihe_term_count;               ///< Number of dihedral restraints handled by this work unit
-  int cnst_group_count;               ///< Number of SHAKE or RATTLE groups managed by this work
-                                      ///<   unit (excludes SETTLE-constrained waters)
-  int sett_group_count;               ///< Number of SETTLE-constrained rigid waters managed by
-                                      ///<   this work unit
-  int vste_count;                     ///< Number of virtual sites managed by this work unit
-  int list_index;                     ///< Index of the work unit in a larger list of similar
-                                      ///<   objects coordinating to cover an entire topology
-  int min_atom_index;                 ///< Lowest topological index of any imported atom
-  int max_atom_index;                 ///< Highest topological index of any imported atom
-  int atom_limit;                     ///< Largest number of atoms that this work unit can hold
+  int atom_count;        ///< Number of atoms in the work unit
+  int bond_term_count;   ///< Number of bond terms in the work unit
+  int angl_term_count;   ///< Number of angle terms in the work unit
+  int dihe_term_count;   ///< Number of cosine-based dihedral terms in the work unit
+  int ubrd_term_count;   ///< Number of Urey-Bradley terms in the work unit
+  int cimp_term_count;   ///< Number of CHARMM harmonic improper dihedral terms in
+                         ///<   the work unit
+  int cmap_term_count;   ///< Number of CMAP terms in the work unit
+  int rposn_term_count;  ///< Number of positional restraints handled by this work
+                         ///<   unit
+  int rbond_term_count;  ///< Number of distance restraints handled by this work unit
+  int rangl_term_count;  ///< Number of angle restraints handled by this work unit
+  int rdihe_term_count;  ///< Number of dihedral restraints handled by this work unit
+  int cnst_group_count;  ///< Number of SHAKE or RATTLE groups managed by this work
+                         ///<   unit (excludes SETTLE-constrained waters)
+  int sett_group_count;  ///< Number of SETTLE-constrained rigid waters managed by
+                         ///<   this work unit
+  int vste_count;        ///< Number of virtual sites managed by this work unit
+  int list_index;        ///< Index of the work unit in a larger list of similar
+                         ///<   objects coordinating to cover an entire topology
+  int min_atom_index;    ///< Lowest topological index of any imported atom
+  int max_atom_index;    ///< Highest topological index of any imported atom
+  int atom_limit;        ///< Largest number of atoms that this work unit can hold
 
   /// The list of imported atoms, indicating indices into the original topology.  The position of
   /// each atom in this list indicates its local index within the work unit, as referenced by
   /// subsequent ????_(i,j,k,...)_atoms arrays.
   std::vector<int> atom_import_list;
+
+  /// The list of atoms that this work unit shall compute complete forces on and thereby move.
+  /// All of these atoms (and perhaps more) must, obviously, be contained in atom_import_list.
+  std::vector<int> atom_move_list;
+
+  /// The list of atoms that this work unit will be responsible for updating after movement.
+  /// All of these atoms must be contained in atom_move_list.  If a work unit moves an atom, it
+  /// would be acceptable for that unit to log the updated position and velocity, but only one
+  /// work unit will be responsible for doing that.
+  std::vector<int> atom_update_list;
 
   // Valence terms for the work unit, typical force field elements
   std::vector<int> bond_term_list;    ///< List of harmonic bonds for which this work unit is
@@ -676,12 +709,26 @@ private:
 
 /// \brief Build a series of valence work units to cover a topology.
 ///
-/// \param ag  The topology of interest
-/// \param ra  Restraints linked to the topology
+/// Overloaded:
+///   - Accept a pre-existing ValenceDelegator, so that information used in creating the work units
+///     will be available after they are finished
+///   - Construct the ValenceDelegator internally (some functionality associated with the
+///     ValenceWorkUnits will be unavaialable later)
+///
+/// \param ag                 The topology of interest
+/// \param ra                 Restraints linked to the topology
+/// \param vdel               Object for managing the creation of the work units
+/// \param max_atoms_per_vwu  The maximum number of atoms to permit in each work unit
+/// \{
 std::vector<ValenceWorkUnit>
 buildValenceWorkUnits(const AtomGraph *ag, const RestraintApparatus *ra,
                       int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
 
+std::vector<ValenceWorkUnit>
+buildValenceWorkUnits(ValenceDelegator *vdel,
+                      int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
+/// \}
+  
 } // namespace topology
 } // namespace omni
 

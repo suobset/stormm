@@ -207,12 +207,12 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < nsys; i++) {
     snapshot(fc_name, polyNumericVector(sys_chem[i].getFormalCharges()), std::string("fc_") +
              std::to_string(i), 1.0e-6, "Formal charges computed for the system described by " +
-             sys_ag[i].getFileName() + " do not meed expectations.", oe.takeSnapshot(), 1.0e-8,
+             sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
              NumberFormat::STANDARD_REAL,
              (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
     snapshot(bo_name, polyNumericVector(sys_chem[i].getBondOrders()), std::string("bo_") +
              std::to_string(i), 1.0e-6, "Bond orders computed for the system described by " +
-             sys_ag[i].getFileName() + " do not meed expectations.", oe.takeSnapshot(), 1.0e-8,
+             sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
              NumberFormat::STANDARD_REAL,
              (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
     check(sum<double>(sys_chem[i].getFormalCharges()), RelationalOperator::EQUAL,
