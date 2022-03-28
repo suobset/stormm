@@ -1450,87 +1450,115 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
               best_settings[i] = frag_settings[i];
             }
 
+            // CHECK
+            int ncycle = 0;
+            // END CHECK
+            
             // With this new best score in hand, look at each state which has multiple options
             // for the charge state: if it were to take a different state, is there some
             // compensatory move which could result in as low an energy?  Loop over all residues,
             // testing the possible alternative states, and eliminating those which cannot be
             // changed to result in a lower energy.  Make any changes that are noted to be
             // unambiguously good.
-            std::vector<int4> good_swaps;
-            for (int i = 0; i < fragment_count; i++) {
-              const int i_best_option_idx = options_bounds[i] + best_settings[i];
-              const double i_e_best = e_options[i_best_option_idx];
-              const int i_q_best = q_options[i_best_option_idx];
-              for (int j = 0; j < max_frag_settings[i]; j++) {
-                const int i_option_idx = options_bounds[i] + j;
-                if (j == best_settings[i] || fragments_culled[i_option_idx]) {
-                  continue;
+            bool swaps_made;
+            do {
+
+              // Compute the energy floor--the best that the energy could possibly improve
+              // beyond its current state if all fragments were allowed to enter their minimum
+              // viable energy states, regardless of the consequences for the total charge.
+              double energy_floor = 0.0;
+              for (int i = 0; i < fragment_count; i++) {
+                const double fragment_curr_e = e_options[options_bounds[i] + best_settings[i]];
+                double fragment_lowest_e = fragment_curr_e;
+                for (int j = options_bounds[i]; j < options_bounds[i + 1]; j++) {
+                  if (! fragments_culled[j] && e_options[j] < fragment_lowest_e) {
+                    fragment_lowest_e = e_options[j];
+                  }
                 }
-
-                // Compute the difference in energy, and the consequence for charge
-                const int i_delta_q = q_options[i_option_idx] - i_q_best;
-                const double i_delta_e = e_options[i_option_idx] - i_e_best;
-
-                // The question is now whether taking delta_q at the energetic price of delta_e
-                // is reasonable.  Search all other fragments--is there some way to compensate for
-                // the change in charge?
-                bool seek_balance_q = true;
-                int k = 0;
-                while (k < fragment_count && seek_balance_q) {
-                  if (k == i) {
-                    k++;
+                energy_floor += fragment_lowest_e - fragment_curr_e;
+              }
+              std::vector<int4> good_swaps;
+              for (int i = 0; i < fragment_count; i++) {
+                const int i_best_option_idx = options_bounds[i] + best_settings[i];
+                const double i_e_best = e_options[i_best_option_idx];
+                const int i_q_best = q_options[i_best_option_idx];
+                for (int j = 0; j < max_frag_settings[i]; j++) {
+                  const int i_option_idx = options_bounds[i] + j;
+                  if (j == best_settings[i] || fragments_culled[i_option_idx]) {
                     continue;
                   }
-                  const int k_best_option_idx = options_bounds[k] + best_settings[k];
-                  const double k_e_best = e_options[k_best_option_idx];
-                  const int k_q_best = q_options[k_best_option_idx];
-                  for (int m = 0; m < max_frag_settings[k]; m++) {
-                    const int k_option_idx = options_bounds[k] + m;
-                    if (m == best_settings[k] || fragments_culled[k_option_idx]) {
+
+                  // Compute the difference in energy, and the consequence for charge
+                  const int i_delta_q = q_options[i_option_idx] - i_q_best;
+                  const double i_delta_e = e_options[i_option_idx] - i_e_best;
+
+                  // The question is now whether taking delta_q at the energetic price of delta_e
+                  // is reasonable.  Search all other fragments--is there some way to compensate
+                  // for the change in charge?
+                  bool seek_balance_q = true;
+                  int k = 0;
+                  while (k < fragment_count && seek_balance_q) {
+                    if (k == i) {
+                      k++;
                       continue;
                     }
-                    const int k_delta_q = q_options[k_option_idx] - k_q_best;
-                    if (k_delta_q + i_delta_q == 0) {
+                    const int k_best_option_idx = options_bounds[k] + best_settings[k];
+                    const double k_e_best = e_options[k_best_option_idx];
+                    const int k_q_best = q_options[k_best_option_idx];
+                    for (int m = 0; m < max_frag_settings[k]; m++) {
+                      const int k_option_idx = options_bounds[k] + m;
+                      if (m == best_settings[k] || fragments_culled[k_option_idx]) {
+                        continue;
+                      }
+                      const int k_delta_q = q_options[k_option_idx] - k_q_best;
+                      if (k_delta_q + i_delta_q == 0) {
 
-                      // The charges are equal, so the net energy had better be negative or the
-                      // charge counterbalance is not viable against the best energy thus far.
-                      const double k_delta_e = e_options[options_bounds[k] + m] - k_e_best;
-                      if (i_delta_e + k_delta_e < 0.0) {
-                        good_swaps.push_back({i, j, k, m});
-                        seek_balance_q = false;
-                        break;
+                        // The charges are equal, so the net energy had better be negative or the
+                        // charge counterbalance is not viable against the best energy thus far.
+                        const double k_delta_e = e_options[options_bounds[k] + m] - k_e_best;
+                        if (i_delta_e + k_delta_e < 0.0) {
+                          good_swaps.push_back({i, j, k, m});
+                          seek_balance_q = false;
+                          break;
+                        }
+                      }
+                      else if (k_delta_q * i_delta_q < 0) {
+
+                        // The charges are counterbalanced, but with the net change not being zero
+                        // the result is ambiguous.  The alternative is viable if it's conceivable
+                        // that the energy might go in the right direction through some combination
+                        // of such charges.  Compare it to the energy floor.
+                        const double k_delta_e = e_options[options_bounds[k] + m] - k_e_best;
+                        if (i_delta_e + k_delta_e + energy_floor < 0.0) {
+                          seek_balance_q = false;
+                          break;
+                        }
                       }
                     }
-                    else if (k_delta_q * i_delta_q < 0) {
-
-                      // The charges are counterbalanced, but with the net change not being zero
-                      // the result is ambiguous.  The alternative is viable for now.
-                      seek_balance_q = false;
-                      break;
-                    }
+                    k++;
                   }
-                  k++;
-                }
-                if (seek_balance_q) {
+                  if (seek_balance_q) {
 
-                  // No viable fragment was found to counterbalance the charge change in a way
-                  // that could possibly lower the energy.  The alternative state of fragment i
-                  // is not viable.
-                  fragments_culled[i_option_idx] = true;
+                    // No viable fragment was found to counterbalance the charge change in a way
+                    // that could possibly lower the energy.  The alternative state of fragment i
+                    // is not viable.
+                    fragments_culled[i_option_idx] = true;
+                  }
                 }
               }
-            }
-            const size_t n_swaps = good_swaps.size();
-            for (size_t pos = 0; pos < n_swaps; pos++) {
-              const int ifrag = good_swaps[pos].x;
-              best_score -= e_options[options_bounds[ifrag] + best_settings[ifrag]];
-              best_score += e_options[options_bounds[ifrag] + good_swaps[pos].y];
-              const int kfrag = good_swaps[pos].z;
-              best_score -= e_options[options_bounds[kfrag] + best_settings[kfrag]];
-              best_score += e_options[options_bounds[kfrag] + good_swaps[pos].w];
-              best_settings[ifrag] = good_swaps[pos].y;
-              best_settings[kfrag] = good_swaps[pos].w;
-            }
+              const size_t n_swaps = good_swaps.size();
+              swaps_made = (n_swaps > 0LLU);
+              for (size_t pos = 0; pos < n_swaps; pos++) {
+                const int ifrag = good_swaps[pos].x;
+                best_score -= e_options[options_bounds[ifrag] + best_settings[ifrag]];
+                best_score += e_options[options_bounds[ifrag] + good_swaps[pos].y];
+                const int kfrag = good_swaps[pos].z;
+                best_score -= e_options[options_bounds[kfrag] + best_settings[kfrag]];
+                best_score += e_options[options_bounds[kfrag] + good_swaps[pos].w];
+                best_settings[ifrag] = good_swaps[pos].y;
+                best_settings[kfrag] = good_swaps[pos].w;
+              }
+            } while (swaps_made);
           }
         }
       }
