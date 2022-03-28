@@ -249,7 +249,11 @@ void ValenceDelegator::markVirtualSiteAddition(const int vwu_index, const int vs
 
 //-------------------------------------------------------------------------------------------------
 bool ValenceDelegator::setUpdateWorkUnit(const int atom_index, const int vwu_index) {
+  if (assigned_update_work_units[atom_index] >= 0) {
+    return false;
+  }
   assigned_update_work_units[atom_index] = vwu_index;
+  return true;
 }
 
 //-------------------------------------------------------------------------------------------------
