@@ -432,7 +432,7 @@ int main(int argc, char* argv[]) {
     const ValenceKit<double> vk = ag_i.getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> vsk = ag_i.getDoublePrecisionVirtualSiteKit();
     for (int j = 0; j < vk.natom; j++) {
-      const std::vector<int> vwu_deps = vwu_i[0].findForcePartners(j, vk, ra_vec[i].dpData(), vsk);
+      const std::vector<int> vwu_deps = vdel.findForcePartners(j);
       force_partner_counts_match = (force_partner_counts_match &&
                                     vwu_deps.size() == fcontrib[j].size());
       const std::vector<ValueWithCounter<int>> missing_dependencies =

@@ -31,6 +31,10 @@ constexpr int maximum_valence_work_unit_atoms = 768;
 ///        indefinitely.  A value of 2 should permit all the recursive calls that might be needed,
 ///        but allow more to let whatever erroneous pattern become clear for debugging purposes.
 constexpr int max_atom_search_stacks = 8;
+
+/// \brief Padding to ensure that there is enough space in most work units for halo atoms needed
+///        to evaluate forces and move partners for any atoms that the work unit needs to update.
+constexpr int default_vwu_halo_padding = 32;
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or
@@ -56,75 +60,39 @@ public:
   /// \brief Get the index of the first unassigned atom in the topology.
   int getFirstUnassignedAtom() const;
 
-  /// \brief Get a list of bonds affecting a given atom.
+  /// \brief Find all partners of a given atom such that the work unit will be able to correctly
+  ///        move the atom.  This implies all other participants in any constraint group that
+  ///        includes the atom, or (if the atom is a virtual site) all frame atoms and any
+  ///        constraint groups which they participate in.  The returned list provides indices of
+  ///        atoms as they are found in the original topology.  It is pruned to remove duplicates.
   ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getBondAffectors(int atom_index) const;
-  
-  /// \brief Get a list of harmonic angle terms affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getAngleAffectors(int atom_index) const;
+  /// \param atom_idx      Topological index of the atom of interest
+  /// \param caller_stack  Cumulative stack indicaing previous recursive calls.  If this gets too
+  ///                      long, it will trigger a runtime error.
+  std::vector<int> findMovementPartners(int atom_idx,
+                                        const std::vector<int> &caller_stack = {}) const;
 
-  /// \brief Get a list of cosine-based dihedrals affecting a given atom.
+  /// \brief Find all partners of a given atom such that the work unit will be able to correctly
+  ///        evaluate the force need to move the atom.  This implies other atoms that participate
+  ///        in any valence terms, inferred 1:4 interactions, or restraints involving the atom, as
+  ///        well as other atoms which participate in a virtual site frame with which the atom of
+  ///        interest is involved.  If the atom of interest is one of the frame atoms to a virtual
+  ///        site, the relevant atoms also include any atoms involved in valence interactions
+  ///        (i.e. inferred non-bonded 1:4 interactions) with the virtual site itself.
   ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getDihedralAffectors(int atom_index) const;
-  
-  /// \brief Get a list of Urey-Bradley harmonic angles affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getUreyBradleyAffectors(int atom_index) const;
-  
-  /// \brief Get a list of CHARMM improper dihedral terms affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getCharmmImproperAffectors(int atom_index) const;
-  
-  /// \brief Get a list of CMAP terms affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getCmapAffectors(int atom_index) const;
+  /// \param atom_idx      Topological index of the atom of interest
+  /// \param caller_stack  Cumulative stack indicaing previous recursive calls.  If this gets too
+  ///                      long, it will trigger a runtime error.
+  std::vector<int> findForcePartners(int atom_idx,
+                                     const std::vector<int> &caller_stack = {}) const;
 
-  /// \brief Get a list of inferred 1:4 attenuated non-bonded interactions affecting a given atom.
+  /// \brief Accumulate a list of all atoms which have bearing on the way that a particular atom
+  ///        shall move.  This routine will loop over the ValenceDelgator's bounded arrays for
+  ///        valence terms, restraints, virtual sites, and various constraint groups to determine
+  ///        any other atoms that must move, and any atoms which can contribute forces.
   ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getInferred14Affectors(int atom_index) const;
-
-  /// \brief Get a list of positional restraints affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getPositionalRestraintAffectors(int atom_index) const;
-  
-  /// \brief Get a list of distance restraints affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getDistanceRestraintAffectors(int atom_index) const;
-
-  /// \brief Get a list of three-point angle restraints affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getAngleRestraintAffectors(int atom_index) const;
-
-  /// \brief Get a list of four-point dihedral restraints affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getDihedralRestraintAffectors(int atom_index) const;
-
-  /// \brief Get a list of SETTLE constraint groups affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getSettleGroupAffectors(int atom_index) const;
-
-  /// \brief Get a list of SHAKE or RATTLE constraint groups affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getConstraintGroupAffectors(int atom_index) const;
-
-  /// \brief Get a list of virtual sites affecting a given atom.
-  ///
-  /// \param atom_index  Topological index of the atom of interest
-  std::vector<int> getVirtualSiteAffectors(int atom_index) const;
+  /// \param atom_index  Topological index of the atom in question
+  std::vector<int> getUpdateDependencies(const int atom_index) const;
   
   /// \brief Get the work unit currently assigned to update an atom's position and velocity.
   ///        The value of -1 signifies that no work unit has yet been assigned to handle the atom.
@@ -431,8 +399,12 @@ public:
   ///        all assignments therein.
   ///
   /// \param atom_index  Index of the atom of interest
-  void addNewAtom(int atom_index);
+  void addNewAtomImport(int atom_index);
 
+  /// \brief Add a new atom to the list of updates that a work unit shall perform.  The atom must
+  ///        already be part of the atom import list.
+  void addNewAtomUpdate(const int atom_index);
+  
   /// \brief Add a new harmonic bond term to the work unit.  Record the fact in the associated
   ///        delegator.
   ///
@@ -512,56 +484,6 @@ public:
   /// \param vsite_index  The index of the virtual site to add
   void addNewVirtualSite(int vsite_index);
 
-  /// \brief Find all partners of a given atom such that the work unit will be able to correctly
-  ///        evaluate the force need to move the atom.  This implies other atoms that participate
-  ///        in any valence terms, inferred 1:4 interactions, or restraints involving the atom, as
-  ///        well as other atoms which participate in a virtual site frame with which the atom of
-  ///        interest is involved.  If the atom of interest is one of the frame atoms to a virtual
-  ///        site, the relevant atoms also include any atoms involved in valence interactions
-  ///        (i.e. inferred non-bonded 1:4 interactions) with the virtual site itself.
-  ///
-  /// \param atom_idx      Topological index of the atom of interest
-  /// \param vk            Valence term details from the original topology
-  /// \param rar           Restraint information pertaining to the system
-  /// \param vsk           Virtual site abstract from the original topology
-  /// \param caller_stack  Cumulative stack indicaing previous recursive calls.  If this gets too
-  ///                      long, it will trigger a runtime error.
-  std::vector<int> findForcePartners(int atom_idx, const ValenceKit<double> &vk,
-                                     const RestraintApparatusDpReader &rar,
-                                     const VirtualSiteKit<double> &vsk,
-                                     const std::vector<int> &caller_stack = {}) const;
-  
-  /// \brief Find all partners of a given atom such that the work unit will be able to correctly
-  ///        move the atom.  This implies all other participants in any constraint group that
-  ///        includes the atom, or (if the atom is a virtual site) all frame atoms and any
-  ///        constraint groups which they participate in.  The returned list provides indices of
-  ///        atoms as they are found in the original topology.  It is pruned to remove duplicates.
-  ///
-  /// \param atom_idx      Topological index of the atom of interest
-  /// \param cnk           Constraint group abstract from the original topology
-  /// \param vsk           Virtual site abstract from the original topology
-  /// \param caller_stack  Cumulative stack indicaing previous recursive calls.  If this gets too
-  ///                      long, it will trigger a runtime error.
-  std::vector<int> findMovementPartners(int atom_idx, const ConstraintKit<double> &cnk,
-                                        const VirtualSiteKit<double> &vsk,
-                                        const std::vector<int> &caller_stack = {}) const;
-
-  /// \brief Assign atom update responsibilities to a work unit, subject to the stipulations that
-  ///        no other work unit has been assigned to update the atom's position and velocity, and
-  ///        that the work unit has all of the atoms needed to compute the forces that will affect
-  ///        the atom itself.  If the atom is part of a constraint group, the work unit must also
-  ///        have all atoms needed to compute forces on other atoms in the constraint group, and
-  ///        if the atom is a virtual site the work unit will also need to have all frame atoms
-  ///        plus whatever atoms are needed to compute forces on them.  This function will scan
-  ///        over all atoms in the work unit as it is found, checking that the criteria are met.
-  ///
-  /// \param vk   Valence term abstract from the original topology
-  /// \param rar  Restraint apparatus abstract
-  /// \param cnk  Constraint group abstract from the original topology
-  /// \param vsk  Virtual site abstract from the original topology
-  void assignUpdateTasks(const ValenceKit<double> &vk, const RestraintApparatusDpReader &rar,
-                         const ConstraintKit<double> &cnk, const VirtualSiteKit<double> &vsk);
-  
 private:
   int atom_count;        ///< Number of atoms in the work unit
   int bond_term_count;   ///< Number of bond terms in the work unit
