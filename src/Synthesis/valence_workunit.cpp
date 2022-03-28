@@ -992,7 +992,7 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
     // of the ith atom possible.
     atom_request_bounds[i + 1] = atom_requests.size();
   }
-
+  
   // Get a list of the unique atom requests
   const std::vector<int> unique_requests = reduceUniqueValues(atom_requests);
   
@@ -1035,10 +1035,12 @@ void ValenceWorkUnit::assignUpdateTasks(const ValenceKit<double> &vk,
     for (int i = 0; i < all_request_count; i++) {
       unique_rc[locateValue(unique_requests, atom_requests[i], DataOrder::ASCENDING)].x += 1;
     }
+    std::sort(unique_rc.begin(), unique_rc.end(), [](int2 a, int2 b) { return a.x > b.x; });
 
     // CHECK
 #if 0
-    printf("There are %2d atoms yet to import in work unit %2d:\n", n_atoms_needed, list_index);
+    printf("There are %2d atoms yet to import in work unit %2d with %2d spaces remaining:\n",
+           n_atoms_needed, list_index, atom_limit - atom_count);
     printf("   ");
     for (int i = 0; i < n_atoms_needed; i++) {
       printf(" %4d", unique_rc[i].y);

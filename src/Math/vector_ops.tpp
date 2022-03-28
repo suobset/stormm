@@ -998,9 +998,14 @@ template <typename T> void reduceUniqueValues(std::vector<T> *va) {
   size_t nunique = 0LLU;
   const size_t nval = va->size();
   T* va_ptr = va->data();
-  for (size_t i = 0; i < nval; i++) {
-    va_ptr[nunique] = va_ptr[i];
-    nunique += (i == 0LLU || va_ptr[i] != va_ptr[i - 1LLU]);
+  const size_t nvalm1 = nval - 1LLU;
+  T last_unique;
+  for (size_t i = 0LLU; i < nval; i++) {
+    if (i == 0LLU || va_ptr[i] != last_unique) {
+      last_unique = va_ptr[i];
+      va_ptr[nunique] = last_unique;
+      nunique++;
+    }
   }
   va->resize(nunique);
   va->shrink_to_fit();
