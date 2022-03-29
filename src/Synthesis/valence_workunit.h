@@ -415,7 +415,12 @@ public:
   ///        responsible for updating must be moved by the work unit, but also any atom sharing a
   ///        constraint group with one of the atoms which is on the official update list.
   void makeAtomMoveList();
-  
+
+  /// \brief Sort the atom lists (import, movement, and update) of this work unit into ascending
+  ///        order.  This will optimize memory access when reading the atoms and set the stage
+  ///        for mapping valence terms / atom groups to the local list.
+  void sortAtomSets();
+
   /// \brief Add a new harmonic bond term to the work unit.  Record the fact in the associated
   ///        delegator.
   ///

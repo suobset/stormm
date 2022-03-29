@@ -2,6 +2,7 @@
 #include "Math/statistics.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+#include "Parsing/parse.h"
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
@@ -13,6 +14,7 @@ using math::locateValue;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::reduceUniqueValues;
+using parse::char4ToString;
 using topology::VirtualSiteKind;
 using topology::markAffectorAtoms;
 using topology::extractBoundedListEntries;
@@ -722,7 +724,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
   growth_points.reserve(32);
   candidate_additions.reserve(32);
   int fua_atom = vdel_pointer->getFirstUnassignedAtom();
-  if (fua_atom < cdk.natom) {
+  if (fua_atom != seed_atom_in && fua_atom < cdk.natom) {
     candidate_additions.push_back(fua_atom);
   }
   
@@ -734,7 +736,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
 
     // A single successful addition is needed to prove that the capacity has not yet been reached.
     capacity_reached = true;
-
+    
     // Transfer candidate atoms to become growth points.  In construction, valence work units
     // do not overlap.  Atoms included in some previous work unit do not become candidates.
     growth_points.resize(0);
@@ -745,17 +747,21 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
       // as one for the work unit to update.
       const std::vector<int> up_deps = vdel_pointer->getUpdateDependencies(candidate_additions[i]);
       const int ndeps = up_deps.size();
+      std::vector<bool> incl_up_deps(ndeps, false);
       int n_new_atoms = 0;
       for (int j = 0; j < ndeps; j++) {
         if (vdel_pointer->checkPresence(up_deps[j], list_index) == false) {
           n_new_atoms++;
+          incl_up_deps[j] = true;
         }
       }
       if (imported_atom_count + n_new_atoms < atom_limit) {
 
         // The candidate atom will be part of its own dependencies list.
         for (int j = 0; j < ndeps; j++) {
-          addNewAtomImport(candidate_additions[i]);
+          if (incl_up_deps[j]) {
+            addNewAtomImport(up_deps[j]);
+          }
         }
         growth_points.push_back(candidate_additions[i]);
         addNewAtomUpdate(candidate_additions[i]);
@@ -763,7 +769,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
       }
     }
     candidate_additions.resize(0);
-
+    
     // Loop over the growth points and determine new candidate atoms.  During construction,
     // valence work units do not overlap.  Atoms included in some previous work unit do not
     // become new candidates.
@@ -771,11 +777,12 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
     for (int i = 0; i < ngrow; i++) {
       const int grow_atom = growth_points[i];
       for (int j = nbk.nb12_bounds[grow_atom]; j < nbk.nb12_bounds[grow_atom + 1]; j++) {
-        if (vdel_pointer->getAtomAssignmentCount(nbk.nb12x[j]) == 0) {
+        if (vdel_pointer->getUpdateWorkUnit(nbk.nb12x[j]) == -1) {
           candidate_additions.push_back(nbk.nb12x[j]);
         }
       }
     }
+    reduceUniqueValues(&candidate_additions);
     ncandidate = candidate_additions.size();
 
     // If no candidate molecules have yet been found, try jumping to the first unassigned
@@ -903,10 +910,73 @@ void ValenceWorkUnit::makeAtomMoveList() {
 
     // The list of movement partners comprises the particle itself.
     const std::vector<int> tmpv = vdel_pointer->findMovementPartners(atom_update_list[i]);
-    required_atoms.insert(required_atoms.end(), required_atoms.begin(), required_atoms.end());
+    required_atoms.insert(required_atoms.end(), tmpv.begin(), tmpv.end());
   }
   atom_move_list = reduceUniqueValues(required_atoms);
   moved_atom_count = atom_move_list.size();
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::sortAtomSets() {
+  std::sort(atom_import_list.begin(), atom_import_list.end(), [](int a, int b) { return a < b; });
+  std::sort(atom_move_list.begin(), atom_move_list.end(), [](int a, int b) { return a < b; });
+  std::sort(atom_update_list.begin(), atom_update_list.end(), [](int a, int b) { return a < b; });
+
+  // Check the sizing of each list
+  if (static_cast<int>(atom_import_list.size()) != imported_atom_count) {
+    rtErr("Atom import count (" + std::to_string(imported_atom_count) + ") does not reflect the "
+          "true length of the imported atom list (" + std::to_string(atom_import_list.size()) +
+          ") in work unit " + std::to_string(list_index) + " serving topology " +
+          ag_pointer->getFileName() + ".", "ValenceWorkUnit", "sortAtomSets");
+  }
+  if (static_cast<int>(atom_move_list.size()) != moved_atom_count) {
+    rtErr("Moving atom count (" + std::to_string(moved_atom_count) + ") does not reflect the "
+          "true length of the atom move list (" + std::to_string(atom_move_list.size()) +
+          ") in work unit " + std::to_string(list_index) + " serving topology " +
+          ag_pointer->getFileName() + ".", "ValenceWorkUnit", "sortAtomSets");    
+  }
+  if (static_cast<int>(atom_update_list.size()) != updated_atom_count) {
+    rtErr("Atom update count (" + std::to_string(updated_atom_count) + ") does not reflect the "
+          "true length of the atom move list (" + std::to_string(atom_update_list.size()) +
+          ") in work unit " + std::to_string(list_index) + " serving topology " +
+          ag_pointer->getFileName() + ".", "ValenceWorkUnit", "sortAtomSets");    
+  }
+  
+  // Check the atom import list to ensure that all entries are unique.
+  for (int i = 1; i < imported_atom_count; i++) {
+    if (atom_import_list[i] == atom_import_list[i - 1]) {
+      const int ires = ag_pointer->getResidueIndex(atom_import_list[i]);
+      rtErr("A duplicate entry is present in the atom import list of work unit " +
+            std::to_string(list_index) + " serving topology " + ag_pointer->getFileName() +
+            ".  The topological atom index is " + std::to_string(atom_import_list[i]) + ", name " +
+            char4ToString(ag_pointer->getAtomName(atom_import_list[i])) + ", residue " +
+            char4ToString(ag_pointer->getResidueName(ires)) + " " +
+            std::to_string(ag_pointer->getResidueNumber(atom_import_list[i])) + ".",
+            "ValenceWorkUnit", "sortAtomSets");
+    }
+  }
+
+  // Check the movement list to ensure that each atom is present in the import list.
+  for (int i = 0; i < moved_atom_count; i++) {
+    if (locateValue(atom_import_list, atom_move_list[i],
+                    DataOrder::ASCENDING) == imported_atom_count) {
+      rtErr("Atom index " + std::to_string(atom_move_list[i]) + "(" +
+            char4ToString(ag_pointer->getAtomName(atom_move_list[i])) + ") in topology " +
+            ag_pointer->getFileName() + " is scheduled to be moved by work unit " +
+            std::to_string(list_index) + " but not present in the import list of " +
+            std::to_string(imported_atom_count) + " atoms.", "ValenceWorkUnit", "sortAtomSets");
+    }
+  }
+  for (int i = 0; i < updated_atom_count; i++) {
+    if (locateValue(atom_move_list, atom_update_list[i],
+                    DataOrder::ASCENDING) == moved_atom_count) {
+      rtErr("Atom index " + std::to_string(atom_update_list[i]) + "(" +
+            char4ToString(ag_pointer->getAtomName(atom_update_list[i])) + ") in topology " +
+            ag_pointer->getFileName() + " is scheduled to be updated and logged by work unit " +
+            std::to_string(list_index) + " but not present in the movement list of " +
+            std::to_string(moved_atom_count) + " atoms.", "ValenceWorkUnit", "sortAtomSets");
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1028,16 +1098,19 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
 
   // Loop once more over the update list and construct the atom movement list.  The movement list
   // is a superset of all the atoms that the work unit will update, and the import list is a
-  // superset of the movement list.
+  // superset of the movement list.  This completes the atom sets that define any work unit.
+  // Sort each of the sets.
   const int nvwu = result.size();
   for (int i = 0; i < nvwu; i++) {
     result[i].makeAtomMoveList();
+    result[i].sortAtomSets();
   }
   
   // With the atom update assignments of each work unit known and the import list furnishing any
   // additional required dependencies (halo atoms), the task is now to loop over all updates and
   // trace back the force terms that must be computed.
 
+  
   return result;
 }
 
