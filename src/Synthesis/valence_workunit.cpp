@@ -706,7 +706,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
     rangl_j_atoms{}, rangl_k_atoms{}, rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{},
     rdihe_l_atoms{}, cnst_group_list{}, sett_group_list{}, cnst_group_atoms{},
     cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{},
-    vsite_atoms{}, vsite_parent_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{},
+    vsite_atoms{}, vsite_frame1_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{},
     vsite_frame4_atoms{}, vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
     ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
@@ -1015,7 +1015,7 @@ void ValenceWorkUnit::logActivities() {
     import_map[atom_import_list[i] - mapping_offset] = i;
   }
   
-  // Log bonded interactions
+  // Detail valence interactions for this work unit
   const DataOrder order = DataOrder::ASCENDING;
   const std::vector<int> relevant_bonds = vdel_pointer->getBondAffectors(atom_move_list);
   const size_t nbond = relevant_bonds.size();
@@ -1081,6 +1081,8 @@ void ValenceWorkUnit::logActivities() {
     infr14_i_atoms.push_back(import_map[vk.infr14_i_atoms[infr_idx] - mapping_offset]);
     infr14_l_atoms.push_back(import_map[vk.infr14_l_atoms[infr_idx] - mapping_offset]);
   }
+
+  // Detail the restraint tersm for this work unit to manage
   const std::vector<int> relevant_rposns =
     vdel_pointer->getPositionalRestraintAffectors(atom_move_list);
   const size_t nrposn = relevant_rposns.size();
@@ -1108,7 +1110,7 @@ void ValenceWorkUnit::logActivities() {
     rangl_j_atoms.push_back(import_map[rar.rangl_j_atoms[rangl_idx] - mapping_offset]);
     rangl_k_atoms.push_back(import_map[rar.rangl_k_atoms[rangl_idx] - mapping_offset]);
   }
-  const std::vector<int> relevant_rangls =
+  const std::vector<int> relevant_rdihes =
     vdel_pointer->getDihedralRestraintAffectors(atom_move_list);
   const size_t nrdihe = relevant_rdihes.size();
   for (size_t pos = 0; pos < nrdihe; pos++) {
@@ -1117,9 +1119,44 @@ void ValenceWorkUnit::logActivities() {
     rdihe_i_atoms.push_back(import_map[rar.rdihe_i_atoms[rdihe_idx] - mapping_offset]);
     rdihe_j_atoms.push_back(import_map[rar.rdihe_j_atoms[rdihe_idx] - mapping_offset]);
     rdihe_k_atoms.push_back(import_map[rar.rdihe_k_atoms[rdihe_idx] - mapping_offset]);
-    rdihe_m_atoms.push_back(import_map[rar.rdihe_m_atoms[rdihe_idx] - mapping_offset]);
+    rdihe_l_atoms.push_back(import_map[rar.rdihe_l_atoms[rdihe_idx] - mapping_offset]);
   }
 
+  // Detail virtual sites for thie work unit to manage
+  const std::vector<int> relevant_vstes = vdel_pointer->getVirtualSiteAffectors(atom_move_list);
+  const size_t nvste = relevant_vstes.size();
+  for (size_t pos = 0; pos < nvste; pos++) {
+    const int vste_idx = relevant_vstes[pos];
+    virtual_site_list.push_back(vste_idx);
+    vsite_atoms.push_back(import_map[vsk.vs_atoms[vste_idx] - mapping_offset]);
+    vsite_frame1_atoms.push_back(import_map[vsk.frame1_idx[vste_idx] - mapping_offset]);
+    vsite_frame2_atoms.push_back(import_map[vsk.frame2_idx[vste_idx] - mapping_offset]);
+    vsite_frame3_atoms.push_back(import_map[vsk.frame3_idx[vste_idx] - mapping_offset]);
+    vsite_frame4_atoms.push_back(import_map[vsk.frame4_idx[vste_idx] - mapping_offset]);
+  }
+
+  // Detail the constraint groups for this work unit
+  const std::vector<int> relevant_setts = vdel_pointer->getSettleGroupAffectors(atom_move_list);
+  const size_t nsett = relevant_setts.size();
+  for (size_t pos = 0; pos < nsett; pos++) {
+    const int sett_idx = relevant_setts[pos];
+    sett_group_list.push_back(sett_idx);
+    sett_ox_atoms.push_back(import_map[cnk.settle_ox_atoms[sett_idx] - mapping_offset]);
+    sett_h1_atoms.push_back(import_map[cnk.settle_h1_atoms[sett_idx] - mapping_offset]);
+    sett_h2_atoms.push_back(import_map[cnk.settle_h2_atoms[sett_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_cnsts =
+    vdel_pointer->getConstraintGroupAffectors(atom_move_list);
+  const size_t ncnst = relevant_cnsts.size();
+  cnst_group_bounds.push_back(0);
+  for (size_t pos = 0; pos < ncnst; pos++) {
+    const int cnst_idx = relevant_cnsts[pos];
+    cnst_group_list.push_back(cnst_idx);
+    for (int i = cnk.group_bounds[cnst_idx]; i < cnk.group_bounds[cnst_idx + 1]; i++) {
+      cnst_group_atoms.push_back(import_map[cnk.group_list[i] - mapping_offset]);
+    }
+    cnst_group_bounds.push_back(cnst_group_atoms.size());
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

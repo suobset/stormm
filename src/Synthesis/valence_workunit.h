@@ -567,7 +567,7 @@ private:
                                         ///<   of TIP4P-Eq water)
   std::vector<int> vsite_atoms;         ///< Local indices for each of the respective virtual
                                         ///<   particles in this work unit's above list
-  std::vector<int> vsite_parent_atoms;  ///< Local indices of this work unit's virtual site parent
+  std::vector<int> vsite_frame1_atoms;  ///< Local indices of this work unit's virtual site parent
                                         ///<   atoms
   std::vector<int> vsite_frame2_atoms;  ///< Local indices of this work unit's virtual site second
                                         ///<   frame atoms
