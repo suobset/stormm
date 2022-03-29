@@ -421,85 +421,11 @@ public:
   ///        for mapping valence terms / atom groups to the local list.
   void sortAtomSets();
 
-  /// \brief Add a new harmonic bond term to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param bond_term_index  Index of the bond term to add, based on the original topology
-  void addNewBondTerm(int bond_term_index);
-
-  /// \brief Add a new harmonic bond angle term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param angl_term_index  Index of the angle term to add, based on the original topology
-  void addNewAngleTerm(int angl_term_index);
-
-  /// \brief Add a new cosine-based dihedral term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param dihe_term_index  Index of the dihedral term to add, based on the original topology
-  void addNewDihedralTerm(int dihe_term_index);
-
-  /// \brief Add a new Urey-Bradley harmonic angle term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param ubrd_term_index  Index of the Urey-Bradley term to add, based on the original topology
-  void addNewUreyBradleyTerm(int ubrd_term_index);
-
-  /// \brief Add a new CHARMM harmonic improper dihedral term to the work unit.  Record the fact
-  ///        in the associated delegator.
-  ///
-  /// \param cimp_term_index  Index of the CHARMM improper to add, based on the original topology
-  void addNewCharmmImproperTerm(int cimp_term_index);
-
-  /// \brief Add a new CMAP bicubic spline surface term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param cmap_term_index  Index of the CMAP to add, based on the original topology
-  void addNewCmapTerm(int cmap_term_index);
-
-  /// \brief Add a new positional restraint to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param posn_rstr_index  The index of the positional restraint to add
-  void addNewPositionalRestraint(int posn_rstr_index);
+  /// \brief Log all activities of this work unit: valence terms, restraints, virtual sites, and
+  ///        constraints.  This will translate the topological indices of atoms into indices of
+  ///        the local import list.
+  void logActivities();
   
-  /// \brief Add a new distance restraint to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param dist_rstr_index  The index of the distance restraint to add
-  void addNewDistanceRestraint(int dist_rstr_index);
-
-  /// \brief Add a new three-point angle restraint to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param angl_rstr_index  The index of the angle restraint to add
-  void addNewAngleRestraint(int angl_rstr_index);
-
-  /// \brief Add a new four-point dihedral angle restraint to the work unit.  Record the fact in
-  ///        the associated delegator.
-  ///
-  /// \param dihe_rstr_index  The index of the dihedral angle restraint to add
-  void addNewDihedralRestraint(int dihe_rstr_index);
-
-  /// \brief Add a new constraint group to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param cnst_group_index  The index of the constraint group to add
-  void addNewConstraintGroup(int cnst_group_index);
-
-  /// \brief Add a new SETTLE rigid water group to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param sett_group_index  The index of the constraint group to add
-  void addNewSettleGroup(int sett_group_index);
-
-  /// \brief Add a new virtual site, referencing the virtual site index (as opposed to the actual
-  ///        atom index of the virtual site particle) in the original topology.  Record the fact
-  ///        in the associated delegator.
-  ///
-  /// \param vsite_index  The index of the virtual site to add
-  void addNewVirtualSite(int vsite_index);
-
 private:
   int imported_atom_count;  ///< Number of atoms imported by the work unit
   int moved_atom_count;     ///< Number of atoms moved by the work unit
@@ -642,6 +568,98 @@ private:
   const AtomGraph *ag_pointer;           ///< Pointer to the topology to which this object pertains
   const RestraintApparatus *ra_pointer;  ///< Pointer to the restraint apparatus to which this
                                          ///<   object pertains
+
+  /// \brief Add a new harmonic bond term to the work unit.  Record the fact in the associated
+  ///        delegator.
+  ///
+  /// \param bond_term_index  Index of the bond term to add, based on the original topology
+  /// \param vk               Valence abstract from the original topology
+  void addNewBondTerm(int bond_term_index, const ValenceKit<double> &vk);
+
+  /// \brief Add a new harmonic bond angle term to the work unit.  Record the fact in the
+  ///        associated delegator.
+  ///
+  /// \param angl_term_index  Index of the angle term to add, based on the original topology
+  /// \param vk               Valence abstract from the original topology
+  void addNewAngleTerm(int angl_term_index, const ValenceKit<double> &vk);
+
+  /// \brief Add a new cosine-based dihedral term to the work unit.  Record the fact in the
+  ///        associated delegator.
+  ///
+  /// \param dihe_term_index  Index of the dihedral term to add, based on the original topology
+  /// \param vk               Valence abstract from the original topology
+  void addNewDihedralTerm(int dihe_term_index, const ValenceKit<double> &vk);
+
+  /// \brief Add a new Urey-Bradley harmonic angle term to the work unit.  Record the fact in the
+  ///        associated delegator.
+  ///
+  /// \param ubrd_term_index  Index of the Urey-Bradley term to add, based on the original topology
+  /// \param vk               Valence abstract from the original topology
+  void addNewUreyBradleyTerm(int ubrd_term_index, const ValenceKit<double> &vk);
+
+  /// \brief Add a new CHARMM harmonic improper dihedral term to the work unit.  Record the fact
+  ///        in the associated delegator.
+  ///
+  /// \param cimp_term_index  Index of the CHARMM improper to add, based on the original topology
+  /// \param vk               Valence abstract from the original topology
+  void addNewCharmmImproperTerm(int cimp_term_index, const ValenceKit<double> &vk);
+
+  /// \brief Add a new CMAP bicubic spline surface term to the work unit.  Record the fact in the
+  ///        associated delegator.
+  ///
+  /// \param cmap_term_index  Index of the CMAP to add, based on the original topology
+  /// \param vk               Valence abstract from the original topology
+  void addNewCmapTerm(int cmap_term_index, const ValenceKit<double> &vk);
+
+  /// \brief Add a new positional restraint to the work unit.  Record the fact in the associated
+  ///        delegator.
+  ///
+  /// \param posn_rstr_index  The index of the positional restraint to add
+  /// \param rar              Restraint apparatus reader, for pointers to restraint information
+  void addNewPositionalRestraint(int posn_rstr_index, const RestraintApparatusDpReader &rar);
+  
+  /// \brief Add a new distance restraint to the work unit.  Record the fact in the associated
+  ///        delegator.
+  ///
+  /// \param dist_rstr_index  The index of the distance restraint to add
+  /// \param rar              Restraint apparatus reader, for pointers to restraint information
+  void addNewDistanceRestraint(int dist_rstr_index, const RestraintApparatusDpReader &rar);
+
+  /// \brief Add a new three-point angle restraint to the work unit.  Record the fact in the
+  ///        associated delegator.
+  ///
+  /// \param angl_rstr_index  The index of the angle restraint to add
+  /// \param rar              Restraint apparatus reader, for pointers to restraint information
+  void addNewAngleRestraint(int angl_rstr_index, const RestraintApparatusDpReader &rar);
+
+  /// \brief Add a new four-point dihedral angle restraint to the work unit.  Record the fact in
+  ///        the associated delegator.
+  ///
+  /// \param dihe_rstr_index  The index of the dihedral angle restraint to add
+  /// \param rar              Restraint apparatus reader, for pointers to restraint information
+  void addNewDihedralRestraint(int dihe_rstr_index, const RestraintApparatusDpReader &rar);
+
+  /// \brief Add a new constraint group to the work unit.  Record the fact in the associated
+  ///        delegator.
+  ///
+  /// \param cnst_group_index  The index of the constraint group to add
+  /// \param cnk               Constraint abstract from the original topology
+  void addNewConstraintGroup(int cnst_group_index, const ConstraintKit<double> &cnk);
+
+  /// \brief Add a new SETTLE rigid water group to the work unit.  Record the fact in the
+  ///        associated delegator.
+  ///
+  /// \param sett_group_index  The index of the constraint group to add
+  /// \param cnk               Constraint abstract from the original topology
+  void addNewSettleGroup(int sett_group_index, const ConstraintKit<double> &cnk);
+
+  /// \brief Add a new virtual site, referencing the virtual site index (as opposed to the actual
+  ///        atom index of the virtual site particle) in the original topology.  Record the fact
+  ///        in the associated delegator.
+  ///
+  /// \param vsite_index  The index of the virtual site to add
+  /// \param vsk          Virtual site abstract from the original topology
+  void addNewVirtualSite(int vsite_index, const VirtualSiteKit<double> &vsk);
 };
 
 /// \brief Build a series of valence work units to cover a topology.

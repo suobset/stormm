@@ -980,79 +980,98 @@ void ValenceWorkUnit::sortAtomSets() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewBondTerm(const int bond_term_index) {
-  bond_term_list.push_back(bond_term_index);
-  vdel_pointer->markBondAddition(list_index, bond_term_index);
+void ValenceWorkUnit::logActivities() {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
+  const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
+  const RestraintApparatusDpReader rar = ra_pointer->dpData();
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewAngleTerm(const int angl_term_index) {
+void ValenceWorkUnit::addNewBondTerm(const int bond_term_index, const ValenceKit<double> &vk) {
+  bond_term_list.push_back(bond_term_index);
+  vdel_pointer->markBondAddition(list_index, bond_term_index);
+  const DataOrder order = DataOrder::ASCENDING;
+  bond_i_atoms.push_back(locateValue(atom_import_list, vk.bond_i_atoms[bond_term_index], order));
+  bond_j_atoms.push_back(locateValue(atom_import_list, vk.bond_j_atoms[bond_term_index], order));
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::addNewAngleTerm(const int angl_term_index, const ValenceKit<double> &vk) {
   angl_term_list.push_back(angl_term_index);
   vdel_pointer->markAngleAddition(list_index, angl_term_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewDihedralTerm(const int dihe_term_index) {
+void ValenceWorkUnit::addNewDihedralTerm(const int dihe_term_index, const ValenceKit<double> &vk) {
   dihe_term_list.push_back(dihe_term_index);
   vdel_pointer->markDihedralAddition(list_index, dihe_term_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewUreyBradleyTerm(const int ubrd_term_index) {
+void ValenceWorkUnit::addNewUreyBradleyTerm(const int ubrd_term_index,
+                                            const ValenceKit<double> &vk) {
   ubrd_term_list.push_back(ubrd_term_index);
   vdel_pointer->markUreyBradleyAddition(list_index, ubrd_term_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewCharmmImproperTerm(const int cimp_term_index) {
+void ValenceWorkUnit::addNewCharmmImproperTerm(const int cimp_term_index,
+                                               const ValenceKit<double> &vk) {
   cimp_term_list.push_back(cimp_term_index);
   vdel_pointer->markCharmmImproperAddition(list_index, cimp_term_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewCmapTerm(const int cmap_term_index) {
+void ValenceWorkUnit::addNewCmapTerm(const int cmap_term_index, const ValenceKit<double> &vk) {
   cmap_term_list.push_back(cmap_term_index);
   vdel_pointer->markCmapAddition(list_index, cmap_term_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewPositionalRestraint(const int posn_rstr_index) {
+void ValenceWorkUnit::addNewPositionalRestraint(const int posn_rstr_index,
+                                                const RestraintApparatusDpReader &rar) {
   rposn_term_list.push_back(posn_rstr_index);
   vdel_pointer->markPositionalRestraintAddition(list_index, posn_rstr_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewDistanceRestraint(const int dist_rstr_index) {
+void ValenceWorkUnit::addNewDistanceRestraint(const int dist_rstr_index,
+                                              const RestraintApparatusDpReader &rar) {
   rbond_term_list.push_back(dist_rstr_index);
   vdel_pointer->markDistanceRestraintAddition(list_index, dist_rstr_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewAngleRestraint(const int angl_rstr_index) {
+void ValenceWorkUnit::addNewAngleRestraint(const int angl_rstr_index,
+                                           const RestraintApparatusDpReader &rar) {
   rangl_term_list.push_back(angl_rstr_index);
   vdel_pointer->markAngleRestraintAddition(list_index, angl_rstr_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewDihedralRestraint(const int dihe_rstr_index) {
+void ValenceWorkUnit::addNewDihedralRestraint(const int dihe_rstr_index,
+                                              const RestraintApparatusDpReader &rar) {
   rdihe_term_list.push_back(dihe_rstr_index);
   vdel_pointer->markDihedralRestraintAddition(list_index, dihe_rstr_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewConstraintGroup(const int cnst_group_index) {
+void ValenceWorkUnit::addNewConstraintGroup(const int cnst_group_index,
+                                            const ConstraintKit<double> &cnk) {
   cnst_group_list.push_back(cnst_group_index);
   vdel_pointer->markConstraintGroupAddition(list_index, cnst_group_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewSettleGroup(const int sett_group_index) {
+void ValenceWorkUnit::addNewSettleGroup(const int sett_group_index,
+                                        const ConstraintKit<double> &cnk) {
   sett_group_list.push_back(sett_group_index);
   vdel_pointer->markSettleGroupAddition(list_index, sett_group_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewVirtualSite(const int vsite_index) {
+void ValenceWorkUnit::addNewVirtualSite(const int vsite_index, const VirtualSiteKit<double> &vsk) {
   virtual_site_list.push_back(vsite_index);
   vdel_pointer->markVirtualSiteAddition(list_index, vsite_index);
 }
@@ -1109,8 +1128,11 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   // With the atom update assignments of each work unit known and the import list furnishing any
   // additional required dependencies (halo atoms), the task is now to loop over all updates and
   // trace back the force terms that must be computed.
-
+  for (int i = 0; i < nvwu; i++) {
+    result[i].logActivities();
+  }
   
+
   return result;
 }
 
