@@ -54,6 +54,87 @@ int ValenceDelegator::getFirstUnassignedAtom() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getBondAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(bond_affector_list, bond_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getAngleAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(angl_affector_list, angl_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getDihedralAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(dihe_affector_list, dihe_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getUreyBradleyAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(ubrd_affector_list, ubrd_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getCharmmImproperAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(cimp_affector_list, cimp_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceDelegator::getCmapAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(cmap_affector_list, cmap_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getInferred14Affectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(infr_affector_list, infr_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getPositionalRestraintAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(rposn_affector_list, rposn_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getDistanceRestraintAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(rbond_affector_list, rbond_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getAngleRestraintAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(rangl_affector_list, rangl_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getDihedralRestraintAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(rdihe_affector_list, rdihe_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getVirtualSiteAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(vste_affector_list, vste_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getSettleGroupAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(sett_affector_list, sett_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+ValenceDelegator::getConstraintGroupAffectors(const std::vector<int> &atom_indices) const {
+  return extractBoundedListEntries(cnst_affector_list, cnst_affector_bounds, atom_indices);
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<int>
 ValenceDelegator::findMovementPartners(const int atom_idx,
                                        const std::vector<int> &caller_stack) const {
@@ -416,75 +497,6 @@ void ValenceDelegator::markAtomAddition(const int vwu_index, const int atom_inde
 }
 
 //-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markBondAddition(const int vwu_index, const int bond_term_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markAngleAddition(const int vwu_index, const int angl_term_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markDihedralAddition(const int vwu_index, const int dihe_term_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markUreyBradleyAddition(const int vwu_index, const int ubrd_term_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markCharmmImproperAddition(const int vwu_index, const int cimp_term_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markCmapAddition(const int vwu_index, const int cmap_term_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markPositionalRestraintAddition(const int vwu_index,
-                                                       const int posn_rstr_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markDistanceRestraintAddition(const int vwu_index,
-                                                     const int dist_rstr_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markAngleRestraintAddition(const int vwu_index, const int angl_rstr_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markDihedralRestraintAddition(const int vwu_index,
-                                                     const int dihe_rstr_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markConstraintGroupAddition(const int vwu_index,
-                                                   const int cnst_group_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markSettleGroupAddition(const int vwu_index, const int sett_group_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceDelegator::markVirtualSiteAddition(const int vwu_index, const int vsite_index) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
 bool ValenceDelegator::setUpdateWorkUnit(const int atom_index, const int vwu_index) {
   if (assigned_update_work_units[atom_index] >= 0) {
     return false;
@@ -685,17 +697,18 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
     rdihe_term_count{0}, cnst_group_count{0}, sett_group_count{0}, vste_count{0},
     list_index{list_index_in}, min_atom_index{-1}, max_atom_index{-1}, atom_limit{max_atoms_in},
     atom_import_list{}, bond_term_list{}, angl_term_list{}, dihe_term_list{}, ubrd_term_list{},
-    cimp_term_list{}, cmap_term_list{}, bond_i_atoms{}, bond_j_atoms{}, angl_i_atoms{},
-    angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{},
-    ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{},
-    cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
-    rposn_term_list{}, rbond_term_list{}, rangl_term_list{}, rdihe_term_list{}, rposn_atoms{},
-    rbond_i_atoms{}, rbond_j_atoms{}, rangl_i_atoms{}, rangl_j_atoms{}, rangl_k_atoms{},
-    rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{}, rdihe_l_atoms{}, cnst_group_list{},
-    sett_group_list{}, cnst_group_atoms{}, cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{},
-    sett_h2_atoms{}, virtual_site_list{}, vsite_atoms{}, vsite_parent_atoms{},
-    vsite_frame2_atoms{}, vsite_frame3_atoms{}, vsite_frame4_atoms{}, vdel_pointer{vdel_in},
-    ag_pointer{vdel_in->getTopologyPointer()}, ra_pointer{vdel_in->getRestraintApparatusPointer()}
+    cimp_term_list{}, cmap_term_list{}, infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{},
+    angl_i_atoms{}, angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{},
+    dihe_l_atoms{}, ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{},
+    cimp_l_atoms{}, cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
+    infr14_i_atoms{}, infr14_l_atoms{}, rposn_term_list{}, rbond_term_list{}, rangl_term_list{},
+    rdihe_term_list{}, rposn_atoms{}, rbond_i_atoms{}, rbond_j_atoms{}, rangl_i_atoms{},
+    rangl_j_atoms{}, rangl_k_atoms{}, rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{},
+    rdihe_l_atoms{}, cnst_group_list{}, sett_group_list{}, cnst_group_atoms{},
+    cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{},
+    vsite_atoms{}, vsite_parent_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{},
+    vsite_frame4_atoms{}, vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
+    ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
   // Check the atom bounds
   if (atom_limit < minimum_valence_work_unit_atoms ||
@@ -981,99 +994,132 @@ void ValenceWorkUnit::sortAtomSets() {
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::logActivities() {
+
+  // Extract information from the topology
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
-}
 
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewBondTerm(const int bond_term_index, const ValenceKit<double> &vk) {
-  bond_term_list.push_back(bond_term_index);
-  vdel_pointer->markBondAddition(list_index, bond_term_index);
+  // Make a "straight table" based on the minimum and maximum imported atom indices.  Most work
+  // units will involve a confined sequence of atoms from within the topology.  While it might
+  // be inefficient to have each work unit allocate a list mapping the entire topology to one of
+  // its internal atoms (a bounded memory requirement in that ValenceWorkUnits are constructed
+  // serially, but memory allocation effort still growing as the number of work units times the
+  // number of atoms), it is feasible to take an offset and then allocate an array to map the
+  // relevant part of the topology to the list of atoms that each work unit does hold.
+  const int mapping_offset = atom_import_list[0];
+  const int map_length = atom_import_list[imported_atom_count - 1] + 1 - mapping_offset;
+  std::vector<int> import_map(map_length, -1);
+  for (int i = 0; i < imported_atom_count; i++) {
+    import_map[atom_import_list[i] - mapping_offset] = i;
+  }
+  
+  // Log bonded interactions
   const DataOrder order = DataOrder::ASCENDING;
-  bond_i_atoms.push_back(locateValue(atom_import_list, vk.bond_i_atoms[bond_term_index], order));
-  bond_j_atoms.push_back(locateValue(atom_import_list, vk.bond_j_atoms[bond_term_index], order));
-}
+  const std::vector<int> relevant_bonds = vdel_pointer->getBondAffectors(atom_move_list);
+  const size_t nbond = relevant_bonds.size();
+  for (size_t pos = 0; pos < nbond; pos++) {
+    const int bond_idx = relevant_bonds[pos];
+    bond_term_list.push_back(bond_idx);
+    bond_i_atoms.push_back(import_map[vk.bond_i_atoms[bond_idx] - mapping_offset]);
+    bond_j_atoms.push_back(import_map[vk.bond_j_atoms[bond_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_angls = vdel_pointer->getAngleAffectors(atom_move_list);
+  const size_t nangl = relevant_angls.size();
+  for (size_t pos = 0; pos < nangl; pos++) {
+    const int angl_idx = relevant_angls[pos];
+    angl_term_list.push_back(angl_idx);
+    angl_i_atoms.push_back(import_map[vk.angl_i_atoms[angl_idx] - mapping_offset]);
+    angl_j_atoms.push_back(import_map[vk.angl_j_atoms[angl_idx] - mapping_offset]);
+    angl_k_atoms.push_back(import_map[vk.angl_k_atoms[angl_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_dihes = vdel_pointer->getDihedralAffectors(atom_move_list);
+  const size_t ndihe = relevant_dihes.size();
+  for (size_t pos = 0; pos < ndihe; pos++) {
+    const int dihe_idx = relevant_dihes[pos];
+    dihe_term_list.push_back(dihe_idx);
+    dihe_i_atoms.push_back(import_map[vk.dihe_i_atoms[dihe_idx] - mapping_offset]);
+    dihe_j_atoms.push_back(import_map[vk.dihe_j_atoms[dihe_idx] - mapping_offset]);
+    dihe_k_atoms.push_back(import_map[vk.dihe_k_atoms[dihe_idx] - mapping_offset]);
+    dihe_l_atoms.push_back(import_map[vk.dihe_l_atoms[dihe_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_ubrds = vdel_pointer->getUreyBradleyAffectors(atom_move_list);
+  const size_t nubrd = relevant_ubrds.size();
+  for (size_t pos = 0; pos < nubrd; pos++) {
+    const int ubrd_idx = relevant_ubrds[pos];
+    ubrd_term_list.push_back(ubrd_idx);
+    ubrd_i_atoms.push_back(import_map[vk.ubrd_i_atoms[ubrd_idx] - mapping_offset]);
+    ubrd_k_atoms.push_back(import_map[vk.ubrd_k_atoms[ubrd_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_cimps = vdel_pointer->getCharmmImproperAffectors(atom_move_list);
+  const size_t ncimp = relevant_cimps.size();
+  for (size_t pos = 0; pos < ncimp; pos++) {
+    const int cimp_idx = relevant_cimps[pos];
+    cimp_term_list.push_back(cimp_idx);
+    cimp_i_atoms.push_back(import_map[vk.cimp_i_atoms[cimp_idx] - mapping_offset]);
+    cimp_j_atoms.push_back(import_map[vk.cimp_j_atoms[cimp_idx] - mapping_offset]);
+    cimp_k_atoms.push_back(import_map[vk.cimp_k_atoms[cimp_idx] - mapping_offset]);
+    cimp_l_atoms.push_back(import_map[vk.cimp_l_atoms[cimp_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_cmaps = vdel_pointer->getCmapAffectors(atom_move_list);
+  const size_t ncmap = relevant_cmaps.size();
+  for (size_t pos = 0; pos < ncmap; pos++) {
+    const int cmap_idx = relevant_cmaps[pos];
+    cmap_term_list.push_back(cmap_idx);
+    cmap_i_atoms.push_back(import_map[vk.cmap_i_atoms[cmap_idx] - mapping_offset]);
+    cmap_j_atoms.push_back(import_map[vk.cmap_j_atoms[cmap_idx] - mapping_offset]);
+    cmap_k_atoms.push_back(import_map[vk.cmap_k_atoms[cmap_idx] - mapping_offset]);
+    cmap_l_atoms.push_back(import_map[vk.cmap_l_atoms[cmap_idx] - mapping_offset]);
+    cmap_m_atoms.push_back(import_map[vk.cmap_m_atoms[cmap_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_infrs = vdel_pointer->getInferred14Affectors(atom_move_list);
+  const size_t ninfr = relevant_infrs.size();
+  for (size_t pos = 0; pos < ninfr; pos++) {
+    const int infr_idx = relevant_infrs[pos];
+    infr14_term_list.push_back(infr_idx);
+    infr14_i_atoms.push_back(import_map[vk.infr14_i_atoms[infr_idx] - mapping_offset]);
+    infr14_l_atoms.push_back(import_map[vk.infr14_l_atoms[infr_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_rposns =
+    vdel_pointer->getPositionalRestraintAffectors(atom_move_list);
+  const size_t nrposn = relevant_rposns.size();
+  for (size_t pos = 0; pos < nrposn; pos++) {
+    const int rposn_idx = relevant_rposns[pos];
+    rposn_term_list.push_back(rposn_idx);
+    rposn_atoms.push_back(import_map[rar.rposn_atoms[rposn_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_rbonds =
+    vdel_pointer->getDistanceRestraintAffectors(atom_move_list);
+  const size_t nrbond = relevant_rbonds.size();
+  for (size_t pos = 0; pos < nrbond; pos++) {
+    const int rbond_idx = relevant_rbonds[pos];
+    rbond_term_list.push_back(rbond_idx);
+    rbond_i_atoms.push_back(import_map[rar.rbond_i_atoms[rbond_idx] - mapping_offset]);
+    rbond_j_atoms.push_back(import_map[rar.rbond_j_atoms[rbond_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_rangls =
+    vdel_pointer->getAngleRestraintAffectors(atom_move_list);
+  const size_t nrangl = relevant_rangls.size();
+  for (size_t pos = 0; pos < nrangl; pos++) {
+    const int rangl_idx = relevant_rangls[pos];
+    rangl_term_list.push_back(rangl_idx);
+    rangl_i_atoms.push_back(import_map[rar.rangl_i_atoms[rangl_idx] - mapping_offset]);
+    rangl_j_atoms.push_back(import_map[rar.rangl_j_atoms[rangl_idx] - mapping_offset]);
+    rangl_k_atoms.push_back(import_map[rar.rangl_k_atoms[rangl_idx] - mapping_offset]);
+  }
+  const std::vector<int> relevant_rangls =
+    vdel_pointer->getDihedralRestraintAffectors(atom_move_list);
+  const size_t nrdihe = relevant_rdihes.size();
+  for (size_t pos = 0; pos < nrdihe; pos++) {
+    const int rdihe_idx = relevant_rdihes[pos];
+    rdihe_term_list.push_back(rdihe_idx);
+    rdihe_i_atoms.push_back(import_map[rar.rdihe_i_atoms[rdihe_idx] - mapping_offset]);
+    rdihe_j_atoms.push_back(import_map[rar.rdihe_j_atoms[rdihe_idx] - mapping_offset]);
+    rdihe_k_atoms.push_back(import_map[rar.rdihe_k_atoms[rdihe_idx] - mapping_offset]);
+    rdihe_m_atoms.push_back(import_map[rar.rdihe_m_atoms[rdihe_idx] - mapping_offset]);
+  }
 
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewAngleTerm(const int angl_term_index, const ValenceKit<double> &vk) {
-  angl_term_list.push_back(angl_term_index);
-  vdel_pointer->markAngleAddition(list_index, angl_term_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewDihedralTerm(const int dihe_term_index, const ValenceKit<double> &vk) {
-  dihe_term_list.push_back(dihe_term_index);
-  vdel_pointer->markDihedralAddition(list_index, dihe_term_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewUreyBradleyTerm(const int ubrd_term_index,
-                                            const ValenceKit<double> &vk) {
-  ubrd_term_list.push_back(ubrd_term_index);
-  vdel_pointer->markUreyBradleyAddition(list_index, ubrd_term_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewCharmmImproperTerm(const int cimp_term_index,
-                                               const ValenceKit<double> &vk) {
-  cimp_term_list.push_back(cimp_term_index);
-  vdel_pointer->markCharmmImproperAddition(list_index, cimp_term_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewCmapTerm(const int cmap_term_index, const ValenceKit<double> &vk) {
-  cmap_term_list.push_back(cmap_term_index);
-  vdel_pointer->markCmapAddition(list_index, cmap_term_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewPositionalRestraint(const int posn_rstr_index,
-                                                const RestraintApparatusDpReader &rar) {
-  rposn_term_list.push_back(posn_rstr_index);
-  vdel_pointer->markPositionalRestraintAddition(list_index, posn_rstr_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewDistanceRestraint(const int dist_rstr_index,
-                                              const RestraintApparatusDpReader &rar) {
-  rbond_term_list.push_back(dist_rstr_index);
-  vdel_pointer->markDistanceRestraintAddition(list_index, dist_rstr_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewAngleRestraint(const int angl_rstr_index,
-                                           const RestraintApparatusDpReader &rar) {
-  rangl_term_list.push_back(angl_rstr_index);
-  vdel_pointer->markAngleRestraintAddition(list_index, angl_rstr_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewDihedralRestraint(const int dihe_rstr_index,
-                                              const RestraintApparatusDpReader &rar) {
-  rdihe_term_list.push_back(dihe_rstr_index);
-  vdel_pointer->markDihedralRestraintAddition(list_index, dihe_rstr_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewConstraintGroup(const int cnst_group_index,
-                                            const ConstraintKit<double> &cnk) {
-  cnst_group_list.push_back(cnst_group_index);
-  vdel_pointer->markConstraintGroupAddition(list_index, cnst_group_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewSettleGroup(const int sett_group_index,
-                                        const ConstraintKit<double> &cnk) {
-  sett_group_list.push_back(sett_group_index);
-  vdel_pointer->markSettleGroupAddition(list_index, sett_group_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-void ValenceWorkUnit::addNewVirtualSite(const int vsite_index, const VirtualSiteKit<double> &vsk) {
-  virtual_site_list.push_back(vsite_index);
-  vdel_pointer->markVirtualSiteAddition(list_index, vsite_index);
 }
 
 //-------------------------------------------------------------------------------------------------

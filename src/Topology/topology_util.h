@@ -4,12 +4,17 @@
 
 #include <string>
 #include <vector>
+#include "Math/sorting.h"
+#include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph_abstracts.h"
 
 namespace omni {
 namespace topology {
 
+using math::UniqueValueHandling;
+using math::reduceUniqueValues;
+  
 /// \brief Check an atom index against the available content, reporting an error if the bounds are
 ///        exceeded.
 ///
@@ -117,16 +122,30 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
                        const int* k_atoms = nullptr, const int* l_atoms = nullptr,
                        const int* m_atoms = nullptr);
 
-/// \brief Extract a series of numbers from a bounded list, based on a single index.  Return the
-///        result as a std::vector of integers.
+/// \brief Extract a series of numbers from a bounded list, based on an index.  Return the result
+///        as a std::vector of integers.  If data from multiple bins is requested, offer an option
+///        to sort and prune the data for unique values.
+///
+/// Overloaded:
+///   - Accept a single bin index
+///   - Accept multiple bin indices
 ///
 /// \param va         The original list of entries with demarcations given in va_bounds
 /// \param va_bounds  Bounds array for va
 /// \param index      Index of the bin of interest (checked against the size of va_bounds)
+/// \param indices    Vector of indices for the bins of interest (each will be checked against the
+///                   size of va_bounds)
+/// \{
 template <typename T> std::vector<T> extractBoundedListEntries(const std::vector<T> &va,
                                                                const std::vector<int> &va_bounds,
                                                                int index);
 
+template <typename T> std::vector<T>
+extractBoundedListEntries(const std::vector<T> &va, const std::vector<int> &va_bounds,
+                          const std::vector<int> &indices,
+                          UniqueValueHandling filter = UniqueValueHandling::UNIQUE_VALUES_ONLY);
+/// \}
+  
 /// \brief Make a human-readable list of atoms based on a topology and a vector of indices,
 ///        providing atom numbers and name as well as residue numbers and names.  This is useful,
 ///        in particular, when printing error messages to the user.

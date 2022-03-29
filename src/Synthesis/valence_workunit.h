@@ -60,6 +60,103 @@ public:
   /// \brief Get the index of the first unassigned atom in the topology.
   int getFirstUnassignedAtom() const;
 
+  /// \brief Get a list of bonds affecting a given list of atoms.  The result is returned (pruned
+  ///        for unique items) as a series of term indices referencing the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getBondAffectors(const std::vector<int> &atom_indices) const;
+  
+  /// \brief Get a list of harmonic angle terms affecting a given list of atoms.  The result is
+  ///        returned (pruned for unique items) as a series of term indices referencing the
+  ///        original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getAngleAffectors(const std::vector<int> &atom_indices) const;
+ 
+  /// \brief Get a list of cosine-based dihedrals affecting a given list of atoms.  The result is
+  ///        returned (pruned for unique items) as a series of term indices referencing the
+  ///        original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getDihedralAffectors(const std::vector<int> &atom_indices) const;
+  
+  /// \brief Get a list of Urey-Bradley harmonic angles affecting a given list of atoms.  The
+  ///        result is returned (pruned for unique items) as a series of term indices referencing
+  ///        the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getUreyBradleyAffectors(const std::vector<int> &atom_indices) const;
+   
+  /// \brief Get a list of CHARMM improper dihedral terms affecting a given list of atoms.  The
+  ///        result is returned (pruned for unique items) as a series of term indices referencing
+  ///        the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getCharmmImproperAffectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of CMAP terms affecting a given list of atoms.  The result is returned
+  ///        (pruned for unique items) as a series of term indices referencing the original
+  ///        topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getCmapAffectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of inferred 1:4 attenuated non-bonded interactions affecting a given list
+  ///        of atoms.  The result is returned (pruned for unique items) as a series of term
+  ///        indices referencing the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getInferred14Affectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of positional restraints affecting a given list of atoms.  The result is
+  ///        returned (pruned for unique items) as a series of term indices referencing the
+  ///        original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getPositionalRestraintAffectors(const std::vector<int> &atom_indices) const;
+  
+  /// \brief Get a list of distance restraints affecting a given list of atoms.  The result is
+  ///        returned (pruned for unique items) as a series of term indices referencing the
+  ///        original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getDistanceRestraintAffectors(const std::vector<int> &atom_indices) const;
+  
+  /// \brief Get a list of three-point angle restraints affecting a given list of atoms.  The
+  ///        result is returned (pruned for unique items) as a series of term indices referencing
+  ///        the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getAngleRestraintAffectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of four-point dihedral angle restraints affecting a given list of atoms.
+  ///        The result is returned (pruned for unique items) as a series of term indices
+  ///        referencing the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getDihedralRestraintAffectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of virtual site frames affecting a given list of atoms.  The result is
+  ///        returned (pruned for unique items) as a series of term indices referencing the
+  ///        original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getVirtualSiteAffectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of SETTLE (fast, rigid water) constraint groups affecting a given list of
+  ///        atoms.  The result is returned (pruned for unique items) as a series of term indices
+  ///        referencing the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getSettleGroupAffectors(const std::vector<int> &atom_indices) const;
+
+  /// \brief Get a list of hub-and-spoke constraint groups affecting a given list of atoms.  The
+  ///        result is returned (pruned for unique items) as a series of term indices referencing
+  ///        the original topology.
+  ///
+  /// \param atom_indices  Topological indices of the atoms of interest
+  std::vector<int> getConstraintGroupAffectors(const std::vector<int> &atom_indices) const;
+
   /// \brief Find all partners of a given atom such that the work unit will be able to correctly
   ///        move the atom.  This implies all other participants in any constraint group that
   ///        includes the atom, or (if the atom is a virtual site) all frame atoms and any
@@ -117,93 +214,6 @@ public:
   /// \param vwu_index   Index of the ValenceWorkUnit receiving the new atom
   /// \param atom_index  Index of the atom to add, referencing the original topology
   void markAtomAddition(int vwu_index, int atom_index);
-
-  /// \brief Mark the addition of a harmonic bond term to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param bond_term_index  Index of the bond term to add, referencing the original topology
-  void markBondAddition(int vwu_index, int bond_term_index);
-
-  /// \brief Mark the addition of a harmonic angle term to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param angl_term_index  Index of the angle term to add, referencing the original topology
-  void markAngleAddition(int vwu_index, int angl_term_index);
-
-  /// \brief Mark the addition of a cosine-based dihedral term to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param dihe_term_index  Index of the dihedral term to add, referencing the original topology
-  void markDihedralAddition(int vwu_index, int dihe_term_index);
-
-  /// \brief Mark the addition of a Urey-Bradley term to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param ubrd_term_index  Index of the Urey-Bradley term to add, referencing the original
-  ///                         topology
-  void markUreyBradleyAddition(int vwu_index, int ubrd_term_index);
-
-  /// \brief Mark the addition of a CHARMM improper dihedral term to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param ubrd_term_index  Index of the CHARMM improper dihedral term to add, referencing the
-  ///                         original topology
-  void markCharmmImproperAddition(int vwu_index, int ubrd_term_index);
-  
-  /// \brief Mark the addition of a CMAP splined surface term to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param cmap_term_index  Index of the CMAP term to add, referencing the original topology
-  void markCmapAddition(int vwu_index, int cmap_term_index);
-
-  /// \brief Mark the addition of a positional restraint to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param posn_rstr_index  Index of the positional restraint to add, referencing the original
-  ///                         restraint apparatus
-  void markPositionalRestraintAddition(int vwu_index, int posn_rstr_index);
-
-  /// \brief Mark the addition of a distance restraint to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param dist_rstr_index  Index of the distance restraint to add, referencing the original
-  ///                         restraint apparatus
-  void markDistanceRestraintAddition(int vwu_index, int dist_rstr_index);
-
-  /// \brief Mark the addition of a three-point angle restraint to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param angl_rstr_index  Index of the angle restraint to add, referencing the original
-  ///                         restraint apparatus
-  void markAngleRestraintAddition(int vwu_index, int angl_rstr_index);
-
-  /// \brief Mark the addition of a four-point dihedral restraint to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index        Index of the ValenceWorkUnit receiving the new atom
-  /// \param dihe_rstr_index  Index of the dihedral restraint to add, referencing the original
-  ///                         restraint apparatus
-  void markDihedralRestraintAddition(int vwu_index, int dihe_rstr_index);
-
-  /// \brief Mark the addition of a constraint group to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index         Index of the ValenceWorkUnit receiving the new atom
-  /// \param cnst_group_index  Index of the constraint group to add, referencing the original
-  ///                          topology
-  void markConstraintGroupAddition(int vwu_index, int cnst_group_index);
-  
-  /// \brief Mark the addition of a SETTLE group to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index         Index of the ValenceWorkUnit receiving the new atom
-  /// \param sett_group_index  Index of the SETTLE group to add, referencing the original
-  ///                          topology
-  void markSettleGroupAddition(int vwu_index, int sett_group_index);
-
-  /// \brief Mark the addition of a virtual site frame to a specific ValenceWorkUnit.
-  ///
-  /// \param vwu_index    Index of the ValenceWorkUnit receiving the new atom
-  /// \param vsite_index  Index of the virtual site frame to add, referencing the original
-  ///                     topology's list of virtual sites (not its list of atoms)
-  void markVirtualSiteAddition(int vwu_index, int vsite_index);
 
   /// \brief Mark the updates (position, velocity) of a particular atom in the topology as the
   ///        responsibility of a particular work unit in the list.  Returns TRUE if the assignment
@@ -482,6 +492,7 @@ private:
   std::vector<int> cimp_term_list;    ///< List of CHARMM harmonic improper dihedral terms to be
                                       ///<   computed by this work unit
   std::vector<int> cmap_term_list;    ///< List of CMAP terms to be computed by this work unit
+  std::vector<int> infr14_term_list;  ///< List of inferred 1:4 attenuated interaction terms
   std::vector<int> bond_i_atoms;      ///< List of I atoms in each harmonic bond computed by this
                                       ///<   work unit, tracking the order in bond_term_list but
                                       ///<   indicating the local indices of imported atoms
@@ -505,6 +516,8 @@ private:
   std::vector<int> cmap_k_atoms;      ///< Local indices for K atoms in each CMAP term
   std::vector<int> cmap_l_atoms;      ///< Local indices for L atoms in each CMAP term
   std::vector<int> cmap_m_atoms;      ///< Local indices for M atoms in each CMAP term
+  std::vector<int> infr14_i_atoms;    ///< Local indices for I atoms in each inferred 1:4 term
+  std::vector<int> infr14_l_atoms;    ///< Local indices for L atoms in each inferred 1:4 term
 
   // Restraint terms for this work unit
   std::vector<int> rposn_term_list;  ///< Positional restraint terms, indexing into the original
@@ -568,98 +581,6 @@ private:
   const AtomGraph *ag_pointer;           ///< Pointer to the topology to which this object pertains
   const RestraintApparatus *ra_pointer;  ///< Pointer to the restraint apparatus to which this
                                          ///<   object pertains
-
-  /// \brief Add a new harmonic bond term to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param bond_term_index  Index of the bond term to add, based on the original topology
-  /// \param vk               Valence abstract from the original topology
-  void addNewBondTerm(int bond_term_index, const ValenceKit<double> &vk);
-
-  /// \brief Add a new harmonic bond angle term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param angl_term_index  Index of the angle term to add, based on the original topology
-  /// \param vk               Valence abstract from the original topology
-  void addNewAngleTerm(int angl_term_index, const ValenceKit<double> &vk);
-
-  /// \brief Add a new cosine-based dihedral term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param dihe_term_index  Index of the dihedral term to add, based on the original topology
-  /// \param vk               Valence abstract from the original topology
-  void addNewDihedralTerm(int dihe_term_index, const ValenceKit<double> &vk);
-
-  /// \brief Add a new Urey-Bradley harmonic angle term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param ubrd_term_index  Index of the Urey-Bradley term to add, based on the original topology
-  /// \param vk               Valence abstract from the original topology
-  void addNewUreyBradleyTerm(int ubrd_term_index, const ValenceKit<double> &vk);
-
-  /// \brief Add a new CHARMM harmonic improper dihedral term to the work unit.  Record the fact
-  ///        in the associated delegator.
-  ///
-  /// \param cimp_term_index  Index of the CHARMM improper to add, based on the original topology
-  /// \param vk               Valence abstract from the original topology
-  void addNewCharmmImproperTerm(int cimp_term_index, const ValenceKit<double> &vk);
-
-  /// \brief Add a new CMAP bicubic spline surface term to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param cmap_term_index  Index of the CMAP to add, based on the original topology
-  /// \param vk               Valence abstract from the original topology
-  void addNewCmapTerm(int cmap_term_index, const ValenceKit<double> &vk);
-
-  /// \brief Add a new positional restraint to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param posn_rstr_index  The index of the positional restraint to add
-  /// \param rar              Restraint apparatus reader, for pointers to restraint information
-  void addNewPositionalRestraint(int posn_rstr_index, const RestraintApparatusDpReader &rar);
-  
-  /// \brief Add a new distance restraint to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param dist_rstr_index  The index of the distance restraint to add
-  /// \param rar              Restraint apparatus reader, for pointers to restraint information
-  void addNewDistanceRestraint(int dist_rstr_index, const RestraintApparatusDpReader &rar);
-
-  /// \brief Add a new three-point angle restraint to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param angl_rstr_index  The index of the angle restraint to add
-  /// \param rar              Restraint apparatus reader, for pointers to restraint information
-  void addNewAngleRestraint(int angl_rstr_index, const RestraintApparatusDpReader &rar);
-
-  /// \brief Add a new four-point dihedral angle restraint to the work unit.  Record the fact in
-  ///        the associated delegator.
-  ///
-  /// \param dihe_rstr_index  The index of the dihedral angle restraint to add
-  /// \param rar              Restraint apparatus reader, for pointers to restraint information
-  void addNewDihedralRestraint(int dihe_rstr_index, const RestraintApparatusDpReader &rar);
-
-  /// \brief Add a new constraint group to the work unit.  Record the fact in the associated
-  ///        delegator.
-  ///
-  /// \param cnst_group_index  The index of the constraint group to add
-  /// \param cnk               Constraint abstract from the original topology
-  void addNewConstraintGroup(int cnst_group_index, const ConstraintKit<double> &cnk);
-
-  /// \brief Add a new SETTLE rigid water group to the work unit.  Record the fact in the
-  ///        associated delegator.
-  ///
-  /// \param sett_group_index  The index of the constraint group to add
-  /// \param cnk               Constraint abstract from the original topology
-  void addNewSettleGroup(int sett_group_index, const ConstraintKit<double> &cnk);
-
-  /// \brief Add a new virtual site, referencing the virtual site index (as opposed to the actual
-  ///        atom index of the virtual site particle) in the original topology.  Record the fact
-  ///        in the associated delegator.
-  ///
-  /// \param vsite_index  The index of the virtual site to add
-  /// \param vsk          Virtual site abstract from the original topology
-  void addNewVirtualSite(int vsite_index, const VirtualSiteKit<double> &vsk);
 };
 
 /// \brief Build a series of valence work units to cover a topology.
