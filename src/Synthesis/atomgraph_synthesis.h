@@ -728,17 +728,34 @@ private:
   /// or improper accumulator.  A fourth atom index in the y member (bits 1-10) precedes the index
   /// for 1:4 scaling factors (bits 11-15, up to 32 unique combinations of electrostatic and
   /// Lennard-Jones scaling factors, including zero to indicate that no 1:4 interaction should be
-  /// computed).  The final bits (16-32) indiate the dihedral or CHARMM improper dihedral parameter
-  /// index (up to 131072 of either, a number larger than nearly any force field, but the limit
-  /// applies to the number of unique parameters at work in a particular simulation).
-  Hybrid<uint2> dihe_instructions;
+  /// computed).  The 16th bit indicates whether an additional cosine-based dihedral term overlaps
+  /// with the same four atoms.  If so, its parameter index is given in an auxiliary array of
+  /// uint values (cdhe_overtones), which is only accessed in cases where such overlaps occur.
+  /// The final bits (17-32) indiate the dihedral or CHARMM improper dihedral parameter index (up
+  /// to 65536 of either, a number larger than nearly any force field, but the limit applies to
+  /// the number of unique parameters at work in a particular simulation).  In some extreme case
+  /// where a model does have more than 65536 unique dihedral parameters, the overflow slot can
+  /// be used to store a parameter index up to four billion.
+  Hybrid<uint2> cdhe_instructions;
 
+  /// Overtones for various dihedrals that overlap with the same four atoms.  This allows a single
+  /// dihedral computation to be extended, with 50% of the marginal read cost, little additional
+  /// arithmetic given the cost of computing a single dihedral, and no additional atomic ops to
+  /// L1 memory.  This POINTER-kind object targets insr_uint_data.
+  Hybrid<uint> cdhe_overtones;
+  
   /// Instructions for CMAP interactions.  Each uint2 tuple contains three atom indices in the x
   /// member (bits 1-10, 11-20, and 21-30, plus two more in the y member (bits 1-10 and 11-20).
   /// The CMAP parameter index is given in the final twelve bits of the y member, offering a total
   /// of 4,096 unique CMAPs that one AtomGraphSynthesis can handle.
   Hybrid<uint2> cmap_instructions;
 
+  /// Instructions for inferred, 1:4 excluded interactions.  Each uint object holds a pair of atom
+  /// indices for the I and L atoms (bits 1-10 and 11-20), plus an index into a potentially much
+  /// larger list of 1:4 scaling factor pairs (up to 4096) than the 32 allowed in the standard
+  /// dihedral / composite dihedral instruction.  This POINTER-kind object targets insr_uint_data.
+  Hybrid<uint> infr14_instructions;
+  
   /// Instructions for positional restraints.  Each uint2 tuple contains an atom index (bits 1-10),
   /// the index of the k(2,3) / r(1,2,3,4) and time dependence series (bits 11-31), and a flag to
   /// indicate whether the restraint is time-dependent (bit 32) in the x member, followed by the
@@ -767,7 +784,10 @@ private:
   /// parameter sets in a single AtomGraphSynthesis.
   Hybrid<uint2> rdihe_instructions;
 
-  /// Collected array of all instructions
+  /// Collected array of all uint instructions
+  Hybrid<uint2> insr_uint_data;
+
+  /// Collected array of all uint2 instructions
   Hybrid<uint2> insr_uint2_data;
   
   /// \brief Check the central lists of topologies and system indices to ensure that the requested

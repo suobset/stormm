@@ -3,6 +3,7 @@
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
@@ -14,10 +15,12 @@ using math::locateValue;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::reduceUniqueValues;
+using math::roundUp;
 using parse::char4ToString;
-using topology::VirtualSiteKind;
-using topology::markAffectorAtoms;
 using topology::extractBoundedListEntries;
+using topology::markAffectorAtoms;
+using topology::TorsionKind;
+using topology::VirtualSiteKind;
 using topology::writeAtomList;
   
 //-------------------------------------------------------------------------------------------------
@@ -693,21 +696,23 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
                                  const int seed_atom_in, const int max_atoms_in) :
     imported_atom_count{0}, moved_atom_count{0}, updated_atom_count{0}, bond_term_count{0},
     angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0}, cimp_term_count{0},
-    cmap_term_count{0}, rposn_term_count{0}, rbond_term_count{0}, rangl_term_count{0},
-    rdihe_term_count{0}, cnst_group_count{0}, sett_group_count{0}, vste_count{0},
-    list_index{list_index_in}, min_atom_index{-1}, max_atom_index{-1}, atom_limit{max_atoms_in},
-    atom_import_list{}, bond_term_list{}, angl_term_list{}, dihe_term_list{}, ubrd_term_list{},
-    cimp_term_list{}, cmap_term_list{}, infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{},
-    angl_i_atoms{}, angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{},
-    dihe_l_atoms{}, ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{},
-    cimp_l_atoms{}, cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
-    infr14_i_atoms{}, infr14_l_atoms{}, rposn_term_list{}, rbond_term_list{}, rangl_term_list{},
+    cdhe_term_count{0}, cmap_term_count{0}, infr14_term_count{0}, rposn_term_count{0},
+    rbond_term_count{0}, rangl_term_count{0}, rdihe_term_count{0}, cnst_group_count{0},
+    sett_group_count{0}, vste_count{0}, list_index{list_index_in}, min_atom_index{-1},
+    max_atom_index{-1}, atom_limit{max_atoms_in}, atom_import_list{}, bond_term_list{},
+    angl_term_list{}, dihe_term_list{}, ubrd_term_list{}, cimp_term_list{}, cmap_term_list{},
+    infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{}, angl_i_atoms{}, angl_j_atoms{},
+    angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{}, ubrd_i_atoms{},
+    ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{}, cmap_i_atoms{},
+    cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{}, infr14_i_atoms{},
+    infr14_l_atoms{}, cdhe_term_list{}, cdhe_is_cimp{}, cdhe_i_atoms{}, cdhe_j_atoms{},
+    cdhe_k_atoms{}, cdhe_l_atoms{}, rposn_term_list{}, rbond_term_list{}, rangl_term_list{},
     rdihe_term_list{}, rposn_atoms{}, rbond_i_atoms{}, rbond_j_atoms{}, rangl_i_atoms{},
     rangl_j_atoms{}, rangl_k_atoms{}, rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{},
-    rdihe_l_atoms{}, cnst_group_list{}, sett_group_list{}, cnst_group_atoms{},
-    cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{},
-    vsite_atoms{}, vsite_frame1_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{},
-    vsite_frame4_atoms{}, vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
+    rdihe_l_atoms{}, cnst_group_list{}, sett_group_list{}, cnst_group_atoms{}, cnst_group_bounds{},
+    sett_ox_atoms{}, sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{}, vsite_atoms{},
+    vsite_frame1_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{}, vsite_frame4_atoms{},
+    vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
     ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
   // Check the atom bounds
@@ -1157,6 +1162,190 @@ void ValenceWorkUnit::logActivities() {
     }
     cnst_group_bounds.push_back(cnst_group_atoms.size());
   }
+
+  // Log the counts of each task
+  bond_term_count   = bond_term_list.size();
+  angl_term_count   = angl_term_list.size();
+  dihe_term_count   = dihe_term_list.size();
+  ubrd_term_count   = ubrd_term_list.size();
+  cimp_term_count   = cimp_term_list.size();
+  cmap_term_count   = cmap_term_list.size();
+  infr14_term_count = infr14_term_list.size();
+  rposn_term_count  = rposn_term_list.size();
+  rbond_term_count  = rbond_term_list.size();
+  rangl_term_count  = rangl_term_list.size();
+  rdihe_term_count  = rdihe_term_list.size();
+  cnst_group_count  = cnst_group_list.size();
+  sett_group_count  = sett_group_list.size();
+  vste_count        = virtual_site_list.size();
+
+  // Compute the number of composite dihedrals: the dihedrals already subsume a great deal of the
+  // 1:4 attenuated interactions (probably the entirety of these interactions if the system has no
+  // virtual sites).  However, many dihedrals have additional cosine terms overlaid on the same
+  // four atoms.  Bundle these terms in pairs, if possible, and eat the blank calculation if there
+  // is no secondary dihedral to pair in any one case.  For a typical simulation with an Amber
+  // force field, this will cut down on the total number of dihedral computations by about 40%,
+  // and bundling the 1:4 interactions will likewise reduce the memory traffic.  The overall
+  // reduction in memory bandwidth for reading instructions (relative to an approach that reads
+  // each dihedral and 1:4 term separately, with a 64-bit instruction for each dihedral and a
+  // 32-bit instruction for each 1:4 term) is roughly 30%, on top of other optimizations that
+  // streamline the information access.  The composite dihedrals will replace the lists of standard
+  // dihedral instructions and CHARMM impropers, fusing them into one.
+  std::vector<int2> dihe_presence_bounds(imported_atom_count);
+  std::vector<bool> presence_found(imported_atom_count, false);
+  std::vector<bool> is_improper(dihe_term_count, false);
+  for (int pos = 0; pos < dihe_term_count; pos++) {
+    const int term_idx = dihe_term_list[pos];
+    switch (static_cast<TorsionKind>(vk.dihe_modifiers[term_idx].w)) {
+    case TorsionKind::PROPER_NO_14:
+    case TorsionKind::PROPER:
+      break;
+    case TorsionKind::IMPROPER_NO_14:
+    case TorsionKind::IMPROPER:
+      is_improper[pos] = true;
+    }
+    const int i_atom = dihe_i_atoms[pos];
+    const int j_atom = dihe_j_atoms[pos];
+    const int k_atom = dihe_k_atoms[pos];
+    const int l_atom = dihe_l_atoms[pos];
+    if (presence_found[i_atom]) {
+      dihe_presence_bounds[i_atom].y = pos;
+    }
+    else {
+      dihe_presence_bounds[i_atom].x = pos;
+      presence_found[i_atom] = true;
+    }
+    if (presence_found[j_atom]) {
+      dihe_presence_bounds[j_atom].y = pos;
+    }
+    else {
+      dihe_presence_bounds[j_atom].x = pos;
+      presence_found[j_atom] = true;
+    }
+    if (presence_found[k_atom]) {
+      dihe_presence_bounds[k_atom].y = pos;
+    }
+    else {
+      dihe_presence_bounds[k_atom].x = pos;
+      presence_found[k_atom] = true;
+    }
+    if (presence_found[l_atom]) {
+      dihe_presence_bounds[l_atom].y = pos;
+    }
+    else {
+      dihe_presence_bounds[l_atom].x = pos;
+      presence_found[l_atom] = true;
+    }
+  }
+
+  // Find all dihedrals that can be paired when acting on the same atoms
+  std::vector<bool> coverage(dihe_term_count, false);
+  for (int pos = 0; pos < dihe_term_count; pos++) {
+    if (coverage[pos] || is_improper[pos]) {
+      continue;
+    }
+    const int i_atom = dihe_i_atoms[pos];
+    const int j_atom = dihe_j_atoms[pos];
+    const int k_atom = dihe_k_atoms[pos];
+    const int l_atom = dihe_l_atoms[pos];
+    int min_np = std::max(dihe_presence_bounds[i_atom].x, dihe_presence_bounds[j_atom].x);
+    min_np = std::max(min_np, dihe_presence_bounds[k_atom].x);
+    min_np = std::max(min_np, dihe_presence_bounds[l_atom].x);
+    min_np = std::max(min_np, pos + 1);
+    int max_np = std::min(dihe_presence_bounds[i_atom].y, dihe_presence_bounds[j_atom].y);
+    max_np = std::min(max_np, dihe_presence_bounds[k_atom].y);
+    max_np = std::min(max_np, dihe_presence_bounds[l_atom].y);
+    for (int npos = min_np; npos < min_np; npos++) {
+      if (coverage[npos] || is_improper[npos]) {
+        continue;
+      }
+      if ((dihe_i_atoms[npos] == dihe_i_atoms[pos] && dihe_j_atoms[npos] == dihe_j_atoms[pos] &&
+           dihe_k_atoms[npos] == dihe_k_atoms[pos] && dihe_l_atoms[npos] == dihe_l_atoms[pos]) ||
+          (dihe_i_atoms[npos] == dihe_l_atoms[pos] && dihe_j_atoms[npos] == dihe_k_atoms[pos] &&
+           dihe_k_atoms[npos] == dihe_j_atoms[pos] && dihe_l_atoms[npos] == dihe_i_atoms[pos])) {
+
+        // This dihedral applies to the same atoms.  Make a composite dihedral, then bail out.
+        cdhe_term_list.push_back({dihe_term_list[pos], dihe_term_list[npos]});
+        cdhe_is_cimp.push_back(false);
+        cdhe_i_atoms.push_back(dihe_i_atoms[pos]);
+        cdhe_j_atoms.push_back(dihe_j_atoms[pos]);
+        cdhe_k_atoms.push_back(dihe_k_atoms[pos]);
+        cdhe_l_atoms.push_back(dihe_l_atoms[pos]);
+        coverage[pos] = true;
+        coverage[npos] = true;
+        break;
+      }
+    }
+  }
+
+  // Add the remaining dihedrals to the composite dihedral list as singlets
+  for (int pos = 0; pos < dihe_term_count; pos++) {
+    if (coverage[pos]) {
+      continue;
+    }
+    cdhe_term_list.push_back({dihe_term_list[pos], -1});
+    cdhe_is_cimp.push_back(false);
+    cdhe_i_atoms.push_back(dihe_i_atoms[pos]);
+    cdhe_j_atoms.push_back(dihe_j_atoms[pos]);
+    cdhe_k_atoms.push_back(dihe_k_atoms[pos]);
+    cdhe_l_atoms.push_back(dihe_l_atoms[pos]);
+    coverage[pos] = true;
+  }
+
+  // Add CHARMM improper dihedrals to the composite list as more singlet terms
+  for (int pos = 0; pos < cimp_term_count; pos++) {
+    cdhe_term_list.push_back({cimp_term_list[pos], -1});
+    cdhe_is_cimp.push_back(true);
+    cdhe_i_atoms.push_back(cimp_i_atoms[pos]);
+    cdhe_j_atoms.push_back(cimp_j_atoms[pos]);
+    cdhe_k_atoms.push_back(cimp_k_atoms[pos]);
+    cdhe_l_atoms.push_back(cimp_l_atoms[pos]);
+    coverage[pos] = true;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::getAtomImportList() const {
+  return atom_import_list;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getAtomManipulationMasks() const {
+  const int nbits = static_cast<int>(sizeof(uint)) * 8;
+  const int n_segment = roundUp((imported_atom_count + nbits - 1) / nbits, warp_size_int);
+  std::vector<uint2> result(n_segment, {0U, 0U});
+  for (int i = 0; i < moved_atom_count; i++) {
+    const int seg_idx = (i / nbits);
+    const int bit_idx = i - (seg_idx * nbits);
+    result[seg_idx].x |= (0x1 << bit_idx);
+  }
+  for (int i = 0; i < updated_atom_count; i++) {
+    const int seg_idx = (i / nbits);
+    const int bit_idx = i - (seg_idx * nbits);
+    result[seg_idx].y |= (0x1 << bit_idx);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::getTaskCounts() const {
+  std::vector<int> result(static_cast<int>(VwuTask::TOTAL_TASKS));
+  result[static_cast<int>(VwuTask::BOND)]   = bond_term_count;
+  result[static_cast<int>(VwuTask::ANGL)]   = angl_term_count;
+  result[static_cast<int>(VwuTask::DIHE)]   = dihe_term_count;
+  result[static_cast<int>(VwuTask::UBRD)]   = ubrd_term_count;
+  result[static_cast<int>(VwuTask::CIMP)]   = cimp_term_count;
+  result[static_cast<int>(VwuTask::CDHE)]   = cdhe_term_count;
+  result[static_cast<int>(VwuTask::CMAP)]   = cmap_term_count;
+  result[static_cast<int>(VwuTask::INFR14)] = infr14_term_count;
+  result[static_cast<int>(VwuTask::RPOSN)]  = rposn_term_count;
+  result[static_cast<int>(VwuTask::RBOND)]  = rbond_term_count;
+  result[static_cast<int>(VwuTask::RANGL)]  = rangl_term_count;
+  result[static_cast<int>(VwuTask::RDIHE)]  = rdihe_term_count;
+  result[static_cast<int>(VwuTask::CGROUP)] = cnst_group_count;
+  result[static_cast<int>(VwuTask::SETTLE)] = sett_group_count;
+  result[static_cast<int>(VwuTask::VSITE)]  = vste_count;
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

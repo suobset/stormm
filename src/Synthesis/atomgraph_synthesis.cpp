@@ -263,13 +263,15 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     bond_instructions{HybridKind::POINTER, "tpsyn_bond_insr"},
     angl_instructions{HybridKind::POINTER, "tpsyn_angl_insr"},
-    dihe_instructions{HybridKind::POINTER, "tpsyn_dihe_insr"},
+    cdhe_instructions{HybridKind::POINTER, "tpsyn_cdhe_insr"},
+    cdhe_overtones{HybridKind::POINTER, "tpsyn_ovrt_insr"},
     cmap_instructions{HybridKind::POINTER, "tpsyn_cmap_insr"},
     rposn_instructions{HybridKind::POINTER, "tpsyn_nmr1_insr"},
     rbond_instructions{HybridKind::POINTER, "tpsyn_nmr2_insr"},
     rangl_instructions{HybridKind::POINTER, "tpsyn_nmr3_insr"},
     rdihe_instructions{HybridKind::POINTER, "tpsyn_nmr4_insr"},
-    insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data"}
+    insr_uint_data{HybridKind::ARRAY, "tpsyn_insr_data1"},
+    insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data2"}
 {
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
@@ -2266,6 +2268,7 @@ void AtomGraphSynthesis::upload() {
   vsite_int_data.upload();
   atom_imports.upload();
   vwu_instruction_sets.upload();
+  insr_uint_data.upload();
   insr_uint2_data.upload();
 }
 
@@ -2301,6 +2304,7 @@ void AtomGraphSynthesis::download() {
   vsite_int_data.download();
   atom_imports.download();
   vwu_instruction_sets.download();
+  insr_uint_data.download();
   insr_uint2_data.download();
 }
 #endif

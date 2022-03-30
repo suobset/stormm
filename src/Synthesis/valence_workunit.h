@@ -35,6 +35,28 @@ constexpr int max_atom_search_stacks = 8;
 /// \brief Padding to ensure that there is enough space in most work units for halo atoms needed
 ///        to evaluate forces and move partners for any atoms that the work unit needs to update.
 constexpr int default_vwu_halo_padding = 32;
+
+/// \brief Enumerate the different tasks that this work unit can perform.
+enum class VwuTask {
+  BOND = 0,    ///< Harmonic bond interactions
+  ANGL,        ///< Harmonic angle interactions
+  DIHE,        ///< Cosine-based dihedral interactions
+  UBRD,        ///< Urey-Bradley harmonic stretching angle terms
+  CIMP,        ///< CHARMM improper dihedrals
+  CDHE,        ///< Composite dihedral term count (includes multiple dihedrals that share the same
+               ///<   atoms as well as CHARMM impropers in one list)
+  CMAP,        ///< CMAP spline-based surface potentials
+  INFR14,      ///< Inferred 1:4 attenuated non-bonded interactions
+  RPOSN,       ///< Positional restraints
+  RBOND,       ///< Distance-based restraints
+  RANGL,       ///< Three-point angle restraints
+  RDIHE,       ///< Four-point dihedral restraints
+  SETTLE,      ///< SETTLE analytic (fast, rigid water) constraints
+  CGROUP,      ///< Constraint groups (hub-and-spoke, Hydrogen-on-heavy atom constraint clusters)
+  VSITE,       ///< Virtual sites
+  TOTAL_TASKS  ///< Total number of distinct tasks that the ValenceWorkUnit can perform (for array
+               ///<   sizing purposes
+};
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or
@@ -383,6 +405,19 @@ public:
   /// \brief Get the maximum atom count that this work unit can hold.
   int getMaxAtoms() const;
 
+  /// \brief Get the list of imported atoms.
+  std::vector<int> getAtomImportList() const;
+  
+  /// \brief Get bitmasks of moving atoms and atoms that this work unit is assigned to update.
+  ///        Bits signify 1 for an atom being moving or an update assignment.  The masks are
+  ///        encoded in a tuple with the x members making a mask for each segment of moving atoms
+  ///        and the y members making a mask for each segment of assigned update atoms.
+  std::vector<uint2> getAtomManipulationMasks() const;
+
+  /// \brief Get a vector describing the number of each type of item this work unit can be tasked
+  ///        to perform.
+  std::vector<int> getTaskCounts() const;
+  
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
 
@@ -445,7 +480,11 @@ private:
   int dihe_term_count;      ///< Number of cosine-based dihedral terms in the work unit
   int ubrd_term_count;      ///< Number of Urey-Bradley terms in the work unit
   int cimp_term_count;      ///< Number of CHARMM harmonic improper dihedral terms in the work unit
+  int cdhe_term_count;      ///< Number of composite dihedral terms, sweeping up dihedrals that
+                            ///<   affect the same four atoms, implicit 1:4 interactions, and
+                            ///<   CHARMM impropers
   int cmap_term_count;      ///< Number of CMAP terms in the work unit
+  int infr14_term_count;    ///< Number of inferred 1:4 interactions (not linked to any dihedral)
   int rposn_term_count;     ///< Number of positional restraints handled by this work unit
   int rbond_term_count;     ///< Number of distance restraints handled by this work unit
   int rangl_term_count;     ///< Number of angle restraints handled by this work unit
@@ -519,6 +558,19 @@ private:
   std::vector<int> infr14_i_atoms;    ///< Local indices for I atoms in each inferred 1:4 term
   std::vector<int> infr14_l_atoms;    ///< Local indices for L atoms in each inferred 1:4 term
 
+  /// Array of composite dihedral terms (this will be composed from entries in dihe_term_list and
+  /// cimp_term_list as well as the atoms those terms affect, and will then replace those lists).
+  std::vector<int2> cdhe_term_list;
+
+  // Arrays to support the composite dihedrals
+  std::vector<bool> cdhe_is_cimp;     ///< Indicates that the composite dihedral serves a CHARMM
+                                      ///<   improper dihedral, not one or two proper torsions
+  std::vector<int> cdhe_i_atoms;      ///< Local indices for I atoms in each dihedral term
+  std::vector<int> cdhe_j_atoms;      ///< Local indices for J atoms in each dihedral term
+  std::vector<int> cdhe_k_atoms;      ///< Local indices for K atoms in each dihedral term
+  std::vector<int> cdhe_l_atoms;      ///< Local indices for L atoms in each dihedral term
+  
+  
   // Restraint terms for this work unit
   std::vector<int> rposn_term_list;  ///< Positional restraint terms, indexing into the original
                                      ///<   restraint apparatus
