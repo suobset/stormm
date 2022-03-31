@@ -713,7 +713,7 @@ private:
   /// two atom indices in the x member (bits 1-10 and 11-20) and the parameter index of the bond /
   /// Urey-Bradley term in the y member.  A flag in the 21st bit of the x member indicates whether
   /// the energy should contribute to the Urey-Bradley sum (if set to 1) or the harmonic bond sum.
-  Hybrid<uint2> bond_instructions;
+  Hybrid<uint2> cbnd_instructions;
 
   /// Instructions for angle bending and three-body NMR restraint interactions.  Each uint2 tuple
   /// contains three atom indices in the x member (bits 1-10, 11-20, and 21-30) and the parameter

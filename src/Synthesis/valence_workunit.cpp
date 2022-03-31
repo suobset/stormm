@@ -891,6 +891,7 @@ std::vector<int> ValenceWorkUnit::getTaskCounts() const {
   result[static_cast<int>(VwuTask::ANGL)]   = angl_term_count;
   result[static_cast<int>(VwuTask::DIHE)]   = dihe_term_count;
   result[static_cast<int>(VwuTask::UBRD)]   = ubrd_term_count;
+  result[static_cast<int>(VwuTask::CBND)]   = bond_term_count + ubrd_term_count;
   result[static_cast<int>(VwuTask::CIMP)]   = cimp_term_count;
   result[static_cast<int>(VwuTask::CDHE)]   = cdhe_term_count;
   result[static_cast<int>(VwuTask::CMAP)]   = cmap_term_count;
@@ -907,19 +908,37 @@ std::vector<int> ValenceWorkUnit::getTaskCounts() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<uint2>
-ValenceWorkUnit::getBondInstructions(const std::vector<int> &parameter_map) const {
+ValenceWorkUnit::getCompositeBondInstructions(const std::vector<int> &bond_param_map,
+                                              const std::vector<int> &ubrd_param_map) const {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  std::vector<uint2> result(bond_term_count);
-  const bool use_map = (parameter_map.size() > 0LLU);
-  if (use_map && static_cast<int>(parameter_map.size()) != vk.nbond_param) {
-    rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
+  std::vector<uint2> result(bond_term_count + ubrd_term_count);
+  const bool bond_mapped = (bond_param_map.size() >= 0LLU);
+  const bool ubrd_mapped = (ubrd_param_map.size() >= 0LLU);
+  if ((vk.nbond > 0 && bond_mapped && vk.nubrd > 0 && ubrd_mapped == false) ||
+      (vk.nbond > 0 && bond_mapped == false && vk.nubrd > 0 && ubrd_mapped)) {
+    rtErr("Parameter correspondence tables must be supplied for both harmonic bond and "
+          "Urey-bradley terms, or neither.", "ValenceWorkUnit", "getCompositeBondInstructions");
+  }
+  const bool use_map = (bond_mapped || ubrd_mapped);
+  if (use_map && static_cast<int>(bond_param_map.size()) != vk.nbond_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(bond_param_map.size()) +
           "entries cannot serve a topology with " + std::to_string(vk.nbond_param) +
-          " bond parameter sets.", "ValenceWorkUnit", "getBondInstructions");
+          " bond parameter sets.", "ValenceWorkUnit", "getCompositeBondInstructions");
+  }
+  if (use_map && static_cast<int>(ubrd_param_map.size()) != vk.nubrd_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(ubrd_param_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.nbond_param) +
+          " Urey-Bradley parameter sets.", "ValenceWorkUnit", "getCompositeBondInstructions");
   }
   for (int pos = 0; pos < bond_term_count; pos++) {
     const int bt_idx = vk.bond_param_idx[bond_term_list[pos]];
     result[pos].x = ((bond_j_atoms[pos] << 10) | bond_i_atoms[pos]);
-    result[pos].y = (use_map) ? parameter_map[bt_idx] : bt_idx;
+    result[pos].y = (use_map) ? bond_param_map[bt_idx] : bt_idx;
+  }
+  for (int pos = 0; pos < ubrd_term_count; pos++) {
+    const int ut_idx = vk.ubrd_param_idx[ubrd_term_list[pos]];
+    result[pos + bond_term_count].x = ((ubrd_k_atoms[pos] << 10) | ubrd_i_atoms[pos]);
+    result[pos + bond_term_count].y = (use_map) ? ubrd_param_map[ut_idx] : ut_idx;
   }
   return result;
 }
@@ -955,7 +974,7 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
   if ((vk.ndihe > 0 && dihe_mapped && vk.ncimp > 0 && cimp_mapped == false) ||
       (vk.ndihe > 0 && dihe_mapped == false && vk.ncimp > 0 && cimp_mapped)) {
     rtErr("Parameter correspondence tables must be supplied for both dihedral and CHARMM improper "
-          "terms, or neither.", "ValenceWorkUnit", "getDihedralInstructions");
+          "terms, or neither.", "ValenceWorkUnit", "getCompositeDihedralInstructions");
   }
   const bool use_map = (dihe_mapped || cimp_mapped); 
   if (use_map && static_cast<int>(dihe_param_map.size()) != vk.ndihe_param) {
@@ -1079,6 +1098,69 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
   }
   return result;
 }
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2>
+ValenceWorkUnit::getCmapInstructions(const std::vector<int> &parameter_map) const {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  std::vector<uint2> result(cmap_term_count);
+  const bool use_map = (parameter_map.size() > 0LLU);
+  if (use_map && static_cast<int>(parameter_map.size()) != vk.ncmap_surf) {
+    rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.ncmap_surf) +
+          " CMAP surfaces.", "ValenceWorkUnit", "getCmapInstructions");
+  }
+  for (int pos = 0; pos < cmap_term_count; pos++) {
+    const int mt_idx = vk.cmap_surf_idx[cmap_term_list[pos]];
+    result[pos].x = ((cmap_k_atoms[pos] << 20) | (cmap_j_atoms[pos] << 10) | cmap_i_atoms[pos]);
+    result[pos].y = ((cmap_m_atoms[pos] << 10) | cmap_l_atoms[pos]);
+    result[pos].y |= (use_map) ? (parameter_map[mt_idx] << 20) : (mt_idx << 20);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint>
+ValenceWorkUnit::getInferred14Instructions(const std::vector<int> &parameter_map) const {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  std::vector<uint> result(infr14_term_count);
+  const bool use_map = (parameter_map.size() > 0LLU);
+  if (use_map && static_cast<int>(parameter_map.size()) != vk.nattn14_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.nattn14_param) +
+          " pairs of 1:4 scaling factors.", "ValenceWorkUnit", "getInferred14Instructions");
+  }
+  for (int pos = 0; pos < infr14_term_count; pos++) {
+    const int ft_idx = vk.infr14_param_idx[infr14_term_list[pos]];
+    result[pos] = ((infr14_l_atoms[pos] << 10) | infr14_i_atoms[pos]);
+    result[pos] |= (use_map) ? (parameter_map[ft_idx] << 20) : (ft_idx << 20);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+#if 0
+std::vector<uint2>
+ValenceWorkUnit::getPositionalRestraintInstructions(const std::vector<int> &kr_param_map,
+                                                    const std::vector<int> &xyz_param_map) const {
+  const RestraintApparatusDpReader rar = ra_pointer->dpData();
+  std::vector<uint2> result(rposn_term_count);
+  if ((kr_param_map.size() > 0 && xyz_param_map.size() == 0) ||
+      (kr_param_map.size() == 0 && xyz_param_map.size() > 0)) {
+    rtErr("Parameter correspondence tables must be supplied for both the k(1,2) / r(1,2,3,4) "
+          "parameter set and the x / y / z target positions, or neither.", "ValenceWorkUnit",
+          "getPositionalRestraintInstructions");
+  }
+  const bool use_map = (kr_param_map.size() > 0);
+  for (int pos = 0; pos < cmap_term_count; pos++) {
+    const int rt_idx = 
+    result[pos].x = 
+    result[pos].y = ((cmap_m_atoms[pos] << 10) | cmap_l_atoms[pos]);
+    result[pos].y |= (use_map) ? (parameter_map[mt_idx] << 20) : (mt_idx << 20);
+  }
+  return result;
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator* ValenceWorkUnit::getDelegatorPointer() {
@@ -1401,7 +1483,7 @@ void ValenceWorkUnit::logActivities() {
     cnst_group_bounds.push_back(cnst_group_atoms.size());
   }
 
-  // Log the counts of each task
+  // Log the counts of each basic task
   bond_term_count   = bond_term_list.size();
   angl_term_count   = angl_term_list.size();
   dihe_term_count   = dihe_term_list.size();
@@ -1416,7 +1498,7 @@ void ValenceWorkUnit::logActivities() {
   cnst_group_count  = cnst_group_list.size();
   sett_group_count  = sett_group_list.size();
   vste_count        = virtual_site_list.size();
-
+  
   // Compute the number of composite dihedrals: the dihedrals already subsume a great deal of the
   // 1:4 attenuated interactions (probably the entirety of these interactions if the system has no
   // virtual sites).  However, many dihedrals have additional cosine terms overlaid on the same
@@ -1541,57 +1623,6 @@ void ValenceWorkUnit::logActivities() {
     coverage[pos] = true;
   }
   cdhe_term_count = cdhe_term_list.size();
-  
-  // CHECK
-  const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
-  std::vector<bool> overlap_seen(vk.ndihe);
-  int n_with_14 = 0;
-  for (int pos = 0; pos < cdhe_term_count; pos++) {
-    const int xterm = cdhe_term_list[pos].x;
-    const int yterm = cdhe_term_list[pos].y;
-    bool x_has_14 = false;
-    bool y_has_14 = false;
-    if (xterm >= 0) {
-      switch (static_cast<TorsionKind>(vk.dihe_modifiers[xterm].w)) {
-      case TorsionKind::PROPER:
-      case TorsionKind::IMPROPER:
-        x_has_14 = true;
-        break;
-      case TorsionKind::PROPER_NO_14:
-      case TorsionKind::IMPROPER_NO_14:
-        x_has_14 = false;
-        break;
-      }
-    }
-    if (yterm >= 0) {
-      switch (static_cast<TorsionKind>(vk.dihe_modifiers[yterm].w)) {
-      case TorsionKind::PROPER:
-      case TorsionKind::IMPROPER:
-        y_has_14 = true;
-        break;
-      case TorsionKind::PROPER_NO_14:
-      case TorsionKind::IMPROPER_NO_14:
-        y_has_14 = false;
-        break;
-      }
-    }
-    if (x_has_14 && y_has_14) {
-      printf("Whoa... Two dihedrals (%4d, %4d) between %4.4s %4.4s %4.4s %4.4s count 1:4 "
-             "interactions.\n", xterm, yterm,
-             char4ToString(cdk.atom_names[atom_import_list[cdhe_i_atoms[pos]]]).c_str(),
-             char4ToString(cdk.atom_names[atom_import_list[cdhe_j_atoms[pos]]]).c_str(),
-             char4ToString(cdk.atom_names[atom_import_list[cdhe_k_atoms[pos]]]).c_str(),
-             char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]).c_str());
-    }
-    else if (x_has_14 || y_has_14) {
-      n_with_14++;
-    }
-  }
-  printf("  %4d %4d %4d atoms  %4d %4d %4d %4d %4d %4d -> %4d(%4d) composite dihedrals\n",
-         imported_atom_count, moved_atom_count, updated_atom_count, bond_term_count,
-         angl_term_count, dihe_term_count, ubrd_term_count, cimp_term_count, cmap_term_count,
-         cdhe_term_count, n_with_14);
-  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------

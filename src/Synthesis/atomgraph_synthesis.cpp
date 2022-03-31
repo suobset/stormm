@@ -261,7 +261,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     atom_import_list{HybridKind::ARRAY, "tpsyn_atom_imports"},
     atom_manipulation_mask{HybridKind::POINTER, "tpsyn_atom_manip"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
-    bond_instructions{HybridKind::POINTER, "tpsyn_bond_insr"},
+    cbnd_instructions{HybridKind::POINTER, "tpsyn_cbnd_insr"},
     angl_instructions{HybridKind::POINTER, "tpsyn_angl_insr"},
     cdhe_instructions{HybridKind::POINTER, "tpsyn_cdhe_insr"},
     cdhe_overtones{HybridKind::POINTER, "tpsyn_ovrt_insr"},

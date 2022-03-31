@@ -42,6 +42,8 @@ enum class VwuTask {
   ANGL,        ///< Harmonic angle interactions
   DIHE,        ///< Cosine-based dihedral interactions
   UBRD,        ///< Urey-Bradley harmonic stretching angle terms
+  CBND,        ///< Composite bond term count, including harmonic bonds and Urey-Bradley angle
+               ///<   stretching terms
   CIMP,        ///< CHARMM improper dihedrals
   CDHE,        ///< Composite dihedral term count (includes multiple dihedrals that share the same
                ///<   atoms as well as CHARMM impropers in one list)
@@ -425,8 +427,11 @@ public:
   ///        interpretation table in order to produce instructions for a collated topology handling
   ///        many systems (AtomGraphSynthesis).
   ///
-  /// \param parameter_map  Map of the bond parameter sets (optional)
-  std::vector<uint2> getBondInstructions(const std::vector<int> &parameter_map = {}) const;
+  /// \param bond_param_map  Map of the bond parameter sets (optional)
+  /// \param ubrd_param_map  Map of the Urey-Bradley parameter sets (optional)
+  std::vector<uint2>
+  getCompositeBondInstructions(const std::vector<int> &bond_param_map = {},
+                               const std::vector<int> &ubrd_param_map = {}) const;
 
   /// \brief Get a vector of the harmonic angle instructions.  This function accepts a parameter
   ///        interpretation table in order to produce instructions for a collated topology
@@ -435,8 +440,8 @@ public:
   /// \param parameter_map  Map of the angle parameter sets (optional)
   std::vector<uint2> getAngleInstructions(const std::vector<int> &parameter_map = {}) const;
 
-  /// \brief Get a vector of the composite (cosine-based dihedral, associated 1:4 interactions, as
-  ///        well as CHARMM dihedral) ngle instructions.  This function accepts parameter
+  /// \brief Get a vector of the composite (cosine-based) dihedral, associated 1:4 interactions,
+  ///        as well as CHARMM improper dihedral instructions.  This function accepts parameter
   ///        interpretation tables in order to produce instructions for a collated topology
   ///        handling many systems (AtomGraphSynthesis).
   ///
@@ -447,6 +452,24 @@ public:
   getCompositeDihedralInstructions(const std::vector<int> &dihe_param_map = {},
                                    const std::vector<int> &dihe14_param_map = {},
                                    const std::vector<int> &cimp_param_map = {}) const;
+
+  /// \brief Get a vector of the CMAP instructions.  This function accepts a parameter
+  ///        interpretation table in order to produce instructions for a collated topology
+  ///        handling many systems (AtomGraphSynthesis).
+  ///
+  /// \param parameter_map  Map of the one topology's CMAP surface indices onto the synthesis
+  ///                       (optional)
+  std::vector<uint2>
+  getCmapInstructions(const std::vector<int> &parameter_map = {}) const;
+
+  /// \brief Get a vector of the inferred 1:4 attenuated pair interaction instructions.  This
+  ///        function accepts a parameter interpretation table in order to produce instructions
+  ///        for a collated topology handling many systems (AtomGraphSynthesis).
+  ///
+  /// \param parameter_map  Map of the one topology's attenuated interaction scaling factors onto
+  ///                       the synthesis (optional)
+  std::vector<uint>
+  getInferred14Instructions(const std::vector<int> &parameter_map = {}) const;
 
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
