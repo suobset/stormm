@@ -471,6 +471,38 @@ public:
   std::vector<uint>
   getInferred14Instructions(const std::vector<int> &parameter_map = {}) const;
 
+  /// \brief Get a vector of the positional restraint instructions for this work unit.  This
+  ///        function accepts parameter interpretation tables showing how the raw list of
+  ///        restraint settings (k(2,3), r(1,2,3,4), and x / y / z targets) can be condensed by
+  ///        an AtomGraphSynthesis.
+  ///
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
+  /// \param xyz_param_map  Mapping for Cartesian coordinate targets
+  std::vector<uint2>
+  getPositionalRestraintInstructions(const std::vector<int> &kr_param_map,
+                                     const std::vector<int> &xyz_param_map) const;
+
+  /// \brief Get a vector of the distance restraint instructions for this work unit.  This
+  ///        function accepts a parameter interpretation table showing how the raw list of
+  ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
+  ///
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
+  std::vector<uint2> getDistanceRestraintInstructions(const std::vector<int> &kr_param_map) const;
+
+  /// \brief Get a vector of the three-point angle restraint instructions for this work unit.
+  ///        This function accepts a parameter interpretation table showing how the raw list of
+  ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
+  ///
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
+  std::vector<uint2> getAngleRestraintInstructions(const std::vector<int> &kr_param_map) const;
+
+  /// \brief Get a vector of the four-point dihedral restraint instructions for this work unit.
+  ///        This function accepts a parameter interpretation table showing how the raw list of
+  ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
+  ///
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
+  std::vector<uint2> getDihedralRestraintInstructions(const std::vector<int> &kr_param_map) const;
+
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
 

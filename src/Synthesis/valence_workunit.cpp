@@ -1139,28 +1139,110 @@ ValenceWorkUnit::getInferred14Instructions(const std::vector<int> &parameter_map
 }
 
 //-------------------------------------------------------------------------------------------------
-#if 0
 std::vector<uint2>
 ValenceWorkUnit::getPositionalRestraintInstructions(const std::vector<int> &kr_param_map,
                                                     const std::vector<int> &xyz_param_map) const {
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
   std::vector<uint2> result(rposn_term_count);
-  if ((kr_param_map.size() > 0 && xyz_param_map.size() == 0) ||
-      (kr_param_map.size() == 0 && xyz_param_map.size() > 0)) {
+  const bool use_map = (kr_param_map.size() > 0LLU);
+  if (kr_param_map.size() != xyz_param_map.size()) {
     rtErr("Parameter correspondence tables must be supplied for both the k(1,2) / r(1,2,3,4) "
           "parameter set and the x / y / z target positions, or neither.", "ValenceWorkUnit",
           "getPositionalRestraintInstructions");
   }
-  const bool use_map = (kr_param_map.size() > 0);
-  for (int pos = 0; pos < cmap_term_count; pos++) {
-    const int rt_idx = 
-    result[pos].x = 
-    result[pos].y = ((cmap_m_atoms[pos] << 10) | cmap_l_atoms[pos]);
-    result[pos].y |= (use_map) ? (parameter_map[mt_idx] << 20) : (mt_idx << 20);
+  if (use_map && static_cast<int>(kr_param_map.size()) != rar.nposn) {
+    rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
+          "entries cannot serve a RestraintApparatus with " + std::to_string(rar.nposn) +
+          "terms.", "ValenceWorkUnit", "getPositionalRestraintInstructions");
+  }
+  for (int pos = 0; pos < rposn_term_count; pos++) {
+
+    // The RestraintApparatus object does not have a concept of restraints as parameters with
+    // parameter indices into a reduced table of unique values.  There, the k(2,3) and r(1,2,3,4)
+    // parameters of the ith restraint are the ith entries of the k and r data arrays.  In the
+    // AtomGraphSynthesis, however, there is a concept of restraint parameter uniqueness.  The
+    // instructions are tailored either way, depending on whether the parameter correspondence
+    // from an AtomGraphSynthesis has been supplied.  It's analogous to what happens with each of
+    // the valence terms above, but for those terms the AtomGraph itself stores parameter tables
+    // for each term, so there is an extra layer of parameter referencing to unroll in order to
+    // get to the AtomGraphSynthesis parameter indexing.
+    const int kr_idx  = (use_map) ? kr_param_map[rposn_term_list[pos]] : rposn_term_list[pos];
+    const int xyz_idx = (use_map) ? xyz_param_map[rposn_term_list[pos]] : rposn_term_list[pos];
+    result[pos].x = rposn_atoms[pos];
+    result[pos].x |= (kr_idx << 10);
+    if (rar.time_dependence) {
+      result[pos].x |= (0x1 << 31);
+    }
+    result[pos].y = xyz_idx;
   }
   return result;
 }
-#endif
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2>
+ValenceWorkUnit::getDistanceRestraintInstructions(const std::vector<int> &kr_param_map) const {
+  const RestraintApparatusDpReader rar = ra_pointer->dpData();
+  std::vector<uint2> result(rbond_term_count);
+  const bool use_map = (kr_param_map.size() > 0LLU);
+  if (use_map && static_cast<int>(kr_param_map.size()) != rar.nbond) {
+    rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
+          "entries cannot serve a RestraintApparatus with " + std::to_string(rar.nbond) +
+          "terms.", "ValenceWorkUnit", "getDistanceRestraintInstructions");
+  }
+  for (int pos = 0; pos < rbond_term_count; pos++) {
+    const int kr_idx  = (use_map) ? kr_param_map[rbond_term_list[pos]] : rbond_term_list[pos];
+    result[pos].x = ((rbond_j_atoms[pos] << 10) | rbond_i_atoms[pos]);
+    result[pos].y = kr_idx;
+    if (rar.time_dependence) {
+      result[pos].x |= (0x1 << 31);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2>
+ValenceWorkUnit::getAngleRestraintInstructions(const std::vector<int> &kr_param_map) const {
+  const RestraintApparatusDpReader rar = ra_pointer->dpData();
+  std::vector<uint2> result(rangl_term_count);
+  const bool use_map = (kr_param_map.size() > 0LLU);
+  if (use_map && static_cast<int>(kr_param_map.size()) != rar.nangl) {
+    rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
+          "entries cannot serve a RestraintApparatus with " + std::to_string(rar.nangl) +
+          "terms.", "ValenceWorkUnit", "getAngleRestraintInstructions");
+  }
+  for (int pos = 0; pos < rangl_term_count; pos++) {
+    const int kr_idx  = (use_map) ? kr_param_map[rangl_term_list[pos]] : rangl_term_list[pos];
+    result[pos].x = ((rangl_k_atoms[pos] << 20) | (rangl_j_atoms[pos] << 10) | rangl_i_atoms[pos]);
+    result[pos].y = kr_idx;
+    if (rar.time_dependence) {
+      result[pos].x |= (0x1 << 31);
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2>
+ValenceWorkUnit::getDihedralRestraintInstructions(const std::vector<int> &kr_param_map) const {
+  const RestraintApparatusDpReader rar = ra_pointer->dpData();
+  std::vector<uint2> result(rdihe_term_count);
+  const bool use_map = (kr_param_map.size() > 0LLU);
+  if (use_map && static_cast<int>(kr_param_map.size()) != rar.ndihe) {
+    rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
+          "entries cannot serve a RestraintApparatus with " + std::to_string(rar.ndihe) +
+          "terms.", "ValenceWorkUnit", "getDihedralRestraintInstructions");
+  }
+  for (int pos = 0; pos < rdihe_term_count; pos++) {
+    const int kr_idx  = (use_map) ? kr_param_map[rdihe_term_list[pos]] : rdihe_term_list[pos];
+    result[pos].x = ((rdihe_k_atoms[pos] << 20) | (rdihe_j_atoms[pos] << 10) | rdihe_i_atoms[pos]);
+    result[pos].y = ((kr_idx << 10) | rdihe_l_atoms[pos]);
+    if (rar.time_dependence) {
+      result[pos].x |= (0x1 << 31);
+    }
+  }
+  return result;
+}
 
 //-------------------------------------------------------------------------------------------------
 ValenceDelegator* ValenceWorkUnit::getDelegatorPointer() {
