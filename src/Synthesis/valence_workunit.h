@@ -406,7 +406,10 @@ public:
   int getMaxAtoms() const;
 
   /// \brief Get the list of imported atoms.
-  std::vector<int> getAtomImportList() const;
+  ///
+  /// \param atom_offset  Offset of the atoms to add to the topological indices, if importing from
+  ///                     a synthesis of many systems
+  std::vector<int> getAtomImportList(int atom_offset = 0) const;
   
   /// \brief Get bitmasks of moving atoms and atoms that this work unit is assigned to update.
   ///        Bits signify 1 for an atom being moving or an update assignment.  The masks are
@@ -417,7 +420,34 @@ public:
   /// \brief Get a vector describing the number of each type of item this work unit can be tasked
   ///        to perform.
   std::vector<int> getTaskCounts() const;
-  
+
+  /// \brief Get a vector of the bond instructions.  This function accepts a parameter
+  ///        interpretation table in order to produce instructions for a collated topology handling
+  ///        many systems (AtomGraphSynthesis).
+  ///
+  /// \param parameter_map  Map of the bond parameter sets (optional)
+  std::vector<uint2> getBondInstructions(const std::vector<int> &parameter_map = {}) const;
+
+  /// \brief Get a vector of the harmonic angle instructions.  This function accepts a parameter
+  ///        interpretation table in order to produce instructions for a collated topology
+  ///        handling many systems (AtomGraphSynthesis).
+  ///
+  /// \param parameter_map  Map of the angle parameter sets (optional)
+  std::vector<uint2> getAngleInstructions(const std::vector<int> &parameter_map = {}) const;
+
+  /// \brief Get a vector of the composite (cosine-based dihedral, associated 1:4 interactions, as
+  ///        well as CHARMM dihedral) ngle instructions.  This function accepts parameter
+  ///        interpretation tables in order to produce instructions for a collated topology
+  ///        handling many systems (AtomGraphSynthesis).
+  ///
+  /// \param dihe_param_map  Map of the dihedral parameter sets (optional)
+  /// \param dihe_param_map  Map of the 1:4 scaling factor parameter pairs (optional)
+  /// \param dihe_param_map  Map of the CHARMM harmonic improper parameter sets (optional)
+  std::vector<uint3>
+  getCompositeDihedralInstructions(const std::vector<int> &dihe_param_map = {},
+                                   const std::vector<int> &dihe14_param_map = {},
+                                   const std::vector<int> &cimp_param_map = {}) const;
+
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
 
@@ -426,11 +456,6 @@ public:
 
   /// \brief Get a pointer to the restraint collection for which this work unit applies.
   const RestraintApparatus* getRestraintApparatusPointer() const;
-
-  /// \brief Get the topological index of one of the work unit's imported atoms.
-  ///
-  /// \param index  The local index of the imported atom of interest
-  int getImportedAtom(int index) const;
   
   /// \brief Set the list index of this work unit, in the event that the list of work units for
   ///        a particular topology needs to be re-ordered.

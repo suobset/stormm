@@ -722,20 +722,23 @@ private:
 
   /// Instructions for dihedral and CHARMM improper dihedral interactions.  Each uint2 tuple
   /// contains three atom indices in the x member (bits 1-10, 11-20, and 21-30), plus a flag in
-  /// bit 31 to indicate whether the form of the potential should be a cosine term or the CHARMM
-  /// harmonic term and another flag in bit 32, relevant only when energy is being computed and
-  /// only if the term is not a CHARMM improper, to indicate whether to add the energy to a proper
-  /// or improper accumulator.  A fourth atom index in the y member (bits 1-10) precedes the index
-  /// for 1:4 scaling factors (bits 11-15, up to 32 unique combinations of electrostatic and
-  /// Lennard-Jones scaling factors, including zero to indicate that no 1:4 interaction should be
-  /// computed).  The 16th bit indicates whether an additional cosine-based dihedral term overlaps
-  /// with the same four atoms.  If so, its parameter index is given in an auxiliary array of
-  /// uint values (cdhe_overtones), which is only accessed in cases where such overlaps occur.
-  /// The final bits (17-32) indiate the dihedral or CHARMM improper dihedral parameter index (up
-  /// to 65536 of either, a number larger than nearly any force field, but the limit applies to
-  /// the number of unique parameters at work in a particular simulation).  In some extreme case
-  /// where a model does have more than 65536 unique dihedral parameters, the overflow slot can
-  /// be used to store a parameter index up to four billion.
+  /// bit 31 to indicate whether the form of the potential should be a cosine term (0) or the
+  /// CHARMM harmonic improper (1) and another flag in bit 32, relevant only when energy is being
+  /// computed and only if the term is not a CHARMM improper, to indicate whether to add the
+  /// energy to a proper or improper accumulator.  A fourth atom index in the y member (bits 1-10)
+  /// precedes the index for 1:4 scaling factors (bits 11-15, up to 32 unique combinations of
+  /// electrostatic and Lennard-Jones scaling factors, including zero if no 1:4 interaction should
+  /// be computed).  The 16th bit indicates whether an additional cosine-based dihedral term
+  /// overlaps with the same four atoms.  If so, its parameter index is given in an auxiliary
+  /// array of uint values (cdhe_overtones), which is only accessed in cases where such overlaps
+  /// occur.  The final bits (17-32) indiate the dihedral or CHARMM improper dihedral parameter
+  /// index (up to 65535 of either with the 65536th slot being a "no interaction" placeholder).
+  /// These instructions can store a number of unique parameters larger than any known force
+  /// field, but the limit applies to the number of unique parameters at work in a particular
+  /// simulation.  In some extreme case where a model does have more than 65535 unique dihedral
+  /// parameters, the parameter of the first dihedral can be set to 65535 (the placeholder 65536th
+  /// parameter) and the secondary dihedral (the overtone) can then use a parameter index up to
+  /// 1048576 with up to 4096 1:4 scaling factor pairs.
   Hybrid<uint2> cdhe_instructions;
 
   /// Overtones for various dihedrals that overlap with the same four atoms.  This allows a single

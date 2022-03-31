@@ -181,7 +181,8 @@ int scanToFlag(const TextFile &tf, const char* flag, std::vector<int4> *detected
   // Any missing, essential flag throws an error
   if (needed == TopologyRequirement::ESSENTIAL) {
     std::string sflag(flag);
-    rtErr("Unable to find %FLAG " + sflag + " within topology " + tf.getFileName(), "scanToFlag");
+    rtErr("Unable to find %FLAG " + sflag + " within topology " + tf.getFileName() + ".",
+          "scanToFlag");
   }
 
   // A missing, optional flag returns -1

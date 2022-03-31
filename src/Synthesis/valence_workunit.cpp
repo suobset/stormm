@@ -773,7 +773,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
           incl_up_deps[j] = true;
         }
       }
-      if (imported_atom_count + n_new_atoms < atom_limit) {
+      if (imported_atom_count + n_new_atoms <= atom_limit) {
 
         // The candidate atom will be part of its own dependencies list.
         for (int j = 0; j < ndeps; j++) {
@@ -852,6 +852,235 @@ int ValenceWorkUnit::getMaxAtoms() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::getAtomImportList(const int atom_offset) const {
+  if (atom_offset == 0) {
+    return atom_import_list;
+  }
+  else {
+    std::vector<int> result(imported_atom_count);
+    for (int i = 0; i < imported_atom_count; i++) {
+      result[i] = atom_import_list[i] + atom_offset;
+    }
+    return result;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getAtomManipulationMasks() const {
+  const int nbits = static_cast<int>(sizeof(uint)) * 8;
+  const int n_segment = roundUp((imported_atom_count + nbits - 1) / nbits, warp_size_int);
+  std::vector<uint2> result(n_segment, {0U, 0U});
+  for (int i = 0; i < moved_atom_count; i++) {
+    const int seg_idx = (i / nbits);
+    const int bit_idx = i - (seg_idx * nbits);
+    result[seg_idx].x |= (0x1 << bit_idx);
+  }
+  for (int i = 0; i < updated_atom_count; i++) {
+    const int seg_idx = (i / nbits);
+    const int bit_idx = i - (seg_idx * nbits);
+    result[seg_idx].y |= (0x1 << bit_idx);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::getTaskCounts() const {
+  std::vector<int> result(static_cast<int>(VwuTask::TOTAL_TASKS));
+  result[static_cast<int>(VwuTask::BOND)]   = bond_term_count;
+  result[static_cast<int>(VwuTask::ANGL)]   = angl_term_count;
+  result[static_cast<int>(VwuTask::DIHE)]   = dihe_term_count;
+  result[static_cast<int>(VwuTask::UBRD)]   = ubrd_term_count;
+  result[static_cast<int>(VwuTask::CIMP)]   = cimp_term_count;
+  result[static_cast<int>(VwuTask::CDHE)]   = cdhe_term_count;
+  result[static_cast<int>(VwuTask::CMAP)]   = cmap_term_count;
+  result[static_cast<int>(VwuTask::INFR14)] = infr14_term_count;
+  result[static_cast<int>(VwuTask::RPOSN)]  = rposn_term_count;
+  result[static_cast<int>(VwuTask::RBOND)]  = rbond_term_count;
+  result[static_cast<int>(VwuTask::RANGL)]  = rangl_term_count;
+  result[static_cast<int>(VwuTask::RDIHE)]  = rdihe_term_count;
+  result[static_cast<int>(VwuTask::CGROUP)] = cnst_group_count;
+  result[static_cast<int>(VwuTask::SETTLE)] = sett_group_count;
+  result[static_cast<int>(VwuTask::VSITE)]  = vste_count;
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2>
+ValenceWorkUnit::getBondInstructions(const std::vector<int> &parameter_map) const {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  std::vector<uint2> result(bond_term_count);
+  const bool use_map = (parameter_map.size() > 0LLU);
+  if (use_map && static_cast<int>(parameter_map.size()) != vk.nbond_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.nbond_param) +
+          " bond parameter sets.", "ValenceWorkUnit", "getBondInstructions");
+  }
+  for (int pos = 0; pos < bond_term_count; pos++) {
+    const int bt_idx = vk.bond_param_idx[bond_term_list[pos]];
+    result[pos].x = ((bond_j_atoms[pos] << 10) | bond_i_atoms[pos]);
+    result[pos].y = (use_map) ? parameter_map[bt_idx] : bt_idx;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2>
+ValenceWorkUnit::getAngleInstructions(const std::vector<int> &parameter_map) const {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  std::vector<uint2> result(angl_term_count);
+  const bool use_map = (parameter_map.size() > 0LLU);
+  if (use_map && static_cast<int>(parameter_map.size()) != vk.nangl_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.nangl_param) +
+          " bond angle parameter sets.", "ValenceWorkUnit", "getAngleInstructions");
+  }
+  for (int pos = 0; pos < angl_term_count; pos++) {
+    const int at_idx = vk.angl_param_idx[angl_term_list[pos]];
+    result[pos].x = ((angl_k_atoms[pos] << 20) | (angl_j_atoms[pos] << 10) | angl_i_atoms[pos]);
+    result[pos].y = (use_map) ? parameter_map[at_idx] : at_idx;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint3>
+ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_param_map,
+                                                  const std::vector<int> &dihe14_param_map,
+                                                  const std::vector<int> &cimp_param_map) const {
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  std::vector<uint3> result(cdhe_term_count);
+  const bool dihe_mapped = (dihe_param_map.size() > 0LLU);
+  const bool cimp_mapped = (cimp_param_map.size() > 0LLU);
+  if ((vk.ndihe > 0 && dihe_mapped && vk.ncimp > 0 && cimp_mapped == false) ||
+      (vk.ndihe > 0 && dihe_mapped == false && vk.ncimp > 0 && cimp_mapped)) {
+    rtErr("Parameter correspondence tables must be supplied for both dihedral and CHARMM improper "
+          "terms, or neither.", "ValenceWorkUnit", "getDihedralInstructions");
+  }
+  const bool use_map = (dihe_mapped || cimp_mapped); 
+  if (use_map && static_cast<int>(dihe_param_map.size()) != vk.ndihe_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(dihe_param_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.ndihe_param) +
+          " torsion parameter sets.", "ValenceWorkUnit", "getCompositeDihedralInstructions");
+  }
+  if (use_map && static_cast<int>(cimp_param_map.size()) != vk.ncimp_param) {
+    rtErr("A parameter correspondence table with " + std::to_string(cimp_param_map.size()) +
+          "entries cannot serve a topology with " + std::to_string(vk.ncimp_param) +
+          " torsion parameter sets.", "ValenceWorkUnit", "getCompositeDihedralInstructions");
+  }
+  for (int pos = 0; pos < cdhe_term_count; pos++) {
+
+    // Write out the atom indices
+    result[pos].x = ((cdhe_k_atoms[pos] << 20) | (cdhe_j_atoms[pos] << 10) | cdhe_i_atoms[pos]);
+    result[pos].y = cdhe_l_atoms[pos];
+
+    // Branch based on whether this is a CHARMM improper
+    if (cdhe_is_cimp[pos]) {
+      result[pos].x |= (0x1 << 30);
+
+      // Record the parameter index of the CHARMM improper.  Do not permit more than 65536 unique
+      // CHARMM improper torsion parameter sets.
+      const int ht_idx = vk.cimp_param_idx[cdhe_term_list[pos].x];
+      const int ht_mapped_idx = (use_map) ? cimp_param_map[ht_idx] : ht_idx;
+      if (ht_mapped_idx >= 65536) {
+        const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+        rtErr("In valence work unit " + std::to_string(list_index) + ", the CHARMM improper "
+              "dihedral involving atoms " +
+              char4ToString(cdk.atom_names[atom_import_list[cdhe_i_atoms[pos]]]) + ", " +
+              char4ToString(cdk.atom_names[atom_import_list[cdhe_j_atoms[pos]]]) + ", " +
+              char4ToString(cdk.atom_names[atom_import_list[cdhe_k_atoms[pos]]]) + ", and " +
+              char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]) + " requires a "
+              "parameter set with index " + std::to_string(ht_mapped_idx) + ", which exceeds the "
+              "allowed number of unique parameter pairs in the first composite dihedral 1:4 "
+              "position.", "ValenceWorkUnit", "getCompositeDihedralInstructions");        
+      }
+      result[pos].y |= (ht_mapped_idx << 16);
+      result[pos].z = 0U;
+    }
+    else {
+
+      // Construct the first (of possibly two) dihedral instructions
+
+      // Indicate whether this interaction contributes to the cosine proper or improper
+      // diehdral energy (this setting will determine the contributions of the second dihedral
+      // in the composite pair, if one exists)
+      switch (static_cast<TorsionKind>(vk.dihe_modifiers[cdhe_term_list[pos].x].w)) {
+      case TorsionKind::PROPER:
+      case TorsionKind::PROPER_NO_14:
+        break;
+      case TorsionKind::IMPROPER:
+      case TorsionKind::IMPROPER_NO_14:
+        result[pos].x |= (0x1 << 31);
+        break;
+      }
+
+      // Record the 1:4 scaling factors for the I:L interaction (up to 32 unique pairs of
+      // electrostatic and Lennard-Jones scaling factors are available, with the 0th being no
+      // interaction)
+      const int dt14_idx = vk.dihe14_param_idx[cdhe_term_list[pos].x];
+      const int dt14_mapped_idx = (use_map) ? dihe14_param_map[dt14_idx] : dt14_idx;
+      if (dt14_mapped_idx >= 32) {
+        const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+        rtErr("In valence work unit " + std::to_string(list_index) + ", the dihedral involving "
+              "atoms " + char4ToString(cdk.atom_names[atom_import_list[cdhe_i_atoms[pos]]]) +
+              ", " + char4ToString(cdk.atom_names[atom_import_list[cdhe_j_atoms[pos]]]) + ", " +
+              char4ToString(cdk.atom_names[atom_import_list[cdhe_k_atoms[pos]]]) + ", and " +
+              char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]) + " requires a "
+              "1:4 scaling factor pair with index " + std::to_string(dt14_mapped_idx) +
+              ", which exceeds the allowed number of unique parameter pairs in the first "
+              "composite dihedral 1:4 position.", "ValenceWorkUnit",
+              "getCompositeDihedralInstructions");
+      }
+      result[pos].y |= (dt14_mapped_idx << 10);
+      
+      // Indicate whether there is a second dihedral in this composite term
+      if (cdhe_term_list[pos].y >= 0) {
+        result[pos].y |= (0x1 << 15);
+      }
+      
+      // Indicate the parameter index of the first dihedral (up to 65535 unique parameter sets).
+      // If the index turns out to be 65535 and there are more than 65535 total parameter sets,
+      // then 65535 is a valid parameter set but it will not do anything when the code later
+      // evaluates this first dihedral.  65535 is the new zero: in this context, it indicates no
+      // dihedral term to evaluate.  
+      const int dt_idx = vk.dihe_param_idx[cdhe_term_list[pos].x];
+      result[pos].y |= (use_map) ? (std::min(dihe_param_map[dt_idx], 65536) << 16) :
+                                   (std::min(dt_idx, 65536) << 16);
+
+      // Record the parameter index for the second dihedral.
+      if (cdhe_term_list[pos].y >= 0) {
+        const int dt2_idx = vk.dihe_param_idx[cdhe_term_list[pos].y];
+        const int dt2_14_idx = vk.dihe14_param_idx[cdhe_term_list[pos].y];
+        const int dt2_mapped_idx = (use_map) ? dihe_param_map[dt2_idx] : dt2_idx;
+        const int dt2_14_mapped_idx = (use_map) ? dihe14_param_map[dt2_14_idx] : dt2_14_idx;
+
+        // There is no more room to go up--if the index of the 1:4 scaling parameters exceeds 4096
+        // or the index of the dihedral term itself exceeds 1048576, that should have been
+        // intercepted during the initial construction.  Trap it here for added protection.
+        if (dt2_mapped_idx >= 1048576 || dt2_14_mapped_idx >= 4096) {
+          const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+          rtErr("In valence work unit " + std::to_string(list_index) + ", the dihedral involving "
+                "atoms " + char4ToString(cdk.atom_names[atom_import_list[cdhe_i_atoms[pos]]]) +
+                ", " + char4ToString(cdk.atom_names[atom_import_list[cdhe_j_atoms[pos]]]) + ", " +
+                char4ToString(cdk.atom_names[atom_import_list[cdhe_k_atoms[pos]]]) + ", and " +
+                char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]) + " requires a "
+                "1:4 scaling factor pair with index " + std::to_string(dt2_14_idx) + " and a "
+                "dihedral parameter set with index " + std::to_string(dt2_idx) + ", which exceeds "
+                "the allowed number of unique parameters.", "ValenceWorkUnit",
+                "getCompositeDihedralInstructions");
+        }
+        result[pos].z = dt2_mapped_idx;
+        result[pos].z |= (dt2_14_mapped_idx << 20);
+      }
+      else {
+        result[pos].z = 0U;
+      }
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 ValenceDelegator* ValenceWorkUnit::getDelegatorPointer() {
   return vdel_pointer;
 }
@@ -864,11 +1093,6 @@ const AtomGraph* ValenceWorkUnit::getTopologyPointer() const {
 //-------------------------------------------------------------------------------------------------
 const RestraintApparatus* ValenceWorkUnit::getRestraintApparatusPointer() const {
   return ra_pointer;
-}
-
-//-------------------------------------------------------------------------------------------------
-int ValenceWorkUnit::getImportedAtom(const int index) const {
-  return atom_import_list[index];
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1127,7 +1351,7 @@ void ValenceWorkUnit::logActivities() {
     rdihe_l_atoms.push_back(import_map[rar.rdihe_l_atoms[rdihe_idx] - mapping_offset]);
   }
 
-  // Detail virtual sites for thie work unit to manage
+  // Detail virtual sites for this work unit to manage
   const std::vector<int> relevant_vstes = vdel_pointer->getVirtualSiteAffectors(atom_move_list);
   const size_t nvste = relevant_vstes.size();
   for (size_t pos = 0; pos < nvste; pos++) {
@@ -1136,8 +1360,22 @@ void ValenceWorkUnit::logActivities() {
     vsite_atoms.push_back(import_map[vsk.vs_atoms[vste_idx] - mapping_offset]);
     vsite_frame1_atoms.push_back(import_map[vsk.frame1_idx[vste_idx] - mapping_offset]);
     vsite_frame2_atoms.push_back(import_map[vsk.frame2_idx[vste_idx] - mapping_offset]);
-    vsite_frame3_atoms.push_back(import_map[vsk.frame3_idx[vste_idx] - mapping_offset]);
-    vsite_frame4_atoms.push_back(import_map[vsk.frame4_idx[vste_idx] - mapping_offset]);
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[vste_idx])) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::NONE:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      vsite_frame3_atoms.push_back(import_map[vsk.frame3_idx[vste_idx] - mapping_offset]);
+      break;
+    case VirtualSiteKind::FIXED_4:
+      vsite_frame3_atoms.push_back(import_map[vsk.frame3_idx[vste_idx] - mapping_offset]);
+      vsite_frame4_atoms.push_back(import_map[vsk.frame4_idx[vste_idx] - mapping_offset]);
+      break;
+    }
   }
 
   // Detail the constraint groups for this work unit
@@ -1255,7 +1493,7 @@ void ValenceWorkUnit::logActivities() {
     int max_np = std::min(dihe_presence_bounds[i_atom].y, dihe_presence_bounds[j_atom].y);
     max_np = std::min(max_np, dihe_presence_bounds[k_atom].y);
     max_np = std::min(max_np, dihe_presence_bounds[l_atom].y);
-    for (int npos = min_np; npos < min_np; npos++) {
+    for (int npos = min_np; npos < max_np; npos++) {
       if (coverage[npos] || is_improper[npos]) {
         continue;
       }
@@ -1302,50 +1540,58 @@ void ValenceWorkUnit::logActivities() {
     cdhe_l_atoms.push_back(cimp_l_atoms[pos]);
     coverage[pos] = true;
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> ValenceWorkUnit::getAtomImportList() const {
-  return atom_import_list;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getAtomManipulationMasks() const {
-  const int nbits = static_cast<int>(sizeof(uint)) * 8;
-  const int n_segment = roundUp((imported_atom_count + nbits - 1) / nbits, warp_size_int);
-  std::vector<uint2> result(n_segment, {0U, 0U});
-  for (int i = 0; i < moved_atom_count; i++) {
-    const int seg_idx = (i / nbits);
-    const int bit_idx = i - (seg_idx * nbits);
-    result[seg_idx].x |= (0x1 << bit_idx);
+  cdhe_term_count = cdhe_term_list.size();
+  
+  // CHECK
+  const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
+  std::vector<bool> overlap_seen(vk.ndihe);
+  int n_with_14 = 0;
+  for (int pos = 0; pos < cdhe_term_count; pos++) {
+    const int xterm = cdhe_term_list[pos].x;
+    const int yterm = cdhe_term_list[pos].y;
+    bool x_has_14 = false;
+    bool y_has_14 = false;
+    if (xterm >= 0) {
+      switch (static_cast<TorsionKind>(vk.dihe_modifiers[xterm].w)) {
+      case TorsionKind::PROPER:
+      case TorsionKind::IMPROPER:
+        x_has_14 = true;
+        break;
+      case TorsionKind::PROPER_NO_14:
+      case TorsionKind::IMPROPER_NO_14:
+        x_has_14 = false;
+        break;
+      }
+    }
+    if (yterm >= 0) {
+      switch (static_cast<TorsionKind>(vk.dihe_modifiers[yterm].w)) {
+      case TorsionKind::PROPER:
+      case TorsionKind::IMPROPER:
+        y_has_14 = true;
+        break;
+      case TorsionKind::PROPER_NO_14:
+      case TorsionKind::IMPROPER_NO_14:
+        y_has_14 = false;
+        break;
+      }
+    }
+    if (x_has_14 && y_has_14) {
+      printf("Whoa... Two dihedrals (%4d, %4d) between %4.4s %4.4s %4.4s %4.4s count 1:4 "
+             "interactions.\n", xterm, yterm,
+             char4ToString(cdk.atom_names[atom_import_list[cdhe_i_atoms[pos]]]).c_str(),
+             char4ToString(cdk.atom_names[atom_import_list[cdhe_j_atoms[pos]]]).c_str(),
+             char4ToString(cdk.atom_names[atom_import_list[cdhe_k_atoms[pos]]]).c_str(),
+             char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]).c_str());
+    }
+    else if (x_has_14 || y_has_14) {
+      n_with_14++;
+    }
   }
-  for (int i = 0; i < updated_atom_count; i++) {
-    const int seg_idx = (i / nbits);
-    const int bit_idx = i - (seg_idx * nbits);
-    result[seg_idx].y |= (0x1 << bit_idx);
-  }
-  return result;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<int> ValenceWorkUnit::getTaskCounts() const {
-  std::vector<int> result(static_cast<int>(VwuTask::TOTAL_TASKS));
-  result[static_cast<int>(VwuTask::BOND)]   = bond_term_count;
-  result[static_cast<int>(VwuTask::ANGL)]   = angl_term_count;
-  result[static_cast<int>(VwuTask::DIHE)]   = dihe_term_count;
-  result[static_cast<int>(VwuTask::UBRD)]   = ubrd_term_count;
-  result[static_cast<int>(VwuTask::CIMP)]   = cimp_term_count;
-  result[static_cast<int>(VwuTask::CDHE)]   = cdhe_term_count;
-  result[static_cast<int>(VwuTask::CMAP)]   = cmap_term_count;
-  result[static_cast<int>(VwuTask::INFR14)] = infr14_term_count;
-  result[static_cast<int>(VwuTask::RPOSN)]  = rposn_term_count;
-  result[static_cast<int>(VwuTask::RBOND)]  = rbond_term_count;
-  result[static_cast<int>(VwuTask::RANGL)]  = rangl_term_count;
-  result[static_cast<int>(VwuTask::RDIHE)]  = rdihe_term_count;
-  result[static_cast<int>(VwuTask::CGROUP)] = cnst_group_count;
-  result[static_cast<int>(VwuTask::SETTLE)] = sett_group_count;
-  result[static_cast<int>(VwuTask::VSITE)]  = vste_count;
-  return result;
+  printf("  %4d %4d %4d atoms  %4d %4d %4d %4d %4d %4d -> %4d(%4d) composite dihedrals\n",
+         imported_atom_count, moved_atom_count, updated_atom_count, bond_term_count,
+         angl_term_count, dihe_term_count, ubrd_term_count, cimp_term_count, cmap_term_count,
+         cdhe_term_count, n_with_14);
+  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1402,8 +1648,7 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   // trace back the force terms that must be computed.
   for (int i = 0; i < nvwu; i++) {
     result[i].logActivities();
-  }
-  
+  }  
 
   return result;
 }
