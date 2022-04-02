@@ -179,6 +179,7 @@ enum class WaterModel {
 
 /// \brief Enumerate the virtual site types available in Amber.
 enum class VirtualSiteKind {
+  NONE = 0, ///< No frame type
   FLEX_2,   ///< Flexible two-atom frame: the distance between the virtual site and its parent
             ///<   atom scales with the distance between the parent atom and frame atom 2
   FIXED_2,  ///< Fixed distance, two-atom frame: the distance between the virtual site and its
@@ -198,10 +199,9 @@ enum class VirtualSiteKind {
             ///<   determined in the manner of FLEX_3, then moved out of plane by some proportion
             ///<   of the cross product of the vectors between the parent atom and frame atoms 2
             ///<   or 3.
-  FIXED_4,  ///< Fixed distance, four-atom frame: this places the virtual site at a set distance
+  FIXED_4   ///< Fixed distance, four-atom frame: this places the virtual site at a set distance
             ///<   from its parent atom, along a vector determined by a cross product of vectors
             ///<   between frame atoms 2, 3, and 4
-  NONE      ///< No frame type
 };
   
 /// \brief Produce a string denoting the meaning of a UnitCellType enumeration.

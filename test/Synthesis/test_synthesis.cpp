@@ -8,6 +8,7 @@
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/mixed_types.h"
+#include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Math/sorting.h"
@@ -30,6 +31,8 @@ using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::MapRotatableGroups;
 using omni::constants::ExceptionResponse;
 using omni::constants::verytiny;
+using omni::data_types::uint2;
+using omni::data_types::uint3;
 using omni::data_types::ValueWithCounter;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
@@ -50,6 +53,61 @@ using namespace omni::synthesis;
 using namespace omni::trajectory;
 using namespace omni::testing;
 using namespace omni::topology;
+
+//-------------------------------------------------------------------------------------------------
+// Run a series of tests using valence work units.
+//
+// Arguments:
+//   top_name:      Name of the topology to use
+//   crd_name:      Name of the coordinate file to use
+//   oe:            Operating environment information (for error reporting)
+//-------------------------------------------------------------------------------------------------
+void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd_name,
+                             const TestEnvironment &oe) {
+  const bool files_exist = (getDrivePathType(top_name) == DrivePathType::FILE &&
+                            getDrivePathType(crd_name) == DrivePathType::FILE);
+  if (files_exist == false) {
+    rtWarn("The topology and input coordinates for the DHFR system appear to be missing.  Check "
+           "the ${OMNI_SOURCE} variable (currently " + oe.getOmniSourcePath() + ") to make sure "
+           "that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
+  }
+  const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  AtomGraph ag  = (files_exist) ? AtomGraph(top_name, ExceptionResponse::SILENT) :
+                                  AtomGraph();
+  PhaseSpace ps = (files_exist) ? PhaseSpace(crd_name) : PhaseSpace();
+  const CoordinateFrameReader cfr(ps);
+  const std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&ag, cfr,
+                                                                            "@N,CA,C,O", 1.4);
+  RestraintApparatus ra_i(bkbn_rstr);
+  ValenceDelegator vdel(&ag, &ra_i);
+  const std::vector<ValenceWorkUnit> all_vwu = buildValenceWorkUnits(&vdel);
+  const int n_vwu = all_vwu.size();
+  int nbond = 0;
+  int nangl = 0;
+  int ndihe = 0;
+  int nimpr = 0;
+  int nubrd = 0;
+  int ncimp = 0;
+  int ncmap = 0;
+  for (int i = 0; i < n_vwu; i++) {
+    const std::vector<uint2> bond_insr = all_vwu[i].getCompositeBondInstructions();
+    for (size_t j = 0; j < bond_insr.size(); j++) {
+      if ((bond_insr[j].x >> 20) & 0x1) {
+        nubrd++;
+      }
+      else {
+        nbond++;
+      }
+    }
+    const std::vector<uint2> angl_insr = all_vwu[i].getAngleInstructions();
+    nangl += angl_insr.size();
+    const std::vector<uint3> cdhe_insr = all_vwu[i].getCompositeDihedralInstructions();
+    for (size_t j = 0; j < cdhe_insr.size(); j++) {
+      const bool is_charmm_improper = ((cdhe_insr[j].x >> 30) & 0x1);
+    }
+    printf(" %4d %4zu %4zu %4d\n", nbond, angl_insr.size(), cdhe_insr.size(), nubrd);
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 // Accumulate contributing atoms base on a series of force terms.
@@ -468,7 +526,23 @@ int main(int argc, char* argv[]) {
   RestraintApparatus dhfr_ra_i(bkbn_rstr);
   ValenceDelegator dhfr_vdel(&dhfr_ag, &dhfr_ra_i);
   const std::vector<ValenceWorkUnit> dhfr_vwu = buildValenceWorkUnits(&dhfr_vdel);
-
+  const int ndhfr_vwu = dhfr_vwu.size();
+  for (int i = 0; i < ndhfr_vwu; i++) {
+    const std::vector<uint2> bond_insr = dhfr_vwu[i].getCompositeBondInstructions();
+    int nbond = 0;
+    int nubrd = 0;
+    for (size_t j = 0; j < bond_insr.size(); j++) {
+      if ((bond_insr[j].x >> 20) & 0x1) {
+        nubrd++;
+      }
+      else {
+        nbond++;
+      }
+    }
+    const std::vector<uint2> angl_insr = dhfr_vwu[i].getAngleInstructions();
+    const std::vector<uint3> cdhe_insr = dhfr_vwu[i].getCompositeDihedralInstructions();
+    printf(" %4d %4zu %4zu %4d\n", nbond, angl_insr.size(), cdhe_insr.size(), nubrd);
+  }
 
   // Read a solvated topology that will be forced to split its contents among work units, and
   // include water molecules with SETTLE constraint groups.
@@ -492,7 +566,7 @@ int main(int argc, char* argv[]) {
   RestraintApparatus ubiq_ra_i(ubq_bkbn_rstr);
   ValenceDelegator ubiq_vdel(&ubiq_ag, &ubiq_ra_i);
   const std::vector<ValenceWorkUnit> ubiq_vwu = buildValenceWorkUnits(&ubiq_vdel);
-
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

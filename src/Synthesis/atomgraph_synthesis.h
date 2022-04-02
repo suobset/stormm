@@ -712,7 +712,8 @@ private:
   /// Instructions for bond stretching and Urey-Bradley interactions.  Each uint2 tuple contains
   /// two atom indices in the x member (bits 1-10 and 11-20) and the parameter index of the bond /
   /// Urey-Bradley term in the y member.  A flag in the 21st bit of the x member indicates whether
-  /// the energy should contribute to the Urey-Bradley sum (if set to 1) or the harmonic bond sum.
+  /// the term is a Urey-Bradley item a harmonic bond, which direct parameter choices as well as
+  /// energy accumulation.
   Hybrid<uint2> cbnd_instructions;
 
   /// Instructions for angle bending and three-body NMR restraint interactions.  Each uint2 tuple
@@ -787,8 +788,54 @@ private:
   /// parameter sets in a single AtomGraphSynthesis.
   Hybrid<uint2> rdihe_instructions;
 
+  /// Instructions for virtual site placement and force transfer to frame atoms.  Each uint2 tuple
+  /// contains the index of the virtual site itself in the x member (bits 1-10), plus up to two
+  /// frame atom indices (bits 11-20 and 21-30).  The third and fourth frame atom indices
+  /// are found in the y member (if a third or fourth atom are even part of the frame).  The frame
+  /// parameter index (which indicates the frame type and up to three frame dimensions) is
+  /// presented in the final twelve bits (21-32) of the y member.  More can be done with the
+  /// remaining bits to increase the number of available virtual site frame parameters, if needed.
+  Hybrid<uint2> vste_instructions;
+
+  /// Instructions for SETTLE group constraints.  These are relatively simple: three atom indices
+  /// are encoded in bits 1-10, 11-20, and 21-30 of the x member, while the constraint parameter
+  /// set (multiple SETTLE configurations are supported in one simulation) is stored in the
+  /// y member.
+  Hybrid<uint2> sett_instructions;
+
+  /// Instructions for hub-and-spoke constraint groups.  These are more complex: there size of the
+  /// constraint group itself is uncertain, but for practical purposes the number of participating
+  /// atoms will be limited to sixteen.  Each instruction pertains to one bond of the group,
+  /// providing the atom index of the central (heavy) atom in bits 1-10 of the x member and the
+  /// atom index of the light atom (hydrogen) in bits 11-20 of the x member.  The number of
+  /// thread participating in evaluating this group is given in bits 21-24 and the number of
+  /// constrained bonds is given in 25-28.  The parameter index indicating the target equilibrium
+  /// length for this constraint group is given in the y member.  Masses of each atom involved will
+  /// be read from global parameter tables and cached in L1 for this and subsequent atom updates.
+  Hybrid<uint2> cnst_instructions;
+
+  // Instructions for evaluating energy terms--these are stored as extra arrays, as they will only
+  // be called when evaluating energies, and offer a compact format in which each interaction in
+  // the list is a bit in a bitstring, (1) indicating that the work unit should contribute the
+  // interaction to its sum, (0) indicating that the work unit should omit the interaction.
+  // All of these are POINTER-kind objects targeting insr_uint_data.
+  Hybrid<uint> accumulate_cbnd_energy;   ///< Contribute harmonic bond or Urey-Bradley energies to
+                                         ///<   the total
+  Hybrid<uint> accumulate_angl_energy;   ///< Contribute harmonic angle energies to the total
+  Hybrid<uint> accumulate_cdhe_energy;   ///< Contribute proper and improper cosine-based dihedral
+                                         ///<   or CHARMM improper dihedral energies to the total
+  Hybrid<uint> accumulate_cmap_energy;   ///< Contribute CMAP energies to the total
+  Hybrid<uint> accumulate_infr14_energy; ///< Contribute CMAP energies to the total
+  Hybrid<uint> accumulate_rposn_energy;  ///< Contribute positional restraint energies to the total
+                                         ///<   (this information could be implicit in directives
+                                         ///<   to log an update to the atom, but it is not a great
+                                         ///<   bandwidth burden and is included for consistency)
+  Hybrid<uint> accumulate_rbond_energy;  ///< Contribute distance restraint energies
+  Hybrid<uint> accumulate_rangl_energy;  ///< Contribute three-point angle restraint energies
+  Hybrid<uint> accumulate_rdihe_energy;  ///< Contribute four-point dihedral restraint energies
+  
   /// Collected array of all uint instructions
-  Hybrid<uint2> insr_uint_data;
+  Hybrid<uint> insr_uint_data;
 
   /// Collected array of all uint2 instructions
   Hybrid<uint2> insr_uint2_data;

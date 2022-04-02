@@ -270,6 +270,18 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rbond_instructions{HybridKind::POINTER, "tpsyn_nmr2_insr"},
     rangl_instructions{HybridKind::POINTER, "tpsyn_nmr3_insr"},
     rdihe_instructions{HybridKind::POINTER, "tpsyn_nmr4_insr"},
+    vste_instructions{HybridKind::POINTER, "tpsyn_vste_insr"},
+    sett_instructions{HybridKind::POINTER, "tpsyn_sett_insr"},
+    cnst_instructions{HybridKind::POINTER, "tpsyn_cnst_insr"},
+    accumulate_cbnd_energy{HybridKind::POINTER, "tpsyn_cbnd_edir"},
+    accumulate_angl_energy{HybridKind::POINTER, "tpsyn_angl_edir"},
+    accumulate_cdhe_energy{HybridKind::POINTER, "tpsyn_cdhe_edir"},
+    accumulate_cmap_energy{HybridKind::POINTER, "tpsyn_cmap_edir"},
+    accumulate_infr14_energy{HybridKind::POINTER, "tpsyn_infr14_edir"},
+    accumulate_rposn_energy{HybridKind::POINTER, "tpsyn_rposn_edir"},
+    accumulate_rbond_energy{HybridKind::POINTER, "tpsyn_rbond_edir"},
+    accumulate_rangl_energy{HybridKind::POINTER, "tpsyn_rangl_edir"},
+    accumulate_rdihe_energy{HybridKind::POINTER, "tpsyn_rdihe_edir"},
     insr_uint_data{HybridKind::ARRAY, "tpsyn_insr_data1"},
     insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data2"}
 {

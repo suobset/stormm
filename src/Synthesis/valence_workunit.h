@@ -32,10 +32,10 @@ constexpr int maximum_valence_work_unit_atoms = 768;
 ///        but allow more to let whatever erroneous pattern become clear for debugging purposes.
 constexpr int max_atom_search_stacks = 8;
 
-/// \brief Padding to ensure that there is enough space in most work units for halo atoms needed
-///        to evaluate forces and move partners for any atoms that the work unit needs to update.
-constexpr int default_vwu_halo_padding = 32;
-
+/// \brief The maximum size of any constraint group.  This limit is imposed to ensure that one
+///        warp can handle each constraint group, and the Intel GPU warp size is 16.
+constexpr int max_constraint_group_size = 16;
+  
 /// \brief Enumerate the different tasks that this work unit can perform.
 enum class VwuTask {
   BOND = 0,    ///< Harmonic bond interactions
@@ -419,6 +419,11 @@ public:
   ///        and the y members making a mask for each segment of assigned update atoms.
   std::vector<uint2> getAtomManipulationMasks() const;
 
+  /// \brief Get the padded size of the largest constraint group.  The padding extends the size of
+  ///        each constraint group in the work unit to the minimum factor of two, with a maximum
+  ///        allowed size of 16.
+  int getMaxConstraintGroupPaddedSize() const;
+
   /// \brief Get a vector describing the number of each type of item this work unit can be tasked
   ///        to perform.
   std::vector<int> getTaskCounts() const;
@@ -476,33 +481,60 @@ public:
   ///        restraint settings (k(2,3), r(1,2,3,4), and x / y / z targets) can be condensed by
   ///        an AtomGraphSynthesis.
   ///
-  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
-  /// \param xyz_param_map  Mapping for Cartesian coordinate targets
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
+  /// \param xyz_param_map  Mapping for Cartesian coordinate targets (optional)
   std::vector<uint2>
-  getPositionalRestraintInstructions(const std::vector<int> &kr_param_map,
-                                     const std::vector<int> &xyz_param_map) const;
+  getPositionalRestraintInstructions(const std::vector<int> &kr_param_map = {},
+                                     const std::vector<int> &xyz_param_map = {}) const;
 
   /// \brief Get a vector of the distance restraint instructions for this work unit.  This
   ///        function accepts a parameter interpretation table showing how the raw list of
   ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
   ///
-  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
-  std::vector<uint2> getDistanceRestraintInstructions(const std::vector<int> &kr_param_map) const;
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
+  std::vector<uint2>
+  getDistanceRestraintInstructions(const std::vector<int> &kr_param_map = {}) const;
 
   /// \brief Get a vector of the three-point angle restraint instructions for this work unit.
   ///        This function accepts a parameter interpretation table showing how the raw list of
   ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
   ///
-  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
-  std::vector<uint2> getAngleRestraintInstructions(const std::vector<int> &kr_param_map) const;
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
+  std::vector<uint2>
+  getAngleRestraintInstructions(const std::vector<int> &kr_param_map = {}) const;
 
   /// \brief Get a vector of the four-point dihedral restraint instructions for this work unit.
   ///        This function accepts a parameter interpretation table showing how the raw list of
   ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
   ///
-  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings
-  std::vector<uint2> getDihedralRestraintInstructions(const std::vector<int> &kr_param_map) const;
+  /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
+  std::vector<uint2>
+  getDihedralRestraintInstructions(const std::vector<int> &kr_param_map = {}) const;
 
+  /// \brief Get a vector of the virtual site instructions for this work unit.  This function
+  ///        accepts a parameter interpretation table showing how the raw list of unique virtual
+  ///        site frames from one topology maps into a larger selection kept by an
+  ///        AtomGraphSynthesis.
+  ///
+  /// \param parameter_map  Mapping for virtual site frame specifications (optional)
+  std::vector<uint2> getVirtualSiteInstructions(const std::vector<int> &parameter_map = {}) const;
+
+  /// \brief Get a vector of the SETTLE constraint group instructions for this work unit.  This
+  ///        function accepts a parameter interpretation table showing how the raw list of unique
+  ///        SETTLE geometries in one topology maps into a possibly more diverse list curated by
+  ///        an AtomGraphSynthesis.
+  ///
+  /// \param parameter_map  Mapping for SETTLE group mass and geometry specifications (optional)
+  std::vector<uint2> getSettleGroupInstructions(const std::vector<int> &parameter_map = {}) const;
+
+  /// \brief Get a vector of the hub-and-spoke constraint group instructions for this work unit.
+  ///        This function accepts a parameter interpretation table showing how the raw list of
+  ///        unique constraint groups in one topology maps into a possibly more diverse list
+  ///        curated by an AtomGraphSynthesis.
+  std::vector<uint2>
+  getConstraintGroupInstructions(const std::vector<int> &parameter_map = {},
+                                 const std::vector<int> &group_param_bounds = {}) const;
+  
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
 
@@ -612,11 +644,11 @@ private:
                                       ///<   computed by this work unit
   std::vector<int> cmap_term_list;    ///< List of CMAP terms to be computed by this work unit
   std::vector<int> infr14_term_list;  ///< List of inferred 1:4 attenuated interaction terms
-  std::vector<int> bond_i_atoms;      ///< List of I atoms in each harmonic bond computed by this
-                                      ///<   work unit, tracking the order in bond_term_list but
-                                      ///<   indicating the local indices of imported atoms
-  std::vector<int> bond_j_atoms;      ///< List of J atoms in each harmonic bond computed by this
-                                      ///<   work unit, indicating local atom indices
+
+  // List of local indices for atoms participating in each task (energy term, virtual site,
+  // or constraint group) for which the work unit is responsible
+  std::vector<int> bond_i_atoms;      ///< List of I atoms in each harmonic bond
+  std::vector<int> bond_j_atoms;      ///< List of J atoms in each harmonic bond
   std::vector<int> angl_i_atoms;      ///< List of local indices for I atoms in each angle term
   std::vector<int> angl_j_atoms;      ///< List of local indices for J atoms in each angle term
   std::vector<int> angl_k_atoms;      ///< List of local indices for K atoms in each angle term
@@ -672,6 +704,20 @@ private:
   std::vector<int> rdihe_k_atoms;    ///< Local indices for K atoms subject to dihedral restraints
   std::vector<int> rdihe_l_atoms;    ///< Local indices for L atoms subject to dihedral restraints
 
+  // Bit string directives on whether to contribute energies to the work unit's reported total
+  std::vector<uint> acc_bond_energy;    ///< Accumulator flags for bond energy terms
+  std::vector<uint> acc_angl_energy;    ///< Accumulator flags for harmonic angle energy terms
+  std::vector<uint> acc_dihe_energy;    ///< Accumulator flags for dihedral energy terms
+  std::vector<uint> acc_ubrd_energy;    ///< Accumulator flags for Urey-Bradley energy terms
+  std::vector<uint> acc_cimp_energy;    ///< Accumulator flags for CHARMM improper energy terms
+  std::vector<uint> acc_cmap_energy;    ///< Accumulator flags for CMAP energy terms
+  std::vector<uint> acc_infr14_energy;  ///< Accumulator flags for inferred 1:4 energy terms
+  std::vector<uint> acc_rposn_energy;   ///< Accumulator flags for positional restraint energies
+  std::vector<uint> acc_rbond_energy;   ///< Accumulator flags for distance restraint energies
+  std::vector<uint> acc_rangl_energy;   ///< Accumulator flags for angle restraint energies
+  std::vector<uint> acc_rdihe_energy;   ///< Accumulator flags for dihedral restraint energies
+  std::vector<uint> acc_cdhe_energy;    ///< Accumulator flags for composite dihedral energies
+
   // Constraint groups for this work unit
   std::vector<int> cnst_group_list;    ///< List of constraint groups, indexing into the group
                                        ///<   enumerated in the original topology, that this
@@ -683,7 +729,7 @@ private:
                                        ///<   topology, assigned to this work unit
   std::vector<int> cnst_group_atoms;   ///< Local indices of atoms in all constrained groups.
                                        ///<   The bounds of this list, delineating separate groups,
-                                       ///<  are found in cnst_group_bounds.
+                                       ///<   are found in cnst_group_bounds.
   std::vector<int> cnst_group_bounds;  ///< Bounds array for cnst_group_atoms
   std::vector<int> sett_ox_atoms;      ///< Local indices of oxygen atoms in each of this work
                                        ///<   unit's SETTLE groups
@@ -713,6 +759,7 @@ private:
   const AtomGraph *ag_pointer;           ///< Pointer to the topology to which this object pertains
   const RestraintApparatus *ra_pointer;  ///< Pointer to the restraint apparatus to which this
                                          ///<   object pertains
+
 };
 
 /// \brief Build a series of valence work units to cover a topology.
