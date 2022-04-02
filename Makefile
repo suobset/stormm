@@ -23,6 +23,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Math/rounding.cpp \
 		 $(SRCDIR)/Math/series_ops.cpp \
 		 $(SRCDIR)/Math/statistics.cpp \
+		 $(SRCDIR)/Math/vector_ops.cpp \
 		 $(SRCDIR)/MoleculeFormat/mdl_mol_format.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
 	         $(SRCDIR)/Namelists/namelist_element.cpp \
@@ -213,6 +214,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Math/rounding.o \
 	        $(SRCDIR)/Math/series_ops.o \
 	        $(SRCDIR)/Math/statistics.o \
+	        $(SRCDIR)/Math/vector_ops.o \
 	        $(SRCDIR)/MoleculeFormat/mdl_mol_format.o \
 		$(SRCDIR)/Namelists/input.o \
 	        $(SRCDIR)/Namelists/namelist_element.o \

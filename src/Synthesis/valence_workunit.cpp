@@ -10,6 +10,7 @@
 namespace omni {
 namespace synthesis {
 
+using math::accumulateBitmask;
 using math::DataOrder;
 using math::locateValue;
 using math::maxValue;
@@ -461,7 +462,62 @@ std::vector<int> ValenceDelegator::getUpdateDependencies(const int atom_index) c
 int ValenceDelegator::getUpdateWorkUnit(const int atom_index) const {
   return assigned_update_work_units[atom_index];
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getBondAccumulatorWorkUnit(const int bond_index) const {
+  return assigned_bond_acc_work_units[bond_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getAngleAccumulatorWorkUnit(const int angl_index) const {
+  return assigned_angl_acc_work_units[angl_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getDihedralAccumulatorWorkUnit(const int dihe_index) const {
+  return assigned_dihe_acc_work_units[dihe_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getUreyBradleyAccumulatorWorkUnit(const int ubrd_index) const {
+  return assigned_ubrd_acc_work_units[ubrd_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getCharmmImproperAccumulatorWorkUnit(const int cimp_index) const {
+  return assigned_cimp_acc_work_units[cimp_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getCmapAccumulatorWorkUnit(const int cmap_index) const {
+  return assigned_cmap_acc_work_units[cmap_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getInferred14AccumulatorWorkUnit(const int infr14_index) const {
+  return assigned_infr14_acc_work_units[infr14_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getPositionalRestraintAccumulatorWorkUnit(const int rposn_index) const {
+  return assigned_rposn_acc_work_units[rposn_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getDistanceRestraintAccumulatorWorkUnit(const int rbond_index) const {
+  return assigned_rbond_acc_work_units[rbond_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getAngleRestraintAccumulatorWorkUnit(const int rangl_index) const {
+  return assigned_rangl_acc_work_units[rangl_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int ValenceDelegator::getDihedralRestraintAccumulatorWorkUnit(const int rdihe_index) const {
+  return assigned_rdihe_acc_work_units[rdihe_index];
+}
+
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* ValenceDelegator::getTopologyPointer() const {
   return ag_pointer;
@@ -1678,9 +1734,7 @@ void ValenceWorkUnit::logActivities() {
     bond_i_atoms.push_back(import_map[vk.bond_i_atoms[bond_idx] - mapping_offset]);
     bond_j_atoms.push_back(import_map[vk.bond_j_atoms[bond_idx] - mapping_offset]);
     if (vdel_pointer->setBondAccumulatorWorkUnit(bond_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_bond_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_bond_energy, pos);
     }
   }
   const std::vector<int> relevant_angls = vdel_pointer->getAngleAffectors(atom_move_list);
@@ -1693,9 +1747,7 @@ void ValenceWorkUnit::logActivities() {
     angl_j_atoms.push_back(import_map[vk.angl_j_atoms[angl_idx] - mapping_offset]);
     angl_k_atoms.push_back(import_map[vk.angl_k_atoms[angl_idx] - mapping_offset]);
     if (vdel_pointer->setAngleAccumulatorWorkUnit(angl_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_angl_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_angl_energy, pos);
     }
   }
   const std::vector<int> relevant_dihes = vdel_pointer->getDihedralAffectors(atom_move_list);
@@ -1709,9 +1761,7 @@ void ValenceWorkUnit::logActivities() {
     dihe_k_atoms.push_back(import_map[vk.dihe_k_atoms[dihe_idx] - mapping_offset]);
     dihe_l_atoms.push_back(import_map[vk.dihe_l_atoms[dihe_idx] - mapping_offset]);
     if (vdel_pointer->setDihedralAccumulatorWorkUnit(dihe_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_dihe_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_dihe_energy, pos);
     }
   }
   const std::vector<int> relevant_ubrds = vdel_pointer->getUreyBradleyAffectors(atom_move_list);
@@ -1723,9 +1773,7 @@ void ValenceWorkUnit::logActivities() {
     ubrd_i_atoms.push_back(import_map[vk.ubrd_i_atoms[ubrd_idx] - mapping_offset]);
     ubrd_k_atoms.push_back(import_map[vk.ubrd_k_atoms[ubrd_idx] - mapping_offset]);
     if (vdel_pointer->setUreyBradleyAccumulatorWorkUnit(ubrd_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_ubrd_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_ubrd_energy, pos);
     }
   }
   const std::vector<int> relevant_cimps = vdel_pointer->getCharmmImproperAffectors(atom_move_list);
@@ -1739,9 +1787,7 @@ void ValenceWorkUnit::logActivities() {
     cimp_k_atoms.push_back(import_map[vk.cimp_k_atoms[cimp_idx] - mapping_offset]);
     cimp_l_atoms.push_back(import_map[vk.cimp_l_atoms[cimp_idx] - mapping_offset]);
     if (vdel_pointer->setCharmmImproperAccumulatorWorkUnit(cimp_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_cimp_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_cimp_energy, pos);
     }
   }
   const std::vector<int> relevant_cmaps = vdel_pointer->getCmapAffectors(atom_move_list);
@@ -1756,9 +1802,7 @@ void ValenceWorkUnit::logActivities() {
     cmap_l_atoms.push_back(import_map[vk.cmap_l_atoms[cmap_idx] - mapping_offset]);
     cmap_m_atoms.push_back(import_map[vk.cmap_m_atoms[cmap_idx] - mapping_offset]);
     if (vdel_pointer->setCmapAccumulatorWorkUnit(cmap_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_cmap_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_cmap_energy, pos);
     }
   }
   const std::vector<int> relevant_infrs = vdel_pointer->getInferred14Affectors(atom_move_list);
@@ -1770,9 +1814,7 @@ void ValenceWorkUnit::logActivities() {
     infr14_i_atoms.push_back(import_map[vk.infr14_i_atoms[infr_idx] - mapping_offset]);
     infr14_l_atoms.push_back(import_map[vk.infr14_l_atoms[infr_idx] - mapping_offset]);
     if (vdel_pointer->setInferred14AccumulatorWorkUnit(infr_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_infr14_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_infr14_energy, pos);
     }
   }
 
@@ -1786,9 +1828,7 @@ void ValenceWorkUnit::logActivities() {
     rposn_term_list.push_back(rposn_idx);
     rposn_atoms.push_back(import_map[rar.rposn_atoms[rposn_idx] - mapping_offset]);
     if (vdel_pointer->setPositionalRestraintAccumulatorWorkUnit(rposn_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_rposn_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_rposn_energy, pos);
     }
   }
   const std::vector<int> relevant_rbonds =
@@ -1801,9 +1841,7 @@ void ValenceWorkUnit::logActivities() {
     rbond_i_atoms.push_back(import_map[rar.rbond_i_atoms[rbond_idx] - mapping_offset]);
     rbond_j_atoms.push_back(import_map[rar.rbond_j_atoms[rbond_idx] - mapping_offset]);
     if (vdel_pointer->setDistanceRestraintAccumulatorWorkUnit(rbond_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_rbond_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_rbond_energy, pos);
     }
   }
   const std::vector<int> relevant_rangls =
@@ -1817,9 +1855,7 @@ void ValenceWorkUnit::logActivities() {
     rangl_j_atoms.push_back(import_map[rar.rangl_j_atoms[rangl_idx] - mapping_offset]);
     rangl_k_atoms.push_back(import_map[rar.rangl_k_atoms[rangl_idx] - mapping_offset]);
     if (vdel_pointer->setAngleRestraintAccumulatorWorkUnit(rangl_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_rangl_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_rangl_energy, pos);
     }
   }
   const std::vector<int> relevant_rdihes =
@@ -1834,9 +1870,7 @@ void ValenceWorkUnit::logActivities() {
     rdihe_k_atoms.push_back(import_map[rar.rdihe_k_atoms[rdihe_idx] - mapping_offset]);
     rdihe_l_atoms.push_back(import_map[rar.rdihe_l_atoms[rdihe_idx] - mapping_offset]);
     if (vdel_pointer->setDihedralRestraintAccumulatorWorkUnit(rdihe_idx, list_index)) {
-      const int acc_elem = pos / uint_bits;
-      const int acc_bit  = pos - (acc_elem * uint_bits);
-      acc_rdihe_energy[acc_elem] |= (0x1 << acc_bit);
+      accumulateBitmask(&acc_rdihe_energy, pos);
     }
   }
 
@@ -2037,8 +2071,13 @@ void ValenceWorkUnit::logActivities() {
   // different work units (which should be impossible, as work unit are built sequentially and all
   // dihedrals involving any four atoms will be present in any work unit that moves one of those
   // atoms), set this work unit to accumulate the potential if it controls the dihedral with the
-  // lower topological term index.
-
+  // lower topological term index.  
+  acc_cdhe_energy.resize((cdhe_term_count + uint_bits_m1) / uint_bits);
+  for (int pos = 0; pos < cdhe_term_count; pos++) {
+    if (cdhe_is_cimp[pos]) {
+      accumulateBitmask(&acc_cdhe_energy, pos);
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2079,7 +2118,7 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
     const int n_units = result.size();
     result.emplace_back(vdel, n_units, vdel->getFirstUnassignedAtom(), max_atoms_per_vwu);
   }
-
+  
   // Loop once more over the update list and construct the atom movement list.  The movement list
   // is a superset of all the atoms that the work unit will update, and the import list is a
   // superset of the movement list.  This completes the atom sets that define any work unit.
@@ -2096,7 +2135,6 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   for (int i = 0; i < nvwu; i++) {
     result[i].logActivities();
   }  
-
   return result;
 }
 

@@ -541,7 +541,6 @@ int main(int argc, char* argv[]) {
     }
     const std::vector<uint2> angl_insr = dhfr_vwu[i].getAngleInstructions();
     const std::vector<uint3> cdhe_insr = dhfr_vwu[i].getCompositeDihedralInstructions();
-    printf(" %4d %4zu %4zu %4d\n", nbond, angl_insr.size(), cdhe_insr.size(), nubrd);
   }
 
   // Read a solvated topology that will be forced to split its contents among work units, and

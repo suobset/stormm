@@ -545,6 +545,26 @@ template <typename T> std::vector<ValueWithCounter<T>>
 findUnmatchedValues(const Hybrid<T> &va, const Hybrid<T> &vb,
                     UniqueValueHandling check_repeats = UniqueValueHandling::UNIQUE_VALUES_ONLY);
 /// \}
+
+/// \brief Log a result in an array of unsigned integers to accumulate a bitmask.
+///
+/// Overloaded:
+///   - Use unsigned integers
+///   - Use long long unsigned integers
+///   - Use short unsigned integers
+///   - Operate on a C-style array trusted to be of sufficient length, or a Standard Template
+///     Library vector (the size will be checked)
+///
+/// \param va   The developing bit mask
+/// \param pos  The index of the bit mask to color by setting the bit to 1
+/// \{
+void accumulateBitmask(uint* va, const size_t pos);
+void accumulateBitmask(std::vector<uint> *va, const size_t pos);
+void accumulateBitmask(ullint* va, const size_t pos);
+void accumulateBitmask(std::vector<ullint> *va, const size_t pos);
+void accumulateBitmask(ushort* va, const size_t pos);
+void accumulateBitmask(std::vector<ushort> *va, const size_t pos);
+/// \}
   
 } // namespace math
 } // namespace omni

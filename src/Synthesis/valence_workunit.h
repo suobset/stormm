@@ -221,6 +221,72 @@ public:
   /// \param atom_index  Topological index of the atom of interest
   int getUpdateWorkUnit(int atom_index) const;
 
+  /// \brief Get the work unit currently assigned to contribute a particular bond term's energy
+  ///        into the global accumulator.
+  ///
+  /// \param bond_index  Topological index of the bond term of interest
+  int getBondAccumulatorWorkUnit(const int bond_index) const;
+  
+  /// \brief Get the work unit currently assigned to contribute a particular harmonic angle term's
+  ///        energy into the global accumulator.
+  ///
+  /// \param angl_index  Topological index of the angle term of interest
+  int getAngleAccumulatorWorkUnit(const int angl_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular cosine-based dihedral
+  ///        term's energy into the global accumulator.
+  ///
+  /// \param dihe_index  Topological index of the cosine-based dihedral term of interest
+  int getDihedralAccumulatorWorkUnit(const int dihe_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular Urey-Bradley term's
+  ///        energy into the global accumulator.
+  ///
+  /// \param ubrd_index  Topological index of the Urey-Bradley term of interest
+  int getUreyBradleyAccumulatorWorkUnit(const int ubrd_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular CHARMM improper
+  ///        dihedral term's energy into the global accumulator.
+  ///
+  /// \param cimp_index  Topological index of the CHARMM improper term of interest
+  int getCharmmImproperAccumulatorWorkUnit(const int cimp_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular CMAP term's energy
+  ///        into the global accumulator.
+  ///
+  /// \param cmap_index  Topological index of the CMAP surface term of interest
+  int getCmapAccumulatorWorkUnit(const int cmap_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular inferred 1:4
+  ///        attenuated pair interaction energy into the global accumulator.
+  ///
+  /// \param infr14_index  Topological index of the inferred 1:4 interaction of interest
+  int getInferred14AccumulatorWorkUnit(const int infr14_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular positional restraint
+  ///        penalty energy into the global accumulator.
+  ///
+  /// \param rposn_index  Index of the positional restraint in the restraint apparatus
+  int getPositionalRestraintAccumulatorWorkUnit(const int rposn_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular distance restraint
+  ///        penalty energy into the global accumulator.
+  ///
+  /// \param rbond_index  Index of the distance restraint in the restraint apparatus
+  int getDistanceRestraintAccumulatorWorkUnit(const int rbond_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular three-point angle
+  ///        restraint penalty energy into the global accumulator.
+  ///
+  /// \param rangl_index  Index of the three-point angle restraint in the restraint apparatus
+  int getAngleRestraintAccumulatorWorkUnit(const int rangl_index) const;
+
+  /// \brief Get the work unit currently assigned to contribute a particular four-point dihedral
+  ///        restraint penalty energy into the global accumulator.
+  ///
+  /// \param rdihe_index  Index of the four-point dihedral restraint in the restraint apparatus
+  int getDihedralRestraintAccumulatorWorkUnit(const int rdihe_index) const;
+
   /// \brief Get a pointer to the topology that this delegator was built for.
   const AtomGraph* getTopologyPointer() const;
   

@@ -15,6 +15,7 @@ namespace chemistry {
 
 using card::HybridKind;
 using topology::TorsionKind;
+using math::accumulateBitmask;
 using math::crossProduct;
 using math::dot;
 using math::numberSeriesToBitMask;
@@ -1492,9 +1493,7 @@ std::vector<uint> ChemicalFeatures::getRingMask(const int min_ring_size,
     const int rsize = rb_ptr[i + 1] - rb_ptr[i];
     if (rsize >= min_ring_size && rsize <= max_ring_size) {
       for (int j = rb_ptr[i]; j < rb_ptr[i + 1]; j++) {
-        const int mask_idx = ra_ptr[j] / n_bits;
-        const int bit_idx  = ra_ptr[j] - (mask_idx * n_bits);
-        result[mask_idx] |= (0x1 << bit_idx);
+        accumulateBitmask(&result, ra_ptr[j]);
       }
     }
   }
@@ -1515,9 +1514,7 @@ std::vector<uint> ChemicalFeatures::getAromaticMask(const int min_pi_electrons,
   for (int i = 0; i < ring_count; i++) {
     if (amp_ptr[i] >= min_pi_electrons && amp_ptr[i] <= max_pi_electrons) {
       for (int j = amb_ptr[i]; j < amb_ptr[i + 1]; j++) {
-        const int mask_idx = ama_ptr[j] / n_bits;
-        const int bit_idx  = ama_ptr[j] - (mask_idx * n_bits);
-        result[mask_idx] |= (0x1 << bit_idx);
+        accumulateBitmask(&result, ama_ptr[j]);
       }
     }
   }
