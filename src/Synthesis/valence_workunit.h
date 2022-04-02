@@ -246,7 +246,95 @@ public:
   /// \param atom_index  The topological index of the atom of interest
   /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing  
   bool setUpdateWorkUnit(int atom_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a specific bond
+  ///        interaction.  Returns TRUE if the assignment is successful, FALSE if the assignment
+  ///        has already been made to some other work unit.
+  ///
+  /// \param bond_index  The topological index of the bond term of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setBondAccumulatorWorkUnit(int bond_index, int vwu_index);
   
+  /// \brief Mark the work unit that will accumulate the potential due to a specific harmonic angle
+  ///        interaction.  Returns TRUE if the assignment is successful, FALSE if the assignment
+  ///        has already been made to some other work unit.
+  ///
+  /// \param angl_index  The topological index of the harmonic angle term of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setAngleAccumulatorWorkUnit(int angl_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a specific cosine-based
+  ///        dihedral interaction.  Returns TRUE if the assignment is successful, FALSE if the
+  ///        assignment has already been made to some other work unit.
+  ///
+  /// \param dihe_index  The topological index of the dihedral term of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setDihedralAccumulatorWorkUnit(int dihe_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a specific Urey-Bradley
+  ///        interaction.  Returns TRUE if the assignment is successful, FALSE if the assignment
+  ///        has already been made to some other work unit.
+  ///
+  /// \param ubrd_index  The topological index of the Urey-Bradley term of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setUreyBradleyAccumulatorWorkUnit(int ubrd_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a specific CHARMM
+  ///        improper dihedral interaction.  Returns TRUE if the assignment is successful, FALSE
+  ///        if the assignment has already been made to some other work unit.
+  ///
+  /// \param cimp_index  The topological index of the CHARMM improper dihedral term of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setCharmmImproperAccumulatorWorkUnit(int cimp_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a specific CMAP splined
+  ///        surface interaction.  Returns TRUE if the assignment is successful, FALSE if the
+  ///        assignment has already been made to some other work unit.
+  ///
+  /// \param cmap_index  The topological index of the CMAP term of interest
+  /// \param vwu_index   Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setCmapAccumulatorWorkUnit(int cmap_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a specific inferred 1:4
+  ///        non-bonded, attenuated interaction.  Returns TRUE if the assignment is successful,
+  ///        FALSE if the assignment has already been made to some other work unit.
+  ///
+  /// \param infr14_index  The topological index of the CMAP term of interest
+  /// \param vwu_index     Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setInferred14AccumulatorWorkUnit(int infr14_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a positional restraint.
+  ///        Returns TRUE if the assignment is successful, FALSE if the assignment has already
+  ///        been made to some other work unit.
+  ///
+  /// \param rposn_index  The restraint apparatus index of the restraint of interest
+  /// \param vwu_index    Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setPositionalRestraintAccumulatorWorkUnit(int rposn_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a distance restraint.
+  ///        Returns TRUE if the assignment is successful, FALSE if the assignment has already
+  ///        been made to some other work unit.
+  ///
+  /// \param rbond_index  The restraint apparatus index of the restraint of interest
+  /// \param vwu_index    Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setDistanceRestraintAccumulatorWorkUnit(int rbond_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a three-point angle
+  ///        restraint.  Returns TRUE if the assignment is successful, FALSE if the assignment has
+  ///        already been made to some other work unit.
+  ///
+  /// \param rangl_index  The restraint apparatus index of the restraint of interest
+  /// \param vwu_index    Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setAngleRestraintAccumulatorWorkUnit(int rangl_index, int vwu_index);
+
+  /// \brief Mark the work unit that will accumulate the potential due to a four-point dihedral
+  ///        restraint.  Returns TRUE if the assignment is successful, FALSE if the assignment has
+  ///        already been made to some other work unit.
+  ///
+  /// \param rdihe_index  The restraint apparatus index of the restraint of interest
+  /// \param vwu_index    Index of the ValenceWorkUnit in a list that this delegator is managing
+  bool setDihedralRestraintAccumulatorWorkUnit(int rdihe_index, int vwu_index);
+
 private:
   int atom_count;                 ///< The number of atoms in the system overall (taken from the
                                   ///<   topology)
@@ -324,6 +412,29 @@ private:
                                                 ///<   update (and log) each atom's position and
                                                 ///<   velocity in the master coordinate set
 
+  // Simple energy terms must leave a record of the work units that will be responsible for
+  // accumulating their values in the total reported energy.  Multiple work units may evaluate
+  // each energy term, but only one must contribute.
+  std::vector<int> assigned_bond_acc_work_units;   ///< Work units assigned to log each bond term
+  std::vector<int> assigned_angl_acc_work_units;   ///< Work units assigned to log each angle term
+  std::vector<int> assigned_dihe_acc_work_units;   ///< Work units assigned to log each dihedral
+  std::vector<int> assigned_ubrd_acc_work_units;   ///< Work units assigned to log each
+                                                   ///<   Urey-Bradley term
+  std::vector<int> assigned_cimp_acc_work_units;   ///< Work units assigned to log each CHARMM
+                                                   ///<   improper dihedral term
+  std::vector<int> assigned_cmap_acc_work_units;   ///< Work units assigned to log each CMAP term
+  std::vector<int> assigned_infr14_acc_work_units; ///< Work units assigned to log each inferred
+                                                   ///<   1:4 attenuated pair interaction
+  std::vector<int> assigned_rposn_acc_work_units;  ///< Work units assigned to log each positional
+                                                   ///<   restraint penalty energy
+  std::vector<int> assigned_rbond_acc_work_units;  ///< Work units assigned to log each distance
+                                                   ///<   restraint penalty energy
+  std::vector<int> assigned_rangl_acc_work_units;  ///< Work units assigned to log each three-point
+                                                   ///<   angle restraint penalty energy
+  std::vector<int> assigned_rdihe_acc_work_units;  ///< Work units assigned to log each four-point
+                                                   ///<   dihedral angle restraint penalty energy
+  
+  
   /// Pointers to the original topology and restraint apparatus that formed this object
   const AtomGraph *ag_pointer;
   const RestraintApparatus *ra_pointer;
