@@ -664,6 +664,17 @@ void ValenceDelegator::allocate() {
   work_unit_assignment_count.resize(atom_count, 0);
   work_unit_presence.resize(max_presence_allocation * atom_count);
   assigned_update_work_units.resize(atom_count, -1);
+  assigned_bond_acc_work_units.resize(vk.nbond, -1);
+  assigned_angl_acc_work_units.resize(vk.nangl, -1);
+  assigned_dihe_acc_work_units.resize(vk.ndihe, -1);
+  assigned_ubrd_acc_work_units.resize(vk.nubrd, -1);
+  assigned_cimp_acc_work_units.resize(vk.ncimp, -1);
+  assigned_cmap_acc_work_units.resize(vk.ncmap, -1);
+  assigned_infr14_acc_work_units.resize(vk.ninfr14, -1);
+  assigned_rposn_acc_work_units.resize(rar.nposn, -1);
+  assigned_rbond_acc_work_units.resize(rar.nbond, -1);
+  assigned_rangl_acc_work_units.resize(rar.nangl, -1);
+  assigned_rdihe_acc_work_units.resize(rar.ndihe, -1);
 }
   
 //-------------------------------------------------------------------------------------------------
