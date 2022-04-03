@@ -57,12 +57,41 @@ using namespace omni::testing;
 using namespace omni::topology;
 
 //-------------------------------------------------------------------------------------------------
+// Check the coverage of a simple task form a ValenceWorkUnit.
+//
+// Arguments:
+//   accd:              Accumulator directives: coverage is only counted if the accumulator bit is
+//                      set to 1, which means energy is accumulated by the work unit
+//   taskid:            List of simple task topological index numbers
+//   coverage:          Coverage array (accumulated and returned)
+//   range_problem_in:  Current state of the array range indexing problem detector
+//-------------------------------------------------------------------------------------------------
+bool checkSimpleTaskCoverage(const std::vector<uint> &accd, const std::vector<int> &taskid,
+                             std::vector<int> *coverage, const bool range_problem_in) {
+  bool range_problem = range_problem_in;
+  const int n_items = coverage->size();
+  int* cov_ptr = coverage->data();
+  for (size_t j = 0; j < taskid.size(); j++) {
+    if (readBitFromMask(accd, j) == 0) {
+      continue;
+    }
+    if (taskid[j] >= 0 && taskid[j] < n_items) {
+      cov_ptr[taskid[j]] += 1;
+    }
+    else {
+      range_problem = true;
+    }
+  }
+  return range_problem;
+}
+
+//-------------------------------------------------------------------------------------------------
 // Run a series of tests using valence work units.
 //
 // Arguments:
-//   top_name:      Name of the topology to use
-//   crd_name:      Name of the coordinate file to use
-//   oe:            Operating environment information (for error reporting)
+//   top_name:  Name of the topology to use
+//   crd_name:  Name of the coordinate file to use
+//   oe:        Operating environment information (for error reporting)
 //-------------------------------------------------------------------------------------------------
 void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd_name,
                              const TestEnvironment &oe) {
@@ -124,20 +153,9 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
         }
       }
     }
-    const std::vector<uint2> angl_insr = all_vwu[i].getAngleInstructions();
-    const std::vector<uint> angl_accd  = all_vwu[i].getAccumulationFlags(VwuTask::ANGL);
-    const std::vector<int> angl_taskid = all_vwu[i].getSimpleTaskList(VwuTask::ANGL);
-    for (size_t j = 0; j < angl_insr.size(); j++) {
-      if (readBitFromMask(angl_accd, j) == 0) {
-        continue;
-      }
-      if (angl_taskid[j] >= 0 && angl_taskid[j] < vk.nangl) {
-        angl_coverage[angl_taskid[j]] += 1;
-      }
-      else {
-        angl_range_problem = true;
-      }
-    }
+    angl_range_problem = checkSimpleTaskCoverage(all_vwu[i].getAccumulationFlags(VwuTask::ANGL),
+                                                 all_vwu[i].getSimpleTaskList(VwuTask::ANGL),
+                                                 &angl_coverage, angl_range_problem);
     const std::vector<uint3> cdhe_insr = all_vwu[i].getCompositeDihedralInstructions();
     const std::vector<uint> cdhe_accd  = all_vwu[i].getAccumulationFlags(VwuTask::CDHE);
     const std::vector<int2> cdhe_taskid = all_vwu[i].getCompositeDihedralTaskList();
@@ -170,6 +188,12 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
         }
       }
     }
+    cmap_range_problem = checkSimpleTaskCoverage(all_vwu[i].getAccumulationFlags(VwuTask::CMAP),
+                                                 all_vwu[i].getSimpleTaskList(VwuTask::CMAP),
+                                                 &cmap_coverage, cmap_range_problem);
+    infr_range_problem = checkSimpleTaskCoverage(all_vwu[i].getAccumulationFlags(VwuTask::INFR14),
+                                                 all_vwu[i].getSimpleTaskList(VwuTask::INFR14),
+                                                 &infr_coverage, infr_range_problem);
   }
   const std::vector<int> bond_coverage_answer(vk.nbond, 1);
   const std::vector<int> angl_coverage_answer(vk.nangl, 1);
@@ -177,6 +201,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const std::vector<int> ubrd_coverage_answer(vk.nubrd, 1);
   const std::vector<int> cimp_coverage_answer(vk.ncimp, 1);
   const std::vector<int> cmap_coverage_answer(vk.ncmap, 1);
+  const std::vector<int> infr_coverage_answer(vk.ninfr14, 1);
   if (vk.nbond > 0) {
     check(bond_range_problem == false, "Composite bond instructions reference a bad topology bond "
           "index in valence work units for topology " + ag.getFileName() + ".", do_tests);
@@ -184,16 +209,16 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
           "incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
   }
   if (vk.nangl > 0) {
-    check(angl_range_problem == false, "Composite angle instructions reference a bad topology index "
-          "in valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(angl_range_problem == false, "Composite angle instructions reference a bad topology "
+          "index in valence work units for topology " + ag.getFileName() + ".", do_tests);
     check(angl_coverage, RelationalOperator::EQUAL, angl_coverage_answer, "Angle accumulation is "
           "incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
   }
   if (vk.ndihe > 0) {
     check(dihe_range_problem == false, "Composite dihedral instructions reference a bad topology "
           "dihedral index in valence work units for topology " + ag.getFileName() + ".", do_tests);
-    check(dihe_coverage, RelationalOperator::EQUAL, dihe_coverage_answer, "Dihedral accumulation is "
-          "incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(dihe_coverage, RelationalOperator::EQUAL, dihe_coverage_answer, "Dihedral accumulation "
+          "is incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
   }
   if (vk.nubrd > 0) {
     check(ubrd_range_problem == false, "Composite bond instructions reference a bad topology "
@@ -212,12 +237,18 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
           do_tests);
   }
   if (vk.ncmap > 0) {
-    check(cmap_range_problem == false, "CMAP instructions reference a bad topology index in valence "
-          "work units for topology " + ag.getFileName() + ".", do_tests);
+    check(cmap_range_problem == false, "CMAP instructions reference a bad topology index in "
+          "valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(cmap_coverage, RelationalOperator::EQUAL, cmap_coverage_answer, "CMAP surface term "
+          "accumulation is incorrect in valence work units for topology " + ag.getFileName() + ".",
+          do_tests);
   }
   if (vk.ninfr14 > 0) {
     check(infr_range_problem == false, "Inferred 1:4 instructions reference a bad topology index "
           "in valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(infr_coverage, RelationalOperator::EQUAL, infr_coverage_answer, "Inferred 1:4 "
+          "non-bonded interaction accumulation is incorrect in valence work units for topology " +
+          ag.getFileName() + ".", do_tests);
   }
 }
 
@@ -616,6 +647,10 @@ int main(int argc, char* argv[]) {
   check(force_partners_match, "Lists of force-relevant partners in ValenceWorkUnit objects made "
         "for a series of amino acid dipeptides do not agree with those assembled through an "
         "alternative method.", do_tests);
+
+  // Run diagnotics of the valence work units on a simple system, one with only a single work unit
+  runValenceWorkUnitTests(sysc.getTopologyReference(0).getFileName(),
+                          sysc.getCoordinateReference(0).getFileName(), oe);
 
   // Read a larger topology that will be forced to split its contents among several work units
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";

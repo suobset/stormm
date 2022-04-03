@@ -2177,7 +2177,7 @@ void ValenceWorkUnit::logActivities() {
     cdhe_l_atoms.push_back(dihe_l_atoms[pos]);
     coverage[pos] = true;
   }
-
+  
   // Add CHARMM improper dihedrals to the composite list as more singlet terms
   for (int pos = 0; pos < cimp_term_count; pos++) {
     cdhe_term_list.push_back({cimp_term_list[pos], -1});
@@ -2201,32 +2201,34 @@ void ValenceWorkUnit::logActivities() {
   for (int pos = 0; pos < cdhe_term_count; pos++) {
 
     // Check that no composite term lists the same dihedral twice
-    if (cdhe_term_list[pos].x == cdhe_term_list[pos].y) {
+    const int xterm = cdhe_term_list[pos].x;
+    const int yterm = cdhe_term_list[pos].y;
+    if (xterm == yterm) {
       rtErr("Composite term " + std::to_string(pos) + " in ValenceWorkUnit " +
             std::to_string(list_index) + " has both dihedrals referencing term index " +
-            std::to_string(cdhe_term_list[pos].x) + ".", "ValenceWorkUnit", "logActivities");
+            std::to_string(xterm) + ".", "ValenceWorkUnit", "logActivities");
     }
     if (cdhe_is_cimp[pos]) {
-      if (vdel_pointer->getUreyBradleyAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+      if (vdel_pointer->getCharmmImproperAccumulatorWorkUnit(xterm) == list_index) {
         accumulateBitmask(&acc_cdhe_energy, pos);
       }
     }
-    else if (cdhe_term_list[pos].x >= 0 && cdhe_term_list[pos].y >= 0) {
-      if (vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index &&
-          vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].y) == list_index) {
+    else if (xterm >= 0 && yterm >= 0) {
+      if (vdel_pointer->getDihedralAccumulatorWorkUnit(xterm) == list_index &&
+          vdel_pointer->getDihedralAccumulatorWorkUnit(yterm) == list_index) {
         accumulateBitmask(&acc_cdhe_energy, pos);
       }
-      else if (cdhe_term_list[pos].x < cdhe_term_list[pos].y &&
-               vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+      else if (xterm < yterm &&
+               vdel_pointer->getDihedralAccumulatorWorkUnit(xterm) == list_index) {
         accumulateBitmask(&acc_cdhe_energy, pos);
       }
-      else if (cdhe_term_list[pos].y < cdhe_term_list[pos].x &&
-               vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+      else if (yterm < xterm &&
+               vdel_pointer->getDihedralAccumulatorWorkUnit(xterm) == list_index) {
         accumulateBitmask(&acc_cdhe_energy, pos);
       }
     }
-    else if (cdhe_term_list[pos].x >= 0  &&
-             vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+    else if (xterm >= 0  &&
+             vdel_pointer->getDihedralAccumulatorWorkUnit(xterm) == list_index) {
       accumulateBitmask(&acc_cdhe_energy, pos);
     }
   }
