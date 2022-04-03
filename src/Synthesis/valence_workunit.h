@@ -38,26 +38,26 @@ constexpr int max_constraint_group_size = 16;
   
 /// \brief Enumerate the different tasks that this work unit can perform.
 enum class VwuTask {
-  BOND = 0,    ///< Harmonic bond interactions
-  ANGL,        ///< Harmonic angle interactions
-  DIHE,        ///< Cosine-based dihedral interactions
-  UBRD,        ///< Urey-Bradley harmonic stretching angle terms
-  CBND,        ///< Composite bond term count, including harmonic bonds and Urey-Bradley angle
-               ///<   stretching terms
-  CIMP,        ///< CHARMM improper dihedrals
-  CDHE,        ///< Composite dihedral term count (includes multiple dihedrals that share the same
-               ///<   atoms as well as CHARMM impropers in one list)
-  CMAP,        ///< CMAP spline-based surface potentials
-  INFR14,      ///< Inferred 1:4 attenuated non-bonded interactions
-  RPOSN,       ///< Positional restraints
-  RBOND,       ///< Distance-based restraints
-  RANGL,       ///< Three-point angle restraints
-  RDIHE,       ///< Four-point dihedral restraints
-  SETTLE,      ///< SETTLE analytic (fast, rigid water) constraints
-  CGROUP,      ///< Constraint groups (hub-and-spoke, Hydrogen-on-heavy atom constraint clusters)
-  VSITE,       ///< Virtual sites
-  TOTAL_TASKS  ///< Total number of distinct tasks that the ValenceWorkUnit can perform (for array
-               ///<   sizing purposes
+  BOND = 0,  ///< Harmonic bond interactions
+  ANGL,      ///< Harmonic angle interactions
+  DIHE,      ///< Cosine-based dihedral interactions
+  UBRD,      ///< Urey-Bradley harmonic stretching angle terms
+  CBND,      ///< Composite bond term count, including harmonic bonds and Urey-Bradley angle
+             ///<   stretching terms
+  CIMP,      ///< CHARMM improper dihedrals
+  CDHE,      ///< Composite dihedral term count (includes multiple dihedrals that share the same
+             ///<   atoms as well as CHARMM impropers in one list)
+  CMAP,      ///< CMAP spline-based surface potentials
+  INFR14,    ///< Inferred 1:4 attenuated non-bonded interactions
+  RPOSN,     ///< Positional restraints
+  RBOND,     ///< Distance-based restraints
+  RANGL,     ///< Three-point angle restraints
+  RDIHE,     ///< Four-point dihedral restraints
+  SETTLE,    ///< SETTLE analytic (fast, rigid water) constraints
+  CGROUP,    ///< Constraint groups (hub-and-spoke, Hydrogen-on-heavy atom constraint clusters)
+  VSITE,     ///< Virtual sites
+  ALL_TASKS  ///< Total number of distinct tasks that the ValenceWorkUnit can perform (for array
+             ///<   sizing purposes
 };
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
@@ -589,6 +589,15 @@ public:
   /// \param atom_offset  Offset of the atoms to add to the topological indices, if importing from
   ///                     a synthesis of many systems
   std::vector<int> getAtomImportList(int atom_offset = 0) const;
+
+  /// \brief Get a specific imported atom.
+  ///
+  /// \param slot         Index of the atom of interest from within the work unit's array (this
+  ///                     will return a topological index found in position atom_idx of the local
+  ///                     import list)
+  /// \param atom_offset  Offset of the atoms to add to the topological indices, if importing from
+  ///                     a larger synthesis of topologies / systems
+  int getImportedAtomIndex(int slot, int atom_offset = 0) const;
   
   /// \brief Get bitmasks of moving atoms and atoms that this work unit is assigned to update.
   ///        Bits signify 1 for an atom being moving or an update assignment.  The masks are

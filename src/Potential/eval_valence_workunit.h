@@ -1,0 +1,46 @@
+// -*-c++-*-
+#ifndef OMNI_EVAL_VALENCE_WORKUNIT_H
+#define OMNI_EVAL_VALENCE_WORKUNIT_H
+
+#include "Synthesis/valence_workunit.h"
+#include "Topology/atomgraph.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Trajectory/phasespace.h"
+#include "Trajectory/coordinateframe.h"
+
+namspace omni {
+namespace energy {
+
+/// \brief Evaluate force and energy-related tasks in a list of valence work units given a system
+///        or synthesis of systems with one or more topologies and coordinate sets.
+///
+/// Overloaded:
+///   - Evaluate for a single topology and coordinate set
+///   - Evaluate for a synthesis of topologies and coordinate sets
+///   - Accept pointers or references to the above objects, or in the case of a single system
+///     offer the option of passing critical topology abstracts by value with pointers to C-style
+///     arrays for coordinates and forces
+///   - Evaluate forces, or energies alone
+/// \{
+void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
+                          const double* xcrd, const dobule* ycrd, const double* zcrd,
+                          const double* umat, const double* invu, UnitCellType unit_cell,
+                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *sc, int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
+                          EvaluateForce eval_force = EvaluateForce::NO,
+                          VwuTask activity = VwuTask::ALL_TASKS);
+
+void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *sc, int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
+                          EvaluateForce eval_force = EvaluateForce::NO,
+                          VwuTask activity = VwuTask::ALL_TASKS);
+
+void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, ScoreCard *sc, int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
+                          VwuTask activity = VwuTask::ALL_TASKS);
+/// \}
+
+} // namespace energy
+} // namespace omni
+
+#endif

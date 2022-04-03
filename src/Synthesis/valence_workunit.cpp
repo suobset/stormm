@@ -1049,6 +1049,11 @@ std::vector<int> ValenceWorkUnit::getAtomImportList(const int atom_offset) const
 }
 
 //-------------------------------------------------------------------------------------------------
+int ValenceWorkUnit::getImportedAtomIndex(const int slot, const int atom_offset) const {
+  return atom_import_list[slot] + atom_offset;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<uint2> ValenceWorkUnit::getAtomManipulationMasks() const {
   const int nbits = static_cast<int>(sizeof(uint)) * 8;
   const int n_segment = roundUp((imported_atom_count + nbits - 1) / nbits, warp_size_int);
@@ -1089,7 +1094,7 @@ int ValenceWorkUnit::getMaxConstraintGroupPaddedSize() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int> ValenceWorkUnit::getTaskCounts() const {
-  std::vector<int> result(static_cast<int>(VwuTask::TOTAL_TASKS));
+  std::vector<int> result(static_cast<int>(VwuTask::ALL_TASKS));
   result[static_cast<int>(VwuTask::BOND)]   = bond_term_count;
   result[static_cast<int>(VwuTask::ANGL)]   = angl_term_count;
   result[static_cast<int>(VwuTask::DIHE)]   = dihe_term_count;
