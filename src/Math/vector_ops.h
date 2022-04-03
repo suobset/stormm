@@ -565,7 +565,28 @@ void accumulateBitmask(std::vector<ullint> *va, const size_t pos);
 void accumulateBitmask(ushort* va, const size_t pos);
 void accumulateBitmask(std::vector<ushort> *va, const size_t pos);
 /// \}
-  
+
+/// \brief Retrieve a numbered bit result from an array of unsigned integers.  This function will
+///        return 1 or zero depending on the value of the queried bit.
+///
+/// Overloaded:
+///   - Use unsigned integers
+///   - Use long long unsigned integers
+///   - Use short unsigned integers
+///   - Operate on a C-style array trusted to be of sufficient length, or a Standard Template
+///     Library vector (the size will be checked)
+///
+/// \param va   The bit mask to evaluate
+/// \param pos  The positon of the bit to access
+/// \{
+int readBitFromMask(const uint* va, const size_t pos);
+int readBitFromMask(const std::vector<uint> &va, const size_t pos);
+int readBitFromMask(const ullint* va, const size_t pos);
+int readBitFromMask(const std::vector<ullint> &va, const size_t pos);
+int readBitFromMask(const ushort* va, const size_t pos);
+int readBitFromMask(const std::vector<ushort> &va, const size_t pos);
+/// \}
+
 } // namespace math
 } // namespace omni
 

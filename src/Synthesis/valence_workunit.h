@@ -708,9 +708,42 @@ public:
   ///        This function accepts a parameter interpretation table showing how the raw list of
   ///        unique constraint groups in one topology maps into a possibly more diverse list
   ///        curated by an AtomGraphSynthesis.
+  ///
+  /// \param parameter_map       Mapping for SETTLE group mass and geometry specifications
+  ///                            (optional)
+  /// \param group_param_bounds  Bounds for constraint group parameter sets in an
+  ///                            AtomGraphSynthesis (required if parameter_map is supplied, to
+  ///                            properly align the parameter indices of each instruction
   std::vector<uint2>
   getConstraintGroupInstructions(const std::vector<int> &parameter_map = {},
                                  const std::vector<int> &group_param_bounds = {}) const;
+
+  /// \brief Get the bitstrings indicating which energetic interactions each work unit is
+  ///        responsible for accumulating into the official energy outputs.
+  ///
+  /// \param vtask  The type of task accumulator
+  std::vector<uint> getAccumulationFlags(VwuTask vtask) const;
+
+  /// \brief Get the topological indices of each task assigned to this work unit.  Assignment of
+  ///        an energy / force-producing term or constraint group does not imply that a work unit
+  ///        is responsible for updating the final positions of all atoms involved.  Composite
+  ///        task lists must be accessed with the special-purpose functions below.
+  ///
+  /// \param vtask  The type of task, i.e. bonded interactions, or SETTLE constraint groups
+  std::vector<int> getSimpleTaskList(VwuTask vtask) const;
+
+  /// \brief Get the composite bond tasks assigned to this work unit.  This will return a vector
+  ///        of concatenated bond and Urey-Bradley term indices into the original topology.
+  ///        Interpreting which is which requires the corresponding vector of composite bond term
+  ///        instructions.
+  std::vector<int> getCompositeBondTaskList() const;
+
+  /// \brief Get the composite dihedral tasks assigned to this work unit.  This will return a
+  ///        vector of tuples containing the topological indices of dihedrals or CHARMM impropers
+  ///        that the work unit evaluates.  Interpretation of the tuples will depend on knowing
+  ///        whether each term index pertains to a standard cosine-based dihedral or a CHARMM
+  ///        improper dihedral, for which the corresponding instructions list must be accessed.
+  std::vector<int2> getCompositeDihedralTaskList() const;
   
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
@@ -768,6 +801,8 @@ private:
   int angl_term_count;      ///< Number of angle terms in the work unit
   int dihe_term_count;      ///< Number of cosine-based dihedral terms in the work unit
   int ubrd_term_count;      ///< Number of Urey-Bradley terms in the work unit
+  int cbnd_term_count;      ///< Combined number of bond and Urey-Bradley terms (these share a
+                            ///<   form, and thus a code pathway)
   int cimp_term_count;      ///< Number of CHARMM harmonic improper dihedral terms in the work unit
   int cdhe_term_count;      ///< Number of composite dihedral terms, sweeping up dihedrals that
                             ///<   affect the same four atoms, implicit 1:4 interactions, and
@@ -847,6 +882,15 @@ private:
   std::vector<int> infr14_i_atoms;    ///< Local indices for I atoms in each inferred 1:4 term
   std::vector<int> infr14_l_atoms;    ///< Local indices for L atoms in each inferred 1:4 term
 
+  /// Array of composite bond terms, a simple concatenation of tasks with similar forms
+  std::vector<int> cbnd_term_list;
+
+  /// Arrays to support the composite bond list, more simple concatenations
+  std::vector<bool> cbnd_is_ubrd;  ///< Indicates that the composite bond term serves a CHARMM
+                                   ///<   Urey-bradley interaction, not a harmonic bond
+  std::vector<int> cbnd_i_atoms;   ///< Local indices for bond or Urey-Bradley I atoms
+  std::vector<int> cbnd_jk_atoms;  ///< Local indices for J atoms (K atoms in Urey-Bradley terms)
+  
   /// Array of composite dihedral terms (this will be composed from entries in dihe_term_list and
   /// cimp_term_list as well as the atoms those terms affect, and will then replace those lists).
   std::vector<int2> cdhe_term_list;
@@ -893,6 +937,7 @@ private:
   std::vector<uint> acc_rbond_energy;   ///< Accumulator flags for distance restraint energies
   std::vector<uint> acc_rangl_energy;   ///< Accumulator flags for angle restraint energies
   std::vector<uint> acc_rdihe_energy;   ///< Accumulator flags for dihedral restraint energies
+  std::vector<uint> acc_cbnd_energy;    ///< Accumulator flags for composite bond energies
   std::vector<uint> acc_cdhe_energy;    ///< Accumulator flags for composite dihedral energies
 
   // Constraint groups for this work unit
@@ -930,13 +975,11 @@ private:
                                         ///<   frame atoms
   std::vector<int> vsite_frame4_atoms;  ///< Local indices of this work unit's virtual site fourth
                                         ///<   frame atoms
-  
-  ValenceDelegator *vdel_pointer;        ///< Pointer to a delegator managing this object's
-                                         ///<   creation
-  const AtomGraph *ag_pointer;           ///< Pointer to the topology to which this object pertains
-  const RestraintApparatus *ra_pointer;  ///< Pointer to the restraint apparatus to which this
-                                         ///<   object pertains
 
+  // Pointers to important objects
+  ValenceDelegator *vdel_pointer;        ///< The delegator managing this object's creation
+  const AtomGraph *ag_pointer;           ///< The topology to which this object pertains
+  const RestraintApparatus *ra_pointer;  ///< Restraint apparatus to which this object pertains
 };
 
 /// \brief Build a series of valence work units to cover a topology.

@@ -873,27 +873,29 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
 ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index_in,
                                  const int seed_atom_in, const int max_atoms_in) :
     imported_atom_count{0}, moved_atom_count{0}, updated_atom_count{0}, bond_term_count{0},
-    angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0}, cimp_term_count{0},
-    cdhe_term_count{0}, cmap_term_count{0}, infr14_term_count{0}, rposn_term_count{0},
-    rbond_term_count{0}, rangl_term_count{0}, rdihe_term_count{0}, cnst_group_count{0},
-    sett_group_count{0}, vste_count{0}, list_index{list_index_in}, min_atom_index{-1},
-    max_atom_index{-1}, atom_limit{max_atoms_in}, atom_import_list{}, bond_term_list{},
-    angl_term_list{}, dihe_term_list{}, ubrd_term_list{}, cimp_term_list{}, cmap_term_list{},
-    infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{}, angl_i_atoms{}, angl_j_atoms{},
-    angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{}, ubrd_i_atoms{},
-    ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{}, cmap_i_atoms{},
-    cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{}, infr14_i_atoms{},
-    infr14_l_atoms{}, cdhe_term_list{}, cdhe_is_cimp{}, cdhe_i_atoms{}, cdhe_j_atoms{},
+    angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0}, cbnd_term_count{0},
+    cimp_term_count{0}, cdhe_term_count{0}, cmap_term_count{0}, infr14_term_count{0},
+    rposn_term_count{0}, rbond_term_count{0}, rangl_term_count{0}, rdihe_term_count{0},
+    cnst_group_count{0}, sett_group_count{0}, vste_count{0}, list_index{list_index_in},
+    min_atom_index{-1}, max_atom_index{-1}, atom_limit{max_atoms_in}, atom_import_list{},
+    bond_term_list{}, angl_term_list{}, dihe_term_list{}, ubrd_term_list{}, cimp_term_list{},
+    cmap_term_list{}, infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{}, angl_i_atoms{},
+    angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{},
+    ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{},
+    cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
+    infr14_i_atoms{}, infr14_l_atoms{}, cbnd_term_list{}, cbnd_is_ubrd{}, cbnd_i_atoms{},
+    cbnd_jk_atoms{}, cdhe_term_list{}, cdhe_is_cimp{}, cdhe_i_atoms{}, cdhe_j_atoms{},
     cdhe_k_atoms{}, cdhe_l_atoms{}, rposn_term_list{}, rbond_term_list{}, rangl_term_list{},
     rdihe_term_list{}, rposn_atoms{}, rbond_i_atoms{}, rbond_j_atoms{}, rangl_i_atoms{},
     rangl_j_atoms{}, rangl_k_atoms{}, rdihe_i_atoms{}, rdihe_j_atoms{}, rdihe_k_atoms{},
     rdihe_l_atoms{}, acc_bond_energy{}, acc_angl_energy{}, acc_dihe_energy{}, acc_ubrd_energy{},
     acc_cimp_energy{}, acc_cmap_energy{}, acc_infr14_energy{}, acc_rposn_energy{},
-    acc_rbond_energy{}, acc_rangl_energy{}, acc_rdihe_energy{}, cnst_group_list{},
-    sett_group_list{}, cnst_group_atoms{}, cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{},
-    sett_h2_atoms{}, virtual_site_list{}, vsite_atoms{}, vsite_frame1_atoms{},
-    vsite_frame2_atoms{}, vsite_frame3_atoms{}, vsite_frame4_atoms{}, vdel_pointer{vdel_in},
-    ag_pointer{vdel_in->getTopologyPointer()}, ra_pointer{vdel_in->getRestraintApparatusPointer()}
+    acc_rbond_energy{}, acc_rangl_energy{}, acc_rdihe_energy{}, acc_cbnd_energy{},
+    acc_cdhe_energy{}, cnst_group_list{}, sett_group_list{}, cnst_group_atoms{},
+    cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{},
+    vsite_atoms{}, vsite_frame1_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{},
+    vsite_frame4_atoms{}, vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
+    ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
   // Check the atom bounds
   if (atom_limit < minimum_valence_work_unit_atoms ||
@@ -1092,7 +1094,7 @@ std::vector<int> ValenceWorkUnit::getTaskCounts() const {
   result[static_cast<int>(VwuTask::ANGL)]   = angl_term_count;
   result[static_cast<int>(VwuTask::DIHE)]   = dihe_term_count;
   result[static_cast<int>(VwuTask::UBRD)]   = ubrd_term_count;
-  result[static_cast<int>(VwuTask::CBND)]   = bond_term_count + ubrd_term_count;
+  result[static_cast<int>(VwuTask::CBND)]   = cbnd_term_count;
   result[static_cast<int>(VwuTask::CIMP)]   = cimp_term_count;
   result[static_cast<int>(VwuTask::CDHE)]   = cdhe_term_count;
   result[static_cast<int>(VwuTask::CMAP)]   = cmap_term_count;
@@ -1134,16 +1136,16 @@ ValenceWorkUnit::getCompositeBondInstructions(const std::vector<int> &bond_param
           " entries cannot serve a topology with " + std::to_string(vk.nbond_param) +
           " Urey-Bradley parameter sets.", "ValenceWorkUnit", "getCompositeBondInstructions");
   }
-  for (int pos = 0; pos < bond_term_count; pos++) {
-    const int bt_idx = vk.bond_param_idx[bond_term_list[pos]];
-    result[pos].x = ((bond_j_atoms[pos] << 10) | bond_i_atoms[pos]);
-    result[pos].y = (use_map) ? bond_param_map[bt_idx] : bt_idx;
-  }
-  for (int pos = 0; pos < ubrd_term_count; pos++) {
-    const int ut_idx = vk.ubrd_param_idx[ubrd_term_list[pos]];
-    result[pos + bond_term_count].x = ((ubrd_k_atoms[pos] << 10) | ubrd_i_atoms[pos]);
-    result[pos + bond_term_count].x |= (0x1 << 20);
-    result[pos + bond_term_count].y = (use_map) ? ubrd_param_map[ut_idx] : ut_idx;
+  for (int pos = 0; pos < cbnd_term_count; pos++) {
+    const int bt_idx = vk.bond_param_idx[cbnd_term_list[pos]];
+    result[pos].x = ((cbnd_jk_atoms[pos] << 10) | cbnd_i_atoms[pos]);
+    if (cbnd_is_ubrd[pos]) {
+      result[pos].x |= (0x1 << 20);
+      result[pos].y = (use_map) ? ubrd_param_map[bt_idx] : bt_idx;
+    }
+    else {
+      result[pos].y = (use_map) ? bond_param_map[bt_idx] : bt_idx;
+    }
   }
   return result;
 }
@@ -1557,6 +1559,93 @@ ValenceWorkUnit::getConstraintGroupInstructions(const std::vector<int> &paramete
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<uint> ValenceWorkUnit::getAccumulationFlags(const VwuTask vtask) const {
+  switch (vtask) {
+  case VwuTask::BOND:
+    return acc_bond_energy;
+  case VwuTask::ANGL:
+    return acc_angl_energy;
+  case VwuTask::DIHE:
+    return acc_dihe_energy;
+  case VwuTask::UBRD:
+    return acc_ubrd_energy;
+  case VwuTask::CBND:
+    return acc_cbnd_energy;
+  case VwuTask::CIMP:
+    return acc_cimp_energy;
+  case VwuTask::CDHE:
+    return acc_cdhe_energy;
+  case VwuTask::CMAP:
+    return acc_cmap_energy;
+  case VwuTask::INFR14:
+    return acc_infr14_energy;
+  case VwuTask::RPOSN:
+    return acc_rposn_energy;
+  case VwuTask::RBOND:
+    return acc_rbond_energy;
+  case VwuTask::RANGL:
+    return acc_rangl_energy;
+  case VwuTask::RDIHE:
+    return acc_rdihe_energy;
+  case VwuTask::SETTLE:
+  case VwuTask::CGROUP:
+  case VwuTask::VSITE:
+    rtErr("Geometry constraints and virtual sites are not terms pertaining to the energy "
+          "accumulation.", "ValenceWorkUnit", "getAccumulationFlags");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::getSimpleTaskList(const VwuTask vtask) const {
+  switch (vtask) {
+  case VwuTask::BOND:
+    return bond_term_list;
+  case VwuTask::ANGL:
+    return angl_term_list;
+  case VwuTask::DIHE:
+    return dihe_term_list;
+  case VwuTask::UBRD:
+    return ubrd_term_list;
+  case VwuTask::CIMP:
+    return cimp_term_list;
+  case VwuTask::CBND:
+  case VwuTask::CDHE:
+    rtErr("Composite terms cannot be returned by this function.  Access them via the "
+          "getComposite<name>TaskList functions.", "ValenceWorkUnit", "getSimpleTaskList");
+  case VwuTask::CMAP:
+    return cmap_term_list;
+  case VwuTask::INFR14:
+    return infr14_term_list;
+  case VwuTask::RPOSN:
+    return rposn_term_list;
+  case VwuTask::RBOND:
+    return rbond_term_list;
+  case VwuTask::RANGL:
+    return rangl_term_list;
+  case VwuTask::RDIHE:
+    return rdihe_term_list;
+  case VwuTask::SETTLE:
+    return sett_group_list;
+  case VwuTask::CGROUP:
+    return cnst_group_list;
+  case VwuTask::VSITE:
+    return virtual_site_list;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ValenceWorkUnit::getCompositeBondTaskList() const {
+  return cbnd_term_list;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int2> ValenceWorkUnit::getCompositeDihedralTaskList() const {
+  return cdhe_term_list;
+}
+
+//-------------------------------------------------------------------------------------------------
 ValenceDelegator* ValenceWorkUnit::getDelegatorPointer() {
   return vdel_pointer;
 }
@@ -1939,6 +2028,32 @@ void ValenceWorkUnit::logActivities() {
   cnst_group_count  = cnst_group_list.size();
   sett_group_count  = sett_group_list.size();
   vste_count        = virtual_site_list.size();
+
+  // Concatenate the bond and Urey-Bradley term lists into the composite bond list.
+  cbnd_term_list = bond_term_list;
+  cbnd_term_list.insert(cbnd_term_list.end(), ubrd_term_list.begin(), ubrd_term_list.end());
+  cbnd_i_atoms = bond_i_atoms;
+  cbnd_jk_atoms = bond_j_atoms;
+  cbnd_i_atoms.insert(cbnd_i_atoms.end(), ubrd_i_atoms.begin(), ubrd_i_atoms.end());
+  cbnd_jk_atoms.insert(cbnd_jk_atoms.end(), ubrd_k_atoms.begin(), ubrd_k_atoms.end());
+  cbnd_is_ubrd.resize(cbnd_term_list.size(), true);
+  for (int i = 0; i < bond_term_count; i++) {
+    cbnd_is_ubrd[i] = false;
+  }
+  cbnd_term_count = cbnd_term_list.size();
+  acc_cbnd_energy.resize((cbnd_term_count + uint_bits_m1) / uint_bits);
+  for (int i = 0; i < cbnd_term_count; i++) {
+    if (cbnd_is_ubrd[i]) {
+      if (vdel_pointer->getUreyBradleyAccumulatorWorkUnit(cbnd_term_list[i]) == list_index) {
+        accumulateBitmask(&acc_cbnd_energy, i);        
+      }
+    }
+    else {
+      if (vdel_pointer->getBondAccumulatorWorkUnit(cbnd_term_list[i]) == list_index) {
+        accumulateBitmask(&acc_cbnd_energy, i);        
+      }
+    }
+  }
   
   // Compute the number of composite dihedrals: the dihedrals already subsume a great deal of the
   // 1:4 attenuated interactions (probably the entirety of these interactions if the system has no
@@ -2002,6 +2117,15 @@ void ValenceWorkUnit::logActivities() {
   // Find all dihedrals that can be paired when acting on the same atoms
   std::vector<bool> coverage(dihe_term_count, false);
   for (int pos = 0; pos < dihe_term_count; pos++) {
+
+    // Filter out terms with extermely large parameter indices--these must appear in their own
+    // composite terms, as the only dihedral.  This filtering applies only to proper dihedrals,
+    // which are more diverse in their parameter combinations than CHARMM improper dihedrals.
+    if (vk.dihe_param_idx[dihe_term_list[pos]] >= 65535) {
+      continue;
+    }
+
+    // Filter out impropers and skip terms that have already been included in a combined item.
     if (coverage[pos] || is_improper[pos]) {
       continue;
     }
@@ -2017,7 +2141,8 @@ void ValenceWorkUnit::logActivities() {
     max_np = std::min(max_np, dihe_presence_bounds[k_atom].y);
     max_np = std::min(max_np, dihe_presence_bounds[l_atom].y);
     for (int npos = min_np; npos < max_np; npos++) {
-      if (coverage[npos] || is_improper[npos]) {
+      if (vk.dihe_param_idx[dihe_term_list[npos]] >= 65535 ||
+          coverage[npos] || is_improper[npos]) {
         continue;
       }
       if ((dihe_i_atoms[npos] == dihe_i_atoms[pos] && dihe_j_atoms[npos] == dihe_j_atoms[pos] &&
@@ -2074,7 +2199,34 @@ void ValenceWorkUnit::logActivities() {
   // lower topological term index.  
   acc_cdhe_energy.resize((cdhe_term_count + uint_bits_m1) / uint_bits);
   for (int pos = 0; pos < cdhe_term_count; pos++) {
+
+    // Check that no composite term lists the same dihedral twice
+    if (cdhe_term_list[pos].x == cdhe_term_list[pos].y) {
+      rtErr("Composite term " + std::to_string(pos) + " in ValenceWorkUnit " +
+            std::to_string(list_index) + " has both dihedrals referencing term index " +
+            std::to_string(cdhe_term_list[pos].x) + ".", "ValenceWorkUnit", "logActivities");
+    }
     if (cdhe_is_cimp[pos]) {
+      if (vdel_pointer->getUreyBradleyAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+        accumulateBitmask(&acc_cdhe_energy, pos);
+      }
+    }
+    else if (cdhe_term_list[pos].x >= 0 && cdhe_term_list[pos].y >= 0) {
+      if (vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index &&
+          vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].y) == list_index) {
+        accumulateBitmask(&acc_cdhe_energy, pos);
+      }
+      else if (cdhe_term_list[pos].x < cdhe_term_list[pos].y &&
+               vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+        accumulateBitmask(&acc_cdhe_energy, pos);
+      }
+      else if (cdhe_term_list[pos].y < cdhe_term_list[pos].x &&
+               vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
+        accumulateBitmask(&acc_cdhe_energy, pos);
+      }
+    }
+    else if (cdhe_term_list[pos].x >= 0  &&
+             vdel_pointer->getDihedralAccumulatorWorkUnit(cdhe_term_list[pos].x) == list_index) {
       accumulateBitmask(&acc_cdhe_energy, pos);
     }
   }

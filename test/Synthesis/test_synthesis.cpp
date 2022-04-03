@@ -31,6 +31,7 @@ using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::MapRotatableGroups;
 using omni::constants::ExceptionResponse;
 using omni::constants::verytiny;
+using omni::data_types::int2;
 using omni::data_types::uint2;
 using omni::data_types::uint3;
 using omni::data_types::ValueWithCounter;
@@ -39,6 +40,7 @@ using omni::diskutil::getDrivePathType;
 using omni::diskutil::openOutputFile;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
+using omni::math::readBitFromMask;
 using omni::math::reduceUniqueValues;
 using omni::math::UniqueValueHandling;
 using omni::namelist::FilesControls;
@@ -82,30 +84,140 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   ValenceDelegator vdel(&ag, &ra_i);
   const std::vector<ValenceWorkUnit> all_vwu = buildValenceWorkUnits(&vdel);
   const int n_vwu = all_vwu.size();
-  int nbond = 0;
-  int nangl = 0;
-  int ndihe = 0;
-  int nimpr = 0;
-  int nubrd = 0;
-  int ncimp = 0;
-  int ncmap = 0;
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  std::vector<int> bond_coverage(vk.nbond, 0);
+  std::vector<int> angl_coverage(vk.nangl, 0);
+  std::vector<int> dihe_coverage(vk.ndihe, 0);
+  std::vector<int> ubrd_coverage(vk.nubrd, 0);
+  std::vector<int> cimp_coverage(vk.ncimp, 0);
+  std::vector<int> cmap_coverage(vk.ncmap, 0);
+  std::vector<int> infr_coverage(vk.ninfr14, 0);
+  bool bond_range_problem = false;
+  bool angl_range_problem = false;
+  bool dihe_range_problem = false;
+  bool ubrd_range_problem = false;
+  bool cimp_range_problem = false;
+  bool cmap_range_problem = false;
+  bool infr_range_problem = false;
   for (int i = 0; i < n_vwu; i++) {
-    const std::vector<uint2> bond_insr = all_vwu[i].getCompositeBondInstructions();
-    for (size_t j = 0; j < bond_insr.size(); j++) {
-      if ((bond_insr[j].x >> 20) & 0x1) {
-        nubrd++;
+    const std::vector<uint2> cbnd_insr = all_vwu[i].getCompositeBondInstructions();
+    const std::vector<uint> cbnd_accd  = all_vwu[i].getAccumulationFlags(VwuTask::CBND);
+    const std::vector<int> cbnd_taskid = all_vwu[i].getCompositeBondTaskList();
+    for (size_t j = 0; j < cbnd_insr.size(); j++) {
+      if (readBitFromMask(cbnd_accd, j) == 0) {
+        continue;
+      }
+      if ((cbnd_insr[j].x >> 20) & 0x1) {
+        if (cbnd_taskid[j] >= 0 && cbnd_taskid[j] < vk.nubrd) {
+          ubrd_coverage[cbnd_taskid[j]] += 1;
+        }
+        else {
+          ubrd_range_problem = true;
+        }
       }
       else {
-        nbond++;
+        if (cbnd_taskid[j] >= 0 && cbnd_taskid[j] < vk.nbond) {
+          bond_coverage[cbnd_taskid[j]] += 1;
+        }
+        else {
+          bond_range_problem = true;
+        }
       }
     }
     const std::vector<uint2> angl_insr = all_vwu[i].getAngleInstructions();
-    nangl += angl_insr.size();
-    const std::vector<uint3> cdhe_insr = all_vwu[i].getCompositeDihedralInstructions();
-    for (size_t j = 0; j < cdhe_insr.size(); j++) {
-      const bool is_charmm_improper = ((cdhe_insr[j].x >> 30) & 0x1);
+    const std::vector<uint> angl_accd  = all_vwu[i].getAccumulationFlags(VwuTask::ANGL);
+    const std::vector<int> angl_taskid = all_vwu[i].getSimpleTaskList(VwuTask::ANGL);
+    for (size_t j = 0; j < angl_insr.size(); j++) {
+      if (readBitFromMask(angl_accd, j) == 0) {
+        continue;
+      }
+      if (angl_taskid[j] >= 0 && angl_taskid[j] < vk.nangl) {
+        angl_coverage[angl_taskid[j]] += 1;
+      }
+      else {
+        angl_range_problem = true;
+      }
     }
-    printf(" %4d %4zu %4zu %4d\n", nbond, angl_insr.size(), cdhe_insr.size(), nubrd);
+    const std::vector<uint3> cdhe_insr = all_vwu[i].getCompositeDihedralInstructions();
+    const std::vector<uint> cdhe_accd  = all_vwu[i].getAccumulationFlags(VwuTask::CDHE);
+    const std::vector<int2> cdhe_taskid = all_vwu[i].getCompositeDihedralTaskList();
+    for (size_t j = 0; j < cdhe_insr.size(); j++) {
+      if (readBitFromMask(cdhe_accd, j) == 0) {
+        continue;
+      }
+      if ((cdhe_insr[j].x >> 30) & 0x1) {
+        if (cdhe_taskid[j].x >= 0 && cdhe_taskid[j].x < vk.ncimp) {
+          cimp_coverage[cdhe_taskid[j].x] += 1;
+        }
+        else {
+          cimp_range_problem = true;
+        }
+      }
+      else {
+        if (cdhe_taskid[j].x >= 0 && cdhe_taskid[j].x < vk.ndihe) {
+          dihe_coverage[cdhe_taskid[j].x] += 1;
+        }
+        else {
+          dihe_range_problem = true;          
+        }
+        if (cdhe_taskid[j].y >= 0) {
+          if (cdhe_taskid[j].y < vk.ndihe) {
+            dihe_coverage[cdhe_taskid[j].y] += 1;
+          }
+          else {
+            dihe_range_problem = true;          
+          }
+        }
+      }
+    }
+  }
+  const std::vector<int> bond_coverage_answer(vk.nbond, 1);
+  const std::vector<int> angl_coverage_answer(vk.nangl, 1);
+  const std::vector<int> dihe_coverage_answer(vk.ndihe, 1);
+  const std::vector<int> ubrd_coverage_answer(vk.nubrd, 1);
+  const std::vector<int> cimp_coverage_answer(vk.ncimp, 1);
+  const std::vector<int> cmap_coverage_answer(vk.ncmap, 1);
+  if (vk.nbond > 0) {
+    check(bond_range_problem == false, "Composite bond instructions reference a bad topology bond "
+          "index in valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(bond_coverage, RelationalOperator::EQUAL, bond_coverage_answer, "Bond accumulation is "
+          "incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
+  }
+  if (vk.nangl > 0) {
+    check(angl_range_problem == false, "Composite angle instructions reference a bad topology index "
+          "in valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(angl_coverage, RelationalOperator::EQUAL, angl_coverage_answer, "Angle accumulation is "
+          "incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
+  }
+  if (vk.ndihe > 0) {
+    check(dihe_range_problem == false, "Composite dihedral instructions reference a bad topology "
+          "dihedral index in valence work units for topology " + ag.getFileName() + ".", do_tests);
+    check(dihe_coverage, RelationalOperator::EQUAL, dihe_coverage_answer, "Dihedral accumulation is "
+          "incorrect in valence work units for topology " + ag.getFileName() + ".", do_tests);
+  }
+  if (vk.nubrd > 0) {
+    check(ubrd_range_problem == false, "Composite bond instructions reference a bad topology "
+          "Urey-Bradley index in valence work units for topology " + ag.getFileName() + ".",
+          do_tests);
+    check(ubrd_coverage, RelationalOperator::EQUAL, ubrd_coverage_answer, "Urey-Bradley "
+          "accumulation is incorrect in valence work units for topology " + ag.getFileName() + ".",
+          do_tests);
+  }
+  if (vk.ncimp > 0) {
+    check(cimp_range_problem == false, "Composite dihedral instructions reference a bad CHARMM "
+          "improper topology index in valence work units for topology " + ag.getFileName() + ".",
+          do_tests);
+    check(cimp_coverage, RelationalOperator::EQUAL, cimp_coverage_answer, "CHARMM improper "
+          "accumulation is incorrect in valence work units for topology " + ag.getFileName() + ".",
+          do_tests);
+  }
+  if (vk.ncmap > 0) {
+    check(cmap_range_problem == false, "CMAP instructions reference a bad topology index in valence "
+          "work units for topology " + ag.getFileName() + ".", do_tests);
+  }
+  if (vk.ninfr14 > 0) {
+    check(infr_range_problem == false, "Inferred 1:4 instructions reference a bad topology index "
+          "in valence work units for topology " + ag.getFileName() + ".", do_tests);
   }
 }
 
@@ -508,63 +620,13 @@ int main(int argc, char* argv[]) {
   // Read a larger topology that will be forced to split its contents among several work units
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
-  const bool dhfr_exists = (getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
-                            getDrivePathType(dhfr_crd_name) == DrivePathType::FILE);
-  if (dhfr_exists == false) {
-    rtWarn("The topology and input coordinates for the DHFR system appear to be missing.  Check "
-           "the ${OMNI_SOURCE} variable (currently " + oe.getOmniSourcePath() + ") to make sure "
-           "that ${OMNI_SOURCE}/test/Topology/dhfr_cmap.top and "
-           "${OMNI_SOURCE}/test/Trajectory/dhfr_cmap.inpcrd are valid paths.", "test_synthesis");
-  }
-  const TestPriority do_dhfr = (dhfr_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  AtomGraph dhfr_ag  = (dhfr_exists) ? AtomGraph(dhfr_top_name, ExceptionResponse::SILENT) :
-                                       AtomGraph();
-  PhaseSpace dhfr_ps = (dhfr_exists) ? PhaseSpace(dhfr_crd_name) : PhaseSpace();
-  const CoordinateFrameReader dhfr_cfr(dhfr_ps);
-  const std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&dhfr_ag, dhfr_cfr,
-                                                                            "@N,CA,C,O", 1.4);
-  RestraintApparatus dhfr_ra_i(bkbn_rstr);
-  ValenceDelegator dhfr_vdel(&dhfr_ag, &dhfr_ra_i);
-  const std::vector<ValenceWorkUnit> dhfr_vwu = buildValenceWorkUnits(&dhfr_vdel);
-  const int ndhfr_vwu = dhfr_vwu.size();
-  for (int i = 0; i < ndhfr_vwu; i++) {
-    const std::vector<uint2> bond_insr = dhfr_vwu[i].getCompositeBondInstructions();
-    int nbond = 0;
-    int nubrd = 0;
-    for (size_t j = 0; j < bond_insr.size(); j++) {
-      if ((bond_insr[j].x >> 20) & 0x1) {
-        nubrd++;
-      }
-      else {
-        nbond++;
-      }
-    }
-    const std::vector<uint2> angl_insr = dhfr_vwu[i].getAngleInstructions();
-    const std::vector<uint3> cdhe_insr = dhfr_vwu[i].getCompositeDihedralInstructions();
-  }
+  runValenceWorkUnitTests(dhfr_top_name, dhfr_crd_name, oe);
 
   // Read a solvated topology that will be forced to split its contents among work units, and
   // include water molecules with SETTLE constraint groups.
   const std::string ubiq_crd_name = base_crd_name + osc + "ubiquitin.inpcrd";
   const std::string ubiq_top_name = base_top_name + osc + "ubiquitin.top";
-  const bool ubiq_exists = (getDrivePathType(ubiq_top_name) == DrivePathType::FILE &&
-                            getDrivePathType(ubiq_crd_name) == DrivePathType::FILE);
-  if (ubiq_exists == false) {
-    rtWarn("The topology and input coordinates for the ubiquitin system appear to be missing.  "
-           "Check the ${OMNI_SOURCE} variable (currently " + oe.getOmniSourcePath() + ") to make "
-           "sure that ${OMNI_SOURCE}/test/Topology/ubiquitin.top and "
-           "${OMNI_SOURCE}/test/Trajectory/ubiquitin.inpcrd are valid paths.", "test_synthesis");
-  }
-  const TestPriority do_ubiq = (ubiq_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  AtomGraph ubiq_ag  = (ubiq_exists) ? AtomGraph(ubiq_top_name, ExceptionResponse::SILENT) :
-                                       AtomGraph();
-  PhaseSpace ubiq_ps = (ubiq_exists) ? PhaseSpace(ubiq_crd_name) : PhaseSpace();
-  const CoordinateFrameReader ubiq_cfr(ubiq_ps);
-  const std::vector<BoundedRestraint> ubq_bkbn_rstr = applyPositionalRestraints(&ubiq_ag, ubiq_cfr,
-                                                                                "@N,CA,C,O", 1.4);
-  RestraintApparatus ubiq_ra_i(ubq_bkbn_rstr);
-  ValenceDelegator ubiq_vdel(&ubiq_ag, &ubiq_ra_i);
-  const std::vector<ValenceWorkUnit> ubiq_vwu = buildValenceWorkUnits(&ubiq_vdel);
+  runValenceWorkUnitTests(ubiq_top_name, ubiq_crd_name, oe);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
