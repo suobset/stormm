@@ -1144,13 +1144,14 @@ void ValenceWorkUnit::storeCompositeBondInstructions(const std::vector<int> &bon
           " Urey-Bradley parameter sets.", "ValenceWorkUnit", "getCompositeBondInstructions");
   }
   for (int pos = 0; pos < cbnd_term_count; pos++) {
-    const int bt_idx = vk.bond_param_idx[cbnd_term_list[pos]];
     cbnd_instructions[pos].x = ((cbnd_jk_atoms[pos] << 10) | cbnd_i_atoms[pos]);
     if (cbnd_is_ubrd[pos]) {
+      const int ut_idx = vk.ubrd_param_idx[cbnd_term_list[pos]];
       cbnd_instructions[pos].x |= (0x1 << 20);
-      cbnd_instructions[pos].y = (use_map) ? ubrd_param_map[bt_idx] : bt_idx;
+      cbnd_instructions[pos].y = (use_map) ? ubrd_param_map[ut_idx] : ut_idx;
     }
     else {
+      const int bt_idx = vk.bond_param_idx[cbnd_term_list[pos]];
       cbnd_instructions[pos].y = (use_map) ? bond_param_map[bt_idx] : bt_idx;
     }
   }
@@ -1222,7 +1223,7 @@ void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> 
               char4ToString(cdk.atom_names[atom_import_list[cdhe_k_atoms[pos]]]) + ", and " +
               char4ToString(cdk.atom_names[atom_import_list[cdhe_l_atoms[pos]]]) + " requires a "
               "parameter set with index " + std::to_string(ht_mapped_idx) + ", which exceeds the "
-              "allowed number of unique parameter pairs in the first composite dihedral 1:4 "
+              "allowed number of unique parameter pairs indexed in the first composite dihedral "
               "position.", "ValenceWorkUnit", "getCompositeDihedralInstructions");        
       }
       cdhe_instructions[pos].y |= (ht_mapped_idx << 16);
@@ -2234,10 +2235,6 @@ void ValenceWorkUnit::logActivities() {
   std::vector<bool> coverage(dihe_term_count, false);
   for (int pos = 0; pos < dihe_term_count; pos++) {
 
-    // CHECK
-    continue;
-    // END CHECK
-    
     // Filter out terms with extermely large parameter indices--these must appear in their own
     // composite terms, as the only dihedral.  This filtering applies only to proper dihedrals,
     // which are more diverse in their parameter combinations than CHARMM improper dihedrals.
@@ -2261,8 +2258,7 @@ void ValenceWorkUnit::logActivities() {
     max_np = std::min(max_np, dihe_presence_bounds[k_atom].y);
     max_np = std::min(max_np, dihe_presence_bounds[l_atom].y);
     for (int npos = min_np; npos < max_np; npos++) {
-      if (vk.dihe_param_idx[dihe_term_list[npos]] >= 65535 ||
-          coverage[npos] || is_improper[npos]) {
+      if (coverage[npos] || is_improper[npos]) {
         continue;
       }
       if ((dihe_i_atoms[npos] == dihe_i_atoms[pos] && dihe_j_atoms[npos] == dihe_j_atoms[pos] &&

@@ -435,7 +435,7 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const double* xcrd,
     const int k_atom = vk.ubrd_k_atoms[pos];
     const int param_idx = vk.ubrd_param_idx[pos];
     const double keq = vk.ubrd_keq[param_idx];
-    const double leq = fabs(vk.ubrd_leq[param_idx]);
+    const double leq = vk.ubrd_leq[param_idx];
     double dx = xcrd[k_atom] - xcrd[i_atom];
     double dy = ycrd[k_atom] - ycrd[i_atom];
     double dz = zcrd[k_atom] - zcrd[i_atom];

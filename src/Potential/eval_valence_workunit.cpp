@@ -26,6 +26,10 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
   llint angl_acc = 0LL;
   llint dihe_acc = 0LL;
   llint impr_acc = 0LL;
+  llint ubrd_acc = 0LL;
+  llint cimp_acc = 0LL;
+  llint cmap_acc = 0LL;
+  llint infr_acc = 0LL;
 
   // Loop over each work unit
   for (size_t vidx = 0LLU; vidx < vwu_list.size(); vidx++) {
@@ -49,30 +53,39 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
       sh_zfrc[i] = zfrc[atom_idx];
     }
     
-    // Evaluate bonds
-    if (activity == VwuTask::BOND || activity == VwuTask::CBND || activity == VwuTask::ALL_TASKS) {
-      const int nbond = task_counts[static_cast<int>(VwuTask::CBND)];
-      const std::vector<uint> bond_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::BOND);
-      for (int pos = 0; pos < nbond; pos++) { 
+    // Evaluate bonds and Urey-Bradley terms
+    if (activity == VwuTask::BOND || activity == VwuTask::UBRD || activity == VwuTask::ALL_TASKS) {
+      const int ncbnd = task_counts[static_cast<int>(VwuTask::CBND)];
+      const std::vector<uint> cbnd_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::CBND);
+      for (int pos = 0; pos < ncbnd; pos++) { 
         const uint2 tinsr = vwu_list[vidx].getCompositeBondInstruction(pos);
-
-        // Skip Urey-Bradley interactions in this loop
-        if (activity == VwuTask::BOND && ((tinsr.x >> 20) & 0x1)) {
+        const bool is_urey_bradley = ((tinsr.x >> 20) & 0x1);
+        
+        // Skip Urey-Bradley interactions if only bonds are desired, and skip bonds if only
+        // Urey-Bradley interactions are of interest.
+        if ((activity == VwuTask::BOND && is_urey_bradley) ||
+            (activity == VwuTask::UBRD && (! is_urey_bradley))) {
           continue;
         }
         const int i_atom = (tinsr.x & 0x3ff);
         const int j_atom = ((tinsr.x >> 10) & 0x3ff);
         const int param_idx = tinsr.y;
-        const double keq = vk.bond_keq[param_idx];
-        const double leq = fabs(vk.bond_leq[param_idx]);
+        const double keq = (is_urey_bradley) ? vk.ubrd_keq[param_idx] : vk.bond_keq[param_idx];
+        const double leq = (is_urey_bradley) ? vk.ubrd_leq[param_idx] :
+                                               fabs(vk.bond_leq[param_idx]);
         const double dx = sh_xcrd[j_atom] - sh_xcrd[i_atom];
         const double dy = sh_ycrd[j_atom] - sh_ycrd[i_atom];
         const double dz = sh_zcrd[j_atom] - sh_zcrd[i_atom];
         const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
         const double dl = dr - leq;
         const double du = keq * dl * dl;
-        if (readBitFromMask(bond_acc_mask, pos) == 1) {
-          bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
+        if (readBitFromMask(cbnd_acc_mask, pos) == 1) {
+          if (is_urey_bradley) {
+            ubrd_acc += static_cast<llint>(round(du * nrg_scale_factor));
+          }
+          else {
+            bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
+          }
         }
 
         // Compute forces
@@ -151,14 +164,17 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     }
 
     // Evaluate harmonic bond angles
-    if (activity == VwuTask::DIHE || activity == VwuTask::ALL_TASKS) {
+    if (activity == VwuTask::DIHE || activity == VwuTask::CIMP || activity == VwuTask::ALL_TASKS) {
       const int ncdhe = task_counts[static_cast<int>(VwuTask::CDHE)];
       const std::vector<uint> cdhe_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::CDHE);
       for (int pos = 0; pos < ncdhe; pos++) {
         const uint3 tinsr = vwu_list[vidx].getCompositeDihedralInstruction(pos);
+        const bool is_charmm_improper = ((tinsr.x >> 30) & 0x1);
 
-        // Skip CHARMM improper interactions in this loop
-        if (activity == VwuTask::DIHE && ((tinsr.x >> 30) & 0x1)) {
+        // Skip CHARMM improper interactions if only standard dihedrals are of interest, and
+        // skip standard dihedrals if only CHARMM impropers are of interest.
+        if ((activity == VwuTask::DIHE && is_charmm_improper) ||
+            (activity == VwuTask::CIMP && (! is_charmm_improper))) {
           continue;
         }
         const int i_atom = (tinsr.x & 0x3ff);
@@ -167,12 +183,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int l_atom = (tinsr.y & 0x3ff);
         const int param_idx = ((tinsr.y >> 16) & 0xffff);
         const bool second_term = ((tinsr.y >> 15) & 0x1);
-        const double ampl = (param_idx < 65535) ? vk.dihe_amp[param_idx] : 0.0;
-        const double freq = vk.dihe_freq[param_idx];
-        const double phi  = vk.dihe_phi[param_idx];        
         const TorsionKind kind = ((tinsr.x >> 31) & 0x1) ? TorsionKind::IMPROPER :
                                                            TorsionKind::PROPER;
-
+        
         // Compute displacements
         double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
         ab[0] = sh_xcrd[j_atom] - sh_xcrd[i_atom];
@@ -195,31 +208,52 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
         const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
                                                                                   -acos(costheta);
-        const double sangle = (freq * theta) - phi;
-        double contrib = ampl * (1.0 + cos(sangle));
-        double sangle_ii, ampl_ii, freq_ii;
-        if (second_term) {
-          const int param_ii_idx = ((tinsr.z >> 12) & 0xfffff);
-          ampl_ii = vk.dihe_amp[param_ii_idx];
-          freq_ii = vk.dihe_freq[param_ii_idx];
-          const double phi_ii  = vk.dihe_phi[param_ii_idx];
-          sangle_ii = (freq_ii * theta) - phi_ii;
-          contrib += ampl_ii * (1.0 + cos(sangle_ii));
-        }
-        if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
-          if (kind == TorsionKind::PROPER) {
-            dihe_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
+        double sangle, sangle_ii, stiffness, stiffness_ii;
+        if (is_charmm_improper) {
+          stiffness = vk.cimp_keq[param_idx];
+          sangle = theta - vk.cimp_phi[param_idx];
+          double contrib = stiffness * sangle * sangle;
+          if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
+            cimp_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
           }
-          else {
-            impr_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+        }
+        else {
+          const double ampl = (param_idx < 65535) ? vk.dihe_amp[param_idx] : 0.0;
+          const double freq = vk.dihe_freq[param_idx];
+          const double phi  = vk.dihe_phi[param_idx];
+          stiffness = ampl * freq;
+          sangle = (freq * theta) - phi;
+          double contrib = ampl * (1.0 + cos(sangle));
+          if (second_term) {
+            const int param_ii_idx = (tinsr.z & 0xfffff);
+            const double ampl_ii = vk.dihe_amp[param_ii_idx];
+            const double freq_ii = vk.dihe_freq[param_ii_idx];
+            const double phi_ii  = vk.dihe_phi[param_ii_idx];
+            stiffness_ii = ampl_ii * freq_ii;
+            sangle_ii = (freq_ii * theta) - phi_ii;
+            contrib += ampl_ii * (1.0 + cos(sangle_ii));
+          }
+          if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
+            if (kind == TorsionKind::PROPER) {
+              dihe_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
+            }
+            else {
+              impr_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+            }
           }
         }
 
         // Compute forces, if requested
         if (eval_force == EvaluateForce::YES) {
-          double fr = ampl * freq * sin(sangle);
-          if (second_term) {
-            fr += ampl_ii * freq_ii * sin(sangle_ii);
+          double fr;
+          if (is_charmm_improper) {
+            fr = -2.0 * stiffness * sangle;
+          }
+          else {
+            fr = stiffness * sin(sangle);
+            if (second_term) {
+              fr += stiffness_ii * sin(sangle_ii);
+            }
           }
           const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
           const double invab = 1.0 / mgab;
@@ -287,7 +321,11 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     ecard->contribute(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
     break;
   case VwuTask::UBRD:
+    ecard->contribute(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
+    break;
   case VwuTask::CIMP:
+    ecard->contribute(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
+    break;
   case VwuTask::CMAP:
   case VwuTask::INFR14:
   case VwuTask::RPOSN:
@@ -306,6 +344,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     ecard->contribute(StateVariable::ANGLE, angl_acc, sysid);
     ecard->contribute(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
     ecard->contribute(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
+    ecard->contribute(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
+    ecard->contribute(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
     break;
   }
 }

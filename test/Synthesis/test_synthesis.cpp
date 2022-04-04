@@ -266,17 +266,33 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::DIHE);
 
   // CHECK
-#if 0
+  printf("Do Urey-Bradley terms\n");
+  // END CHECK
+  
+  evaluateUreyBradleyTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::UBRD);
+
+  // CHECK
+  printf("Do CHARMM Improper terms\n");
+  // END CHECK
+  
+  evaluateCharmmImproperTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CIMP);
+
+  // CHECK
   const std::vector<double> bond_e = sc.reportInstantaneousStates(StateVariable::BOND);
   const std::vector<double> angl_e = sc.reportInstantaneousStates(StateVariable::ANGLE);
   const std::vector<double> dihe_e = sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
   const std::vector<double> impr_e =
     sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
+  const std::vector<double> ubrd_e = sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY);
+  const std::vector<double> cimp_e = sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER);
   printf("Bond energies = %12.4lf %12.4lf\n", bond_e[0], bond_e[1]);
   printf("Angl energies = %12.4lf %12.4lf\n", angl_e[0], angl_e[1]);
   printf("Dihe energies = %12.4lf %12.4lf\n", dihe_e[0], dihe_e[1]);
   printf("Impr energies = %12.4lf %12.4lf\n", impr_e[0], impr_e[1]);
-#endif
+  printf("Ubrd energies = %12.4lf %12.4lf\n", ubrd_e[0], ubrd_e[1]);
+  printf("CImp energies = %12.4lf %12.4lf\n", cimp_e[0], cimp_e[1]);
   // END CHECK
 }
 
