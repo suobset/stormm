@@ -7,10 +7,21 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/phasespace.h"
 #include "Trajectory/coordinateframe.h"
+#include "energy_enumerators.h"
+#include "scorecard.h"
 
-namspace omni {
+namespace omni {
 namespace energy {
 
+using synthesis::ValenceWorkUnit;
+using synthesis::VwuTask;
+using topology::AtomGraph;
+using topology::UnitCellType;
+using topology::ValenceKit;
+using topology::VirtualSiteKit;
+using trajectory::CoordinateFrame;
+using trajectory::PhaseSpace;
+  
 /// \brief Evaluate force and energy-related tasks in a list of valence work units given a system
 ///        or synthesis of systems with one or more topologies and coordinate sets.
 ///
@@ -23,19 +34,19 @@ namespace energy {
 ///   - Evaluate forces, or energies alone
 /// \{
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const double* xcrd, const dobule* ycrd, const double* zcrd,
+                          const double* xcrd, const double* ycrd, const double* zcrd,
                           const double* umat, const double* invu, UnitCellType unit_cell,
-                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *sc, int sysid,
+                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
                           VwuTask activity = VwuTask::ALL_TASKS);
 
-void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *sc, int sysid,
+void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
                           VwuTask activity = VwuTask::ALL_TASKS);
 
-void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, ScoreCard *sc, int sysid,
+void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           VwuTask activity = VwuTask::ALL_TASKS);
 /// \}

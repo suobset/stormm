@@ -42,6 +42,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Parsing/tabulation.cpp \
 	         $(SRCDIR)/Parsing/textfile.cpp \
 	         $(SRCDIR)/Parsing/textguard.cpp \
+	         $(SRCDIR)/Potential/eval_valence_workunit.cpp \
 	         $(SRCDIR)/Potential/forward_exclusionmask.cpp \
 	         $(SRCDIR)/Potential/nonbonded_potential.cpp \
 	         $(SRCDIR)/Potential/scorecard.cpp \
@@ -136,6 +137,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Parsing/textguard.h \
 	           $(SRCDIR)/Potential/energy_abstracts.h \
 	           $(SRCDIR)/Potential/energy_enumerators.h \
+	           $(SRCDIR)/Potential/eval_valence_workunit.h \
 	           $(SRCDIR)/Potential/forward_exclusionmask.h \
 	           $(SRCDIR)/Potential/nonbonded_potential.h \
 	           $(SRCDIR)/Potential/scorecard.h \
@@ -232,6 +234,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Parsing/tabulation.o \
 	        $(SRCDIR)/Parsing/textfile.o \
 	        $(SRCDIR)/Parsing/textguard.o \
+	        $(SRCDIR)/Potential/eval_valence_workunit.o \
 	        $(SRCDIR)/Potential/forward_exclusionmask.o \
 	        $(SRCDIR)/Potential/nonbonded_potential.o \
 	        $(SRCDIR)/Potential/scorecard.o \

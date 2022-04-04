@@ -1611,6 +1611,66 @@ std::vector<uint2> ValenceWorkUnit::getConstraintGroupInstructions() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getCompositeBondInstruction(const int index) const {
+  return cbnd_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getAngleInstruction(const int index) const {
+  return angl_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint3 ValenceWorkUnit::getCompositeDihedralInstruction(const int index) const {
+  return cdhe_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getCmapInstruction(const int index) const {
+  return cmap_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint ValenceWorkUnit::getInferred14Instruction(const int index) const {
+  return infr14_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getPositionalRestraintInstruction(const int index) const {
+  return rposn_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getDistanceRestraintInstruction(const int index) const {
+  return rbond_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getAngleRestraintInstruction(const int index) const {
+  return rangl_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getDihedralRestraintInstruction(const int index) const {
+  return rdihe_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getVirtualSiteInstruction(const int index) const {
+  return vste_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getSettleGroupInstruction(const int index) const {
+  return sett_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+uint2 ValenceWorkUnit::getConstraintGroupInstruction(const int index) const {
+  return cnst_instructions[index];
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<uint> ValenceWorkUnit::getAccumulationFlags(const VwuTask vtask) const {
   switch (vtask) {
   case VwuTask::BOND:

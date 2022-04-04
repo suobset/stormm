@@ -757,62 +757,62 @@ public:
   /// \brief Get a specific composite bond instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getCompositeBondInstruction(int index) const;
+  uint2 getCompositeBondInstruction(int index) const;
 
   /// \brief Get a specific angle instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getAngleInstruction(int index) const;
+  uint2 getAngleInstruction(int index) const;
 
   /// \brief Get a specific composite dihedral instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint3> getCompositeDihedralInstruction(int index) const;
+  uint3 getCompositeDihedralInstruction(int index) const;
 
   /// \brief Get a specific CMAP instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getCmapInstruction(int index) const;
+  uint2 getCmapInstruction(int index) const;
 
   /// \brief Get a specific CMAP instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint> getInferred14Instruction(int index) const;
+  uint getInferred14Instruction(int index) const;
 
   /// \brief Get a specific positional restraint instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getPositionalRestraintInstruction(int index) const;
+  uint2 getPositionalRestraintInstruction(int index) const;
 
   /// \brief Get a specific distance restraint instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getDistanceRestraintInstruction(int index) const;
+  uint2 getDistanceRestraintInstruction(int index) const;
 
   /// \brief Get a specific three-point angle restraint instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getAngleRestraintInstruction(int index) const;
+  uint2 getAngleRestraintInstruction(int index) const;
 
   /// \brief Get a specific four-point dihedral restraint instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getDihedralRestraintInstruction(int index) const;
+  uint2 getDihedralRestraintInstruction(int index) const;
 
   /// \brief Get a specific virtual site placement instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getVirtualSiteInstruction(int index) const;  
+  uint2 getVirtualSiteInstruction(int index) const;  
   
   /// \brief Get a specific SETTLE constraint group instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getSettleGroupInstruction(int index) const;  
+  uint2 getSettleGroupInstruction(int index) const;  
   
   /// \brief Get a specific hub-and-spoke constraint group instruction.
   ///
   /// \param index  Index of the instruction to retrieve
-  std::vector<uint2> getConstraintGroupInstruction(int index) const;  
+  uint2 getConstraintGroupInstruction(int index) const;  
 
   /// \brief Get the bitstrings indicating which energetic interactions each work unit is
   ///        responsible for accumulating into the official energy outputs.
