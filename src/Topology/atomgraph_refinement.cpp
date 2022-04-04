@@ -18,12 +18,15 @@ namespace topology {
 
 using chemistry::massToZNumber;
 using card::HybridTargetLevel;
+using math::crossProduct;
+using math::magnitude;
 using math::matrixMultiply;
 using math::maxValue;
 using math::minValue;
 using math::PrefixSumType;
 using math::prefixSumInPlace;
 using math::sum;
+using parse::char4ToString;
 using parse::NumberFormat;
 using parse::PolyNumeric;
 using parse::realToString;
@@ -1132,6 +1135,7 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
                                   const std::vector<double> &tmp_masses,
                                   const BasicValenceTable &bvt,
                                   const std::vector<double> &tmp_bond_equilibria,
+                                  const std::vector<double> &tmp_angl_equilibria,
                                   const std::vector<char4> &tmp_atom_types,
                                   const std::vector<char4> &tmp_atom_names,
                                   const std::vector<int> &vsite_custom_frames,
@@ -1364,12 +1368,16 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
                 "has not 2 but " + std::to_string(bonds_to_real_atoms[vst.frame2_atoms[pos]]) +
                 " real atom neighbors.  This is cannot be a type II frame.", "listVirtualSites");
         }
-        vst.frame3_atoms[pos] = real_atom_neighbors[vst.frame2_atoms[pos]].x;
-        vst.frame4_atoms[pos] = real_atom_neighbors[vst.frame2_atoms[pos]].y;
+        vst.frame4_atoms[pos] = -1;
         if (bonds_to_impvs[parent_atoms[i]] == 2) {
-          vst.frame_types[pos] = 0;
-          vst.frame_dim1[pos]  = 0.5 * impvs_bond_lengths[i];
-          vst.frame_dim2[pos]  = 0.5 * std::sqrt(3.0) * impvs_bond_lengths[i];
+
+          // Place the two sites at fixed angles of +/- 120 degrees from the parent-frame atom
+          // line, at a fixed distance defined by the bond length between the virtual site and its
+          // parent atom.  Take the first atom as the reference point for defining the sign of the
+          // angle (the choice is not really consequential)
+          vst.frame_types[pos] = static_cast<int>(VirtualSiteKind::FAD_3);
+          vst.frame_dim1[pos]  = impvs_bond_lengths[i];
+          vst.frame_dim2[pos]  = 2.0 * symbols::pi / 3.0;
           if (i == impvs_neighbors[parent_atoms[i]].y) {
             vst.frame_dim2[pos] *= -1.0;
           }
@@ -1378,10 +1386,15 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
                   "substituents of atom " + std::to_string(parent_atoms[i] + 1) + ".",
                   "listVirtualSites");
           }
+          vst.frame3_atoms[pos] = real_atom_neighbors[vst.frame2_atoms[pos]].x;
         }
         else {
-          vst.frame_types[pos] = 2;
+
+          // Place the one site at a fixed distance from the parent atom, along the line with
+          // the other frame atom.
+          vst.frame_types[pos] = static_cast<int>(VirtualSiteKind::FIXED_2);
           vst.frame_dim1[pos]  = impvs_bond_lengths[i];
+          vst.frame3_atoms[pos] = -1;
         }
       }
       else if (bonds_to_real_atoms[parent_atoms[i]] == 2) {
@@ -1395,11 +1408,121 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
         // The TIP5P arrangement gets type 1 frame designation (TIP4P gets 3... pmemd-inspired
         // convention)
         if (bonds_to_impvs[parent_atoms[i]] == 2) {
-          vst.frame_types[pos] = 1;
-          vst.frame_dim1[pos]  = std::cos(0.5 * tetrahedral_angle) * impvs_bond_lengths[i];
-          vst.frame_dim2[pos]  = std::sin(0.5 * tetrahedral_angle) * impvs_bond_lengths[i];
+          vst.frame_types[pos] = static_cast<int>(VirtualSiteKind::OUT_3);
+
+          // Find the bond lengths between the parent atom and its two substituents.  These
+          // will determine the way that the frame is laid out.
+          double pf2, pf3, f2f3, f2_p_f3;
+          bool pf2_found = false;
+          bool pf3_found = false;
+          bool f2f3_found = false;
+          bool f2_p_f3_found = false;
+          const int p_atom = parent_atoms[i];
+          const int f2_atom = real_atom_neighbors[p_atom].x;
+          const int f3_atom = real_atom_neighbors[p_atom].y;
+          for (int j = bvt.bond_assigned_bounds[p_atom];
+               j < bvt.bond_assigned_bounds[p_atom + 1]; j++) {
+            if (bvt.bond_assigned_atoms[j] == f2_atom) {
+              pf2 = tmp_bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+              pf2_found = true;
+            }
+            if (bvt.bond_assigned_atoms[j] == f3_atom) {
+              pf3 = tmp_bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+              pf3_found = true;
+            }
+          }
+          for (int j = bvt.bond_assigned_bounds[f2_atom];
+               j < bvt.bond_assigned_bounds[f2_atom + 1]; j++) {
+            if (bvt.bond_assigned_atoms[j] == p_atom) {
+              pf2 = tmp_bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+              pf2_found = true;
+            }
+            if (bvt.bond_assigned_atoms[j] == f3_atom) {
+              f2f3 = tmp_bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+              f2f3_found = true;
+            }
+          }
+          for (int j = bvt.bond_assigned_bounds[f3_atom];
+               j < bvt.bond_assigned_bounds[f3_atom + 1]; j++) {
+            if (bvt.bond_assigned_atoms[j] == p_atom) {
+              pf3 = tmp_bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+              pf3_found = true;
+            }
+            if (bvt.bond_assigned_atoms[j] == f2_atom) {
+              f2f3 = tmp_bond_equilibria[bvt.bond_param_idx[bvt.bond_assigned_terms[j]]];
+              f2f3_found = true;
+            }
+          }
+
+          // Check that the trivial bond lengths were found
+          if (pf2_found == false || pf3_found == false) {
+            rtErr("Bond lengths could not be located between parent atom " +
+                  char4ToString(tmp_atom_names[p_atom]) + " " + std::to_string(p_atom + 1) +
+                  " and frame atoms " + char4ToString(tmp_atom_names[f2_atom]) + " " +
+                  std::to_string(f2_atom + 1) + " / " + char4ToString(tmp_atom_names[f3_atom]) +
+                  " " + std::to_string(f3_atom + 1) + ".", "listVirtualSites");
+          }
+
+          // If the equilibrium distance between frame atoms cannot be found, seek out the angle
+          if (f2f3_found == false) {
+            for (int j = bvt.angl_assigned_bounds[p_atom];
+               j < bvt.angl_assigned_bounds[p_atom + 1]; j++) {
+              if ((bvt.angl_assigned_atoms[ 2 * j     ] == f2_atom &&
+                   bvt.angl_assigned_atoms[(2 * j) + 1] == f3_atom) ||
+                  (bvt.angl_assigned_atoms[ 2 * j     ] == f3_atom &&
+                   bvt.angl_assigned_atoms[(2 * j) + 1] == f2_atom)) {
+                f2_p_f3 = tmp_angl_equilibria[bvt.angl_param_idx[bvt.angl_assigned_terms[j]]];
+                f2_p_f3_found = true;
+              }
+            }
+            if (f2_p_f3_found == false) {
+              rtErr("Neither a bond between frame atoms " +
+                    char4ToString(tmp_atom_names[f2_atom]) + " " + std::to_string(f2_atom + 1) +
+                    " and " + char4ToString(tmp_atom_names[f3_atom]) + " " +
+                    std::to_string(f3_atom + 1) + " nor an angle between these atoms and parent "
+                    "atom " + char4ToString(tmp_atom_names[p_atom]) + " " +
+                    std::to_string(p_atom + 1) + " could be found.", "listVirtualSites");
+            }
+            const double dx = pf2 - (pf3 * cos(f2_p_f3));
+            const double dy = pf3 * sin(f2_p_f3);
+            f2f3 = sqrt((dx * dx) + (dy * dy));
+          }
+
+          // A balanced ratio of parent->frame2 and parent->frame3 vectors will trace a line down
+          // the bisector of angle frame2 - parent - frame3.  The magnitude of the displacement
+          // from the parent atom will be determined by a sacling factor and the distance between
+          // the frame2 and frame3 atoms at equilibrium.  The total displacement needed is given
+          // by the cosine of half the tetrahedral angle times the bond length from the parent
+          // atom to each virtual site.
+          const double disp_needed = cos(0.5 * tetrahedral_angle) * impvs_bond_lengths[i];
+          const double scale_pf2f3 = disp_needed / f2f3;
+          vst.frame_dim1[pos] = scale_pf2f3;
+          vst.frame_dim2[pos] = scale_pf2f3;
+
+          // The cross product of parent->frame2 and parent->frame3 vectors must be scaled by a
+          // factor so as to move the virtual site out of the plane by the sine of half the
+          // tetrahedral angle times the bond length from the parent atom to each virtual site.
+          double pf2v[3], pf3v[3], cr_pf2f3[3];
+          pf2v[0] = pf2;
+          pf2v[1] = 0.0;
+          pf2v[2] = 0.0;
+          if (f2_p_f3_found == false) {
+
+            // Law of cosines: a^2 = b^2 + c^2 - 2 * b * c * cos(A).  Here, a^2 is (f2f3^2) and
+            // b and c are (pf2) and (pf3), respectively.
+            f2_p_f3 = acos(((pf2 * pf2) + (pf3 * pf3) - (f2f3 * f2f3)) / (2.0 * pf2 * pf3));
+          }
+          pf3v[0] = pf3 * cos(f2_p_f3);
+          pf3v[1] = pf3 * sin(f2_p_f3);
+          pf3v[2] = 0.0;
+          crossProduct(pf2v, pf3v, cr_pf2f3);
+          const double mcr = magnitude(cr_pf2f3, 3);
+          vst.frame_dim3[pos] = sin(0.5 * tetrahedral_angle) * impvs_bond_lengths[i] / mcr;
+
+          // Flip the second of the two virtual sites in how it is displaced from the plane.
+          // Check that both virtual sites are substituents of the same parent atom.
           if (i == impvs_neighbors[parent_atoms[i]].y) {
-            vst.frame_dim2[pos] *= -1.0;
+            vst.frame_dim3[pos] *= -1.0;
           }
           else if (i != impvs_neighbors[parent_atoms[i]].x) {
             rtErr("Implicit virtual site " + std::to_string(i + 1) + " was not listed among the "
@@ -1408,8 +1531,9 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
           }
         }
         else {
-          vst.frame_types[pos] = 3;
+          vst.frame_types[pos] = static_cast<int>(VirtualSiteKind::FIXED_3);
           vst.frame_dim1[pos]  = impvs_bond_lengths[i];
+          vst.frame_dim2[pos]  = 0.5;
         }
       }
       else {

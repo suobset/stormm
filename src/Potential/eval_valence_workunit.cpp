@@ -31,16 +31,54 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
       sh_zfrc[i] = zfrc[atom_idx];
     }
 
+    // Evaluate composite bonds
+    if (activity == VwuTask::CBND || activity == VwuTask::ALL_TASKS) {
+      
+    }
+    
     // Evaluate bonds
-    if (activity == VwuTask::BOND || activitiy == VwuTask::ALL_TASKS) {
-      for (int pos = 0; pos < task_counts[VwuTask::BOND]; pos++) {
+    if (activity == VwuTask::BOND || activity == VwuTask::CBND || activity == VwuTask::ALL_TASKS) {
+      for (int pos = 0; pos < task_counts[VwuTask::CBND]; pos++) { 
+        const uint2 tinsr = vwu_list[i].getCompositeBondInstruction(pos);
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
 
+        // Skip Urey-Bradley interactions in this loop
+        if (activity == VwuTask::BOND && ((tinsr.x >> 20) & 0x1)) {
+          continue;
+        }
+        const int param_idx = tinsr.y;
+        const double keq = vk.bond_keq[param_idx];
+        const double leq = fabs(vk.bond_leq[param_idx]);
+        const double dx = xcrd[j_atom] - xcrd[i_atom];
+        const double dy = ycrd[j_atom] - ycrd[i_atom];
+        const double dz = zcrd[j_atom] - zcrd[i_atom];
+        const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        const double dl = dr - leq;
+        const double du = keq * dl * dl;
+        bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
+
+        // Compute forces
+        if (eval_force == EvaluateForce::YES) {
+          const double fmag = 2.0 * keq * dl / dr;
+          const double fmag_dx = fmag * dx;
+          const double fmag_dy = fmag * dy;
+          const double fmag_dz = fmag * dz;
+          xfrc[i_atom] += fmag_dx;
+          yfrc[i_atom] += fmag_dy;
+          zfrc[i_atom] += fmag_dz;
+          xfrc[j_atom] -= fmag_dx;
+          yfrc[j_atom] -= fmag_dy;
+          zfrc[j_atom] -= fmag_dz;
+        }
       }
     }
     
     // Evaluate harmonic bond angles
     if (activity == VwuTask::ANGL || activitiy == VwuTask::ALL_TASKS) {
-      for (int pos = 0; pos < task_counts[VwuTask::ANGL]; pos++) {        
+      for (int pos = 0; pos < task_counts[VwuTask::ANGL]; pos++) {
+        const uint2 tinsr = vwu_list[i].getAngleInstruction(pos);
+        
       }
     }
     

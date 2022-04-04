@@ -696,7 +696,7 @@ private:
   /// A list of atoms that the VWU shall import, with indices into the global array of atoms for
   /// all systems.  Each VWU may import up to 3/4 as many atoms as the kernel blocks have threads,
   /// and each VWU takes a stride of that many ints from this array.
-  Hybrid<int> atom_import_list;
+  Hybrid<int> atom_import_lists;
 
   /// A mask of the imported atoms that each VWU shall move (x member) and also update (y member)
   /// in terms of position and velocity.  Each bit is set to 1 if the atom must be moved or

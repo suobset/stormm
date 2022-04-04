@@ -1142,8 +1142,9 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
   // virtual site frames from the result.
   VirtualSiteTable vsite_table = listVirtualSites(virtual_site_count, source,
                                                   tmp_masses, basic_vtable, tmp_bond_equilibria,
-                                                  tmp_atom_types, tmp_atom_names,
-                                                  vsite_custom_frames, vsite_custom_details);
+                                                  tmp_angl_equilibria, tmp_atom_types,
+                                                  tmp_atom_names, vsite_custom_frames,
+                                                  vsite_custom_details);
   virtual_site_parameter_set_count = vsite_table.frame_dim1.size();
 
   // Check the largest residue--it may have changed given the virtual site placement

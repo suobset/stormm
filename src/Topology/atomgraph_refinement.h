@@ -536,6 +536,7 @@ AttenuationParameterSet condenseScreeningFactors(const BasicValenceTable &bvt,
 /// \param bvt                   Table of basic valence parameters, containing arrays to denote
 ///                              which atoms are bonded to one another
 /// \param tmp_bond_equilibria   Parameter array of bond equilibrium lengths
+/// \param tmp_angl_equilibria   Parameter array of angle equilibrium spreads
 /// \param tmp_atom_names        Name of all atoms in the system, for tracing purposes if a problem
 ///                              is found during this procedure
 /// \param tmp_residue_names     Names of all residues in the system, for tracing purposes if a
@@ -548,6 +549,7 @@ VirtualSiteTable listVirtualSites(int expected_vsite_count, const std::string &f
                                   const std::vector<double> &tmp_masses,
                                   const BasicValenceTable &bvt,
                                   const std::vector<double> &tmp_bond_equilibria,
+                                  const std::vector<double> &tmp_angl_equilibria,
                                   const std::vector<char4> &tmp_atom_types,
                                   const std::vector<char4> &tmp_atom_names,
                                   const std::vector<int> &vsite_custom_frames,

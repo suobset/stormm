@@ -258,7 +258,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     virtual_site_frame4_atoms{HybridKind::POINTER, "tpsyn_vs_frame4"},
     virtual_site_parameter_indices{HybridKind::POINTER, "tpsyn_vs_param_idx"},
     vsite_int_data{HybridKind::ARRAY, "tpsyn_vsite_ints"},
-    atom_import_list{HybridKind::ARRAY, "tpsyn_atom_imports"},
+    atom_import_lists{HybridKind::ARRAY, "tpsyn_atom_imports"},
     atom_manipulation_mask{HybridKind::POINTER, "tpsyn_atom_manip"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     cbnd_instructions{HybridKind::POINTER, "tpsyn_cbnd_insr"},
@@ -2278,7 +2278,7 @@ void AtomGraphSynthesis::upload() {
   virtual_site_parameters.upload();
   sp_virtual_site_parameters.upload();
   vsite_int_data.upload();
-  atom_imports.upload();
+  atom_import_lists.upload();
   vwu_instruction_sets.upload();
   insr_uint_data.upload();
   insr_uint2_data.upload();
@@ -2314,7 +2314,7 @@ void AtomGraphSynthesis::download() {
   virtual_site_parameters.download();
   sp_virtual_site_parameters.download();
   vsite_int_data.download();
-  atom_imports.download();
+  atom_import_lists.download();
   vwu_instruction_sets.download();
   insr_uint_data.download();
   insr_uint2_data.download();

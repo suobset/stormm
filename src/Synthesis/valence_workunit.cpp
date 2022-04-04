@@ -894,7 +894,10 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
     acc_cdhe_energy{}, cnst_group_list{}, sett_group_list{}, cnst_group_atoms{},
     cnst_group_bounds{}, sett_ox_atoms{}, sett_h1_atoms{}, sett_h2_atoms{}, virtual_site_list{},
     vsite_atoms{}, vsite_frame1_atoms{}, vsite_frame2_atoms{}, vsite_frame3_atoms{},
-    vsite_frame4_atoms{}, vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
+    vsite_frame4_atoms{}, cbnd_instructions{}, angl_instructions{}, cdhe_instructions{},
+    cmap_instructions{}, infr14_instructions{}, rposn_instructions{}, rbond_instructions{},
+    rangl_instructions{}, rdihe_instructions{}, vste_instructions{}, sett_instructions{},
+    cnst_instructions{}, vdel_pointer{vdel_in}, ag_pointer{vdel_in->getTopologyPointer()},
     ra_pointer{vdel_in->getRestraintApparatusPointer()}
 {
   // Check the atom bounds
@@ -1118,11 +1121,10 @@ std::vector<int> ValenceWorkUnit::getTaskCounts() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getCompositeBondInstructions(const std::vector<int> &bond_param_map,
-                                              const std::vector<int> &ubrd_param_map) const {
+void ValenceWorkUnit::storeCompositeBondInstructions(const std::vector<int> &bond_param_map,
+                                                     const std::vector<int> &ubrd_param_map) {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  std::vector<uint2> result(bond_term_count + ubrd_term_count);
+  cbnd_instructions.resize(bond_term_count + ubrd_term_count);
   const bool bond_mapped = (bond_param_map.size() > 0LLU);
   const bool ubrd_mapped = (ubrd_param_map.size() > 0LLU);
   if ((vk.nbond > 0 && bond_mapped && vk.nubrd > 0 && ubrd_mapped == false) ||
@@ -1143,23 +1145,21 @@ ValenceWorkUnit::getCompositeBondInstructions(const std::vector<int> &bond_param
   }
   for (int pos = 0; pos < cbnd_term_count; pos++) {
     const int bt_idx = vk.bond_param_idx[cbnd_term_list[pos]];
-    result[pos].x = ((cbnd_jk_atoms[pos] << 10) | cbnd_i_atoms[pos]);
+    cbnd_instructions[pos].x = ((cbnd_jk_atoms[pos] << 10) | cbnd_i_atoms[pos]);
     if (cbnd_is_ubrd[pos]) {
-      result[pos].x |= (0x1 << 20);
-      result[pos].y = (use_map) ? ubrd_param_map[bt_idx] : bt_idx;
+      cbnd_instructions[pos].x |= (0x1 << 20);
+      cbnd_instructions[pos].y = (use_map) ? ubrd_param_map[bt_idx] : bt_idx;
     }
     else {
-      result[pos].y = (use_map) ? bond_param_map[bt_idx] : bt_idx;
+      cbnd_instructions[pos].y = (use_map) ? bond_param_map[bt_idx] : bt_idx;
     }
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getAngleInstructions(const std::vector<int> &parameter_map) const {
+void ValenceWorkUnit::storeAngleInstructions(const std::vector<int> &parameter_map) {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  std::vector<uint2> result(angl_term_count);
+  angl_instructions.resize(angl_term_count);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != vk.nangl_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
@@ -1168,19 +1168,18 @@ ValenceWorkUnit::getAngleInstructions(const std::vector<int> &parameter_map) con
   }
   for (int pos = 0; pos < angl_term_count; pos++) {
     const int at_idx = vk.angl_param_idx[angl_term_list[pos]];
-    result[pos].x = ((angl_k_atoms[pos] << 20) | (angl_j_atoms[pos] << 10) | angl_i_atoms[pos]);
-    result[pos].y = (use_map) ? parameter_map[at_idx] : at_idx;
+    angl_instructions[pos].x = ((angl_k_atoms[pos] << 20) | (angl_j_atoms[pos] << 10) |
+                                angl_i_atoms[pos]);
+    angl_instructions[pos].y = (use_map) ? parameter_map[at_idx] : at_idx;
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint3>
-ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_param_map,
-                                                  const std::vector<int> &dihe14_param_map,
-                                                  const std::vector<int> &cimp_param_map) const {
+void ValenceWorkUnit::storeCompositeDihedralInstructions(const std::vector<int> &dihe_param_map,
+                                                         const std::vector<int> &dihe14_param_map,
+                                                         const std::vector<int> &cimp_param_map) {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  std::vector<uint3> result(cdhe_term_count);
+  cdhe_instructions.resize(cdhe_term_count);
   const bool dihe_mapped = (dihe_param_map.size() > 0LLU);
   const bool cimp_mapped = (cimp_param_map.size() > 0LLU);
   if ((vk.ndihe > 0 && dihe_mapped && vk.ncimp > 0 && cimp_mapped == false) ||
@@ -1202,12 +1201,13 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
   for (int pos = 0; pos < cdhe_term_count; pos++) {
 
     // Write out the atom indices
-    result[pos].x = ((cdhe_k_atoms[pos] << 20) | (cdhe_j_atoms[pos] << 10) | cdhe_i_atoms[pos]);
-    result[pos].y = cdhe_l_atoms[pos];
+    cdhe_instructions[pos].x = ((cdhe_k_atoms[pos] << 20) | (cdhe_j_atoms[pos] << 10) |
+                                cdhe_i_atoms[pos]);
+    cdhe_instructions[pos].y = cdhe_l_atoms[pos];
 
     // Branch based on whether this is a CHARMM improper
     if (cdhe_is_cimp[pos]) {
-      result[pos].x |= (0x1 << 30);
+      cdhe_instructions[pos].x |= (0x1 << 30);
 
       // Record the parameter index of the CHARMM improper.  Do not permit more than 65536 unique
       // CHARMM improper torsion parameter sets.
@@ -1225,8 +1225,8 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
               "allowed number of unique parameter pairs in the first composite dihedral 1:4 "
               "position.", "ValenceWorkUnit", "getCompositeDihedralInstructions");        
       }
-      result[pos].y |= (ht_mapped_idx << 16);
-      result[pos].z = 0U;
+      cdhe_instructions[pos].y |= (ht_mapped_idx << 16);
+      cdhe_instructions[pos].z = 0U;
     }
     else {
 
@@ -1241,7 +1241,7 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
         break;
       case TorsionKind::IMPROPER:
       case TorsionKind::IMPROPER_NO_14:
-        result[pos].x |= (0x1 << 31);
+        cdhe_instructions[pos].x |= (0x1 << 31);
         break;
       }
 
@@ -1262,11 +1262,11 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
               "composite dihedral 1:4 position.", "ValenceWorkUnit",
               "getCompositeDihedralInstructions");
       }
-      result[pos].y |= (dt14_mapped_idx << 10);
+      cdhe_instructions[pos].y |= (dt14_mapped_idx << 10);
       
       // Indicate whether there is a second dihedral in this composite term
       if (cdhe_term_list[pos].y >= 0) {
-        result[pos].y |= (0x1 << 15);
+        cdhe_instructions[pos].y |= (0x1 << 15);
       }
       
       // Indicate the parameter index of the first dihedral (up to 65535 unique parameter sets).
@@ -1275,7 +1275,7 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
       // evaluates this first dihedral.  65535 is the new zero: in this context, it indicates no
       // dihedral term to evaluate.  
       const int dt_idx = vk.dihe_param_idx[cdhe_term_list[pos].x];
-      result[pos].y |= (use_map) ? (std::min(dihe_param_map[dt_idx], 65536) << 16) :
+      cdhe_instructions[pos].y |= (use_map) ? (std::min(dihe_param_map[dt_idx], 65536) << 16) :
                                    (std::min(dt_idx, 65536) << 16);
 
       // Record the parameter index for the second dihedral.
@@ -1300,22 +1300,20 @@ ValenceWorkUnit::getCompositeDihedralInstructions(const std::vector<int> &dihe_p
                 "the allowed number of unique parameters.", "ValenceWorkUnit",
                 "getCompositeDihedralInstructions");
         }
-        result[pos].z = dt2_mapped_idx;
-        result[pos].z |= (dt2_14_mapped_idx << 20);
+        cdhe_instructions[pos].z = dt2_mapped_idx;
+        cdhe_instructions[pos].z |= (dt2_14_mapped_idx << 20);
       }
       else {
-        result[pos].z = 0U;
+        cdhe_instructions[pos].z = 0U;
       }
     }
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getCmapInstructions(const std::vector<int> &parameter_map) const {
+void ValenceWorkUnit::storeCmapInstructions(const std::vector<int> &parameter_map) {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  std::vector<uint2> result(cmap_term_count);
+  cmap_instructions.resize(cmap_term_count);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != vk.ncmap_surf) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
@@ -1324,18 +1322,17 @@ ValenceWorkUnit::getCmapInstructions(const std::vector<int> &parameter_map) cons
   }
   for (int pos = 0; pos < cmap_term_count; pos++) {
     const int mt_idx = vk.cmap_surf_idx[cmap_term_list[pos]];
-    result[pos].x = ((cmap_k_atoms[pos] << 20) | (cmap_j_atoms[pos] << 10) | cmap_i_atoms[pos]);
-    result[pos].y = ((cmap_m_atoms[pos] << 10) | cmap_l_atoms[pos]);
-    result[pos].y |= (use_map) ? (parameter_map[mt_idx] << 20) : (mt_idx << 20);
+    cmap_instructions[pos].x = ((cmap_k_atoms[pos] << 20) | (cmap_j_atoms[pos] << 10) |
+                                cmap_i_atoms[pos]);
+    cmap_instructions[pos].y = ((cmap_m_atoms[pos] << 10) | cmap_l_atoms[pos]);
+    cmap_instructions[pos].y |= (use_map) ? (parameter_map[mt_idx] << 20) : (mt_idx << 20);
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint>
-ValenceWorkUnit::getInferred14Instructions(const std::vector<int> &parameter_map) const {
+void ValenceWorkUnit::storeInferred14Instructions(const std::vector<int> &parameter_map) {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
-  std::vector<uint> result(infr14_term_count);
+  infr14_instructions.resize(infr14_term_count);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != vk.nattn14_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
@@ -1344,18 +1341,16 @@ ValenceWorkUnit::getInferred14Instructions(const std::vector<int> &parameter_map
   }
   for (int pos = 0; pos < infr14_term_count; pos++) {
     const int ft_idx = vk.infr14_param_idx[infr14_term_list[pos]];
-    result[pos] = ((infr14_l_atoms[pos] << 10) | infr14_i_atoms[pos]);
-    result[pos] |= (use_map) ? (parameter_map[ft_idx] << 20) : (ft_idx << 20);
+    infr14_instructions[pos] = ((infr14_l_atoms[pos] << 10) | infr14_i_atoms[pos]);
+    infr14_instructions[pos] |= (use_map) ? (parameter_map[ft_idx] << 20) : (ft_idx << 20);
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getPositionalRestraintInstructions(const std::vector<int> &kr_param_map,
-                                                    const std::vector<int> &xyz_param_map) const {
+void ValenceWorkUnit::storePositionalRestraintInstructions(const std::vector<int> &kr_param_map,
+                                                           const std::vector<int> &xyz_param_map) {
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
-  std::vector<uint2> result(rposn_term_count);
+  rposn_instructions.resize(rposn_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (kr_param_map.size() != xyz_param_map.size()) {
     rtErr("Parameter correspondence tables must be supplied for both the k(1,2) / r(1,2,3,4) "
@@ -1380,21 +1375,19 @@ ValenceWorkUnit::getPositionalRestraintInstructions(const std::vector<int> &kr_p
     // get to the AtomGraphSynthesis parameter indexing.
     const int kr_idx  = (use_map) ? kr_param_map[rposn_term_list[pos]] : rposn_term_list[pos];
     const int xyz_idx = (use_map) ? xyz_param_map[rposn_term_list[pos]] : rposn_term_list[pos];
-    result[pos].x = rposn_atoms[pos];
-    result[pos].x |= (kr_idx << 10);
+    rposn_instructions[pos].x = rposn_atoms[pos];
+    rposn_instructions[pos].x |= (kr_idx << 10);
     if (rar.time_dependence) {
-      result[pos].x |= (0x1 << 31);
+      rposn_instructions[pos].x |= (0x1 << 31);
     }
-    result[pos].y = xyz_idx;
+    rposn_instructions[pos].y = xyz_idx;
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getDistanceRestraintInstructions(const std::vector<int> &kr_param_map) const {
+void ValenceWorkUnit::storeDistanceRestraintInstructions(const std::vector<int> &kr_param_map) {
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
-  std::vector<uint2> result(rbond_term_count);
+  rbond_instructions.resize(rbond_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nbond) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
@@ -1403,20 +1396,18 @@ ValenceWorkUnit::getDistanceRestraintInstructions(const std::vector<int> &kr_par
   }
   for (int pos = 0; pos < rbond_term_count; pos++) {
     const int kr_idx  = (use_map) ? kr_param_map[rbond_term_list[pos]] : rbond_term_list[pos];
-    result[pos].x = ((rbond_j_atoms[pos] << 10) | rbond_i_atoms[pos]);
-    result[pos].y = kr_idx;
+    rbond_instructions[pos].x = ((rbond_j_atoms[pos] << 10) | rbond_i_atoms[pos]);
+    rbond_instructions[pos].y = kr_idx;
     if (rar.time_dependence) {
-      result[pos].x |= (0x1 << 31);
+      rbond_instructions[pos].x |= (0x1 << 31);
     }
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getAngleRestraintInstructions(const std::vector<int> &kr_param_map) const {
+void ValenceWorkUnit::storeAngleRestraintInstructions(const std::vector<int> &kr_param_map) {
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
-  std::vector<uint2> result(rangl_term_count);
+  rangl_instructions.resize(rangl_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nangl) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
@@ -1425,20 +1416,19 @@ ValenceWorkUnit::getAngleRestraintInstructions(const std::vector<int> &kr_param_
   }
   for (int pos = 0; pos < rangl_term_count; pos++) {
     const int kr_idx  = (use_map) ? kr_param_map[rangl_term_list[pos]] : rangl_term_list[pos];
-    result[pos].x = ((rangl_k_atoms[pos] << 20) | (rangl_j_atoms[pos] << 10) | rangl_i_atoms[pos]);
-    result[pos].y = kr_idx;
+    rangl_instructions[pos].x = ((rangl_k_atoms[pos] << 20) | (rangl_j_atoms[pos] << 10) |
+                                 rangl_i_atoms[pos]);
+    rangl_instructions[pos].y = kr_idx;
     if (rar.time_dependence) {
-      result[pos].x |= (0x1 << 31);
+      rangl_instructions[pos].x |= (0x1 << 31);
     }
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getDihedralRestraintInstructions(const std::vector<int> &kr_param_map) const {
+void ValenceWorkUnit::storeDihedralRestraintInstructions(const std::vector<int> &kr_param_map) {
   const RestraintApparatusDpReader rar = ra_pointer->dpData();
-  std::vector<uint2> result(rdihe_term_count);
+  rdihe_instructions.resize(rdihe_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.ndihe) {
     rtErr("A parameter correspondence table with " + std::to_string(kr_param_map.size()) +
@@ -1447,20 +1437,19 @@ ValenceWorkUnit::getDihedralRestraintInstructions(const std::vector<int> &kr_par
   }
   for (int pos = 0; pos < rdihe_term_count; pos++) {
     const int kr_idx  = (use_map) ? kr_param_map[rdihe_term_list[pos]] : rdihe_term_list[pos];
-    result[pos].x = ((rdihe_k_atoms[pos] << 20) | (rdihe_j_atoms[pos] << 10) | rdihe_i_atoms[pos]);
-    result[pos].y = ((kr_idx << 10) | rdihe_l_atoms[pos]);
+    rdihe_instructions[pos].x = ((rdihe_k_atoms[pos] << 20) | (rdihe_j_atoms[pos] << 10) |
+                                 rdihe_i_atoms[pos]);
+    rdihe_instructions[pos].y = ((kr_idx << 10) | rdihe_l_atoms[pos]);
     if (rar.time_dependence) {
-      result[pos].x |= (0x1 << 31);
+      rdihe_instructions[pos].x |= (0x1 << 31);
     }
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getVirtualSiteInstructions(const std::vector<int> &parameter_map) const {
+void ValenceWorkUnit::storeVirtualSiteInstructions(const std::vector<int> &parameter_map) {
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
-  std::vector<uint2> result(vste_count);
+  vste_instructions.resize(vste_count);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != vsk.nframe_set) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
@@ -1469,8 +1458,8 @@ ValenceWorkUnit::getVirtualSiteInstructions(const std::vector<int> &parameter_ma
   }
   for (int pos = 0; pos < vste_count; pos++) {
     const int vp_idx = vsk.vs_param_idx[virtual_site_list[pos]];
-    result[pos].x = ((vsite_frame2_atoms[pos] << 20) | (vsite_frame1_atoms[pos] << 10) |
-                     vsite_atoms[pos]);
+    vste_instructions[pos].x = ((vsite_frame2_atoms[pos] << 20) | (vsite_frame1_atoms[pos] << 10) |
+                                vsite_atoms[pos]);
     switch (static_cast<VirtualSiteKind>(vsk.vs_types[vp_idx])) {
     case VirtualSiteKind::FIXED_2:
     case VirtualSiteKind::FLEX_2:
@@ -1480,22 +1469,20 @@ ValenceWorkUnit::getVirtualSiteInstructions(const std::vector<int> &parameter_ma
     case VirtualSiteKind::FLEX_3:
     case VirtualSiteKind::FAD_3:
     case VirtualSiteKind::OUT_3:
-      result[pos].y = vsite_frame3_atoms[pos];
+      vste_instructions[pos].y = vsite_frame3_atoms[pos];
       break;
     case VirtualSiteKind::FIXED_4:
-      result[pos].y = ((vsite_frame4_atoms[pos] << 10) | vsite_frame3_atoms[pos]);
+      vste_instructions[pos].y = ((vsite_frame4_atoms[pos] << 10) | vsite_frame3_atoms[pos]);
       break;
     }
-    result[pos].y |= (use_map) ? (parameter_map[vp_idx] << 20) : (vp_idx << 20);
+    vste_instructions[pos].y |= (use_map) ? (parameter_map[vp_idx] << 20) : (vp_idx << 20);
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getSettleGroupInstructions(const std::vector<int> &parameter_map) const {
+void ValenceWorkUnit::storeSettleGroupInstructions(const std::vector<int> &parameter_map) {
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
-  std::vector<uint2> result(sett_group_count);
+  sett_instructions.resize(sett_group_count);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != cnk.nsett_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
@@ -1504,20 +1491,20 @@ ValenceWorkUnit::getSettleGroupInstructions(const std::vector<int> &parameter_ma
   }
   for (int pos = 0; pos < sett_group_count; pos++) {
     const int st_idx = cnk.settle_param_idx[sett_group_list[pos]];
-    result[pos].x = ((sett_h2_atoms[pos] << 20) | (sett_h1_atoms[pos] << 10) | sett_ox_atoms[pos]);
-    result[pos].y = (use_map) ? parameter_map[st_idx] : st_idx;
+    sett_instructions[pos].x = ((sett_h2_atoms[pos] << 20) | (sett_h1_atoms[pos] << 10) |
+                                sett_ox_atoms[pos]);
+    sett_instructions[pos].y = (use_map) ? parameter_map[st_idx] : st_idx;
   }
-  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2>
-ValenceWorkUnit::getConstraintGroupInstructions(const std::vector<int> &parameter_map,
-                                                const std::vector<int> &group_param_bounds) const {
+void
+ValenceWorkUnit::storeConstraintGroupInstructions(const std::vector<int> &parameter_map,
+                                                  const std::vector<int> &group_param_bounds) {
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
   const int padded_group_size = getMaxConstraintGroupPaddedSize();
   const int result_size = padded_group_size * cnst_group_count;
-  std::vector<uint2> result(result_size);
+  cnst_instructions.resize(result_size);
   const bool use_map = (parameter_map.size() > 0LLU);
   if (use_map && static_cast<int>(parameter_map.size()) != cnk.ncnst_param) {
     rtErr("A parameter correspondence table with " + std::to_string(parameter_map.size()) +
@@ -1538,12 +1525,13 @@ ValenceWorkUnit::getConstraintGroupInstructions(const std::vector<int> &paramete
     const int param_llim = (use_map) ? parameter_map[ct_idx] : ct_idx;
     const int total_bonds = cnst_group_bounds[pos + 1] - cnst_group_bounds[pos] - 1;
     for (int i = cnst_group_bounds[pos] + 1; i < cnst_group_bounds[pos + 1]; i++) {
-      result[ridx].x = ((cnst_group_atoms[i] << 10) | cnst_group_atoms[cnst_group_bounds[pos]]);
-      result[ridx].x |= ((total_bonds << 24) | (padded_group_size << 20));
+      cnst_instructions[ridx].x = ((cnst_group_atoms[i] << 10) |
+                                   cnst_group_atoms[cnst_group_bounds[pos]]);
+      cnst_instructions[ridx].x |= ((total_bonds << 24) | (padded_group_size << 20));
 
       // Use the loop control variable as the offset here, but do not subtract 1 as the
       // length parameter array will have a blank for the central atom.  
-      result[ridx].y = param_llim + i - cnst_group_bounds[pos];
+      cnst_instructions[ridx].y = param_llim + i - cnst_group_bounds[pos];
       ridx++;
     }
 
@@ -1555,12 +1543,71 @@ ValenceWorkUnit::getConstraintGroupInstructions(const std::vector<int> &paramete
       // that by comparing their position in the warp with these two numbers.  The padded group
       // size is the same across all threads, but it is only four bits of otherwise unused
       // information to keep it in every instruction.
-      result[ridx].x = ((total_bonds << 24) | (padded_group_size << 20));
-      result[ridx].y = 0U;
+      cnst_instructions[ridx].x = ((total_bonds << 24) | (padded_group_size << 20));
+      cnst_instructions[ridx].y = 0U;
       ridx++;
     }
   }
-  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getCompositeBondInstructions() const {
+  return cbnd_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getAngleInstructions() const {
+  return angl_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint3> ValenceWorkUnit::getCompositeDihedralInstructions() const {
+  return cdhe_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getCmapInstructions() const {
+  return cmap_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint> ValenceWorkUnit::getInferred14Instructions() const {
+  return infr14_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getPositionalRestraintInstructions() const {
+  return rposn_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getDistanceRestraintInstructions() const {
+  return rbond_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getAngleRestraintInstructions() const {
+  return rangl_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getDihedralRestraintInstructions() const {
+  return rdihe_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getVirtualSiteInstructions() const {
+  return vste_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getSettleGroupInstructions() const {
+  return sett_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<uint2> ValenceWorkUnit::getConstraintGroupInstructions() const {
+  return cnst_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1977,16 +2024,20 @@ void ValenceWorkUnit::logActivities() {
     vsite_atoms.push_back(import_map[vsk.vs_atoms[vste_idx] - mapping_offset]);
     vsite_frame1_atoms.push_back(import_map[vsk.frame1_idx[vste_idx] - mapping_offset]);
     vsite_frame2_atoms.push_back(import_map[vsk.frame2_idx[vste_idx] - mapping_offset]);
-    switch (static_cast<VirtualSiteKind>(vsk.vs_types[vste_idx])) {
+    const int frame_param_idx = vsk.vs_param_idx[vste_idx];
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[frame_param_idx])) {
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::FIXED_2:
     case VirtualSiteKind::NONE:
+      vsite_frame3_atoms.push_back(-1);
+      vsite_frame4_atoms.push_back(-1);
       break;
     case VirtualSiteKind::FLEX_3:
     case VirtualSiteKind::FIXED_3:
     case VirtualSiteKind::FAD_3:
     case VirtualSiteKind::OUT_3:
       vsite_frame3_atoms.push_back(import_map[vsk.frame3_idx[vste_idx] - mapping_offset]);
+      vsite_frame4_atoms.push_back(-1);
       break;
     case VirtualSiteKind::FIXED_4:
       vsite_frame3_atoms.push_back(import_map[vsk.frame3_idx[vste_idx] - mapping_offset]);
@@ -2237,6 +2288,22 @@ void ValenceWorkUnit::logActivities() {
       accumulateBitmask(&acc_cdhe_energy, pos);
     }
   }
+
+  // Store instruction sets based on the original topology only.  If the instructions need to be
+  // realigned to the parameter tables in an AtomGraphSynthesis, that can be done with external
+  // calls to the same functions, supply the necessary parameter translation tables.
+  storeCompositeBondInstructions();
+  storeAngleInstructions();
+  storeCompositeDihedralInstructions();
+  storeCmapInstructions();
+  storeInferred14Instructions();
+  storePositionalRestraintInstructions();
+  storeDistanceRestraintInstructions();
+  storeAngleRestraintInstructions();
+  storeDihedralRestraintInstructions();
+  storeVirtualSiteInstructions();
+  storeSettleGroupInstructions();
+  storeConstraintGroupInstructions();
 }
 
 //-------------------------------------------------------------------------------------------------

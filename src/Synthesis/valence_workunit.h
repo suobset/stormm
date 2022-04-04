@@ -614,24 +614,23 @@ public:
   ///        to perform.
   std::vector<int> getTaskCounts() const;
 
-  /// \brief Get a vector of the bond instructions.  This function accepts a parameter
-  ///        interpretation table in order to produce instructions for a collated topology handling
-  ///        many systems (AtomGraphSynthesis).
+  /// \brief Compute and store a vector of the bond instructions.  This function accepts parameter
+  ///        interpretation tables in order to produce instructions for a collated topology
+  ///        handling many systems (AtomGraphSynthesis).
   ///
   /// \param bond_param_map  Map of the bond parameter sets (optional)
   /// \param ubrd_param_map  Map of the Urey-Bradley parameter sets (optional)
-  std::vector<uint2>
-  getCompositeBondInstructions(const std::vector<int> &bond_param_map = {},
-                               const std::vector<int> &ubrd_param_map = {}) const;
+  void storeCompositeBondInstructions(const std::vector<int> &bond_param_map = {},
+                                      const std::vector<int> &ubrd_param_map = {});
 
-  /// \brief Get a vector of the harmonic angle instructions.  This function accepts a parameter
+  /// \brief Store a vector of the harmonic angle instructions.  This function accepts a parameter
   ///        interpretation table in order to produce instructions for a collated topology
   ///        handling many systems (AtomGraphSynthesis).
   ///
   /// \param parameter_map  Map of the angle parameter sets (optional)
-  std::vector<uint2> getAngleInstructions(const std::vector<int> &parameter_map = {}) const;
+  void storeAngleInstructions(const std::vector<int> &parameter_map = {});
 
-  /// \brief Get a vector of the composite (cosine-based) dihedral, associated 1:4 interactions,
+  /// \brief Store a vector of the composite (cosine-based) dihedral, associated 1:4 interactions,
   ///        as well as CHARMM improper dihedral instructions.  This function accepts parameter
   ///        interpretation tables in order to produce instructions for a collated topology
   ///        handling many systems (AtomGraphSynthesis).
@@ -639,81 +638,74 @@ public:
   /// \param dihe_param_map  Map of the dihedral parameter sets (optional)
   /// \param dihe_param_map  Map of the 1:4 scaling factor parameter pairs (optional)
   /// \param dihe_param_map  Map of the CHARMM harmonic improper parameter sets (optional)
-  std::vector<uint3>
-  getCompositeDihedralInstructions(const std::vector<int> &dihe_param_map = {},
-                                   const std::vector<int> &dihe14_param_map = {},
-                                   const std::vector<int> &cimp_param_map = {}) const;
-
-  /// \brief Get a vector of the CMAP instructions.  This function accepts a parameter
+  void storeCompositeDihedralInstructions(const std::vector<int> &dihe_param_map = {},
+                                          const std::vector<int> &dihe14_param_map = {},
+                                          const std::vector<int> &cimp_param_map = {});
+  
+  /// \brief Store a vector of the CMAP instructions.  This function accepts a parameter
   ///        interpretation table in order to produce instructions for a collated topology
   ///        handling many systems (AtomGraphSynthesis).
   ///
   /// \param parameter_map  Map of the one topology's CMAP surface indices onto the synthesis
   ///                       (optional)
-  std::vector<uint2>
-  getCmapInstructions(const std::vector<int> &parameter_map = {}) const;
-
-  /// \brief Get a vector of the inferred 1:4 attenuated pair interaction instructions.  This
+  void storeCmapInstructions(const std::vector<int> &parameter_map = {});
+  
+  /// \brief Store a vector of the inferred 1:4 attenuated pair interaction instructions.  This
   ///        function accepts a parameter interpretation table in order to produce instructions
   ///        for a collated topology handling many systems (AtomGraphSynthesis).
   ///
   /// \param parameter_map  Map of the one topology's attenuated interaction scaling factors onto
   ///                       the synthesis (optional)
-  std::vector<uint>
-  getInferred14Instructions(const std::vector<int> &parameter_map = {}) const;
+  void storeInferred14Instructions(const std::vector<int> &parameter_map = {});
 
-  /// \brief Get a vector of the positional restraint instructions for this work unit.  This
+  /// \brief Store a vector of the positional restraint instructions for this work unit.  This
   ///        function accepts parameter interpretation tables showing how the raw list of
   ///        restraint settings (k(2,3), r(1,2,3,4), and x / y / z targets) can be condensed by
   ///        an AtomGraphSynthesis.
   ///
   /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
   /// \param xyz_param_map  Mapping for Cartesian coordinate targets (optional)
-  std::vector<uint2>
-  getPositionalRestraintInstructions(const std::vector<int> &kr_param_map = {},
-                                     const std::vector<int> &xyz_param_map = {}) const;
+  void storePositionalRestraintInstructions(const std::vector<int> &kr_param_map = {},
+                                            const std::vector<int> &xyz_param_map = {});
 
-  /// \brief Get a vector of the distance restraint instructions for this work unit.  This
+  /// \brief Store a vector of the distance restraint instructions for this work unit.  This
   ///        function accepts a parameter interpretation table showing how the raw list of
   ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
   ///
   /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
-  std::vector<uint2>
-  getDistanceRestraintInstructions(const std::vector<int> &kr_param_map = {}) const;
+  void storeDistanceRestraintInstructions(const std::vector<int> &kr_param_map = {});
 
-  /// \brief Get a vector of the three-point angle restraint instructions for this work unit.
+  /// \brief Store a vector of the three-point angle restraint instructions for this work unit.
   ///        This function accepts a parameter interpretation table showing how the raw list of
   ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
   ///
   /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
-  std::vector<uint2>
-  getAngleRestraintInstructions(const std::vector<int> &kr_param_map = {}) const;
+  void storeAngleRestraintInstructions(const std::vector<int> &kr_param_map = {});
 
-  /// \brief Get a vector of the four-point dihedral restraint instructions for this work unit.
+  /// \brief Store a vector of the four-point dihedral restraint instructions for this work unit.
   ///        This function accepts a parameter interpretation table showing how the raw list of
   ///        restraint settings (k(2,3) and r(1,2,3,4)) can be condensed by an AtomGraphSynthesis.
   ///
   /// \param kr_param_map   Mapping for k(2,3) and r(1,2,3,4) settings (optional)
-  std::vector<uint2>
-  getDihedralRestraintInstructions(const std::vector<int> &kr_param_map = {}) const;
+  void storeDihedralRestraintInstructions(const std::vector<int> &kr_param_map = {});
 
-  /// \brief Get a vector of the virtual site instructions for this work unit.  This function
+  /// \brief Store a vector of the virtual site instructions for this work unit.  This function
   ///        accepts a parameter interpretation table showing how the raw list of unique virtual
   ///        site frames from one topology maps into a larger selection kept by an
   ///        AtomGraphSynthesis.
   ///
   /// \param parameter_map  Mapping for virtual site frame specifications (optional)
-  std::vector<uint2> getVirtualSiteInstructions(const std::vector<int> &parameter_map = {}) const;
+  void storeVirtualSiteInstructions(const std::vector<int> &parameter_map = {});
 
-  /// \brief Get a vector of the SETTLE constraint group instructions for this work unit.  This
+  /// \brief Store a vector of the SETTLE constraint group instructions for this work unit.  This
   ///        function accepts a parameter interpretation table showing how the raw list of unique
   ///        SETTLE geometries in one topology maps into a possibly more diverse list curated by
   ///        an AtomGraphSynthesis.
   ///
   /// \param parameter_map  Mapping for SETTLE group mass and geometry specifications (optional)
-  std::vector<uint2> getSettleGroupInstructions(const std::vector<int> &parameter_map = {}) const;
+  void storeSettleGroupInstructions(const std::vector<int> &parameter_map = {});
 
-  /// \brief Get a vector of the hub-and-spoke constraint group instructions for this work unit.
+  /// \brief Store a vector of the hub-and-spoke constraint group instructions for this work unit.
   ///        This function accepts a parameter interpretation table showing how the raw list of
   ///        unique constraint groups in one topology maps into a possibly more diverse list
   ///        curated by an AtomGraphSynthesis.
@@ -723,9 +715,104 @@ public:
   /// \param group_param_bounds  Bounds for constraint group parameter sets in an
   ///                            AtomGraphSynthesis (required if parameter_map is supplied, to
   ///                            properly align the parameter indices of each instruction
-  std::vector<uint2>
-  getConstraintGroupInstructions(const std::vector<int> &parameter_map = {},
-                                 const std::vector<int> &group_param_bounds = {}) const;
+  void storeConstraintGroupInstructions(const std::vector<int> &parameter_map = {},
+                                        const std::vector<int> &group_param_bounds = {});
+
+  /// \brief Get the stored vector of composite bond instructions.
+  std::vector<uint2> getCompositeBondInstructions() const;
+
+  /// \brief Get the stored vector of angle instructions.
+  std::vector<uint2> getAngleInstructions() const;
+
+  /// \brief Get the stored vector of composite dihedral instructions.
+  std::vector<uint3> getCompositeDihedralInstructions() const;
+
+  /// \brief Get the stored vector of CMAP instructions.
+  std::vector<uint2> getCmapInstructions() const;
+
+  /// \brief Get the stored vector of CMAP instructions.
+  std::vector<uint> getInferred14Instructions() const;
+
+  /// \brief Get the stored vector of positional restraint instructions.
+  std::vector<uint2> getPositionalRestraintInstructions() const;
+
+  /// \brief Get the stored vector of distance restraint instructions.
+  std::vector<uint2> getDistanceRestraintInstructions() const;
+
+  /// \brief Get the stored vector of three-point angle restraint instructions.
+  std::vector<uint2> getAngleRestraintInstructions() const;
+
+  /// \brief Get the stored vector of four-point dihedral restraint instructions.
+  std::vector<uint2> getDihedralRestraintInstructions() const;
+
+  /// \brief Get the stored vector of virtual site placement instructions.
+  std::vector<uint2> getVirtualSiteInstructions() const;  
+  
+  /// \brief Get the stored vector of SETTLE constraint group instructions.
+  std::vector<uint2> getSettleGroupInstructions() const;  
+  
+  /// \brief Get the stored vector of hub-and-spoke constraint group instructions.
+  std::vector<uint2> getConstraintGroupInstructions() const;  
+
+  /// \brief Get a specific composite bond instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getCompositeBondInstruction(int index) const;
+
+  /// \brief Get a specific angle instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getAngleInstruction(int index) const;
+
+  /// \brief Get a specific composite dihedral instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint3> getCompositeDihedralInstruction(int index) const;
+
+  /// \brief Get a specific CMAP instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getCmapInstruction(int index) const;
+
+  /// \brief Get a specific CMAP instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint> getInferred14Instruction(int index) const;
+
+  /// \brief Get a specific positional restraint instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getPositionalRestraintInstruction(int index) const;
+
+  /// \brief Get a specific distance restraint instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getDistanceRestraintInstruction(int index) const;
+
+  /// \brief Get a specific three-point angle restraint instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getAngleRestraintInstruction(int index) const;
+
+  /// \brief Get a specific four-point dihedral restraint instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getDihedralRestraintInstruction(int index) const;
+
+  /// \brief Get a specific virtual site placement instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getVirtualSiteInstruction(int index) const;  
+  
+  /// \brief Get a specific SETTLE constraint group instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getSettleGroupInstruction(int index) const;  
+  
+  /// \brief Get a specific hub-and-spoke constraint group instruction.
+  ///
+  /// \param index  Index of the instruction to retrieve
+  std::vector<uint2> getConstraintGroupInstruction(int index) const;  
 
   /// \brief Get the bitstrings indicating which energetic interactions each work unit is
   ///        responsible for accumulating into the official energy outputs.
@@ -985,6 +1072,21 @@ private:
   std::vector<int> vsite_frame4_atoms;  ///< Local indices of this work unit's virtual site fourth
                                         ///<   frame atoms
 
+  // Internal arrays of instructions for each energy term, constraint, or virtual site task,
+  // stored for fast retrieval.
+  std::vector<uint2> cbnd_instructions;   ///< Composite bond and Urey-Bradley instructions
+  std::vector<uint2> angl_instructions;   ///< Harmonic bond angle instructions
+  std::vector<uint3> cdhe_instructions;   ///< Composite dihedral and CHARMM improper instructions
+  std::vector<uint2> cmap_instructions;   ///< CMAP surface term instructions
+  std::vector<uint> infr14_instructions;  ///< Inferred 1:4 attenuated interaction instructions
+  std::vector<uint2> rposn_instructions;  ///< Positional restraint instructions
+  std::vector<uint2> rbond_instructions;  ///< Distance restraint instructions
+  std::vector<uint2> rangl_instructions;  ///< Three-point angle restraint instructions
+  std::vector<uint2> rdihe_instructions;  ///< Four-point dihedral restraint instructions
+  std::vector<uint2> vste_instructions;   ///< Virtual site placement instructions
+  std::vector<uint2> sett_instructions;   ///< Settle group instructions
+  std::vector<uint2> cnst_instructions;   ///< Constraint group instructions
+  
   // Pointers to important objects
   ValenceDelegator *vdel_pointer;        ///< The delegator managing this object's creation
   const AtomGraph *ag_pointer;           ///< The topology to which this object pertains
