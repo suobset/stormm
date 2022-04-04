@@ -314,7 +314,7 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, c
       break;
     case TorsionKind::IMPROPER:
     case TorsionKind::IMPROPER_NO_14:
-      dihe_energy.y += ampl * (1.0 + cos(sangle));
+      dihe_energy.y += contrib;
       improper_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
       break;
     }

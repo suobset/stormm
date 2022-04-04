@@ -14,6 +14,9 @@
 #include "../../src/Math/sorting.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Parsing/textfile.h"
+#include "../../src/Potential/scorecard.h"
+#include "../../src/Potential/valence_potential.h"
+#include "../../src/Potential/eval_valence_workunit.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Restraints/restraint_apparatus.h"
@@ -50,11 +53,12 @@ using omni::restraints::applyHydrogenBondPreventors;
 using omni::restraints::applyPositionalRestraints;
 using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
+using namespace omni::energy;
 using namespace omni::numerics;
 using namespace omni::synthesis;
-using namespace omni::trajectory;
 using namespace omni::testing;
 using namespace omni::topology;
+using namespace omni::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Check the coverage of a simple task form a ValenceWorkUnit.
@@ -250,6 +254,30 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
           "non-bonded interaction accumulation is incorrect in valence work units for topology " +
           ag.getFileName() + ".", do_tests);
   }
+
+  // Check each component of the energies the work units evaluate
+  ScoreCard sc(2);
+  PhaseSpace ps_vwu(ps);
+  evaluateBondTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::BOND);
+  evaluateAngleTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::ANGL);
+  evaluateDihedralTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::DIHE);
+
+  // CHECK
+#if 0
+  const std::vector<double> bond_e = sc.reportInstantaneousStates(StateVariable::BOND);
+  const std::vector<double> angl_e = sc.reportInstantaneousStates(StateVariable::ANGLE);
+  const std::vector<double> dihe_e = sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
+  const std::vector<double> impr_e =
+    sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
+  printf("Bond energies = %12.4lf %12.4lf\n", bond_e[0], bond_e[1]);
+  printf("Angl energies = %12.4lf %12.4lf\n", angl_e[0], angl_e[1]);
+  printf("Dihe energies = %12.4lf %12.4lf\n", dihe_e[0], dihe_e[1]);
+  printf("Impr energies = %12.4lf %12.4lf\n", impr_e[0], impr_e[1]);
+#endif
+  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------

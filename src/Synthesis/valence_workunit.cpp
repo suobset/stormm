@@ -2234,6 +2234,10 @@ void ValenceWorkUnit::logActivities() {
   std::vector<bool> coverage(dihe_term_count, false);
   for (int pos = 0; pos < dihe_term_count; pos++) {
 
+    // CHECK
+    continue;
+    // END CHECK
+    
     // Filter out terms with extermely large parameter indices--these must appear in their own
     // composite terms, as the only dihedral.  This filtering applies only to proper dihedrals,
     // which are more diverse in their parameter combinations than CHARMM improper dihedrals.
