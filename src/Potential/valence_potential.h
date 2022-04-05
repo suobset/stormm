@@ -401,8 +401,8 @@ double evalCmap(const double* cmap_patches, const int* cmap_patch_bounds, int su
 /// \param invu          Inverse transformation matrix, fractional coordinates back to real space
 /// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param xfrc          Cartesian X forces acting on all particles
-/// \param yfrc          Cartesian X forces acting on all particles
-/// \param zfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian Y forces acting on all particles
+/// \param zfrc          Cartesian Z forces acting on all particles
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -440,25 +440,34 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
 ///        electrostatic and van-der Waals interactions.  Both dihedral-bound and inferred
 ///        1:4 pairs can be evaluated with this one routine.
 ///
-/// \param i_atom           The first atom in the pair
-/// \param l_atom           The second atom in the pair
-/// \param attn_idx         The attenuation index into arrays of electrostatic and van-der Waals
-///                         scaling factors
-/// \param vk               Valence parameters abstract from the system topology
-/// \param nbk              Non-bonded parameters abstract from the system topology
-/// \param xcrd             Cartesian X coordinates of all particles
-/// \param ycrd             Cartesian Y coordinates of all particles
-/// \param zcrd             Cartesian Z coordinates of all particles
-/// \param xfrc             Cartesian X forces acting on all particles
-/// \param yfrc             Cartesian X forces acting on all particles
-/// \param zfrc             Cartesian X forces acting on all particles
-/// \param umat             Box space transformation matrix
-/// \param invu             Inverse transformation, fractional coordinates back to real space
-/// \param unit_cell        The unit cell type, i.e. triclinic
-/// \param eval_elec_force  Flag to have electrostatic forces evaluated
-/// \param eval_vdw_force   Flag to have van-der Waals (Lennard-Jones) forces evaluated
-double2 evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, ValenceKit<double> vk,
-                                 const NonbondedKit<double> nbk, const double* xcrd,
+/// \param i_atom               The first atom in the pair
+/// \param l_atom               The second atom in the pair
+/// \param attn_idx             The attenuation index into arrays of electrostatic and van-der
+///                             Waals scaling factors
+/// \param coulomb_constant     Coulomb's constant for scaling electrostatic interactions
+/// \param lj_param_idx         Lennard-Jones parameter index numbers
+/// \param attn14_elec_factors  Unique electrostatic 1:4 scaling factors
+/// \param attn14_vdw_factors   Unique van-der Waals 1:4 scaling factors
+/// \param lja_14_coeff         Lennard-Jones A coefficients, in U = (A / r^12) - (B / r^6)
+/// \param ljb_14_coeff         Lennard-Jones B coefficients, in U = (A / r^12) - (B / r^6)
+/// \param n_lj_types           Number of unique Lennard-Jones types, the rank of the A and B
+///                             coefficient matrices above
+/// \param xcrd                 Cartesian X coordinates of all particles
+/// \param ycrd                 Cartesian Y coordinates of all particles
+/// \param zcrd                 Cartesian Z coordinates of all particles
+/// \param xfrc                 Cartesian X forces acting on all particles
+/// \param yfrc                 Cartesian Y forces acting on all particles
+/// \param zfrc                 Cartesian Z forces acting on all particles
+/// \param umat                 Box space transformation matrix
+/// \param invu                 Inverse transformation, fractional coordinates back to real space
+/// \param unit_cell            The unit cell type, i.e. triclinic
+/// \param eval_elec_force      Flag to have electrostatic forces evaluated
+/// \param eval_vdw_force       Flag to have van-der Waals (Lennard-Jones) forces evaluated
+double2 evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, double coulomb_constant,
+                                 const double* charges, const int* lj_param_idx,
+                                 const double* attn14_elec_factors,
+                                 const double* attn14_vdw_factors, const double* lja_14_coeff,
+                                 const double* ljb_14_coeff, int n_lj_types, const double* xcrd,
                                  const double* ycrd, const double* zcrd, const double* umat,
                                  const double* invu, UnitCellType unit_cell, double* xfrc,
                                  double* yfrc, double* zfrc, EvaluateForce eval_elec_force,

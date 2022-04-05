@@ -17,6 +17,7 @@ using synthesis::ValenceWorkUnit;
 using synthesis::VwuTask;
 using topology::AtomGraph;
 using topology::UnitCellType;
+using topology::NonbondedKit;
 using topology::ValenceKit;
 using topology::VirtualSiteKit;
 using trajectory::CoordinateFrame;
@@ -34,9 +35,10 @@ using trajectory::PhaseSpace;
 ///   - Evaluate forces, or energies alone
 /// \{
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const double* xcrd, const double* ycrd, const double* zcrd,
-                          const double* umat, const double* invu, UnitCellType unit_cell,
-                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard, int sysid,
+                          const NonbondedKit<double> nbk, const double* xcrd, const double* ycrd,
+                          const double* zcrd, const double* umat, const double* invu,
+                          UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
                           VwuTask activity = VwuTask::ALL_TASKS);

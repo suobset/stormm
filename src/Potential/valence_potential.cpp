@@ -957,14 +957,17 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
-                                 const ValenceKit<double> vk, const NonbondedKit<double> nbk,
+                                 const double coulomb_constant, const double* charges,
+                                 const int* lj_param_idx, const double* attn14_elec_factors,
+                                 const double* attn14_vdw_factors, const double* lja_14_coeff,
+                                 const double* ljb_14_coeff, const int n_lj_types,
                                  const double* xcrd, const double* ycrd, const double* zcrd,
                                  const double* umat, const double* invu,
                                  const UnitCellType unit_cell, double* xfrc, double* yfrc,
                                  double* zfrc, const EvaluateForce eval_elec_force,
                                  const EvaluateForce eval_vdw_force) {
-  const int ilj_t = nbk.lj_idx[i_atom];
-  const int jlj_t = nbk.lj_idx[l_atom];
+  const int ilj_t = lj_param_idx[i_atom];
+  const int jlj_t = lj_param_idx[l_atom];
   double dx = xcrd[l_atom] - xcrd[i_atom];
   double dy = ycrd[l_atom] - ycrd[i_atom];
   double dz = zcrd[l_atom] - zcrd[i_atom];
@@ -972,12 +975,11 @@ double2 evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int a
   const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
   const double invr = sqrt(invr2);
   const double invr4 = invr2 * invr2;
-  const double ele_scale = vk.attn14_elec[attn_idx];
-  const double vdw_scale = vk.attn14_vdw[attn_idx];
-  const double qiqj = (nbk.coulomb_constant * nbk.charge[i_atom] * nbk.charge[l_atom]) /
-                      ele_scale;
-  const double lja = nbk.lja_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
-  const double ljb = nbk.ljb_14_coeff[(ilj_t * nbk.n_lj_types) + jlj_t] / vdw_scale;
+  const double ele_scale = attn14_elec_factors[attn_idx];
+  const double vdw_scale = attn14_vdw_factors[attn_idx];
+  const double qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
+  const double lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
+  const double ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
   const double ele_contrib = qiqj * invr;
   const double vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
 
@@ -1032,9 +1034,11 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
       continue;
     }
     const double2 uc = evaluateAttenuated14Pair(vk.dihe_i_atoms[pos], vk.dihe_l_atoms[pos],
-                                                attn_idx, vk, nbk, xcrd, ycrd, zcrd, umat, invu,
-                                                unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
-                                                eval_vdw_force);
+                                                attn_idx, nbk.coulomb_constant, nbk.charge,
+                                                nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
+                                                nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
+                                                xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                                yfrc, zfrc, eval_elec_force, eval_vdw_force);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
@@ -1049,9 +1053,11 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
       continue;
     }
     const double2 uc = evaluateAttenuated14Pair(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos],
-                                                attn_idx, vk, nbk, xcrd, ycrd, zcrd, umat, invu,
-                                                unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
-                                                eval_vdw_force);
+                                                attn_idx, nbk.coulomb_constant, nbk.charge,
+                                                nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
+                                                nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
+                                                xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                                yfrc, zfrc, eval_elec_force, eval_vdw_force);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));

@@ -270,9 +270,10 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CIMP);
   evaluateCmapTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CMAP);
+  evaluateAttenuated14Terms(&ag, &ps, &sc, EvaluateForce::YES, EvaluateForce::YES, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::INFR14);
 
   // CHECK
-#if 0
   const std::vector<double> bond_e = sc.reportInstantaneousStates(StateVariable::BOND);
   const std::vector<double> angl_e = sc.reportInstantaneousStates(StateVariable::ANGLE);
   const std::vector<double> dihe_e = sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
@@ -281,6 +282,10 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const std::vector<double> ubrd_e = sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY);
   const std::vector<double> cimp_e = sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER);
   const std::vector<double> cmap_e = sc.reportInstantaneousStates(StateVariable::CMAP);
+  const std::vector<double> qq14_e =
+    sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
+  const std::vector<double> lj14_e =
+    sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
   printf("Bond energies = %12.4lf %12.4lf\n", bond_e[0], bond_e[1]);
   printf("Angl energies = %12.4lf %12.4lf\n", angl_e[0], angl_e[1]);
   printf("Dihe energies = %12.4lf %12.4lf\n", dihe_e[0], dihe_e[1]);
@@ -288,7 +293,8 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   printf("Ubrd energies = %12.4lf %12.4lf\n", ubrd_e[0], ubrd_e[1]);
   printf("CImp energies = %12.4lf %12.4lf\n", cimp_e[0], cimp_e[1]);
   printf("CMAP energies = %12.4lf %12.4lf\n", cmap_e[0], cmap_e[1]);
-#endif
+  printf("QQ14 energies = %12.4lf %12.4lf\n", qq14_e[0], qq14_e[1]);
+  printf("LJ14 energies = %12.4lf %12.4lf\n", lj14_e[0], lj14_e[1]);
   // END CHECK
 }
 

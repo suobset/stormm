@@ -14,10 +14,11 @@ using trajectory::PhaseSpaceWriter;
   
 //-------------------------------------------------------------------------------------------------
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const double* xcrd, const double* ycrd, const double* zcrd,
-                          const double* umat, const double* invu, const UnitCellType unit_cell,
-                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard,
-                          const int sysid, const std::vector<ValenceWorkUnit> &vwu_list,
+                          const NonbondedKit<double> nbk, const double* xcrd, const double* ycrd,
+                          const double* zcrd, const double* umat, const double* invu,
+                          const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          ScoreCard *ecard, const int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
                           const EvaluateForce eval_force, const VwuTask activity) {  
 
   // Initialize energy accumulators
@@ -29,7 +30,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
   llint ubrd_acc = 0LL;
   llint cimp_acc = 0LL;
   llint cmap_acc = 0LL;
-  llint infr_acc = 0LL;
+  llint qq14_acc = 0LL;
+  llint lj14_acc = 0LL;
 
   // Loop over each work unit
   for (size_t vidx = 0LLU; vidx < vwu_list.size(); vidx++) {
@@ -42,6 +44,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     const int max_atoms = vwu_list[vidx].getMaxAtoms();
     std::vector<double> sh_xcrd(max_atoms), sh_ycrd(max_atoms), sh_zcrd(max_atoms);
     std::vector<double> sh_xfrc(max_atoms), sh_yfrc(max_atoms), sh_zfrc(max_atoms);
+    std::vector<double> sh_charges(max_atoms);
+    std::vector<int> sh_lj_idx(max_atoms);
     const int n_imp_atoms = vwu_list[vidx].getImportedAtomCount();
     for (int i = 0; i < n_imp_atoms; i++) {
       const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
@@ -51,6 +55,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
       sh_xfrc[i] = xfrc[atom_idx];
       sh_yfrc[i] = yfrc[atom_idx];
       sh_zfrc[i] = zfrc[atom_idx];
+      sh_charges[i] = nbk.charge[atom_idx];
+      sh_lj_idx[i] = nbk.lj_idx[atom_idx];
     }
     
     // Evaluate bonds and Urey-Bradley terms
@@ -164,11 +170,41 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     }
 
     // Evaluate cosine-based dihedrals and CHARMM improper dihedrals
-    if (activity == VwuTask::DIHE || activity == VwuTask::CIMP || activity == VwuTask::ALL_TASKS) {
+    if (activity == VwuTask::DIHE || activity == VwuTask::CIMP || activity == VwuTask::INFR14 ||
+        activity == VwuTask::ALL_TASKS) {
       const int ncdhe = task_counts[static_cast<int>(VwuTask::CDHE)];
       const std::vector<uint> cdhe_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::CDHE);
       for (int pos = 0; pos < ncdhe; pos++) {
         const uint3 tinsr = vwu_list[vidx].getCompositeDihedralInstruction(pos);
+
+        // Compute 1:4 interactions and go on if that is all that is required.  Here, the
+        // 1:4 interactions are being *inferred* from the dihedral that controls them, as this
+        // routine can compute all van-der Waals and electrostatic 1:4 interactions as specific
+        // energy quantities.
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int l_atom = (tinsr.y & 0x3ff);
+        if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
+          const int attn_idx = ((tinsr.y >> 10) & 0x1f);
+          if (attn_idx > 0) {
+            const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx,
+                                                        nbk.coulomb_constant, sh_charges.data(),
+                                                        sh_lj_idx.data(), vk.attn14_elec,
+                                                        vk.attn14_vdw, nbk.lja_14_coeff,
+                                                        nbk.ljb_14_coeff, nbk.n_lj_types,
+                                                        sh_xcrd.data(), sh_ycrd.data(),
+                                                        sh_zcrd.data(), umat, invu, unit_cell,
+                                                        sh_xfrc.data(), sh_yfrc.data(),
+                                                        sh_zfrc.data(), eval_force, eval_force);
+            if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
+              qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
+              lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+            }
+          }
+          if (activity == VwuTask::INFR14) {
+            continue;
+          }
+        }
+        
         const bool is_charmm_improper = ((tinsr.x >> 30) & 0x1);
 
         // Skip CHARMM improper interactions if only standard dihedrals are of interest, and
@@ -177,10 +213,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
             (activity == VwuTask::CIMP && (! is_charmm_improper))) {
           continue;
         }
-        const int i_atom = (tinsr.x & 0x3ff);
         const int j_atom = ((tinsr.x >> 10) & 0x3ff);
         const int k_atom = ((tinsr.x >> 20) & 0x3ff);
-        const int l_atom = (tinsr.y & 0x3ff);
         const int param_idx = ((tinsr.y >> 16) & 0xffff);
         const bool second_term = ((tinsr.y >> 15) & 0x1);
         const TorsionKind kind = ((tinsr.x >> 31) & 0x1) ? TorsionKind::IMPROPER :
@@ -309,11 +343,15 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int l_atom = (tinsr.y & 0x3ff);
         const int m_atom = ((tinsr.y >> 10) & 0x3ff);
         const int surf_idx = (tinsr.y >> 20);
+
+        // Assume that, by this point, the imported atoms in the ValenceWorkUnit have been
+        // arranged into an image that can be trusted for all interactions.  Avoid further
+        // re-imaging of displacements inside the CMAP calculation.
         const double contrib = evalCmap(vk.cmap_patches, vk.cmap_patch_bounds, surf_idx,
                                         vk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom,
                                         m_atom, sh_xcrd.data(), sh_ycrd.data(), sh_zcrd.data(),
-                                        umat, invu, unit_cell, sh_xfrc.data(), sh_yfrc.data(),
-                                        sh_zfrc.data(), eval_force);
+                                        nullptr, nullptr, UnitCellType::NONE, sh_xfrc.data(),
+                                        sh_yfrc.data(), sh_zfrc.data(), eval_force);
         if (readBitFromMask(cmap_acc_mask, pos) == 1) {
           cmap_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
@@ -328,6 +366,41 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
       xfrc[atom_idx] += sh_xfrc[i];
       yfrc[atom_idx] += sh_yfrc[i];
       zfrc[atom_idx] += sh_zfrc[i];
+    }
+
+    // Evaluate remaining 1:4 interactions.  Calling this routine by the "INFR14" enumeration will
+    // compute all 1:4 interactions, a redefinition of "inferred 1:4" relative to other situations.
+    // In calling this function, "inferred 1:4" means *inferring* 1:4 interactions from dihedrals
+    // that control them as well as extra 1:4 interactions that cannot be attached to a dihedral
+    // interaction.  Elsewhere, including the following conditional statement, "inferred 1:4"
+    // refers to only the extra interactions (which had to be *inferred* from virtual site
+    // exclusion rules).  This minor bit of confusion was accepted for convenience, to reuse
+    // VwuTask and avoid making a totally separate enumerator.  The StateVariable enumerator
+    // doesn't serve quite the right definitions, either.
+    if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
+      const int ninfr14 = task_counts[static_cast<int>(VwuTask::INFR14)];
+      const std::vector<uint> infr_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::INFR14);
+      for (int pos = 0; pos < ninfr14; pos++) {
+        const uint tinsr = vwu_list[vidx].getInferred14Instruction(pos);
+        const int i_atom = (tinsr & 0x3ff);
+        const int l_atom = ((tinsr >> 10) & 0x3ff);
+        const int attn_idx = (tinsr >> 20);
+        if (attn_idx == 0) {
+          continue;
+        }
+        const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant,
+                                                    sh_charges.data(), sh_lj_idx.data(),
+                                                    vk.attn14_elec, vk.attn14_vdw,
+                                                    nbk.lja_14_coeff, nbk.ljb_14_coeff,
+                                                    nbk.n_lj_types, sh_xcrd.data(), sh_ycrd.data(),
+                                                    sh_zcrd.data(), umat, invu, unit_cell,
+                                                    sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
+                                                    eval_force, eval_force);
+        if (readBitFromMask(infr_acc_mask, pos) == 1) {
+          qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
+          lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+        }
+      }
     }
   }
 
@@ -353,6 +426,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     ecard->contribute(StateVariable::CMAP, cmap_acc, sysid);
     break;
   case VwuTask::INFR14:
+    ecard->contribute(StateVariable::ELECTROSTATIC_ONE_FOUR, qq14_acc, sysid);
+    ecard->contribute(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
+    break;
   case VwuTask::RPOSN:
   case VwuTask::RBOND:
   case VwuTask::RANGL:
@@ -381,8 +457,9 @@ void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard,
                           const EvaluateForce eval_force, const VwuTask activity) {
   PhaseSpaceWriter psw = ps->data();
   evalValenceWorkUnits(ag->getDoublePrecisionValenceKit(), ag->getDoublePrecisionVirtualSiteKit(),
-                       psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                       psw.xfrc, psw.yfrc, psw.zfrc, ecard, sysid, vwu_list, eval_force, activity);
+                       ag->getDoublePrecisionNonbondedKit(), psw.xcrd, psw.ycrd, psw.zcrd,
+                       psw.umat, psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, ecard,
+                       sysid, vwu_list, eval_force, activity);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -391,9 +468,9 @@ void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, ScoreCard *
                           const VwuTask activity) {
   PhaseSpaceReader psr = ps.data();
   evalValenceWorkUnits(ag.getDoublePrecisionValenceKit(), ag.getDoublePrecisionVirtualSiteKit(),
-                       psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.unit_cell,
-                       nullptr, nullptr, nullptr, ecard, sysid, vwu_list, EvaluateForce::NO,
-                       activity);
+                       ag.getDoublePrecisionNonbondedKit(), psr.xcrd, psr.ycrd, psr.zcrd, psr.umat,
+                       psr.invu, psr.unit_cell, nullptr, nullptr, nullptr, ecard, sysid, vwu_list,
+                       EvaluateForce::NO, activity);
 }
 
 } // namespace energy
