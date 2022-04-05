@@ -344,6 +344,40 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
                                    ScoreCard *ecard, int system_index = 0);
 /// \}
 
+/// \brief Evaluate a single CHARMM CMAP two-dimensional potential and force term.  This procedure
+///        is abstracted to avoid code replication.  Other lengthy procedures like the dihedral
+///        computation are computed in slightly different ways that would make such encapsulation
+///        difficult.
+///
+/// \param cmap_patches       Data array of all CMAP surfaces, in patch format (pre-computed Axy
+///                           coefficients for every grid element)
+/// \param cmap_patch_bounds  Bounds array for cmap_patches, with demarcations for each individual
+///                           CMAP (not each individual patch)
+/// \param surf_idx           The relevant surface, an index into cmap_patch_bounds
+/// \param surf_dim           Dimension of the CMAP surface of interest (periodicity with 2 x pi
+///                           extent along each axis is assumed)
+/// \param i_atom             Atom I in the interaction (this still assumes that there are two
+///                           dihedral terms with three overlapping atoms)
+/// \param j_atom             Atom J in the interaction
+/// \param k_atom             Atom K in the interaction
+/// \param l_atom             Atom L in the interaction
+/// \param m_atom             Atom M in the interaction
+/// \param xcrd               Cartesian X coordinates of all particles
+/// \param ycrd               Cartesian Y coordinates of all particles
+/// \param zcrd               Cartesian Z coordinates of all particles
+/// \param umat               Box space transformation matrix
+/// \param invu               Inverse transformation matrix, fractional coordinates to real space
+/// \param unit_cell          The unit cell type, i.e. triclinic
+/// \param xfrc               Cartesian X forces acting on all particles
+/// \param yfrc               Cartesian X forces acting on all particles
+/// \param zfrc               Cartesian X forces acting on all particles
+/// \param eval_force         Flag to have forces also evaluated
+double evalCmap(const double* cmap_patches, const int* cmap_patch_bounds, int surf_idx,
+                int surf_dim, int i_atom, int j_atom, int k_atom, int l_atom, int m_atom,
+                const double* xcrd, const double* ycrd, const double* zcrd, const double* umat,
+                const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
+                double* zfrc, EvaluateForce eval_force);
+  
 /// \brief Evaluate CHARMM CMAP two-dimensional cubic spline potentials.  As with all other
 ///        functions in this library, the results of double-precision accumulation are returned
 ///        for comparison to fixed-precision results.
@@ -363,12 +397,12 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 /// \param xcrd          Cartesian X coordinates of all particles
 /// \param ycrd          Cartesian Y coordinates of all particles
 /// \param zcrd          Cartesian Z coordinates of all particles
-/// \param xfrc          Cartesian X forces acting on all particles
-/// \param yfrc          Cartesian X forces acting on all particles
-/// \param zfrc          Cartesian X forces acting on all particles
 /// \param umat          Box space transformation matrix
 /// \param invu          Inverse transformation matrix, fractional coordinates back to real space
 /// \param unit_cell     The unit cell type, i.e. triclinic
+/// \param xfrc          Cartesian X forces acting on all particles
+/// \param yfrc          Cartesian X forces acting on all particles
+/// \param zfrc          Cartesian X forces acting on all particles
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated

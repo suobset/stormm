@@ -163,7 +163,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
       }
     }
 
-    // Evaluate harmonic bond angles
+    // Evaluate cosine-based dihedrals and CHARMM improper dihedrals
     if (activity == VwuTask::DIHE || activity == VwuTask::CIMP || activity == VwuTask::ALL_TASKS) {
       const int ncdhe = task_counts[static_cast<int>(VwuTask::CDHE)];
       const std::vector<uint> cdhe_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::CDHE);
@@ -296,6 +296,29 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         }
       }
     }
+
+    // Evaluate CMAP-based terms 
+    if (activity == VwuTask::CMAP || activity == VwuTask::ALL_TASKS) {
+      const int ncmap = task_counts[static_cast<int>(VwuTask::CMAP)];
+      const std::vector<uint> cmap_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::CMAP);
+      for (int pos = 0; pos < ncmap; pos++) {
+        const uint2 tinsr = vwu_list[vidx].getCmapInstruction(pos);
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+        const int l_atom = (tinsr.y & 0x3ff);
+        const int m_atom = ((tinsr.y >> 10) & 0x3ff);
+        const int surf_idx = (tinsr.y >> 20);
+        const double contrib = evalCmap(vk.cmap_patches, vk.cmap_patch_bounds, surf_idx,
+                                        vk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom,
+                                        m_atom, sh_xcrd.data(), sh_ycrd.data(), sh_zcrd.data(),
+                                        umat, invu, unit_cell, sh_xfrc.data(), sh_yfrc.data(),
+                                        sh_zfrc.data(), eval_force);
+        if (readBitFromMask(cmap_acc_mask, pos) == 1) {
+          cmap_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+        }
+      }
+    }
     
     // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
     // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
@@ -327,6 +350,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     ecard->contribute(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
     break;
   case VwuTask::CMAP:
+    ecard->contribute(StateVariable::CMAP, cmap_acc, sysid);
+    break;
   case VwuTask::INFR14:
   case VwuTask::RPOSN:
   case VwuTask::RBOND:

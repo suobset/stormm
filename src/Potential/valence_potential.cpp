@@ -672,6 +672,207 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 }
 
 //-------------------------------------------------------------------------------------------------
+double evalCmap(const double* cmap_patches, const int* cmap_patch_bounds, const int surf_idx,
+                const int surf_dim, const int i_atom, const int j_atom, const int k_atom,
+                const int l_atom, const int m_atom, const double* xcrd, const double* ycrd,
+                const double* zcrd, const double* umat, const double* invu,
+                const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                const EvaluateForce eval_force) {
+
+  // Compute displacements
+  std::vector<double> acoef(16);
+  double ab[3], bc[3], cd[3], de[3], crabbc[3], crbccd[3], crcdde[3], scr_phi[3], scr_psi[3];
+  double phi_progression[4], psi_progression[4], acoef_psi[4];
+  for (int i = 0; i < 4; i++) {
+    acoef_psi[i] = 0.0;
+  }
+  ab[0] = xcrd[j_atom] - xcrd[i_atom];
+  ab[1] = ycrd[j_atom] - ycrd[i_atom];
+  ab[2] = zcrd[j_atom] - zcrd[i_atom];
+  bc[0] = xcrd[k_atom] - xcrd[j_atom];
+  bc[1] = ycrd[k_atom] - ycrd[j_atom];
+  bc[2] = zcrd[k_atom] - zcrd[j_atom];
+  cd[0] = xcrd[l_atom] - xcrd[k_atom];
+  cd[1] = ycrd[l_atom] - ycrd[k_atom];
+  cd[2] = zcrd[l_atom] - zcrd[k_atom];
+  de[0] = xcrd[m_atom] - xcrd[l_atom];
+  de[1] = ycrd[m_atom] - ycrd[l_atom];
+  de[2] = zcrd[m_atom] - zcrd[l_atom];
+  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&de[0], &de[1], &de[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    
+  // Compute the first dihedral
+  crossProduct(ab, bc, crabbc);
+  crossProduct(bc, cd, crbccd);
+  double cos_phi = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
+  cos_phi /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                  (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+  crossProduct(crabbc, crbccd, scr_phi);
+  cos_phi = (cos_phi < -1.0) ? -1.0 : (cos_phi > 1.0) ? 1.0 : cos_phi;
+  double phi = (scr_phi[0]*bc[0] + scr_phi[1]*bc[1] + scr_phi[2]*bc[2] > 0.0) ?  acos(cos_phi) :
+                                                                                -acos(cos_phi);
+  phi += pi;
+  phi = (phi < 0.0) ? phi + twopi : (phi >= twopi) ? phi - twopi : phi;
+
+  // Compute the second dihedral
+  crossProduct(cd, de, crcdde);
+  double cos_psi = crbccd[0]*crcdde[0] + crbccd[1]*crcdde[1] + crbccd[2]*crcdde[2];
+  cos_psi /= sqrt((crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]) *
+                  (crcdde[0]*crcdde[0] + crcdde[1]*crcdde[1] + crcdde[2]*crcdde[2]));
+  crossProduct(crbccd, crcdde, scr_psi);
+  cos_psi = (cos_psi < -1.0) ? -1.0 : (cos_psi > 1.0) ? 1.0 : cos_psi;
+  double psi = (scr_psi[0]*bc[0] + scr_psi[1]*bc[1] + scr_psi[2]*bc[2] > 0.0) ?  acos(cos_psi) :
+                                                                                -acos(cos_psi);
+  psi += pi;
+  psi = (psi < 0.0) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
+
+  // Compute the patch index (idx_phi, idx_psi) of the CMAP
+  const double dsurf_dim = static_cast<double>(surf_dim);
+  const double phi_grid = phi * dsurf_dim * inverse_twopi;
+  const double psi_grid = psi * dsurf_dim * inverse_twopi;
+  const int idx_phi = phi_grid;
+  const int idx_psi = psi_grid;
+  const double phifrac = phi_grid - idx_phi;
+  const double psifrac = psi_grid - idx_psi;
+
+  // Draw in the matrix of spline values and derivatives
+  const int patch_idx = cmap_patch_bounds[surf_idx] + (((idx_psi * surf_dim) + idx_phi) * 16);
+  for (int i = 0; i < 16; i++) {
+    acoef[i] = cmap_patches[patch_idx + i];
+  }
+
+  // Perform the matrix multiplications to obtain the bicubic spline coefficients
+  phi_progression[0] = 1.0;
+  psi_progression[0] = 1.0;
+  for (int i = 1; i < 4; i++) {
+    phi_progression[i] = phi_progression[i - 1] * phifrac;
+    psi_progression[i] = psi_progression[i - 1] * psifrac;
+  }
+  matrixVectorMultiply(acoef.data(), psi_progression, acoef_psi, 4, 4, 1.0, 1.0, 0.0);
+  const double contrib = (phi_progression[0] * acoef_psi[0]) +
+                         (phi_progression[1] * acoef_psi[1]) + 
+                         (phi_progression[2] * acoef_psi[2]) + 
+                         (phi_progression[3] * acoef_psi[3]);
+
+  // Compute forces, if requested
+  if (eval_force == EvaluateForce::YES) {
+
+    // The derivatives along phi and psi follow from the energy expression, evaluation of the
+    // guiding matrix equation for the bicubic spline potential:
+    //
+    //                                                    [ a00 a01 a02 a03     [ 1
+    // Energy = [ 1 + phifrac + phifrac^2 + phifrac^3 ] *   a10 a11 a12 a13  *    psifrac
+    //                                                      a20 a21 a22 a23       psifrac^2
+    //                                                      a30 a31 a32 a33 ]     psifrac^3 ]
+    double dphi = (((3.0 * acoef[15] * phifrac) + (2.0 * acoef[14])) * phifrac) + acoef[13];
+    dphi *= psifrac;
+    dphi +=       (((3.0 * acoef[11] * phifrac) + (2.0 * acoef[10])) * phifrac) + acoef[ 9];
+    dphi *= psifrac;
+    dphi +=       (((3.0 * acoef[ 7] * phifrac) + (2.0 * acoef[ 6])) * phifrac) + acoef[ 5];
+    dphi *= psifrac;
+    dphi +=       (((3.0 * acoef[ 3] * phifrac) + (2.0 * acoef[ 2])) * phifrac) + acoef[ 1];
+    double dpsi = (((3.0 * acoef[15] * psifrac) + (2.0 * acoef[11])) * psifrac) + acoef[ 7];
+    dpsi *= phifrac;
+    dpsi +=       (((3.0 * acoef[14] * psifrac) + (2.0 * acoef[10])) * psifrac) + acoef[ 6];
+    dpsi *= phifrac;
+    dpsi +=       (((3.0 * acoef[13] * psifrac) + (2.0 * acoef[ 9])) * psifrac) + acoef[ 5];
+    dpsi *= phifrac;
+    dpsi +=       (((3.0 * acoef[12] * psifrac) + (2.0 * acoef[ 8])) * psifrac) + acoef[ 4];
+    dphi *= dsurf_dim / twopi;
+    dpsi *= dsurf_dim / twopi;
+
+    // With the derivative in hand, evaluate the transformation of coordinates for either the
+    // phi or psi dihedrals.
+    const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+    const double invab = 1.0 / mgab;
+    const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+    const double invbc = 1.0 / mgbc;
+    const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+    const double invcd = 1.0 / mgcd;
+    const double mgde = sqrt(de[0]*de[0] + de[1]*de[1] + de[2]*de[2]);
+    const double invde = 1.0 / mgde;
+    const double invabc = invab * invbc;
+    const double invbcd = invbc * invcd;
+    const double invcde = invcd * invde;
+    for (int i = 0; i < 3; i++) {
+      crabbc[i] *= invabc;
+      crbccd[i] *= invbcd;
+      crcdde[i] *= invcde;
+    }
+
+    // Feed the gradient, negative of the derivative, into the functions below
+    dphi *= -1.0;
+    dpsi *= -1.0;
+
+    // Phi accumulation: transform the rotational derivatives to cartesian coordinates
+    const double phi_cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
+    const double phi_isinb2 = (phi_cosb * phi_cosb < asymptotic_to_one_lf) ?
+                              dphi / (1.0 - (phi_cosb * phi_cosb)) :
+                              dphi * inverse_one_minus_asymptote_lf;
+    const double phi_cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+    const double phi_isinc2 = (phi_cosc * phi_cosc < asymptotic_to_one_lf) ?
+                              dphi / (1.0 - (phi_cosc * phi_cosc)) :
+                              dphi * inverse_one_minus_asymptote_lf;
+    const double phi_fa = -invab * phi_isinb2;
+    const double phi_fb1 = (mgbc - (mgab * phi_cosb)) * invabc * phi_isinb2;
+    const double phi_fb2 = phi_cosc * invbc * phi_isinc2;
+    const double phi_fc1 = (mgbc - (mgcd * phi_cosc)) * invbcd * phi_isinc2;
+    const double phi_fc2 = phi_cosb * invbc * phi_isinb2;
+    const double phi_fd = -invcd * phi_isinc2;
+
+    // Psi accumulation: transform the rotational derivatives to cartesian coordinates
+    const double psi_cosb = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+    const double psi_isinb2 = (psi_cosb * psi_cosb < asymptotic_to_one_lf) ?
+                              dpsi / (1.0 - (psi_cosb * psi_cosb)) :
+                              dpsi * inverse_one_minus_asymptote_lf;
+    const double psi_cosc = -(cd[0]*de[0] + cd[1]*de[1] + cd[2]*de[2]) * invcd * invde;
+    const double psi_isinc2 = (psi_cosc * psi_cosc < asymptotic_to_one_lf) ?
+                              dpsi / (1.0 - (psi_cosc * psi_cosc)) : 
+                              dpsi * inverse_one_minus_asymptote_lf;
+    const double psi_fa = -invbc * psi_isinb2;
+    const double psi_fb1 = (mgcd - (mgbc * psi_cosb)) * invbcd * psi_isinb2;
+    const double psi_fb2 = psi_cosc * invcd * psi_isinc2;
+    const double psi_fc1 = (mgcd - (mgde * psi_cosc)) * invcde * psi_isinc2;
+    const double psi_fc2 = psi_cosb * invcd * psi_isinb2;
+    const double psi_fd = -invde * psi_isinc2;
+
+    // Accumulate the phi dihedral forces
+    xfrc[i_atom] += crabbc[0] * phi_fa;
+    yfrc[i_atom] += crabbc[1] * phi_fa;
+    zfrc[i_atom] += crabbc[2] * phi_fa;
+    xfrc[j_atom] += (phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0]);
+    yfrc[j_atom] += (phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1]);
+    zfrc[j_atom] += (phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2]);
+    xfrc[k_atom] += (phi_fc2 * crabbc[0]) - (phi_fc1 * crbccd[0]);
+    yfrc[k_atom] += (phi_fc2 * crabbc[1]) - (phi_fc1 * crbccd[1]);
+    zfrc[k_atom] += (phi_fc2 * crabbc[2]) - (phi_fc1 * crbccd[2]);
+    xfrc[l_atom] -= phi_fd * crbccd[0];
+    yfrc[l_atom] -= phi_fd * crbccd[1];
+    zfrc[l_atom] -= phi_fd * crbccd[2];
+
+    // Accumulate the psi dihedral forces
+    xfrc[j_atom] += crbccd[0] * psi_fa;
+    yfrc[j_atom] += crbccd[1] * psi_fa;
+    zfrc[j_atom] += crbccd[2] * psi_fa;
+    xfrc[k_atom] += (psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0]);
+    yfrc[k_atom] += (psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1]);
+    zfrc[k_atom] += (psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2]);
+    xfrc[l_atom] += (psi_fc2 * crbccd[0]) - (psi_fc1 * crcdde[0]);
+    yfrc[l_atom] += (psi_fc2 * crbccd[1]) - (psi_fc1 * crcdde[1]);
+    zfrc[l_atom] += (psi_fc2 * crbccd[2]) - (psi_fc1 * crcdde[2]);
+    xfrc[m_atom] -= psi_fd * crcdde[0];
+    yfrc[m_atom] -= psi_fd * crcdde[1];
+    zfrc[m_atom] -= psi_fd * crcdde[2];
+  }
+
+  // Return the double-precision energy result.  It will be converted to a fixed-precision
+  // quantity later.
+  return contrib;
+}
+
+//-------------------------------------------------------------------------------------------------
 double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                          const double* zcrd, const double* umat, const double* invu,
                          const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
@@ -680,14 +881,8 @@ double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const 
   double cmap_energy = 0.0;
   llint cmap_acc = 0LL;
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
-  std::vector<double> acoef(16);
 
   // Accumulate results by looping over all CMAP (here, meaning coupled dihedral) terms.
-  double ab[3], bc[3], cd[3], de[3], crabbc[3], crbccd[3], crcdde[3], scr_phi[3], scr_psi[3];
-  double phi_progression[4], psi_progression[4], acoef_psi[4];
-  for (int i = 0; i < 4; i++) {
-    acoef_psi[i] = 0.0;
-  }
   for (int pos = 0; pos < vk.ncmap; pos++) {
 
     // Get parameters for an angle between atoms i, j, and k
@@ -698,190 +893,12 @@ double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const 
     const int m_atom = vk.cmap_m_atoms[pos];
     const int surf_idx = vk.cmap_surf_idx[pos];
     const int surf_dim = vk.cmap_dim[surf_idx];
-
-    // Compute displacements
-    ab[0] = xcrd[j_atom] - xcrd[i_atom];
-    ab[1] = ycrd[j_atom] - ycrd[i_atom];
-    ab[2] = zcrd[j_atom] - zcrd[i_atom];
-    bc[0] = xcrd[k_atom] - xcrd[j_atom];
-    bc[1] = ycrd[k_atom] - ycrd[j_atom];
-    bc[2] = zcrd[k_atom] - zcrd[j_atom];
-    cd[0] = xcrd[l_atom] - xcrd[k_atom];
-    cd[1] = ycrd[l_atom] - ycrd[k_atom];
-    cd[2] = zcrd[l_atom] - zcrd[k_atom];
-    de[0] = xcrd[m_atom] - xcrd[l_atom];
-    de[1] = ycrd[m_atom] - ycrd[l_atom];
-    de[2] = zcrd[m_atom] - zcrd[l_atom];
-    imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    imageCoordinates(&de[0], &de[1], &de[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    
-    // Compute the first dihedral
-    crossProduct(ab, bc, crabbc);
-    crossProduct(bc, cd, crbccd);
-    double cos_phi = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
-    cos_phi /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
-                    (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
-    crossProduct(crabbc, crbccd, scr_phi);
-    cos_phi = (cos_phi < -1.0) ? -1.0 : (cos_phi > 1.0) ? 1.0 : cos_phi;
-    double phi = (scr_phi[0]*bc[0] + scr_phi[1]*bc[1] + scr_phi[2]*bc[2] > 0.0) ?  acos(cos_phi) :
-                                                                                  -acos(cos_phi);
-    phi += pi;
-    phi = (phi < 0.0) ? phi + twopi : (phi >= twopi) ? phi - twopi : phi;
-
-    // Compute the second dihedral
-    crossProduct(cd, de, crcdde);
-    double cos_psi = crbccd[0]*crcdde[0] + crbccd[1]*crcdde[1] + crbccd[2]*crcdde[2];
-    cos_psi /= sqrt((crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]) *
-                    (crcdde[0]*crcdde[0] + crcdde[1]*crcdde[1] + crcdde[2]*crcdde[2]));
-    crossProduct(crbccd, crcdde, scr_psi);
-    cos_psi = (cos_psi < -1.0) ? -1.0 : (cos_psi > 1.0) ? 1.0 : cos_psi;
-    double psi = (scr_psi[0]*bc[0] + scr_psi[1]*bc[1] + scr_psi[2]*bc[2] > 0.0) ?  acos(cos_psi) :
-                                                                                  -acos(cos_psi);
-    psi += pi;
-    psi = (psi < 0.0) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
-
-    // Compute the patch index (idx_phi, idx_psi) of the CMAP
-    const double dsurf_dim = static_cast<double>(surf_dim);
-    const double phi_grid = phi * dsurf_dim * inverse_twopi;
-    const double psi_grid = psi * dsurf_dim * inverse_twopi;
-    const int idx_phi = phi_grid;
-    const int idx_psi = psi_grid;
-    const double phifrac = phi_grid - idx_phi;
-    const double psifrac = psi_grid - idx_psi;
-
-    // Draw in the matrix of spline values and derivatives
-    const int patch_idx = vk.cmap_patch_bounds[surf_idx] + (((idx_psi * surf_dim) + idx_phi) * 16);
-    for (int i = 0; i < 16; i++) {
-      acoef[i] = vk.cmap_patches[patch_idx + i];
-    }
-
-    // Perform the matrix multiplications to obtain the bicubic spline coefficients
-    phi_progression[0] = 1.0;
-    psi_progression[0] = 1.0;
-    for (int i = 1; i < 4; i++) {
-      phi_progression[i] = phi_progression[i - 1] * phifrac;
-      psi_progression[i] = psi_progression[i - 1] * psifrac;
-    }
-    matrixVectorMultiply(acoef.data(), psi_progression, acoef_psi, 4, 4, 1.0, 1.0, 0.0);
-    const double contrib = (phi_progression[0] * acoef_psi[0]) +
-                           (phi_progression[1] * acoef_psi[1]) + 
-                           (phi_progression[2] * acoef_psi[2]) + 
-                           (phi_progression[3] * acoef_psi[3]);
+    const double contrib = evalCmap(vk.cmap_patches, vk.cmap_patch_bounds, vk.cmap_surf_idx[pos],
+                                    vk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom, m_atom,
+                                    xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
+                                    eval_force);
     cmap_energy += contrib;
     cmap_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
-
-    // Compute forces, if requested
-    if (eval_force == EvaluateForce::YES) {
-
-      // The derivatives along phi and psi follow from the energy expression, evaluation of the
-      // guiding matrix equation for the bicubic spline potential:
-      //
-      //                                                    [ a00 a01 a02 a03     [ 1
-      // Energy = [ 1 + phifrac + phifrac^2 + phifrac^3 ] *   a10 a11 a12 a13  *    psifrac
-      //                                                      a20 a21 a22 a23       psifrac^2
-      //                                                      a30 a31 a32 a33 ]     psifrac^3 ]
-      double dphi = (((3.0 * acoef[15] * phifrac) + (2.0 * acoef[14])) * phifrac) + acoef[13];
-      dphi *= psifrac;
-      dphi +=       (((3.0 * acoef[11] * phifrac) + (2.0 * acoef[10])) * phifrac) + acoef[ 9];
-      dphi *= psifrac;
-      dphi +=       (((3.0 * acoef[ 7] * phifrac) + (2.0 * acoef[ 6])) * phifrac) + acoef[ 5];
-      dphi *= psifrac;
-      dphi +=       (((3.0 * acoef[ 3] * phifrac) + (2.0 * acoef[ 2])) * phifrac) + acoef[ 1];
-      double dpsi = (((3.0 * acoef[15] * psifrac) + (2.0 * acoef[11])) * psifrac) + acoef[ 7];
-      dpsi *= phifrac;
-      dpsi +=       (((3.0 * acoef[14] * psifrac) + (2.0 * acoef[10])) * psifrac) + acoef[ 6];
-      dpsi *= phifrac;
-      dpsi +=       (((3.0 * acoef[13] * psifrac) + (2.0 * acoef[ 9])) * psifrac) + acoef[ 5];
-      dpsi *= phifrac;
-      dpsi +=       (((3.0 * acoef[12] * psifrac) + (2.0 * acoef[ 8])) * psifrac) + acoef[ 4];
-      dphi *= dsurf_dim / twopi;
-      dpsi *= dsurf_dim / twopi;
-
-      // With the derivative in hand, evaluate the transformation of coordinates for either the
-      // phi or psi dihedrals.
-      const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
-      const double invab = 1.0 / mgab;
-      const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
-      const double invbc = 1.0 / mgbc;
-      const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
-      const double invcd = 1.0 / mgcd;
-      const double mgde = sqrt(de[0]*de[0] + de[1]*de[1] + de[2]*de[2]);
-      const double invde = 1.0 / mgde;
-      const double invabc = invab * invbc;
-      const double invbcd = invbc * invcd;
-      const double invcde = invcd * invde;
-      for (int i = 0; i < 3; i++) {
-        crabbc[i] *= invabc;
-        crbccd[i] *= invbcd;
-        crcdde[i] *= invcde;
-      }
-
-      // Feed the gradient, negative of the derivative, into the functions below
-      dphi *= -1.0;
-      dpsi *= -1.0;
-
-      // Phi accumulation: transform the rotational derivatives to cartesian coordinates
-      const double phi_cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
-      const double phi_isinb2 = (phi_cosb * phi_cosb < asymptotic_to_one_lf) ?
-                                dphi / (1.0 - (phi_cosb * phi_cosb)) :
-                                dphi * inverse_one_minus_asymptote_lf;
-      const double phi_cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
-      const double phi_isinc2 = (phi_cosc * phi_cosc < asymptotic_to_one_lf) ?
-                                dphi / (1.0 - (phi_cosc * phi_cosc)) :
-                                dphi * inverse_one_minus_asymptote_lf;
-      const double phi_fa = -invab * phi_isinb2;
-      const double phi_fb1 = (mgbc - (mgab * phi_cosb)) * invabc * phi_isinb2;
-      const double phi_fb2 = phi_cosc * invbc * phi_isinc2;
-      const double phi_fc1 = (mgbc - (mgcd * phi_cosc)) * invbcd * phi_isinc2;
-      const double phi_fc2 = phi_cosb * invbc * phi_isinb2;
-      const double phi_fd = -invcd * phi_isinc2;
-
-      // Psi accumulation: transform the rotational derivatives to cartesian coordinates
-      const double psi_cosb = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
-      const double psi_isinb2 = (psi_cosb * psi_cosb < asymptotic_to_one_lf) ?
-                                dpsi / (1.0 - (psi_cosb * psi_cosb)) :
-                                dpsi * inverse_one_minus_asymptote_lf;
-      const double psi_cosc = -(cd[0]*de[0] + cd[1]*de[1] + cd[2]*de[2]) * invcd * invde;
-      const double psi_isinc2 = (psi_cosc * psi_cosc < asymptotic_to_one_lf) ?
-                                dpsi / (1.0 - (psi_cosc * psi_cosc)) : 
-                                dpsi * inverse_one_minus_asymptote_lf;
-      const double psi_fa = -invbc * psi_isinb2;
-      const double psi_fb1 = (mgcd - (mgbc * psi_cosb)) * invbcd * psi_isinb2;
-      const double psi_fb2 = psi_cosc * invcd * psi_isinc2;
-      const double psi_fc1 = (mgcd - (mgde * psi_cosc)) * invcde * psi_isinc2;
-      const double psi_fc2 = psi_cosb * invcd * psi_isinb2;
-      const double psi_fd = -invde * psi_isinc2;
-
-      // Accumulate the phi dihedral forces
-      xfrc[i_atom] += crabbc[0] * phi_fa;
-      yfrc[i_atom] += crabbc[1] * phi_fa;
-      zfrc[i_atom] += crabbc[2] * phi_fa;
-      xfrc[j_atom] += (phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0]);
-      yfrc[j_atom] += (phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1]);
-      zfrc[j_atom] += (phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2]);
-      xfrc[k_atom] += (phi_fc2 * crabbc[0]) - (phi_fc1 * crbccd[0]);
-      yfrc[k_atom] += (phi_fc2 * crabbc[1]) - (phi_fc1 * crbccd[1]);
-      zfrc[k_atom] += (phi_fc2 * crabbc[2]) - (phi_fc1 * crbccd[2]);
-      xfrc[l_atom] -= phi_fd * crbccd[0];
-      yfrc[l_atom] -= phi_fd * crbccd[1];
-      zfrc[l_atom] -= phi_fd * crbccd[2];
-
-      // Accumulate the psi dihedral forces
-      xfrc[j_atom] += crbccd[0] * psi_fa;
-      yfrc[j_atom] += crbccd[1] * psi_fa;
-      zfrc[j_atom] += crbccd[2] * psi_fa;
-      xfrc[k_atom] += (psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0]);
-      yfrc[k_atom] += (psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1]);
-      zfrc[k_atom] += (psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2]);
-      xfrc[l_atom] += (psi_fc2 * crbccd[0]) - (psi_fc1 * crcdde[0]);
-      yfrc[l_atom] += (psi_fc2 * crbccd[1]) - (psi_fc1 * crcdde[1]);
-      zfrc[l_atom] += (psi_fc2 * crbccd[2]) - (psi_fc1 * crcdde[2]);
-      xfrc[m_atom] -= psi_fd * crcdde[0];
-      yfrc[m_atom] -= psi_fd * crcdde[1];
-      zfrc[m_atom] -= psi_fd * crcdde[2];
-    }
   }
 
   // Contribute results
