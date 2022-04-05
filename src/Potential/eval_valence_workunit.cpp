@@ -14,12 +14,13 @@ using trajectory::PhaseSpaceWriter;
   
 //-------------------------------------------------------------------------------------------------
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const NonbondedKit<double> nbk, const double* xcrd, const double* ycrd,
-                          const double* zcrd, const double* umat, const double* invu,
-                          const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                          ScoreCard *ecard, const int sysid,
-                          const std::vector<ValenceWorkUnit> &vwu_list,
-                          const EvaluateForce eval_force, const VwuTask activity) {  
+                          const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
+                          const double* xcrd, const double* ycrd, const double* zcrd,
+                          const double* umat, const double* invu, const UnitCellType unit_cell,
+                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard,
+                          const int sysid, const std::vector<ValenceWorkUnit> &vwu_list,
+                          const EvaluateForce eval_force, const VwuTask activity,
+                          const int step_number) {  
 
   // Initialize energy accumulators
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
@@ -32,6 +33,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
   llint cmap_acc = 0LL;
   llint qq14_acc = 0LL;
   llint lj14_acc = 0LL;
+  llint rest_acc = 0LL;
 
   // Loop over each work unit
   for (size_t vidx = 0LLU; vidx < vwu_list.size(); vidx++) {
@@ -217,8 +219,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int k_atom = ((tinsr.x >> 20) & 0x3ff);
         const int param_idx = ((tinsr.y >> 16) & 0xffff);
         const bool second_term = ((tinsr.y >> 15) & 0x1);
-        const TorsionKind kind = ((tinsr.x >> 31) & 0x1) ? TorsionKind::IMPROPER :
-                                                           TorsionKind::PROPER;
+        const TorsionKind kind = (tinsr.x >> 31) ? TorsionKind::IMPROPER : TorsionKind::PROPER;
         
         // Compute displacements
         double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
@@ -402,6 +403,105 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         }
       }
     }
+
+    // Evaluate positional restraints (all restraint energies contribute to the same accumulator)
+    const double2 steady_restraint = { 1.0, 0.0 };
+    if (activity == VwuTask::RPOSN || activity == VwuTask::ALL_TASKS) {
+      const int nrposn = task_counts[static_cast<int>(VwuTask::RPOSN)];
+      const std::vector<uint> rposn_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::RPOSN);
+      for (int pos = 0; pos < nrposn; pos++) {
+        const uint2 tinsr = vwu_list[vidx].getPositionalRestraintInstruction(pos);
+        const int p_atom = (tinsr.x & 0x3ff);
+        const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
+        const int xyz_param_idx = tinsr.y;
+        const double contrib = evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number,
+                                                 kr_param_idx, xyz_param_idx, rar.rposn_init_step,
+                                                 rar.rposn_finl_step, rar.rposn_init_xy,
+                                                 rar.rposn_finl_xy, rar.rposn_init_z,
+                                                 rar.rposn_finl_z, rar.rposn_init_keq,
+                                                 rar.rposn_finl_keq, rar.rposn_init_r,
+                                                 rar.rposn_finl_r, sh_xcrd.data(), sh_ycrd.data(),
+                                                 sh_zcrd.data(), umat, invu, unit_cell,
+                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
+                                                 eval_force);
+        if (readBitFromMask(rposn_acc_mask, pos) == 1) {
+          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+        }
+      }
+    }
+
+    // Evaluate distance restraints
+    if (activity == VwuTask::RBOND || activity == VwuTask::ALL_TASKS) {
+      const int nrbond = task_counts[static_cast<int>(VwuTask::RBOND)];
+      const std::vector<uint> rbond_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::RBOND);
+      for (int pos = 0; pos < nrbond; pos++) {
+        const uint2 tinsr = vwu_list[vidx].getDistanceRestraintInstruction(pos);
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int param_idx = tinsr.y;
+        const double contrib = evalBondRestraint(i_atom, j_atom, (tinsr.x >> 31), step_number,
+                                                 param_idx, rar.rbond_init_step,
+                                                 rar.rbond_finl_step, rar.rbond_init_keq,
+                                                 rar.rbond_finl_keq, rar.rbond_init_r,
+                                                 rar.rbond_finl_r, sh_xcrd.data(), sh_ycrd.data(),
+                                                 sh_zcrd.data(), umat, invu, unit_cell,
+                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
+                                                 eval_force);
+        if (readBitFromMask(rbond_acc_mask, pos) == 1) {
+          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+        }
+      }
+    }
+
+    // Evaluate three-point angle restraints
+    if (activity == VwuTask::RANGL || activity == VwuTask::ALL_TASKS) {
+      const int nrangl = task_counts[static_cast<int>(VwuTask::RANGL)];
+      const std::vector<uint> rangl_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::RANGL);
+      for (int pos = 0; pos < nrangl; pos++) {
+        const uint2 tinsr = vwu_list[vidx].getAngleRestraintInstruction(pos);
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+        const int param_idx = tinsr.y;
+        const double contrib = evalAnglRestraint(i_atom, j_atom, k_atom, (tinsr.x >> 31),
+                                                 step_number, param_idx, rar.rangl_init_step,
+                                                 rar.rangl_finl_step, rar.rangl_init_keq,
+                                                 rar.rangl_finl_keq, rar.rangl_init_r,
+                                                 rar.rangl_finl_r, sh_xcrd.data(), sh_ycrd.data(),
+                                                 sh_zcrd.data(), umat, invu, unit_cell,
+                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
+                                                 eval_force);
+        if (readBitFromMask(rangl_acc_mask, pos) == 1) {
+          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+        }
+      }
+    }
+
+    // Evaluate four-point dihedral restraints
+    if (activity == VwuTask::RDIHE || activity == VwuTask::ALL_TASKS) {
+      const int nrdihe = task_counts[static_cast<int>(VwuTask::RDIHE)];
+      const std::vector<uint> rdihe_acc_mask = vwu_list[vidx].getAccumulationFlags(VwuTask::RDIHE);
+      for (int pos = 0; pos < nrdihe; pos++) {
+        const uint2 tinsr = vwu_list[vidx].getDihedralRestraintInstruction(pos);
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+        const int l_atom = (tinsr.y & 0x3ff);
+        const int param_idx = (tinsr.y >> 10);
+        const double contrib = evalDiheRestraint(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31),
+                                                 step_number, param_idx, rar.rdihe_init_step,
+                                                 rar.rdihe_finl_step, rar.rdihe_init_keq,
+                                                 rar.rdihe_finl_keq, rar.rdihe_init_r,
+                                                 rar.rdihe_finl_r, sh_xcrd.data(), sh_ycrd.data(),
+                                                 sh_zcrd.data(), umat, invu, unit_cell,
+                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
+                                                 eval_force);
+        if (readBitFromMask(rdihe_acc_mask, pos) == 1) {
+          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+        }
+      }
+    }
+    
   }
 
   // Contribute results as the instantaneous states
@@ -433,6 +533,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
   case VwuTask::RBOND:
   case VwuTask::RANGL:
   case VwuTask::RDIHE:
+    ecard->contribute(StateVariable::RESTRAINT, rest_acc, sysid);
     break;
   case VwuTask::SETTLE:
   case VwuTask::CGROUP:
@@ -452,25 +553,28 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
 }
 
 //-------------------------------------------------------------------------------------------------
-void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard, const int sysid,
+void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, const RestraintApparatus *ra,
+                          ScoreCard *ecard, const int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
-                          const EvaluateForce eval_force, const VwuTask activity) {
+                          const EvaluateForce eval_force, const VwuTask activity,
+                          const int step_number) {
   PhaseSpaceWriter psw = ps->data();
   evalValenceWorkUnits(ag->getDoublePrecisionValenceKit(), ag->getDoublePrecisionVirtualSiteKit(),
-                       ag->getDoublePrecisionNonbondedKit(), psw.xcrd, psw.ycrd, psw.zcrd,
-                       psw.umat, psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, ecard,
-                       sysid, vwu_list, eval_force, activity);
+                       ag->getDoublePrecisionNonbondedKit(), ra->dpData(), psw.xcrd, psw.ycrd,
+                       psw.zcrd, psw.umat, psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc,
+                       ecard, sysid, vwu_list, eval_force, activity, step_number);
 }
 
 //-------------------------------------------------------------------------------------------------
-void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, ScoreCard *ecard,
-                          const int sysid, const std::vector<ValenceWorkUnit> &vwu_list,
-                          const VwuTask activity) {
+void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const RestraintApparatus &ra,
+                          ScoreCard *ecard, const int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
+                          const VwuTask activity, const int step_number) {
   PhaseSpaceReader psr = ps.data();
   evalValenceWorkUnits(ag.getDoublePrecisionValenceKit(), ag.getDoublePrecisionVirtualSiteKit(),
-                       ag.getDoublePrecisionNonbondedKit(), psr.xcrd, psr.ycrd, psr.zcrd, psr.umat,
-                       psr.invu, psr.unit_cell, nullptr, nullptr, nullptr, ecard, sysid, vwu_list,
-                       EvaluateForce::NO, activity);
+                       ag.getDoublePrecisionNonbondedKit(), ra.dpData(), psr.xcrd, psr.ycrd,
+                       psr.zcrd, psr.umat, psr.invu, psr.unit_cell, nullptr, nullptr, nullptr,
+                       ecard, sysid, vwu_list, EvaluateForce::NO, activity, step_number);
 }
 
 } // namespace energy

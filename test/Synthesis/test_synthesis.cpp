@@ -37,6 +37,7 @@ using omni::constants::verytiny;
 using omni::data_types::int2;
 using omni::data_types::uint2;
 using omni::data_types::uint3;
+using omni::data_types::double3;
 using omni::data_types::ValueWithCounter;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
@@ -96,9 +97,10 @@ bool checkSimpleTaskCoverage(const std::vector<uint> &accd, const std::vector<in
 //   top_name:  Name of the topology to use
 //   crd_name:  Name of the coordinate file to use
 //   oe:        Operating environment information (for error reporting)
+//   my_prng:   Random number generator (modified by use inside this function)
 //-------------------------------------------------------------------------------------------------
 void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd_name,
-                             const TestEnvironment &oe) {
+                             const TestEnvironment &oe, Xoroshiro128pGenerator *my_prng) {
   const bool files_exist = (getDrivePathType(top_name) == DrivePathType::FILE &&
                             getDrivePathType(crd_name) == DrivePathType::FILE);
   if (files_exist == false) {
@@ -111,10 +113,16 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                                   AtomGraph();
   PhaseSpace ps = (files_exist) ? PhaseSpace(crd_name) : PhaseSpace();
   const CoordinateFrameReader cfr(ps);
-  const std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&ag, cfr,
-                                                                            "@N,CA,C,O", 1.4);
-  RestraintApparatus ra_i(bkbn_rstr);
-  ValenceDelegator vdel(&ag, &ra_i);
+  std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&ag, cfr,
+                                                                      "@N,CA,C,O", 1.4);
+  for (size_t i = 0; i < bkbn_rstr.size(); i++) {
+    const double3 trgt = bkbn_rstr[i].getTargetSite();
+    bkbn_rstr[i].setTargetSite({ trgt.x + 0.5 - my_prng->uniformRandomNumber(),
+                                 trgt.y + 0.5 - my_prng->uniformRandomNumber(),
+                                 trgt.z + 0.5 - my_prng->uniformRandomNumber() });
+  }
+  RestraintApparatus ra(bkbn_rstr);
+  ValenceDelegator vdel(&ag, &ra);
   const std::vector<ValenceWorkUnit> all_vwu = buildValenceWorkUnits(&vdel);
   const int n_vwu = all_vwu.size();
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
@@ -259,21 +267,32 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   ScoreCard sc(2);
   PhaseSpace ps_vwu(ps);
   evaluateBondTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::BOND);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::BOND);
   evaluateAngleTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::ANGL);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::ANGL);
   evaluateDihedralTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::DIHE);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::DIHE);
   evaluateUreyBradleyTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::UBRD);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::UBRD);
   evaluateCharmmImproperTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CIMP);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CIMP);
   evaluateCmapTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CMAP);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CMAP);
   evaluateAttenuated14Terms(&ag, &ps, &sc, EvaluateForce::YES, EvaluateForce::YES, 0);
-  evalValenceWorkUnits(&ag, &ps_vwu, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::INFR14);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::INFR14);
+  evaluateRestraints(&ra, &ps, &sc, EvaluateForce::YES, 0);
+  const double rest_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 0);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::RPOSN);
+  const double rposn_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::RBOND);
+  const double rbond_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::RANGL);
+  const double rangl_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
+  evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::RDIHE);
+  const double rdihe_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
 
   // CHECK
+#if 0
   const std::vector<double> bond_e = sc.reportInstantaneousStates(StateVariable::BOND);
   const std::vector<double> angl_e = sc.reportInstantaneousStates(StateVariable::ANGLE);
   const std::vector<double> dihe_e = sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
@@ -286,15 +305,19 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
     sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
   const std::vector<double> lj14_e =
     sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
-  printf("Bond energies = %12.4lf %12.4lf\n", bond_e[0], bond_e[1]);
-  printf("Angl energies = %12.4lf %12.4lf\n", angl_e[0], angl_e[1]);
-  printf("Dihe energies = %12.4lf %12.4lf\n", dihe_e[0], dihe_e[1]);
-  printf("Impr energies = %12.4lf %12.4lf\n", impr_e[0], impr_e[1]);
-  printf("Ubrd energies = %12.4lf %12.4lf\n", ubrd_e[0], ubrd_e[1]);
-  printf("CImp energies = %12.4lf %12.4lf\n", cimp_e[0], cimp_e[1]);
-  printf("CMAP energies = %12.4lf %12.4lf\n", cmap_e[0], cmap_e[1]);
-  printf("QQ14 energies = %12.4lf %12.4lf\n", qq14_e[0], qq14_e[1]);
-  printf("LJ14 energies = %12.4lf %12.4lf\n", lj14_e[0], lj14_e[1]);
+  printf("Bond   energies = %12.4lf %12.4lf\n", bond_e[0], bond_e[1]);
+  printf("Angl   energies = %12.4lf %12.4lf\n", angl_e[0], angl_e[1]);
+  printf("Dihe   energies = %12.4lf %12.4lf\n", dihe_e[0], dihe_e[1]);
+  printf("Impr   energies = %12.4lf %12.4lf\n", impr_e[0], impr_e[1]);
+  printf("Ubrd   energies = %12.4lf %12.4lf\n", ubrd_e[0], ubrd_e[1]);
+  printf("CImp   energies = %12.4lf %12.4lf\n", cimp_e[0], cimp_e[1]);
+  printf("CMAP   energies = %12.4lf %12.4lf\n", cmap_e[0], cmap_e[1]);
+  printf("QQ14   energies = %12.4lf %12.4lf\n", qq14_e[0], qq14_e[1]);
+  printf("LJ14   energies = %12.4lf %12.4lf\n", lj14_e[0], lj14_e[1]);
+  printf("R-Posn energies = %12.4lf %12.4lf\n", rest_e, rposn_e);
+  printf("R-Bond energies = %12.4lf %12.4lf\n", rest_e, rbond_e);
+  printf("\n");
+#endif
   // END CHECK
 }
 
@@ -696,18 +719,18 @@ int main(int argc, char* argv[]) {
 
   // Run diagnotics of the valence work units on a simple system, one with only a single work unit
   runValenceWorkUnitTests(sysc.getTopologyReference(0).getFileName(),
-                          sysc.getCoordinateReference(0).getFileName(), oe);
+                          sysc.getCoordinateReference(0).getFileName(), oe, &my_prng);
 
   // Read a larger topology that will be forced to split its contents among several work units
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
-  runValenceWorkUnitTests(dhfr_top_name, dhfr_crd_name, oe);
+  runValenceWorkUnitTests(dhfr_top_name, dhfr_crd_name, oe, &my_prng);
 
   // Read a solvated topology that will be forced to split its contents among work units, and
   // include water molecules with SETTLE constraint groups.
   const std::string ubiq_crd_name = base_crd_name + osc + "ubiquitin.inpcrd";
   const std::string ubiq_top_name = base_top_name + osc + "ubiquitin.top";
-  runValenceWorkUnitTests(ubiq_top_name, ubiq_crd_name, oe);
+  runValenceWorkUnitTests(ubiq_top_name, ubiq_crd_name, oe, &my_prng);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

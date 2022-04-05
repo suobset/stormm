@@ -2,6 +2,7 @@
 #ifndef OMNI_EVAL_VALENCE_WORKUNIT_H
 #define OMNI_EVAL_VALENCE_WORKUNIT_H
 
+#include "Restraints/restraint_apparatus.h"
 #include "Synthesis/valence_workunit.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -13,6 +14,8 @@
 namespace omni {
 namespace energy {
 
+using restraints::RestraintApparatus;
+using restraints::RestraintApparatusDpReader;
 using synthesis::ValenceWorkUnit;
 using synthesis::VwuTask;
 using topology::AtomGraph;
@@ -35,22 +38,24 @@ using trajectory::PhaseSpace;
 ///   - Evaluate forces, or energies alone
 /// \{
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const NonbondedKit<double> nbk, const double* xcrd, const double* ycrd,
-                          const double* zcrd, const double* umat, const double* invu,
-                          UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
+                          const double* xcrd, const double* ycrd, const double* zcrd,
+                          const double* umat, const double* invu, UnitCellType unit_cell,
+                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard, int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
+                          EvaluateForce eval_force = EvaluateForce::NO,
+                          VwuTask activity = VwuTask::ALL_TASKS, int step_number = 0);
+
+void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, const RestraintApparatus *ra,
                           ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
-                          VwuTask activity = VwuTask::ALL_TASKS);
+                          VwuTask activity = VwuTask::ALL_TASKS, int step_number = 0);
 
-void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, ScoreCard *ecard, int sysid,
+void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const RestraintApparatus &ra,
+                          ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
-                          EvaluateForce eval_force = EvaluateForce::NO,
-                          VwuTask activity = VwuTask::ALL_TASKS);
-
-void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, ScoreCard *ecard, int sysid,
-                          const std::vector<ValenceWorkUnit> &vwu_list,
-                          VwuTask activity = VwuTask::ALL_TASKS);
+                          VwuTask activity = VwuTask::ALL_TASKS, int step_number = 0);
 /// \}
 
 } // namespace energy

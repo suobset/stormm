@@ -189,11 +189,21 @@ public:
   /// \brief Get the simulation step at which to finish applying this restraint
   int getFinalStep() const;
 
+  /// \brief Get the stiffnesses of a restraint at a given step in the simulation
+  ///
+  /// \param step_number  The step at which to compute the target site
+  double2 getStiffness(int step_number = 0) const;
+
   /// \brief Get the initial stiffnesses to use when applying this restraint
   double2 getInitialStiffness() const;
 
   /// \brief Get the final stiffnesses of the restraint in its complete form
   double2 getFinalStiffness() const;
+
+  /// \brief Get the displacement parameters of a restraint at a given step in the simulation
+  ///
+  /// \param step_number  The step at which to compute the target site
+  double4 getDisplacements(int step_number = 0) const;
 
   /// \brief Get the initial displacement parameters to use in applying this restraint
   double4 getInitialDisplacements() const;
@@ -201,6 +211,11 @@ public:
   /// \brief Get the final displacement parameters of the restraint in its complete form
   double4 getFinalDisplacements() const;
 
+  /// \brief Get the target site of a positional restraint at a given step in the simulation
+  ///
+  /// \param step_number  The step at which to compute the target site
+  double3 getTargetSite(int step_number = 0) const;
+  
   /// \brief Get the initial target of a positional restraint
   double3 getInitialTargetSite() const;
 
@@ -372,6 +387,19 @@ private:
   ///        restraints for which the angle is periodic.
   void checkDisplacementLimits(double4 *rval);
 };
+
+/// \brief Compute the mixture of end-point values that will determine the actual strength and
+///        displacement settings of a flat-bottom bimodal harmonic restraint.  The flag about a
+///        RestraintApparatus having time-dependent restraints is mostly for convenience, a way to
+///        tell whether there is any time-dependent restraint in the collection at all.  Initial
+///        and final settings of the steps for each restraint encode whether there is actual time
+///        dependence in the result.
+///
+/// \param step_number  The current step number of the simulation (may include energy minimization
+///                     step counts)
+/// \param init_step    The initial step at which the restraint engages
+/// \param final_step   The final step at which the restraint becomes mature
+double2 computeRestraintMixture(int step_number, int init_step, int final_step);
 
 } // namespace restraints
 } // namespace omni

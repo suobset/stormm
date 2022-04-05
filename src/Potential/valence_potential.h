@@ -483,24 +483,24 @@ double2 evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, double co
 ///   - Evaluate energy only based on a CoordinateFrame abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
-/// \param ag              System topology
-/// \param vk              Valence parameters abstract from the system topology
-/// \param nbk             Non-bonded parameters abstract from the system topology
-/// \param ps              Coordinates, box size, and force accumulators (modified by this
-///                        function)
-/// \param psw             Coordinates, box size, and force accumulators (modified by this
-///                        function)
-/// \param cfr             Coordinates of all particles, plus box dimensions (if needed)
-/// \param cfw             Coordinates of all particles, plus box dimensions (if needed)
+/// \param ag               System topology
+/// \param vk               Valence parameters abstract from the system topology
+/// \param nbk              Non-bonded parameters abstract from the system topology
+/// \param ps               Coordinates, box size, and force accumulators (modified by this
+///                         function)
+/// \param psw              Coordinates, box size, and force accumulators (modified by this
+///                         function)
+/// \param cfr              Coordinates of all particles, plus box dimensions (if needed)
+/// \param cfw              Coordinates of all particles, plus box dimensions (if needed)
 /// \param xcrd             Cartesian X coordinates of all particles
 /// \param ycrd             Cartesian Y coordinates of all particles
 /// \param zcrd             Cartesian Z coordinates of all particles
-/// \param xfrc             Cartesian X forces acting on all particles
-/// \param yfrc             Cartesian X forces acting on all particles
-/// \param zfrc             Cartesian X forces acting on all particles
 /// \param umat             Box space transformation matrix
 /// \param invu             Inverse transformation, fractional coordinates back to real space
 /// \param unit_cell        The unit cell type, i.e. triclinic
+/// \param xfrc             Cartesian X forces acting on all particles
+/// \param yfrc             Cartesian Y forces acting on all particles
+/// \param zfrc             Cartesian Z forces acting on all particles
 /// \param ecard            Energy components and other state variables (volume, temperature, etc.)
 ///                         (modified by this function)
 /// \param eval_elec_force  Flag to have electrostatic forces evaluated
@@ -547,19 +547,6 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameRead
                                   ScoreCard *ecard, int system_index = 0);
 /// \}
 
-/// \brief Compute the mixture of end-point values that will determine the actual strength and
-///        displacement settings of a flat-bottom bimodal harmonic restraint.  The flag about a
-///        RestraintApparatus having time-dependent restraints is mostly for convenience, a way to
-///        tell whether there is any time-dependent restraint in the collection at all.  The initial
-///        and final settings of the steps for each restraint encode whether there is actual time
-///        dependence in the result.
-///
-/// \param step_number  The current step number of the simulation (may include energy minimization
-///                     step counts)
-/// \param init_step    The initial step at which the restraint engages
-/// \param final_step   The final step at which the restraint becomes mature
-double2 computeRestraintMixture(int step_number, int init_step, int final_step);
-
 /// \brief Compute critical elements of the restraining potential: its difference from the target
 ///        value that determines some harmonic stiffness penalty, the harmonic penalty stiffness,
 ///        and the energy contribution.
@@ -572,6 +559,75 @@ double2 computeRestraintMixture(int step_number, int init_step, int final_step);
 /// \param dr       The measured value of the restraint coordinate among its participating atoms
 double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
                        const double4 final_r, const double2 mixwt, double dr);
+
+/// \brief Evaluate a positional restraint.  Return the energy penalty.
+///
+/// \param p_atom           The atom being restraint (in distance, angle, or dihedral restraints
+///                         the atoms become I, J, K, and L)
+/// \param time_dependence  Flag to indicate that the restraint parameters evolve over time
+/// \param step_number      The current step of the simulation, relevant only if the restraint
+///                         evolves with time
+/// \param param_idx        The restraint parameter set index (if referencing condensed arrays in
+///                         an AtomGraphSynthesis) or simply the restraint number of some type
+///                         (if referencing a single system's RestraintApparatus)
+/// \param init_step        Array of initial steps at which the restraint engages
+/// \param finl_step        Array of final steps at which the restraint reaches its mature state
+/// \param init_xy          Array of initial Cartesian X and Y target coordinates
+/// \param finl_xy          Array of final Cartesian X and Y target coordinates
+/// \param init_z           Array of initial Cartesian Z target coordinates
+/// \param finl_z           Array of final Cartesian Z target coordinates
+/// \param init_keq         Array of initial harmonic stiffnesses on the right and left sides
+/// \param finl_keq         Array of final harmonic stiffnesses on the right and left sides
+/// \param init_r           Array of initial displacement parameters
+/// \param finl_r           Array of final displacement parameters
+/// \param xcrd             Cartesian X coordinates of all particles
+/// \param ycrd             Cartesian Y coordinates of all particles
+/// \param zcrd             Cartesian Z coordinates of all particles
+/// \param umat             Box space transformation matrix
+/// \param invu             Inverse transformation, fractional coordinates back to real space
+/// \param unit_cell        The unit cell type, i.e. triclinic
+/// \param xfrc             Cartesian X forces acting on all particles
+/// \param yfrc             Cartesian Y forces acting on all particles
+/// \param zfrc             Cartesian Z forces acting on all particles
+/// \param eval_force       Flag to have forces due to the restraint evaluated
+double evalPosnRestraint(int p_atom, bool time_dependence, int step_number, int kr_param_idx,
+                         int xyz_param_idx, const int* init_step, const int* finl_step,
+                         const double2* init_xy, const double2* finl_xy, const double* init_z,
+                         const double* finl_z, const double2* init_keq, const double2* finl_keq,
+                         const double4* init_r, const double4* finl_r, const double* xcrd,
+                         const double* ycrd, const double* zcrd, const double* umat,
+                         const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
+                         double* zfrc, EvaluateForce eval_force);
+
+/// \brief Evaluate distance restraints.  See the descriptions in evalPosnRestraint (above) for
+///        explanations of each input parameter.  The restraint energy is returned.
+double evalBondRestraint(int i_atom, int j_atom, bool time_dependence, int step_number,
+                         int param_idx, const int* init_step, const int* finl_step,
+                         const double2* init_keq, const double2* finl_keq, const double4* init_r,
+                         const double4* finl_r, const double* xcrd, const double* ycrd,
+                         const double* zcrd, const double* umat, const double* invu,
+                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                         EvaluateForce eval_force);
+
+/// \brief Evaluate three-point angle restraints.  See the descriptions in evalPosnRestraint
+///        (above) for explanations of each input parameter.  The restraint energy is returned.
+double evalAnglRestraint(int i_atom, int j_atom, int k_atom, bool time_dependence, int step_number,
+                         int param_idx, const int* init_step, const int* finl_step,
+                         const double2* init_keq, const double2* finl_keq, const double4* init_r,
+                         const double4* finl_r, const double* xcrd, const double* ycrd,
+                         const double* zcrd, const double* umat, const double* invu,
+                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                         EvaluateForce eval_force);
+
+/// \brief Evaluate four-point dihedral restraints.  See the descriptions in evalPosnRestraint
+///        (above) for explanations of each input parameter.  The restraint energy is returned.
+double evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, bool time_dependence,
+                         int step_number, int param_idx, const int* init_step,
+                         const int* finl_step, const double2* init_keq, const double2* finl_keq,
+                         const double4* init_r, const double4* finl_r, const double* xcrd,
+                         const double* ycrd, const double* zcrd, const double* umat,
+                         const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
+                         double* zfrc, EvaluateForce eval_force);
 
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
 ///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is
