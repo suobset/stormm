@@ -268,18 +268,50 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   PhaseSpace ps_vwu(ps);
   evaluateBondTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::BOND);
+  const std::vector<double> bond_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> bond_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
   evaluateAngleTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::ANGL);
+  const std::vector<double> angl_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> angl_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
   evaluateDihedralTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::DIHE);
+  const std::vector<double> dihe_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> dihe_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
   evaluateUreyBradleyTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::UBRD);
+  const std::vector<double> ubrd_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> ubrd_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
   evaluateCharmmImproperTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CIMP);
+  const std::vector<double> cimp_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> cimp_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
   evaluateCmapTerms(&ag, &ps, &sc, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::CMAP);
+  const std::vector<double> cmap_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> cmap_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
   evaluateAttenuated14Terms(&ag, &ps, &sc, EvaluateForce::YES, EvaluateForce::YES, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::INFR14);
+  const std::vector<double> attn_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> attn_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  ps.initializeForces();
+  ps_vwu.initializeForces();
+
+  // Restraint energies need to be plucked from the results immediately, as the reference
+  // calculations only evaluate restraints all at once whereas the ValenceWorkUnit evaluation
+  // implements them one type at a time.
   evaluateRestraints(&ra, &ps, &sc, EvaluateForce::YES, 0);
   const double rest_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 0);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::RPOSN);
@@ -290,9 +322,10 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const double rangl_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
   evalValenceWorkUnits(&ag, &ps_vwu, &ra, &sc, 1, all_vwu, EvaluateForce::YES, VwuTask::RDIHE);
   const double rdihe_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
+  const std::vector<double> rstr_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> rstr_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
 
-  // CHECK
-#if 0
+  // Read off other energy terms
   const std::vector<double> bond_e = sc.reportInstantaneousStates(StateVariable::BOND);
   const std::vector<double> angl_e = sc.reportInstantaneousStates(StateVariable::ANGLE);
   const std::vector<double> dihe_e = sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
@@ -305,20 +338,64 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
     sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
   const std::vector<double> lj14_e =
     sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
-  printf("Bond   energies = %12.4lf %12.4lf\n", bond_e[0], bond_e[1]);
-  printf("Angl   energies = %12.4lf %12.4lf\n", angl_e[0], angl_e[1]);
-  printf("Dihe   energies = %12.4lf %12.4lf\n", dihe_e[0], dihe_e[1]);
-  printf("Impr   energies = %12.4lf %12.4lf\n", impr_e[0], impr_e[1]);
-  printf("Ubrd   energies = %12.4lf %12.4lf\n", ubrd_e[0], ubrd_e[1]);
-  printf("CImp   energies = %12.4lf %12.4lf\n", cimp_e[0], cimp_e[1]);
-  printf("CMAP   energies = %12.4lf %12.4lf\n", cmap_e[0], cmap_e[1]);
-  printf("QQ14   energies = %12.4lf %12.4lf\n", qq14_e[0], qq14_e[1]);
-  printf("LJ14   energies = %12.4lf %12.4lf\n", lj14_e[0], lj14_e[1]);
-  printf("R-Posn energies = %12.4lf %12.4lf\n", rest_e, rposn_e);
-  printf("R-Bond energies = %12.4lf %12.4lf\n", rest_e, rbond_e);
-  printf("\n");
-#endif
-  // END CHECK
+
+  // Check that energy terms computed with ValenceWorkUnits match the reference calculations
+  check(bond_e[0], RelationalOperator::EQUAL, Approx(bond_e[1]).margin(1.0e-6), "Bond energies "
+        "computed with ValenceWorkUnits do not agree with the reference calculations (topology " +
+        top_name + ").", do_tests);
+  check(angl_e[0], RelationalOperator::EQUAL, Approx(angl_e[1]).margin(1.0e-6), "Angle energies "
+        "computed with ValenceWorkUnits do not agree with the reference calculations (topology " +
+        top_name + ").", do_tests);
+  check(dihe_e[0], RelationalOperator::EQUAL, Approx(dihe_e[1]).margin(1.0e-6), "Cosine-based "
+        "proper dihedral energies computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
+  check(impr_e[0], RelationalOperator::EQUAL, Approx(impr_e[1]).margin(1.0e-6), "Cosine-based "
+        "improper dihedral energies computed with ValenceWorkUnits do not agree with the "
+        "reference calculations (topology " + top_name + ").", do_tests);
+  check(ubrd_e[0], RelationalOperator::EQUAL, Approx(ubrd_e[1]).margin(1.0e-6), "Urey-Bradley "
+        "energies computed with ValenceWorkUnits do not agree with the reference calculations "
+        "(topology " + top_name + ").", do_tests);
+  check(cimp_e[0], RelationalOperator::EQUAL, Approx(cimp_e[1]).margin(1.0e-6), "CHARMM improper "
+        "energies computed with ValenceWorkUnits do not agree with the reference calculations "
+        "(topology " + top_name + ").", do_tests);
+  check(cmap_e[0], RelationalOperator::EQUAL, Approx(cmap_e[1]).margin(1.0e-6), "CMAP energies "
+        "computed with ValenceWorkUnits do not agree with the reference calculations (topology " +
+        top_name + ").", do_tests);
+  check(qq14_e[0], RelationalOperator::EQUAL, Approx(qq14_e[1]).margin(1.0e-6), "Electrostatic "
+        "1:4 interactions computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
+  check(lj14_e[0], RelationalOperator::EQUAL, Approx(lj14_e[1]).margin(1.0e-6), "Electrostatic "
+        "1:4 interactions computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
+  check(rest_e, RelationalOperator::EQUAL, Approx(rposn_e + rbond_e + rangl_e + rdihe_e, 1.0e-6),
+        "Restraint penalty energies computed with ValenceWorkUnits do not agree with the "
+        "reference calculations (topology " + top_name + ").", do_tests);
+
+  // Check that forces computed with ValenceWorkUnits match the reference calculations
+  check(bond_frc, RelationalOperator::EQUAL, Approx(bond_frc_ref).margin(1.0e-6), "Forces due to "
+        "bonds computed with ValenceWorkUnits do not agree with the reference calculations "
+        "(topology " + top_name + ").", do_tests);
+  check(angl_frc, RelationalOperator::EQUAL, Approx(angl_frc_ref).margin(1.0e-6), "Forces due to "
+        "angles computed with ValenceWorkUnits do not agree with the reference calculations "
+        "(topology " + top_name + ").", do_tests);
+  check(dihe_frc, RelationalOperator::EQUAL, Approx(dihe_frc_ref).margin(1.0e-6), "Forces due to "
+        "proper and improper (cosine-based) dihedral terms computed with ValenceWorkUnits do not "
+        "agree with the reference calculations (topology " + top_name + ").", do_tests);
+  check(attn_frc, RelationalOperator::EQUAL, Approx(attn_frc_ref).margin(1.0e-6), "Forces due to "
+        "attenuated 1:4 interactions computed with ValenceWorkUnits do not agree with the "
+        "reference calculations (topology " + top_name + ").", do_tests);
+  check(ubrd_frc, RelationalOperator::EQUAL, Approx(ubrd_frc_ref).margin(1.0e-6), "Forces due to "
+        "Urey-Bradley terms computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
+  check(cimp_frc, RelationalOperator::EQUAL, Approx(cimp_frc_ref).margin(1.0e-6), "Forces due to "
+        "CHARMM improper dihedrals computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
+  check(cmap_frc, RelationalOperator::EQUAL, Approx(cmap_frc_ref).margin(1.0e-6), "Forces due to "
+        "CMAP potential surfaces computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
+  check(rstr_frc, RelationalOperator::EQUAL, Approx(rstr_frc_ref).margin(1.0e-6), "Forces due to "
+        "restraint potentials computed with ValenceWorkUnits do not agree with the reference "
+        "calculations (topology " + top_name + ").", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------

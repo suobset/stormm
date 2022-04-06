@@ -1496,8 +1496,8 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
           // atom to each virtual site.
           const double disp_needed = cos(0.5 * tetrahedral_angle) * impvs_bond_lengths[i];
           const double scale_pf2f3 = disp_needed / f2f3;
-          vst.frame_dim1[pos] = scale_pf2f3;
-          vst.frame_dim2[pos] = scale_pf2f3;
+          vst.frame_dim1[pos] = -scale_pf2f3;
+          vst.frame_dim2[pos] = -scale_pf2f3;
 
           // The cross product of parent->frame2 and parent->frame3 vectors must be scaled by a
           // factor so as to move the virtual site out of the plane by the sine of half the

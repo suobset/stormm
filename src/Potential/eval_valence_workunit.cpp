@@ -94,20 +94,20 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
           else {
             bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
           }
-        }
 
-        // Compute forces
-        if (eval_force == EvaluateForce::YES) {
-          const double fmag = 2.0 * keq * dl / dr;
-          const double fmag_dx = fmag * dx;
-          const double fmag_dy = fmag * dy;
-          const double fmag_dz = fmag * dz;
-          sh_xfrc[i_atom] += fmag_dx;
-          sh_yfrc[i_atom] += fmag_dy;
-          sh_zfrc[i_atom] += fmag_dz;
-          sh_xfrc[j_atom] -= fmag_dx;
-          sh_yfrc[j_atom] -= fmag_dy;
-          sh_zfrc[j_atom] -= fmag_dz;
+          // Compute forces
+          if (eval_force == EvaluateForce::YES) {
+            const double fmag = 2.0 * keq * dl / dr;
+            const double fmag_dx = fmag * dx;
+            const double fmag_dy = fmag * dy;
+            const double fmag_dz = fmag * dz;
+            sh_xfrc[i_atom] += fmag_dx;
+            sh_yfrc[i_atom] += fmag_dy;
+            sh_zfrc[i_atom] += fmag_dz;
+            sh_xfrc[j_atom] -= fmag_dx;
+            sh_yfrc[j_atom] -= fmag_dy;
+            sh_zfrc[j_atom] -= fmag_dz;
+          }
         }
       }
     }
@@ -145,28 +145,28 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const double du = keq * dtheta * dtheta;
         if (readBitFromMask(angl_acc_mask, pos) == 1) {
           angl_acc += static_cast<llint>(round(du * nrg_scale_factor));
-        }
         
-        // Compute forces
-        if (eval_force == EvaluateForce::YES) {
-          const double dA = -2.0 * keq * dtheta / sqrt(1.0 - costheta * costheta);
-          const double sqba = dA / mgba;
-          const double sqbc = dA / mgbc;
-          const double mbabc = dA * invbabc;
-          double adf[3], cdf[3];
-          for (int i = 0; i < 3; i++) {
-            adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
-            cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
+          // Compute forces
+          if (eval_force == EvaluateForce::YES) {
+            const double dA = -2.0 * keq * dtheta / sqrt(1.0 - costheta * costheta);
+            const double sqba = dA / mgba;
+            const double sqbc = dA / mgbc;
+            const double mbabc = dA * invbabc;
+            double adf[3], cdf[3];
+            for (int i = 0; i < 3; i++) {
+              adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
+              cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
+            }
+            sh_xfrc[i_atom] -= adf[0];
+            sh_yfrc[i_atom] -= adf[1];
+            sh_zfrc[i_atom] -= adf[2];
+            sh_xfrc[j_atom] += adf[0] + cdf[0];
+            sh_yfrc[j_atom] += adf[1] + cdf[1];
+            sh_zfrc[j_atom] += adf[2] + cdf[2];
+            sh_xfrc[k_atom] -= cdf[0];
+            sh_yfrc[k_atom] -= cdf[1];
+            sh_zfrc[k_atom] -= cdf[2];
           }
-          sh_xfrc[i_atom] -= adf[0];
-          sh_yfrc[i_atom] -= adf[1];
-          sh_zfrc[i_atom] -= adf[2];
-          sh_xfrc[j_atom] += adf[0] + cdf[0];
-          sh_yfrc[j_atom] += adf[1] + cdf[1];
-          sh_zfrc[j_atom] += adf[2] + cdf[2];
-          sh_xfrc[k_atom] -= cdf[0];
-          sh_yfrc[k_atom] -= cdf[1];
-          sh_zfrc[k_atom] -= cdf[2];
         }
       }
     }
@@ -185,9 +185,11 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         // energy quantities.
         const int i_atom = (tinsr.x & 0x3ff);
         const int l_atom = (tinsr.y & 0x3ff);
+        const bool log_term = readBitFromMask(cdhe_acc_mask, pos);
         if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
           const int attn_idx = ((tinsr.y >> 10) & 0x1f);
           if (attn_idx > 0) {
+            const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
             const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx,
                                                         nbk.coulomb_constant, sh_charges.data(),
                                                         sh_lj_idx.data(), vk.attn14_elec,
@@ -196,8 +198,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                         sh_xcrd.data(), sh_ycrd.data(),
                                                         sh_zcrd.data(), umat, invu, unit_cell,
                                                         sh_xfrc.data(), sh_yfrc.data(),
-                                                        sh_zfrc.data(), eval_force, eval_force);
-            if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
+                                                        sh_zfrc.data(), lcl_eval_force,
+                                                        lcl_eval_force);
+            if (log_term) {
               qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
               lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
             }
@@ -248,7 +251,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
           stiffness = vk.cimp_keq[param_idx];
           sangle = theta - vk.cimp_phi[param_idx];
           double contrib = stiffness * sangle * sangle;
-          if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
+          if (log_term) {
             cimp_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
           }
         }
@@ -268,7 +271,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
             sangle_ii = (freq_ii * theta) - phi_ii;
             contrib += ampl_ii * (1.0 + cos(sangle_ii));
           }
-          if (readBitFromMask(cdhe_acc_mask, pos) == 1) {
+          if (log_term) {
             if (kind == TorsionKind::PROPER) {
               dihe_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
             }
@@ -279,7 +282,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         }
 
         // Compute forces, if requested
-        if (eval_force == EvaluateForce::YES) {
+        if (log_term && eval_force == EvaluateForce::YES) {
           double fr;
           if (is_charmm_improper) {
             fr = -2.0 * stiffness * sangle;
@@ -348,27 +351,19 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         // Assume that, by this point, the imported atoms in the ValenceWorkUnit have been
         // arranged into an image that can be trusted for all interactions.  Avoid further
         // re-imaging of displacements inside the CMAP calculation.
+        const bool log_term = readBitFromMask(cmap_acc_mask, pos);
+        const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
         const double contrib = evalCmap(vk.cmap_patches, vk.cmap_patch_bounds, surf_idx,
                                         vk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom,
                                         m_atom, sh_xcrd.data(), sh_ycrd.data(), sh_zcrd.data(),
                                         nullptr, nullptr, UnitCellType::NONE, sh_xfrc.data(),
-                                        sh_yfrc.data(), sh_zfrc.data(), eval_force);
-        if (readBitFromMask(cmap_acc_mask, pos) == 1) {
+                                        sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
+        if (log_term) {
           cmap_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
       }
     }
     
-    // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
-    // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
-    // zero'ed for atoms they are responsible for moving).
-    for (int i = 0; i < n_imp_atoms; i++) {
-      const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
-      xfrc[atom_idx] += sh_xfrc[i];
-      yfrc[atom_idx] += sh_yfrc[i];
-      zfrc[atom_idx] += sh_zfrc[i];
-    }
-
     // Evaluate remaining 1:4 interactions.  Calling this routine by the "INFR14" enumeration will
     // compute all 1:4 interactions, a redefinition of "inferred 1:4" relative to other situations.
     // In calling this function, "inferred 1:4" means *inferring* 1:4 interactions from dihedrals
@@ -389,6 +384,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         if (attn_idx == 0) {
           continue;
         }
+        const bool log_term = readBitFromMask(infr_acc_mask, pos);
+        const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
         const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant,
                                                     sh_charges.data(), sh_lj_idx.data(),
                                                     vk.attn14_elec, vk.attn14_vdw,
@@ -396,8 +393,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                     nbk.n_lj_types, sh_xcrd.data(), sh_ycrd.data(),
                                                     sh_zcrd.data(), umat, invu, unit_cell,
                                                     sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                    eval_force, eval_force);
-        if (readBitFromMask(infr_acc_mask, pos) == 1) {
+                                                    lcl_eval_force, lcl_eval_force);
+        if (log_term) {
           qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
           lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
         }
@@ -414,6 +411,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int p_atom = (tinsr.x & 0x3ff);
         const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
         const int xyz_param_idx = tinsr.y;
+        const bool log_term = readBitFromMask(rposn_acc_mask, pos);
+        const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
         const double contrib = evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number,
                                                  kr_param_idx, xyz_param_idx, rar.rposn_init_step,
                                                  rar.rposn_finl_step, rar.rposn_init_xy,
@@ -423,8 +422,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rposn_finl_r, sh_xcrd.data(), sh_ycrd.data(),
                                                  sh_zcrd.data(), umat, invu, unit_cell,
                                                  sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 eval_force);
-        if (readBitFromMask(rposn_acc_mask, pos) == 1) {
+                                                 lcl_eval_force);
+        if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
       }
@@ -439,6 +438,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int i_atom = (tinsr.x & 0x3ff);
         const int j_atom = ((tinsr.x >> 10) & 0x3ff);
         const int param_idx = tinsr.y;
+        const bool log_term = readBitFromMask(rbond_acc_mask, pos);
+        const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
         const double contrib = evalBondRestraint(i_atom, j_atom, (tinsr.x >> 31), step_number,
                                                  param_idx, rar.rbond_init_step,
                                                  rar.rbond_finl_step, rar.rbond_init_keq,
@@ -446,8 +447,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rbond_finl_r, sh_xcrd.data(), sh_ycrd.data(),
                                                  sh_zcrd.data(), umat, invu, unit_cell,
                                                  sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 eval_force);
-        if (readBitFromMask(rbond_acc_mask, pos) == 1) {
+                                                 lcl_eval_force);
+        if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
       }
@@ -463,6 +464,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int j_atom = ((tinsr.x >> 10) & 0x3ff);
         const int k_atom = ((tinsr.x >> 20) & 0x3ff);
         const int param_idx = tinsr.y;
+        const bool log_term = readBitFromMask(rangl_acc_mask, pos);
+        const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
         const double contrib = evalAnglRestraint(i_atom, j_atom, k_atom, (tinsr.x >> 31),
                                                  step_number, param_idx, rar.rangl_init_step,
                                                  rar.rangl_finl_step, rar.rangl_init_keq,
@@ -470,8 +473,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rangl_finl_r, sh_xcrd.data(), sh_ycrd.data(),
                                                  sh_zcrd.data(), umat, invu, unit_cell,
                                                  sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 eval_force);
-        if (readBitFromMask(rangl_acc_mask, pos) == 1) {
+                                                 lcl_eval_force);
+        if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
       }
@@ -488,6 +491,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const int k_atom = ((tinsr.x >> 20) & 0x3ff);
         const int l_atom = (tinsr.y & 0x3ff);
         const int param_idx = (tinsr.y >> 10);
+        const bool log_term = readBitFromMask(rdihe_acc_mask, pos);
+        const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
         const double contrib = evalDiheRestraint(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31),
                                                  step_number, param_idx, rar.rdihe_init_step,
                                                  rar.rdihe_finl_step, rar.rdihe_init_keq,
@@ -495,13 +500,28 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rdihe_finl_r, sh_xcrd.data(), sh_ycrd.data(),
                                                  sh_zcrd.data(), umat, invu, unit_cell,
                                                  sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 eval_force);
-        if (readBitFromMask(rdihe_acc_mask, pos) == 1) {
+                                                 lcl_eval_force);
+        if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
       }
     }
     
+    // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
+    // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
+    // zero'ed for atoms they are responsible for moving).  It is only possible to write these
+    // forces back because one and only one work unit is assigned to log the force due to any
+    // particular interaction.  If any two work units import the same atoms for any reason (i.e.
+    // they are needed to support certain forces that both work units must know in order to move
+    // some of their imported atoms) it is not possible to move atoms in a valid way and write
+    // back the accumulated forces.  GPU kernels will generally move atoms and not write back
+    // forces.  This function writes back forces but does not (cannot, safely) move atoms.
+    for (int i = 0; i < n_imp_atoms; i++) {
+      const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
+      xfrc[atom_idx] = sh_xfrc[i];
+      yfrc[atom_idx] = sh_yfrc[i];
+      zfrc[atom_idx] = sh_zfrc[i];
+    }
   }
 
   // Contribute results as the instantaneous states
