@@ -22,8 +22,10 @@ using math::numberSeriesToBitMask;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::project;
+using math::readBitFromMask;
 using math::roundUp;
 using testing::Approx;
+using topology::colorConnectivity;
 using topology::selectRotatingAtoms;
 using trajectory::CoordinateFrameReader;
 
@@ -263,7 +265,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_rotatable_groups,
                        &tmp_rotatable_group_bounds);
     rotatable_bond_count = static_cast<int>(tmp_rotatable_group_bounds.size()) - 1;
-    findInvertibleGroups(nbk, tmp_chiral_centers, &tmp_anchor_a_branches, &tmp_anchor_b_branches,
+    findInvertibleGroups(tmp_chiral_centers, &tmp_anchor_a_branches, &tmp_anchor_b_branches,
                          &tmp_invertible_groups, &tmp_invertible_group_bounds);
     break;
   case MapRotatableGroups::NO:
@@ -1406,12 +1408,43 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
 }
 
 //-------------------------------------------------------------------------------------------------
-void ChemicalFeatures::findInvertibleGroups(const NonbondedKit<double> &nbk,
-                                            const std::vector<int> tmp_chiral_centers,
+void ChemicalFeatures::findInvertibleGroups(const std::vector<int> tmp_chiral_centers,
                                             std::vector<int> *tmp_anchor_a_branches,
                                             std::vector<int> *tmp_anchor_b_branches,
                                             std::vector<int> *tmp_invertible_groups,
                                             std::vector<int> *tmp_invertible_group_bounds) {
+
+  const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+  
+  // Loop over all chiral centers and determine the number of atoms in each branch
+  tmp_anchor_a_branches->resize(chiral_center_count);
+  tmp_anchor_b_branches->resize(chiral_center_count);
+  tmp_invertible_group_bounds->resize(chiral_center_count + 1);
+  std::vector<uint> marked((nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int);
+  std::vector<int> prev_atoms(16), new_atoms(16);
+  for (int i = 0; i < chiral_center_count; i++) {
+    const int chatom = tmp_chiral_centers[i];
+    std::vector<int> nbranch(4, -1);
+    int brpos = 0;
+    for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
+      if (nbranch[brpos] >= 0) {
+        continue;
+      }
+      bool ring_completed;
+      nbranch[brpos] = colorConnectivity(nbk, chatom, nbk.nb12x[j], &marked, &ring_completed);
+
+      // Search for one of the remaining branch roots in the marked atoms if there was a ring
+      // completion.  This will accomplish one of the following searches.
+      if (ring_completed) {
+        for (int k = j + 1; k < nbk.nb12_bounds[chatom + 1]; k++) {
+          if (readBitFromMask(marked, nbk.nb12x[k])) {
+            nbranch[k - nbk.nb12_bounds[chatom]] = nbranch[brpos];
+          }
+        }
+      }
+      brpos++;
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

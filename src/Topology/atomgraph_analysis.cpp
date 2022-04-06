@@ -11,6 +11,9 @@ namespace omni {
 namespace topology {
 
 using math::findBin;
+using math::accumulateBitmask;
+using math::unsetBitInMask;
+using math::readBitFromMask;
 using parse::char4ToString;
 using testing::Approx;
 
@@ -578,58 +581,77 @@ std::string listVirtualSiteFrameTypes(const int* vs_types, const int nsite) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
-                                  const int atom_i, const int atom_j) {
-  std::vector<bool> marked(nbk.natom, false);
-  marked[atom_i] = true;
-  marked[atom_j] = true;
+int colorConnectivity(const NonbondedKit<double> &nbk, const int atom_i, const int atom_j,
+                      std::vector<uint> *marked, bool *ring_report) {
+  bool ring_completion = false;
+  uint* marked_ptr = marked->data();
+  const int nm_elem = marked->size();
+  for (int i = 0; i < nm_elem; i++) {
+    marked_ptr[i] = 0U;
+  }
+  accumulateBitmask(marked_ptr, atom_i);
+  accumulateBitmask(marked_ptr, atom_j);
   std::vector<int> prev_atoms(16);
   std::vector<int> new_atoms(16);
   prev_atoms.resize(1);
   new_atoms.resize(0);
   prev_atoms[0] = atom_j;
   bool more_added = true;
-  size_t nrot = 0LLU;
+  int nrot = 0;
   while (more_added) {
     more_added = false;
     new_atoms.resize(0);
-    const size_t nprev = prev_atoms.size();
-    for (size_t i = 0; i < nprev; i++) {
-      const size_t jlim = nbk.nb12_bounds[prev_atoms[i] + 1];
-      for (size_t j = nbk.nb12_bounds[prev_atoms[i]]; j < jlim; j++) {
-        const size_t candidate_atom = nbk.nb12x[j];
-        if (marked[candidate_atom]) {
+    const int nprev = prev_atoms.size();
+    for (int i = 0; i < nprev; i++) {
+      const int jlim = nbk.nb12_bounds[prev_atoms[i] + 1];
+      for (int j = nbk.nb12_bounds[prev_atoms[i]]; j < jlim; j++) {
+	const int candidate_atom = nbk.nb12x[j];
+        if (readBitFromMask(marked_ptr, candidate_atom)) {
           continue;
         }
         else {
           new_atoms.push_back(candidate_atom);
-          marked[candidate_atom] = true;
-          if (candidate_atom == atom_i && prev_atoms[i] != atom_j) {
-            rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
-                  std::to_string(atom_j + 1) + ", " +
-                  char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
-                  std::to_string(cdk.res_numbers[atom_i]) + " :: " +
-                  char4ToString(cdk.atom_names[atom_i]) + " and " +
-                  char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
-                  std::to_string(cdk.res_numbers[atom_j]) + " :: " +
-                  char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring "
-                  "system.  This should not have happened if the bond was selected from a "
-                  "ChemicalFeatures object.", "selectRotatingAtoms");
-          }
+          accumulateBitmask(marked_ptr, candidate_atom);
+          ring_completion = (ring_completion ||
+                             (candidate_atom == atom_i && prev_atoms[i] != atom_j));
         }
       }
     }
-    const size_t nnew = new_atoms.size();
+    const int nnew = new_atoms.size();
     nrot += nnew;
-    if (nnew > 0LLU) {
+    if (nnew > 0) {
       more_added = true;
       prev_atoms.resize(nnew);
-      for (size_t i = 0; i < nnew; i++) {
+      for (int i = 0; i < nnew; i++) {
         prev_atoms[i] = new_atoms[i];
       }
     }
   }
-  if (nrot == 0LLU || nrot == static_cast<size_t>(nbk.natom - 2)) {
+
+  // Report whether a ring was completed by this coloring
+  *ring_report = ring_completion;
+  return nrot;
+}
+  
+//-------------------------------------------------------------------------------------------------
+std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
+                                  const int atom_i, const int atom_j) {
+  std::vector<uint> marked((nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int, false);
+  bool ring_completed;
+  int nrot = colorConnectivity(nbk, atom_i, atom_j, &marked, &ring_completed);
+  if (ring_completed) {
+    rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
+          std::to_string(atom_j + 1) + ", " +
+          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
+          std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+          char4ToString(cdk.atom_names[atom_i]) + " and " +
+          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
+          std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+          char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring system.  This "
+          "should not have happened if the bond was selected from a ChemicalFeatures object.",
+          "selectRotatingAtoms");
+  }
+  if (nrot == 0 || nrot == nbk.natom - 2) {
     rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
           std::to_string(atom_j + 1) + ", " +
           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
@@ -643,10 +665,10 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
   }
   std::vector<int> result(nrot);
   int counter = 0;
-  marked[atom_i] = false;
-  marked[atom_j] = false;
+  unsetBitInMask(&marked, atom_i);
+  unsetBitInMask(&marked, atom_j);
   for (int i = 0; i < nbk.natom; i++) {
-    if (marked[i]) {
+    if (readBitFromMask(marked,i)) {
       result[counter] = i;
       counter++;
     }

@@ -544,7 +544,6 @@ private:
   ///        that have the fewest possible atoms.  The number of invertible groups is the number of
   ///        chiral centers.
   ///
-  /// \param nbk                          Needed for 1:2 bonding information
   /// \param tmp_chiral_centers           Array of pre-determined chiral centers
   /// \param tmp_anchor_a_branches        Roots of the largest branch on each chiral center (in
   ///                                     terms of the number of atoms), not to be inverted
@@ -554,8 +553,7 @@ private:
   ///                                     returned)
   /// \param tmp_invertible_group_bounds  Bounds array for tmp_invertible_groups (assembled and
   ///                                     returned)
-  void findInvertibleGroups(const NonbondedKit<double> &nbk,
-                            const std::vector<int> tmp_chiral_centers,
+  void findInvertibleGroups(const std::vector<int> tmp_chiral_centers,
                             std::vector<int> *tmp_anchor_a_branches,
                             std::vector<int> *tmp_anchor_b_branches,
                             std::vector<int> *tmp_invertible_groups,

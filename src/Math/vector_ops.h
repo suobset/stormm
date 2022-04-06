@@ -566,6 +566,26 @@ void accumulateBitmask(ushort* va, const size_t pos);
 void accumulateBitmask(std::vector<ushort> *va, const size_t pos);
 /// \}
 
+/// \brief Uncheck a result in an array of unsigned integers to modify a bitmask.
+///
+/// Overloaded:
+///   - Use unsigned integers
+///   - Use long long unsigned integers
+///   - Use short unsigned integers
+///   - Operate on a C-style array trusted to be of sufficient length, or a Standard Template
+///     Library vector (the size will be checked)
+///
+/// \param va   The developing bit mask
+/// \param pos  The index of the bit mask to color by setting the bit to 0
+/// \{
+void unsetBitInMask(uint* va, const size_t pos);
+void unsetBitInMask(std::vector<uint> *va, const size_t pos);
+void unsetBitInMask(ullint* va, const size_t pos);
+void unsetBitInMask(std::vector<ullint> *va, const size_t pos);
+void unsetBitInMask(ushort* va, const size_t pos);
+void unsetBitInMask(std::vector<ushort> *va, const size_t pos);
+/// \}
+
 /// \brief Retrieve a numbered bit result from an array of unsigned integers.  This function will
 ///        return 1 or zero depending on the value of the queried bit.
 ///
