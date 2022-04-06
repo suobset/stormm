@@ -391,6 +391,23 @@ private:
   /// atom, the pivot atom, and one or more atoms beyond the pivot that rotate as a consequence of
   /// twisting about the rotatable bond.
   Hybrid<int> rotatable_group_bounds;
+
+  /// List of atoms that move (by a C2 symmetry operation) to invert a chiral center.  These groups
+  /// are chosen to minimize the number of moving atoms involved in flipping a chiral center.  For
+  /// some molecules like proteins, the list can get very long, so a flag is provided for disabling
+  /// the search if it is not needed.
+  Hybrid<int> invertible_groups;
+  
+  /// Bounds array for chiral inversion groups.  Each group will have at least two members,
+  /// covering two branches of the chiral center that will undergo a C2 symmetry operation in order
+  /// to invert the center.
+  Hybrid<int> invertible_group_bounds;
+
+  /// First atoms of the heaviest chain branching from each chiral center
+  Hybrid<int> anchor_a_branches;
+  
+  /// First atoms of the second-heaviest chain branching from each chiral center
+  Hybrid<int> anchor_b_branches;
   
   /// Formal charges determined for all atoms in the system, based on a Lewis structure drawing
   /// with the Indigo method
@@ -523,6 +540,27 @@ private:
                           std::vector<int> *tmp_rotatable_groups,
                           std::vector<int> *tmp_rotatable_group_bounds);
 
+  /// \brief Find invertible groups in the system, those comprising two branches of a chiral center
+  ///        that have the fewest possible atoms.  The number of invertible groups is the number of
+  ///        chiral centers.
+  ///
+  /// \param nbk                          Needed for 1:2 bonding information
+  /// \param tmp_chiral_centers           Array of pre-determined chiral centers
+  /// \param tmp_anchor_a_branches        Roots of the largest branch on each chiral center (in
+  ///                                     terms of the number of atoms), not to be inverted
+  /// \param tmp_anchor_b_branches        Roots of the second largest branch on each chiral center,
+  ///                                     not to be inverted
+  /// \param tmp_invertible_groups        Array of atoms in invertible groups (assembled and
+  ///                                     returned)
+  /// \param tmp_invertible_group_bounds  Bounds array for tmp_invertible_groups (assembled and
+  ///                                     returned)
+  void findInvertibleGroups(const NonbondedKit<double> &nbk,
+                            const std::vector<int> tmp_chiral_centers,
+                            std::vector<int> *tmp_anchor_a_branches,
+                            std::vector<int> *tmp_anchor_b_branches,
+                            std::vector<int> *tmp_invertible_groups,
+                            std::vector<int> *tmp_invertible_group_bounds);
+  
   /// \brief Find polar heavy atoms that can act as hydrogen bond donors, and label polar hydrogens
   ///        in the process.  Unlike findRotatableBonds above, this is a fast evaluation and will
   ///        be performed automatically with the ChemicalFeatures object construction.

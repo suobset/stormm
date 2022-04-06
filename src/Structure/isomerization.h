@@ -20,7 +20,7 @@ using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
   
 /// \brief Rotate a molecule such that selected internal coordinates achieve particular values.
-///        The internal coordinates much define a rotatable bond (bonds in rings are prohibited
+///        The internal coordinates must define a rotatable bond (bonds in rings are prohibited
 ///        from rotation under this procedure).  This operation takes place only on the CPU.  The
 ///        results must be uploaded to the GPU but can serve to seed coordinates for more detailed
 ///        manipulations.
@@ -48,8 +48,7 @@ using synthesis::PsSynthesisWriter;
 ///                        angle is oriented by the right hand rule with one's hand on atom_i and
 ///                        thumb pointed towards atom_j.
 /// \{
-void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const double* umat,
-                     const double* invu, UnitCellType unit_cell, int atom_i, int atom_j,
+void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 
 void rotateAboutBond(CoordinateFrame *cf, int atom_i, int atom_j,
@@ -70,6 +69,11 @@ void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, 
 void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle);
 /// \}
+
+/// \brief Rotate two branches of a chiral center 180 degrees, so as to invert the center.  
+void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const double* umat,
+                      const double* invu, const UnitCellType unit_cell, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b);
 
 } // namespace structure
 } // namespace omni

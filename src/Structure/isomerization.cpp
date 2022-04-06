@@ -15,39 +15,33 @@ using parse::char4ToString;
 using topology::NonbondedKit;
 
 //-------------------------------------------------------------------------------------------------
-void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const double* umat,
-                     const double* invu, const UnitCellType unit_cell, const int atom_i,
-                     const int atom_j, const std::vector<int> &moving_atoms,
-                     const double rotation_angle) {
+void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const int atom_i, const int atom_j,
+                     const std::vector<int> &moving_atoms, const double rotation_angle) {
   const int natom = moving_atoms.size();
   double center_x, center_y, center_z;
   std::vector<double> x_moves(natom), y_moves(natom), z_moves(natom);
-  if (unit_cell != UnitCellType::NONE) {
 
-    // Center and image the coordinates
-    center_x = xcrd[atom_j];
-    center_y = ycrd[atom_j];
-    center_z = zcrd[atom_j];
-    xcrd[atom_i] -= center_x;
-    ycrd[atom_i] -= center_y;
-    zcrd[atom_i] -= center_z;
-    xcrd[atom_j] = 0.0;
-    ycrd[atom_j] = 0.0;
-    zcrd[atom_j] = 0.0;
-    for (int i = 0; i < natom; i++) {
-      const int mk = moving_atoms[i];
-      double mvx = xcrd[mk];
-      double mvy = ycrd[mk];
-      double mvz = zcrd[mk];
-      xcrd[mk] -= center_x;
-      ycrd[mk] -= center_y;
-      zcrd[mk] -= center_z;
-      imageCoordinates(&xcrd[mk], &ycrd[mk], &zcrd[mk], umat, invu, unit_cell,
-                       ImagingMethod::MINIMUM_IMAGE);
-      x_moves[mk] = mvx - xcrd[mk];
-      y_moves[mk] = mvy - ycrd[mk];
-      z_moves[mk] = mvz - zcrd[mk];
-    }
+  // Center and image the coordinates
+  center_x = xcrd[atom_j];
+  center_y = ycrd[atom_j];
+  center_z = zcrd[atom_j];
+  xcrd[atom_i] -= center_x;
+  ycrd[atom_i] -= center_y;
+  zcrd[atom_i] -= center_z;
+  xcrd[atom_j] = 0.0;
+  ycrd[atom_j] = 0.0;
+  zcrd[atom_j] = 0.0;
+  for (int i = 0; i < natom; i++) {
+    const int mk = moving_atoms[i];
+    double mvx = xcrd[mk];
+    double mvy = ycrd[mk];
+    double mvz = zcrd[mk];
+    xcrd[mk] -= center_x;
+    ycrd[mk] -= center_y;
+    zcrd[mk] -= center_z;
+    x_moves[mk] = mvx - xcrd[mk];
+    y_moves[mk] = mvy - ycrd[mk];
+    z_moves[mk] = mvz - zcrd[mk];
   }
 
   // Define the vector of rotation, then the matrix
@@ -78,21 +72,19 @@ void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const double* uma
   }
 
   // Restore the original imaging and location of the bond atoms and moving atoms
-  if (unit_cell != UnitCellType::NONE) {
-    xcrd[atom_j] += center_x;
-    ycrd[atom_j] += center_y;
-    zcrd[atom_j] += center_z;
-    xcrd[atom_i] += center_x;
-    ycrd[atom_i] += center_y;
-    zcrd[atom_i] += center_z;
-    for (int i = 0; i < natom; i++) {
+  xcrd[atom_j] = center_x;
+  ycrd[atom_j] = center_y;
+  zcrd[atom_j] = center_z;
+  xcrd[atom_i] += center_x;
+  ycrd[atom_i] += center_y;
+  zcrd[atom_i] += center_z;
+  for (int i = 0; i < natom; i++) {
 
-      // The centering for each movable atom has already been folded into the imaging move
-      const int mk = moving_atoms[i];
-      xcrd[mk] += x_moves[mk];
-      ycrd[mk] += y_moves[mk];
-      zcrd[mk] += z_moves[mk];
-    }
+    // The centering for each movable atom has already been folded into the imaging move
+    const int mk = moving_atoms[i];
+    xcrd[mk] += x_moves[mk];
+    ycrd[mk] += y_moves[mk];
+    zcrd[mk] += z_moves[mk];
   }
 }
 
@@ -105,8 +97,7 @@ void rotateAboutBond(CoordinateFrame *cf, const int atom_i, const int atom_j,
 //-------------------------------------------------------------------------------------------------
 void rotateAboutBond(CoordinateFrameWriter cfw, const int atom_i, const int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle) {
-  rotateAboutBond(cfw.xcrd, cfw.ycrd, cfw.zcrd, cfw.umat, cfw.invu, cfw.unit_cell, atom_i, atom_j,
-                  moving_atoms, rotation_angle);
+  rotateAboutBond(cfw.xcrd, cfw.ycrd, cfw.zcrd, atom_i, atom_j, moving_atoms, rotation_angle);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -118,8 +109,7 @@ void rotateAboutBond(PhaseSpace *ps, const int atom_i, const int atom_j,
 //-------------------------------------------------------------------------------------------------
 void rotateAboutBond(PhaseSpaceWriter psw, const int atom_i, const int atom_j,
                      const std::vector<int> &moving_atoms, const double rotation_angle) {
-  rotateAboutBond(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, atom_i, atom_j,
-                  moving_atoms, rotation_angle);
+  rotateAboutBond(psw.xcrd, psw.ycrd, psw.zcrd, atom_i, atom_j, moving_atoms, rotation_angle);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -156,9 +146,7 @@ void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const in
     zcrd[i + 2] = static_cast<double>(tmpcrd.z) * inv_scl;
   }
   const int xfrm_offset = roundUp(9, warp_size_int) * system_index;
-  rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), &psynthw.umat[xfrm_offset],
-                  &psynthw.invu[xfrm_offset], psynthw.unit_cell, 0, 1, local_atoms,
-                  rotation_angle);
+  rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), 0, 1, local_atoms, rotation_angle);
   const double pos_scl = psynthw.gpos_scale;
   for (int i = 0; i < nmove; i++) {
     const int ixyz_dest = moving_atoms[i] + system_offset;
@@ -168,5 +156,16 @@ void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const in
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const double* umat,
+                      const double* invu, const UnitCellType unit_cell, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+
+  // Find the bisector of the root_a : chiral_center : root_b angle, then rotate the moving atoms
+  // 180 degrees about this bond.
+  
+  
+}
+  
 } // namespace structure
 } // namespace omni

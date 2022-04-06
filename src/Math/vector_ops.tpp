@@ -1015,14 +1015,20 @@ template <typename T> void reduceUniqueValues(std::vector<T> *va) {
 template <typename T> std::vector<ValueWithCounter<T>>
 findUnmatchedValues(const std::vector<T> &va, const std::vector<T> &vb,
                     const UniqueValueHandling check_repeats) {
-  std::vector<T> va_copy(va);
-  std::vector<T> vb_copy(vb);
+  const size_t length_a = va.size();
+  const size_t length_b = vb.size();
+  std::vector<T> va_copy(length_a);
+  std::vector<T> vb_copy(length_b);
+  for (size_t i = 0; i < length_a; i++) {
+    va_copy[i] = va[i];
+  }
+  for (size_t i = 0; i < length_b; i++) {
+    vb_copy[i] = vb[i];
+  }
   std::sort(va_copy.begin(), va_copy.end(), [](T a, T b) { return a < b; });
   std::sort(vb_copy.begin(), vb_copy.end(), [](T a, T b) { return a < b; });
   std::vector<ValueWithCounter<T>> unique_a;
   std::vector<ValueWithCounter<T>> unique_b;
-  const size_t length_a = va.size();
-  const size_t length_b = vb.size();
   for (size_t i = 0; i < length_a; i++) {
     if (i == 0 || va_copy[i - 1] != va_copy[i]) {
       unique_a.push_back({va_copy[i], 1});
