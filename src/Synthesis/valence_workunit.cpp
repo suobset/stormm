@@ -1705,6 +1705,8 @@ std::vector<uint> ValenceWorkUnit::getAccumulationFlags(const VwuTask vtask) con
   case VwuTask::VSITE:
     rtErr("Geometry constraints and virtual sites are not terms pertaining to the energy "
           "accumulation.", "ValenceWorkUnit", "getAccumulationFlags");
+  case VwuTask::ALL_TASKS:
+    rtErr("Accumulation flags are only defined for a single, specific task.");
   }
   __builtin_unreachable();
 }
@@ -1744,6 +1746,8 @@ std::vector<int> ValenceWorkUnit::getSimpleTaskList(const VwuTask vtask) const {
     return cnst_group_list;
   case VwuTask::VSITE:
     return virtual_site_list;
+  case VwuTask::ALL_TASKS:
+    rtErr("A task list is only defined for a single, specific task.");
   }
   __builtin_unreachable();
 }

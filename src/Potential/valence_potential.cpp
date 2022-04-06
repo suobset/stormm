@@ -1400,6 +1400,7 @@ double evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, c
     zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
     zfrc[l_atom] -= fd * crbccd[2];
   }
+  return rst_eval.z;  
 }
 
 //-------------------------------------------------------------------------------------------------

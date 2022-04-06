@@ -173,9 +173,9 @@ int main(int argc, char* argv[]) {
   const std::string gly_tyr_crd_name = coordinate_base + osc + "gly_tyr.inpcrd";
   const std::string gly_lys_top_name = topology_base + osc + "gly_lys.top";
   const std::string gly_lys_crd_name = coordinate_base + osc + "gly_lys.inpcrd";
-  const bool input_exists = (getDrivePathType(gly_tyr_top_name) == DrivePathType::FILE,
-                             getDrivePathType(gly_tyr_crd_name) == DrivePathType::FILE,
-                             getDrivePathType(gly_lys_crd_name) == DrivePathType::FILE,
+  const bool input_exists = (getDrivePathType(gly_tyr_top_name) == DrivePathType::FILE &&
+                             getDrivePathType(gly_tyr_crd_name) == DrivePathType::FILE &&
+                             getDrivePathType(gly_lys_top_name) == DrivePathType::FILE &&
                              getDrivePathType(gly_lys_crd_name) == DrivePathType::FILE);
   const TestPriority do_tests = (input_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   const std::string snp_name = oe.getOmniSourcePath() + osc + "test" + osc + "Restraints" + osc +
