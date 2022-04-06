@@ -1017,29 +1017,23 @@ findUnmatchedValues(const std::vector<T> &va, const std::vector<T> &vb,
                     const UniqueValueHandling check_repeats) {
   const size_t length_a = va.size();
   const size_t length_b = vb.size();
-  std::vector<T> va_copy(length_a);
-  std::vector<T> vb_copy(length_b);
-  for (size_t i = 0; i < length_a; i++) {
-    va_copy[i] = va[i];
-  }
-  for (size_t i = 0; i < length_b; i++) {
-    vb_copy[i] = vb[i];
-  }
-  std::sort(va_copy.begin(), va_copy.end(), [](T a, T b) { return a < b; });
-  std::sort(vb_copy.begin(), vb_copy.end(), [](T a, T b) { return a < b; });
+  std::vector<T> va_duplicate(va);
+  std::vector<T> vb_duplicate(vb);
+  std::sort(va_duplicate.begin(), va_duplicate.end(), [](T a, T b) { return a < b; });
+  std::sort(vb_duplicate.begin(), vb_duplicate.end(), [](T a, T b) { return a < b; });
   std::vector<ValueWithCounter<T>> unique_a;
   std::vector<ValueWithCounter<T>> unique_b;
   for (size_t i = 0; i < length_a; i++) {
-    if (i == 0 || va_copy[i - 1] != va_copy[i]) {
-      unique_a.push_back({va_copy[i], 1});
+    if (i == 0 || va_duplicate[i - 1] != va_duplicate[i]) {
+      unique_a.push_back({va_duplicate[i], 1});
     }
     else {
       unique_a[unique_a.size() - 1LLU].count += 1;
     }
   }
   for (size_t i = 0; i < length_b; i++) {
-    if (i == 0 || vb_copy[i - 1] != vb_copy[i]) {
-      unique_b.push_back({vb_copy[i], 1});
+    if (i == 0 || vb_duplicate[i - 1] != vb_duplicate[i]) {
+      unique_b.push_back({vb_duplicate[i], 1});
     }
     else {
       unique_b[unique_b.size() - 1LLU].count += 1;
