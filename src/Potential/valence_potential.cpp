@@ -1357,7 +1357,7 @@ double evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, c
   theta += midpoint_delta - (theta - midpoint);
   const double3 rst_eval = restraintDelta(init_keq[param_idx], finl_keq[param_idx],
                                           init_r[param_idx], finl_r[param_idx], mixwt, theta);
-
+  
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
     const double fr = -2.0 * rst_eval.x * rst_eval.y;
@@ -1448,7 +1448,7 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
   }
   for (int pos = 0; pos < rar.ndihe; pos++) {
     const double contrib = evalDiheRestraint(rar.rdihe_i_atoms[pos], rar.rdihe_j_atoms[pos],
-                                             rar.rdihe_k_atoms[pos], rar.rdihe_j_atoms[pos],
+                                             rar.rdihe_k_atoms[pos], rar.rdihe_l_atoms[pos],
                                              rar.time_dependence, step_number, pos,
                                              rar.rdihe_init_step, rar.rdihe_finl_step,
                                              rar.rdihe_init_keq, rar.rdihe_finl_keq,

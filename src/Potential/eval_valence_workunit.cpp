@@ -196,10 +196,10 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                         vk.attn14_vdw, nbk.lja_14_coeff,
                                                         nbk.ljb_14_coeff, nbk.n_lj_types,
                                                         sh_xcrd.data(), sh_ycrd.data(),
-                                                        sh_zcrd.data(), umat, invu, unit_cell,
-                                                        sh_xfrc.data(), sh_yfrc.data(),
-                                                        sh_zfrc.data(), lcl_eval_force,
-                                                        lcl_eval_force);
+                                                        sh_zcrd.data(), nullptr, nullptr,
+                                                        UnitCellType::NONE, sh_xfrc.data(),
+                                                        sh_yfrc.data(), sh_zfrc.data(),
+                                                        lcl_eval_force, lcl_eval_force);
             if (log_term) {
               qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
               lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
@@ -391,8 +391,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                     vk.attn14_elec, vk.attn14_vdw,
                                                     nbk.lja_14_coeff, nbk.ljb_14_coeff,
                                                     nbk.n_lj_types, sh_xcrd.data(), sh_ycrd.data(),
-                                                    sh_zcrd.data(), umat, invu, unit_cell,
-                                                    sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
+                                                    sh_zcrd.data(), nullptr, nullptr,
+                                                    UnitCellType::NONE, sh_xfrc.data(),
+                                                    sh_yfrc.data(), sh_zfrc.data(),
                                                     lcl_eval_force, lcl_eval_force);
         if (log_term) {
           qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
@@ -420,9 +421,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rposn_finl_z, rar.rposn_init_keq,
                                                  rar.rposn_finl_keq, rar.rposn_init_r,
                                                  rar.rposn_finl_r, sh_xcrd.data(), sh_ycrd.data(),
-                                                 sh_zcrd.data(), umat, invu, unit_cell,
-                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 lcl_eval_force);
+                                                 sh_zcrd.data(), nullptr, nullptr,
+                                                 UnitCellType::NONE, sh_xfrc.data(),
+                                                 sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
@@ -445,9 +446,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rbond_finl_step, rar.rbond_init_keq,
                                                  rar.rbond_finl_keq, rar.rbond_init_r,
                                                  rar.rbond_finl_r, sh_xcrd.data(), sh_ycrd.data(),
-                                                 sh_zcrd.data(), umat, invu, unit_cell,
-                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 lcl_eval_force);
+                                                 sh_zcrd.data(), nullptr, nullptr,
+                                                 UnitCellType::NONE, sh_xfrc.data(),
+                                                 sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
@@ -471,9 +472,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rangl_finl_step, rar.rangl_init_keq,
                                                  rar.rangl_finl_keq, rar.rangl_init_r,
                                                  rar.rangl_finl_r, sh_xcrd.data(), sh_ycrd.data(),
-                                                 sh_zcrd.data(), umat, invu, unit_cell,
-                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 lcl_eval_force);
+                                                 sh_zcrd.data(), nullptr, nullptr,
+                                                 UnitCellType::NONE, sh_xfrc.data(),
+                                                 sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }
@@ -498,9 +499,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  rar.rdihe_finl_step, rar.rdihe_init_keq,
                                                  rar.rdihe_finl_keq, rar.rdihe_init_r,
                                                  rar.rdihe_finl_r, sh_xcrd.data(), sh_ycrd.data(),
-                                                 sh_zcrd.data(), umat, invu, unit_cell,
-                                                 sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
-                                                 lcl_eval_force);
+                                                 sh_zcrd.data(), nullptr, nullptr,
+                                                 UnitCellType::NONE, sh_xfrc.data(),
+                                                 sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
           rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
         }

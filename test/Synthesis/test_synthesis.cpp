@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "../../src/Accelerator/hybrid.h"
@@ -7,6 +8,7 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
+#include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/mixed_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -21,6 +23,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
+#include "../../src/Structure/local_arrangement.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/valence_workunit.h"
@@ -54,6 +57,9 @@ using omni::restraints::applyHydrogenBondPreventors;
 using omni::restraints::applyPositionalRestraints;
 using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
+using omni::structure::distance;
+using omni::structure::angle;
+using omni::structure::dihedral_angle;
 using namespace omni::energy;
 using namespace omni::numerics;
 using namespace omni::synthesis;
@@ -91,6 +97,22 @@ bool checkSimpleTaskCoverage(const std::vector<uint> &accd, const std::vector<in
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check that the naive distance between two particles is the distance computed upon re-imaging.
+// Return TRUE is this is so, FALSE otherwise.
+//
+// Arguments:
+//   i:     The first particle
+//   j:     The second particle
+//   cfr:   Coordinates of the particles, plus box information
+//-------------------------------------------------------------------------------------------------
+bool checkNaiveDistance(const int i, const int j, const CoordinateFrameReader &cfr) {
+  const double reim_dist  = distance(i, j, cfr);
+  const double naive_dist = distance(i, j, cfr.xcrd, cfr.ycrd, cfr.zcrd, nullptr, nullptr,
+                                     UnitCellType::NONE);
+  return (fabs(reim_dist - naive_dist) < omni::constants::tiny);
+}
+
+//-------------------------------------------------------------------------------------------------
 // Run a series of tests using valence work units.
 //
 // Arguments:
@@ -113,19 +135,53 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                                   AtomGraph();
   PhaseSpace ps = (files_exist) ? PhaseSpace(crd_name) : PhaseSpace();
   const CoordinateFrameReader cfr(ps);
-  std::vector<BoundedRestraint> bkbn_rstr = applyPositionalRestraints(&ag, cfr,
-                                                                      "@N,CA,C,O", 1.4);
-  for (size_t i = 0; i < bkbn_rstr.size(); i++) {
-    const double3 trgt = bkbn_rstr[i].getTargetSite();
-    bkbn_rstr[i].setTargetSite({ trgt.x + 0.5 - my_prng->uniformRandomNumber(),
+
+  // Create a set of restraints on the structure, starting from backbone positional restraints
+  // and adding things that randomly keep various two-, three-, and four-point meansurements near
+  // their observed values.
+  std::vector<BoundedRestraint> mol_rstr = applyPositionalRestraints(&ag, cfr, "@N,CA,C,O", 1.4);
+  for (size_t i = 0; i < mol_rstr.size(); i++) {
+    const double3 trgt = mol_rstr[i].getTargetSite();
+    mol_rstr[i].setTargetSite({ trgt.x + 0.5 - my_prng->uniformRandomNumber(),
                                  trgt.y + 0.5 - my_prng->uniformRandomNumber(),
                                  trgt.z + 0.5 - my_prng->uniformRandomNumber() });
   }
-  RestraintApparatus ra(bkbn_rstr);
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const int solute_extent = ag.getLastSoluteAtom();
+  const int min_iinc = std::max(solute_extent / 8, 4);
+  for (int i = min_iinc; i < solute_extent; i += min_iinc) {
+    for (int j = 0; j < i; j += min_iinc) {
+      const double orig_distance = distance(i, j, ps) + 0.5 - my_prng->uniformRandomNumber();
+      if (checkNaiveDistance(i, j, cfr) == false) {
+        continue;
+      }
+      mol_rstr.emplace_back(i, j, &ag, 1.0, 1.4, 0.0, orig_distance - 0.25, orig_distance + 0.25,
+                            orig_distance + 100.0);
+      if (checkNaiveDistance(i, i - 2, cfr) && checkNaiveDistance(j, i - 2, cfr)) {
+        const double orig_angle = angle(i, j, i - 2, ps) +
+                                  (0.1 * (0.5 - my_prng->uniformRandomNumber()));
+        if (orig_angle > 0.1 && orig_angle < 3.0) {
+          mol_rstr.emplace_back(i, j, i - 2, &ag, 2.3, 0.9, 0.0, orig_angle - 0.05,
+                                orig_angle + 0.02, omni::symbols::pi - omni::constants::tiny);
+        }
+      }
+      if (checkNaiveDistance(i, i - 1, cfr) && checkNaiveDistance(j, i - 1, cfr) &&
+          checkNaiveDistance(j, j + 1, cfr)) {
+        const double orig_dihedral = dihedral_angle(i, i - 1, j, j + 1, ps) +
+                                     (0.8 * (0.5 - my_prng->uniformRandomNumber()));
+        mol_rstr.emplace_back(i, i - 1, j, j + 1, &ag, 2.3, 0.9, orig_dihedral - 1.0,
+                              orig_dihedral - 0.03, orig_dihedral + 0.03, orig_dihedral + 1.0);
+      }
+    }
+  }
+
+  // Create the restraint apparatus, then the valence work units.
+  RestraintApparatus ra(mol_rstr);
   ValenceDelegator vdel(&ag, &ra);
   const std::vector<ValenceWorkUnit> all_vwu = buildValenceWorkUnits(&vdel);
   const int n_vwu = all_vwu.size();
-  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+
+  // Check the coverage in valence work units with an independent tally of each atom and term
   std::vector<int> bond_coverage(vk.nbond, 0);
   std::vector<int> angl_coverage(vk.nangl, 0);
   std::vector<int> dihe_coverage(vk.ndihe, 0);
@@ -308,7 +364,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const std::vector<double> attn_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
   ps.initializeForces();
   ps_vwu.initializeForces();
-
+  
   // Restraint energies need to be plucked from the results immediately, as the reference
   // calculations only evaluate restraints all at once whereas the ValenceWorkUnit evaluation
   // implements them one type at a time.
@@ -324,7 +380,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const double rdihe_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 1);
   const std::vector<double> rstr_frc = ps_vwu.getInterlacedCoordinates(TrajectoryKind::FORCES);
   const std::vector<double> rstr_frc_ref = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-
+  
   // Read off other energy terms
   const std::vector<double> bond_e = sc.reportInstantaneousStates(StateVariable::BOND);
   const std::vector<double> angl_e = sc.reportInstantaneousStates(StateVariable::ANGLE);
