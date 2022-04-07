@@ -1371,11 +1371,11 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
     const std::vector<int> ifirst = selectRotatingAtoms(ag_pointer, atom_i, atom_j);
     const std::vector<int> jfirst = selectRotatingAtoms(ag_pointer, atom_j, atom_i);
     if (ifirst.size() >= jfirst.size()) {
-      rotators.push_back({atom_i, atom_j});
+      rotators.push_back({atom_j, atom_i});
       moving_lists.push_back(jfirst);
     }
     else {
-      rotators.push_back({atom_j, atom_i});
+      rotators.push_back({atom_i, atom_j});
       moving_lists.push_back(ifirst);
     }
   }
@@ -1731,7 +1731,7 @@ std::vector<RotatorGroup> ChemicalFeatures::getRotatableBondGroups() const {
     const int llim = rotatable_group_bounds.readHost(i);
     const int hlim = rotatable_group_bounds.readHost(i + 1);
     result[i].root_atom  = rg_ptr[llim];
-    result[i].pivot_atom = rg_ptr[hlim];
+    result[i].pivot_atom = rg_ptr[llim + 1];
     result[i].rotatable_atoms.resize(hlim - llim - 2);
     int k = 0;
     for (int j = llim + 2; j < hlim; j++) {

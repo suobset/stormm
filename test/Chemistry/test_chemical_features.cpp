@@ -12,6 +12,11 @@
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+// CHECK
+#include "../../src/Parsing/parse.h"
+using omni::parse::char4ToString;
+// END CHECK
+
 using omni::chemistry::ChiralOrientation;
 using omni::constants::ExceptionResponse;
 using omni::symbols::amber_ancient_bioq;
@@ -76,14 +81,6 @@ int main(int argc, char* argv[]) {
   // Water boxes
   const std::string tip5p_top_name = base_top_name + osc + "tip5p.top";
   const std::string tip5p_crd_name = base_crd_name + osc + "tip5p.rst";
-
-  // CHECK
-  const std::string trpc_top_name = base_top_name + osc + "trpcage.top";
-  const std::string trpc_crd_name = base_crd_name + osc + "trpcage.inpcrd";
-  AtomGraph ubiq_ag(trpc_top_name);
-  PhaseSpace ubiq_ps(trpc_crd_name);
-  ChemicalFeatures ubiq_chem(&ubiq_ag, CoordinateFrameReader(ubiq_ps), MapRotatableGroups::NO);
-  // END CHECK
   
   // Check the existence of all files
   const std::vector<std::string> top_files = { mol1_top_name, mol2_top_name, mol3_top_name,
@@ -195,14 +192,16 @@ int main(int argc, char* argv[]) {
         "CB atom) do not meet expectations.", do_tests);
   const std::string fc_name = base_chem_name + osc + "formal_charges.m";
   const std::string bo_name = base_chem_name + osc + "bond_orders.m";
+  const std::string ro_name = base_chem_name + osc + "rotating_groups.m";
   const bool snps_exist = (getDrivePathType(fc_name) == DrivePathType::FILE &&
-                           getDrivePathType(bo_name) == DrivePathType::FILE);
+                           getDrivePathType(bo_name) == DrivePathType::FILE &&
+                           getDrivePathType(ro_name) == DrivePathType::FILE);
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snps_exist == false) {
-    rtWarn("Snapshot files " + fc_name + " and " + bo_name + " must be accessible in order to "
-           "check formal charge and bond order calculations, respectively.  Check the "
-           "${OMNI_SOURCE} environment variable for validity.  Subsequent tests will be skipped.",
-           "test_chemical_features");
+    rtWarn("Snapshot files " + fc_name + ", " + bo_name + ", and " + ro_name + " must be "
+           "accessible in order to check formal charge and bond order calculations, "
+           "respectively.  Check the ${OMNI_SOURCE} environment variable for validity.  "
+           "Subsequent tests will be skipped.", "test_chemical_features");
   }
   for (size_t i = 0; i < nsys; i++) {
     snapshot(fc_name, polyNumericVector(sys_chem[i].getFormalCharges()), std::string("fc_") +
@@ -219,6 +218,28 @@ int main(int argc, char* argv[]) {
           Approx(sum<double>(sys_ag[i].getPartialCharge<double>())).margin(1.0e-4), "The sum of "
           "formal charges computed for " + sys_ag[i].getFileName() + " does not match the sum of "
           "partial charges given in the topology.", do_tests);
+  }
+  
+  // Check the rotatable bond groups, and the inversion groups generated for smaller structures
+  for (size_t i = 0; i < nsys; i++) {
+    const int nrotor = sys_chem[i].getRotatableBondCount();
+    if (nrotor == 0) {
+      continue;
+    }
+    const std::vector<RotatorGroup> all_rotors = sys_chem[i].getRotatableBondGroups();
+    std::vector<int> rotor_ids;
+    for (int j = 0; j < nrotor; j++) {
+      rotor_ids.push_back(all_rotors[j].root_atom);
+      rotor_ids.push_back(all_rotors[j].pivot_atom);
+      for (size_t k = 0; k < all_rotors[j].rotatable_atoms.size(); k++) {
+        rotor_ids.push_back(all_rotors[j].rotatable_atoms[k]);
+      }
+    }
+    snapshot(ro_name, polyNumericVector(rotor_ids), std::string("rotators_") + std::to_string(i),
+             1.0e-6, "Rotatable atom IDs obtained for the system described by " +
+             sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
+             NumberFormat::INTEGER,
+             (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
   }
   
   // Summary evaluation
