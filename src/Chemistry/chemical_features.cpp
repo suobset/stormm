@@ -23,12 +23,14 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::project;
 using math::readBitFromMask;
+using math::reduceUniqueValues;
 using math::roundUp;
+using math::unsetBitInMask;
 using testing::Approx;
 using topology::colorConnectivity;
 using topology::selectRotatingAtoms;
 using trajectory::CoordinateFrameReader;
-
+  
 //-------------------------------------------------------------------------------------------------
 BondedNode::BondedNode() :
     previous_atom_index{-1}, atom_index{-1}, layer_index{-1}, root_bond_order{0.0},
@@ -254,6 +256,17 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   // Find chiral centers
   const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
   chiral_center_count = tmp_chiral_centers.size();
+
+  // CHECK
+#if 0
+  printf("Chiral centers in %s:\n", ag_pointer->getFileName().c_str());
+  for (int i = 0; i < chiral_center_count; i++) {
+    printf("  %4.4s",
+           char4ToString(ag_pointer->getAtomName(abs(tmp_chiral_centers[i]) - 1)).c_str());
+  }
+  printf("\n");
+#endif
+  // END CHECK
 
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
@@ -1408,7 +1421,7 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
 }
 
 //-------------------------------------------------------------------------------------------------
-void ChemicalFeatures::findInvertibleGroups(const std::vector<int> tmp_chiral_centers,
+void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_centers,
                                             std::vector<int> *tmp_anchor_a_branches,
                                             std::vector<int> *tmp_anchor_b_branches,
                                             std::vector<int> *tmp_invertible_groups,
@@ -1420,29 +1433,113 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> tmp_chiral_ce
   tmp_anchor_a_branches->resize(chiral_center_count);
   tmp_anchor_b_branches->resize(chiral_center_count);
   tmp_invertible_group_bounds->resize(chiral_center_count + 1);
-  std::vector<uint> marked((nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int);
-  std::vector<int> prev_atoms(16), new_atoms(16);
+  int* anchor_a_ptr = tmp_anchor_a_branches->data();
+  int* anchor_b_ptr = tmp_anchor_a_branches->data();
+  int* bounds_ptr   = tmp_invertible_group_bounds->data();
+  const size_t mask_len = (nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int;
+  std::vector<std::vector<uint>> marked(4);
+  std::vector<int2> branch_counts(4);
+  for (int i = 0; i < 4; i++) {
+    marked[i].resize(mask_len);
+  }
+  std::vector<int> prev_atoms(16), new_atoms(16), tmp_igroup(16);
+  int all_grp_size = 0;
   for (int i = 0; i < chiral_center_count; i++) {
-    const int chatom = tmp_chiral_centers[i];
-    std::vector<int> nbranch(4, -1);
+    
+    // The chiral orientation is encoded in the index of the chiral center by making D-chiral
+    // centers the negative of the original index, but this leaves an ambiguity if the atom with
+    // topological index 0 is chiral.  Therefore, 1 is added to the index and D-chiral centers
+    // have their index values multiplied by -1.  Unroll this arrangement to recover the correct
+    // topological index.
+    const int chatom = abs(tmp_chiral_centers[i]) - 1;
+    for (int j = 0; j < 4; j++) {
+      branch_counts[j].x = -1;
+      branch_counts[j].y = j;
+    }
     int brpos = 0;
     for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
-      if (nbranch[brpos] >= 0) {
+      if (branch_counts[brpos].x >= 0) {
+        brpos++;
         continue;
       }
       bool ring_completed;
-      nbranch[brpos] = colorConnectivity(nbk, chatom, nbk.nb12x[j], &marked, &ring_completed);
+      branch_counts[brpos].x = colorConnectivity(nbk, chatom, nbk.nb12x[j], &marked[brpos],
+                                                 &ring_completed);
 
       // Search for one of the remaining branch roots in the marked atoms if there was a ring
       // completion.  This will accomplish one of the following searches.
       if (ring_completed) {
         for (int k = j + 1; k < nbk.nb12_bounds[chatom + 1]; k++) {
-          if (readBitFromMask(marked, nbk.nb12x[k])) {
-            nbranch[k - nbk.nb12_bounds[chatom]] = nbranch[brpos];
+          if (readBitFromMask(marked[brpos], nbk.nb12x[k])) {
+            const size_t mirror_idx = k - nbk.nb12_bounds[chatom];
+            for (size_t m = 0; m < mask_len; m++) {
+              marked[mirror_idx][m] = marked[brpos][m];
+            }
+            branch_counts[mirror_idx].x = branch_counts[brpos].x;
           }
         }
       }
       brpos++;
+    }
+
+    // Unset the chiral atom itself in the masks just created.  It will not rotate during the
+    // inversion.  The number of atoms in each branch is one more than the number of "rotators"
+    // counted by the colorConnectivity function, which was originally written for mapping the
+    // moving atom dependencies of rotatable bonds.
+    for (int j = 0; j < 4; j++) {
+      branch_counts[j].x += 1;
+      unsetBitInMask(&marked[j], chatom);
+    }
+
+    // Sort the branches in descending order of size.  The list is only four elements long.
+    std::sort(branch_counts.begin(), branch_counts.end(),
+              [](int2 a, int2 b) { return a.x > b.x; });
+    anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+    anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+    const int invr_a_branch = branch_counts[2].y;
+    const int invr_b_branch = branch_counts[3].y;
+    tmp_igroup.resize(branch_counts[2].x + branch_counts[3].x + 2);
+    
+    // Quickly scan the relevant masks for any marked atoms.  This uses the unsigned integers to
+    // account for 32 atoms at a time.  In large topologies with relatively few atoms in the
+    // inversion mask, this is a big speed advantage.  Make a list of atoms in either branch, then
+    // reduce this list to its unique values, unique atoms in the smallest two branches coming out
+    // of the chiral center.
+    tmp_igroup[0] = nbk.nb12x[nbk.nb12_bounds[chatom] + invr_a_branch];
+    tmp_igroup[1] = nbk.nb12x[nbk.nb12_bounds[chatom] + invr_b_branch];
+    int ntg = 2;
+    for (int j = 0; j < mask_len; j++) {
+      if (marked[invr_a_branch][j] > 0) {
+        const int jbase = j * uint_bit_count_int;
+        for (int k = 0; k < uint_bit_count_int; k++) {
+          if (readBitFromMask(marked[invr_a_branch], jbase + k)) {
+            tmp_igroup[ntg] = jbase + k;
+            ntg++;
+          }
+        }
+      }
+      if (marked[invr_b_branch][j] > 0) {
+        const int jbase = j * uint_bit_count_int;
+        for (int k = 0; k < uint_bit_count_int; k++) {
+          if (readBitFromMask(marked[invr_b_branch], jbase + k)) {
+            tmp_igroup[ntg] = jbase + k;
+            ntg++;
+          }
+        }
+      }
+    }
+    reduceUniqueValues(&tmp_igroup);
+    const int igrp_size = tmp_igroup.size();
+    all_grp_size += igrp_size;
+    bounds_ptr[i + 1] = all_grp_size;
+
+    // This resizing operation is potentially inefficient as it happens for each chiral center,
+    // but it is very hard to anticipate what a reasonable size for the entire array might be.
+    tmp_invertible_groups->resize(all_grp_size);
+    int* group_ptr = tmp_invertible_groups->data();
+    int k = 0;
+    for (int j = 0; j < igrp_size; j++) {
+      group_ptr[bounds_ptr[i] + j] = tmp_igroup[j];
     }
   }
 }
@@ -1786,6 +1883,26 @@ ChemicalFeatures::getRotatableBondGroups(const int cutoff, const int mol_index) 
               return a.rotatable_atoms.size() > b.rotatable_atoms.size();
             });
   
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<RotatorGroup> ChemicalFeatures::getInvertibleGroups() const {
+  std::vector<RotatorGroup> result(chiral_center_count);
+  const int* groups_ptr   = invertible_groups.data();
+  const int* bounds_ptr   = invertible_group_bounds.data();
+  const int* anchor_a_ptr = anchor_a_branches.data();
+  const int* anchor_b_ptr = anchor_b_branches.data();
+  for (int i = 0; i < chiral_center_count; i++) {
+    result[i].root_atom  = anchor_a_ptr[i];
+    result[i].pivot_atom = anchor_b_ptr[i];
+    result[i].rotatable_atoms.resize(bounds_ptr[i + 1] - bounds_ptr[i]);
+    int k = 0;
+    for (int j = bounds_ptr[i]; j < bounds_ptr[i + 1]; j++) {
+      result[i].rotatable_atoms[k] = groups_ptr[j];
+      k++;
+    }
+  }
   return result;
 }
 

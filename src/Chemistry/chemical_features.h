@@ -29,7 +29,7 @@ struct RotatorGroup {
   std::vector<int> rotatable_atoms;  ///< List of all atoms that turn as a consequence of twisting
                                      ///<   about the rotatable bond axis
 };
-  
+
 /// \brief A struct to serve as a tracker of progress through a molecule in the search for loops.
 ///        Proceeding forward in the search, every link will have come from one and only one
 ///        previous link, but could go in multiple directions thereafter.
@@ -43,7 +43,7 @@ public:
   ///        pointer.  This is in the interest of not repeatedly allocating and freeing many tiny
   ///        std::vector<int> objects as BondedNodes are created and destroyed to grow a chain of
   ///        atoms.
-  ///
+   ///
   /// \param vi            Vector of integers in which this BondedNode will store some of its data
   /// \param pos           Indicator of the space in the storage vector allocate to this object
   /// \param max_branches  The maximum number of branches that this chain link shall support
@@ -286,21 +286,32 @@ public:
   ///     whereby the AtomMask object depends on ChemicalFeatures and vice-versa).
   ///   - Get a list of the N largest rotatable groups of atoms.
   ///
-  /// \param index   The index of the rotatable bond to obtain.  Such a request is naive as to what
-  ///                the list actually contains, but a bounds check will be applied to ensure that
-  ///                the request is valid.
-  /// \param cutoff  The threshold at which to accept rotatable bond groups.  The meaning depends
-  ///                the value of the choice enumeration (see below).  If the choice is
-  ///                COM_PRXIMITY, then cutoff is a distance with units of Angstroms.  If the
-  ///                choice is GROUP_SIZE, then cutoff is a minimium number of rotating atoms.
-  /// \param choice     Specification of the means for discriminating different rotatable bond
-  ///                   groups.  See the description for cutoff, above.
+  /// \param cutoff     The threshold at which to accept rotatable bond groups.  The meaning
+  ///                   depends on the value of the choice enumeration (see below).  If the choice
+  ///                   is COM_PROXIMITY, then cutoff is a distance with units of Angstroms.  If
+  ///                   the choice is GROUP_SIZE, then cutoff is a minimium number of rotating
+  ///                   atoms.
   /// \param mol_index  The molecule of interest (the system may have multiple molecules).
   /// \{
   std::vector<RotatorGroup> getRotatableBondGroups() const;
   std::vector<RotatorGroup> getRotatableBondGroups(int cutoff, int mol_index = 0) const;
   /// \}
 
+  /// \brief Get the group of atoms that can invert a chiral center by a C2 symmetry rotation.
+  ///        This re-uses the RotatorGroup struct, this time casting the root and pivot atoms as
+  ///        the origins of the heaviest and second-heaviest branches, respectively, which will
+  ///        again not move even as the rest of the atoms rotate.
+  ///
+  /// Overloaded:
+  ///   - Get all invertible groups connected to chiral centers without re-ordering the list.
+  ///   - Get a list of all invertible groups with fewer than a given number of dependent atoms
+  ///     in a particular molecule (the system may have more than one molecule)
+  ///
+  /// \param cutoff     The maximum number of dependents for a chiral center 
+  /// \param mol_index  The molecule for which to obtain chiral center inversion groups
+  ///                   system may contain more than one molecule)
+  std::vector<RotatorGroup> getInvertibleGroups() const;
+  
   /// \brief Get a pointer to the AtomGraph which built this object.
   const AtomGraph* getTopologyPointer() const;
   
@@ -553,7 +564,7 @@ private:
   ///                                     returned)
   /// \param tmp_invertible_group_bounds  Bounds array for tmp_invertible_groups (assembled and
   ///                                     returned)
-  void findInvertibleGroups(const std::vector<int> tmp_chiral_centers,
+  void findInvertibleGroups(const std::vector<int> &tmp_chiral_centers,
                             std::vector<int> *tmp_anchor_a_branches,
                             std::vector<int> *tmp_anchor_b_branches,
                             std::vector<int> *tmp_invertible_groups,

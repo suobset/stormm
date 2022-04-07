@@ -54,8 +54,12 @@ int main(int argc, char* argv[]) {
   const std::string base_crd_path = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string drug_top_path = base_top_path + osc + "drug_example.top";
   const std::string drug_crd_path = base_crd_path + osc + "drug_example.inpcrd";
+  const std::string trpc_top_path = base_top_path + osc + "trpcage.top";
+  const std::string trpc_crd_path = base_crd_path + osc + "trpcage.inpcrd";
   const bool files_exist = (getDrivePathType(drug_top_path) == DrivePathType::FILE &&
-                            getDrivePathType(drug_crd_path) == DrivePathType::FILE);
+                            getDrivePathType(drug_crd_path) == DrivePathType::FILE &&
+                            getDrivePathType(trpc_top_path) == DrivePathType::FILE &&
+                            getDrivePathType(trpc_crd_path) == DrivePathType::FILE);
   if (files_exist == false) {
     rtWarn("Files for a drug molecule, in water and inside a periodic box, were not found.  Check "
            "the $OMNI_SOURCE environment variable to ensure that " + drug_top_path + " and " +
@@ -70,6 +74,15 @@ int main(int argc, char* argv[]) {
   CoordinateFrameReader drug_cfr = (files_exist) ? CoordinateFrameReader(drug_ps) :
                                                    CoordinateFrameReader(CoordinateFrame().data());
   const ChemicalFeatures drug_feat = (files_exist) ? ChemicalFeatures(&drug_ag, drug_cfr,
+                                                                      MapRotatableGroups::YES) :
+                                                     ChemicalFeatures();
+  AtomGraph trpc_ag = (files_exist) ? AtomGraph(trpc_top_path) : AtomGraph();
+  PhaseSpace trpc_ps = (files_exist) ? PhaseSpace(trpc_crd_path,
+                                                  CoordinateFileKind::AMBER_INPCRD) :
+                                       PhaseSpace();
+  CoordinateFrameReader trpc_cfr = (files_exist) ? CoordinateFrameReader(trpc_ps) :
+                                                   CoordinateFrameReader(CoordinateFrame().data());
+  const ChemicalFeatures trpc_feat = (files_exist) ? ChemicalFeatures(&trpc_ag, trpc_cfr,
                                                                       MapRotatableGroups::YES) :
                                                      ChemicalFeatures();
 

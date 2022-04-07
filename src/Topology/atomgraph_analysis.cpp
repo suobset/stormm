@@ -607,13 +607,13 @@ int colorConnectivity(const NonbondedKit<double> &nbk, const int atom_i, const i
       for (int j = nbk.nb12_bounds[prev_atoms[i]]; j < jlim; j++) {
 	const int candidate_atom = nbk.nb12x[j];
         if (readBitFromMask(marked_ptr, candidate_atom)) {
+          ring_completion = (ring_completion ||
+                             (candidate_atom == atom_i && prev_atoms[i] != atom_j));
           continue;
         }
         else {
           new_atoms.push_back(candidate_atom);
           accumulateBitmask(marked_ptr, candidate_atom);
-          ring_completion = (ring_completion ||
-                             (candidate_atom == atom_i && prev_atoms[i] != atom_j));
         }
       }
     }

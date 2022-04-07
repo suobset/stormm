@@ -702,7 +702,7 @@ int main(int argc, char* argv[]) {
            "environment variable to make sure that it is set properly.  A number of tests will "
            "be skipped.", "test_phase_space_synthesis");
   }
-
+  
   // Make a PhaseSpaceSynthesis the meticulous way
   section(2);
   std::vector<PhaseSpace>  psv = { tip3p_ps, tip4p_ps, trpcage_ps, tip3p_ps, tip4p_ps,
