@@ -153,13 +153,13 @@ int main(int argc, char* argv[]) {
                                                  3,    3,    0 };
   std::vector<int> polar_h_cnt_ans        = {    0,    0,    6, 2450, 2450,    2,    3,    2,
                                               3155, 1088,  432 };
-  std::vector<int> hbond_donor_cnt_ans    = {    0,    0,    6, 1226, 1226,    2,    3,    2,
-                                                35,  128,  216 };
+  std::vector<int> hbond_donor_cnt_ans    = {    0,    0,    4, 1226, 1226,    2,    3,    2,
+                                              1587,  580,  216 };
   std::vector<int> hbond_acceptor_cnt_ans = {    0,    1,    7, 1228, 1228,    4,    6,    4,
                                               1614,  681,  216 };
   std::vector<int> chiral_center_cnt_ans  = {    0,    0,    0,    1,    1,    1,    0,    1,
                                                 18,   82,    0 };
-  std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    7,    7,    4,    7,    6,
+  std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    8,    8,    4,    7,    6,
                                                  0,    0,    0 };
   std::vector<int> trp_cage_lchir = sys_chem[8].listChiralCenters(ChiralOrientation::SINISTER);
   std::vector<int> trp_cage_lchir_ans;
@@ -182,6 +182,14 @@ int main(int argc, char* argv[]) {
         "aromatic ring systems do not meet expectations.", do_tests);
   check(polar_h_counts, RelationalOperator::EQUAL, polar_h_cnt_ans, "Counts of polar hydrogens "
         "do not meet expectations.", do_tests);
+  check(hbond_donor_counts, RelationalOperator::EQUAL, hbond_donor_cnt_ans, "Counts of hydrogen "
+        "bond donors do not meet expectations.", do_tests);
+  check(hbond_acceptor_counts, RelationalOperator::EQUAL, hbond_acceptor_cnt_ans, "Counts of "
+        "hydrogen bond acceptors do not meet expectations.", do_tests);
+  check(chiral_center_counts, RelationalOperator::EQUAL, chiral_center_cnt_ans, "Counts of chiral "
+        "centers in various systems do not agree.", do_tests);
+  check(rotatable_bond_counts, RelationalOperator::EQUAL, rotatable_bond_cnt_ans, "Counts of "
+        "rotatable bonds do not meet expectations.", do_tests);
   check(trp_cage_lchir_ans, RelationalOperator::EQUAL, trp_cage_lchir, "Chiral center indices for "
         "L-chiral centers (should be amino acid CA atoms, excluding glycine, plus the isoleucine "
         "CB atom) do not meet expectations.", do_tests);

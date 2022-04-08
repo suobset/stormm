@@ -1207,7 +1207,6 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
     int n_vs = 0;
     for (int j = nbk.nb12_bounds[i]; j < nbk.nb12_bounds[i + 1]; j++) {
       const int ex_znum = cdk.z_numbers[nbk.nb12x[j]];
-      candidate = (candidate && ex_znum > 0);
       n_hydrogen += (ex_znum == 1);
       n_vs += (ex_znum == 0);
       candidate = (candidate && n_hydrogen < 2);
@@ -1215,7 +1214,7 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
     if (candidate == false || nbk.nb12_bounds[i + 1] - nbk.nb12_bounds[i] - n_vs != 4) {
       continue;
     }
-
+    
     // Initiate the chains
     int n_real = 0;
     std::vector<int> layer_llim(4, 0);

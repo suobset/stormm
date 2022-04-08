@@ -50,6 +50,12 @@ rotators_4 = [
 ];
 rotators_4 = reshape(transpose(rotators_4), 1, 144);
 rotators_4 = rotators_4(1:126);
+% Snapshot data, 7 int { INTEGER 24 4 } (24 x %4d per line).
+invertors_4 = [
+  24   0  34  35  36  37  38   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+invertors_4 = reshape(transpose(invertors_4), 1, 24);
+invertors_4 = invertors_4(1:7);
 % Snapshot data, 32 int { INTEGER 24 4 } (24 x %4d per line).
 rotators_5 = [
    6   4   0   1   2   3   5  14  16  17  18  19  20  21   8  14  15  16  17  18  19  20  21   8

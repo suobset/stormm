@@ -4,6 +4,12 @@ chcen_3 = [
 ];
 chcen_3 = reshape(transpose(chcen_3), 1, 24);
 chcen_3 = chcen_3(1:1);
+% Snapshot data, 1 int { INTEGER 24 4 } (24 x %4d per line).
+chcen_4 = [
+  23   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+chcen_4 = reshape(transpose(chcen_4), 1, 24);
+chcen_4 = chcen_4(1:1);
 % Snapshot data, 1 int { INTEGER 33 3 } (33 x %3d per line).
 chcen_5 = [
   8  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
