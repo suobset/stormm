@@ -1449,10 +1449,6 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
             for (int i = 0; i < fragment_count; i++) {
               best_settings[i] = frag_settings[i];
             }
-
-            // CHECK
-            int ncycle = 0;
-            // END CHECK
             
             // With this new best score in hand, look at each state which has multiple options
             // for the charge state: if it were to take a different state, is there some

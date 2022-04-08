@@ -581,8 +581,9 @@ std::string listVirtualSiteFrameTypes(const int* vs_types, const int nsite) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int colorConnectivity(const NonbondedKit<double> &nbk, const int atom_i, const int atom_j,
-                      std::vector<uint> *marked, bool *ring_report) {
+int colorConnectivity(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
+                      const int atom_i, const int atom_j, std::vector<uint> *marked,
+                      bool *ring_report) {
   bool ring_completion = false;
   uint* marked_ptr = marked->data();
   const int nm_elem = marked->size();
@@ -606,7 +607,10 @@ int colorConnectivity(const NonbondedKit<double> &nbk, const int atom_i, const i
       const int jlim = nbk.nb12_bounds[prev_atoms[i] + 1];
       for (int j = nbk.nb12_bounds[prev_atoms[i]]; j < jlim; j++) {
 	const int candidate_atom = nbk.nb12x[j];
-        if (readBitFromMask(marked_ptr, candidate_atom)) {
+        if (cdk.z_numbers[candidate_atom] == 0) {
+          continue;
+        }
+        else if (readBitFromMask(marked_ptr, candidate_atom)) {
           ring_completion = (ring_completion ||
                              (candidate_atom == atom_i && prev_atoms[i] != atom_j));
           continue;
@@ -638,7 +642,7 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
                                   const int atom_i, const int atom_j) {
   std::vector<uint> marked((nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int, false);
   bool ring_completed;
-  int nrot = colorConnectivity(nbk, atom_i, atom_j, &marked, &ring_completed);
+  int nrot = colorConnectivity(nbk, cdk, atom_i, atom_j, &marked, &ring_completed);
   if (ring_completed) {
     rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
           std::to_string(atom_j + 1) + ", " +

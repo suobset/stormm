@@ -257,17 +257,6 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
   chiral_center_count = tmp_chiral_centers.size();
 
-  // CHECK
-#if 0
-  printf("Chiral centers in %s:\n", ag_pointer->getFileName().c_str());
-  for (int i = 0; i < chiral_center_count; i++) {
-    printf("  %4.4s",
-           char4ToString(ag_pointer->getAtomName(abs(tmp_chiral_centers[i]) - 1)).c_str());
-  }
-  printf("\n");
-#endif
-  // END CHECK
-
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
   std::vector<int> tmp_rotatable_groups, tmp_rotatable_group_bounds;
@@ -1428,6 +1417,7 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
                                             std::vector<int> *tmp_invertible_group_bounds) {
 
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
+  const ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
   
   // Loop over all chiral centers and determine the number of atoms in each branch
   tmp_anchor_a_branches->resize(chiral_center_count);
@@ -1463,7 +1453,7 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
         continue;
       }
       bool ring_completed;
-      branch_counts[brpos].x = colorConnectivity(nbk, chatom, nbk.nb12x[j], &marked[brpos],
+      branch_counts[brpos].x = colorConnectivity(nbk, cdk, chatom, nbk.nb12x[j], &marked[brpos],
                                                  &ring_completed);
 
       // Search for one of the remaining branch roots in the marked atoms if there was a ring

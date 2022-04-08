@@ -12,11 +12,6 @@
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-// CHECK
-#include "../../src/Parsing/parse.h"
-using omni::parse::char4ToString;
-// END CHECK
-
 using omni::chemistry::ChiralOrientation;
 using omni::constants::ExceptionResponse;
 using omni::symbols::amber_ancient_bioq;

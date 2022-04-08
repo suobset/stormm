@@ -44,8 +44,8 @@ std::string listVirtualSiteFrameTypes(const int* vs_types, int nsite);
 ///                     of atoms in the system
 /// \param ring_report  Flag to indicate that a ring was completed as a result of the coloring
 ///                     (returned)
-int colorConnectivity(const NonbondedKit<double> &nbk, const int atom_i, const int atom_j,
-                      std::vector<uint> *marked, bool *ring_report);
+int colorConnectivity(const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk,
+                      int atom_i, int atom_j, std::vector<uint> *marked, bool *ring_report);
   
 /// \brief The essential work of the selectRotatingAtoms() function below, abstracted to allow
 ///        more flexibility in the way the function is called.
