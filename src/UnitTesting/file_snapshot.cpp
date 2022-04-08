@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -209,7 +210,8 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
     {
       icontent = intFromPolyNumeric(content);
       const int maxv = maxAbsValue(icontent);
-      const int n_digits = ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01;
+      const int n_digits = (abs(maxv) > 0) ?
+                           ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
       width = n_digits + 2;
       digits_after_decimal = 0;
       name_of_the_type = getOmniScalarTypeName<int>();
@@ -219,7 +221,8 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
     {
       llicontent = llintFromPolyNumeric(content);
       const llint maxv = maxAbsValue(llicontent);
-      const int n_digits = ceil(fabs(log10(fabs(static_cast<double>(maxv) * 1.1))));
+      const int n_digits = (std::llabs(maxv) > 0) ?
+                           ceil(fabs(log10(fabs(static_cast<double>(maxv) * 1.1)))) + 0.01 : 2;
       width = n_digits + 2;
       digits_after_decimal = 0;
       name_of_the_type = getOmniScalarTypeName<llint>();
@@ -229,7 +232,8 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
     {
       uicontent = uintFromPolyNumeric(content);
       const llint maxv = maxAbsValue(uicontent);
-      const int n_digits = ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01;
+      const int n_digits = (std::llabs(maxv) > 0LL) ?
+                           ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
       width = n_digits + 1;
       digits_after_decimal = 0;
       name_of_the_type = getOmniScalarTypeName<uint>();
@@ -239,7 +243,8 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
     {
       ullicontent = ullintFromPolyNumeric(content);
       const llint maxv = maxAbsValue(ullicontent);
-      const int n_digits = ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01;
+      const int n_digits = (std::llabs(maxv) > 0LL) ?
+                           ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
       width = n_digits + 1;
       digits_after_decimal = 0;
       name_of_the_type = getOmniScalarTypeName<ullint>();

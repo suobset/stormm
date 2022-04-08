@@ -310,7 +310,7 @@ public:
   /// \param cutoff     The maximum number of dependents for a chiral center 
   /// \param mol_index  The molecule for which to obtain chiral center inversion groups
   ///                   system may contain more than one molecule)
-  std::vector<RotatorGroup> getInvertibleGroups() const;
+  std::vector<RotatorGroup> getChiralInversionGroups() const;
   
   /// \brief Get a pointer to the AtomGraph which built this object.
   const AtomGraph* getTopologyPointer() const;

@@ -188,9 +188,11 @@ int main(int argc, char* argv[]) {
   const std::string fc_name = base_chem_name + osc + "formal_charges.m";
   const std::string bo_name = base_chem_name + osc + "bond_orders.m";
   const std::string ro_name = base_chem_name + osc + "rotating_groups.m";
+  const std::string ch_name = base_chem_name + osc + "chiral_atoms.m";
   const bool snps_exist = (getDrivePathType(fc_name) == DrivePathType::FILE &&
                            getDrivePathType(bo_name) == DrivePathType::FILE &&
-                           getDrivePathType(ro_name) == DrivePathType::FILE);
+                           getDrivePathType(ro_name) == DrivePathType::FILE &&
+                           getDrivePathType(ch_name) == DrivePathType::FILE);
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snps_exist == false) {
     rtWarn("Snapshot files " + fc_name + ", " + bo_name + ", and " + ro_name + " must be "
@@ -198,6 +200,7 @@ int main(int argc, char* argv[]) {
            "respectively.  Check the ${OMNI_SOURCE} environment variable for validity.  "
            "Subsequent tests will be skipped.", "test_chemical_features");
   }
+  bool ch_unwritten = true;
   for (size_t i = 0; i < nsys; i++) {
     snapshot(fc_name, polyNumericVector(sys_chem[i].getFormalCharges()), std::string("fc_") +
              std::to_string(i), 1.0e-6, "Formal charges computed for the system described by " +
@@ -209,6 +212,14 @@ int main(int argc, char* argv[]) {
              sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
              NumberFormat::STANDARD_REAL,
              (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+    if (sys_chem[i].getChiralCenterCount() > 0) {
+      snapshot(ch_name, polyNumericVector(sys_chem[i].listChiralCenters()), std::string("chcen_") +
+               std::to_string(i), 1.0e-6, "Chiral centers detected for the system described by " +
+               sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
+               NumberFormat::INTEGER,
+               (ch_unwritten) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+      ch_unwritten = false;
+    }
     check(sum<double>(sys_chem[i].getFormalCharges()), RelationalOperator::EQUAL,
           Approx(sum<double>(sys_ag[i].getPartialCharge<double>())).margin(1.0e-4), "The sum of "
           "formal charges computed for " + sys_ag[i].getFileName() + " does not match the sum of "
@@ -216,25 +227,45 @@ int main(int argc, char* argv[]) {
   }
   
   // Check the rotatable bond groups, and the inversion groups generated for smaller structures
+  bool ro_unwritten = true;
   for (size_t i = 0; i < nsys; i++) {
     const int nrotor = sys_chem[i].getRotatableBondCount();
-    if (nrotor == 0) {
-      continue;
-    }
-    const std::vector<RotatorGroup> all_rotors = sys_chem[i].getRotatableBondGroups();
-    std::vector<int> rotor_ids;
-    for (int j = 0; j < nrotor; j++) {
-      rotor_ids.push_back(all_rotors[j].root_atom);
-      rotor_ids.push_back(all_rotors[j].pivot_atom);
-      for (size_t k = 0; k < all_rotors[j].rotatable_atoms.size(); k++) {
-        rotor_ids.push_back(all_rotors[j].rotatable_atoms[k]);
+    if (nrotor > 0) {
+      const std::vector<RotatorGroup> all_rotors = sys_chem[i].getRotatableBondGroups();
+      std::vector<int> rotor_ids;
+      for (int j = 0; j < nrotor; j++) {
+        rotor_ids.push_back(all_rotors[j].root_atom);
+        rotor_ids.push_back(all_rotors[j].pivot_atom);
+        for (size_t k = 0; k < all_rotors[j].rotatable_atoms.size(); k++) {
+          rotor_ids.push_back(all_rotors[j].rotatable_atoms[k]);
+        }
       }
+      snapshot(ro_name, polyNumericVector(rotor_ids), std::string("rotators_") + std::to_string(i),
+               1.0e-6, "Rotatable atom IDs obtained for the system described by " +
+               sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
+               NumberFormat::INTEGER,
+               (ro_unwritten) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+      ro_unwritten = false;
     }
-    snapshot(ro_name, polyNumericVector(rotor_ids), std::string("rotators_") + std::to_string(i),
-             1.0e-6, "Rotatable atom IDs obtained for the system described by " +
-             sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
-             NumberFormat::INTEGER,
-             (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+    const int nchiral = sys_chem[i].getChiralCenterCount();
+    if (nchiral > 0) {
+      const std::vector<RotatorGroup> all_invertors = sys_chem[i].getChiralInversionGroups();
+      std::vector<int> invertor_ids;
+      for (int j = 0; j < nchiral; j++) {
+        invertor_ids.push_back(all_invertors[j].root_atom);
+        invertor_ids.push_back(all_invertors[j].pivot_atom);
+        for (size_t k = 0; k < all_invertors[j].rotatable_atoms.size(); k++) {
+          invertor_ids.push_back(all_invertors[j].rotatable_atoms[k]);
+        }
+      }
+      snapshot(ro_name, polyNumericVector(invertor_ids), std::string("invertors_") +
+               std::to_string(i), 1.0e-6, "Chiral inversion group atom IDs obtained for the "
+               "system described by " + sys_ag[i].getFileName() + " do not meet expectations.",
+               oe.takeSnapshot(), 1.0e-8, NumberFormat::INTEGER,
+               (ro_unwritten) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
+      ro_unwritten = false;
+    }
+    
   }
   
   // Summary evaluation

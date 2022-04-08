@@ -11,6 +11,13 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
                        const NumberFormat format, const std::string &caller,
                        const std::string &task) {
 
+  // CHECK
+  if (values_per_line * width + 65 < 0) {
+    printf("What... ?  %4d x %4d + 65 = %4d\n", values_per_line, width,
+           values_per_line * width + 65);
+  }
+  // END CHECK
+  
   // Allocate an individual line
   std::vector<char> line(values_per_line * width + 65, '\0');
 

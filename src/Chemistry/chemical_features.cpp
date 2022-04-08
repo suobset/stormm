@@ -1877,7 +1877,7 @@ ChemicalFeatures::getRotatableBondGroups(const int cutoff, const int mol_index) 
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<RotatorGroup> ChemicalFeatures::getInvertibleGroups() const {
+std::vector<RotatorGroup> ChemicalFeatures::getChiralInversionGroups() const {
   std::vector<RotatorGroup> result(chiral_center_count);
   const int* groups_ptr   = invertible_groups.data();
   const int* bounds_ptr   = invertible_group_bounds.data();

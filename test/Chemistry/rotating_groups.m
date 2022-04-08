@@ -33,6 +33,12 @@ rotators_3 = [
 ];
 rotators_3 = reshape(transpose(rotators_3), 1, 144);
 rotators_3 = rotators_3(1:126);
+% Snapshot data, 7 int { INTEGER 24 4 } (24 x %4d per line).
+invertors_3 = [
+  24   0  34  35  36  37  38   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+invertors_3 = reshape(transpose(invertors_3), 1, 24);
+invertors_3 = invertors_3(1:7);
 % Snapshot data, 126 int { INTEGER 24 4 } (24 x %4d per line).
 rotators_4 = [
   10   9   0   1   2   3   4   5   6   7   8  20  21  11  10   0   1   2   3   4   5   6   7   8
@@ -51,6 +57,12 @@ rotators_5 = [
 ];
 rotators_5 = reshape(transpose(rotators_5), 1, 48);
 rotators_5 = rotators_5(1:32);
+% Snapshot data, 7 int { INTEGER 24 4 } (24 x %4d per line).
+invertors_5 = [
+   6   0   9  10  11  12  13   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+invertors_5 = reshape(transpose(invertors_5), 1, 24);
+invertors_5 = invertors_5(1:7);
 % Snapshot data, 70 int { INTEGER 24 4 } (24 x %4d per line).
 rotators_6 = [
    6   4   0   1   2   3   5  13  11   0   1   2   3   4   5   6   7   8   9  10  12  11   8   0
@@ -67,3 +79,28 @@ rotators_7 = [
 ];
 rotators_7 = reshape(transpose(rotators_7), 1, 72);
 rotators_7 = rotators_7(1:59);
+% Snapshot data, 11 int { INTEGER 24 4 } (24 x %4d per line).
+invertors_7 = [
+  24   0   0   1   2   3   4   5   6   7   9   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+invertors_7 = reshape(transpose(invertors_7), 1, 24);
+invertors_7 = invertors_7(1:11);
+% Snapshot data, 36 int { INTEGER 24 4 } (24 x %4d per line).
+invertors_8 = [
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+invertors_8 = reshape(transpose(invertors_8), 1, 48);
+invertors_8 = invertors_8(1:36);
+% Snapshot data, 164 int { INTEGER 24 4 } (24 x %4d per line).
+invertors_9 = [
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+];
+invertors_9 = reshape(transpose(invertors_9), 1, 168);
+invertors_9 = invertors_9(1:164);
