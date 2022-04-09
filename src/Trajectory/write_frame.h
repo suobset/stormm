@@ -5,12 +5,14 @@
 #include <string>
 #include <vector>
 #include "FileManagement/file_util.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "trajectory_enumerators.h"
 
 namespace omni {
 namespace trajectory {
 
 using diskutil::PrintSituation;
+using topology::UnitCellType;
 
 /// \brief Write a coordinate trajectory file or input coordinates file.  Each of the overloaded
 ///        versions of the function feeds into the base case, which uses pointers to the data
@@ -30,6 +32,8 @@ using diskutil::PrintSituation;
 /// \param x_crd           Vector / array of Cartesian x coordinates for all atoms
 /// \param y_crd           Vector / array of Cartesian y coordinates for all atoms
 /// \param z_crd           Vector / array of Cartesian z coordinates for all atoms
+/// \param unit_cell       The unit cell type (to avoid needing to infer the lack of periodic
+///                        boundary conditions from some special settings of the box dimensions)
 /// \param box_dimensions  Six-element vector of box dimensions (can be obtained from a
 ///                        transformation matrix)
 /// \param time_point      The time point to write at the top of a restart file
@@ -37,13 +41,13 @@ using diskutil::PrintSituation;
 void writeFrame(std::ofstream *foutp, const std::string &filename, CoordinateFileKind kind,
                 int natom, const double* x_crd, const double* y_crd, const double* z_crd,
                 const double* x_vel, const double* y_vel, const double* z_vel,
-                const double* box_dimensions);
+                UnitCellType unit_cell, const double* box_dimensions);
 
 void writeFrame(std::ofstream *foutp, const std::string &filename, CoordinateFileKind kind,
                 const std::vector<double> &x_crd, const std::vector<double> &y_crd,
                 const std::vector<double> &z_crd, const std::vector<double> &x_vel,
                 const std::vector<double> &y_vel, const std::vector<double> &z_vel,
-                const std::vector<double> &box_dimensions);
+                UnitCellType unit_cell, const std::vector<double> &box_dimensions);
 /// \}
 
 } // namespace trajectory

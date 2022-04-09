@@ -19,6 +19,7 @@ std::ofstream openOutputFile(const std::string &filename, const PrintSituation e
   // Check the file conditions: look before you leap
   std::ofstream foutp;
   switch (expectation) {
+  case PrintSituation::UNKNOWN:
   case PrintSituation::OPEN_NEW:
     switch (getDrivePathType(filename)) {
     case DrivePathType::FILE:

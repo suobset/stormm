@@ -157,6 +157,10 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
           integral[j] = static_cast<int>(floor(tmp_values[j]) + 0.01);
           fraction[j] = static_cast<int>(round((tmp_values[j] -
                                                 floor(tmp_values[j])) * decimal_scale) + 0.01);
+          if (fraction[j] == decimal_scale) {
+            fraction[j] = 0;
+            integral[j] += 1;
+          }
           line_symbols[j*width + dec_offset] = dot_index;
           integral_nonzero[j] = (integral[j] != 0);
           last_blank_char[j] = -1;
@@ -190,7 +194,7 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
             else {
 
               // The remaining option is that dec_offset == 1
-              line[j*width] = zero_index + (sign_symbols[j] == negative_index) * nz_index;
+              line[j * width] = zero_index + (sign_symbols[j] == negative_index) * nz_index;
             }
           }
           else if (last_blank_char[j] >= 0) {

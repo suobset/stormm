@@ -1357,9 +1357,12 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
       vst.frame1_atoms[pos] = parent_atoms[i];
       if (bonds_to_real_atoms[parent_atoms[i]] == 1) {
 
-        // Commit to making this a "type II" (frame index 0 or 2) virtual site,
-        // applicable to carbonyl oxygen lone pairs or sigma holes on halo-organic
-        // compounds, respectively.
+        // In the Amber code, this becomes a "type II" (frame index 0 or 2) virtual site,
+        // applicable to carbonyl oxygen lone pairs or sigma holes on halo-organic compounds,
+        // respectively.  OMNI will approximate those frames with the appropriate GROMACS frame
+        // types: fixed-distance, two-atom frames (halogen sigma hole case) and fixed angle and
+        // distance, three-atom frames (carbonyl lone pair case).  The GROMACS types are better
+        // suited for most situations and more easily understood.
         vst.frame2_atoms[pos] = real_atom_neighbors[parent_atoms[i]].x;
         if (bonds_to_real_atoms[vst.frame2_atoms[pos]] != 2) {
           rtErr("Implicit virtual site " + std::to_string(i + 1) + " bonds to atom " +
@@ -1399,8 +1402,8 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
       }
       else if (bonds_to_real_atoms[parent_atoms[i]] == 2) {
 
-        // Commit to making this a "type I" (frame index 0 or 2) virtual site,
-        // type 0 for TIP5P and type 2 for TIP4P.
+        // In the Amber code, this becomes a "type I" virtual site, type 0 for TIP5P and type 2
+        // for TIP4P.  GROMACS frames offer exact substitutes for both of these important cases.
         vst.frame2_atoms[pos] = real_atom_neighbors[parent_atoms[i]].x;
         vst.frame3_atoms[pos] = real_atom_neighbors[parent_atoms[i]].y;
         vst.frame4_atoms[pos] = -1;

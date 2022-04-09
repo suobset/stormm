@@ -49,31 +49,48 @@ using synthesis::PsSynthesisWriter;
 ///                        thumb pointed towards atom_j.
 /// \{
 void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, const double rotation_angle);
+                     const std::vector<int> &moving_atoms, double rotation_angle);
 
 void rotateAboutBond(CoordinateFrame *cf, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, const double rotation_angle);
+                     const std::vector<int> &moving_atoms, double rotation_angle);
 
 void rotateAboutBond(CoordinateFrameWriter cfw, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, const double rotation_angle);
+                     const std::vector<int> &moving_atoms, double rotation_angle);
 
 void rotateAboutBond(PhaseSpace *ps, int atom_i, int atom_j, const std::vector<int> &moving_atoms,
-                     const double rotation_angle);
+                     double rotation_angle);
 
 void rotateAboutBond(PhaseSpaceWriter psw, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, const double rotation_angle);
-
-void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, const double rotation_angle);
+                     const std::vector<int> &moving_atoms, double rotation_angle);
 
 void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, const double rotation_angle);
+                     const std::vector<int> &moving_atoms, double rotation_angle);
+
+void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, double rotation_angle);
 /// \}
 
 /// \brief Rotate two branches of a chiral center 180 degrees, so as to invert the center.  
-void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const double* umat,
-                      const double* invu, const UnitCellType unit_cell, const int chiral_center,
-                      const std::vector<int> &moving_atoms, const int root_a, const int root_b);
+void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, int chiral_center,
+                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+
+void flipChiralCenter(CoordinateFrame *cf, int chiral_center,
+                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+
+void flipChiralCenter(CoordinateFrameWriter cfw, int chiral_center,
+                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+
+void flipChiralCenter(PhaseSpace *ps, int chiral_center, const std::vector<int> &moving_atoms,
+                      int root_a, int root_b);
+
+void flipChiralCenter(PhaseSpaceWriter psw, int chiral_center,
+                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+
+void flipChiralCenter(PsSynthesisWriter psynthw, int system_index, int chiral_center,
+                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+
+void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int chiral_center,
+                      const std::vector<int> &moving_atoms, int root_a, int root_b);
 
 } // namespace structure
 } // namespace omni

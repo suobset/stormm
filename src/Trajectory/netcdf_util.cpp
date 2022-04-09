@@ -81,6 +81,7 @@ int ncdfCreate(const std::string &file_name, const int PrintSituation) {
   // Determine the creation mode (this becomes an opening mode for the APPEND case)
   int cmode;
   switch (expectation) {
+  case PrintSituation::UNKNOWN:
   case PrintSituation::OPEN_NEW:
     cmode = (NC_NOCLOBBER | NC_64BIT_OFFSET);
     break;
@@ -96,6 +97,7 @@ int ncdfCreate(const std::string &file_name, const int PrintSituation) {
   // one for appending
   int ncid;
   switch (expectation) {
+  case PrintSituation::UNKNOWN:
   case PrintSituation::OPEN_NEW:
   case PrintSituation::OVERWRITE:
     checkNetcdfStatus(nc_create(file_name.c_str(), cmode, &ncid), "creating file");

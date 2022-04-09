@@ -1,4 +1,5 @@
 #include <cmath>
+#include "Constants/symbol_values.h"
 #include "Math/rounding.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
@@ -19,7 +20,6 @@ void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const int atom_i,
                      const std::vector<int> &moving_atoms, const double rotation_angle) {
   const int natom = moving_atoms.size();
   double center_x, center_y, center_z;
-  std::vector<double> x_moves(natom), y_moves(natom), z_moves(natom);
 
   // Center and image the coordinates
   center_x = xcrd[atom_j];
@@ -39,15 +39,17 @@ void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const int atom_i,
     xcrd[mk] -= center_x;
     ycrd[mk] -= center_y;
     zcrd[mk] -= center_z;
-    x_moves[mk] = mvx - xcrd[mk];
-    y_moves[mk] = mvy - ycrd[mk];
-    z_moves[mk] = mvz - zcrd[mk];
   }
-
+  
   // Define the vector of rotation, then the matrix
-  const double dx = xcrd[atom_j] - xcrd[atom_i];
-  const double dy = ycrd[atom_j] - ycrd[atom_i];
-  const double dz = zcrd[atom_j] - zcrd[atom_i];
+  double dx = xcrd[atom_j] - xcrd[atom_i];
+  double dy = ycrd[atom_j] - ycrd[atom_i];
+  double dz = zcrd[atom_j] - zcrd[atom_i];
+  const double invdr = 1.0 / sqrt((dx * dx) + (dy * dy) + (dz * dz));
+  dx *= invdr;
+  dy *= invdr;
+  dz *= invdr;
+
   const double cos_ra = cos(rotation_angle);
   const double sin_ra = sin(rotation_angle);
   const std::vector<double> rmat = { cos_ra + (dx * dx * (1.0 - cos_ra)),
@@ -59,7 +61,7 @@ void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const int atom_i,
                                      (dx * dz * (1.0 - cos_ra)) + (dy * sin_ra),
                                      (dy * dz * (1.0 - cos_ra)) - (dx * sin_ra),
                                      cos_ra + (dz * dz * (1.0 - cos_ra)) };
-
+  
   // Loop over all moving particles and rotate about the vector
   for (int i = 0; i < natom; i++) {
     const int mk = moving_atoms[i];
@@ -82,9 +84,9 @@ void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, const int atom_i,
 
     // The centering for each movable atom has already been folded into the imaging move
     const int mk = moving_atoms[i];
-    xcrd[mk] += x_moves[mk];
-    ycrd[mk] += y_moves[mk];
-    zcrd[mk] += z_moves[mk];
+    xcrd[mk] += center_x;
+    ycrd[mk] += center_y;
+    zcrd[mk] += center_z;
   }
 }
 
@@ -113,13 +115,6 @@ void rotateAboutBond(PhaseSpaceWriter psw, const int atom_i, const int atom_j,
 }
 
 //-------------------------------------------------------------------------------------------------
-void rotateAboutBond(PhaseSpaceSynthesis *psynth, const int system_index, const int atom_i,
-                     const int atom_j, const std::vector<int> &moving_atoms,
-                     const double rotation_angle) {
-  rotateAboutBond(psynth->data(), system_index, atom_i, atom_j, moving_atoms, rotation_angle);
-}
-
-//-------------------------------------------------------------------------------------------------
 void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const int atom_i,
                      const int atom_j, const std::vector<int> &moving_atoms,
                      const double rotation_angle) {
@@ -145,7 +140,6 @@ void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const in
     ycrd[i + 2] = static_cast<double>(tmpcrd.y) * inv_scl;
     zcrd[i + 2] = static_cast<double>(tmpcrd.z) * inv_scl;
   }
-  const int xfrm_offset = roundUp(9, warp_size_int) * system_index;
   rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), 0, 1, local_atoms, rotation_angle);
   const double pos_scl = psynthw.gpos_scale;
   for (int i = 0; i < nmove; i++) {
@@ -157,15 +151,105 @@ void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const in
 }
 
 //-------------------------------------------------------------------------------------------------
-void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const double* umat,
-                      const double* invu, const UnitCellType unit_cell, const int chiral_center,
+void rotateAboutBond(PhaseSpaceSynthesis *psynth, const int system_index, const int atom_i,
+                     const int atom_j, const std::vector<int> &moving_atoms,
+                     const double rotation_angle) {
+  rotateAboutBond(psynth->data(), system_index, atom_i, atom_j, moving_atoms, rotation_angle);
+}
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int chiral_center,
                       const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
 
-  // Find the bisector of the root_a : chiral_center : root_b angle, then rotate the moving atoms
-  // 180 degrees about this bond.
-  
-  
+  // Find the bisector of the root_a : chiral_center : root_b angle.  Shift the root_b atom to
+  // lie along the line of the bisector, rotate the moving atoms 180 degrees about this "bond,"
+  // then replace the root_b atom.
+  const double orig_bx = xcrd[root_b];
+  const double orig_by = ycrd[root_b];
+  const double orig_bz = zcrd[root_b];
+  const double midpoint_x = orig_bx - xcrd[root_a];
+  const double midpoint_y = orig_by - ycrd[root_a];
+  const double midpoint_z = orig_bz - zcrd[root_a];
+  xcrd[root_b] = midpoint_x;
+  ycrd[root_b] = midpoint_y;
+  zcrd[root_b] = midpoint_z;
+  rotateAboutBond(xcrd, ycrd, zcrd, root_b, chiral_center, moving_atoms, symbols::pi);
+  xcrd[root_b] = orig_bx;
+  ycrd[root_b] = orig_by;
+  zcrd[root_b] = orig_bz;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(CoordinateFrame *cf, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+  flipChiralCenter(cf->data(), chiral_center, moving_atoms, root_a, root_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(CoordinateFrameWriter cfw, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+  flipChiralCenter(cfw.xcrd, cfw.ycrd, cfw.zcrd, chiral_center, moving_atoms, root_a, root_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(PhaseSpace *ps, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+  flipChiralCenter(ps->data(), chiral_center, moving_atoms, root_a, root_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(PhaseSpaceWriter psw, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+  flipChiralCenter(psw.xcrd, psw.ycrd, psw.zcrd, chiral_center, moving_atoms, root_a, root_b);
+}
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+
+  // Prepare an array of local atom indices to indicate moving atoms.
+  const int system_offset = psynthw.atom_starts[system_index];
+  const int nmove = moving_atoms.size();
+  std::vector<int> local_atoms(nmove);
+  for (int i = 0; i < nmove; i++) {
+    local_atoms[i] = i + 2;
+  }
+  std::vector<double> xcrd(nmove + 2), ycrd(nmove + 2), zcrd(nmove + 2);
+  const double inv_scl = psynthw.inv_gpos_scale;
+
+  // Prepare double-precision representations of the relevant coordinates, including the midpoint
+  // of the two root atoms for the heaviest chiral branches and the chiral atom itself.
+  const longlong4 tmp_roota = psynthw.xyz_qlj[root_a + system_offset];
+  const longlong4 tmp_rootb = psynthw.xyz_qlj[root_b + system_offset];
+  const longlong4 tmp_ccen  = psynthw.xyz_qlj[chiral_center + system_offset];
+  xcrd[0] = static_cast<double>(tmp_roota.x + ((tmp_rootb.x - tmp_roota.x) / 2LL)) * inv_scl;
+  ycrd[0] = static_cast<double>(tmp_roota.y + ((tmp_rootb.y - tmp_roota.y) / 2LL)) * inv_scl;
+  zcrd[0] = static_cast<double>(tmp_roota.z + ((tmp_rootb.z - tmp_roota.z) / 2LL)) * inv_scl;
+  xcrd[1] = static_cast<double>(tmp_ccen.x) * inv_scl;
+  ycrd[1] = static_cast<double>(tmp_ccen.y) * inv_scl;
+  zcrd[1] = static_cast<double>(tmp_ccen.z) * inv_scl;
+  for (int i = 0; i < nmove; i++) {
+    const longlong4 tmpcrd = psynthw.xyz_qlj[moving_atoms[i] + system_offset];
+    xcrd[i + 2] = static_cast<double>(tmpcrd.x) * inv_scl;
+    ycrd[i + 2] = static_cast<double>(tmpcrd.y) * inv_scl;
+    zcrd[i + 2] = static_cast<double>(tmpcrd.z) * inv_scl;
+  }
+  rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), 0, 1, local_atoms, symbols::pi);
+  const double pos_scl = psynthw.gpos_scale;
+  for (int i = 0; i < nmove; i++) {
+    const int ixyz_dest = moving_atoms[i] + system_offset;
+    psynthw.xyz_qlj[ixyz_dest].x = round(xcrd[i + 2] * pos_scl);
+    psynthw.xyz_qlj[ixyz_dest].y = round(ycrd[i + 2] * pos_scl);
+    psynthw.xyz_qlj[ixyz_dest].z = round(zcrd[i + 2] * pos_scl);
+  }
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void flipChiralCenter(PhaseSpaceSynthesis *psynth, const int system_index, const int chiral_center,
+                      const std::vector<int> &moving_atoms, const int root_a, const int root_b) {
+  flipChiralCenter(psynth->data(), system_index, chiral_center, moving_atoms, root_a, root_b);
+}
+
 } // namespace structure
 } // namespace omni

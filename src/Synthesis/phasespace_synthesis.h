@@ -370,16 +370,18 @@ public:
   ///
   /// \param system_indices  List of system coordinates / velocities / forces to print
   /// \param file_name       Name of the file to write, or base name of a set of files to write
+  /// \param current_time    Current time progress of the group of simulations
   /// \param output_kind     The type of trajectory file to write
   /// \param expectation     The state that the output trajectory file is expected to be found in
   /// \param gpu             Specs of the GPU in use for the calculation (HPC mode only)
 #ifdef OMNI_USE_HPC
   void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
-                       CoordinateFileKind output_kind, PrintSituation expectation,
-                       const GpuDetails &gpu);
+                       double current_time, CoordinateFileKind output_kind,
+                       PrintSituation expectation, const GpuDetails &gpu);
 #else
   void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
-                       CoordinateFileKind output_kind, PrintSituation expectation);
+                       double current_time, CoordinateFileKind output_kind,
+                       PrintSituation expectation);
 #endif
   
 private:

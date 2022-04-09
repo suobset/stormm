@@ -1,4 +1,5 @@
 #include <cstring>
+#include "Constants/symbol_values.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/polynumeric.h"
 #include "write_frame.h"
@@ -13,12 +14,12 @@ using parse::PolyNumeric;
 void writeFrame(std::ofstream *foutp, const std::string &filename, const CoordinateFileKind kind,
                 int natom, const double* x_crd, const double* y_crd, const double* z_crd,
                 const double* x_vel, const double* y_vel, const double* z_vel,
-                const double* box_dimensions) {
+                const UnitCellType unit_cell, const double* box_dimensions) {
 
   // Declare arrays that will be filled out later, as necessary
   std::vector<PolyNumeric> pn_allcrd;
   std::vector<PolyNumeric> pn_allvel;
-
+  
   // Lay out the appropriate coordinates array: PolyNumeric for ASCII text speed printing,
   // double-precision real vector for NetCDF and other formats
   switch (kind) {
@@ -59,7 +60,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   }
   switch (kind) {
   case CoordinateFileKind::AMBER_CRD:
-    printNumberSeries(foutp, pn_allcrd, 8, 10, 3, NumberFormat::STANDARD_REAL, "writeFrame",
+    printNumberSeries(foutp, pn_allcrd, 10, 8, 3, NumberFormat::STANDARD_REAL, "writeFrame",
                       "Write a frame to an Amber-format .crd trajectory file, " + filename +
                       ".");
     break;
@@ -81,6 +82,47 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
   case CoordinateFileKind::UNKNOWN:
     break;
   }
+
+  // Print the unit cell information  
+  switch (unit_cell) {
+  case UnitCellType::NONE:
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    switch (kind) {
+    case CoordinateFileKind::AMBER_CRD:
+      {
+        std::vector<PolyNumeric> pn_boxlen(3);
+        for (int i = 0; i < 3; i++) {
+          pn_boxlen[i].d = box_dimensions[i];
+        }        
+        printNumberSeries(foutp, pn_boxlen, 3, 8, 3, NumberFormat::STANDARD_REAL, "writeFrame",
+                          "Write box dimensions to an Amber-format coordinate trajectory, " +
+                          filename + ".");
+      }
+      break;
+    case CoordinateFileKind::AMBER_INPCRD:
+    case CoordinateFileKind::AMBER_ASCII_RST:
+      {
+        std::vector<PolyNumeric> pn_boxdim(6);
+        for (int i = 0; i < 3; i++) {
+          pn_boxdim[i].d = box_dimensions[i];
+        }
+        for (int i = 3; i < 6; i++) {
+          pn_boxdim[i].d = box_dimensions[i] * 180.0 / symbols::pi;
+        }
+        printNumberSeries(foutp, pn_boxdim, 6, 12, 7, NumberFormat::STANDARD_REAL, "writeFrame",
+                          "Write box dimensions to an Amber-format input coordinates file, " +
+                          filename + ".");
+      }
+      break;
+    case CoordinateFileKind::AMBER_NETCDF:
+    case CoordinateFileKind::AMBER_NETCDF_RST:
+    case CoordinateFileKind::UNKNOWN:
+      break;
+    }
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -88,7 +130,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
                 const std::vector<double> &x_crd, const std::vector<double> &y_crd,
                 const std::vector<double> &z_crd, const std::vector<double> &x_vel,
                 const std::vector<double> &y_vel, const std::vector<double> &z_vel,
-                const std::vector<double> &box_dimensions) {
+                const UnitCellType unit_cell, const std::vector<double> &box_dimensions) {
 
   // Check that all arrays are of the same size
   if (x_crd.size() != y_crd.size() || x_crd.size() != z_crd.size()) {
@@ -105,7 +147,7 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, const Coordin
           "writeAmberCrd");
   }
   writeFrame(foutp, filename, kind, x_crd.size(), x_crd.data(), y_crd.data(), z_crd.data(),
-             x_vel.data(), y_vel.data(), z_vel.data(), box_dimensions.data());
+             x_vel.data(), y_vel.data(), z_vel.data(), unit_cell, box_dimensions.data());
 }
 
 } // namespace trajectory

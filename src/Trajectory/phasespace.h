@@ -5,7 +5,8 @@
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Topology/atomgraph.h"
-#include "Trajectory/trajectory_enumerators.h"
+#include "trajectory_enumerators.h"
+#include "write_frame.h"
 
 namespace omni {
 namespace trajectory {
@@ -270,6 +271,20 @@ public:
   /// \brief Initialize the forces (set them to zero)
   void initializeForces();
 
+  /// \brief Put the phase space data into a trajectory or checkpoint file.
+  ///
+  /// \param file_name     Name of the file to write
+  /// \param current_time  Time progress of the simulation
+  /// \param traj_kind     The type of trajectory to print (coordinates, velocities, or forces)
+  /// \param output_kind   The format of the file to write (checkpoint files print position and
+  ///                      velocity data by obligation, but trajectory files can contain either of
+  ///                      these as well as forces)
+  /// \param expectation   The condition in which the output file is expected to be found
+  void printCoordinates(const std::string &file_name, double current_time = 0.0,
+                        TrajectoryKind traj_kind = TrajectoryKind::POSITIONS,
+                        CoordinateFileKind output_kind = CoordinateFileKind::AMBER_INPCRD,
+                        PrintSituation expectation = PrintSituation::UNKNOWN);
+  
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information
   void upload();
