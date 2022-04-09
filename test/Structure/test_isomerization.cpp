@@ -15,6 +15,7 @@
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 // CHECK
@@ -48,6 +49,92 @@ using omni::trajectory::PhaseSpace;
 using namespace omni::structure;
 using namespace omni::testing;
 
+//-------------------------------------------------------------------------------------------------
+// Check rotatable bonds throughout a structure.  If the topology supplied pertains to a system
+// with many molecules, only the first will be analyzed.  Options are provided to take snapshots
+// of detailed particle positions.
+//-------------------------------------------------------------------------------------------------
+void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
+                             const ChemicalFeatures &chemfe, const TestEnvironment &oe,
+                             const TestPriority do_tests,
+                             const std::string &snp_var_name = std::string("")) {
+  ScoreCard sc(1);
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  const CoordinateFrameReader cfr(ps);
+  const double orig_bond_e = evaluateBondTerms(vk, cfr, &sc, 0);
+  const double orig_angl_e = evaluateAngleTerms(vk, cfr, &sc, 0);
+  section(1);
+  
+  // Rotate about various bonds.  This will generate all sorts of clashes, but bond and angle
+  // energies should be unaffected.
+  const std::vector<RotatorGroup> rt_grp = chemfe.getRotatableBondGroups();
+  const int nrt = rt_grp.size();
+  PhaseSpace ps_copy(ps);
+  PhaseSpaceWriter psw = ps_copy.data();
+  const PhaseSpaceReader psr = ps.data();
+  std::vector<double> rot_crd(3 * (cdk.mol_limits[1] - cdk.mol_limits[0]) * nrt);
+  std::vector<double> repos_dev(nrt), ubond_dev(nrt), uangl_dev(nrt);
+  int rcpos = 0;
+  for (int i = 0; i < nrt; i++) {
+    rotateAboutBond(&ps_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
+                    rt_grp[i].rotatable_atoms, 2.0 * omni::symbols::pi / 3.0);
+
+    // Record the positions of atoms in the first molecule
+    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
+      rot_crd[rcpos] = psw.xcrd[cdk.mol_contents[j]];
+      rcpos++;
+      rot_crd[rcpos] = psw.ycrd[cdk.mol_contents[j]];
+      rcpos++;
+      rot_crd[rcpos] = psw.zcrd[cdk.mol_contents[j]];
+      rcpos++;
+    }
+
+    // Record the bond and angle energies
+    const double new_bond_e = evaluateBondTerms(vk, cfr, &sc, 0);
+    const double new_angl_e = evaluateAngleTerms(vk, cfr, &sc, 0);
+    ubond_dev[i] = fabs(new_bond_e - orig_bond_e);
+    uangl_dev[i] = fabs(new_angl_e - orig_angl_e);
+
+    // Reverse the rotation
+    rotateAboutBond(&ps_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
+                    rt_grp[i].rotatable_atoms, -2.0 * omni::symbols::pi / 3.0);
+
+    // Check that the molecule was returned to its original state
+    double rmsd = 0.0;
+    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
+      const size_t jatom = cdk.mol_contents[j];
+      const double dx = psw.xcrd[jatom] - psr.xcrd[jatom];
+      const double dy = psw.ycrd[jatom] - psr.ycrd[jatom];
+      const double dz = psw.zcrd[jatom] - psr.zcrd[jatom];
+      rmsd += (dx * dx) + (dy * dy) + (dz * dz);
+    }
+    rmsd = sqrt(rmsd / static_cast<double>(cdk.mol_limits[1] - cdk.mol_limits[0]));
+    repos_dev[i] = rmsd;
+  }
+  const char osc = osSeparator();
+  const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
+  const std::string rcrd_snapshot = base_iso_path + osc + "rotated_coords.m";
+  const bool snps_exist = (getDrivePathType(rcrd_snapshot) == DrivePathType::FILE);
+  const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  if (snp_var_name.size() > 0) {
+    snapshot(rcrd_snapshot, polyNumericVector(rot_crd), snp_var_name, 1.0e-6, "Coordinate "
+             "obtained from rotation of selected bonds do not meet expectations.",
+             oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE,
+             do_snps);
+  }
+  const Approx target(std::vector<double>(nrt, 0.0), ComparisonType::ABSOLUTE, 1.0e-6); 
+  check(repos_dev, RelationalOperator::EQUAL, target, "Reversing the rotational operations of "
+        "selected bonds does not return the molecule to its original state.", do_tests);
+  check(ubond_dev, RelationalOperator::EQUAL, target, "Bond energies are changed by rotation "
+        "about a bond.", do_tests);
+  check(uangl_dev, RelationalOperator::EQUAL, target, "Angle energies are changed by rotation "
+        "about a bond.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
 
   // Some baseline initialization
@@ -65,16 +152,23 @@ int main(int argc, char* argv[]) {
   const std::string base_crd_path = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string drug_top_path = base_top_path + osc + "drug_example.top";
   const std::string drug_crd_path = base_crd_path + osc + "drug_example.inpcrd";
+  const std::string lig1_top_path = base_top_path + osc + "stereo_L1.top";
+  const std::string lig1_crd_path = base_crd_path + osc + "stereo_L1.inpcrd";
+  const std::string lig2_top_path = base_top_path + osc + "symmetry_L1.top";
+  const std::string lig2_crd_path = base_crd_path + osc + "symmetry_L1.inpcrd";
   const std::string trpc_top_path = base_top_path + osc + "trpcage.top";
   const std::string trpc_crd_path = base_crd_path + osc + "trpcage.inpcrd";
-  const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
   const bool files_exist = (getDrivePathType(drug_top_path) == DrivePathType::FILE &&
                             getDrivePathType(drug_crd_path) == DrivePathType::FILE &&
+                            getDrivePathType(lig1_top_path) == DrivePathType::FILE &&
+                            getDrivePathType(lig1_crd_path) == DrivePathType::FILE &&
+                            getDrivePathType(lig2_top_path) == DrivePathType::FILE &&
+                            getDrivePathType(lig2_crd_path) == DrivePathType::FILE &&
                             getDrivePathType(trpc_top_path) == DrivePathType::FILE &&
                             getDrivePathType(trpc_crd_path) == DrivePathType::FILE);
   if (files_exist == false) {
-    rtWarn("Files for a drug molecule, in water and inside a periodic box, were not found.  Check "
-           "the $OMNI_SOURCE environment variable to ensure that " + drug_top_path + " and " +
+    rtWarn("Files for various drug molecules and a miniprotein were not found.  Check the "
+           "$OMNI_SOURCE environment variable to ensure that " + drug_top_path + " and " +
            drug_crd_path + " become valid paths.  Some tests will be skipped",
            "test_local_arrangement");
   }
@@ -83,78 +177,41 @@ int main(int argc, char* argv[]) {
   PhaseSpace drug_ps = (files_exist) ? PhaseSpace(drug_crd_path,
                                                   CoordinateFileKind::AMBER_INPCRD) :
                                        PhaseSpace();
-  CoordinateFrameReader drug_cfr = (files_exist) ? CoordinateFrameReader(drug_ps) :
-                                                   CoordinateFrameReader(CoordinateFrame().data());
-  const ChemicalFeatures drug_feat = (files_exist) ? ChemicalFeatures(&drug_ag, drug_cfr,
+  const ChemicalFeatures drug_feat = (files_exist) ? ChemicalFeatures(&drug_ag, drug_ps,
                                                                       MapRotatableGroups::YES) :
                                                      ChemicalFeatures();
   AtomGraph trpc_ag = (files_exist) ? AtomGraph(trpc_top_path) : AtomGraph();
   PhaseSpace trpc_ps = (files_exist) ? PhaseSpace(trpc_crd_path,
                                                   CoordinateFileKind::AMBER_INPCRD) :
                                        PhaseSpace();
-  CoordinateFrameReader trpc_cfr = (files_exist) ? CoordinateFrameReader(trpc_ps) :
-                                                   CoordinateFrameReader(CoordinateFrame().data());
-  const ChemicalFeatures trpc_feat = (files_exist) ? ChemicalFeatures(&trpc_ag, trpc_cfr,
+  const ChemicalFeatures trpc_feat = (files_exist) ? ChemicalFeatures(&trpc_ag, trpc_ps,
                                                                       MapRotatableGroups::YES) :
                                                      ChemicalFeatures();
 
-  // Compute the bond and angle energies.  These quantities should not change when manipulating
-  // rotatable bonds.
-  ScoreCard sc(1);
-  const ValenceKit<double> vk = drug_ag.getDoublePrecisionValenceKit();
-  const ChemicalDetailsKit cdk = drug_ag.getChemicalDetailsKit();
-  const double drug_bond_e = evaluateBondTerms(vk, drug_cfr, &sc, 0);
-  const double drug_angl_e = evaluateAngleTerms(vk, drug_cfr, &sc, 0);
-  section(1);
+  // CHECK
+  AtomGraph lig1_ag = (files_exist) ? AtomGraph(lig1_top_path) : AtomGraph();
+  PhaseSpace lig1_ps = (files_exist) ? PhaseSpace(lig1_crd_path,
+                                                  CoordinateFileKind::AMBER_INPCRD) :
+                                       PhaseSpace();
+  const ChemicalFeatures lig1_feat = (files_exist) ? ChemicalFeatures(&lig1_ag, lig1_ps,
+                                                                      MapRotatableGroups::YES) :
+                                                     ChemicalFeatures();
+  AtomGraph lig2_ag = (files_exist) ? AtomGraph(lig2_top_path) : AtomGraph();
+  PhaseSpace lig2_ps = (files_exist) ? PhaseSpace(lig2_crd_path,
+                                                  CoordinateFileKind::AMBER_INPCRD) :
+                                       PhaseSpace();
+  const ChemicalFeatures lig2_feat = (files_exist) ? ChemicalFeatures(&lig2_ag, lig2_ps,
+                                                                      MapRotatableGroups::YES) :
+                                                     ChemicalFeatures();
+  printf("Ligand 1 has %2d rotatable bonds and %d chiral centers.\n",
+         lig1_feat.getRotatableBondCount(), lig1_feat.getChiralCenterCount());
+  printf("Ligand 2 has %2d rotatable bonds and %d chiral centers.\n",
+         lig2_feat.getRotatableBondCount(), lig2_feat.getChiralCenterCount());
+  // END CHECK
   
-  // Rotate about various bonds.  This will generate all sorts of clashes, but bond and angle
-  // energies should be unaffected.
-  const std::vector<RotatorGroup> drug_rt = drug_feat.getRotatableBondGroups();
-  const int ndrug_rt = drug_rt.size();
-  const PhaseSpace drug_ps_copy(drug_ps);
-  PhaseSpaceWriter dpsw = drug_ps.data();
-  const PhaseSpaceReader dpsr = drug_ps_copy.data();
-  std::vector<double> drug_rot_crd(3 * (cdk.mol_limits[1] - cdk.mol_limits[0]) * ndrug_rt);
-  std::vector<double> drug_repos_dev(ndrug_rt);
-  int rcpos = 0;
-  for (int i = 0; i < ndrug_rt; i++) {
-    rotateAboutBond(&drug_ps, drug_rt[i].root_atom, drug_rt[i].pivot_atom,
-                    drug_rt[i].rotatable_atoms, 2.0 * omni::symbols::pi / 3.0);
-
-    // Record the positions of atoms in the first molecule
-    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
-      drug_rot_crd[rcpos] = dpsw.xcrd[cdk.mol_contents[j]];
-      rcpos++;
-      drug_rot_crd[rcpos] = dpsw.ycrd[cdk.mol_contents[j]];
-      rcpos++;
-      drug_rot_crd[rcpos] = dpsw.zcrd[cdk.mol_contents[j]];
-      rcpos++;
-    }
-    rotateAboutBond(&drug_ps, drug_rt[i].root_atom, drug_rt[i].pivot_atom,
-                    drug_rt[i].rotatable_atoms, -2.0 * omni::symbols::pi / 3.0);
-
-    // Check that the molecule was returned to its original state
-    double rmsd = 0.0;
-    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
-      const size_t jatom = cdk.mol_contents[j];
-      const double dx = dpsw.xcrd[jatom] - dpsr.xcrd[jatom];
-      const double dy = dpsw.ycrd[jatom] - dpsr.ycrd[jatom];
-      const double dz = dpsw.zcrd[jatom] - dpsr.zcrd[jatom];
-      rmsd += (dx * dx) + (dy * dy) + (dz * dz);
-    }
-    rmsd = sqrt(rmsd / static_cast<double>(cdk.mol_limits[1] - cdk.mol_limits[0]));
-    drug_repos_dev[i] = rmsd;
-  }
-  const std::string rcrd_snapshot = base_iso_path + osc + "rotated_coords.m";
-  const bool snps_exist = (getDrivePathType(rcrd_snapshot) == DrivePathType::FILE);
-  const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  snapshot(rcrd_snapshot, polyNumericVector(drug_rot_crd), std::string("rot_iso"), 1.0e-6,
-           "Coordinate obtained from rotation of selected bonds do not meet expectations.",
-           oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE,
-           do_snps);
-  check(drug_repos_dev, RelationalOperator::EQUAL, std::vector<double>(ndrug_rt, 0.0), "Reversing "
-        "the rotational operations of selected bonds does not return the molecule to its original "
-        "state.", do_tests);
+  // Rotate bonds within each system
+  checkRotationalSampling(drug_ag, drug_ps, drug_feat, oe, do_tests, "drug_rot_iso");
+  checkRotationalSampling(trpc_ag, trpc_ps, trpc_feat, oe, do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

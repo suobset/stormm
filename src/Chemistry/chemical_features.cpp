@@ -10,9 +10,17 @@
 #include "chemical_features.h"
 #include "indigo.h"
 
+// CHECK
+#include "Parsing/parse.h"
+// END CHECK
+
 namespace omni {
 namespace chemistry {
 
+// CHECK
+using parse::char4ToString;
+// END CHECK
+  
 using card::HybridKind;
 using topology::TorsionKind;
 using math::accumulateBitmask;
@@ -1321,6 +1329,18 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
                                           std::vector<int> *tmp_rotatable_groups,
                                           std::vector<int> *tmp_rotatable_group_bounds) {
 
+  // CHECK
+  if (cdk.natom == 78) {
+    for (int i = 0; i < ring_count; i++) {
+      printf("Ring %2d : ", i);
+      for (int j = ring_atom_bounds[i]; j < ring_atom_bounds[i + 1]; j++) {
+        printf("%4.4s ", char4ToString(cdk.atom_names[ring_atoms[j]]).c_str());
+      }
+      printf("\n");
+    }
+  }
+  // END CHECK
+  
   // Prepare a table of atoms that are part of rings
   std::vector<bool> bond_in_ring(vk.nbond, false);
   for (int i = 0; i < ring_count; i++) {
@@ -1328,10 +1348,26 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
       const int jatom = ring_atoms[j];
       for (int k = vk.bond_asgn_bounds[jatom]; k < vk.bond_asgn_bounds[jatom + 1]; k++) {
         const int katom = vk.bond_asgn_atoms[k];
+        
+        // CHECK
+        const bool report = (cdk.natom == 78 &&
+                             ((jatom == 19 && katom == 24) || (jatom == 24 && katom == 19)));
+        if (report) {
+          printf("Checking the bond for ring inclusion...\n");
+        }
+        // END CHECK
+        
         bool tb_in_ring = false;
         for (int m = ring_atom_bounds[i]; m < ring_atom_bounds[i + 1]; m++) {
           tb_in_ring = (tb_in_ring || katom == ring_atoms[m]);
         }
+
+        // CHECK
+        if (report) {
+          printf("tb_in_ring = %d\n", static_cast<int>(tb_in_ring));
+        }
+        // END CHECK
+        
         bond_in_ring[vk.bond_asgn_terms[k]] = tb_in_ring;
       }
     }
@@ -1343,11 +1379,27 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
   std::vector<std::vector<int>> moving_lists;
   for (int pos = 0; pos < vk.nbond; pos++) {
 
+    // CHECK
+    const bool report = (vk.natom == 78 &&
+                         ((vk.bond_i_atoms[pos] == 19 && vk.bond_j_atoms[pos] == 24) ||
+                          (vk.bond_j_atoms[pos] == 19 && vk.bond_i_atoms[pos] == 24)));
+    if (report) {
+      printf("Here is the bond...\n");
+    }
+    // END CHECK
+    
     // Omit bonds within rings.  Those will be handled separately.  Otherwise, allow a liberal
     // definition of a single bond--a small amount of double-bond character might be permissible.
     if (bond_in_ring[pos] || bond_orders.readHost(pos) != near_one) {
       continue;
     }
+
+    // CHECK
+    if (report) {
+      printf("bond_in_ring = %d\n", static_cast<int>(bond_in_ring[pos]));
+      printf("bond_orders  = %9.4lf\n", bond_orders.readHost(pos));
+    }
+    // END CHECK
     
     // Ensure that both ends have more branching from them, and that the branches are worth
     // rotating (more than just hydrogen atoms branching from them)
