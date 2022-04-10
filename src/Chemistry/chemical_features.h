@@ -54,6 +54,9 @@ public:
 
   /// \brief Set this as the next link in the chain, or as the chain initiator.
   ///
+  /// Overloaded:
+  ///   - Optionally accept the index of the previous node for traceback purposes
+  ///
   /// \param previous_in      Index of the previous BondedNode leading to this one, or -1 if this
   ///                         is intended to be the chain initiator
   /// \param current_atom     Topological index of the current atom this BondedNode describes
@@ -62,6 +65,8 @@ public:
   ///                         for list of 1:2 exclusions, which indicate bonds)
   /// \param valid_atom_mask  Reference table of which atoms are valid to include in the tree
   void addToTree(int previous_in, int current_atom, int current_layer,
+                 const NonbondedKit<double> &nbk, const std::vector<bool> &valid_atom_mask);
+  void addToTree(int previous_in, int current_atom, int current_layer, int previous_node_in,
                  const NonbondedKit<double> &nbk, const std::vector<bool> &valid_atom_mask);
 
   /// \brief Add the bond order between this atom and its previous atom
@@ -72,6 +77,9 @@ public:
   
   /// \brief Get the previous atom index
   int getPreviousAtom() const;
+
+  /// \brief Get the previous node's list index
+  int getPreviousNode() const;
 
   /// \brief Get the central atom for this BondedNode.
   int getAtom() const;
@@ -115,6 +123,7 @@ public:
 
 private:
   int previous_atom_index;   ///< Topological index of the previous atom
+  int previous_node_index;   ///< Tree list index of the previous node
   int atom_index;            ///< Topological index of this atom
   int layer_index;           ///< Index of the layer to which this BondedNode belongs.  The first
                              ///<   atom in the tree is layer zero.

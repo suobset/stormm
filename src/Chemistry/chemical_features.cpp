@@ -42,8 +42,8 @@ using trajectory::CoordinateFrameReader;
   
 //-------------------------------------------------------------------------------------------------
 BondedNode::BondedNode() :
-    previous_atom_index{-1}, atom_index{-1}, layer_index{-1}, root_bond_order{0.0},
-    branch_count{0}, branch_atoms{nullptr}, rings_completed{0}
+    previous_atom_index{-1}, previous_node_index{-1}, atom_index{-1}, layer_index{-1},
+    root_bond_order{0.0}, branch_count{0}, branch_atoms{nullptr}, rings_completed{0}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -78,6 +78,14 @@ void BondedNode::addToTree(const int previous_in, const int current_atom, const 
 }
 
 //-------------------------------------------------------------------------------------------------
+void BondedNode::addToTree(const int previous_in, const int current_atom, const int current_layer,
+                           const int previous_node_in, const NonbondedKit<double> &nbk,
+                           const std::vector<bool> &valid_atom_mask) {
+  previous_node_index = previous_node_in;
+  addToTree(previous_in, current_atom, current_layer, nbk, valid_atom_mask);
+}
+
+//-------------------------------------------------------------------------------------------------
 void BondedNode::addBondOrder(const ValenceKit<double> &vk, const Hybrid<double> &bond_orders) {
   for (int i = vk.bond_asgn_bounds[atom_index]; i < vk.bond_asgn_bounds[atom_index + 1]; i++) {
     if (vk.bond_asgn_atoms[i] == previous_atom_index) {
@@ -97,6 +105,11 @@ void BondedNode::addBondOrder(const ValenceKit<double> &vk, const Hybrid<double>
 //-------------------------------------------------------------------------------------------------
 int BondedNode::getPreviousAtom() const {
   return previous_atom_index;
+}
+
+//-------------------------------------------------------------------------------------------------
+int BondedNode::getPreviousNode() const {
+  return previous_node_index;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -655,6 +668,12 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
   std::vector<int> fused_ring_atom_connections;
   std::vector<int> ranked_connections;
   std::vector<bool> fusion_coverage(atom_count, false);
+  std::vector<int> layer_bounds(32);
+  std::vector<int> jk_paths(32);
+  std::vector<int> jk_path_bounds(32);
+  std::vector<int> subsystem_ring_atoms;
+  std::vector<int> subsystem_ring_atom_bounds(1, 0);
+  std::vector<int2> subsystem_ring_ranks;
   for (int i = 0; i < atom_count; i++) {
     valid_atom_mask[i] = false;
   }
@@ -685,7 +704,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
 
       // Loop over all newly added rings and see if the atoms they contain point to other rings.
       for (int pos = prev_ring_count; pos < curr_ring_count; pos++) {
-        const int pring = fused_rings[pos];
+        const int pring = fused_rings[pos];        
         for (int j = ring_bounds_ptr[pring]; j < ring_bounds_ptr[pring + 1]; j++) {
           const int atom_idx = ring_atoms_ptr[j];
           for (int k = ring_participation_bounds[atom_idx];
@@ -800,23 +819,32 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
     printf("The maximum tree depth is calculated to be %d\n", max_tree_depth);
     printf("The maximum tree allocation is calculated to be %d\n", prospective_tree_size);
     // END CHECK
-    
+
+    int n_multi_split = 0;
     for (int j = 1; j < nfused_atoms; j++) {
       if (fused_ring_atom_connections[j] == 2) {
+        continue;
+      }
+
+      // Increment the count of nodes that might branch into new rings.  If only one has thus
+      // far been encountered, keep going, as it requires two such nodes to complete a ring.
+      n_multi_split++;
+      if (n_multi_split == 1) {
         continue;
       }
       const int jatom = fused_ring_atoms[j];
 
       // Make a tree, starting at jatom and extending through all available combinations to
       // arrive back at jatom.
-      links[0].addToTree(-1, jatom, 0, nbk, valid_atom_mask);
-      tree_positions[i] = 0;
+      links[0].addToTree(-1, jatom, 0, -1, nbk, valid_atom_mask);
       int node_count = 1;
-      int current_layer = 1;
+      int layer_count = 1;
       int layer_llim = 0;
       int layer_hlim = 1;
-#if 0
-      while (layer_hlim > layer_llim) {
+      layer_bounds.resize(1);
+      layer_bounds[0] = 0;
+      layer_bounds.push_back(node_count);
+      while (layer_hlim > layer_llim && layer_count < max_tree_depth) {
         const int next_layer_llim = node_count;
         for (int pos = layer_llim; pos < layer_hlim; pos++) {
           const int pos_atom = links[pos].getAtom();
@@ -827,37 +855,120 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
             // Check this atom against the history in the tree.  If it has already been visited
             // by this branch of the tree, do not incorporate it into the next layer.
             bool found = false;
-            test_layer = current_layer - 1;
-            while (found == false && test_layer >= 0) {
-              const int prev_atom = links[pos].getPreviousAtom();
-              const int prev_node = links[pos].getPreviousNode();
+            int prev_node = links[pos].getPreviousNode();
+            while ((! found) && prev_node != -1) {
+              const int prev_atom = links[prev_node].getAtom();
+              prev_node = links[prev_node].getPreviousNode();
               found = (found || (prev_atom == pos2_atom));
-
+            }
+            if (! found) {
+              links[node_count].addToTree(pos_atom, pos2_atom, layer_count, pos, nbk,
+                                          valid_atom_mask);
+              node_count++;
             }
           }
         }
+        layer_llim = next_layer_llim;
+        layer_hlim = node_count;
+        layer_bounds.push_back(node_count);
+        layer_count++;
       }
-#endif
 
+      // CHECK
+      printf("Tree for %4.4s:\n", char4ToString(cdk.atom_names[jatom]).c_str());
+      for (int k = 0; k < layer_count; k++) {
+        printf("  ");
+        for (int m = layer_bounds[k]; m < layer_bounds[k + 1]; m++) {
+          printf("%4.4s ", char4ToString(cdk.atom_names[links[m].getAtom()]).c_str());
+        }
+        printf("\n");
+      }
+      // END CHECK
+      
       for (int k = 0; k < j; k++) {
         if (fused_ring_atom_connections[k] == 2) {
           continue;
         }
         const int katom = fused_ring_atoms[k];
+        const int path_quota = std::min(fused_ring_atom_connections[j],
+                                        fused_ring_atom_connections[k]);
 
         // Find the shortest and second-shortest paths between atoms jatom and katom, staying
         // within the fused ring atom system.  This occurs when a tree starting at jatom includes
         // katom twice.  If, in the same layer that katom was include twice, katom is included
         // additional times, this implies additional rings of equal size.  Log them all.
+        int nk_found = 0;
+        int m = 0;
+        jk_path_bounds.resize(1);
+        jk_path_bounds[0] = 0;
+        jk_paths.resize(0);
+
+        // CHECK
+        printf("Find a path between %4.4s (%4d) and %4.4s (%4d).  There are %2d layers.\n",
+               char4ToString(cdk.atom_names[jatom]).c_str(), jatom,
+               char4ToString(cdk.atom_names[katom]).c_str(), katom, layer_count);
+        // END CHECK
         
+        while (m < layer_count) {
+          for (int node_idx = layer_bounds[m]; node_idx < layer_bounds[m + 1]; node_idx++) {
+            if (links[node_idx].getAtom() == katom) {
+              int prev_node = links[node_idx].getPreviousNode();
+              jk_paths.push_back(links[node_idx].getAtom());
+              while (prev_node >= 0) {
+                jk_paths.push_back(links[prev_node].getAtom());
+                prev_node = links[prev_node].getPreviousNode();
+              }
+              jk_path_bounds.push_back(jk_paths.size());
+
+              // CHECK
+              printf("  Found a path %4.4s - %4.4s (layer %2d, node %4d) [ %2zu %2d %2d ]: ",
+                     char4ToString(cdk.atom_names[jatom]).c_str(),
+                     char4ToString(cdk.atom_names[katom]).c_str(), m, node_idx,
+                     jk_path_bounds.size(), nk_found, nk_found + 1);
+              for (int ii = jk_path_bounds[nk_found]; ii < jk_path_bounds[nk_found + 1]; ii++) {
+                printf("%4.4s ", char4ToString(cdk.atom_names[jk_paths[ii]]).c_str());
+              }
+              printf("\n");
+              // END CHECK
+              
+              nk_found++;
+            }
+          }
+          m++;
+        }
+
+        // With the possible paths computed, list out the rings for this subsystem.
+        for (int m = 1; m < nk_found; m++) {
+          for (int n = 0; n < m; n++) {
+
+            // Incorporate the first path, in its entirety to include both jatom and katom
+            for (int npos = jk_path_bounds[n]; npos < jk_path_bounds[n + 1]; npos++) {
+              subsystem_ring_atoms.push_back(jk_paths[npos]);
+            }
+
+            // Incorporate the second path, in reverse, omitting the endpoints, to complete the
+            // ring in a sensible order (all paths proceed from katom to jatom, and include both
+            // katom and jatom).
+            for (int mpos = jk_path_bounds[m + 1] - 2; mpos > jk_path_bounds[m]; mpos--) {
+              subsystem_ring_atoms.push_back(jk_paths[mpos]);
+            }
+
+            // Update the bounds
+            const int2 tmp_rank = { jk_path_bounds[n + 1] - jk_path_bounds[n] +
+                                    jk_path_bounds[m + 1] - 2 - jk_path_bounds[m],
+                                    static_cast<int>(subsystem_ring_atom_bounds.size()) - 1 };
+            subsystem_ring_atom_bounds.push_back(subsystem_ring_atoms.size());
+            subsystem_ring_ranks.push_back(tmp_rank);
+          }
+        }
       }
     }
-    
-    // Clear the fused ring mask for the next round
-    for (int pos = 0; pos < nfused_atoms; pos++) {
-      valid_atom_mask[fused_ring_atoms[pos]] = false;
-    }
 
+    // Clear the valid atom mask
+    for (int j = 0; j < nfused_atoms; j++) {
+      valid_atom_mask[fused_ring_atoms[j]] = false;
+    }
+    
     // CHECK
     bool problem = false;
     for (int j = 0; j < atom_count; j++) {
@@ -867,6 +978,54 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       printf("The fused ring mask was not entirely cleared.\n");
     }
     // END CHECK
+  }
+  
+  // Cull larger rings if they can be found to be a superset of two or more smaller rings.
+  // This is done by starting with the smallest rings in the set and marking the atoms of
+  // the fused ring subsystem that they cover.  As larger and larger rings are added, those
+  // that do not cover any new atoms can be deemed irrelevant.  Use the valid_atom_mask
+  // array a second time, this tim
+  std::sort(subsystem_ring_ranks.begin(), subsystem_ring_ranks.end(),
+            [](int2 a, int2 b) { return a.x < b.x; });
+  const int nsubsys_rings = subsystem_ring_atom_bounds.size() - 1LLU;
+  ullint* ring_inclusion_ptr = tmp_ring_inclusion->data();
+  for (int i = 0; i < nsubsys_rings; i++) {
+    const int ring_idx = subsystem_ring_ranks[i].y;
+    bool ring_is_essential = false;
+    for (int j = subsystem_ring_atom_bounds[ring_idx];
+         j < subsystem_ring_atom_bounds[ring_idx + 1]; j++) {
+      const int atom_idx = subsystem_ring_atoms[j];
+      ring_is_essential = (ring_is_essential || valid_atom_mask[atom_idx] == false);
+      valid_atom_mask[atom_idx] = true;
+    }
+    if (ring_is_essential) {
+
+      // CHECK
+      printf("Essential ring of size %d : ", subsystem_ring_atom_bounds[ring_idx + 1] -
+             subsystem_ring_atom_bounds[ring_idx]);
+      for (int j = subsystem_ring_atom_bounds[ring_idx];
+         j < subsystem_ring_atom_bounds[ring_idx + 1]; j++) {
+        printf("%4.4s ", char4ToString(cdk.atom_names[subsystem_ring_atoms[j]]).c_str());
+      }
+      printf("\n");
+      // END CHECK
+
+      const int tring_size = subsystem_ring_atom_bounds[ring_idx + 1] -
+                             subsystem_ring_atom_bounds[ring_idx];
+      if (tring_size < max_ring_size) {
+        const ullint incl_mask = (0x1LLU << tring_size);
+        for (int j = subsystem_ring_atom_bounds[ring_idx];
+             j < subsystem_ring_atom_bounds[ring_idx + 1]; j++) {
+          ring_inclusion_ptr[subsystem_ring_atoms[j]] |= incl_mask;
+        }
+      }
+      for (int j = subsystem_ring_atom_bounds[ring_idx];
+         j < subsystem_ring_atom_bounds[ring_idx + 1]; j++) {
+        tmp_ring_atoms->push_back(subsystem_ring_atoms[j]);
+      }
+      tmp_ring_atom_bounds->push_back(tmp_ring_atoms->size());
+      ring_count += 1;
+    }
   }
 }
 
@@ -958,7 +1117,7 @@ void ChemicalFeatures::markRingAtoms(const int j_atom, const int k_atom,
     // Step through the J history until the pivot point, then backwards through the K history
     // starting at the pivot point.  This will list all atoms in the ring.    
     int n_planar = 0;
-    const ullint ring_mask = (0x1 << ring_size);
+    const ullint ring_mask = (0x1LLU << ring_size);
     ullint* ring_ptr = tmp_ring_inclusion->data();
     for (int j = 0; j < j_pivot; j++) {
       ring_ptr[j_history[j]] |= ring_mask;
