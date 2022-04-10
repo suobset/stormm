@@ -57,7 +57,8 @@ using namespace omni::testing;
 void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
                              const ChemicalFeatures &chemfe, const TestEnvironment &oe,
                              const TestPriority do_tests,
-                             const std::string &snp_var_name = std::string("")) {
+                             const std::string &snp_var_name = std::string(""),
+                             const PrintSituation expectation = PrintSituation::APPEND) {
   ScoreCard sc(1);
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
@@ -120,8 +121,7 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   if (snp_var_name.size() > 0) {
     snapshot(rcrd_snapshot, polyNumericVector(rot_crd), snp_var_name, 1.0e-6, "Coordinate "
              "obtained from rotation of selected bonds do not meet expectations.",
-             oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE,
-             do_snps);
+             oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, expectation, do_snps);
   }
   const Approx target(std::vector<double>(nrt, 0.0), ComparisonType::ABSOLUTE, 1.0e-6); 
   check(repos_dev, RelationalOperator::EQUAL, target, "Reversing the rotational operations of "
@@ -187,8 +187,6 @@ int main(int argc, char* argv[]) {
   const ChemicalFeatures trpc_feat = (files_exist) ? ChemicalFeatures(&trpc_ag, trpc_ps,
                                                                       MapRotatableGroups::YES) :
                                                      ChemicalFeatures();
-
-  // CHECK
   AtomGraph lig1_ag = (files_exist) ? AtomGraph(lig1_top_path) : AtomGraph();
   PhaseSpace lig1_ps = (files_exist) ? PhaseSpace(lig1_crd_path,
                                                   CoordinateFileKind::AMBER_INPCRD) :
@@ -203,15 +201,13 @@ int main(int argc, char* argv[]) {
   const ChemicalFeatures lig2_feat = (files_exist) ? ChemicalFeatures(&lig2_ag, lig2_ps,
                                                                       MapRotatableGroups::YES) :
                                                      ChemicalFeatures();
-  printf("Ligand 1 has %2d rotatable bonds and %d chiral centers.\n",
-         lig1_feat.getRotatableBondCount(), lig1_feat.getChiralCenterCount());
-  printf("Ligand 2 has %2d rotatable bonds and %d chiral centers.\n",
-         lig2_feat.getRotatableBondCount(), lig2_feat.getChiralCenterCount());
-  // END CHECK
   
   // Rotate bonds within each system
-  checkRotationalSampling(drug_ag, drug_ps, drug_feat, oe, do_tests, "drug_rot_iso");
+  checkRotationalSampling(drug_ag, drug_ps, drug_feat, oe, do_tests, "drug_rot_iso",
+                          PrintSituation::OVERWRITE);
   checkRotationalSampling(trpc_ag, trpc_ps, trpc_feat, oe, do_tests);
+  checkRotationalSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_rot_iso");
+  checkRotationalSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_rot_iso");
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

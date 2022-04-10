@@ -150,7 +150,7 @@ int main(int argc, char* argv[]) {
   std::vector<int> mutable_ring_cnt_ans   = {    1,    1,    4, 1226, 1226,    0,    0,    1,
                                               1567,  486,  216 };
   std::vector<int> aromatic_group_cnt_ans = {    1,    1,    3,    1,    1,    0,    0,    1,
-                                                 3,    3,    0 };
+                                                 2,    3,    0 };
   std::vector<int> polar_h_cnt_ans        = {    0,    0,    6, 2450, 2450,    2,    3,    2,
                                               3155, 1088,  432 };
   std::vector<int> hbond_donor_cnt_ans    = {    0,    0,    4, 1226, 1226,    2,    3,    2,
