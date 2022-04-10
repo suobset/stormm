@@ -24,6 +24,7 @@ using parse::char4ToString;
 using card::HybridKind;
 using topology::TorsionKind;
 using math::accumulateBitmask;
+using math::addScalarToVector;
 using math::crossProduct;
 using math::dot;
 using math::numberSeriesToBitMask;
@@ -58,7 +59,8 @@ void BondedNode::setBranchPointer(std::vector<int> *vi, const size_t pos,
 
 //-------------------------------------------------------------------------------------------------
 void BondedNode::addToTree(const int previous_in, const int current_atom, const int current_layer,
-                           const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk) {
+                           const NonbondedKit<double> &nbk,
+                           const std::vector<bool> &valid_atom_mask) {
   previous_atom_index = previous_in;
   atom_index = current_atom;
   layer_index = current_layer;
@@ -67,7 +69,7 @@ void BondedNode::addToTree(const int previous_in, const int current_atom, const 
   int j = 0;
   for (int i = 0; i < link_candidate_count; i++) {
     const int candidate_atom = nbk.nb12x[i + excl_start];
-    if (candidate_atom != previous_in && cdk.z_numbers[candidate_atom] != 0) {
+    if (candidate_atom != previous_in && valid_atom_mask[candidate_atom]) {
       branch_atoms[j] = candidate_atom;
       j++;
     }
@@ -563,6 +565,10 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
   // Loop over all atoms, proceeding to explore all available bonds, until all atoms have been
   // either used as the start of chain / ring exploration or have been included in the exploration
   // initiated by some other atom.
+  std::vector<bool> valid_atom_mask(atom_count);
+  for (int i = 0; i < atom_count; i++) {
+    valid_atom_mask[i] = (cdk.z_numbers[i] > 0);
+  }
   std::vector<bool> atom_touched(atom_count, false);
   for (int i = 0; i < atom_count; i++) {
     if (cdk.z_numbers[i] == 0) {
@@ -574,7 +580,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
     
     // Initiate the chain
     atom_touched[i] = true;
-    links[0].addToTree(-1, i, 0, nbk, cdk);
+    links[0].addToTree(-1, i, 0, nbk, valid_atom_mask);
     tree_positions[i] = 0;
     int node_count = 1;
     int current_layer = 1;
@@ -587,7 +593,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
         const int j_branch_count = links[j].getBranchCount();
         for (int k = 0; k < j_branch_count; k++) {
           const int k_atom = links[j].getBranchAtom(k);
-
+          
           // Check the status of the next atom: has it already been incorporated into this chain
           // or an earlier one?  If so, this signifies the completion of some loop.  Determine that
           // loop based on the histories of the current atom and the atom it touches.  Otherwise,
@@ -598,7 +604,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
           }
           else {
             atom_touched[k_atom] = true;
-            links[node_count].addToTree(j_atom, k_atom, current_layer, nbk, cdk);
+            links[node_count].addToTree(j_atom, k_atom, current_layer, nbk, valid_atom_mask);
             tree_positions[k_atom] = node_count;
             node_count++;
           }
@@ -613,6 +619,254 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
     for (int j = 0; j < layer_hlim; j++) {
       links[j].wipeRingCompletion();
     }
+  }
+
+  // Fused rings will imply additional cyclic structures than have already been detected.
+  // Further analyze any rings with overlapping sets of atoms.
+  std::vector<int> ring_participation_bounds(atom_count + 1, 0);
+  int* ring_atoms_ptr  = tmp_ring_atoms->data();
+  int* ring_bounds_ptr = tmp_ring_atom_bounds->data();
+  const int nring = tmp_ring_atom_bounds->size() - 1LLU;
+  const int nring_atoms = ring_bounds_ptr[nring];
+  for (int i = 0; i < nring; i++) {
+    for (int j = ring_bounds_ptr[i]; j < ring_bounds_ptr[i + 1]; j++) {
+      ring_participation_bounds[ring_atoms_ptr[j]] += 1;
+    }
+  }
+  prefixSumInPlace<int>(&ring_participation_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
+  std::vector<int> ring_participation(ring_participation_bounds[atom_count]);
+  for (int i = 0; i < nring; i++) {
+    for (int j = ring_bounds_ptr[i]; j < ring_bounds_ptr[i + 1]; j++) {
+      const size_t atom_idx = ring_atoms_ptr[j];
+      const int partic_idx = ring_participation_bounds[atom_idx];
+      ring_participation[partic_idx] = i;
+      ring_participation_bounds[atom_idx] = partic_idx + 1;
+    }
+  }
+  for (int i = atom_count; i > 0; i--) {
+    ring_participation_bounds[i] = ring_participation_bounds[i - 1];    
+  }
+  ring_participation_bounds[0] = 0;
+  
+  // Search all bonds coming out of atoms in fused rings: do they imply other rings that have
+  // not yet been detected?
+  std::vector<int> fused_rings(16);
+  std::vector<int> fused_ring_atoms(32);
+  std::vector<int> fused_ring_atom_connections;
+  std::vector<int> ranked_connections;
+  std::vector<bool> fusion_coverage(atom_count, false);
+  for (int i = 0; i < atom_count; i++) {
+    valid_atom_mask[i] = false;
+  }
+  for (int i = 0; i < atom_count; i++) {
+    if (fusion_coverage[i]) {
+      continue;
+    }
+    if (ring_participation_bounds[i + 1] - ring_participation_bounds[i] <= 1) {
+      fusion_coverage[i] = true;
+      continue;
+    }
+
+    // CHECK
+    if (atom_count == 78) {
+      printf("Start at atom %4.4s\n", char4ToString(cdk.atom_names[i]).c_str());
+    }
+    // END CHECK
+    
+    // This atom participates in two or more rings and has not yet been analyzed, implying an
+    // unattended multi-ring system.  Map the extent of that system.
+    fused_rings.resize(0);
+    for (int j = ring_participation_bounds[i]; j < ring_participation_bounds[i + 1]; j++) {
+      fused_rings.push_back(ring_participation[j]);
+    }
+    int prev_ring_count = 0;
+    int curr_ring_count = fused_rings.size();
+    while (curr_ring_count > prev_ring_count) {
+
+      // Loop over all newly added rings and see if the atoms they contain point to other rings.
+      for (int pos = prev_ring_count; pos < curr_ring_count; pos++) {
+        const int pring = fused_rings[pos];
+        for (int j = ring_bounds_ptr[pring]; j < ring_bounds_ptr[pring + 1]; j++) {
+          const int atom_idx = ring_atoms_ptr[j];
+          for (int k = ring_participation_bounds[atom_idx];
+               k < ring_participation_bounds[atom_idx + 1]; k++) {
+            if (ring_participation[k] != pring) {
+              fused_rings.push_back(ring_participation[k]);
+            }
+          }
+        }
+      }
+
+      // Cull duplicate entries in the list of fused rings.
+      reduceUniqueValues(&fused_rings);
+      prev_ring_count = curr_ring_count;
+      curr_ring_count = fused_rings.size();
+    }
+
+    // Mark all atoms in the complete fused ring system to avoid investigating them again.  Take
+    // this opportunity to make a list of rings already present in the fused system, to accumulate
+    // secondary ring findings.
+    const int nfused_rings = fused_rings.size();
+    int s2_est_size = 0;
+    for (int pos = 0; pos < nfused_rings; pos++) {
+      const int pring = fused_rings[pos];
+      s2_est_size += ring_bounds_ptr[pring + 1] - ring_bounds_ptr[pring];
+    }
+    std::vector<int> s2_ring_atoms(s2_est_size * 2);
+    std::vector<int> s2_ring_bounds(nfused_rings * 2);
+    s2_ring_atoms.resize(0);
+    s2_ring_bounds.resize(0);
+    fused_ring_atoms.resize(0);
+    for (int pos = 0; pos < nfused_rings; pos++) {
+      const int pring = fused_rings[pos];
+      for (int j = ring_bounds_ptr[pring]; j < ring_bounds_ptr[pring + 1]; j++) {
+        fused_ring_atoms.push_back(ring_atoms_ptr[j]);
+        s2_ring_atoms.push_back(ring_atoms_ptr[j]);
+      }
+      s2_ring_bounds[pos + 1] = s2_ring_atoms.size();
+    }
+    reduceUniqueValues(&fused_ring_atoms);
+    const int nfused_atoms = fused_ring_atoms.size();
+    for (int j = 0; j < nfused_atoms; j++) {
+      fusion_coverage[fused_ring_atoms[j]] = true;
+      valid_atom_mask[fused_ring_atoms[j]] = true;
+    }
+    
+    // CHECK
+    if (atom_count == 78) {
+      printf("There are %zu fused rings with %2zu unique atoms:\n", fused_rings.size(),
+             fused_ring_atoms.size());
+    }
+    // END CHECK
+    
+    // Search the 1:2 exclusions of each atom in the fused ring system to see if it connects to
+    // other atoms in the fused ring system.  Find all such atoms that connect to three or more
+    // other atoms.  These are the atoms in the fused ring system that will form smaller rings,
+    // and must be searched in O(N^2) fashion for the smallest rings that encompass both atoms.
+    fused_ring_atom_connections.resize(nfused_atoms);
+    ranked_connections.resize(nfused_atoms);
+    for (int pos = 0; pos < nfused_atoms; pos++) {
+      fused_ring_atom_connections[pos] = 0;
+      const int atom_idx = fused_ring_atoms[pos];
+      for (int j = nbk.nb12_bounds[atom_idx]; j < nbk.nb12_bounds[atom_idx + 1]; j++) {
+        if (valid_atom_mask[nbk.nb12x[j]]) {
+          fused_ring_atom_connections[pos] += 1;
+        }
+      }
+      ranked_connections[pos] = fused_ring_atom_connections[pos];
+      
+      // CHECK
+      if (atom_count == 78) {
+        printf("  %4.4s %2d : %d relevant connections\n",
+               char4ToString(cdk.atom_names[atom_idx]).c_str(), atom_idx,
+               fused_ring_atom_connections[pos]);
+      }
+      // END CHECK
+    }
+    std::sort(ranked_connections.begin(), ranked_connections.end(),
+              [](int a, int b) { return a > b; });
+    addScalarToVector(&ranked_connections, -1);
+
+    // Calculate the maximum size of a tree for this fused ring system.  Keep the search bounded
+    // by searching only for secondary rings of up to a certain size starting at each atom j.
+    const int max_splits = ranked_connections[0];
+    int max_tree_depth = 1;
+    int prospective_tree_size = max_splits + 1;
+    int layer_size = max_splits;
+    int ranked_pos = 1;
+    while (prospective_tree_size < max_fused_ring_tree_size && max_tree_depth < nfused_atoms - 1) {
+      layer_size *= ranked_connections[ranked_pos];
+      prospective_tree_size += layer_size;
+      ranked_pos++;
+      max_tree_depth++;
+    }
+    max_tree_depth -= (prospective_tree_size > max_fused_ring_tree_size);
+
+    // Reallocate the tree search arrays if more memory is needed
+    if (static_cast<size_t>(prospective_tree_size) > tree_positions.size()) {
+      tree_positions.resize(prospective_tree_size);
+    }
+    if (static_cast<size_t>(prospective_tree_size) > links.size()) {
+      links.resize(prospective_tree_size);
+    }
+    if (static_cast<size_t>(prospective_tree_size * max_branches) > all_branch_atoms.size()) {
+      all_branch_atoms.resize(prospective_tree_size * max_branches);
+      for (int i = 0; i < prospective_tree_size; i++) {
+        links[i].setBranchPointer(&all_branch_atoms, i, max_branches);
+      }
+    }
+    
+    // CHECK
+    printf("The maximum tree depth is calculated to be %d\n", max_tree_depth);
+    printf("The maximum tree allocation is calculated to be %d\n", prospective_tree_size);
+    // END CHECK
+    
+    for (int j = 1; j < nfused_atoms; j++) {
+      if (fused_ring_atom_connections[j] == 2) {
+        continue;
+      }
+      const int jatom = fused_ring_atoms[j];
+
+      // Make a tree, starting at jatom and extending through all available combinations to
+      // arrive back at jatom.
+      links[0].addToTree(-1, jatom, 0, nbk, valid_atom_mask);
+      tree_positions[i] = 0;
+      int node_count = 1;
+      int current_layer = 1;
+      int layer_llim = 0;
+      int layer_hlim = 1;
+#if 0
+      while (layer_hlim > layer_llim) {
+        const int next_layer_llim = node_count;
+        for (int pos = layer_llim; pos < layer_hlim; pos++) {
+          const int pos_atom = links[pos].getAtom();
+          const int pos_branch_count = links[pos].getBranchCount();
+          for (int pos2 = 0; pos2 < pos_branch_count; pos2++) {
+            const int pos2_atom = links[pos].getBranchAtom(pos2);
+
+            // Check this atom against the history in the tree.  If it has already been visited
+            // by this branch of the tree, do not incorporate it into the next layer.
+            bool found = false;
+            test_layer = current_layer - 1;
+            while (found == false && test_layer >= 0) {
+              const int prev_atom = links[pos].getPreviousAtom();
+              const int prev_node = links[pos].getPreviousNode();
+              found = (found || (prev_atom == pos2_atom));
+
+            }
+          }
+        }
+      }
+#endif
+
+      for (int k = 0; k < j; k++) {
+        if (fused_ring_atom_connections[k] == 2) {
+          continue;
+        }
+        const int katom = fused_ring_atoms[k];
+
+        // Find the shortest and second-shortest paths between atoms jatom and katom, staying
+        // within the fused ring atom system.  This occurs when a tree starting at jatom includes
+        // katom twice.  If, in the same layer that katom was include twice, katom is included
+        // additional times, this implies additional rings of equal size.  Log them all.
+        
+      }
+    }
+    
+    // Clear the fused ring mask for the next round
+    for (int pos = 0; pos < nfused_atoms; pos++) {
+      valid_atom_mask[fused_ring_atoms[pos]] = false;
+    }
+
+    // CHECK
+    bool problem = false;
+    for (int j = 0; j < atom_count; j++) {
+      problem = (problem || valid_atom_mask[j]);
+    }
+    if (problem) {
+      printf("The fused ring mask was not entirely cleared.\n");
+    }
+    // END CHECK
   }
 }
 
@@ -1204,6 +1458,10 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
   // initiated by some other atom.
   std::vector<std::vector<bool>> atom_touched(4, std::vector<bool>(atom_count, false));
   std::vector<int> result;
+  std::vector<bool> valid_atom_mask(atom_count);
+  for (int i = 0; i < atom_count; i++) {
+    valid_atom_mask[i] = (cdk.z_numbers[i] > 0);
+  }
   for (int i = 0; i < atom_count; i++) {
 
     // Test whether this atom is a chiral candidate
@@ -1238,7 +1496,7 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
       if (cdk.z_numbers[nbk.nb12x[j]] == 0) {
         continue;
       }
-      links[n_real][0].addToTree(i, nbk.nb12x[j], 0, nbk, cdk);
+      links[n_real][0].addToTree(i, nbk.nb12x[j], 0, nbk, valid_atom_mask);
       links[n_real][0].addBondOrder(vk, bond_orders);
       atom_touched[n_real][i] = true;
       atom_touched[n_real][nbk.nb12x[j]] = true;
@@ -1267,7 +1525,8 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
               atom_touched[j][m_atom] = true;
               touch_min[j] = std::min(touch_min[j], m_atom);
               touch_max[j] = std::max(touch_max[j], m_atom);
-              links[j][node_count[j]].addToTree(k_atom, m_atom, current_layer, nbk, cdk);
+              links[j][node_count[j]].addToTree(k_atom, m_atom, current_layer, nbk,
+                                                valid_atom_mask);
               links[j][node_count[j]].addBondOrder(vk, bond_orders);
               tree_positions[j][m_atom] = node_count[j];
               node_count[j] += 1;
@@ -1329,18 +1588,6 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
                                           std::vector<int> *tmp_rotatable_groups,
                                           std::vector<int> *tmp_rotatable_group_bounds) {
 
-  // CHECK
-  if (cdk.natom == 78) {
-    for (int i = 0; i < ring_count; i++) {
-      printf("Ring %2d : ", i);
-      for (int j = ring_atom_bounds[i]; j < ring_atom_bounds[i + 1]; j++) {
-        printf("%4.4s ", char4ToString(cdk.atom_names[ring_atoms[j]]).c_str());
-      }
-      printf("\n");
-    }
-  }
-  // END CHECK
-  
   // Prepare a table of atoms that are part of rings
   std::vector<bool> bond_in_ring(vk.nbond, false);
   for (int i = 0; i < ring_count; i++) {
@@ -1348,26 +1595,10 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
       const int jatom = ring_atoms[j];
       for (int k = vk.bond_asgn_bounds[jatom]; k < vk.bond_asgn_bounds[jatom + 1]; k++) {
         const int katom = vk.bond_asgn_atoms[k];
-        
-        // CHECK
-        const bool report = (cdk.natom == 78 &&
-                             ((jatom == 19 && katom == 24) || (jatom == 24 && katom == 19)));
-        if (report) {
-          printf("Checking the bond for ring inclusion...\n");
-        }
-        // END CHECK
-        
         bool tb_in_ring = false;
         for (int m = ring_atom_bounds[i]; m < ring_atom_bounds[i + 1]; m++) {
           tb_in_ring = (tb_in_ring || katom == ring_atoms[m]);
         }
-
-        // CHECK
-        if (report) {
-          printf("tb_in_ring = %d\n", static_cast<int>(tb_in_ring));
-        }
-        // END CHECK
-        
         bond_in_ring[vk.bond_asgn_terms[k]] = tb_in_ring;
       }
     }
@@ -1378,28 +1609,12 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
   std::vector<int2> rotators;
   std::vector<std::vector<int>> moving_lists;
   for (int pos = 0; pos < vk.nbond; pos++) {
-
-    // CHECK
-    const bool report = (vk.natom == 78 &&
-                         ((vk.bond_i_atoms[pos] == 19 && vk.bond_j_atoms[pos] == 24) ||
-                          (vk.bond_j_atoms[pos] == 19 && vk.bond_i_atoms[pos] == 24)));
-    if (report) {
-      printf("Here is the bond...\n");
-    }
-    // END CHECK
     
     // Omit bonds within rings.  Those will be handled separately.  Otherwise, allow a liberal
     // definition of a single bond--a small amount of double-bond character might be permissible.
     if (bond_in_ring[pos] || bond_orders.readHost(pos) != near_one) {
       continue;
     }
-
-    // CHECK
-    if (report) {
-      printf("bond_in_ring = %d\n", static_cast<int>(bond_in_ring[pos]));
-      printf("bond_orders  = %9.4lf\n", bond_orders.readHost(pos));
-    }
-    // END CHECK
     
     // Ensure that both ends have more branching from them, and that the branches are worth
     // rotating (more than just hydrogen atoms branching from them)

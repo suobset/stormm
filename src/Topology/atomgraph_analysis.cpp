@@ -644,28 +644,31 @@ std::vector<int> mapRotatingGroup(const NonbondedKit<double> &nbk, const Chemica
   bool ring_completed;
   int nrot = colorConnectivity(nbk, cdk, atom_i, atom_j, &marked, &ring_completed);
   if (ring_completed) {
-    rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
-          std::to_string(atom_j + 1) + ", " +
-          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
-          std::to_string(cdk.res_numbers[atom_i]) + " :: " +
-          char4ToString(cdk.atom_names[atom_i]) + " and " +
-          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
-          std::to_string(cdk.res_numbers[atom_j]) + " :: " +
-          char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring system.  This "
-          "should not have happened if the bond was selected from a ChemicalFeatures object.",
-          "selectRotatingAtoms");
+    rtWarn("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
+           std::to_string(atom_j + 1) + ", " +
+           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
+           std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+           char4ToString(cdk.atom_names[atom_i]) + " and " +
+           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
+           std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+           char4ToString(cdk.atom_names[atom_j]) + ", appears to be part of a ring system.  This "
+           "should not have happened if the bond was selected from a ChemicalFeatures object, but "
+           "may have occurred if there is a very complex fused ring system that could not be "
+           "fully mapped.  No atoms will rotate about this bond.", "selectRotatingAtoms");
+    std::vector<int> tmp_result;
+    return tmp_result;
   }
   if (nrot == 0 || nrot == nbk.natom - 2) {
-    rtErr("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
-          std::to_string(atom_j + 1) + ", " +
-          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
-          std::to_string(cdk.res_numbers[atom_i]) + " :: " +
-          char4ToString(cdk.atom_names[atom_i]) + " and " +
-          char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
-          std::to_string(cdk.res_numbers[atom_j]) + " :: " +
-          char4ToString(cdk.atom_names[atom_j]) + ", does not appear to be worth rotating.  This "
-          "should not have happened if the bond was selected from a ChemicalFeatures object.",
-          "selectRotatingAtoms");
+    rtWarn("The rotatable bond between atoms " + std::to_string(atom_i + 1) + " and " +
+           std::to_string(atom_j + 1) + ", " +
+           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_i, cdk.nres)]) + " " +
+           std::to_string(cdk.res_numbers[atom_i]) + " :: " +
+           char4ToString(cdk.atom_names[atom_i]) + " and " +
+           char4ToString(cdk.res_names[findBin(cdk.res_limits, atom_j, cdk.nres)]) + " " +
+           std::to_string(cdk.res_numbers[atom_j]) + " :: " +
+           char4ToString(cdk.atom_names[atom_j]) + ", does not appear to be worth rotating.  This "
+           "should not have happened if the bond was selected from a ChemicalFeatures object.",
+           "selectRotatingAtoms");
   }
   std::vector<int> result(nrot);
   int counter = 0;

@@ -30,6 +30,9 @@ struct RotatorGroup {
                                      ///<   about the rotatable bond axis
 };
 
+/// \brief The maximum number of nodes permitted in the tree searches of fused ring systems
+constexpr int max_fused_ring_tree_size = 33554432;
+  
 /// \brief A struct to serve as a tracker of progress through a molecule in the search for loops.
 ///        Proceeding forward in the search, every link will have come from one and only one
 ///        previous link, but could go in multiple directions thereafter.
@@ -51,15 +54,15 @@ public:
 
   /// \brief Set this as the next link in the chain, or as the chain initiator.
   ///
-  /// \param previous_in    Index of the previous BondedNode leading to this one, or -1 if this is
-  ///                       intended to be the chain initiator
-  /// \param current_atom   Topological index of the current atom, which this BondedNode describes
-  /// \param current_layer  The current layer in the growing tree
-  /// \param nbk            Nonbonded interactions abstract for the overarching topology (needed
-  ///                       for list of 1:2 exclusions, which indicate bonds)
-  /// \param cdk            Atom, residue, and molecule details taken from the original topology
+  /// \param previous_in      Index of the previous BondedNode leading to this one, or -1 if this
+  ///                         is intended to be the chain initiator
+  /// \param current_atom     Topological index of the current atom this BondedNode describes
+  /// \param current_layer    The current layer in the growing tree
+  /// \param nbk              Nonbonded interactions abstract for the overarching topology (needed
+  ///                         for list of 1:2 exclusions, which indicate bonds)
+  /// \param valid_atom_mask  Reference table of which atoms are valid to include in the tree
   void addToTree(int previous_in, int current_atom, int current_layer,
-                 const NonbondedKit<double> &nbk, const ChemicalDetailsKit &cdk);
+                 const NonbondedKit<double> &nbk, const std::vector<bool> &valid_atom_mask);
 
   /// \brief Add the bond order between this atom and its previous atom
   ///
