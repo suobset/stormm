@@ -12,6 +12,21 @@ enum class ChiralOrientation {
   NONE       ///< No chirality, or no preference
 };
 
+/// \brief Enumerate the ways for inverting a chiral center
+enum class ChiralInversionProtocol {
+  ROTATE,        ///< A simple rotation of two arms about the bisector between them will invert
+                 ///<   the chiral center without severe bond stretching.
+  REFLECT,       ///< A reflection of the entire molecule across a plane will be necessary to
+                 ///<   invert the chiral center in a way that does not break covalent bonds.
+                 ///<   Because this inverts all centers in the molecule, those that can be
+                 ///<   inverted individually by rotation must be reset to their original
+                 ///<   orientations following the reflection.
+  DO_NOT_INVERT  ///< Applied to the 2nd, 3rd, and subsequent chiral centers that require
+                 ///<   reflection across a plane in order to invert them.  All such centers must
+                 ///<   be inverted together, so there is no point in sampling orientations beyond
+                 ///<   those of the first.
+};
+  
 /// \brief Enumerate the options for mapping rotatable groups in the molecule:
 enum class MapRotatableGroups {
   YES, NO

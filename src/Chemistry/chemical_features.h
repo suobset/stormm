@@ -323,7 +323,20 @@ public:
   /// \param mol_index  The molecule for which to obtain chiral center inversion groups
   ///                   system may contain more than one molecule)
   std::vector<RotatorGroup> getChiralInversionGroups() const;
-  
+
+  /// \brief Get the means for inverting one or more chiral centers.
+  ///
+  /// Overloaded:
+  ///   - Get all chiral inversion instructions
+  ///   - Get the instruction for a specific center, numbered according to the list of all chiral
+  ///     centers in the molecule.
+  ///
+  /// \param index  The index of the chiral center of interest
+  /// \{
+  std::vector<ChiralInversionProtocol> getChiralInversionMethods() const;
+  ChiralInversionProtocol getChiralInversionMethods(int index) const;
+  /// \}
+
   /// \brief Get a pointer to the AtomGraph which built this object.
   const AtomGraph* getTopologyPointer() const;
   
@@ -403,6 +416,11 @@ private:
   /// with the index equal to the absolute value is D-chiral.
   Hybrid<int> chiral_centers;
 
+  /// List of chiral inversion capabilities.  The integers are tied to the chemistry enumeration
+  /// ChiralInversionProtocol, spanning "do not invert" to "invert by full reflection and reverse
+  /// all other centers to compensate."
+  Hybrid<int> chiral_inversion_methods;
+  
   /// List of rotating atoms, and the endpoints of bonds defining the axes of rotation.  The first
   /// atom in each group is the "root," distal to the atoms that move from the "pivot," the second
   /// atom listed in each group.  Neither the root atom or the pivot actually moves, but subsequent
@@ -459,8 +477,6 @@ private:
   ///
   /// \param vk  Abstract of valence terms from the topology
   std::vector<int> findPlanarAtoms(const ValenceKit<double> &vk) const;
-
-  /// \brief 
 
   /// \brief Trace all rings in the system based on a tree structure linked list.
   ///
@@ -542,6 +558,21 @@ private:
   std::vector<int> findChiralCenters(const NonbondedKit<double> &nbk, const ValenceKit<double> &vk,
                                      const ChemicalDetailsKit &cdk,
                                      const CoordinateFrameReader &cfr) const;
+
+  /// \brief Determine whether each chiral center can be inverted, and whether that is best done by
+  ///        rotating two chiral branches by C2 symmetry or reflecting the entire molecule across a
+  ///        plane.  Reflection across a plane inverts all chiral centers, so other centers which
+  ///        can be flipped with C2 rotations must be reset to their original configurations
+  ///        following a reflection.  If there are multiple chiral atoms requiring complete
+  ///        reflection, their centers can only be flipped simultaneously, so only the first such
+  ///        center in a molecule will be considered invertible at all.
+  ///
+  /// \param tmp_chiral_centers    List of previously detected chiral centers
+  /// \param tmp_ring_atoms        List of all atoms in rings
+  /// \param tmp_ring_atom_bounds  Bounds array for tmp_ring_atoms
+  std::vector<int> findChiralInversionMethods(const std::vector<int> &tmp_chiral_centers,
+                                              const std::vector<int> &tmp_ring_atoms,
+                                              const std::vector<int> &tmp_ring_atom_bounds);
 
   /// \brief Find rotatable bonds in the system, those with bond order of 1.0 and nontrivial groups
   ///        sprouting from either end, and return a vector of the atom indices at either end.

@@ -182,6 +182,7 @@ ChemicalFeatures::ChemicalFeatures() :
     hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
     hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
+    chiral_inversion_methods{HybridKind::POINTER, "chemfe_chiral_meth"},
     rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
     rotatable_group_bounds{HybridKind::POINTER, "chemfe_rotator_bounds"},
     invertible_groups{HybridKind::POINTER, "chemfe_invertors"},
@@ -216,6 +217,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
     hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
+    chiral_inversion_methods{HybridKind::POINTER, "chemfe_chiral_meth"},
     rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
     rotatable_group_bounds{HybridKind::POINTER, "chemfe_rotator_bounds"},
     invertible_groups{HybridKind::POINTER, "chemfe_invertors"},
@@ -280,6 +282,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   // Find chiral centers
   const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
   chiral_center_count = tmp_chiral_centers.size();
+  const std::vector<int>
+    tmp_chiral_inversion_methods = findChiralInversionMethods(tmp_chiral_centers, tmp_ring_atoms,
+                                                              tmp_ring_atom_bounds);
 
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
@@ -305,7 +310,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
                       roundUp(tmp_aromatic_group_bounds.size(), warp_size_zu) +
                       roundUp(tmp_aromatic_pi_electrons.size(), warp_size_zu) +
                       roundUp(tmp_aromatic_groups.size(), warp_size_zu) +
-                      3 * roundUp(tmp_chiral_centers.size(), warp_size_zu) +
+                      4 * roundUp(tmp_chiral_centers.size(), warp_size_zu) +
                       roundUp(tmp_rotatable_groups.size(), warp_size_zu) +
                       roundUp(tmp_rotatable_group_bounds.size(), warp_size_zu) +
                       roundUp(tmp_invertible_groups.size(), warp_size_zu) +
@@ -324,6 +329,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ic = hydrogen_bond_donors.putHost(&int_data, tmp_hydrogen_bond_donors, ic, warp_size_zu);
   ic = hydrogen_bond_acceptors.putHost(&int_data, tmp_hydrogen_bond_acceptors, ic, warp_size_zu);
   ic = chiral_centers.putHost(&int_data, tmp_chiral_centers, ic, warp_size_zu);
+  ic = chiral_inversion_methods.putHost(&int_data, tmp_chiral_inversion_methods, ic, warp_size_zu);
   ic = rotatable_groups.putHost(&int_data, tmp_rotatable_groups, ic, warp_size_zu);
   ic = rotatable_group_bounds.putHost(&int_data, tmp_rotatable_group_bounds, ic, warp_size_zu);
   ic = invertible_groups.putHost(&int_data, tmp_invertible_groups, ic, warp_size_zu);
@@ -376,6 +382,7 @@ ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     hydrogen_bond_donors{original.hydrogen_bond_donors},
     hydrogen_bond_acceptors{original.hydrogen_bond_acceptors},
     chiral_centers{original.chiral_centers},
+    chiral_inversion_methods{original.chiral_inversion_methods},
     rotatable_groups{original.rotatable_groups},
     rotatable_group_bounds{original.rotatable_group_bounds},
     invertible_groups{original.invertible_groups},
@@ -422,6 +429,7 @@ ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
     hydrogen_bond_donors{std::move(original.hydrogen_bond_donors)},
     hydrogen_bond_acceptors{std::move(original.hydrogen_bond_acceptors)},
     chiral_centers{std::move(original.chiral_centers)},
+    chiral_inversion_methods{std::move(original.chiral_inversion_methods)},
     rotatable_groups{std::move(original.rotatable_groups)},
     rotatable_group_bounds{std::move(original.rotatable_group_bounds)},
     invertible_groups{std::move(original.invertible_groups)},
@@ -473,6 +481,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
   hydrogen_bond_donors = other.hydrogen_bond_donors;
   hydrogen_bond_acceptors = other.hydrogen_bond_acceptors;
   chiral_centers = other.chiral_centers;
+  chiral_inversion_methods = other.chiral_inversion_methods;
   rotatable_groups = other.rotatable_groups;
   rotatable_group_bounds = other.rotatable_group_bounds;
   invertible_groups = other.invertible_groups;
@@ -526,6 +535,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
   hydrogen_bond_donors = std::move(other.hydrogen_bond_donors);
   hydrogen_bond_acceptors = std::move(other.hydrogen_bond_acceptors);
   chiral_centers = std::move(other.chiral_centers);
+  chiral_inversion_methods = std::move(other.chiral_inversion_methods);
   rotatable_groups = std::move(other.rotatable_groups);
   rotatable_group_bounds = std::move(other.rotatable_group_bounds);
   invertible_groups = std::move(other.invertible_groups);
@@ -1694,6 +1704,73 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<int>
+ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_centers,
+                                             const std::vector<int> &tmp_ring_atoms,
+                                             const std::vector<int> &tmp_ring_atom_bounds) {
+  std::vector<int> result(chiral_center_count);
+
+  // Count the number of rings, irrespective of size, that each atom participates in.
+  // Chiral centers which participate in two rings can be inverted using the standard protocol
+  // of C2 symmetry rotation so long as those two rings only share one atom, the chiral center
+  // itself.  If the two rings share more atoms than just the chiral center, then the additional
+  // bindings between the rings prevent a clean rotation of two branches coming out of the center
+  // and force inversion by complete reflection of the molecule across some plane.  Chiral atoms
+  // which participate in three rings cannot be inverted by C2 symmtery rotation and must be
+  // inverted by complete reflection of the entire molecule across a plane.
+  std::vector<int> ring_occupancy_bounds(atom_count + 1, 0);
+  for (int i = 0; i < tmp_ring_atom_bounds[ring_count]; i++) {
+    ring_occupancy_bounds[tmp_ring_atoms[i]] += 1;
+  }
+  prefixSumInPlace<int>(&ring_occupancy_bounds, PrefixSumType::EXCLUSIVE, "ChemicalFeatures");
+  std::vector<int> ring_occupancy(ring_occupancy_bounds[atom_count]);
+  for (int i = 0; i < ring_count; i++) {
+    for (int j = tmp_ring_atom_bounds[i]; j < tmp_ring_atom_bounds[i + 1]; j++) {
+      const int cpos = ring_occupancy_bounds[tmp_ring_atoms[j]];
+      ring_occupancy[cpos] = i;
+      ring_occupancy_bounds[tmp_ring_atoms[j]] = cpos + 1;
+    }
+  }
+  for (int i = atom_count; i > 0; i--) {
+    ring_occupancy_bounds[i] = ring_occupancy_bounds[i - 1];
+  }
+  ring_occupancy_bounds[0] = 0;
+
+  for (int i = 0; i < chiral_center_count; i++) {
+
+    // The chiral center indices are encoded with D- and L- orientations by offsetting all of
+    // their atom indices by +1 and then multiplying D- center indices by -1.
+    const int chatom = abs(tmp_chiral_centers[i] - 1);
+    const int nrings = (ring_occupancy_bounds[chatom + 1] - ring_occupancy_bounds[chatom]);
+    if (nrings >= 3) {
+      result[i] = static_cast<int>(ChiralInversionProtocol::REFLECT);
+    }
+    else if (nrings == 2) {
+      int nfusion = 0;
+      const int r1_idx = ring_occupancy_bounds[chatom];
+      const int r2_idx = ring_occupancy_bounds[chatom] + 1;
+      for (int j = tmp_ring_atom_bounds[r1_idx]; j < tmp_ring_atom_bounds[r1_idx + 1]; j++) {
+        const int jring_atom = tmp_ring_atoms[j];
+        for (int k = tmp_ring_atom_bounds[r2_idx]; k < tmp_ring_atom_bounds[r2_idx + 1]; k++) {
+          nfusion += (tmp_ring_atoms[k] == jring_atom);
+        }
+      }
+      if (nfusion == 1) {
+        result[i] = static_cast<int>(ChiralInversionProtocol::ROTATE);
+      }
+      else {
+        result[i] = static_cast<int>(ChiralInversionProtocol::REFLECT);
+      }
+    }
+    else {
+      result[i] = static_cast<int>(ChiralInversionProtocol::ROTATE);
+    }
+  }
+  
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
                                           const ChemicalDetailsKit &cdk,
                                           const NonbondedKit<double> &nbk,
@@ -2274,6 +2351,20 @@ std::vector<RotatorGroup> ChemicalFeatures::getChiralInversionGroups() const {
     }
   }
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<ChiralInversionProtocol> ChemicalFeatures::getChiralInversionMethods() const {
+  std::vector<ChiralInversionProtocol> result(chiral_center_count);
+  for (int i = 0; i < chiral_center_count; i++) {
+    result[i] = static_cast<ChiralInversionProtocol>(chiral_inversion_methods.readHost(i));
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+ChiralInversionProtocol ChemicalFeatures::getChiralInversionMethods(const int index) const {
+  return static_cast<ChiralInversionProtocol>(chiral_inversion_methods.readHost(index));
 }
 
 //-------------------------------------------------------------------------------------------------
