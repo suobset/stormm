@@ -32,7 +32,7 @@ public:
   /// \param nframe_in         Initial number of frames to allocate for
   /// \param unit_cell_in      The type of unit cell to prepare for (this can be modified after
   ///                          creating the object)
-  /// \param file_name_in      File to read from
+  /// \param file_name         File to read from
   /// \param frame_numbers_in  Frame numbers of the file to read (default all frames)
   /// \param replica_count_in  The number of times to replicate a series of one of more frames
   ///                          read from a file (this is useful for immediately making many copies
@@ -49,7 +49,7 @@ public:
   /// \{
   explicit CoordinateSeries(int natom_in = 0, int nframe_in = 0,
                             UnitCellType unit_cell_in = UnitCellType::NONE);
-  explicit CoordinateSeries(const std::string &file_name_in,
+  explicit CoordinateSeries(const std::string &file_name,
                             CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
                             const std::vector<int> &frame_numbers_in = {},
                             int replica_count_in = 1, int atom_count_in = 0);
@@ -62,10 +62,56 @@ public:
   explicit CoordinateSeries(const CoordinateFrame &cf, int nframe_in);
   /// \}
 
+  /// \brief Import coordinates from a CoordinateFrame or PhaseSpace object.  The original object
+  ///        must have the same number of atoms as the CoordinateSeries itself, or else a range of
+  ///        atoms within the original coordinate object must be specified that fits the
+  ///        CoordinateSeries.  The default behavior is to push the new coordinates to the back of
+  ///        the list, but any frame index within the bounds of the current list may also be
+  ///        specified.
+  ///
+  /// Overloaded:
+  ///   - Accept all types of single-frame coordinate objects
+  ///   - Accept all atoms or a subset of the atoms that fits the current atom count of the
+  ///     CoordinateSeries
+  /// \param cfr          Coordinates to import.  The CoordinateFrameReader is the most basic
+  ///                     object available for importation.  Both CoordinateFrame and PhaseSpace
+  ///                     objects can create CoordinateFrameReaders or writers, and the writers
+  ///                     can be const-ified into readers.
+  /// \param cfw          Coordinates to import
+  /// \param cf           Coordinates to import
+  /// \param ps           Coordinates to import
+  /// \param frame_index  Index of the frame into which the coordinates should be imported.  The
+  ///                     default value of -1 adds the new coordinates to the end of the list.
+  void importCoordinateSet(const CoordinateFrameReader &cfr, int atom_start, int atom_end,
+                           int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrameReader &cfr, int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrameWriter &cfw, int atom_start, int atom_end,
+                           int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrameWriter &cfw, int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrame &cf, int atom_start, int atom_end,
+                           int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrame &cf, int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrame *cf, int atom_start, int atom_end,
+                           int frame_index = -1);
+  void importCoordinateSet(const CoordinateFrame *cf, int frame_index = -1);
+  void importCoordinateSet(const PhaseSpace &ps, int atom_start, int atom_end,
+                           int frame_index = -1);
+  void importCoordinateSet(const PhaseSpace &ps, int frame_index = -1);
+  void importCoordinateSet(const PhaseSpace *ps, nt atom_start, int atom_end,
+                           int frame_index = -1);
+  void importCoordinateSet(const PhaseSpace *ps, int frame_index = -1);
+  
+  /// \brief 
+  
 private:
-  std::string file_name;                ///< File from which the series was derived, if applicable
-  int atom_count;                       ///< Number of atoms in each frame
-  int frame_count;                      ///< Total number of frames currently allocated
+  int atom_count;                       ///< Number of atoms in each frame.  This number is also
+                                        ///<   modifiable with a special call to the resize()
+                                        ///<   member function, and between frames the space for
+                                        ///<   atoms is padded by the warp size, but there is no
+                                        ///<   concept of an atom capacity in the same way that
+                                        ///<   there is a frame capacity.
+  int frame_count;                      ///< Total number of frames currently in the object
+  int frame_capacity;                   ///< Total frame capacity of the object
   Hybrid<int> frame_numbers;            ///< Frame numbers of the different frames derived from
                                         ///<   some trajectory, if applicable
   Hybrid<T> x_coordinates;              ///< Cartesian X coordinates of all particles, with each
