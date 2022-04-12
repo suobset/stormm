@@ -1,10 +1,12 @@
-#include "Math/vector_ops.h"
+#include "Math/matrix_ops.h"
+#include "Math/summation.h"
 #include "rmsd.h"
 
 namespace omni {
 namespace structure {
 
 using math::sum;
+using math::jacobiEigensolver;
 
 //-------------------------------------------------------------------------------------------------
 double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, const double* xcrd_b,
@@ -101,40 +103,46 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
       }
       std::vector<double> vmat(16, 0.0), eigval(4, 0.0);
       jacobiEigensolver(&rmat, &vmat, &eigval, 4);
-      eigenSort(&eigval, &vmat, 4);
+      int max_eig_loc = 0;
+      for (int i = 1; i < 4; i++) {
+        if (eigval[i] > eigval[max_eig_loc]) {
+          max_eig_loc = i;
+        }
+      }
 
       // Form the rotation matrix
-      const double a = vmat[0];
-      const double x = vmat[1];
-      const double y = vmat[2];
-      const double z = vmat[3];
+      const double a = vmat[(4 * max_eig_loc)    ];
+      const double x = vmat[(4 * max_eig_loc) + 1];
+      const double y = vmat[(4 * max_eig_loc) + 2];
+      const double z = vmat[(4 * max_eig_loc) + 3];
       std::vector<double> umat(9);
-      u[0] = (a * a) + (x * x) - (y * y) - (z * z);
-      u[3] = 2.0 * ((x * y) + (a * z));
-      u[6] = 2.0 * ((x * z) - (a * y));
-      u[1] = 2.0 * ((x * y) - (a * z));
-      u[4] = (a * a) - (x * x) + (y * y) - (z * z);
-      u[7] = 2.0 * ((y * z) + (a * x));
-      u[2] = 2.0 * ((x * z) + (a * y));
-      u[5] = 2.0 * ((y * z) - (a * x));
-      u[8] = (a * a) - (x * x) - (y * y) + (z * z);
+      umat[0] = (a * a) + (x * x) - (y * y) - (z * z);
+      umat[3] = 2.0 * ((x * y) + (a * z));
+      umat[6] = 2.0 * ((x * z) - (a * y));
+      umat[1] = 2.0 * ((x * y) - (a * z));
+      umat[4] = (a * a) - (x * x) + (y * y) - (z * z);
+      umat[7] = 2.0 * ((y * z) + (a * x));
+      umat[2] = 2.0 * ((x * z) + (a * y));
+      umat[5] = 2.0 * ((y * z) - (a * x));
+      umat[8] = (a * a) - (x * x) - (y * y) + (z * z);
 
       // Shift and rotate the coordinates of the first frame (in temporary variables only) and
       // compare them to the shifted, unrotated coordinates of the second frame.
       for (int i = lower_limit; i < upper_limit; i++) {
+        const double tmass = (use_mass) ? masses[i] : 1.0;
         const double shfta_x = xcrd_a[i] - coma_x;
         const double shfta_y = ycrd_a[i] - coma_y;
         const double shfta_z = zcrd_a[i] - coma_z;
         const double shftb_x = xcrd_b[i] - comb_x;
         const double shftb_y = ycrd_b[i] - comb_y;
         const double shftb_z = zcrd_b[i] - comb_z;
-        const double rota_x = (u[0] * shfta_x) + (u[3] * shfta_y) + (u[6] * shfta_z);
-        const double rota_y = (u[1] * shfta_x) + (u[4] * shfta_y) + (u[7] * shfta_z);
-        const double rota_z = (u[2] * shfta_x) + (u[5] * shfta_y) + (u[8] * shfta_z);
+        const double rota_x = (umat[0] * shfta_x) + (umat[3] * shfta_y) + (umat[6] * shfta_z);
+        const double rota_y = (umat[1] * shfta_x) + (umat[4] * shfta_y) + (umat[7] * shfta_z);
+        const double rota_z = (umat[2] * shfta_x) + (umat[5] * shfta_y) + (umat[8] * shfta_z);
         const double dx = shftb_x - rota_x;
         const double dy = shftb_y - rota_y;
         const double dz = shftb_z - rota_z;
-        result += masses[i] * ((dx * dx) + (dy * dy) + (dz * dz));
+        result += tmass * ((dx * dx) + (dy * dy) + (dz * dz));
       } 
     }
     break;
@@ -162,17 +170,36 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
 double rmsd(const PhaseSpaceReader &psr_a, const PhaseSpaceReader &psr_b,
             const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
             const int upper_limit) {
+  return rmsd(psr_a.xcrd, psr_a.ycrd, psr_a.zcrd, psr_b.xcrd, psr_b.ycrd, psr_b.zcrd, cdk.masses,
+              method, lower_limit, upper_limit);
 }
 
 //-------------------------------------------------------------------------------------------------
 double rmsd(const PhaseSpace &ps_a, const PhaseSpace &ps_b, const AtomGraph &ag,
             const RmsdMethod method, const int lower_limit, const int upper_limit) {
-
+  const PhaseSpaceReader psr_a = ps_a.data();
+  const PhaseSpaceReader psr_b = ps_b.data();
+  const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  return rmsd(psr_a.xcrd, psr_a.ycrd, psr_a.zcrd, psr_b.xcrd, psr_b.ycrd, psr_b.zcrd, cdk.masses,
+              method, lower_limit, upper_limit);
 }
 
 //-------------------------------------------------------------------------------------------------
-double massWeightedRmsd(const PhaseSpace &ps_a, const PhaseSpace &ps_b const ) {
+double rmsd(const CoordinateFrameReader &cfr_a, const CoordinateFrameReader &cfr_b,
+            const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
+            const int upper_limit) {
+  return rmsd(cfr_a.xcrd, cfr_a.ycrd, cfr_a.zcrd, cfr_b.xcrd, cfr_b.ycrd, cfr_b.zcrd, cdk.masses,
+              method, lower_limit, upper_limit);
+}
 
+//-------------------------------------------------------------------------------------------------
+double rmsd(const CoordinateFrame &cf_a, const CoordinateFrame &cf_b, const AtomGraph &ag,
+            const RmsdMethod method, const int lower_limit, const int upper_limit) {
+  const CoordinateFrameReader cfr_a = cf_a.data();
+  const CoordinateFrameReader cfr_b = cf_b.data();
+  const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  return rmsd(cfr_a.xcrd, cfr_a.ycrd, cfr_a.zcrd, cfr_b.xcrd, cfr_b.ycrd, cfr_b.zcrd, cdk.masses,
+              method, lower_limit, upper_limit);
 }
 
 } // namespace structure

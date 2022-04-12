@@ -9,8 +9,10 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Structure/global_manipulation.h"
 #include "../../src/Structure/isomerization.h"
 #include "../../src/Structure/local_arrangement.h"
+#include "../../src/Structure/rmsd.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
@@ -38,6 +40,9 @@ using omni::math::computeBoxTransform;
 using omni::energy::evaluateBondTerms;
 using omni::energy::evaluateAngleTerms;
 using omni::energy::ScoreCard;
+using omni::structure::rotateCoordinates;
+using omni::structure::rmsd;
+using omni::structure::RmsdMethod;
 using omni::topology::AtomGraph;
 using omni::topology::ChemicalDetailsKit;
 using omni::topology::UnitCellType;
@@ -145,6 +150,9 @@ int main(int argc, char* argv[]) {
 
   // Section 2
   section("Selected chiral inversions");
+
+  // Section 3
+  section("Test RMSD calculations");
   
   // Get a handful of realistic systems
   const char osc = osSeparator();
@@ -208,7 +216,49 @@ int main(int argc, char* argv[]) {
   checkRotationalSampling(trpc_ag, trpc_ps, trpc_feat, oe, do_tests);
   checkRotationalSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_rot_iso");
   checkRotationalSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_rot_iso");
-  
+
+  // Test RMSD computations on simple structures
+  section(3);
+  CoordinateFrame starfish_a(7);
+  CoordinateFrameWriter strfa = starfish_a.data();
+  strfa.xcrd[1] =  1.0;
+  strfa.ycrd[2] =  1.0;
+  strfa.xcrd[3] = -1.0;
+  strfa.ycrd[4] = -1.0;
+  strfa.zcrd[5] =  1.0;
+  strfa.zcrd[6] = -1.0;
+  CoordinateFrame starfish_b(starfish_a);
+  CoordinateFrameWriter strfb = starfish_b.data();
+  rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.0, 0.0, omni::symbols::pi / 4.0, 0,
+                    strfb.natom);
+  double rms_no_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                             strfb.zcrd, nullptr, RmsdMethod::NO_ALIGN_GEOM, 0, strfa.natom);
+  double rms_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                          strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+  check(rms_no_align, RelationalOperator::EQUAL, Approx(0.578562967).margin(1.0e-8),
+        "Positional (non-aligned) RMSD computed for coordinates pre-shifted to their respective "
+        "centers of mass does not produce the expected result.");
+  check(rms_align, RelationalOperator::EQUAL, Approx(0.0).margin(1.0e-8), "Quaternion-aligned, "
+        "positional RMSD computed for coordinates pre-shifted to their respective centers of mass "
+        "does not produce the expected result.");
+  translateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 5.0, 4.8, 9.7, 0, strfb.natom);
+  rms_no_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                      strfb.zcrd, nullptr, RmsdMethod::NO_ALIGN_GEOM, 0, strfa.natom);
+  rms_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+  check(rms_no_align, RelationalOperator::EQUAL, Approx(11.935859211).margin(1.0e-8),
+        "Positional (non-aligned) RMSD computed for coordinates differing in their respective "
+        "centers of mass does not produce the expected result.");
+  check(rms_align, RelationalOperator::EQUAL, Approx(0.0).margin(1.0e-8), "Quaternion-aligned, "
+        "positional RMSD computed for coordinates differing in their respective centers of mass "
+        "does not produce the expected result.");
+  rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.1, -0.3, -0.25, 0, strfb.natom);
+  rms_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+  check(rms_align, RelationalOperator::EQUAL, Approx(0.0).margin(1.0e-8), "Quaternion-aligned, "
+        "positional RMSD computed for coordinates differing in their respective centers of mass, "
+        "one rotated a second time for more frustration, does not produce the expected result.");
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }

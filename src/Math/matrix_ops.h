@@ -163,7 +163,7 @@ template <typename T>
 void jacobiEigensolver(HpcMatrix<T> *a, HpcMatrix<T> *v, Hybrid<T> *d,
                        ExceptionResponse policy = ExceptionResponse::WARN);
 /// \}
-  
+
 /// \brief Compute the upper-triangular form of a system of equations using the QR decomposition.
 ///        The matrix shall be presented in column major format
 

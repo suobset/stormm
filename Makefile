@@ -55,9 +55,12 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		 $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		 $(SRCDIR)/Restraints/restraint_builder.cpp \
+		 $(SRCDIR)/Structure/global_manipulation.cpp \
 		 $(SRCDIR)/Structure/isomerization.cpp \
 		 $(SRCDIR)/Structure/local_arrangement.cpp \
+		 $(SRCDIR)/Structure/rmsd.cpp \
 		 $(SRCDIR)/Structure/structure_ops.cpp \
+		 $(SRCDIR)/Structure/structure_utils.cpp \
 		 $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
@@ -150,10 +153,13 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Restraints/bounded_restraint.h \
 	           $(SRCDIR)/Restraints/restraint_apparatus.h \
 	           $(SRCDIR)/Restraints/restraint_builder.h \
+		   $(SRCDIR)/Structure/global_manipulation.h \
 		   $(SRCDIR)/Structure/isomerization.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
 		   $(SRCDIR)/Structure/structure_enumerators.h \
+		   $(SRCDIR)/Structure/rmsd.h \
 		   $(SRCDIR)/Structure/structure_ops.h \
+		   $(SRCDIR)/Structure/structure_utils.h \
 		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
@@ -247,9 +253,12 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Restraints/bounded_restraint.o \
 	        $(SRCDIR)/Restraints/restraint_apparatus.o \
 	        $(SRCDIR)/Restraints/restraint_builder.o \
+		$(SRCDIR)/Structure/global_manipulation.o \
 		$(SRCDIR)/Structure/isomerization.o \
 		$(SRCDIR)/Structure/local_arrangement.o \
+		$(SRCDIR)/Structure/rmsd.o \
 		$(SRCDIR)/Structure/structure_ops.o \
+		$(SRCDIR)/Structure/structure_utils.o \
 		$(SRCDIR)/Structure/virtual_site_handling.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \

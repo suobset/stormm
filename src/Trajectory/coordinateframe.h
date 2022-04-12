@@ -225,7 +225,7 @@ public:
   const CoordinateFrameReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   CoordinateFrameWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
-
+  
 private:
   std::string file_name;              ///< File from which this frame was derived, if applicable.
   int frame_number;                   ///< The frame number at which this frame appears in the

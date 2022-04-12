@@ -1735,7 +1735,6 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
     ring_occupancy_bounds[i] = ring_occupancy_bounds[i - 1];
   }
   ring_occupancy_bounds[0] = 0;
-
   for (int i = 0; i < chiral_center_count; i++) {
 
     // The chiral center indices are encoded with D- and L- orientations by offsetting all of
@@ -1747,8 +1746,8 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
     }
     else if (nrings == 2) {
       int nfusion = 0;
-      const int r1_idx = ring_occupancy_bounds[chatom];
-      const int r2_idx = ring_occupancy_bounds[chatom] + 1;
+      const int r1_idx = ring_occupancy[chatom];
+      const int r2_idx = ring_occupancy[chatom + 1];
       for (int j = tmp_ring_atom_bounds[r1_idx]; j < tmp_ring_atom_bounds[r1_idx + 1]; j++) {
         const int jring_atom = tmp_ring_atoms[j];
         for (int k = tmp_ring_atom_bounds[r2_idx]; k < tmp_ring_atom_bounds[r2_idx + 1]; k++) {

@@ -12,6 +12,7 @@ namespace omni {
 namespace structure {
 
 using topology::AtomGraph;
+using topology::UnitCellType;
 using topology::VirtualSiteKit;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameWriter;
