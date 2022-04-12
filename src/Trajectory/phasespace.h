@@ -119,7 +119,8 @@ public:
   PhaseSpace(const std::string &file_name_in,
              CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN, int frame_number = 0);
 
-  PhaseSpace(const std::string &file_name_in, CoordinateFileKind file_kind, const AtomGraph &ag, 
+  PhaseSpace(const std::string &file_name_in, const AtomGraph &ag,
+             CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
              int frame_number = 0);
   /// \}
 

@@ -299,8 +299,8 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
       }
       allocate();
       TextFile tf(file_name);
-      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, &box_space_transform,
-                         &inverse_transform, frame_number);
+      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, unit_cell,
+                         &box_space_transform, &inverse_transform, &box_dimensions, frame_number);
     }
     break;
   case CoordinateFileKind::AMBER_INPCRD:
@@ -311,6 +311,9 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
       allocate();
       getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
                                &box_space_transform, &inverse_transform, &box_dimensions);
+
+      // Interpret the box transformation, updating the unit cell type based on the file
+      unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
@@ -320,9 +323,6 @@ void CoordinateFrame::buildFromFile(const std::string &file_name_in,
     rtErr("The file type of " + file_name + " could not be understood.", "CoordinateFrame",
           "buildFromFile");
   }
-
-  // Interpret the box transformation
-  unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -345,8 +345,8 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
               "file.", "CoordinateFrame", "buildFromFile");
       }
       allocate();
-      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, &box_space_transform,
-                         &inverse_transform, frame_number);
+      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, unit_cell,
+                         &box_space_transform, &inverse_transform, &box_dimensions, frame_number);
     }
     break;
   case CoordinateFileKind::AMBER_INPCRD:
@@ -356,6 +356,9 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
       allocate();
       getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
                                &box_space_transform, &inverse_transform, &box_dimensions);
+
+      // Interpret the box transformation, updating the unit cell type based on the file
+      unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
@@ -365,9 +368,6 @@ void CoordinateFrame::buildFromFile(const TextFile &tf, const CoordinateFileKind
     rtErr("The file type of " + file_name + " could not be understood.", "CoordinateFrame",
           "buildFromFile");
   }
-
-  // Interpret the box transformation
-  unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
 }
 
 //-------------------------------------------------------------------------------------------------

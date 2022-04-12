@@ -80,8 +80,8 @@ PhaseSpace::PhaseSpace(const std::string &file_name_in, const CoordinateFileKind
 }
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpace::PhaseSpace(const std::string &file_name_in, const CoordinateFileKind file_kind,
-                       const AtomGraph &ag, const int frame_number) :
+PhaseSpace::PhaseSpace(const std::string &file_name_in, const AtomGraph &ag,
+                       const CoordinateFileKind file_kind, const int frame_number) :
     PhaseSpace(file_name_in, file_kind, frame_number)
 {
   // Check that the coordinates agree with the topology
@@ -232,8 +232,8 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
       }
       allocate();
       TextFile tf(file_name);
-      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, &box_space_transform,
-                         &inverse_transform, frame_number);
+      readAmberCrdFormat(tf, &x_coordinates, &y_coordinates, &z_coordinates, unit_cell,
+                         &box_space_transform, &inverse_transform, &box_dimensions, frame_number);
     }
     break;
   case CoordinateFileKind::AMBER_INPCRD:
@@ -243,6 +243,9 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
       allocate();
       getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
                                &box_space_transform, &inverse_transform, &box_dimensions);
+
+      // Interpret the box transformation, updating the unit cell type based on the file
+      unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
     break;
   case CoordinateFileKind::AMBER_ASCII_RST:
@@ -253,6 +256,9 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
       getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
                                &box_space_transform, &inverse_transform, &box_dimensions);
       getAmberRestartVelocities(tf, &x_velocities, &y_velocities, &z_velocities);
+
+      // Interpret the box transformation, updating the unit cell type based on the file
+      unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
     }
     break;
   case CoordinateFileKind::AMBER_NETCDF:
@@ -263,9 +269,6 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
     rtErr("The coordinate file type of " + file_name + " could not be understood.", "PhaseSpace",
           "buildFromFile");
   }
-
-  // Interpret the box transformation
-  unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
 }
 
 //-------------------------------------------------------------------------------------------------

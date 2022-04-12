@@ -41,7 +41,7 @@ struct CoordinateFrameWriter {
   double* umat;                  ///< Transformation matrix to take coordinates into box
                                  ///<   (fractional) space
   double* invu;                  ///< Inverse transformation matrix out of box space
-  const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
+  double* boxdim;                ///< Box dimensions (these will be consistent with umat and invu)
 };
 
 /// \brief Collect C-style pointers for the elements of a read-only CoordinateFrame object.
@@ -97,18 +97,19 @@ public:
   /// \param  umat_in          Matrix to transform coordinates into box space (3 x 3)
   /// \param  invu_in          Matrix to transform coordinates into real space (3 x 3)
   /// \param  file_name_in     File to read from
+  /// \param  file_kind        The type of coordinate file to expect
   /// \param  frame_number_in  Frame number of the file to read (default 0, the first frame)
   /// \param  ps               Pre-existing object with complete description of the system state
-  /// \param  mode_in          Indicates whether the CoordinateFrame will point to or become an
-  ///                          independent copy of the PhaseSpace object (final constructor only)
   /// \{
   CoordinateFrame(int natom_in = 0, UnitCellType unit_cell_in = UnitCellType::NONE);
   CoordinateFrame(int natom_in, UnitCellType unit_cell_in, const double* xcrd_in,
                   const double* ycrd_in, const double* zcrd_in, const double* umat_in = nullptr,
                   const double* invu_in = nullptr, const double* boxdim_in = nullptr);
-  CoordinateFrame(const std::string &file_name_in, CoordinateFileKind file_kind,
+  CoordinateFrame(const std::string &file_name_in,
+                  CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
                   int frame_number_in = 0);
-  CoordinateFrame(const TextFile &tf, CoordinateFileKind file_kind, int frame_number_in = 0);
+  CoordinateFrame(const TextFile &tf, CoordinateFileKind file_kind  = CoordinateFileKind::UNKNOWN,
+                  int frame_number_in = 0);
   CoordinateFrame(PhaseSpace *ps);
   CoordinateFrame(const PhaseSpace &ps);
   /// \}

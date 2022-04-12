@@ -180,28 +180,44 @@ void getAmberRestartVelocities(const TextFile &tf, Hybrid<double> *x_velocities,
 }
 
 //-------------------------------------------------------------------------------------------------
+int countAmberCrdFormatFrames(const TextFile &tf, const int natom, const UnitCellType unit_cell) {
+  const int lines_per_frame = (((3 * natom) + 9) / 10) + (unit_cell != UnitCellType::NONE);
+  if (tf.getLineCount() < lines_per_frame + 1) {
+    rtErr("File " + tf.getFileName() + " has only " + std::to_string(tf.getLineCount()) +
+          " lines, not enough to accommodate " + std::to_string(natom) + " atoms.",
+          "readAmberCrdFormat");
+  }
+  return (tf.getLineCount() - 1) / lines_per_frame;
+}
+  
+//-------------------------------------------------------------------------------------------------
 void readAmberCrdFormat(const TextFile &tf, double* x_coordinates, double* y_coordinates,
-                        double* z_coordinates, const int natom, double* box_space_transform,
-                        double* inverse_transform, const int frame_number)
+                        double* z_coordinates, const int natom, const UnitCellType unit_cell,
+                        double* box_space_transform, double* inverse_transform,
+                        double* box_dimensions, const int frame_number)
 {
   // Check for a frame dimension line
   const TextFileReader tfr = tf.data();
-  const int lines_per_frame = ((3 * natom) + 9) / 10;
-  if (tfr.line_count < lines_per_frame + 1) {
-    rtErr("File " + tf.getFileName() + " has only " + std::to_string(tfr.line_count) + " lines, "
-          "not enough to accommodate " + std::to_string(natom) + " atoms.", "readAmberCrdFormat");
-  }
-  if (tfr.line_count < (frame_number * (lines_per_frame + 1)) + 1) {
+  if (countAmberCrdFormatFrames(tf, natom, unit_cell) <= frame_number) {
     rtErr("File " + tf.getFileName() + " has only " + std::to_string(tfr.line_count) + " lines, "
           "not enough to accommodate " + std::to_string(natom) + " atoms and " +
           std::to_string(frame_number + 1) + " frames.", "readAmberCrdFormat");    
   }
-  const int llim = tfr.line_limits[lines_per_frame + 1];
-  const int hlim = tfr.line_limits[lines_per_frame + 2];
-  std::vector<std::string> frame_test = separateText(&tfr.text[llim], hlim - llim);
-  const bool has_box = (frame_test.size() == 3LLU);
+  bool has_box = false;
+  const int lines_for_coords = ((3 * natom) + 9) / 10;
+  if (tfr.line_count >= lines_for_coords + 2) {
+    const int llim = tfr.line_limits[lines_for_coords + 1];
+    const int hlim = tfr.line_limits[lines_for_coords + 2];
+    std::vector<std::string> frame_test = separateText(&tfr.text[llim], hlim - llim);
+    has_box = (natom != 1 && frame_test.size() == 3LLU);
+    if (has_box && unit_cell == UnitCellType::NONE) {
+      rtWarn("Trajectory " + tf.getFileName() + " was requested to be read as a non-periodic "
+             "series of coordinates, but appears to contain box information.",
+             "readAmberCrdFormat");
+    }
+  }
   const int ihas_box = has_box;
-  const int start_line = 1 + frame_number * (lines_per_frame + ihas_box);
+  const int start_line = 1 + frame_number * (lines_for_coords + ihas_box);
   std::vector<PolyNumeric> allcrd = readNumberSeries(tf, start_line, 3 * natom,
                                                      10, 8, 3, NumberFormat::STANDARD_REAL,
                                                      "readAmberCrdFormat", "Read data in "
@@ -209,7 +225,7 @@ void readAmberCrdFormat(const TextFile &tf, double* x_coordinates, double* y_coo
                                                      ".");
   splitInterlacedCoordinates(allcrd, x_coordinates, y_coordinates, z_coordinates, natom);
   if (has_box) {
-    std::vector<PolyNumeric> boxlen = readNumberSeries(tf, start_line + lines_per_frame, 3,
+    std::vector<PolyNumeric> boxlen = readNumberSeries(tf, start_line + lines_for_coords, 3,
                                                        3, 8, 3, NumberFormat::STANDARD_REAL,
                                                        "readAmberCrdFormat", "Read data in %8.3f "
                                                        "format from " + tf.getFileName() + ".");
@@ -231,24 +247,32 @@ void readAmberCrdFormat(const TextFile &tf, double* x_coordinates, double* y_coo
     ly = boxlen[1].d;
     lz = boxlen[2].d;
     computeBoxTransform(lx, ly, lz, alpha, beta, gamma, box_space_transform, inverse_transform);
+    box_dimensions[0] = lx;
+    box_dimensions[1] = ly;
+    box_dimensions[2] = lz;
+    box_dimensions[3] = alpha;
+    box_dimensions[4] = beta;
+    box_dimensions[5] = gamma;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 void readAmberCrdFormat(const TextFile &tf, Hybrid<double> *x_coordinates,
                         Hybrid<double> *y_coordinates,  Hybrid<double> *z_coordinates,
-                        Hybrid<double> *box_space_transform, Hybrid<double> *inverse_transform,
+                        const UnitCellType unit_cell, Hybrid<double> *box_space_transform,
+                        Hybrid<double> *inverse_transform, Hybrid<double> *box_dimensions,
                         const int frame_number) {
   const int natom = checkXYZDimensions(x_coordinates->size(), y_coordinates->size(),
                                        z_coordinates->size(), "readAmberCrdFormat");
   readAmberCrdFormat(tf, x_coordinates->data(), y_coordinates->data(), z_coordinates->data(),
-                     natom, box_space_transform->data(), inverse_transform->data(), frame_number);
+                     natom, unit_cell, box_space_transform->data(), inverse_transform->data(),
+                     box_dimensions->data(), frame_number);
 }
 
 //-------------------------------------------------------------------------------------------------
 void readAmberCrdFormat(const TextFile &tf, CoordinateFrameWriter *cfw, const int frame_number) {
-  readAmberCrdFormat(tf, cfw->xcrd, cfw->ycrd, cfw->zcrd, cfw->natom, cfw->umat, cfw->invu,
-                     frame_number);
+  readAmberCrdFormat(tf, cfw->xcrd, cfw->ycrd, cfw->zcrd, cfw->natom, cfw->unit_cell, cfw->umat,
+                     cfw->invu, cfw->boxdim, frame_number);
 }
 
 } // namespace trajectory
