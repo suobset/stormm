@@ -175,6 +175,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Trajectory/amber_ascii.h \
 		   $(SRCDIR)/Trajectory/barostat.h \
 		   $(SRCDIR)/Trajectory/coordinateframe.h \
+		   $(SRCDIR)/Trajectory/coordinate_series.h \
 		   $(SRCDIR)/Trajectory/phasespace.h \
 		   $(SRCDIR)/Trajectory/thermostat.h \
 		   $(SRCDIR)/Trajectory/trajectory_enumerators.h \
@@ -204,6 +205,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Topology/atomgraph.tpp \
 		 $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
 		 $(SRCDIR)/Topology/topology_util.tpp \
+		 $(SRCDIR)/Trajectory/coordinate_series.tpp \
 		 $(SRCDIR)/UnitTesting/approx.tpp \
 		 $(SRCDIR)/UnitTesting/unit_test.tpp
 
