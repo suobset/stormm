@@ -229,4 +229,6 @@ private:
 } // namespace trajectory 
 } // namespace omni
 
+#include "coordinate_series.tpp"
+
 #endif

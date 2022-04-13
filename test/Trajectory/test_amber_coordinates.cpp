@@ -73,6 +73,9 @@ int main(int argc, char* argv[]) {
   // Section 4
   section("Coordinate object C++ handling");
 
+  // Section 5
+  section("Coordinate series handling");
+  
   // If one or more of the coordinate files is missing, this will cause tests to be skipped.
   // Do not report immediately, as one missing file likely means other missing files.  Wait
   // until the end and then alert the user that some tests were aborted.
@@ -483,6 +486,9 @@ int main(int argc, char* argv[]) {
   check(set_sums, RelationalOperator::EQUAL, Approx(set_sums_ans).margin(1.0e-8), "Sums of "
         "random particle coordinates obtained from PhaseSpace objects after std::vector "
         "push_back() and subsequent copy assignment operations do not meet expectations.");
+
+  // Read a trajectory and manipulate a coordinate series
+  
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
