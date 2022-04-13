@@ -51,11 +51,9 @@ public:
                             UnitCellType unit_cell_in = UnitCellType::NONE);
   explicit CoordinateSeries(const std::string &file_name,
                             CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
-                            const std::vector<int> &frame_numbers_in = {},
-                            int replica_count_in = 1, int atom_count_in = 0);
-  explicit CoordinateSeries(const TextFile &tf, CoordinateFileKind file_kind,
-                            const std::vector<int> &frame_numbers_in = {},
-                            int replica_count_in = 1, int atom_count_in = 0);
+                            const std::vector<int> &frame_numbers = {},
+                            int replica_count = 1, int atom_count_in = 0,
+                            UnitCellType unit_cell_in = UnitCellType::NONE);
   explicit CoordinateSeries(PhaseSpace *ps, int nframe_in);
   explicit CoordinateSeries(const PhaseSpace &ps, int nframe_in);
   explicit CoordinateSeries(CoordinateFrame *cf, int nframe_in);

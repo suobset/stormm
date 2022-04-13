@@ -21,36 +21,49 @@ CoordinateSeries::CoordinateSeries(const int natom_in, const int nframe_in,
 //-------------------------------------------------------------------------------------------------
 CoordinateSeries::CoordinateSeries(const std::string &file_name,
                                    const CoordinateFileKind file_kind,
-                                   const std::vector<int> &frame_numbers_in,
-                                   const int replica_count_in, const int atom_count_in) :
-    CoordinateSeries(atom_count_in, replica_count_in * static_cast<int>(frame_numbers_in.size()))
+                                   const std::vector<int> &frame_numbers,
+                                   const int replica_count, const int atom_count_in,
+                                   const UnitCellType unit_cell_in) :
+    CoordinateSeries(atom_count_in, replica_count_in * static_cast<int>(frame_numbers_in.size()),
+                     unit_cell_in)
 {
-
+  importFromFile(file_name, file_kind, frame_numbers, replica_count, 0);
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateSeries::CoordinateSeries(const TextFile &tf, const CoordinateFileKind file_kind,
-                                   const std::vector<int> &frame_numbers_in,
-                                   const int replica_count_in, const int atom_count_in) :
-{}
-
-//-------------------------------------------------------------------------------------------------
-CoordinateSeries::CoordinateSeries(PhaseSpace *ps, const int nframe_in) {
+CoordinateSeries::CoordinateSeries(PhaseSpace *ps, const int nframe_in) :
+    CoordinateSeries(ps->getAtomCount(), nframe_in, ps->getUnitCellType())
+{
+  for (int i = 0; i < frame_count; i++) {
+    importCoordinateSet(ps, 0, ps->getAtomCount(), i);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateSeries::CoordinateSeries(const PhaseSpace &ps, const int nframe_in) {
-
+CoordinateSeries::CoordinateSeries(const PhaseSpace &ps, const int nframe_in) :
+    CoordinateSeries(ps.getAtomCount(), nframe_in, ps.getUnitCellType())
+{
+  for (int i = 0; i < frame_count; i++) {
+    importCoordinateSet(ps, 0, ps.getAtomCount(), i);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateSeries::CoordinateSeries(CoordinateFrame *cf, const int nframe_in) {
-
+CoordinateSeries::CoordinateSeries(CoordinateFrame *cf, const int nframe_in) :
+    CoordinateSeries(cf->getAtomCount(), nframe_in, cf->getUnitCellType())
+{
+  for (int i = 0; i < frame_count; i++) {
+    importCoordinateSet(cf, 0, cf->getAtomCount(), i);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-CoordinateSeries::CoordinateSeries(const CoordinateFrame &cf, const int nframe_in) {
-
+CoordinateSeries::CoordinateSeries(const CoordinateFrame &cf, const int nframe_in) :
+    CoordinateSeries(cf.getAtomCount(), nframe_in, cf.getUnitCell())
+{
+  for (int i = 0; i < frame_count; i++) {
+    importCoordinateSet(cf, 0, cf.getAtomCount(), i);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -70,7 +83,6 @@ void CoordinateSeries::importCoordinateSet(const CoordinateFrameReader &cfr,
   if (actual_frame_index >= frame_capacity) {
     allocate(((actual_frame_index * 5) + 3) / 4);
   }
-
   T* xptr = x_coordinates->data();
   T* yptr = y_coordinates->data();
   T* zptr = z_coordinates->data();
