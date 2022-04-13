@@ -73,6 +73,7 @@ public:
   ///   - Accept all types of single-frame coordinate objects
   ///   - Accept all atoms or a subset of the atoms that fits the current atom count of the
   ///     CoordinateSeries
+  ///
   /// \param cfr          Coordinates to import.  The CoordinateFrameReader is the most basic
   ///                     object available for importation.  Both CoordinateFrame and PhaseSpace
   ///                     objects can create CoordinateFrameReaders or writers, and the writers
@@ -80,8 +81,11 @@ public:
   /// \param cfw          Coordinates to import
   /// \param cf           Coordinates to import
   /// \param ps           Coordinates to import
+  /// \param atom_start   First atom from the coordinate set to add to a frame of the series
+  /// \param atom_end     Limit of atoms from the coordinate set to add to a frame of the series
   /// \param frame_index  Index of the frame into which the coordinates should be imported.  The
   ///                     default value of -1 adds the new coordinates to the end of the list.
+  /// \{
   void importCoordinateSet(const CoordinateFrameReader &cfr, int atom_start, int atom_end,
                            int frame_index = -1);
   void importCoordinateSet(const CoordinateFrameReader &cfr, int frame_index = -1);
@@ -100,16 +104,84 @@ public:
   void importCoordinateSet(const PhaseSpace *ps, nt atom_start, int atom_end,
                            int frame_index = -1);
   void importCoordinateSet(const PhaseSpace *ps, int frame_index = -1);
+  /// \}
+
+  /// \brief Reserve capacity in this series.  The new frames will be uninitialized.
+  ///
+  /// \param new_frame_capacity  The new capacity to prepare for.  If such capacity already exists,
+  ///                            the function will do nothing.
+  void reserve(const int new_frame_capacity);
+
+  /// \brief Resize the series, allocating new capacity if needed, initializing new frames with the
+  ///        provided coordinate set. ("New" frames are defined as any frames with indices greater
+  ///        than the original maximum index, regardless of whether new capacity was allocated to
+  ///        hold them or if the size simply increased within the existing space available.)
+  ///
+  /// Overloaded:
+  ///   - Accept all types of single-frame coordinate objects
+  ///   - Accept all atoms or a subset of the atoms that fits the current atom count of the
+  ///     CoordinateSeries
+  ///
+  /// \param new_frame_count  The number of new frames that the list shall report holding.  This is
+  ///                         less than or equal to the capacity; if there is insufficient
+  ///                         capacity when resize() is called, new capacity will be allocated to
+  ///                         hold precisely new_frame_count frames.
+  /// \param cfr              Optional coordinate set to use in initializing new frames.  If no
+  ///                         coordinates are provided, the series will report holding frames but
+  ///                         have undefined values in them.
+  /// \param cfw              Optional coordinate set to use in initializing new frames
+  /// \param cf               Optional coordinate set to use in initializing new frames
+  /// \param ps               Optional coordinate set to use in initializing new frames
+  /// \param atom_start       First atom from the coordinate set to add to a frame of the series
+  ///                         (the default value is zero, to use all atoms)
+  /// \param atom_end         Limit of atoms from the coordinate set to add to a frame of the
+  ///                         series (the default value of zero will trigger an access to atom
+  ///                         count from the coordinate object to load all of its atoms)
+  /// \{
+  void resize(int new_frame_count);
+  void resize(int new_frame_count, const CoordinateFrameReader &cfr, int atom_start = 0,
+              int atom_end = 0);
+  void resize(int new_frame_count, const CoordinateFrameWriter &cfw, int atom_start = 0,
+              int atom_end = 0);
+  void resize(int new_frame_count, const CoordinateFrame &cf, int atom_start = 0,
+              int atom_end = 0);
+  void resize(int new_frame_count, CoordinateFrame *cf, int atom_start = 0, int atom_end = 0);
+  void resize(int new_frame_count, const PhaseSpace &ps, int atom_start = 0, int atom_end = 0);
+  void resize(int new_frame_count, PhaseSpace *ps, int atom_start = 0, int atom_end = 0);
+  /// \}
   
-  /// \brief 
-  
+  /// \brief Push a coordinate set to the back of the list.  This invokes the importCoordinateSet
+  ///        member function after reallocating the frame series with 25% spare capacity if the
+  ///        original capacity is insufficient.
+  ///
+  /// Overloaded:
+  ///   - Accept all types of single-frame coordinate objects
+  ///   - Accept all atoms or a subset of the atoms that fits the current atom count of the
+  ///     CoordinateSeries
+  ///
+  /// \param cfr          Coordinates to import.  The CoordinateFrameReader is the most basic
+  ///                     object available for importation.  Both CoordinateFrame and PhaseSpace
+  ///                     objects can create CoordinateFrameReaders or writers, and the writers
+  ///                     can be const-ified into readers.
+  /// \param cfw          Coordinates to import
+  /// \param cf           Coordinates to import
+  /// \param ps           Coordinates to import
+  /// \param atom_start   First atom from the coordinate set to add to a frame of the series
+  /// \param atom_end     Limit of atoms from the coordinate set to add to a frame of the series
+  /// \{
+  void pushBack(const CoordinateFrameReader &cfr, int atom_start, int atom_end);
+  void pushBack(const CoordinateFrameWriter &cfw, int atom_start, int atom_end);
+  void pushBack(const CoordinateFrame &cf, int atom_start, int atom_end);
+  void pushBack(CoordinateFrame *cf, int atom_start, int atom_end);
+  void pushBack(const PhaseSpace &ps, int atom_start, int atom_end);
+  void pushBack(PhaseSpace *ps, int atom_start, int atom_end);
+  /// \}
+
 private:
-  int atom_count;                       ///< Number of atoms in each frame.  This number is also
-                                        ///<   modifiable with a special call to the resize()
-                                        ///<   member function, and between frames the space for
-                                        ///<   atoms is padded by the warp size, but there is no
-                                        ///<   concept of an atom capacity in the same way that
-                                        ///<   there is a frame capacity.
+  int atom_count;                       ///< Number of atoms in each frame.  Between frames the
+                                        ///<   space for atoms is padded by the warp size, but
+                                        ///<   there is no concept of an atom capacity in the same
+                                        ///<   way that there is a frame capacity.
   int frame_count;                      ///< Total number of frames currently in the object
   int frame_capacity;                   ///< Total frame capacity of the object
   Hybrid<int> frame_numbers;            ///< Frame numbers of the different frames derived from
@@ -122,10 +194,17 @@ private:
   Hybrid<double> inverse_transforms;    ///< Matrix to transform each frame into real space
   Hybrid<double> box_dimensions;        ///< Lengths and angles defining each frame's unit cell
                                         ///<   (lengths are given in Angstroms, angles in radians)
-  Hybrid<T> particle_data;              ///< Array targeted by the x_, y_, and z_coordinates
-                                        ///<   POINTER-kind Hybrid objects
-  Hybrid<double> box_data;              ///< Array targeted by box transform and dimension
-                                        ///<   POINTER-kind Hybrid objects
+
+  /// \brief Allocate space for this series.  This will only allocate in the forward direction,
+  ///        never less than already exists, but it does so stepwise through each of the x, y, and
+  ///        z coordinate arrays and each of the box transformation arrays.  This process will
+  ///        reduce the spike in memory needed to allocated a larger array ands transfer over the
+  ///        original data.
+  ///
+  /// \param new_frame_capacity  The new capacity to allocate.  The frame count and atom count are
+  ///        are both int type, although the total size is measured in size_t to avoid integer
+  ///        overflow.
+  void allocate(int new_frame_capacity)
 };
  
 } // namespace trajectory 

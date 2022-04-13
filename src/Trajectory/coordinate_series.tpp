@@ -7,16 +7,15 @@ CoordinateSeries::CoordinateSeries(const int natom_in, const int nframe_in,
                                    const UnitCellType unit_cell_in) :
     atom_count{natom_in}, frame_count{nframe_in}, frame_capacity{nframe_in},
     frame_numbers{nframe_in, "cser_frame_nums"},
-    x_coordinates{HybridKind::POINTER, "cser_x_coords"},
-    y_coordinates{HybridKind::POINTER, "cser_y_coords"},
-    z_coordinates{HybridKind::POINTER, "cser_z_coords"},
-    box_space_transforms{HybridKind::POINTER, "cser_umat"},
-    inverse_transforms{HybridKind::POINTER, "cser_invu"},
-    box_dimensions{HybridKind::POINTER, "cser_boxdims"},
-    particle_data{static_cast<size_t>(natom_in) * static_cast<size_t>(nframe_in),
-                  "cser_particle_data"},
-    box_data{nframe_in * ((2 * roundUp(9, warp_size_int)) + roundUp(6, warp_size_int)),
-             "cser_box_data"}
+    x_coordinates{static_cast<size_t>(nframe_in) * static_cast<size_t>(natom_in), "cser_x_coords"},
+    y_coordinates{static_cast<size_t>(nframe_in) * static_cast<size_t>(natom_in), "cser_y_coords"},
+    z_coordinates{static_cast<size_t>(nframe_in) * static_cast<size_t>(natom_in), "cser_z_coords"},
+    box_space_transforms{static_cast<size_t>(nframe_in) * roundUp<size_t>(9, warp_size_zu),
+                         "cser_umat"},
+    inverse_transforms{static_cast<size_t>(nframe_in) * roundUp<size_t>(9, warp_size_zu),
+                       "cser_invu"},
+    box_dimensions{static_cast<size_t>(nframe_in) * roundUp<size_t>(6, warp_size_zu),
+                   "cser_boxdims"},
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -31,8 +30,9 @@ CoordinateSeries::CoordinateSeries(const std::string &file_name,
 
 //-------------------------------------------------------------------------------------------------
 CoordinateSeries::CoordinateSeries(const TextFile &tf, const CoordinateFileKind file_kind,
-                                   const std::vector<int> &frame_numbers_in) {
-}
+                                   const std::vector<int> &frame_numbers_in,
+                                   const int replica_count_in, const int atom_count_in) :
+{}
 
 //-------------------------------------------------------------------------------------------------
 CoordinateSeries::CoordinateSeries(PhaseSpace *ps, const int nframe_in) {
@@ -68,8 +68,7 @@ void CoordinateSeries::importCoordinateSet(const CoordinateFrameReader &cfr,
   // Exapnd the capacity to at least 125% of its original size to avoid continuous resizing of the
   // arrays as more frames are added.
   if (actual_frame_index >= frame_capacity) {
-    frame_capacity = ((actual_frame_index * 5) + 3) / 4;
-    reallocate();
+    allocate(((actual_frame_index * 5) + 3) / 4);
   }
 
   T* xptr = x_coordinates->data();
@@ -165,64 +164,126 @@ void CoordinateSeries::importFromFile(const std::string &file_name,
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::allocate() {
-
+void CoordinateSeries::reserve(const int new_frame_capacity) {
+  allocate(new_frame_capacity);
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::reallocate() {
-  
+void CoordinateSeries::resize(const int new_frame_count) {
+  allocate(new_frame_count);
+  frame_count = new_frame_count;
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in, const CoordinateFrameReader &cfr,
+void CoordinateSeries::resize(const int new_frame_count, const CoordinateFrameReader &cfr,
                               const int atom_start, const int atom_end) {
-
+  allocate(new_frame_count);
+  const int orig_frame_count = frame_count;
+  for (int i = orig_frame_count; i < new_frame_count; i++) {
+    importCoordinateSet(cfr, atom_start, atom_end, i);    
+  }
+  frame_count = new_frame_count;
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in, const CoordinateFrameWriter &cfw,
+void CoordinateSeries::resize(const int new_frame_count, const CoordinateFrameWriter &cfw,
                               const int atom_start, const int atom_end) {
-
+  resize(new_frame_count, CoordinateFrameReader(cfw), atom_start, atom_end);
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in, const CoordinateFrame &cf,
+void CoordinateSeries::resize(const int new_frame_count, const CoordinateFrame &cf,
                               const int atom_start, const int atom_end) {
-
+  resize(new_frame_count, cf.data(), atom_start, atom_end);
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in, const CoordinateFrame *cf,
+void CoordinateSeries::resize(const int new_frame_count, CoordinateFrame *cf, const int atom_start,
+                              const int atom_end) {
+  resize(new_frame_count, CoordinateFrameReader(cf->data()), atom_start, atom_end);
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateSeries::resize(const int new_frame_count, const PhaseSpace &ps,
                               const int atom_start, const int atom_end) {
-
+  resize(new_frame_count, CoordinateFrameReader(ps), atom_start, atom_end);
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in, const PhaseSpace &ps,
+void CoordinateSeries::resize(const int new_frame_count, PhaseSpace *ps,
                               const int atom_start, const int atom_end) {
-
+  resize(new_frame_count, CoordinateFrameReader(CoordinateFrameWriter(ps)), atom_start, atom_end);
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::resize(const int new_frame_count_in, const PhaseSpace *ps,
-                              const int atom_start, const int atom_end) {
-
+void CoordinateSeries::pushBack(const CoordinateFrameReader &cfr, const int atom_start,
+                                const int atom_end) {
+  if (frame_count >= frame_capacity) {
+    allocate(((frame_count * 5) + 3) / 4);
+  }
+  importCoordinateSet(cfr, atom_start, atom_end, frame_count);
+  frame_count++;
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::reserve() {
-
+void CoordinateSeries::pushBack(const CoordinateFrameWriter &cfw, const int atom_start,
+                                const int atom_end) {
+  pushBack(CoordinateFrameReader(cfw), atom_start, atom_end);
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::pushBack() {
+void CoordinateSeries::pushBack(const CoordinateFrame &cf, const int atom_start,
+                                const int atom_end) {
+  pushBack(cf.data(), atom_start, atom_end);
+}
 
+//-------------------------------------------------------------------------------------------------
+void CoordinateSeries::pushBack(CoordinateFrame *cf, const int atom_start, const int atom_end) {
+  pushBack(CoordinateFrameReader(cf->data()), atom_start, atom_end);
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateSeries::pushBack(const PhaseSpace &ps, const int atom_start, const int atom_end) {
+  pushBack(CoordinateFrameReader(ps), atom_start, atom_end);
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateSeries::pushBack(PhaseSpace *ps, const int atom_start, const int atom_end) {
+  pushBack(CoordinateFrameReader(CoordinateFrameWriter(ps)), atom_start, atom_end);
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateSeries::allocate(const int new_frame_capacity) {
+  if (new_frame_capacity > frame_capacity) {
+    frame_capacity = new_frame_capacity;
+    const size_t fc_zu = static_cast<size_t>(frame_capacity);
+    const size_t total_atoms = fc_zu * roundUp(static_cast<size_t>(atom_count), warp_size_zu);
+    const size_t total_xfrm = fc_zu * roundUp<size_t>(9, warp_size_zu);
+    const size_t total_bdim = fc_zu * roundUp<size_t>(6, warp_size_zu);
+
+    // Allocate space for the new capacity.  This will reallocate each array, but one by one in
+    // order to avoid keeping what could be nearly double the amount of data at any one time.
+    frame_numbers.resize(frame_capacity);
+    x_coordinates.resize(total_atoms);
+    y_coordinates.resize(total_atoms);
+    z_coordinates.resize(total_atoms);
+    box_space_transforms.resize(total_xfrm);
+    inverse_transforms.resize(total_xfrm);
+    box_dimensions.resize(total_bdim);
+
+    // Reset the array sizes to the current storage 
+    const size_t fn_zu = static_cast<size_t>(frame_count);
+    const size_t active_atoms = fn_zu * roundUp(static_cast<size_t>(atom_count), warp_size_zu);
+    const size_t active_xfrm = fn_zu * roundUp<size_t>(9, warp_size_zu);
+    const size_t active_bdim = fn_zu * roundUp<size_t>(6, warp_size_zu);
+    frame_numbers.resize(frame_count);
+    x_coordinates.resize(active_atoms);
+    y_coordinates.resize(active_atoms);
+    z_coordinates.resize(active_atoms);
+    box_space_transforms.resize(active_xfrm);
+    inverse_transforms.resize(active_xfrm);
+    box_dimensions.resize(active_bdim);
+  }
 }
 
 } // namespace trajectory
