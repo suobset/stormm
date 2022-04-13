@@ -289,7 +289,7 @@ int main(int argc, char* argv[]) {
         "a CoordinateFrame object was not correctly found to have isolated boundary conditions.",
         do_trpcage);
 
-  // Try making an ARRAY-kind CoordinateFrame based on an existing PhaseSpace object
+  // Try making a CoordinateFrame based on an existing PhaseSpace object
   CoordinateFrame tip5p_coord_frame(&tip5p);
   CoordinateFrameWriter tip5p_coord_frame_wr = tip5p_coord_frame.data();
   check(tip5p_coord_frame.getAtomCount(), RelationalOperator::EQUAL, tip5p.getAtomCount(),
@@ -487,8 +487,13 @@ int main(int argc, char* argv[]) {
         "random particle coordinates obtained from PhaseSpace objects after std::vector "
         "push_back() and subsequent copy assignment operations do not meet expectations.");
 
-  // Read a trajectory and manipulate a coordinate series
-  
+  // Create a CoordinateSeries based on several copies of a coordinate frame
+  const std::string stereo_crd_name = base_crd_name + osc + "stereo_L1.inpcrd";
+  const std::string stereo_trj_name = base_crd_name + osc + "stereo_L1x.crd";
+  const bool stereo_exists = (getDrivePathType(stereo_crd_name) == DrivePathType::FILE &&
+                              getDrivePathType(stereo_trj_name) == DrivePathType::FILE);
+  const CoordinateFrame stro_cf = (stereo_exists) ? CoordinateFrame(stereo_crd_name) :
+                                                    CoordinateFrame();
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
