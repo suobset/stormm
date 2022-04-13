@@ -116,10 +116,7 @@ void CoordinateSeries::importCoordinateSet(const CoordinateFrameReader &cfr,
 void CoordinateSeries::importFromFile(const std::string &file_name,
                                       const CoordinateFileKind file_kind,
                                       const std::vector<int> &frame_numbers,
-                                      const int replica_count_in, const int frame_index_start) {
-
-  // Check that there is sufficient space in the object.  If there is not, allocate more.
-  if (frame_count < 
+                                      const int replica_count, const int frame_index_start) {
   
   // Try to detect the file format if it is not already specified.  If it remains UNKNOWN, that
   // will ultimately lead to an error.
@@ -135,31 +132,107 @@ void CoordinateSeries::importFromFile(const std::string &file_name,
         rtErr("A number of atoms matching the trajectory must be known prior to reading a .crd "
               "file.", "CoordinateSeries", "buildFromFile");
       }
-      allocate();
       TextFile tf(file_name);
+      std::vector<int> actual_frame_numbers;
       if (frame_numbers.size() == 0LLU) {
         const size_t nframe_detected = countAmberCrdFormatFrames(tf, atom_count, unit_cell);
+        actual_frame_numbers.resize(nframe_detected);
+        for (int i = 0; i < nframe_detected; i++) {
+          actual_frame_numbers[i] = i;
+        }
+      }
+      else {
+        actual_frame_numbers.insert(actual_frame_numbers.end(), frame_numbers.begin(),
+                                    frame_numbers.end());
+      }
+      const int nimports = actual_frame_numbers.size();
+      const int orig_frame_count = frame_count;
+      if (frame_index_start < 0) {
+        resize((nimports * replica_count_in) + frame_count);
+      }
+      else {
+        resize((nimports * replica_count_in) + frame_index_start);
+      }
 
-        // The file must be read in as double precision, despite the multiple modes that a
-        // CoordinateSeries can operate in.  Buffer the data in a CoordinateFrame object, feeding
-        // its pointers to a low-level overload of the reading function.  Transfer the results to
-        // the CoordinateSeries.
-        CoordinateFrame tmp_cf(atom_count, unit_cell);
-        CoordinateFrameWriter tmp_cfw = tmp_cf.data();
-        T* xptr = x_coordinates->data();
-        T* yptr = y_coordinates->data();
-        T* zptr = z_coordinates->data();
-        double* umat_ptr = box_space_transforms->data();
-        double* invu_ptr = inverse_transforms->data();
-        double* bdim_ptr = box_dimensions->data();
-        for (size_t i = 0; i < nframe_detected; i++) {
-          readAmberCrdFormat(tf, tmp_cfw.xcrd, tmp_cfw.ycrd, tmp_cfw.zcrd, unit_cell,
-                             tmp_cfw.umat, tmp_cfw.invu, tmp_cfw.boxdim, i);
+      // The file must be read in as double precision, despite the multiple modes that a
+      // CoordinateSeries can operate in.  Buffer the data in a CoordinateFrame object, feeding
+      // its pointers to a low-level overload of the reading function.  Transfer the results to
+      // the CoordinateSeries.
+      CoordinateFrame tmp_cf(atom_count, unit_cell);
+      CoordinateFrameWriter tmp_cfw = tmp_cf.data();
+      const CoordinateFrameReader tmp_cfr(tmp_cfw);
+      T* xptr = x_coordinates->data();
+      T* yptr = y_coordinates->data();
+      T* zptr = z_coordinates->data();
+      double* umat_ptr = box_space_transforms->data();
+      double* invu_ptr = inverse_transforms->data();
+      double* bdim_ptr = box_dimensions->data();
+      for (int i = 0; i < nimports; i++) {
+        readAmberCrdFormat(tf, tmp_cfw.xcrd, tmp_cfw.ycrd, tmp_cfw.zcrd, unit_cell,
+                           tmp_cfw.umat, tmp_cfw.invu, tmp_cfw.boxdim, actual_frame_numbers[i]);
+        for (int j = 0; j < replica_count; j++) {
+          if (frame_index_start < 0) {
+            importCoordinateSet(tmp_cfr, orig_frame_count + i + (j * n_imports));
+          }
+          else {
+            importCoordinateSet(tmp_cfr, frame_start_index + i + (j * n_imports));            
+          }
         }
       }
     }
     break;
-  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    {
+      // The number of atoms need not be known when first reading an Amber ASCII input coordinate
+      // or restart file--it is present in those files, and any NetCDF coordinate file.  However,
+      // if the number of atoms currently in the CoordinateSeries is not zero and there are one or
+      // more frames, assume that it is a legitimate number and enforce that any subsequent files
+      // match that number of atoms.
+      TextFile tf(file_name);
+      const int test_atom_count = getAmberRestartAtomCount(tf);
+      if (atom_count > 0 && frame_count > 0 && test_atom_count != atom_count) {
+        rtErr("The atom count detected in " + file_name + " (" + std::to_string(test_atom_count) +
+              " does not agree with the atom count of " + std::to_string(frame_count) +
+              " frames of the existing series (" + std::to_string(atom_count) + " atoms).",
+              "CoordinateSeries", "importFromFile");
+      }
+      else {
+        atom_count = test_atom_count;
+      }
+      if (frame_index_start < 0) {
+        resize(replica_count_in + frame_count);
+      }
+      else {
+        resize(replica_count_in + frame_index_start);
+      }
+      CoordinateFrame tmp_cf(atom_count, unit_cell);
+      CoordinateFrameWriter tmp_cfw = tmp_cf.data();
+      const CoordinateFrameReader tmp_cfr(tmp_cfw);
+      T* xptr = x_coordinates->data();
+      T* yptr = y_coordinates->data();
+      T* zptr = z_coordinates->data();
+      double* umat_ptr = box_space_transforms->data();
+      double* invu_ptr = inverse_transforms->data();
+      double* bdim_ptr = box_dimensions->data();
+      getAmberInputCoordinates(tf, tmp_cfw.xcrd, tmp_cfw.ycrd, tmp_cfw.zcrd, tmp_cfw.umat,
+                               tmp_cfw.invu, tmp_cfw.boxdim);
+      for (int i = 0; i < replica_count; i++) {
+        if (frame_index_start < 0) {
+          importCoordinateSet(tmp_cfr, orig_frame_count + i);
+        }
+        else {
+          importCoordinateSet(tmp_cfr, frame_start_index + i);            
+        }
+      }
+    }
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("The file type of " + file_name + " could not be understood.", "CoordinateSeries",
+          "importFromFile");
   }
 }
 

@@ -106,6 +106,25 @@ public:
   void importCoordinateSet(const PhaseSpace *ps, int frame_index = -1);
   /// \}
 
+  /// \brief Import coordinates from a file.  This function accepts directives to read a subset of
+  ///        the coordinates and integrate them into the series at a specified point.
+  ///
+  /// \param file_name          Name of the file
+  /// \param file_kind          The kind of coordinate file being read, default UNKNOWN which will
+  ///                           lead to automatic deduction of the file type
+  /// \param frame_numbers      List of frame indices (starting from zero) to import from the file
+  ///                           (if the file is too small to hold one or more frames with the
+  ///                           requested indices, this is an error)
+  /// \param replica_count_in   The number of replicas of the frames from this file (default 1).
+  ///                           If additional replicas are requested, the whole series will be
+  ///                           added in sequence, i.e. frames 3, 5, 8, 9, 3, 5, 8, 9, 3, ...
+  /// \param frame_index_start  The starting index of the series for incorporating frames found in
+  ///                           the file.  A negative value in this argument triggers addition to
+  ///                           the end of any existing series.
+  void importFromFile(const std::string &file_name, const CoordinateFileKind file_kind,
+                      const std::vector<int> &frame_numbers, int replica_count = 1,
+                      int frame_index_start = -1);
+
   /// \brief Reserve capacity in this series.  The new frames will be uninitialized.
   ///
   /// \param new_frame_capacity  The new capacity to prepare for.  If such capacity already exists,
@@ -202,8 +221,8 @@ private:
   ///        original data.
   ///
   /// \param new_frame_capacity  The new capacity to allocate.  The frame count and atom count are
-  ///        are both int type, although the total size is measured in size_t to avoid integer
-  ///        overflow.
+  ///                            are both int type, although the total size is measured in size_t
+  ///                            to avoid integer overflow.
   void allocate(int new_frame_capacity)
 };
  
