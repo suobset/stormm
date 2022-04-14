@@ -104,25 +104,18 @@ void splitInterlacedCoordinates(const std::vector<PolyNumeric> &allcrd,
 }
 
 //-------------------------------------------------------------------------------------------------
-void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
-                              Hybrid<double> *y_coordinates,  Hybrid<double> *z_coordinates,
-                              Hybrid<double> *box_space_transform,
-                              Hybrid<double> *inverse_transform, Hybrid<double> *box_dimensions) {
-  const int natom = checkXYZDimensions(x_coordinates->size(), y_coordinates->size(),
-                                       z_coordinates->size(), "getAmberInputCoordinates");
+void getAmberInputCoordinates(const TextFile &tf, double* x_coordinates, double* y_coordinates,
+                              double* z_coordinates, const int natom, double* box_space_transform,
+                              double* inverse_transform, double* box_dimensions) {
   std::vector<PolyNumeric> allcrd = readNumberSeries(tf, 2, 3 * natom, 6, 12, 7,
                                                      NumberFormat::STANDARD_REAL,
                                                      "getAmberInputCoordinates", "Read data in "
                                                      "%12.7f format from " + tf.getFileName() +
                                                      ".");
-  splitInterlacedCoordinates(allcrd, x_coordinates->data(), y_coordinates->data(),
-                             z_coordinates->data(), natom);
+  splitInterlacedCoordinates(allcrd, x_coordinates, y_coordinates, z_coordinates, natom);
   const int lines_per_set = ((natom * 3) + 5) / 6;
   const bool has_velocities = (tf.getLineCount() >= 2 + (2 * lines_per_set));
   const int box_line = 2 + ((1 + has_velocities) * lines_per_set);
-  double* box_ptr = box_space_transform->data();
-  double* inv_ptr = inverse_transform->data();
-  double* dim_ptr = box_dimensions->data();
   const TextFileReader tfr = tf.data();
   if (tfr.line_count > box_line) {
 
@@ -131,8 +124,8 @@ void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
     if (nchar < 6 * 12 ||
         separateText(&tfr.text[tfr.line_limits[box_line]], nchar).size() < 6LLU) {
       for (int i = 0; i < 9; i++) {
-        box_ptr[i] = static_cast<double>((i & 0x3) == 0);
-        inv_ptr[i] = static_cast<double>((i & 0x3) == 0);
+        box_space_transform[i] = static_cast<double>((i & 0x3) == 0);
+        inverse_transform[i]   = static_cast<double>((i & 0x3) == 0);
       }
     }
     else {
@@ -147,9 +140,9 @@ void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
         box_dims[i + 3] = boxinfo[i + 3].d * symbols::pi / 180.0;
       }
       for (int i = 0; i < 6; i++) {
-        dim_ptr[i] = box_dims[i];
+        box_dimensions[i] = box_dims[i];
       }
-      computeBoxTransform(box_dims, box_ptr, inv_ptr);
+      computeBoxTransform(box_dims, box_space_transform, inverse_transform);
     }
   }
   else {
@@ -159,10 +152,22 @@ void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
     // no or yes on whether the integer is a multiple of 2^N, in this case 4).  Fill in matrix
     // slots 0, 4, and 8 (that is, (0,0), (1,1), and (2,2)) with 1.0. 
     for (int i = 0; i < 9; i++) {
-      box_ptr[i] = static_cast<double>((i & 0x3) == 0);
-      inv_ptr[i] = static_cast<double>((i & 0x3) == 0);
+      box_space_transform[i] = static_cast<double>((i & 0x3) == 0);
+      inverse_transform[i]   = static_cast<double>((i & 0x3) == 0);
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
+                              Hybrid<double> *y_coordinates,  Hybrid<double> *z_coordinates,
+                              Hybrid<double> *box_space_transform,
+                              Hybrid<double> *inverse_transform, Hybrid<double> *box_dimensions) {
+  const int natom = checkXYZDimensions(x_coordinates->size(), y_coordinates->size(),
+                                       z_coordinates->size(), "getAmberInputCoordinates");
+  getAmberInputCoordinates(tf, x_coordinates->data(), y_coordinates->data(), z_coordinates->data(),
+                           natom, box_space_transform->data(), inverse_transform->data(),
+                           box_dimensions->data());
 }
 
 //-------------------------------------------------------------------------------------------------

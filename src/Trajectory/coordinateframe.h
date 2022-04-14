@@ -27,10 +27,16 @@ struct CoordinateFrameWriter {
   ///   - Take all arguments piecemeal
   ///   - Take a PhaseSpace object
   /// \{
-  CoordinateFrameWriter(const int natom_in, const UnitCellType unit_cell_in, double* xcrd_in,
-                        double* ycrd_in, double* zcrd_in, double* umat_in, double* invu_in,
-                        double* boxdim_in);
+  CoordinateFrameWriter(int natom_in, UnitCellType unit_cell_in, double* xcrd_in, double* ycrd_in,
+                        double* zcrd_in, double* umat_in, double* invu_in, double* boxdim_in);
   CoordinateFrameWriter(PhaseSpace *ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  CoordinateFrameWriter(const CoordinateFrameWriter &original) = default;
+  CoordinateFrameWriter(CoordinateFrameWriter &&original) = default;
+  CoordinateFrameWriter& operator=(const CoordinateFrameWriter &other) = default;
   /// \}
   
   const int natom;               ///< The number of atoms in the system
@@ -54,13 +60,20 @@ struct CoordinateFrameReader {
   ///   - Take a CoordinateFrameWriter
   ///   - Take a PhaseSpace object
   /// \{
-  CoordinateFrameReader(const int natom_in, const UnitCellType unit_cell_in, const double* xcrd_in,
+  CoordinateFrameReader(int natom_in, UnitCellType unit_cell_in, const double* xcrd_in,
                         const double* ycrd_in, const double* zcrd_in, const double* umat_in,
                         const double* invu_in, const double* boxdim_in);
   CoordinateFrameReader(const CoordinateFrameWriter &cfw);
   CoordinateFrameReader(const PhaseSpace &ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  CoordinateFrameReader(const CoordinateFrameReader &original) = default;
+  CoordinateFrameReader(CoordinateFrameReader &&original) = default;
+  CoordinateFrameReader& operator=(const CoordinateFrameReader &other) = default;
+  /// \}
+  
   const int natom;               ///< The number of atoms in the system
   const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
   const double* xcrd;            ///< Cartesian X coordinates of all atoms
@@ -180,11 +193,9 @@ public:
   /// \param tier        Level at which to extract the data
   /// \{
   std::vector<double>
-  getInterlacedCoordinates(TrajectoryKind kind = TrajectoryKind::POSITIONS,
-                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  getInterlacedCoordinates(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   std::vector<double>
   getInterlacedCoordinates(int low_index, int high_index,
-                           TrajectoryKind kind = TrajectoryKind::POSITIONS,
                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 

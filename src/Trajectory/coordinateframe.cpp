@@ -392,21 +392,19 @@ UnitCellType CoordinateFrame::getUnitCellType() const {
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double>
-CoordinateFrame::getInterlacedCoordinates(const TrajectoryKind kind,
-                                          const HybridTargetLevel tier) const {
-  return getInterlacedCoordinates(0, atom_count, kind, tier);
+CoordinateFrame::getInterlacedCoordinates(const HybridTargetLevel tier) const {
+  return getInterlacedCoordinates(0, atom_count, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double>
 CoordinateFrame::getInterlacedCoordinates(const int low_index, const int high_index,
-                                          const TrajectoryKind kind,
                                           const HybridTargetLevel tier) const {
 
   // Range check as this will use pointers
   if (low_index < 0 || high_index > atom_count || high_index <= low_index) {
     rtErr("Invalid atom range " + std::to_string(low_index) + " to " + std::to_string(high_index) +
-          " in an object with " + std::to_string(atom_count) + " atoms.", "PhaseSpace",
+          " in an object with " + std::to_string(atom_count) + " atoms.", "CoordinateFrame",
           "getInterlacedCoordinates");
   }
   std::vector<double> result(3 * (high_index - low_index));
@@ -430,11 +428,10 @@ CoordinateFrame::getInterlacedCoordinates(const int low_index, const int high_in
       const std::vector<double> xval = x_coordinates.readDevice(low_index, high_index);
       const std::vector<double> yval = y_coordinates.readDevice(low_index, high_index);
       const std::vector<double> zval = z_coordinates.readDevice(low_index, high_index);
-      for (int i = low_index; i < high_index; i++) {
-        const int base_idx = 3 * (i - low_index);
-        result[base_idx    ] = xval[i];
-        result[base_idx + 1] = yval[i];
-        result[base_idx + 2] = zval[i];
+      for (int i = 0; i < high_index - low_index; i++) {
+        result[(3 * i)    ] = xval[i];
+        result[(3 * i) + 1] = yval[i];
+        result[(3 * i) + 2] = zval[i];
       }
     }
     break;

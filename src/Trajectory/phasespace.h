@@ -32,6 +32,7 @@ struct PhaseSpaceReader {
   /// \{
   PhaseSpaceReader(const PhaseSpaceReader &original) = default;
   PhaseSpaceReader(PhaseSpaceReader &&original) = default;
+  PhaseSpaceReader& operator=(const PhaseSpaceReader &other) = default;
   /// \}
   
   const int natom;                ///< Atom count for this system (still a constant)
@@ -69,6 +70,7 @@ struct PhaseSpaceWriter {
   /// \{
   PhaseSpaceWriter(const PhaseSpaceWriter &original) = default;
   PhaseSpaceWriter(PhaseSpaceWriter &&original) = default;
+  PhaseSpaceWriter& operator=(const PhaseSpaceWriter &other) = default;
   /// \}
 
   const int natom;               ///< Atom count for this system (still a constant)

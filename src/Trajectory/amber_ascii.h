@@ -50,18 +50,29 @@ void splitInterlacedCoordinates(const std::vector<PolyNumeric> &allcrd, double* 
 
 /// \brief Read coordinates from an Amber inpcrd or ASCII-format restart file.
 ///
+/// Overloaded:
+///   - Accept pointers to Hybrid objects and burrow into their host-side data
+///   - Accept pointers to C-style arrays
+///
 /// \param tf                   The text file to read from
 /// \param x_coordinates        Cartesian X coordinates of all particles (returned)
 /// \param y_coordinates        Cartesian Y coordinates of all particles (returned)
 /// \param z_coordinates        Cartesian Z coordinates of all particles (returned)
+/// \param natom                Number of atoms (if C-style arrays are provided)
 /// \param box_space_transform  Transformation to take coordinates into fractional (box) space
 /// \param inverse_transform    Transformation to take fractional coordinates into real space
 /// \param box_dimensions       Box dimensions (taken directly from the file)
+/// \{
+void getAmberInputCoordinates(const TextFile &tf, double* x_coordinates, double* y_coordinates,
+                              double* z_coordinates, int natom, double* box_space_transform,
+                              double* inverse_transform, double* box_dimensions);
+  
 void getAmberInputCoordinates(const TextFile &tf, Hybrid<double> *x_coordinates,
                               Hybrid<double> *y_coordinates,  Hybrid<double> *z_coordinates,
                               Hybrid<double> *box_space_transform,
                               Hybrid<double> *inverse_transform, Hybrid<double> *box_dimensions);
-
+/// \}
+  
 /// \brief Read velocities from an Amber ASCII-format restart file.
 ///
 /// \param tf            The text file to read from

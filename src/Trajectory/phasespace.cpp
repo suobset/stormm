@@ -444,11 +444,10 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
         zval = z_forces.readDevice(low_index, high_index);
         break;
       }
-      for (int i = low_index; i < high_index; i++) {
-        const int base_idx = 3 * (i - low_index);
-        result[base_idx    ] = xval[i];
-        result[base_idx + 1] = yval[i];
-        result[base_idx + 2] = zval[i];
+      for (int i = 0; i < high_index - low_index; i++) {
+        result[(3 * i)    ] = xval[i];
+        result[(3 * i) + 1] = yval[i];
+        result[(3 * i) + 2] = zval[i];
       }
     }
     break;

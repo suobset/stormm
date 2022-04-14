@@ -7,6 +7,7 @@
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/Topology/atomgraph.h"
@@ -492,8 +493,49 @@ int main(int argc, char* argv[]) {
   const std::string stereo_trj_name = base_crd_name + osc + "stereo_L1x.crd";
   const bool stereo_exists = (getDrivePathType(stereo_crd_name) == DrivePathType::FILE &&
                               getDrivePathType(stereo_trj_name) == DrivePathType::FILE);
+  const TestPriority do_stereo_tests = (stereo_exists) ? TestPriority::CRITICAL :
+                                                         TestPriority::ABORT;
+  if (stereo_exists == false) {
+    rtWarn("Coordinate files for a highly stereo-isomerized ligand, " + stereo_crd_name + " and " +
+           stereo_trj_name + " were not found.  Check the ${OMNI_SOURCE} variable, currently set "
+           "to " + oe.getOmniSourcePath() + " to make sure it is valid.  Subsequent tests will be "
+           "skipped.", "test_amber_coordinates");
+  }
   const CoordinateFrame stro_cf = (stereo_exists) ? CoordinateFrame(stereo_crd_name) :
                                                     CoordinateFrame();
+  const CoordinateFrameReader stro_cfr = stro_cf.data();
+  CoordinateSeries<double> stro_cs = (stereo_exists) ?
+                                     CoordinateSeries<double>(stereo_trj_name,
+                                                              stro_cf.getAtomCount()) :
+                                     CoordinateSeries<double>();
+  std::vector<double> xyz_sum(3, 0.0);
+  for (int i = 0; i < stro_cs.getFrameCount(); i++) {
+    std::vector<double> frm_crd = stro_cs.getInterlacedCoordinates(i, 0, 3);
+    for (int j = 0; j < 3; j++) {
+      for (int k = 0; k < 3; k++) {
+        xyz_sum[k] += frm_crd[(3 * j) + k];
+      }
+    }
+  }
+  const std::vector<double> xyz_sum_ans = { 346.572, -149.484, 2220.577 };
+  check(xyz_sum, RelationalOperator::EQUAL, Approx(xyz_sum_ans).margin(1.0e-8), "Sums of "
+        "coordinates extracted from a CoordinateSeries object do not meet expectations.",
+        do_stereo_tests);
+  check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 20, "The trajectory read from " +
+        stereo_trj_name + " does not contain the correct number of frames.", do_stereo_tests);
+  std::vector<double> fr2_crd = stro_cs.getInterlacedCoordinates(2);
+  for (int i = 0; i < 3; i++) {
+    xyz_sum[i] = 0.0;
+  }
+  for (int i = 0; i < stro_cfr.natom; i++) {
+    xyz_sum[0] += fr2_crd[(3 * i)    ];
+    xyz_sum[1] += fr2_crd[(3 * i) + 1];
+    xyz_sum[2] += fr2_crd[(3 * i) + 2];
+  }
+  const std::vector<double> fr2_sum_ans = { 482.8030, -198.3540, 2850.508 };
+  check(xyz_sum, RelationalOperator::EQUAL, Approx(fr2_sum_ans).margin(1.0e-8), "Sums of "
+        "coordinates extracted from one frame of a CoordinateSeries object do not meet "
+        "expectations.", do_stereo_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

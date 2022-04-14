@@ -2,13 +2,73 @@
 #ifndef OMNI_COORDINATE_SERIES_H
 #define OMNI_COORDINATE_SERIES_H
 
+#include "Accelerator/hybrid.h"
 #include "Constants/scaling.h"
-#include "trajectory_enumerators.h"
+#include "Math/rounding.h"
+#include "amber_ascii.h"
 #include "coordinateframe.h"
 #include "phasespace.h"
+#include "trajectory_enumerators.h"
 
 namespace omni {
 namespace trajectory {
+
+using card::Hybrid;
+using card::HybridTargetLevel;
+  
+/// \brief Collect C-style pointers and critical constants for a writeable CoordinateSeries object.
+template <typename T> struct CoordinateSeriesWriter {
+
+  /// \brief The constructor feeds all arguments straight to the inline initialization list.
+  CoordinateSeriesWriter(int natom_in, int nframe_in, UnitCellType unit_cell_in, T* xcrd_in,
+                         T* ycrd_in, T* zcrd_in, double* umat_in, double* invu_in,
+                         double* boxdim_in);
+
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  CoordinateSeriesWriter(const CoordinateSeriesWriter &original) = default;
+  CoordinateSeriesWriter(CoordinateSeriesWriter &&original) = default;
+  CoordinateSeriesWriter& operator=(const CoordinateSeriesWriter &other) = default;
+  /// \}
+
+  const int natom;               ///< The number of atoms in the system
+  const int nframe;              ///< The number of frames in the series
+  const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  T* xcrd;                       ///< Cartesian X coordinates of all atoms
+  T* ycrd;                       ///< Cartesian Y coordinates of all atoms
+  T* zcrd;                       ///< Cartesian Z coordinates of all atoms
+  double* umat;                  ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  double* invu;                  ///< Inverse transformation matrix out of box space
+  double* boxdim;                ///< Box dimensions (these will be consistent with umat and invu)
+};
+  
+/// \brief Collect C-style pointers and critical constants for a read-only CoordinateSeries object.
+template <typename T> struct CoordinateSeriesReader {
+
+  /// \brief The constructor feeds all arguments straight to the inline initialization list.
+  CoordinateSeriesReader(int natom_in, int nframe_in, UnitCellType unit_cell_in, const T* xcrd_in,
+                         const T* ycrd_in, const T* zcrd_in, const double* umat_in,
+                         const double* invu_in, const double* boxdim_in);
+
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  CoordinateSeriesReader(const CoordinateSeriesReader &original) = default;
+  CoordinateSeriesReader(CoordinateSeriesReader &&original) = default;
+  CoordinateSeriesReader& operator=(const CoordinateSeriesReader &other) = default;
+  /// \}
+
+  const int natom;               ///< The number of atoms in the system
+  const int nframe;              ///< The number of frames in the series
+  const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  const T* xcrd;                 ///< Cartesian X coordinates of all atoms
+  const T* ycrd;                 ///< Cartesian Y coordinates of all atoms
+  const T* zcrd;                 ///< Cartesian Z coordinates of all atoms
+  const double* umat;            ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  const double* invu;            ///< Inverse transformation matrix out of box space
+  const double* boxdim;          ///< Box dimensions (these will be consistent with umat and invu)
+};
 
 /// \brief Store the coordinates and box information for a series of frames, in one of several
 ///        levels of precision.  Individual frames can be extracted into CoordinateFrame, and
@@ -49,15 +109,95 @@ public:
   /// \{
   explicit CoordinateSeries(int natom_in = 0, int nframe_in = 0,
                             UnitCellType unit_cell_in = UnitCellType::NONE);
-  explicit CoordinateSeries(const std::string &file_name,
+  explicit CoordinateSeries(const std::string &file_name, int atom_count_in = 0,
                             CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
                             const std::vector<int> &frame_numbers = {},
-                            int replica_count = 1, int atom_count_in = 0,
-                            UnitCellType unit_cell_in = UnitCellType::NONE);
+                            int replica_count = 1, UnitCellType unit_cell_in = UnitCellType::NONE);
   explicit CoordinateSeries(PhaseSpace *ps, int nframe_in);
   explicit CoordinateSeries(const PhaseSpace &ps, int nframe_in);
   explicit CoordinateSeries(CoordinateFrame *cf, int nframe_in);
   explicit CoordinateSeries(const CoordinateFrame &cf, int nframe_in);
+  /// \}
+
+  /// \brief Use the default copy and move constructors, copy and move assignment operators.  This
+  ///        object has no const members to trigger implicit deletions and no POINTER-kind Hybrid
+  ///        objects to repair.
+  /// \{
+  CoordinateSeries(const CoordinateSeries &original) = default;
+  CoordinateSeries(CoordinateSeries &&original) = default;
+  CoordinateSeries& operator=(const CoordinateSeries &other) = default;
+  CoordinateSeries& operator=(CoordinateSeries &&other) = default;
+  /// \}
+  
+  
+  /// \brief Get the number of atoms in each frame of the series.
+  int getAtomCount() const;
+
+  /// \brief Get the number of frames in the series.
+  int getFrameCount() const;
+
+  /// \brief Get the maximum number of frames that the object can hold.
+  int getFrameCapacity() const;
+
+  /// \brief Get the unit cell type of the coordinate system
+  UnitCellType getUnitCellType() const;
+
+  /// \brief Get the interlaced coordinates of one frame.
+  ///
+  /// Overloaded:
+  ///   - Get coordinates for all atoms in a frame
+  ///   - Get coordinates for a selected range of atoms in a frame
+  ///
+  /// \param frame_index  Index of the frame to access
+  /// \param low_index    The lower atom index of a range
+  /// \param high_index   The upper atom index of a range
+  /// \param tier  The level at which to access coordinates
+  /// \{
+  std::vector<T> getInterlacedCoordinates(int frame_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  std::vector<T> getInterlacedCoordinates(int frame_index, int low_index, int high_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+
+  /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The
+  ///        result should be interpreted as a 3x3 matrix in column-major format.
+  ///
+  /// \param frame_index  The frame for which to extract the transformation matrix
+  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  std::vector<double> getBoxSpaceTransform(int frame_index,
+                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the transformation matrix to take coordinates from fractional space back into
+  ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
+  ///
+  /// \param frame_index  The frame for which to extract the transformation matrix
+  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  std::vector<double> getInverseTransform(int frame_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the box dimensions in their pure form for a particular frame.
+  ///
+  /// \param frame_index  The frame for which to extract the transformation matrix
+  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  std::vector<double> getBoxDimensions(int frame_index,
+                                       HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
+#ifdef OMNI_USE_HPC
+  /// \brief Upload all information
+  void upload();
+
+  /// \brief Download all information
+  void download();
+#endif
+  /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
+  ///        access to any of its member variables.
+  ///
+  /// Overloaded:
+  ///   - Get a read-only object
+  ///   - Get a writeable object
+  /// \{
+  const CoordinateSeriesReader<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  CoordinateSeriesWriter<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
   /// \brief Import coordinates from a CoordinateFrame or PhaseSpace object.  The original object
@@ -99,7 +239,7 @@ public:
   void importCoordinateSet(const PhaseSpace &ps, int atom_start, int atom_end,
                            int frame_index = -1);
   void importCoordinateSet(const PhaseSpace &ps, int frame_index = -1);
-  void importCoordinateSet(const PhaseSpace *ps, nt atom_start, int atom_end,
+  void importCoordinateSet(const PhaseSpace *ps, int atom_start, int atom_end,
                            int frame_index = -1);
   void importCoordinateSet(const PhaseSpace *ps, int frame_index = -1);
   /// \}
@@ -119,8 +259,9 @@ public:
   /// \param frame_index_start  The starting index of the series for incorporating frames found in
   ///                           the file.  A negative value in this argument triggers addition to
   ///                           the end of any existing series.
-  void importFromFile(const std::string &file_name, const CoordinateFileKind file_kind,
-                      const std::vector<int> &frame_numbers, int replica_count = 1,
+  void importFromFile(const std::string &file_name,                       
+                      CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
+                      const std::vector<int> &frame_numbers = {}, int replica_count = 1,
                       int frame_index_start = -1);
 
   /// \brief Reserve capacity in this series.  The new frames will be uninitialized.
@@ -193,7 +334,7 @@ public:
   void pushBack(const PhaseSpace &ps, int atom_start, int atom_end);
   void pushBack(PhaseSpace *ps, int atom_start, int atom_end);
   /// \}
-
+  
 private:
   int atom_count;                       ///< Number of atoms in each frame.  Between frames the
                                         ///<   space for atoms is padded by the warp size, but
@@ -201,8 +342,7 @@ private:
                                         ///<   way that there is a frame capacity.
   int frame_count;                      ///< Total number of frames currently in the object
   int frame_capacity;                   ///< Total frame capacity of the object
-  Hybrid<int> frame_numbers;            ///< Frame numbers of the different frames derived from
-                                        ///<   some trajectory, if applicable
+  UnitCellType unit_cell;               ///< The unit cell type for these coordinate frames
   Hybrid<T> x_coordinates;              ///< Cartesian X coordinates of all particles, with each
                                         ///<   frame's coordinates padded by the warp size
   Hybrid<T> y_coordinates;              ///< Cartesian Y coordinates of all particles 
@@ -221,7 +361,7 @@ private:
   /// \param new_frame_capacity  The new capacity to allocate.  The frame count and atom count are
   ///                            are both int type, although the total size is measured in size_t
   ///                            to avoid integer overflow.
-  void allocate(int new_frame_capacity)
+  void allocate(int new_frame_capacity);
 };
  
 } // namespace trajectory 
