@@ -40,7 +40,9 @@ CoordinateSeries<T>::CoordinateSeries(const int natom_in, const int nframe_in,
                        "cser_invu"},
     box_dimensions{static_cast<size_t>(nframe_in) * roundUp<size_t>(6, warp_size_zu),
                    "cser_boxdims"}
-{}
+{
+  allocate(frame_count);
+}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
@@ -59,6 +61,7 @@ template <typename T>
 CoordinateSeries<T>::CoordinateSeries(PhaseSpace *ps, const int nframe_in) :
     CoordinateSeries(ps->getAtomCount(), nframe_in, ps->getUnitCellType())
 {
+  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(ps, 0, ps->getAtomCount(), i);
   }
@@ -69,6 +72,7 @@ template <typename T>
 CoordinateSeries<T>::CoordinateSeries(const PhaseSpace &ps, const int nframe_in) :
     CoordinateSeries(ps.getAtomCount(), nframe_in, ps.getUnitCellType())
 {
+  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(ps, 0, ps.getAtomCount(), i);
   }
@@ -79,6 +83,7 @@ template <typename T>
 CoordinateSeries<T>::CoordinateSeries(CoordinateFrame *cf, const int nframe_in) :
     CoordinateSeries(cf->getAtomCount(), nframe_in, cf->getUnitCellType())
 {
+  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(cf, 0, cf->getAtomCount(), i);
   }
@@ -89,6 +94,7 @@ template <typename T>
 CoordinateSeries<T>::CoordinateSeries(const CoordinateFrame &cf, const int nframe_in) :
     CoordinateSeries(cf.getAtomCount(), nframe_in, cf.getUnitCellType())
 {
+  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(cf, 0, cf.getAtomCount(), i);
   }
@@ -614,7 +620,7 @@ void CoordinateSeries<T>::allocate(const int new_frame_capacity) {
     const size_t total_atoms = fc_zu * roundUp(static_cast<size_t>(atom_count), warp_size_zu);
     const size_t total_xfrm = fc_zu * roundUp<size_t>(9, warp_size_zu);
     const size_t total_bdim = fc_zu * roundUp<size_t>(6, warp_size_zu);
-
+    
     // Allocate space for the new capacity.  This will reallocate each array, but one by one in
     // order to avoid keeping what could be nearly double the amount of data at any one time.
     x_coordinates.resize(total_atoms);
@@ -623,18 +629,6 @@ void CoordinateSeries<T>::allocate(const int new_frame_capacity) {
     box_space_transforms.resize(total_xfrm);
     inverse_transforms.resize(total_xfrm);
     box_dimensions.resize(total_bdim);
-
-    // Reset the array sizes to the current storage 
-    const size_t fn_zu = static_cast<size_t>(frame_count);
-    const size_t active_atoms = fn_zu * roundUp(static_cast<size_t>(atom_count), warp_size_zu);
-    const size_t active_xfrm = fn_zu * roundUp<size_t>(9, warp_size_zu);
-    const size_t active_bdim = fn_zu * roundUp<size_t>(6, warp_size_zu);
-    x_coordinates.resize(active_atoms);
-    y_coordinates.resize(active_atoms);
-    z_coordinates.resize(active_atoms);
-    box_space_transforms.resize(active_xfrm);
-    inverse_transforms.resize(active_xfrm);
-    box_dimensions.resize(active_bdim);
   }
 }
 

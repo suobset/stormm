@@ -521,6 +521,9 @@ int main(int argc, char* argv[]) {
   check(xyz_sum, RelationalOperator::EQUAL, Approx(xyz_sum_ans).margin(1.0e-8), "Sums of "
         "coordinates extracted from a CoordinateSeries object do not meet expectations.",
         do_stereo_tests);
+  check(stro_cs.getAtomCount(), RelationalOperator::EQUAL, stro_cf.getAtomCount(),
+        "The trajectory read from " + stereo_trj_name + " does not contain the correct number of "
+        "atoms.", do_stereo_tests);
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 20, "The trajectory read from " +
         stereo_trj_name + " does not contain the correct number of frames.", do_stereo_tests);
   std::vector<double> fr2_crd = stro_cs.getInterlacedCoordinates(2);
@@ -542,6 +545,15 @@ int main(int argc, char* argv[]) {
   check(stro_cf.getInterlacedCoordinates(), RelationalOperator::EQUAL,
         stro_cs.getInterlacedCoordinates(20), "The pushBack() member function of the "
         "CoordinateSeries object does not extend the series as expected.", do_stereo_tests);
+  if (stereo_exists) {
+    stro_cs.importFromFile(stereo_trj_name);
+  }
+  check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 41, "Importing a second time from a "
+        "trajectory file did not extend a CoordinateSeries object in the expected manner.",
+        do_stereo_tests);
+  check(stro_cs.getInterlacedCoordinates(4), RelationalOperator::EQUAL,
+        stro_cs.getInterlacedCoordinates(25), "Correspondence between frames read from the same "
+        "trajectory file is not maintained in a CoordinateSeries object.", do_stereo_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
