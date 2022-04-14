@@ -515,6 +515,28 @@ void CoordinateSeries<T>::reserve(const int new_frame_capacity) {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+void CoordinateSeries<T>::shrinkToFit() {
+  const size_t natom_zu = roundUp<size_t>(atom_count, warp_size_zu);
+  const size_t fc_zu    = static_cast<size_t>(frame_count);
+  const size_t xfrm_zu  = roundUp<size_t>(9, warp_size_zu);
+  const size_t bdim_zu  = roundUp<size_t>(6, warp_size_zu);
+  x_coordinates.resize(natom_zu * fc_zu);
+  y_coordinates.resize(natom_zu * fc_zu);
+  z_coordinates.resize(natom_zu * fc_zu);
+  box_space_transforms.resize(xfrm_zu * fc_zu);
+  inverse_transforms.resize(xfrm_zu * fc_zu);
+  box_dimensions.resize(xfrm_zu * fc_zu);
+  x_coordinates.shrinkToFit();
+  y_coordinates.shrinkToFit();
+  z_coordinates.shrinkToFit();
+  box_space_transforms.shrinkToFit();
+  inverse_transforms.shrinkToFit();
+  box_dimensions.shrinkToFit();
+  frame_capacity = frame_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 void CoordinateSeries<T>::resize(const int new_frame_count) {
   allocate(new_frame_count);
   frame_count = new_frame_count;

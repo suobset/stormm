@@ -270,6 +270,10 @@ public:
   ///                            the function will do nothing.
   void reserve(const int new_frame_capacity);
 
+  /// \brief Shrink the object's various arrays to accommodate only the current frame and atom
+  ///        counts.  Mimics the Standard Template Library vector shrink_to_fit() member function.
+  void shrinkToFit();
+
   /// \brief Resize the series, allocating new capacity if needed, initializing new frames with the
   ///        provided coordinate set. ("New" frames are defined as any frames with indices greater
   ///        than the original maximum index, regardless of whether new capacity was allocated to

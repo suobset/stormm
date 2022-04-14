@@ -554,7 +554,14 @@ int main(int argc, char* argv[]) {
   check(stro_cs.getInterlacedCoordinates(4), RelationalOperator::EQUAL,
         stro_cs.getInterlacedCoordinates(25), "Correspondence between frames read from the same "
         "trajectory file is not maintained in a CoordinateSeries object.", do_stereo_tests);
-  
+  for (int i = 0; i < 5; i++) {
+    stro_cs.pushBack(stro_cf);
+  }
+  stro_cs.shrinkToFit();
+  check(stro_cs.getInterlacedCoordinates(20), RelationalOperator::EQUAL,
+        stro_cs.getInterlacedCoordinates(43), "Frames that should match exactly no longer do "
+        "after applying the CoordinateSeries object's shirnkToFit method.", do_stereo_tests);
+    
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 
