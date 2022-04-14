@@ -327,12 +327,12 @@ public:
   /// \param atom_start   First atom from the coordinate set to add to a frame of the series
   /// \param atom_end     Limit of atoms from the coordinate set to add to a frame of the series
   /// \{
-  void pushBack(const CoordinateFrameReader &cfr, int atom_start, int atom_end);
-  void pushBack(const CoordinateFrameWriter &cfw, int atom_start, int atom_end);
-  void pushBack(const CoordinateFrame &cf, int atom_start, int atom_end);
-  void pushBack(CoordinateFrame *cf, int atom_start, int atom_end);
-  void pushBack(const PhaseSpace &ps, int atom_start, int atom_end);
-  void pushBack(PhaseSpace *ps, int atom_start, int atom_end);
+  void pushBack(const CoordinateFrameReader &cfr, int atom_start = 0, int atom_end = 0);
+  void pushBack(const CoordinateFrameWriter &cfw, int atom_start = 0, int atom_end = 0);
+  void pushBack(const CoordinateFrame &cf, int atom_start = 0, int atom_end = 0);
+  void pushBack(CoordinateFrame *cf, int atom_start = 0, int atom_end = 0);
+  void pushBack(const PhaseSpace &ps, int atom_start = 0, int atom_end = 0);
+  void pushBack(PhaseSpace *ps, int atom_start = 0, int atom_end = 0);
   /// \}
   
 private:

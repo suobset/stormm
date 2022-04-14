@@ -536,6 +536,12 @@ int main(int argc, char* argv[]) {
   check(xyz_sum, RelationalOperator::EQUAL, Approx(fr2_sum_ans).margin(1.0e-8), "Sums of "
         "coordinates extracted from one frame of a CoordinateSeries object do not meet "
         "expectations.", do_stereo_tests);
+  stro_cs.pushBack(stro_cf);
+  check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 21, "The pushBack() member function "
+        "of the CoordinateSeries object does not extend the series as expected.", do_stereo_tests);
+  check(stro_cf.getInterlacedCoordinates(), RelationalOperator::EQUAL,
+        stro_cs.getInterlacedCoordinates(20), "The pushBack() member function of the "
+        "CoordinateSeries object does not extend the series as expected.", do_stereo_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

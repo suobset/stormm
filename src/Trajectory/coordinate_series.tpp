@@ -277,13 +277,14 @@ template <typename T>
 void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrameReader &cfr,
                                               const int atom_start, const int atom_end,
                                               const int frame_index) {
+  const int actual_atom_end = (atom_end > atom_start) ? atom_end : cfr.natom;
 
   // Compute the actual frame index that shall be written, and the upper limit of the atoms that
   // will be written.  If the frame index exceeds the current capacity, make more capacity.
   const int actual_frame_index = (frame_index == -1) ? frame_count : frame_index;
   const size_t atom_offset = static_cast<size_t>(actual_frame_index) *
                              roundUp(static_cast<size_t>(atom_count), warp_size_zu);
-  const size_t frame_limit = atom_offset + static_cast<size_t>(atom_end - atom_start);
+  const size_t frame_limit = atom_offset + static_cast<size_t>(actual_atom_end - atom_start);
 
   // Exapnd the capacity to at least 125% of its original size to avoid continuous resizing of the
   // arrays as more frames are added.
@@ -330,6 +331,48 @@ template <typename T>
 void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrameReader &cfr,
                                               const int frame_index) {
   importCoordinateSet(cfr, 0, cfr.natom, frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrameWriter &cfw,
+                                              const int atom_start, const int atom_end,
+                                              const int frame_index) {
+  importCoordinateSet(CoordinateFrameReader(cfw), atom_start, atom_end, frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrameWriter &cfw,
+                                              const int frame_index) {
+  importCoordinateSet(CoordinateFrameReader(cfw), 0, cfw.natom, frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrame &cf, const int atom_start,
+                                              const int atom_end, const int frame_index) {
+  importCoordinateSet(cf.data(), atom_start, atom_end, frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrame *cf, const int frame_index) {
+  importCoordinateSet(cf->data(), 0, cf->getAtomCount(), frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::importCoordinateSet(const PhaseSpace &ps, const int atom_start,
+                                              const int atom_end, const int frame_index) {
+  importCoordinateSet(CoordinateFrameReader(ps), atom_start, atom_end, frame_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::importCoordinateSet(const PhaseSpace *ps, const int frame_index) {
+  importCoordinateSet(CoordinateFrameReader(CoordinateFrameWriter(ps)), 0, ps->getAtomCount(),
+                      frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -478,7 +521,7 @@ void CoordinateSeries<T>::resize(const int new_frame_count, const CoordinateFram
   allocate(new_frame_count);
   const int orig_frame_count = frame_count;
   for (int i = orig_frame_count; i < new_frame_count; i++) {
-    importCoordinateSet(cfr, atom_start, atom_end, i);    
+    importCoordinateSet(cfr, atom_start, atom_end, i);
   }
   frame_count = new_frame_count;
 }
@@ -522,11 +565,11 @@ void CoordinateSeries<T>::resize(const int new_frame_count, PhaseSpace *ps,
 template <typename T>
 void CoordinateSeries<T>::pushBack(const CoordinateFrameReader &cfr, const int atom_start,
                                    const int atom_end) {
+  const int orig_frame_count = frame_count;
   if (frame_count >= frame_capacity) {
     allocate(((frame_count * 5) + 3) / 4);
   }
-  importCoordinateSet(cfr, atom_start, atom_end, frame_count);
-  frame_count++;
+  importCoordinateSet(cfr, atom_start, atom_end, orig_frame_count);
 }
 
 //-------------------------------------------------------------------------------------------------
