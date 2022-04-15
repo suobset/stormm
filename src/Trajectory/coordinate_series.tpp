@@ -93,10 +93,10 @@ CoordinateSeries<T>::CoordinateSeries(const std::string &file_name, const int at
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-CoordinateSeries<T>::CoordinateSeries(PhaseSpace *ps, const int nframe_in) :
-    CoordinateSeries(ps->getAtomCount(), nframe_in, ps->getUnitCellType())
+CoordinateSeries<T>::CoordinateSeries(PhaseSpace *ps, const int nframe_in,
+                                      const int globalpos_scale_bits_in) :
+    CoordinateSeries(ps->getAtomCount(), nframe_in, ps->getUnitCellType(), globalpos_scale_bits_in)
 {
-  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(ps, 0, ps->getAtomCount(), i);
   }
@@ -104,10 +104,10 @@ CoordinateSeries<T>::CoordinateSeries(PhaseSpace *ps, const int nframe_in) :
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-CoordinateSeries<T>::CoordinateSeries(const PhaseSpace &ps, const int nframe_in) :
-    CoordinateSeries(ps.getAtomCount(), nframe_in, ps.getUnitCellType())
+CoordinateSeries<T>::CoordinateSeries(const PhaseSpace &ps, const int nframe_in,
+                                      const int globalpos_scale_bits_in) :
+    CoordinateSeries(ps.getAtomCount(), nframe_in, ps.getUnitCellType(), globalpos_scale_bits_in)
 {
-  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(ps, 0, ps.getAtomCount(), i);
   }
@@ -115,10 +115,10 @@ CoordinateSeries<T>::CoordinateSeries(const PhaseSpace &ps, const int nframe_in)
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-CoordinateSeries<T>::CoordinateSeries(CoordinateFrame *cf, const int nframe_in) :
-    CoordinateSeries(cf->getAtomCount(), nframe_in, cf->getUnitCellType())
+CoordinateSeries<T>::CoordinateSeries(CoordinateFrame *cf, const int nframe_in,
+                                      const int globalpos_scale_bits_in) :
+    CoordinateSeries(cf->getAtomCount(), nframe_in, cf->getUnitCellType(), globalpos_scale_bits_in)
 {
-  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(cf, 0, cf->getAtomCount(), i);
   }
@@ -126,10 +126,10 @@ CoordinateSeries<T>::CoordinateSeries(CoordinateFrame *cf, const int nframe_in) 
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-CoordinateSeries<T>::CoordinateSeries(const CoordinateFrame &cf, const int nframe_in) :
-    CoordinateSeries(cf.getAtomCount(), nframe_in, cf.getUnitCellType())
+CoordinateSeries<T>::CoordinateSeries(const CoordinateFrame &cf, const int nframe_in,
+                                      const int globalpos_scale_bits_in) :
+    CoordinateSeries(cf.getAtomCount(), nframe_in, cf.getUnitCellType(), globalpos_scale_bits_in)
 {
-  allocate(frame_count);
   for (int i = 0; i < frame_count; i++) {
     importCoordinateSet(cf, 0, cf.getAtomCount(), i);
   }
@@ -416,7 +416,12 @@ void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrameReader &cfr,
                                               const int atom_start, const int atom_end,
                                               const int frame_index) {
   const int actual_atom_end = (atom_end > atom_start) ? atom_end : cfr.natom;
-
+  if (actual_atom_end - atom_start != atom_count) {
+    rtErr("A CoordinateSeries with frames of " + std::to_string(atom_count) + " atoms cannot "
+          "accept " + std::to_string(actual_atom_end - atom_start) + " atoms from a system with " +
+          std::to_string(cfr.natom) + " atoms.", "CoordinateSeries", "importCoordinateSet");
+  }
+  
   // Compute the actual frame index that shall be written, and the upper limit of the atoms that
   // will be written.  If the frame index exceeds the current capacity, make more capacity.
   const int actual_frame_index = (frame_index == -1) ? frame_count : frame_index;

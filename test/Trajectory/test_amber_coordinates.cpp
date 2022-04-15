@@ -493,8 +493,7 @@ int main(int argc, char* argv[]) {
   const std::string stereo_trj_name = base_crd_name + osc + "stereo_L1x.crd";
   const bool stereo_exists = (getDrivePathType(stereo_crd_name) == DrivePathType::FILE &&
                               getDrivePathType(stereo_trj_name) == DrivePathType::FILE);
-  const TestPriority do_stereo_tests = (stereo_exists) ? TestPriority::CRITICAL :
-                                                         TestPriority::ABORT;
+  const TestPriority do_stereo = (stereo_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (stereo_exists == false) {
     rtWarn("Coordinate files for a highly stereo-isomerized ligand, " + stereo_crd_name + " and " +
            stereo_trj_name + " were not found.  Check the ${OMNI_SOURCE} variable, currently set "
@@ -520,12 +519,12 @@ int main(int argc, char* argv[]) {
   const std::vector<double> xyz_sum_ans = { 346.572, -149.484, 2220.577 };
   check(xyz_sum, RelationalOperator::EQUAL, Approx(xyz_sum_ans).margin(1.0e-8), "Sums of "
         "coordinates extracted from a CoordinateSeries object do not meet expectations.",
-        do_stereo_tests);
+        do_stereo);
   check(stro_cs.getAtomCount(), RelationalOperator::EQUAL, stro_cf.getAtomCount(),
         "The trajectory read from " + stereo_trj_name + " does not contain the correct number of "
-        "atoms.", do_stereo_tests);
+        "atoms.", do_stereo);
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 20, "The trajectory read from " +
-        stereo_trj_name + " does not contain the correct number of frames.", do_stereo_tests);
+        stereo_trj_name + " does not contain the correct number of frames.", do_stereo);
   std::vector<double> fr2_crd = stro_cs.getInterlacedCoordinates(2);
   for (int i = 0; i < 3; i++) {
     xyz_sum[i] = 0.0;
@@ -538,38 +537,53 @@ int main(int argc, char* argv[]) {
   const std::vector<double> fr2_sum_ans = { 482.8030, -198.3540, 2850.508 };
   check(xyz_sum, RelationalOperator::EQUAL, Approx(fr2_sum_ans).margin(1.0e-8), "Sums of "
         "coordinates extracted from one frame of a CoordinateSeries object do not meet "
-        "expectations.", do_stereo_tests);
+        "expectations.", do_stereo);
   stro_cs.pushBack(stro_cf);
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 21, "The pushBack() member function "
-        "of the CoordinateSeries object does not extend the series as expected.", do_stereo_tests);
+        "of the CoordinateSeries object does not extend the series as expected.", do_stereo);
   check(stro_cf.getInterlacedCoordinates(), RelationalOperator::EQUAL,
         stro_cs.getInterlacedCoordinates(20), "The pushBack() member function of the "
-        "CoordinateSeries object does not extend the series as expected.", do_stereo_tests);
+        "CoordinateSeries object does not extend the series as expected.", do_stereo);
   if (stereo_exists) {
     stro_cs.importFromFile(stereo_trj_name);
   }
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 41, "Importing a second time from a "
         "trajectory file did not extend a CoordinateSeries object in the expected manner.",
-        do_stereo_tests);
+        do_stereo);
   check(stro_cs.getInterlacedCoordinates(4), RelationalOperator::EQUAL,
         stro_cs.getInterlacedCoordinates(25), "Correspondence between frames read from the same "
-        "trajectory file is not maintained in a CoordinateSeries object.", do_stereo_tests);
+        "trajectory file is not maintained in a CoordinateSeries object.", do_stereo);
   for (int i = 0; i < 5; i++) {
     stro_cs.pushBack(stro_cf);
   }
   stro_cs.shrinkToFit();
   check(stro_cs.getInterlacedCoordinates(20), RelationalOperator::EQUAL,
         stro_cs.getInterlacedCoordinates(43), "Frames that should match exactly no longer do "
-        "after applying the CoordinateSeries object's shirnkToFit method.", do_stereo_tests);
+        "after applying the CoordinateSeries object's shirnkToFit method.", do_stereo);
   CoordinateSeries<int> istro_cs = changeCoordinateSeriesType<double, int>(stro_cs, 14);
   
   const CoordinateFrame frame17 = istro_cs.exportFrame(17);
-  const std::vector<double> drep = stro_cs.getInterlacedCoordinates(17);
-  const std::vector<double> di14rep = frame17.getInterlacedCoordinates();
-  check(maxAbsoluteDifference(di14rep, drep), RelationalOperator::LESS_THAN, 1.0e-4, "A 14 bit "
-        "fixed-precision representation of the coordinate series does not reproduce the original, "
-        "double-precision data with the expected accuracy.", do_stereo_tests);
-
+  const std::vector<double> stro_drep = stro_cs.getInterlacedCoordinates(17);
+  const std::vector<double> stro_di14rep = frame17.getInterlacedCoordinates();
+  check(maxAbsoluteDifference(stro_di14rep, stro_drep), RelationalOperator::LESS_THAN, 1.0e-4,
+        "A 14 bit fixed-precision representation of the coordinate series does not reproduce the "
+        "original, double-precision data with the expected accuracy.", do_stereo);
+  CoordinateSeries<int> tip5p_cs(tip5p, 15, 16);
+  const std::vector<double> tip5p_drep = tip5p.getInterlacedCoordinates();
+  const CoordinateFrame frame9 = tip5p_cs.exportFrame(9);
+  const std::vector<double> tip5p_di16rep = frame9.getInterlacedCoordinates();
+  check(maxAbsoluteDifference(tip5p_di16rep, tip5p_drep), RelationalOperator::LESS_THAN, 1.5e-5,
+        "A 16 bit fixed-precision representation of the coordinate series does not reproduce the "
+        "original, double-precision data with the expected accuracy.", do_tip5p);
+  check(tip5p_cs.getUnitCellType() == tip5p.getUnitCellType(), "A CoordinateSeries object does "
+        "not adopt the original PhaseSpace object's unit cell type (" +
+        getUnitCellTypeName(tip5p.getUnitCellType()) + ").", do_tip5p);
+  CHECK_THROWS_SOFT(tip5p_cs.pushBack(trpcage), "A CoordinateSeries accepts new coordinates from "
+                    "a system with the wrong particle number.", do_tip5p);
+  CHECK_THROWS_SOFT(tip5p_cs.importFromFile(tip3p_crd_name), "A CoordinateSeries accepts new "
+                    "coordinates from an Amber input coordinates file with the wrong particle "
+                    "number.", do_tip3p);
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

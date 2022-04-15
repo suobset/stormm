@@ -126,10 +126,11 @@ public:
                             const std::vector<int> &frame_numbers = {},
                             int replica_count = 1, UnitCellType unit_cell_in = UnitCellType::NONE,
                             int globalpos_scale_bits_in = 0);
-  explicit CoordinateSeries(PhaseSpace *ps, int nframe_in);
-  explicit CoordinateSeries(const PhaseSpace &ps, int nframe_in);
-  explicit CoordinateSeries(CoordinateFrame *cf, int nframe_in);
-  explicit CoordinateSeries(const CoordinateFrame &cf, int nframe_in);
+  explicit CoordinateSeries(PhaseSpace *ps, int nframe_in, int globalpos_scale_bits_in = 0);
+  explicit CoordinateSeries(const PhaseSpace &ps, int nframe_in, int globalpos_scale_bits_in = 0);
+  explicit CoordinateSeries(CoordinateFrame *cf, int nframe_in, int globalpos_scale_bits_in = 0);
+  explicit CoordinateSeries(const CoordinateFrame &cf, int nframe_in,
+                            int globalpos_scale_bits_in = 0);
   /// \}
 
   /// \brief Use the default copy and move constructors, copy and move assignment operators.  This
