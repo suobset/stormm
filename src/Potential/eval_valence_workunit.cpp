@@ -89,10 +89,10 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const double du = keq * dl * dl;
         if (readBitFromMask(cbnd_acc_mask, pos) == 1) {
           if (is_urey_bradley) {
-            ubrd_acc += static_cast<llint>(round(du * nrg_scale_factor));
+            ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
           }
           else {
-            bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
+            bond_acc += static_cast<llint>(llround(du * nrg_scale_factor));
           }
 
           // Compute forces
@@ -144,7 +144,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
         const double dtheta = theta - theta0;
         const double du = keq * dtheta * dtheta;
         if (readBitFromMask(angl_acc_mask, pos) == 1) {
-          angl_acc += static_cast<llint>(round(du * nrg_scale_factor));
+          angl_acc += static_cast<llint>(llround(du * nrg_scale_factor));
         
           // Compute forces
           if (eval_force == EvaluateForce::YES) {
@@ -201,8 +201,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                         sh_yfrc.data(), sh_zfrc.data(),
                                                         lcl_eval_force, lcl_eval_force);
             if (log_term) {
-              qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
-              lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+              qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
+              lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
             }
           }
           if (activity == VwuTask::INFR14) {
@@ -252,7 +252,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
           sangle = theta - vk.cimp_phi[param_idx];
           double contrib = stiffness * sangle * sangle;
           if (log_term) {
-            cimp_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
+            cimp_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));          
           }
         }
         else {
@@ -273,10 +273,10 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
           }
           if (log_term) {
             if (kind == TorsionKind::PROPER) {
-              dihe_acc += static_cast<llint>(round(contrib * nrg_scale_factor));          
+              dihe_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));          
             }
             else {
-              impr_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+              impr_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
             }
           }
         }
@@ -359,7 +359,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                         nullptr, nullptr, UnitCellType::NONE, sh_xfrc.data(),
                                         sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
-          cmap_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+          cmap_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
         }
       }
     }
@@ -396,8 +396,8 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                     sh_yfrc.data(), sh_zfrc.data(),
                                                     lcl_eval_force, lcl_eval_force);
         if (log_term) {
-          qq14_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
-          lj14_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+          qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
+          lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
         }
       }
     }
@@ -425,7 +425,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  UnitCellType::NONE, sh_xfrc.data(),
                                                  sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
-          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+          rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
         }
       }
     }
@@ -450,7 +450,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  UnitCellType::NONE, sh_xfrc.data(),
                                                  sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
-          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+          rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
         }
       }
     }
@@ -476,7 +476,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  UnitCellType::NONE, sh_xfrc.data(),
                                                  sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
-          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+          rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
         }
       }
     }
@@ -503,7 +503,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                                                  UnitCellType::NONE, sh_xfrc.data(),
                                                  sh_yfrc.data(), sh_zfrc.data(), lcl_eval_force);
         if (log_term) {
-          rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+          rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
         }
       }
     }

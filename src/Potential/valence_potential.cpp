@@ -52,7 +52,7 @@ double evaluateBondTerms(const ValenceKit<double> vk, const double* xcrd, const 
     const double dl = dr - leq;
     const double du = keq * dl * dl;
     bond_energy += du;
-    bond_acc += static_cast<llint>(round(du * nrg_scale_factor));
+    bond_acc += static_cast<llint>(llround(du * nrg_scale_factor));
 
     // Compute forces
     if (eval_force == EvaluateForce::YES) {
@@ -175,7 +175,7 @@ double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const
     const double dtheta = theta - theta0;
     const double du = keq * dtheta * dtheta;
     angl_energy += du;
-    angl_acc += static_cast<llint>(round(du * nrg_scale_factor));
+    angl_acc += static_cast<llint>(llround(du * nrg_scale_factor));
 
     // Compute forces
     if (eval_force == EvaluateForce::YES) {
@@ -312,12 +312,12 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, c
     case TorsionKind::PROPER:
     case TorsionKind::PROPER_NO_14:
       dihe_energy.x += contrib;
-      proper_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+      proper_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       break;
     case TorsionKind::IMPROPER:
     case TorsionKind::IMPROPER_NO_14:
       dihe_energy.y += contrib;
-      improper_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+      improper_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       break;
     }
 
@@ -446,7 +446,7 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const double* xcrd,
     const double dl = dr - leq;
     const double du = keq * dl * dl;
     ubrd_energy += du;
-    ubrd_acc += static_cast<llint>(round(du * nrg_scale_factor));
+    ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
 
     // Compute forces
     if (eval_force == EvaluateForce::YES) {
@@ -571,7 +571,7 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const double* xc
     // Contribute the result to the correct pile: proper or improper
     const double contrib = keq * dtheta * dtheta;
     cimp_energy += contrib;
-    cimp_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+    cimp_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
 
     // Compute forces
     if (eval_force == EvaluateForce::YES) {
@@ -900,7 +900,7 @@ double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const 
                                     xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
                                     eval_force);
     cmap_energy += contrib;
-    cmap_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+    cmap_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
 
   // Contribute results
@@ -1043,8 +1043,8 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
                                                 yfrc, zfrc, eval_elec_force, eval_vdw_force);
     ele_energy += uc.x;
     vdw_energy += uc.y;
-    ele_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
-    vdw_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+    ele_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
+    vdw_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
   }
 
   // Evaluate additional, inferred 1:4 attenuated interactions.  These occur between virtual sites
@@ -1062,8 +1062,8 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
                                                 yfrc, zfrc, eval_elec_force, eval_vdw_force);
     ele_energy += uc.x;
     vdw_energy += uc.y;
-    ele_acc += static_cast<llint>(round(uc.x * nrg_scale_factor));
-    vdw_acc += static_cast<llint>(round(uc.y * nrg_scale_factor));
+    ele_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
+    vdw_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
   }
 
   // Contribute results
@@ -1424,7 +1424,7 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
                                              rar.rposn_init_r, rar.rposn_finl_r, xcrd, ycrd, zcrd,
                                              umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
-    rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+    rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
   for (int pos = 0; pos < rar.nbond; pos++) {
     const double contrib = evalBondRestraint(rar.rbond_i_atoms[pos], rar.rbond_j_atoms[pos],
@@ -1434,7 +1434,7 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
                                              rar.rbond_init_r, rar.rbond_finl_r, xcrd, ycrd, zcrd,
                                              umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
-    rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+    rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
   for (int pos = 0; pos < rar.nangl; pos++) {
     const double contrib = evalAnglRestraint(rar.rangl_i_atoms[pos], rar.rangl_j_atoms[pos],
@@ -1445,7 +1445,7 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
                                              rar.rangl_finl_r, xcrd, ycrd, zcrd, umat, invu,
                                              unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
-    rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+    rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
   for (int pos = 0; pos < rar.ndihe; pos++) {
     const double contrib = evalDiheRestraint(rar.rdihe_i_atoms[pos], rar.rdihe_j_atoms[pos],
@@ -1456,7 +1456,7 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
                                              rar.rdihe_init_r, rar.rdihe_finl_r, xcrd, ycrd, zcrd,
                                              umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
-    rest_acc += static_cast<llint>(round(contrib * nrg_scale_factor));
+    rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
 
   // Contribute results

@@ -3,7 +3,9 @@
 #define OMNI_COORDINATE_SERIES_H
 
 #include "Accelerator/hybrid.h"
+#include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
+#include "DataTypes/common_types.h"
 #include "Math/rounding.h"
 #include "amber_ascii.h"
 #include "coordinateframe.h"
@@ -15,14 +17,16 @@ namespace trajectory {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
-  
+using data_types::isFloatingPointScalarType;
+using data_types::isSignedIntegralScalarType;
+
 /// \brief Collect C-style pointers and critical constants for a writeable CoordinateSeries object.
 template <typename T> struct CoordinateSeriesWriter {
 
   /// \brief The constructor feeds all arguments straight to the inline initialization list.
-  CoordinateSeriesWriter(int natom_in, int nframe_in, UnitCellType unit_cell_in, T* xcrd_in,
-                         T* ycrd_in, T* zcrd_in, double* umat_in, double* invu_in,
-                         double* boxdim_in);
+  CoordinateSeriesWriter(int natom_in, int nframe_in, UnitCellType unit_cell_in, int gpos_bits_in,
+                         double gpos_scale_in, double inv_gpos_scale_in, T* xcrd_in, T* ycrd_in,
+                         T* zcrd_in, double* umat_in, double* invu_in, double* boxdim_in);
 
   /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
   /// \{
@@ -34,6 +38,9 @@ template <typename T> struct CoordinateSeriesWriter {
   const int natom;               ///< The number of atoms in the system
   const int nframe;              ///< The number of frames in the series
   const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  const int gpos_bits;           ///< Global position coordinate bits after the decimal
+  const double gpos_scale;       ///< Global position coordinate scaling factor
+  const double inv_gpos_scale;   ///< Inverse global coordinate scaling factor
   T* xcrd;                       ///< Cartesian X coordinates of all atoms
   T* ycrd;                       ///< Cartesian Y coordinates of all atoms
   T* zcrd;                       ///< Cartesian Z coordinates of all atoms
@@ -47,7 +54,8 @@ template <typename T> struct CoordinateSeriesWriter {
 template <typename T> struct CoordinateSeriesReader {
 
   /// \brief The constructor feeds all arguments straight to the inline initialization list.
-  CoordinateSeriesReader(int natom_in, int nframe_in, UnitCellType unit_cell_in, const T* xcrd_in,
+  CoordinateSeriesReader(int natom_in, int nframe_in, UnitCellType unit_cell_in, int gpos_bits_in,
+                         double gpos_scale_in, double inv_gpos_scale_in, const T* xcrd_in,
                          const T* ycrd_in, const T* zcrd_in, const double* umat_in,
                          const double* invu_in, const double* boxdim_in);
 
@@ -61,6 +69,9 @@ template <typename T> struct CoordinateSeriesReader {
   const int natom;               ///< The number of atoms in the system
   const int nframe;              ///< The number of frames in the series
   const UnitCellType unit_cell;  ///< The type of unit cell (i.e. ORTHORHOMBIC, could also be NONE)
+  const int gpos_bits;           ///< Global position coordinate bits after the decimal
+  const double gpos_scale;       ///< Global position coordinate scaling factor
+  const double inv_gpos_scale;   ///< Inverse global coordinate scaling factor
   const T* xcrd;                 ///< Cartesian X coordinates of all atoms
   const T* ycrd;                 ///< Cartesian Y coordinates of all atoms
   const T* zcrd;                 ///< Cartesian Z coordinates of all atoms
@@ -108,11 +119,13 @@ public:
   ///                          nframe_in indicates a number of copies to allocate for and create.
   /// \{
   explicit CoordinateSeries(int natom_in = 0, int nframe_in = 0,
-                            UnitCellType unit_cell_in = UnitCellType::NONE);
+                            UnitCellType unit_cell_in = UnitCellType::NONE,
+                            int globalpos_scale_bits_in = 0);
   explicit CoordinateSeries(const std::string &file_name, int atom_count_in = 0,
                             CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
                             const std::vector<int> &frame_numbers = {},
-                            int replica_count = 1, UnitCellType unit_cell_in = UnitCellType::NONE);
+                            int replica_count = 1, UnitCellType unit_cell_in = UnitCellType::NONE,
+                            int globalpos_scale_bits_in = 0);
   explicit CoordinateSeries(PhaseSpace *ps, int nframe_in);
   explicit CoordinateSeries(const PhaseSpace &ps, int nframe_in);
   explicit CoordinateSeries(CoordinateFrame *cf, int nframe_in);
@@ -129,7 +142,6 @@ public:
   CoordinateSeries& operator=(CoordinateSeries &&other) = default;
   /// \}
   
-  
   /// \brief Get the number of atoms in each frame of the series.
   int getAtomCount() const;
 
@@ -142,6 +154,10 @@ public:
   /// \brief Get the unit cell type of the coordinate system
   UnitCellType getUnitCellType() const;
 
+  /// \brief Get the fixed precision bits after the decimal (if applicable, warn if the data type
+  ///        is non-integer).
+  int getFixedPrecisionBits() const;
+  
   /// \brief Get the interlaced coordinates of one frame.
   ///
   /// Overloaded:
@@ -181,6 +197,15 @@ public:
   /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
   std::vector<double> getBoxDimensions(int frame_index,
                                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Prepare a CoordinateFrame object based on one frame of the series, accomplishing any
+  ///        necessary data conversions to put the coordinates back into the familiar
+  ///        double-precision format.
+  ///
+  /// \param frame_index  The frame to extract
+  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  CoordinateFrame exportFrame(int frame_index,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information
@@ -199,7 +224,7 @@ public:
   const CoordinateSeriesReader<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   CoordinateSeriesWriter<T> data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
-
+  
   /// \brief Import coordinates from a CoordinateFrame or PhaseSpace object.  The original object
   ///        must have the same number of atoms as the CoordinateSeries itself, or else a range of
   ///        atoms within the original coordinate object must be specified that fits the
@@ -346,7 +371,16 @@ private:
                                         ///<   way that there is a frame capacity.
   int frame_count;                      ///< Total number of frames currently in the object
   int frame_capacity;                   ///< Total frame capacity of the object
+  int globalpos_scale_bits;             ///< The number of bits for global position scaling, if
+                                        ///<   the coordinate series is given in a fixed-precision
+                                        ///<   representation
   UnitCellType unit_cell;               ///< The unit cell type for these coordinate frames
+  double globalpos_scale;               ///< Scaling factor for converting real-number
+                                        ///<   representations of the coordinates into the serie's
+                                        ///<   fixed-precision representation, if applicable
+  double inverse_globalpos_scale;       ///< Inverse scaling factor for converting a series's
+                                        ///<   fixed-precision representation into real numbers,
+                                        ///<   if a fixed-precision representation is in effect
   Hybrid<T> x_coordinates;              ///< Cartesian X coordinates of all particles, with each
                                         ///<   frame's coordinates padded by the warp size
   Hybrid<T> y_coordinates;              ///< Cartesian Y coordinates of all particles 
@@ -367,7 +401,17 @@ private:
   ///                            to avoid integer overflow.
   void allocate(int new_frame_capacity);
 };
- 
+
+/// \brief Convert a coordinate series from one data type to another.  There are three major data
+///        types for a CoordinateSeries: double, float, and long long int.  This function has
+///        numerous branches to make efficient conversions between real and signed integral data
+///        and minimize any loss of precision in the process.
+///
+/// \param cs  The original coordinate series
+template <typename Torig, typename Tnew>
+CoordinateSeries<Tnew> changeCoordinateSeriesType(const CoordinateSeries<Torig> &cs,
+                                                  int globalpos_scale_bits_in);
+  
 } // namespace trajectory 
 } // namespace omni
 

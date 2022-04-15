@@ -5,6 +5,7 @@
 #include "Chemistry/chemistry_enumerators.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 #include "Synthesis/phasespace_synthesis.h"
 
@@ -16,6 +17,8 @@ using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameWriter;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
 using synthesis::PhaseSpaceSynthesis;
@@ -69,6 +72,9 @@ void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, in
                      const std::vector<int> &moving_atoms, double rotation_angle);
 
 void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, double rotation_angle);
+
+void rotateAboutBond(CoordinateSeriesWriter<double> csw, int frame_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, double rotation_angle);
 /// \}
 

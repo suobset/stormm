@@ -237,6 +237,12 @@ public:
   const CoordinateFrameReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   CoordinateFrameWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
+
+  /// \brief Set the frame number, for bookkeeping purposes.  This function exists that the frame
+  ///        number does not become a necessary argument in one of the overloaded constructors.
+  ///
+  /// \param frame_number_in  The (arbitrary) number to set the frame as
+  void setFrameNumber(int frame_number_in);
   
 private:
   std::string file_name;              ///< File from which this frame was derived, if applicable.

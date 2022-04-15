@@ -2,15 +2,20 @@
 namespace omni {
 namespace trajectory {
 
+using numerics::default_trajpos_scale_bits;
 using math::roundUp;
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 CoordinateSeriesWriter<T>::CoordinateSeriesWriter(const int natom_in, const int nframe_in,
-                                                  const UnitCellType unit_cell_in, T* xcrd_in,
+                                                  const UnitCellType unit_cell_in,
+                                                  const int gpos_bits_in,
+                                                  const double gpos_scale_in,
+                                                  const double inv_gpos_scale_in, T* xcrd_in,
                                                   T* ycrd_in, T* zcrd_in, double* umat_in,
                                                   double* invu_in, double* boxdim_in) :
-    natom{natom_in}, nframe{nframe_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in},
+    natom{natom_in}, nframe{nframe_in}, unit_cell{unit_cell_in}, gpos_bits{gpos_bits_in},
+    gpos_scale{gpos_scale_in}, inv_gpos_scale{inv_gpos_scale_in}, xcrd{xcrd_in}, ycrd{ycrd_in},
     zcrd{zcrd_in}, umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}
 {}
 
@@ -18,22 +23,32 @@ CoordinateSeriesWriter<T>::CoordinateSeriesWriter(const int natom_in, const int 
 template <typename T>
 CoordinateSeriesReader<T>::CoordinateSeriesReader(const int natom_in, const int nframe_in,
                                                   const UnitCellType unit_cell_in,
-                                                  const T* xcrd_in, const T* ycrd_in,
-                                                  const T* zcrd_in, const double* umat_in,
-                                                  const double* invu_in, const double* boxdim_in) :
-    natom{natom_in}, nframe{nframe_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in},
+                                                  const int gpos_bits_in,
+                                                  const double gpos_scale_in,
+                                                  const double inv_gpos_scale_in, const T* xcrd_in,
+                                                  const T* ycrd_in, const T* zcrd_in,
+                                                  const double* umat_in, const double* invu_in,
+                                                  const double* boxdim_in) :
+    natom{natom_in}, nframe{nframe_in}, unit_cell{unit_cell_in}, gpos_bits{gpos_bits_in},
+    gpos_scale{gpos_scale_in}, inv_gpos_scale{inv_gpos_scale_in}, xcrd{xcrd_in}, ycrd{ycrd_in},
     zcrd{zcrd_in}, umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 CoordinateSeries<T>::CoordinateSeries(const int natom_in, const int nframe_in,
-                                      const UnitCellType unit_cell_in) :
+                                      const UnitCellType unit_cell_in,
+                                      const int globalpos_scale_bits_in) :
     atom_count{natom_in}, frame_count{nframe_in}, frame_capacity{nframe_in},
-    unit_cell{unit_cell_in},
-    x_coordinates{static_cast<size_t>(nframe_in) * static_cast<size_t>(natom_in), "cser_x_coords"},
-    y_coordinates{static_cast<size_t>(nframe_in) * static_cast<size_t>(natom_in), "cser_y_coords"},
-    z_coordinates{static_cast<size_t>(nframe_in) * static_cast<size_t>(natom_in), "cser_z_coords"},
+    globalpos_scale_bits{globalpos_scale_bits_in}, unit_cell{unit_cell_in},
+    globalpos_scale{pow(2.0, globalpos_scale_bits)},
+    inverse_globalpos_scale{1.0 / globalpos_scale},
+    x_coordinates{static_cast<size_t>(nframe_in) * roundUp<size_t>(natom_in, warp_size_zu),
+                  "cser_x_coords"},
+    y_coordinates{static_cast<size_t>(nframe_in) * roundUp<size_t>(natom_in, warp_size_zu),
+                  "cser_y_coords"},
+    z_coordinates{static_cast<size_t>(nframe_in) * roundUp<size_t>(natom_in, warp_size_zu),
+                  "cser_z_coords"},
     box_space_transforms{static_cast<size_t>(nframe_in) * roundUp<size_t>(9, warp_size_zu),
                          "cser_umat"},
     inverse_transforms{static_cast<size_t>(nframe_in) * roundUp<size_t>(9, warp_size_zu),
@@ -41,6 +56,25 @@ CoordinateSeries<T>::CoordinateSeries(const int natom_in, const int nframe_in,
     box_dimensions{static_cast<size_t>(nframe_in) * roundUp<size_t>(6, warp_size_zu),
                    "cser_boxdims"}
 {
+  // Limits on the valid data types
+  if (isFloatingPointScalarType<T>() == false && isSignedIntegralScalarType<T>() == false) {
+    rtErr("A CoordinateSeries object is only valid with a signed integer or real number scalar "
+          "data type.", "CoordinateSeries");
+  }
+  if (globalpos_scale_bits < 0) {
+    rtErr("A fixed precision representation cannot have a negative bit count (" +
+          std::to_string(globalpos_scale_bits) + ") after the decimal.", "CoordinateSeries");
+  }
+  if (isFloatingPointScalarType<T>() && globalpos_scale_bits != 0) {
+    rtErr("A real-numbered representation of coordinates is incompatible with a fixed-precision "
+          "representation of " + std::to_string(globalpos_scale_bits) + " bits after the decimal.",
+          "CoordinateSeries");
+  }
+  if (isSignedIntegralScalarType<T>() && globalpos_scale_bits == 0) {
+    globalpos_scale_bits = default_trajpos_scale_bits;
+    globalpos_scale = pow(2.0, globalpos_scale_bits);
+    inverse_globalpos_scale = 1.0 / globalpos_scale;
+  }
   allocate(frame_count);
 }
 
@@ -49,9 +83,10 @@ template <typename T>
 CoordinateSeries<T>::CoordinateSeries(const std::string &file_name, const int atom_count_in,
                                       const CoordinateFileKind file_kind,
                                       const std::vector<int> &frame_numbers,
-                                      const int replica_count, const UnitCellType unit_cell_in) :
+                                      const int replica_count, const UnitCellType unit_cell_in,
+                                      const int globalpos_scale_bits_in) :
     CoordinateSeries(atom_count_in, replica_count * static_cast<int>(frame_numbers.size()),
-                     unit_cell_in)
+                     unit_cell_in, globalpos_scale_bits_in)
 {
   importFromFile(file_name, file_kind, frame_numbers, replica_count, 0);
 }
@@ -125,10 +160,20 @@ UnitCellType CoordinateSeries<T>::getUnitCellType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T>
+int CoordinateSeries<T>::getFixedPrecisionBits() const {
+  if (isFloatingPointScalarType<T>()) {
+    rtWarn("A CoordinateSeries object with a real-numbered data representation does not have a "
+           "meaningful fixed-precision scaling factor.", "CoordinateSeries",
+           "getFixedPrecisionBits");
+  }
+  return globalpos_scale_bits;
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> std::vector<T>
 CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index,
                                               const HybridTargetLevel tier) const {
-
   return getInterlacedCoordinates(frame_index, 0, atom_count, tier);
 }
 
@@ -144,15 +189,15 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
           " in an object with " + std::to_string(atom_count) + " atoms.", "CoordinateSeries",
           "getInterlacedCoordinates");
   }
-  std::vector<double> result(3 * (high_index - low_index));
+  std::vector<T> result(3 * (high_index - low_index));
   const size_t fidx_zu  = static_cast<size_t>(frame_index);
   const size_t natom_zu = roundUp(static_cast<size_t>(atom_count), warp_size_zu);
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
-      const double* xptr = x_coordinates.data();
-      const double* yptr = y_coordinates.data();
-      const double* zptr = z_coordinates.data();
+      const T* xptr = x_coordinates.data();
+      const T* yptr = y_coordinates.data();
+      const T* zptr = z_coordinates.data();
       const size_t frame_offset = natom_zu * fidx_zu;
       for (int i = low_index; i < high_index; i++) {
         const int base_idx = 3 * (i - low_index);
@@ -168,9 +213,9 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
     {
       const size_t llim = (fidx_zu * natom_zu) + static_cast<size_t>(low_index);
       const size_t hlim = (fidx_zu * natom_zu) + static_cast<size_t>(high_index);
-      const std::vector<double> xval = x_coordinates.readDevice(llim, hlim);
-      const std::vector<double> yval = y_coordinates.readDevice(llim, hlim);
-      const std::vector<double> zval = z_coordinates.readDevice(llim, hlim);
+      const std::vector<T> xval = x_coordinates.readDevice(llim, hlim);
+      const std::vector<T> yval = y_coordinates.readDevice(llim, hlim);
+      const std::vector<T> zval = z_coordinates.readDevice(llim, hlim);
       const size_t frame_offset = natom_zu * fidx_zu;
       for (int i = 0; i < high_index - low_index; i++) {
         result[(3 * i)    ] = xval[i];
@@ -238,6 +283,91 @@ std::vector<double> CoordinateSeries<T>::getBoxDimensions(const int frame_index,
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
+                                                 const HybridTargetLevel tier) const {
+  CoordinateFrame result(atom_count, unit_cell);
+  CoordinateFrameWriter resultw = result.data();
+  const size_t natom_zu = atom_count;
+  const size_t fidx_zu  = static_cast<size_t>(frame_index); 
+  const size_t frame_offset = roundUp<size_t>(atom_count, warp_size_zu) * fidx_zu;
+  const size_t xfrm_offset  = roundUp<size_t>(9, warp_size_zu) * fidx_zu;
+  const size_t bdim_offset  = roundUp<size_t>(6, warp_size_zu) * fidx_zu;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const T* xptr = x_coordinates.data();
+      const T* yptr = y_coordinates.data();
+      const T* zptr = z_coordinates.data();
+      const double* umat_ptr = box_space_transforms.data();
+      const double* invu_ptr = inverse_transforms.data();
+      const double* bdim_ptr = box_dimensions.data();
+      if (globalpos_scale_bits == 0) {
+        for (size_t i = 0; i < natom_zu; i++) {
+          resultw.xcrd[i] = xptr[frame_offset + i];
+          resultw.ycrd[i] = yptr[frame_offset + i];
+          resultw.zcrd[i] = zptr[frame_offset + i];
+        }
+      }
+      else {
+        const double conv_factor = inverse_globalpos_scale;
+        for (size_t i = 0; i < natom_zu; i++) {
+          resultw.xcrd[i] = static_cast<double>(xptr[frame_offset + i]) * conv_factor;
+          resultw.ycrd[i] = static_cast<double>(yptr[frame_offset + i]) * conv_factor;
+          resultw.zcrd[i] = static_cast<double>(zptr[frame_offset + i]) * conv_factor;
+        }
+      }
+      for (size_t i = 0; i < 9LLU; i++) {
+        resultw.umat[i] = umat_ptr[xfrm_offset + i];
+        resultw.invu[i] = invu_ptr[xfrm_offset + i];
+      }
+      for (size_t i = 0; i < 6LLU; i++) {
+        resultw.boxdim[i] = bdim_ptr[bdim_offset + i];
+      }
+    }
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::HOST:
+    {
+      const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_ycrd = y_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<T> tmp_zcrd = z_coordinates.readDevice(frame_offset, natom_zu);
+      const std::vector<double> tmp_umat = box_space_transforms.readDevice(xfrm_offset, 9);
+      const std::vector<double> tmp_invu = inverse_transforms.readDevice(xfrm_offset, 9);
+      const std::vector<double> tmp_bdim = box_dimensions.readDevice(bdim_offset, 6);
+      if (globalpos_scale_bits == 0) {
+        for (size_t i = 0; i < natom_zu; i++) {
+          resultw.xcrd[i] = tmp_xcrd[i];
+          resultw.ycrd[i] = tmp_ycrd[i];
+          resultw.zcrd[i] = tmp_zcrd[i];
+        }
+      }
+      else {
+        const double conv_factor = inverse_globalpos_scale;
+        for (size_t i = 0; i < natom_zu; i++) {
+          resultw.xcrd[i] = static_cast<double>(tmp_xcrd[i]) * conv_factor;
+          resultw.ycrd[i] = static_cast<double>(tmp_ycrd[i]) * conv_factor;
+          resultw.zcrd[i] = static_cast<double>(tmp_zcrd[i]) * conv_factor;
+        }
+      }
+      for (size_t i = 0; i < 9LLU; i++) {
+        resultw.umat[i] = tmp_umat[i];
+        resultw.invu[i] = tmp_invu[i];
+      }
+      for (size_t i = 0; i < 6LLU; i++) {
+        resultw.boxdim[i] = tmp_bdim[i];
+      }
+    }
+    break;
+#endif
+  }
+  
+  // Set the frame number based on the position in the series
+  result.setFrameNumber(frame_index);
+  return result;
+}
+
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void CoordinateSeries::upload() {
@@ -263,19 +393,21 @@ void CoordinateSeries::download() {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 CoordinateSeriesWriter<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) {
-  return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, x_coordinates.data(tier),
-                                   y_coordinates.data(tier), z_coordinates.data(tier),
-                                   box_space_transforms.data(tier), inverse_transforms.data(tier),
-                                   box_dimensions.data(tier));
+  return CoordinateSeriesWriter<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                   globalpos_scale, inverse_globalpos_scale,
+                                   x_coordinates.data(tier), y_coordinates.data(tier),
+                                   z_coordinates.data(tier), box_space_transforms.data(tier),
+                                   inverse_transforms.data(tier), box_dimensions.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 const CoordinateSeriesReader<T> CoordinateSeries<T>::data(const HybridTargetLevel tier) const {
-  return CoordinateSeriesReader<T>(atom_count, frame_count, unit_cell, x_coordinates.data(tier),
-                                   y_coordinates.data(tier), z_coordinates.data(tier),
-                                   box_space_transforms.data(tier), inverse_transforms.data(tier),
-                                   box_dimensions.data(tier));
+  return CoordinateSeriesReader<T>(atom_count, frame_count, unit_cell, globalpos_scale_bits,
+                                   globalpos_scale, inverse_globalpos_scale,
+                                   x_coordinates.data(tier), y_coordinates.data(tier),
+                                   z_coordinates.data(tier), box_space_transforms.data(tier),
+                                   inverse_transforms.data(tier), box_dimensions.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -304,11 +436,22 @@ void CoordinateSeries<T>::importCoordinateSet(const CoordinateFrameReader &cfr,
   double* invu_ptr = inverse_transforms.data();
   double* bdim_ptr = box_dimensions.data();
   size_t jcon = atom_start;
-  for (size_t j = atom_offset; j < frame_limit; j++) {
-    xptr[j] = cfr.xcrd[jcon];
-    yptr[j] = cfr.ycrd[jcon];
-    zptr[j] = cfr.zcrd[jcon];
-    jcon++;
+  if (globalpos_scale_bits == 0) {
+    for (size_t j = atom_offset; j < frame_limit; j++) {
+      xptr[j] = cfr.xcrd[jcon];
+      yptr[j] = cfr.ycrd[jcon];
+      zptr[j] = cfr.zcrd[jcon];
+      jcon++;
+    }
+  }
+  else {
+    const double lgpos_scale = globalpos_scale;
+    for (size_t j = atom_offset; j < frame_limit; j++) {
+      xptr[j] = llround(cfr.xcrd[jcon] * lgpos_scale);
+      yptr[j] = llround(cfr.ycrd[jcon] * lgpos_scale);
+      zptr[j] = llround(cfr.zcrd[jcon] * lgpos_scale);
+      jcon++;
+    }
   }
   const size_t xfrm_offset = actual_frame_index * roundUp(static_cast<size_t>(9), warp_size_zu);
   const size_t bdim_offset = actual_frame_index * roundUp(static_cast<size_t>(6), warp_size_zu);
@@ -652,6 +795,104 @@ void CoordinateSeries<T>::allocate(const int new_frame_capacity) {
     inverse_transforms.resize(total_xfrm);
     box_dimensions.resize(total_bdim);
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Torig, typename Tnew>
+CoordinateSeries<Tnew> changeCoordinateSeriesType(const CoordinateSeries<Torig> &cs,
+                                                  const int globalpos_scale_bits_in) {
+  const CoordinateSeriesReader<Torig> csr = cs.data();
+  CoordinateSeries<Tnew> result(csr.natom, csr.nframe, csr.unit_cell, globalpos_scale_bits_in);
+  CoordinateSeriesWriter<Tnew> resultw = result.data();
+  const size_t natom_zu        = csr.natom;
+  const size_t padded_natom_zu = roundUp<size_t>(csr.natom, warp_size_zu);
+  const size_t padded_xfrm_zu  = roundUp<size_t>(9, warp_size_zu);
+  const size_t padded_bdim_zu  = roundUp<size_t>(6, warp_size_zu);
+  const size_t fc_zu           = static_cast<size_t>(csr.nframe);
+  if (isFloatingPointScalarType<Torig>() && isFloatingPointScalarType<Tnew>()) {
+    for (size_t i = 0; i < fc_zu; i++) {
+      for (size_t j = 0; j < natom_zu; j++) {
+        const size_t pos = (i * padded_natom_zu) + j;
+        resultw.xcrd[pos] = csr.xcrd[pos];
+        resultw.ycrd[pos] = csr.ycrd[pos];
+        resultw.zcrd[pos] = csr.zcrd[pos];
+      }
+    }
+  }
+  else if (isFloatingPointScalarType<Torig>() && isSignedIntegralScalarType<Tnew>()) {
+    for (size_t i = 0; i < fc_zu; i++) {
+      for (size_t j = 0; j < natom_zu; j++) {
+        const size_t pos = (i * padded_natom_zu) + j;
+        resultw.xcrd[pos] = llround(csr.xcrd[pos] * resultw.gpos_scale);
+        resultw.ycrd[pos] = llround(csr.ycrd[pos] * resultw.gpos_scale);
+        resultw.zcrd[pos] = llround(csr.zcrd[pos] * resultw.gpos_scale);
+      }
+    }
+  }
+  else if (isFloatingPointScalarType<Tnew>() && isSignedIntegralScalarType<Torig>()) {
+    const double conv_factor = pow(2.0, -globalpos_scale_bits_in);
+    for (size_t i = 0; i < fc_zu; i++) {
+      for (size_t j = 0; j < natom_zu; j++) {
+        const size_t pos = (i * padded_natom_zu) + j;
+        resultw.xcrd[pos] = static_cast<double>(csr.xcrd[pos]) * csr.inv_gpos_scale;
+        resultw.ycrd[pos] = static_cast<double>(csr.ycrd[pos]) * csr.inv_gpos_scale;
+        resultw.zcrd[pos] = static_cast<double>(csr.zcrd[pos]) * csr.inv_gpos_scale;
+      }
+    }
+  }
+  else if (isSignedIntegralScalarType<Tnew>() && isSignedIntegralScalarType<Torig>()) {
+    if (globalpos_scale_bits_in == csr.gpos_bits) {
+      for (size_t i = 0; i < fc_zu; i++) {
+        for (size_t j = 0; j < natom_zu; j++) {
+          const size_t pos = (i * padded_natom_zu) + j;
+          resultw.xcrd[pos] = static_cast<Tnew>(csr.xcrd[pos]);
+          resultw.ycrd[pos] = static_cast<Tnew>(csr.ycrd[pos]);
+          resultw.zcrd[pos] = static_cast<Tnew>(csr.zcrd[pos]);
+        }
+      }
+    }
+    else if (globalpos_scale_bits_in > csr.gpos_bits) {
+      const int forward_shift = globalpos_scale_bits_in - csr.gpos_bits;
+      for (size_t i = 0; i < fc_zu; i++) {
+        for (size_t j = 0; j < natom_zu; j++) {
+          const size_t pos = (i * padded_natom_zu) + j;
+          const llint ixval = csr.xcrd[pos];
+          const llint iyval = csr.ycrd[pos];
+          const llint izval = csr.zcrd[pos];
+          resultw.xcrd[pos] = static_cast<Tnew>(ixval << forward_shift);
+          resultw.ycrd[pos] = static_cast<Tnew>(iyval << forward_shift);
+          resultw.zcrd[pos] = static_cast<Tnew>(izval << forward_shift);
+        }
+      }
+    }
+    else {
+      const int backward_shift = globalpos_scale_bits_in - csr.gpos_bits;
+      for (size_t i = 0; i < fc_zu; i++) {
+        for (size_t j = 0; j < natom_zu; j++) {
+          const size_t pos = (i * padded_natom_zu) + j;
+          const llint ixval = csr.xcrd[pos];
+          const llint iyval = csr.ycrd[pos];
+          const llint izval = csr.zcrd[pos];
+          resultw.xcrd[pos] = static_cast<Tnew>(ixval >> backward_shift);
+          resultw.ycrd[pos] = static_cast<Tnew>(iyval >> backward_shift);
+          resultw.zcrd[pos] = static_cast<Tnew>(izval >> backward_shift);
+        }
+      }
+    }
+  }
+  for (size_t i = 0; i < fc_zu; i++) {
+    for (size_t j = 0; j < 9LLU; j++) {
+      const size_t pos = (i * padded_xfrm_zu) + j;
+      resultw.umat[pos] = csr.umat[pos];
+      resultw.invu[pos] = csr.invu[pos];
+    }
+    for (size_t j = 0; j < 6LLU; j++) {
+      const size_t pos = (i * padded_bdim_zu) + j;
+      resultw.boxdim[pos] = csr.boxdim[pos];
+    }
+  }
+  
+  return result;
 }
 
 } // namespace trajectory

@@ -231,10 +231,11 @@ CheckResult check(const double lhs, const RelationalOperator relationship, const
     case RelationalOperator::GE:
     case RelationalOperator::LESS_THAN_OR_EQUAL:
     case RelationalOperator::LE:
-      error_edit += "Absolute comparison " + realToString(lhs, idec) + " " + 
-                    getRelationalOperatorString(relationship) + " " +
-                    realToString(rhs.getValue(), idec) + " failed.  The inequality could not be "
-                    "supported beyond the marginal value associated with the reference.";
+      error_edit += "Absolute comparison " + realToString(lhs, 11, 4, NumberFormat::SCIENTIFIC) +
+                    " " + getRelationalOperatorString(relationship) + " " +
+                    realToString(rhs.getValue(), 11, 4, NumberFormat::SCIENTIFIC) +
+                    " failed.  The inequality could not be supported beyond the marginal value "
+                    "associated with the reference.";
       break;
     }
     break;

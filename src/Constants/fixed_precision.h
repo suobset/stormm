@@ -40,6 +40,14 @@ constexpr double default_inverse_localpos_scale_lf = 1.0 / default_localpos_scal
 constexpr float  default_inverse_localpos_scale_f  = (float)1.0 / default_localpos_scale_f;
 constexpr int    min_localpos_scale_bits = 20;
 constexpr int    max_localpos_scale_bits = 26;
+constexpr double default_trajpos_scale_lf = 16384.0;
+constexpr float  default_trajpos_scale_f  = (float)default_trajpos_scale_lf;
+constexpr int    default_trajpos_scale_bits = 14;
+constexpr double default_inverse_trajpos_scale_lf = 1.0 / default_trajpos_scale_lf;
+constexpr float  default_inverse_trajpos_scale_f  = (float)1.0 / default_trajpos_scale_f;
+constexpr int    min_trajpos_scale_bits = 10;
+constexpr int    max_trajpos_scale_bits = 48;
+
 /// \}
 
 /// \brief Velocities are expressed in A / sqrt(418.4) fs, and as such the velocity scaling should

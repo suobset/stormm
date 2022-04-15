@@ -521,6 +521,11 @@ CoordinateFrameWriter CoordinateFrame::data(HybridTargetLevel tier) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void CoordinateFrame::setFrameNumber(int frame_number_in) {
+  frame_number = frame_number_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<CoordinateFrame> getSelectedFrames(const TextFile &tf, const CoordinateFileKind kind,
                                                const int atom_count, const UnitCellType unit_cell,
                                                const std::vector<int> &frame_numbers) {

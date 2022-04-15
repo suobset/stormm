@@ -561,7 +561,15 @@ int main(int argc, char* argv[]) {
   check(stro_cs.getInterlacedCoordinates(20), RelationalOperator::EQUAL,
         stro_cs.getInterlacedCoordinates(43), "Frames that should match exactly no longer do "
         "after applying the CoordinateSeries object's shirnkToFit method.", do_stereo_tests);
-    
+  CoordinateSeries<int> istro_cs = changeCoordinateSeriesType<double, int>(stro_cs, 14);
+  
+  const CoordinateFrame frame17 = istro_cs.exportFrame(17);
+  const std::vector<double> drep = stro_cs.getInterlacedCoordinates(17);
+  const std::vector<double> di14rep = frame17.getInterlacedCoordinates();
+  check(maxAbsoluteDifference(di14rep, drep), RelationalOperator::LESS_THAN, 1.0e-4, "A 14 bit "
+        "fixed-precision representation of the coordinate series does not reproduce the original, "
+        "double-precision data with the expected accuracy.", do_stereo_tests);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

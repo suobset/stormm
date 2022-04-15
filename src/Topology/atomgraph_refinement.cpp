@@ -667,7 +667,7 @@ void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_param
     // sprinkle increments of charge among the largest values.
     double disc_qsum = 0.0;
     for (int i = 0; i < natom; i++) {
-      qdata[i] = round(qdata[i] / charge_discretization);
+      qdata[i] = llround(qdata[i] / charge_discretization);
       qdata[i] *= charge_discretization;
       disc_qsum += qdata[i];
     }
@@ -737,7 +737,7 @@ void smoothCharges(std::vector<double> *q, std::vector<double> *tmp_charge_param
   std::vector<double> unique_q(natom, 0);
   std::vector<llint> discretized_charges(natom, 0);
   for (int i = 0; i < natom; i++) {
-    discretized_charges[i] = round(qdata[i] / charge_discretization);
+    discretized_charges[i] = llround(qdata[i] / charge_discretization);
   }
   std::vector<bool> found(natom, false);
   int* tq_idx_ptr = tmp_charge_indices->data();

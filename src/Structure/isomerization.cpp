@@ -143,9 +143,9 @@ void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const in
   const double pos_scl = psynthw.gpos_scale;
   for (int i = 0; i < nmove; i++) {
     const int ixyz_dest = moving_atoms[i] + system_offset;
-    psynthw.xyz_qlj[ixyz_dest].x = round(xcrd[i + 2] * pos_scl);
-    psynthw.xyz_qlj[ixyz_dest].y = round(ycrd[i + 2] * pos_scl);
-    psynthw.xyz_qlj[ixyz_dest].z = round(zcrd[i + 2] * pos_scl);
+    psynthw.xyz_qlj[ixyz_dest].x = llround(xcrd[i + 2] * pos_scl);
+    psynthw.xyz_qlj[ixyz_dest].y = llround(ycrd[i + 2] * pos_scl);
+    psynthw.xyz_qlj[ixyz_dest].z = llround(zcrd[i + 2] * pos_scl);
   }
 }
 
@@ -154,6 +154,16 @@ void rotateAboutBond(PhaseSpaceSynthesis *psynth, const int system_index, const 
                      const int atom_j, const std::vector<int> &moving_atoms,
                      const double rotation_angle) {
   rotateAboutBond(psynth->data(), system_index, atom_i, atom_j, moving_atoms, rotation_angle);
+}
+
+//-------------------------------------------------------------------------------------------------
+void rotateAboutBond(CoordinateSeriesWriter<double> csw, const int frame_index, const int atom_i,
+                     const int atom_j, const std::vector<int> &moving_atoms, 
+                     const double rotation_angle) {
+  const size_t fidx_zu  = static_cast<size_t>(frame_index);
+  const size_t natom_zu = roundUp<size_t>(csw.natom, warp_size_zu);
+  rotateAboutBond(&csw.xcrd[fidx_zu * natom_zu], &csw.ycrd[fidx_zu * natom_zu],
+                  &csw.zcrd[fidx_zu * natom_zu], atom_i, atom_j, moving_atoms, rotation_angle);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -262,9 +272,9 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       const double pos_scl = psynthw.gpos_scale;
       for (int i = 0; i < nmove; i++) {
         const int ixyz_dest = moving_atoms[i] + system_offset;
-        psynthw.xyz_qlj[ixyz_dest].x = round(xcrd[i + 2] * pos_scl);
-        psynthw.xyz_qlj[ixyz_dest].y = round(ycrd[i + 2] * pos_scl);
-        psynthw.xyz_qlj[ixyz_dest].z = round(zcrd[i + 2] * pos_scl);
+        psynthw.xyz_qlj[ixyz_dest].x = llround(xcrd[i + 2] * pos_scl);
+        psynthw.xyz_qlj[ixyz_dest].y = llround(ycrd[i + 2] * pos_scl);
+        psynthw.xyz_qlj[ixyz_dest].z = llround(zcrd[i + 2] * pos_scl);
       }
     }
     break;

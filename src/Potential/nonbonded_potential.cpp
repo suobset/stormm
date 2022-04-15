@@ -65,13 +65,13 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExcl
                 const double qiqj = qi * nbk.charge[atom_j];
                 const double ele_contrib = qiqj * invr;
                 ele_energy += ele_contrib;
-                ele_acc += static_cast<llint>(round(ele_contrib * nrg_scale_factor));
+                ele_acc += static_cast<llint>(llround(ele_contrib * nrg_scale_factor));
                 const int ljt_j = nbk.lj_idx[atom_j];
                 const double lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const double ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const double vdw_contrib = ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
                 vdw_energy += vdw_contrib;
-                vdw_acc += static_cast<llint>(round(vdw_contrib * nrg_scale_factor));
+                vdw_acc += static_cast<llint>(llround(vdw_contrib * nrg_scale_factor));
 
                 // Evaluate the force, if requested
                 if (eval_elec_force == EvaluateForce::YES ||
@@ -122,13 +122,13 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExcl
                 const double qiqj = qi * nbk.charge[atom_j];
                 const double ele_contrib = qiqj * invr;
                 ele_energy += ele_contrib;
-                ele_acc += static_cast<llint>(round(ele_contrib * nrg_scale_factor));
+                ele_acc += static_cast<llint>(llround(ele_contrib * nrg_scale_factor));
                 const int ljt_j = nbk.lj_idx[atom_j];
                 const double lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const double ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const double vdw_contrib = ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
                 vdw_energy += vdw_contrib;
-                vdw_acc += static_cast<llint>(round(vdw_contrib * nrg_scale_factor));
+                vdw_acc += static_cast<llint>(llround(vdw_contrib * nrg_scale_factor));
 
                 // Evaluate the force, if requested
                 if (eval_elec_force == EvaluateForce::YES ||
