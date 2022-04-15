@@ -10,17 +10,9 @@
 #include "chemical_features.h"
 #include "indigo.h"
 
-// CHECK
-#include "Parsing/parse.h"
-// END CHECK
-
 namespace omni {
 namespace chemistry {
 
-// CHECK
-using parse::char4ToString;
-// END CHECK
-  
 using card::HybridKind;
 using topology::TorsionKind;
 using math::accumulateBitmask;
@@ -1735,6 +1727,7 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
     ring_occupancy_bounds[i] = ring_occupancy_bounds[i - 1];
   }
   ring_occupancy_bounds[0] = 0;
+  bool reflection_taken = false;
   for (int i = 0; i < chiral_center_count; i++) {
 
     // The chiral center indices are encoded with D- and L- orientations by offsetting all of
@@ -1742,7 +1735,9 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
     const int chatom = abs(tmp_chiral_centers[i] - 1);
     const int nrings = (ring_occupancy_bounds[chatom + 1] - ring_occupancy_bounds[chatom]);
     if (nrings >= 3) {
-      result[i] = static_cast<int>(ChiralInversionProtocol::REFLECT);
+      result[i] = (reflection_taken) ? static_cast<int>(ChiralInversionProtocol::DO_NOT_INVERT) :
+                                       static_cast<int>(ChiralInversionProtocol::REFLECT);
+      reflection_taken = true;
     }
     else if (nrings == 2) {
       int nfusion = 0;
@@ -1758,7 +1753,9 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
         result[i] = static_cast<int>(ChiralInversionProtocol::ROTATE);
       }
       else {
-        result[i] = static_cast<int>(ChiralInversionProtocol::REFLECT);
+        result[i] = (reflection_taken) ? static_cast<int>(ChiralInversionProtocol::DO_NOT_INVERT) :
+                                         static_cast<int>(ChiralInversionProtocol::REFLECT);
+        reflection_taken = true;
       }
     }
     else {
@@ -2036,7 +2033,17 @@ void ChemicalFeatures::repairPointers() {
   aromatic_group_bounds.swapTarget(&int_data);
   aromatic_pi_electrons.swapTarget(&int_data);
   aromatic_groups.swapTarget(&int_data);
+  polar_hydrogens.swapTarget(&int_data);
+  hydrogen_bond_donors.swapTarget(&int_data);
+  hydrogen_bond_acceptors.swapTarget(&int_data);
   chiral_centers.swapTarget(&int_data);
+  chiral_inversion_methods.swapTarget(&int_data);
+  rotatable_groups.swapTarget(&int_data);
+  rotatable_group_bounds.swapTarget(&int_data);
+  invertible_groups.swapTarget(&int_data);
+  invertible_group_bounds.swapTarget(&int_data);
+  anchor_a_branches.swapTarget(&int_data);
+  anchor_b_branches.swapTarget(&int_data);
 }
 
 #ifdef OMNI_USE_HPC

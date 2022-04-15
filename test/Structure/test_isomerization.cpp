@@ -58,6 +58,15 @@ using namespace omni::testing;
 // Check rotatable bonds throughout a structure.  If the topology supplied pertains to a system
 // with many molecules, only the first will be analyzed.  Options are provided to take snapshots
 // of detailed particle positions.
+//
+// Arguments:
+//   ag:            System topology
+//   ps:            Coordinates of the system
+//   chemfe:        Chemical features of the system
+//   oe:            System environment variables (for snapshotting behavior)
+//   snp_var_name:  The variable name under which to store or access snapshot data
+//   expectation:   The manner in which to approach the snapshot file, if a variable name has been
+//                  supplied to direct the flow of data into it (when updating snapshot files)
 //-------------------------------------------------------------------------------------------------
 void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
                              const ChemicalFeatures &chemfe, const TestEnvironment &oe,
@@ -135,6 +144,33 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
         "about a bond.", do_tests);
   check(uangl_dev, RelationalOperator::EQUAL, target, "Angle energies are changed by rotation "
         "about a bond.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Check chiral centers throughout a structure.  If the topology supplied pertains to a system
+// with many molecules, only the first will be analyzed.  Options are provided to take snapshots
+// of detailed particle positions resulting from inverting the various chiral centers.
+//
+// Arguments:
+//   ag:            System topology
+//   ps:            Coordinates of the system
+//   chemfe:        Chemical features of the system
+//   oe:            System environment variables (for snapshotting behavior)
+//   snp_var_name:  The variable name under which to store or access snapshot data
+//   expectation:   The manner in which to approach the snapshot file, if a variable name has been
+//                  supplied to direct the flow of data into it (when updating snapshot files)
+//-------------------------------------------------------------------------------------------------
+void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
+                         const ChemicalFeatures &chemfe, const TestEnvironment &oe,
+                         const TestPriority do_tests,
+                         const std::string &snp_var_name = std::string(""),
+                         const PrintSituation expectation = PrintSituation::APPEND) {
+  const std::vector<RotatorGroup> inv_grp = chemfe.getChiralInversionGroups();
+  const std::vector<ChiralInversionProtocol> protocols = chemfe.getChiralInversionMethods();
+  const int nchiral = protocols.size();
+  for (int i = 0; i < nchiral; i++) {
+
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -216,6 +252,12 @@ int main(int argc, char* argv[]) {
   checkRotationalSampling(trpc_ag, trpc_ps, trpc_feat, oe, do_tests);
   checkRotationalSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_rot_iso");
   checkRotationalSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_rot_iso");
+
+  // Isomerize chiral centers
+  checkChiralSampling(drug_ag, drug_ps, drug_feat, oe, do_tests, "drug_chir_iso");
+  checkChiralSampling(trpc_ag, trpc_ps, trpc_feat, oe, do_tests);
+  checkChiralSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_rot_iso");
+  checkChiralSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_rot_iso");
 
   // Test RMSD computations on simple structures
   section(3);
