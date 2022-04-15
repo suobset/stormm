@@ -2,6 +2,7 @@
 #ifndef OMNI_ISOMERIZATION_H
 #define OMNI_ISOMERIZATION_H
 
+#include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
@@ -13,6 +14,9 @@ namespace omni {
 namespace structure {
 
 using chemistry::ChiralInversionProtocol;
+using chemistry::RotatorGroup;
+using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisWriter;
 using topology::AtomGraph;
 using topology::UnitCellType;
 using trajectory::CoordinateFrame;
@@ -21,8 +25,6 @@ using trajectory::CoordinateSeries;
 using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
-using synthesis::PhaseSpaceSynthesis;
-using synthesis::PsSynthesisWriter;
   
 /// \brief Rotate a molecule such that selected internal coordinates achieve particular values.
 ///        The internal coordinates must define a rotatable bond (bonds in rings are prohibited
@@ -79,30 +81,38 @@ void rotateAboutBond(CoordinateSeriesWriter<double> csw, int frame_index, int at
 /// \}
 
 /// \brief Rotate two branches of a chiral center 180 degrees, so as to invert the center.  
-void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, int chiral_center,
-                      ChiralInversionProtocol protocol, const std::vector<int> &moving_atoms,
-                      int natom, int root_a, int root_b);
+void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, int center_idx, int natom,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
-void flipChiralCenter(CoordinateFrame *cf, int chiral_center, ChiralInversionProtocol protocol,
-                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+void flipChiralCenter(CoordinateFrame *cf, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
-void flipChiralCenter(CoordinateFrameWriter cfw, int chiral_center,
-                      ChiralInversionProtocol protocol, const std::vector<int> &moving_atoms,
-                      int root_a, int root_b);
+void flipChiralCenter(CoordinateFrameWriter cfw, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
-void flipChiralCenter(PhaseSpace *ps, int chiral_center, ChiralInversionProtocol protocol,
-                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+void flipChiralCenter(PhaseSpace *ps, int center_idx, const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
-void flipChiralCenter(PhaseSpaceWriter psw, int chiral_center, ChiralInversionProtocol protocol,
-                      const std::vector<int> &moving_atoms, int root_a, int root_b);
+void flipChiralCenter(PhaseSpaceWriter psw, int center_idx, const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
-void flipChiralCenter(PsSynthesisWriter psynthw, int system_index, int chiral_center,
-                      ChiralInversionProtocol protocol, const std::vector<int> &moving_atoms,
-                      int root_a, int root_b);
+void flipChiralCenter(PsSynthesisWriter psynthw, int system_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
-void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int chiral_center,
-                      ChiralInversionProtocol protocol, const std::vector<int> &moving_atoms,
-                      int root_a, int root_b);
+void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
 
 } // namespace structure
 } // namespace omni
