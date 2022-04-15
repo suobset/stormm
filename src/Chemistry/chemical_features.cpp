@@ -1901,6 +1901,13 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
     }
     int brpos = 0;
     for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
+
+      // Skip "branches" that are actually virtual sites
+      if (cdk.z_numbers[nbk.nb12x[j]] == 0) {
+        continue;
+      }
+
+      // Skip branches making up the other end of a loop which has already been determined
       if (branch_counts[brpos].x >= 0) {
         brpos++;
         continue;
