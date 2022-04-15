@@ -23,9 +23,11 @@
 // CHECK
 #include "../../src/FileManagement/file_util.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
+#include "../../src/Trajectory/coordinate_series.h"
+using omni::diskutil::PrintSituation;
 using omni::trajectory::TrajectoryKind;
 using omni::trajectory::CoordinateFileKind;
-using omni::diskutil::PrintSituation;
+using omni::trajectory::CoordinateSeries;
 // END CHECK
 
 using omni::chemistry::ChemicalFeatures;
@@ -85,14 +87,14 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   // energies should be unaffected.
   const std::vector<RotatorGroup> rt_grp = chemfe.getRotatableBondGroups();
   const int nrt = rt_grp.size();
-  PhaseSpace ps_copy(ps);
-  PhaseSpaceWriter psw = ps_copy.data();
+  PhaseSpace rotation_copy(ps);
+  PhaseSpaceWriter psw = rotation_copy.data();
   const PhaseSpaceReader psr = ps.data();
   std::vector<double> rot_crd(3 * (cdk.mol_limits[1] - cdk.mol_limits[0]) * nrt);
   std::vector<double> repos_dev(nrt), ubond_dev(nrt), uangl_dev(nrt);
   int rcpos = 0;
   for (int i = 0; i < nrt; i++) {
-    rotateAboutBond(&ps_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
+    rotateAboutBond(&rotation_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
                     rt_grp[i].rotatable_atoms, 2.0 * omni::symbols::pi / 3.0);
 
     // Record the positions of atoms in the first molecule
@@ -106,13 +108,13 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
     }
 
     // Record the bond and angle energies
-    const double new_bond_e = evaluateBondTerms(vk, cfr, &sc, 0);
-    const double new_angl_e = evaluateAngleTerms(vk, cfr, &sc, 0);
+    const double new_bond_e = evaluateBondTerms(vk, CoordinateFrameReader(rotation_copy), &sc, 0);
+    const double new_angl_e = evaluateAngleTerms(vk, CoordinateFrameReader(rotation_copy), &sc, 0);
     ubond_dev[i] = fabs(new_bond_e - orig_bond_e);
     uangl_dev[i] = fabs(new_angl_e - orig_angl_e);
 
     // Reverse the rotation
-    rotateAboutBond(&ps_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
+    rotateAboutBond(&rotation_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
                     rt_grp[i].rotatable_atoms, -2.0 * omni::symbols::pi / 3.0);
 
     // Check that the molecule was returned to its original state
@@ -131,9 +133,14 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
   const std::string rcrd_snapshot = base_iso_path + osc + "rotated_coords.m";
   const bool snps_exist = (getDrivePathType(rcrd_snapshot) == DrivePathType::FILE);
+  if (snps_exist == false && oe.takeSnapshot() == SnapshotOperation::COMPARE) {
+    rtWarn("The snapshot file " + rcrd_snapshot + " was not found.  Check the ${OMNI_SOURCE} "
+           "environment variable, currently set to " + oe.getOmniSourcePath() + ", for validity.  "
+           "Subsequent tests will be skipped.", "test_isomerization");
+  }
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snp_var_name.size() > 0) {
-    snapshot(rcrd_snapshot, polyNumericVector(rot_crd), snp_var_name, 1.0e-6, "Coordinate "
+    snapshot(rcrd_snapshot, polyNumericVector(rot_crd), snp_var_name, 1.0e-6, "Coordinates "
              "obtained from rotation of selected bonds do not meet expectations.",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, expectation, do_snps);
   }
@@ -165,12 +172,94 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
                          const TestPriority do_tests,
                          const std::string &snp_var_name = std::string(""),
                          const PrintSituation expectation = PrintSituation::APPEND) {
+  ScoreCard sc(1);
   const std::vector<RotatorGroup> inv_grp = chemfe.getChiralInversionGroups();
   const std::vector<ChiralInversionProtocol> protocols = chemfe.getChiralInversionMethods();
+  const std::vector<int> centers = chemfe.getChiralCenters();
   const int nchiral = protocols.size();
-  for (int i = 0; i < nchiral; i++) {
-
+  if (nchiral == 0) {
+    return;
   }
+
+  // CHECK
+  const bool take_traj = (ps.getAtomCount() == 304);
+  CoordinateSeries<double> trpcage = (take_traj) ? CoordinateSeries<double>(ps, 1) :
+                                                   CoordinateSeries<double>();
+  // END CHECK
+  
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  const CoordinateFrameReader cfr(ps);
+  const double orig_bond_e = evaluateBondTerms(vk, cfr, &sc, 0);
+  PhaseSpace inversion_copy(ps);
+  PhaseSpaceWriter psw = inversion_copy.data();
+  const PhaseSpaceReader psr = ps.data();
+  int invcpos = 0;
+  std::vector<double> inverted_crd(3 * nchiral * (cdk.mol_limits[1] - cdk.mol_limits[0]));
+  std::vector<double> repos_dev(nchiral), ubond_dev(nchiral);
+  for (int i = 0; i < nchiral; i++) {
+    flipChiralCenter(&inversion_copy, i, centers, protocols, inv_grp);
+
+    // Record the positions of atoms in the first molecule
+    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
+      inverted_crd[invcpos] = psw.xcrd[cdk.mol_contents[j]];
+      invcpos++;
+      inverted_crd[invcpos] = psw.ycrd[cdk.mol_contents[j]];
+      invcpos++;
+      inverted_crd[invcpos] = psw.zcrd[cdk.mol_contents[j]];
+      invcpos++;
+    }
+
+    // CHECK
+    if (take_traj) {
+      trpcage.pushBack(inversion_copy);
+    }
+    // END CHECK
+    
+    // Record the bond and angle energies
+    const double new_bond_e = evaluateBondTerms(vk, CoordinateFrameReader(inversion_copy), &sc, 0);
+
+    // Reverse the inversion to check that the molecule recovers its initial state
+    flipChiralCenter(&inversion_copy, i, centers, protocols, inv_grp);
+    double rmsd = 0.0;
+    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
+      const size_t jatom = cdk.mol_contents[j];
+      const double dx = psw.xcrd[jatom] - psr.xcrd[jatom];
+      const double dy = psw.ycrd[jatom] - psr.ycrd[jatom];
+      const double dz = psw.zcrd[jatom] - psr.zcrd[jatom];
+      rmsd += (dx * dx) + (dy * dy) + (dz * dz);
+    }
+    rmsd = sqrt(rmsd / static_cast<double>(cdk.mol_limits[1] - cdk.mol_limits[0]));
+    repos_dev[i] = rmsd;    
+  }
+
+  // CHECK
+  if (take_traj) {
+    //printf("The coordinate series has %2d frames.\n", trpcage.getFrameCount());
+    //trpcage.exportToFile("trpcage_frames.crd");
+  }
+  // END CHECK
+  
+  const char osc = osSeparator();
+  const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
+  const std::string invcrd_snapshot = base_iso_path + osc + "inverted_coords.m";
+  const bool snps_exist = (getDrivePathType(invcrd_snapshot) == DrivePathType::FILE);
+  if (snps_exist == false && oe.takeSnapshot() == SnapshotOperation::COMPARE) {
+    rtWarn("The snapshot file " + invcrd_snapshot + " was not found.  Check the ${OMNI_SOURCE} "
+           "environment variable, currently set to " + oe.getOmniSourcePath() + ", for validity.  "
+           "Subsequent tests will be skipped.", "test_isomerization");
+  }
+  const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  if (snp_var_name.size() > 0) {
+    snapshot(invcrd_snapshot, polyNumericVector(inverted_crd), snp_var_name, 1.0e-6, "Coordinates "
+             "obtained from inversion of selected chiral centers do not meet expectations.",
+             oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, expectation, do_snps);
+  }
+  const Approx target(std::vector<double>(nchiral, 0.0), ComparisonType::ABSOLUTE, 1.0e-6);
+  check(repos_dev, RelationalOperator::EQUAL, target, "Reversing the inversion operations of "
+        "selected chiral centers does not return the molecule to its original state.", do_tests);
+  check(ubond_dev, RelationalOperator::EQUAL, target, "Bond energies are changed by inversion "
+        "of a chiral center.", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -254,10 +343,11 @@ int main(int argc, char* argv[]) {
   checkRotationalSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_rot_iso");
 
   // Isomerize chiral centers
-  checkChiralSampling(drug_ag, drug_ps, drug_feat, oe, do_tests, "drug_chir_iso");
+  checkChiralSampling(drug_ag, drug_ps, drug_feat, oe, do_tests, "drug_chir_iso",
+                      PrintSituation::OVERWRITE);
   checkChiralSampling(trpc_ag, trpc_ps, trpc_feat, oe, do_tests);
-  checkChiralSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_rot_iso");
-  checkChiralSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_rot_iso");
+  checkChiralSampling(lig1_ag, lig1_ps, lig1_feat, oe, do_tests, "lig1_chir_iso");
+  checkChiralSampling(lig2_ag, lig2_ps, lig2_feat, oe, do_tests, "lig2_chir_iso");
 
   // Test RMSD computations on simple structures
   section(3);

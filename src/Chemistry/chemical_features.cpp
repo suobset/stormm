@@ -2185,7 +2185,7 @@ std::vector<uint> ChemicalFeatures::getHydrogenBondAcceptorMask() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> ChemicalFeatures::listChiralCenters(const ChiralOrientation direction) const {
+std::vector<int> ChemicalFeatures::getChiralCenters(const ChiralOrientation direction) const {
   std::vector<int> result;
   const int* chi_ptr = chiral_centers.data();
   int ncen;

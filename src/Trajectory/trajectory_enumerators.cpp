@@ -36,6 +36,24 @@ std::string getCoordinateFileKindName(const CoordinateFileKind cfkind) {
 }
 
 //-------------------------------------------------------------------------------------------------
+DataFormat getTrajectoryFormat(CoordinateFileKind cfkind) {
+  switch (cfkind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+  case CoordinateFileKind::AMBER_ASCII_RST:
+    return DataFormat::ASCII;
+  case CoordinateFileKind::AMBER_NETCDF:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    return DataFormat::BINARY;
+  case CoordinateFileKind::UNKNOWN:
+    rtWarn("Unable to determine the nature of an UNKNOWN kind trajectory file.  Reporting BINARY.",
+           "getTrajectoryFormat");
+    return DataFormat::BINARY;    
+  }
+  __builtin_unreachable();
+}
+  
+//-------------------------------------------------------------------------------------------------
 CoordinateFileKind translateCoordinateFileKind(const std::string &name_in) {
   if (strncmpCased(name_in, "AMBER_CRD")) {
     return CoordinateFileKind::AMBER_CRD;

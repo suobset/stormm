@@ -368,6 +368,56 @@ CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void CoordinateSeries<T>::exportToFile(const std::string &file_name, const CoordinateFileKind kind,
+                                       const PrintSituation expectation, const int low_index,
+                                       const int high_index, const HybridTargetLevel tier) {
+  if (low_index < 0 || low_index >= frame_count || high_index < low_index ||
+      high_index >= frame_count) {
+    rtErr("The frame index range " + std::to_string(low_index) + " to " +
+          std::to_string(high_index) + " is invalid for a series with " +
+          std::to_string(frame_count) + " frames.", "CoordinateSeries", "exportToFile");
+  }
+  const int actual_high_index = (high_index > low_index) ? high_index : frame_count;
+  const PrintSituation aexp = adjustTrajectoryOpeningProtocol(expectation, kind,
+                                                              "CoordinateSeries", "exportToFile");
+  const DataFormat style = getTrajectoryFormat(kind);
+  const bool fi_exists = (getDrivePathType(file_name) == DrivePathType::FILE);
+  std::ofstream foutp;
+  foutp = openOutputFile(file_name, aexp, "Open an output file for writing CoordinateSeries "
+                         "contents.", style);
+  if (fi_exists == false) {
+    initializeTrajectory(&foutp, kind, atom_count);
+  }
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+    if (kind == CoordinateFileKind::AMBER_INPCRD && actual_high_index - low_index != 1) {
+      rtErr("The " + getCoordinateFileKindName(kind) + " file format requires one and only "
+            "one frame.  It cannot accept a series of " +
+            std::to_string(actual_high_index - low_index) + " frames.", "CoordinateSeries",
+            "exportToFile");
+    }
+    for (int i = low_index; i < actual_high_index; i++) {
+      const CoordinateFrame cf = exportFrame(i, tier);
+      const CoordinateFrameReader cfr = cf.data();
+      writeFrame(&foutp, file_name, kind, atom_count, cfr.xcrd, cfr.ycrd, cfr.zcrd,
+                 nullptr, nullptr, nullptr, cfr.unit_cell, cfr.boxdim);
+    }
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+    break;
+  case CoordinateFileKind::AMBER_ASCII_RST:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    rtErr("A restart file cannot be written based on a CoordinateSeries.  The object will not be "
+          "able to store both coordinates and velocities needed for checkpointing.",
+          "CoordinateFrame", "exportToFile");
+    break;
+  }
+  foutp.close();
+}
+
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void CoordinateSeries::upload() {

@@ -283,10 +283,10 @@ public:
   ///                      velocity data by obligation, but trajectory files can contain either of
   ///                      these as well as forces)
   /// \param expectation   The condition in which the output file is expected to be found
-  void printCoordinates(const std::string &file_name, double current_time = 0.0,
-                        TrajectoryKind traj_kind = TrajectoryKind::POSITIONS,
-                        CoordinateFileKind output_kind = CoordinateFileKind::AMBER_INPCRD,
-                        PrintSituation expectation = PrintSituation::UNKNOWN);
+  void exportToFile(const std::string &file_name, double current_time = 0.0,
+                    TrajectoryKind traj_kind = TrajectoryKind::POSITIONS,
+                    CoordinateFileKind output_kind = CoordinateFileKind::AMBER_INPCRD,
+                    PrintSituation expectation = PrintSituation::UNKNOWN);
   
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information

@@ -14,6 +14,27 @@ namespace trajectory {
 using diskutil::PrintSituation;
 using topology::UnitCellType;
 
+/// \brief Modify the expected file opening approach in light of the nature of the output.  Check
+///        for impossible expectations.
+///
+/// \param expectation
+/// \param output_kind  The type of output being written
+/// \param caller       Name of the calling object (for error reporting purposes)
+/// \param method       Name of the calling member function (for error reporting purposes)
+PrintSituation adjustTrajectoryOpeningProtocol(const PrintSituation expectation,
+                                               const CoordinateFileKind output_kind,
+                                               const char* caller = nullptr,
+                                               const char* method = nullptr);
+
+/// \brief Print the opening lines or basic details of one of the trajectories.
+///
+/// \param foutp         The just-opened, new trajectory file to begin writing
+/// \param output_kind   The trajectory file kind, i.e. AMBER_INPCRD
+/// \param atom_count    Number of atoms in the system (if applicable)
+/// \param current_time  Current time in the simulation (if applicable)
+void initializeTrajectory(std::ofstream *foutp, const CoordinateFileKind output_kind,
+                          int atom_count = 0, double current_time = 0.0);
+
 /// \brief Write a coordinate trajectory file or input coordinates file.  Each of the overloaded
 ///        versions of the function feeds into the base case, which uses pointers to the data
 ///        at hand, with a verified dimension.

@@ -6,6 +6,7 @@
 #include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
+#include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "amber_ascii.h"
 #include "coordinateframe.h"
@@ -19,7 +20,9 @@ using card::Hybrid;
 using card::HybridTargetLevel;
 using data_types::isFloatingPointScalarType;
 using data_types::isSignedIntegralScalarType;
-
+using diskutil::DrivePathType;
+using diskutil::getDrivePathType;
+  
 /// \brief Collect C-style pointers and critical constants for a writeable CoordinateSeries object.
 template <typename T> struct CoordinateSeriesWriter {
 
@@ -180,7 +183,7 @@ public:
   ///        result should be interpreted as a 3x3 matrix in column-major format.
   ///
   /// \param frame_index  The frame for which to extract the transformation matrix
-  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
   std::vector<double> getBoxSpaceTransform(int frame_index,
                                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
@@ -188,14 +191,14 @@ public:
   ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
   ///
   /// \param frame_index  The frame for which to extract the transformation matrix
-  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
   std::vector<double> getInverseTransform(int frame_index,
                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get the box dimensions in their pure form for a particular frame.
   ///
   /// \param frame_index  The frame for which to extract the transformation matrix
-  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
   std::vector<double> getBoxDimensions(int frame_index,
                                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
@@ -204,10 +207,25 @@ public:
   ///        double-precision format.
   ///
   /// \param frame_index  The frame to extract
-  /// \param tier         Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
   CoordinateFrame exportFrame(int frame_index,
                               HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  
+
+  /// \brief Export the contents of this coordinate series to a trajectory file.
+  ///
+  /// \param file_name     Name of the file to write
+  /// \param output_kind   The format of the file to write (checkpoint files print position and
+  ///                      velocity data by obligation, but trajectory files can contain either of
+  ///                      these as well as forces)
+  /// \param expectation   The condition in which the output file is expected to be found
+  /// \param low_index     The first frame index to export
+  /// \param high_index    The upper limit of frame indices to export
+  /// \param tier          Level at which to retrieve data (if OMNI is compiled to run on a GPU)
+  void exportToFile(const std::string &file_name,
+                    CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
+                    PrintSituation expectation = PrintSituation::UNKNOWN, int low_index = 0,
+                    int high_index = 0, HybridTargetLevel tier = HybridTargetLevel::HOST);
+
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information
   void upload();

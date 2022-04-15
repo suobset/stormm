@@ -219,7 +219,19 @@ public:
   ///
   /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)  
   std::vector<double> getBoxDimensions(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  
+
+  /// \brief Export the contents of this coordinate series to a trajectory, restart, or
+  ///        input coordinates file.
+  ///
+  /// \param file_name     Name of the file to write
+  /// \param output_kind   The format of the file to write (checkpoint files print position and
+  ///                      velocity data by obligation, but trajectory files can contain either of
+  ///                      these as well as forces)
+  /// \param expectation   The condition in which the output file is expected to be found
+  void exportToFile(const std::string &file_name,
+                    CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
+                    PrintSituation expectation = PrintSituation::UNKNOWN);
+
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information
   void upload();

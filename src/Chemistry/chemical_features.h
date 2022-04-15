@@ -266,7 +266,7 @@ public:
   /// \brief List the chiral centers in a system, using topological indices.
   ///
   /// \param direction  Preferred chiral orientation of the centers to return (D-, L-, or both)
-  std::vector<int> listChiralCenters(ChiralOrientation direction = ChiralOrientation::NONE) const;
+  std::vector<int> getChiralCenters(ChiralOrientation direction = ChiralOrientation::NONE) const;
   
   /// \brief Return a mask of chiral centers in the system.
   ///

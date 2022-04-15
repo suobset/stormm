@@ -600,7 +600,7 @@ bench.exe : $(OMNI_BENCH_PROGS)
 test : $(OMNI_TEST_PROGS)
 	for PROG in $(OMNI_TEST_PROGS) ; do \
 		echo "[OMNI] Execute $$PROG" ; \
-		valgrind $$PROG ; \
+		$$PROG ; \
 	done
 
 bench : $(OMNI_BENCH_PROGS)

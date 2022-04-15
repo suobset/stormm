@@ -3,11 +3,13 @@
 #define OMNI_TRAJECTORY_ENUMERATORS_H
 
 #include <string>
+#include "FileManagement/file_util.h"
 #include "Parsing/textfile.h"
 
 namespace omni {
 namespace trajectory {
 
+using diskutil::DataFormat;
 using parse::TextFile;
 
 /// \brief Options for the type of coordinate file to write
@@ -54,6 +56,12 @@ enum class TrajectoryKind {
 /// \param cfkind  The enumerator instance of interest
 std::string getCoordinateFileKindName(CoordinateFileKind cfkind);
 
+/// \brief Get the nature of a trajectory file based on the stated format (this will return
+///        binary or ASCII based on the stated trajectory file kind)
+///
+/// \param cfkind  The trajectory file kind
+DataFormat getTrajectoryFormat(CoordinateFileKind cfkind);
+  
 /// \brief Translate a string into one of the CoordinateFileKind enumerations.
 ///
 /// \param name_in  The string to translate

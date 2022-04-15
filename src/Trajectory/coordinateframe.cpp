@@ -1,5 +1,6 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
+#include "FileManagement/file_listing.h"
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"
 #include "amber_ascii.h"
@@ -10,6 +11,8 @@ namespace omni {
 namespace trajectory {
 
 using constants::CartesianDimension;
+using diskutil::DrivePathType;
+using diskutil::getDrivePathType;
 using math::extractBoxDimensions;
 using math::roundUp;
 using parse::TextFileReader;
@@ -477,6 +480,37 @@ std::vector<double> CoordinateFrame::getBoxDimensions(const HybridTargetLevel ti
 #endif
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void CoordinateFrame::exportToFile(const std::string &file_name, const CoordinateFileKind kind,
+                                   const PrintSituation expectation) {
+  const PrintSituation aexp = adjustTrajectoryOpeningProtocol(expectation, kind,
+                                                              "CoordinateFrame", "exportToFile");
+  const DataFormat style = getTrajectoryFormat(kind);
+  const bool fi_exists = (getDrivePathType(file_name) == DrivePathType::FILE);
+  std::ofstream foutp;
+  foutp = openOutputFile(file_name, aexp, "Open an output file for writing CoordinateFrame "
+                         "contents.", style);
+  if (fi_exists == false) {
+    initializeTrajectory(&foutp, kind, atom_count);
+  }
+  switch (kind) {
+  case CoordinateFileKind::AMBER_CRD:
+  case CoordinateFileKind::AMBER_INPCRD:
+    writeFrame(&foutp, file_name, kind, atom_count, x_coordinates.data(), y_coordinates.data(),
+               z_coordinates.data(), nullptr, nullptr, nullptr, unit_cell, box_dimensions.data());
+    break;
+  case CoordinateFileKind::AMBER_NETCDF:
+    break;
+  case CoordinateFileKind::AMBER_ASCII_RST:
+  case CoordinateFileKind::AMBER_NETCDF_RST:
+    rtErr("A restart file cannot be written based on a CoordinateFrame.  The object will not be "
+          "able to store both coordinates and velocities needed for checkpointing.",
+          "CoordinateFrame", "exportToFile");
+    break;
+  }
+  foutp.close();
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
                                                 18,   82,    0 };
   std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    8,    8,    4,    7,    6,
                                                  0,    0,    0 };
-  std::vector<int> trp_cage_lchir = sys_chem[8].listChiralCenters(ChiralOrientation::SINISTER);
+  std::vector<int> trp_cage_lchir = sys_chem[8].getChiralCenters(ChiralOrientation::SINISTER);
   std::vector<int> trp_cage_lchir_ans;
   const ChemicalDetailsKit trp_cdk = sys_ag[8].getChemicalDetailsKit();
   for (int i = 0; i < trp_cdk.natom; i++) {
@@ -221,7 +221,7 @@ int main(int argc, char* argv[]) {
              NumberFormat::STANDARD_REAL,
              (i == 0LLU) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
     if (sys_chem[i].getChiralCenterCount() > 0) {
-      snapshot(ch_name, polyNumericVector(sys_chem[i].listChiralCenters()), std::string("chcen_") +
+      snapshot(ch_name, polyNumericVector(sys_chem[i].getChiralCenters()), std::string("chcen_") +
                std::to_string(i), 1.0e-6, "Chiral centers detected for the system described by " +
                sys_ag[i].getFileName() + " do not meet expectations.", oe.takeSnapshot(), 1.0e-8,
                NumberFormat::INTEGER,
