@@ -168,7 +168,7 @@ void rotateAboutBond(CoordinateSeriesWriter<double> csw, const int frame_index, 
 
 //-------------------------------------------------------------------------------------------------
 void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int center_idx,
-                      const int natom, const std::vector<int> &chiral_centers,
+                      const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<RotatorGroup> &inversion_groups) {
   switch (chiral_protocols[center_idx]) {
@@ -215,8 +215,10 @@ void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int center
   case ChiralInversionProtocol::REFLECT:
     {
       // Find the molecule home of the present center and flip those atoms only.
+      const int natom = inversion_groups[center_idx].rotatable_atoms.size();
       for (int i = 0; i < natom; i++) {
-        xcrd[i] = -xcrd[i];
+        const int atom_idx = inversion_groups[center_idx].rotatable_atoms[i];
+        xcrd[atom_idx] = -xcrd[atom_idx];
       }
       
       // All centers have been flipped by the reflection.  Loop over all other chiral centers and
@@ -226,7 +228,7 @@ void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int center
       const int nchirals = chiral_protocols.size();
       for (int i = 0; i < nchirals; i++) {
         if (chiral_protocols[i] == ChiralInversionProtocol::ROTATE) {
-          flipChiralCenter(xcrd, ycrd, zcrd, i, natom, chiral_centers, chiral_protocols,
+          flipChiralCenter(xcrd, ycrd, zcrd, i, chiral_centers, chiral_protocols,
                            inversion_groups);
         }
       }
@@ -250,8 +252,8 @@ void flipChiralCenter(CoordinateFrameWriter cfw, const int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<RotatorGroup> &inversion_groups) {
-  flipChiralCenter(cfw.xcrd, cfw.ycrd, cfw.zcrd, center_idx, cfw.natom, chiral_centers,
-                   chiral_protocols, inversion_groups);
+  flipChiralCenter(cfw.xcrd, cfw.ycrd, cfw.zcrd, center_idx, chiral_centers, chiral_protocols,
+                   inversion_groups);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -266,8 +268,8 @@ void flipChiralCenter(PhaseSpaceWriter psw, const int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<RotatorGroup> &inversion_groups) {
-  flipChiralCenter(psw.xcrd, psw.ycrd, psw.zcrd, center_idx, psw.natom, chiral_centers,
-                   chiral_protocols, inversion_groups);
+  flipChiralCenter(psw.xcrd, psw.ycrd, psw.zcrd, center_idx, chiral_centers, chiral_protocols,
+                   inversion_groups);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -343,11 +345,12 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
   case ChiralInversionProtocol::REFLECT:
     {
       const int system_offset = psynthw.atom_starts[system_index];
-      const int natom = psynthw.atom_counts[system_index];
+      const int natom = inversion_groups[center_idx].rotatable_atoms.size();
       for (int i = 0; i < natom; i++) {
-        const longlong4 tmp_crd = psynthw.xyz_qlj[i + system_offset];
+        const int atom_idx = inversion_groups[center_idx].rotatable_atoms[i];
+        const longlong4 tmp_crd = psynthw.xyz_qlj[atom_idx + system_offset];
         const longlong4 tmp_rfl = { -tmp_crd.x, tmp_crd.y, tmp_crd.z, tmp_crd.w };
-        psynthw.xyz_qlj[i + system_offset] = tmp_rfl;
+        psynthw.xyz_qlj[atom_idx + system_offset] = tmp_rfl;
       }
 
       // All centers have been flipped by the reflection.  Loop over all other chiral centers and

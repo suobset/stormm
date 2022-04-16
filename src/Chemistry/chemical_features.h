@@ -599,6 +599,7 @@ private:
   ///        chiral centers.
   ///
   /// \param tmp_chiral_centers           Array of pre-determined chiral centers
+  /// \param tmp_inversion_methods        Array of pre-determined inversion protocols
   /// \param tmp_anchor_a_branches        Roots of the largest branch on each chiral center (in
   ///                                     terms of the number of atoms), not to be inverted
   /// \param tmp_anchor_b_branches        Roots of the second largest branch on each chiral center,
@@ -608,6 +609,7 @@ private:
   /// \param tmp_invertible_group_bounds  Bounds array for tmp_invertible_groups (assembled and
   ///                                     returned)
   void findInvertibleGroups(const std::vector<int> &tmp_chiral_centers,
+                            const std::vector<int> &tmp_inversion_methods,
                             std::vector<int> *tmp_anchor_a_branches,
                             std::vector<int> *tmp_anchor_b_branches,
                             std::vector<int> *tmp_invertible_groups,

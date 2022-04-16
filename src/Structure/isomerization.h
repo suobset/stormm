@@ -81,7 +81,7 @@ void rotateAboutBond(CoordinateSeriesWriter<double> csw, int frame_index, int at
 /// \}
 
 /// \brief Rotate two branches of a chiral center 180 degrees, so as to invert the center.  
-void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, int center_idx, int natom,
+void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<RotatorGroup> &inversion_groups);

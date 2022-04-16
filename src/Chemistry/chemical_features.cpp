@@ -10,9 +10,17 @@
 #include "chemical_features.h"
 #include "indigo.h"
 
+// CHECK
+#include "Parsing/parse.h"
+// END CHECK
+
 namespace omni {
 namespace chemistry {
 
+// CHECK
+using parse::char4ToString;
+// END CHECK
+  
 using card::HybridKind;
 using topology::TorsionKind;
 using math::accumulateBitmask;
@@ -288,8 +296,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_rotatable_groups,
                        &tmp_rotatable_group_bounds);
     rotatable_bond_count = static_cast<int>(tmp_rotatable_group_bounds.size()) - 1;
-    findInvertibleGroups(tmp_chiral_centers, &tmp_anchor_a_branches, &tmp_anchor_b_branches,
-                         &tmp_invertible_groups, &tmp_invertible_group_bounds);
+    findInvertibleGroups(tmp_chiral_centers, tmp_chiral_inversion_methods, &tmp_anchor_a_branches,
+                         &tmp_anchor_b_branches, &tmp_invertible_groups,
+                         &tmp_invertible_group_bounds);
     break;
   case MapRotatableGroups::NO:
     break;
@@ -1864,6 +1873,7 @@ void ChemicalFeatures::findRotatableBonds(const ValenceKit<double> &vk,
 
 //-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_centers,
+                                            const std::vector<int> &tmp_inversion_methods,
                                             std::vector<int> *tmp_anchor_a_branches,
                                             std::vector<int> *tmp_anchor_b_branches,
                                             std::vector<int> *tmp_invertible_groups,
@@ -1888,147 +1898,173 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
   std::vector<int> prev_atoms(16), new_atoms(16), tmp_igroup(16);
   int all_grp_size = 0;
   for (int i = 0; i < chiral_center_count; i++) {
-    
+
     // The chiral orientation is encoded in the index of the chiral center by making D-chiral
     // centers the negative of the original index, but this leaves an ambiguity if the atom with
     // topological index 0 is chiral.  Therefore, 1 is added to the index and D-chiral centers
     // have their index values multiplied by -1.  Unroll this arrangement to recover the correct
     // topological index.
     const int chatom = abs(tmp_chiral_centers[i]) - 1;
-    for (int j = 0; j < 4; j++) {
-      branch_counts[j].x = -1;
-      branch_counts[j].y = j;
-    }
-    int brpos = 0;
-    int nring = 0;
-    for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
 
-      // Skip "branches" that are actually virtual sites
-      if (cdk.z_numbers[nbk.nb12x[j]] == 0) {
-        continue;
-      }
+    // Switch over the various inversion methods--methods imply group content
+    switch (static_cast<ChiralInversionProtocol>(tmp_inversion_methods[i])) {
+    case ChiralInversionProtocol::ROTATE:
+      {
+        for (int j = 0; j < 4; j++) {
+          branch_counts[j].x = -1;
+          branch_counts[j].y = j;
+        }
+        int brpos = 0;
+        int nring = 0;
+        for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
 
-      // Skip branches making up the other end of a loop which has already been determined
-      if (branch_counts[brpos].x >= 0) {
-        brpos++;
-        continue;
-      }
-      bool ring_completed;
-      branch_counts[brpos].x = colorConnectivity(nbk, cdk, chatom, nbk.nb12x[j], &marked[brpos],
-                                                 &ring_completed);
+          // Skip "branches" that are actually virtual sites
+          if (cdk.z_numbers[nbk.nb12x[j]] == 0) {
+            continue;
+          }
 
-      // Search for one of the remaining branch roots in the marked atoms if there was a ring
-      // completion.  This will accomplish one of the following searches.  Mark the fact that this
-      // branch (and its partner, form the other end of the ring) are part of the same ring.  If
-      // one of these two branches ends up as one of the ones that rotates, the other must rotate
-      // along with it.
-      if (ring_completed) {
-        nring++;
-        branch_counts[brpos].z = nring;
-        for (int k = j + 1; k < nbk.nb12_bounds[chatom + 1]; k++) {
-          if (readBitFromMask(marked[brpos], nbk.nb12x[k])) {
-            const size_t mirror_idx = k - nbk.nb12_bounds[chatom];
-            for (size_t m = 0; m < mask_len; m++) {
-              marked[mirror_idx][m] = marked[brpos][m];
+          // Skip branches making up the other end of a loop which has already been determined
+          if (branch_counts[brpos].x >= 0) {
+            brpos++;
+            continue;
+          }
+          bool ring_completed;
+          branch_counts[brpos].x = colorConnectivity(nbk, cdk, chatom, nbk.nb12x[j],
+                                                     &marked[brpos], &ring_completed);
+
+          // Search for one of the remaining branch roots in the marked atoms if there was a ring
+          // completion.  This will accomplish one of the following searches.  Mark the fact that
+          // this branch (and its partner, form the other end of the ring) are part of the same
+          // ring.  If one of these two branches ends up as one of the ones that rotates, the
+          // other must rotate along with it.
+          if (ring_completed) {
+            nring++;
+            branch_counts[brpos].z = nring;
+            for (int k = j + 1; k < nbk.nb12_bounds[chatom + 1]; k++) {
+              if (readBitFromMask(marked[brpos], nbk.nb12x[k])) {
+                const size_t mirror_idx = k - nbk.nb12_bounds[chatom];
+                for (size_t m = 0; m < mask_len; m++) {
+                  marked[mirror_idx][m] = marked[brpos][m];
+                }
+                branch_counts[mirror_idx].x = branch_counts[brpos].x;
+                branch_counts[mirror_idx].z = nring;
+              }
             }
-            branch_counts[mirror_idx].x = branch_counts[brpos].x;
-            branch_counts[mirror_idx].z = nring;
+          }
+          else {
+            branch_counts[brpos].z = 0;
+          }
+          brpos++;
+        }
+
+        // Unset the chiral atom itself in the masks just created.  It will not rotate during the
+        // inversion.  The number of atoms in each branch is one more than the number of "rotators"
+        // counted by the colorConnectivity function, which was originally written for mapping the
+        // moving atom dependencies of rotatable bonds.
+        for (int j = 0; j < 4; j++) {
+          branch_counts[j].x += 1;
+          unsetBitInMask(&marked[j], chatom);
+        }
+
+        // Sort the branches in descending order of size.  The list is only four elements long.
+        std::sort(branch_counts.begin(), branch_counts.end(),
+                  [](int3 a, int3 b) { return a.x > b.x; });
+
+        // In absense of rings, the shortest two branches will do.  If one of the branches is
+        // part of a ring, however, the second branch in that ring must also be taken.
+        int invr_a_idx, invr_b_idx;
+        if (nring == 0 || (branch_counts[0].z == 0 && branch_counts[1].z == 0) ||
+            branch_counts[0].z == branch_counts[1].z) {
+          anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+          anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+          invr_a_idx = 2;
+          invr_b_idx = 3;
+        }
+        else if (nring == 1) {
+
+          // If there is one ring and branch zero were part of it, branch one would also be a part
+          // of the ring due to the ordering and the anchors would have been determined above.
+          // Both branches of a ring will have the same number of dependencies and will therefor
+          // appear back-to-back in the ordered list.
+          if (branch_counts[0].x + branch_counts[3].x <= branch_counts[1].x + branch_counts[2].x) {
+            anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+            anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[3].y];  
+            invr_a_idx = 1;
+            invr_b_idx = 2;
+          }
+          else {
+            anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+            anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[2].y];  
+            invr_a_idx = 0;
+            invr_b_idx = 3;
           }
         }
-      }
-      else {
-        branch_counts[brpos].z = 0;
-      }
-      brpos++;
-    }
+        else if (nring >= 2) {
 
-    // Unset the chiral atom itself in the masks just created.  It will not rotate during the
-    // inversion.  The number of atoms in each branch is one more than the number of "rotators"
-    // counted by the colorConnectivity function, which was originally written for mapping the
-    // moving atom dependencies of rotatable bonds.
-    for (int j = 0; j < 4; j++) {
-      branch_counts[j].x += 1;
-      unsetBitInMask(&marked[j], chatom);
-    }
-
-    // Sort the branches in descending order of size.  The list is only four elements long.
-    std::sort(branch_counts.begin(), branch_counts.end(),
-              [](int3 a, int3 b) { return a.x > b.x; });
-
-    // In absense of rings, the shortest two branches will do.  If one of the branches is part of
-    // a ring, however, the second branch in that ring must also be taken.
-    int invr_a_idx, invr_b_idx;
-    if (nring == 0 || (branch_counts[0].z == 0 && branch_counts[1].z == 0) ||
-        branch_counts[0].z == branch_counts[1].z) {
-      anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
-      anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
-      invr_a_idx = 2;
-      invr_b_idx = 3;
-    }
-    else if (nring == 1) {
-
-      // If there is one ring and branch zero were part of it, branch one would also be a part of
-      // the ring due to the ordering and the anchors would have been determined above.  Both
-      // branches of a ring will have the same number of dependencies and will therefor appear
-      // back-to-back in the ordered list.
-      if (branch_counts[0].x + branch_counts[3].x <= branch_counts[1].x + branch_counts[2].x) {
-        anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
-        anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[3].y];  
-        invr_a_idx = 1;
-        invr_b_idx = 2;
-      }
-      else {
-        anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
-        anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[2].y];  
-        invr_a_idx = 0;
-        invr_b_idx = 3;
-      }         
-    }
-    else if (nring >= 2) {
-
-      // If there are two rings that are fused in more places than just the chiral atom, the
-      // center will ultimately be marked for reflection rather than rotation.  Otherwise, take
-      // the ring with fewer atoms and mark that as the inversion group (this has already been
-      // done in the first case above).  If there are more than two rings, the center will have
-      // to be reflected.
-      anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
-      anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
-      invr_a_idx = 2;
-      invr_b_idx = 3;
-    }
-    const int invr_a_branch = branch_counts[invr_a_idx].y;
-    const int invr_b_branch = branch_counts[invr_b_idx].y;
-    tmp_igroup.resize(branch_counts[invr_a_idx].x + branch_counts[invr_b_idx].x + 2);
+          // If there are two rings that are fused in more places than just the chiral atom, the
+          // center will ultimately be marked for reflection rather than rotation.  Otherwise, take
+          // the ring with fewer atoms and mark that as the inversion group (this has already been
+          // done in the first case above).  If there are more than two rings, the center will have
+          // to be reflected.
+          anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+          anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+          invr_a_idx = 2;
+          invr_b_idx = 3;
+        }
+        const int invr_a_branch = branch_counts[invr_a_idx].y;
+        const int invr_b_branch = branch_counts[invr_b_idx].y;
+        tmp_igroup.resize(branch_counts[invr_a_idx].x + branch_counts[invr_b_idx].x + 2);
     
-    // Quickly scan the relevant masks for any marked atoms.  This uses the unsigned integers to
-    // account for 32 atoms at a time.  In large topologies with relatively few atoms in the
-    // inversion mask, this is a big speed advantage.  Make a list of atoms in either branch, then
-    // reduce this list to its unique values, unique atoms in the smallest two branches coming out
-    // of the chiral center.
-    tmp_igroup[0] = nbk.nb12x[nbk.nb12_bounds[chatom] + invr_a_branch];
-    tmp_igroup[1] = nbk.nb12x[nbk.nb12_bounds[chatom] + invr_b_branch];
-    int ntg = 2;
-    for (int j = 0; j < mask_len; j++) {
-      if (marked[invr_a_branch][j] > 0) {
-        const int jbase = j * uint_bit_count_int;
-        for (int k = 0; k < uint_bit_count_int; k++) {
-          if (readBitFromMask(marked[invr_a_branch], jbase + k)) {
-            tmp_igroup[ntg] = jbase + k;
-            ntg++;
+        // Quickly scan the relevant masks for any marked atoms.  This uses the unsigned integers
+        // to account for 32 atoms at a time.  In large topologies with relatively few atoms in the
+        // inversion mask, this is a big speed advantage.  Make a list of atoms in either branch,
+        // then reduce this list to its unique values, unique atoms in the smallest two branches
+        // coming out of the chiral center.
+        tmp_igroup[0] = nbk.nb12x[nbk.nb12_bounds[chatom] + invr_a_branch];
+        tmp_igroup[1] = nbk.nb12x[nbk.nb12_bounds[chatom] + invr_b_branch];
+        int ntg = 2;
+        for (int j = 0; j < mask_len; j++) {
+          if (marked[invr_a_branch][j] > 0) {
+            const int jbase = j * uint_bit_count_int;
+            for (int k = 0; k < uint_bit_count_int; k++) {
+              if (readBitFromMask(marked[invr_a_branch], jbase + k)) {
+                tmp_igroup[ntg] = jbase + k;
+                ntg++;
+              }
+            }
+          }
+          if (marked[invr_b_branch][j] > 0) {
+            const int jbase = j * uint_bit_count_int;
+            for (int k = 0; k < uint_bit_count_int; k++) {
+              if (readBitFromMask(marked[invr_b_branch], jbase + k)) {
+                tmp_igroup[ntg] = jbase + k;
+                ntg++;
+              }
+            }
           }
         }
+        reduceUniqueValues(&tmp_igroup);
       }
-      if (marked[invr_b_branch][j] > 0) {
-        const int jbase = j * uint_bit_count_int;
-        for (int k = 0; k < uint_bit_count_int; k++) {
-          if (readBitFromMask(marked[invr_b_branch], jbase + k)) {
-            tmp_igroup[ntg] = jbase + k;
-            ntg++;
-          }
+      break;
+    case ChiralInversionProtocol::REFLECT:
+      {
+        // In the special case of a chiral center than can only be inverted by mirroring the whole
+        // molecule, list all atoms.
+        const int center_home = cdk.mol_home[chatom];
+        tmp_igroup.resize(cdk.mol_limits[center_home + 1] - cdk.mol_limits[center_home] + 2);
+        int k = 0;
+        for (int j = cdk.mol_limits[center_home]; j < cdk.mol_limits[center_home + 1]; j++) {
+          tmp_igroup[k] = cdk.mol_contents[j];
+          k++;
         }
       }
+      break;
+    case ChiralInversionProtocol::DO_NOT_INVERT:
+      tmp_igroup.resize(0);
+      break;
     }
-    reduceUniqueValues(&tmp_igroup);
+
+    // Add the temporary atom group to the growing list of inversion instructions
     const int igrp_size = tmp_igroup.size();
     all_grp_size += igrp_size;
     bounds_ptr[i + 1] = all_grp_size;
@@ -2037,7 +2073,6 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
     // but it is very hard to anticipate what a reasonable size for the entire array might be.
     tmp_invertible_groups->resize(all_grp_size);
     int* group_ptr = tmp_invertible_groups->data();
-    int k = 0;
     for (int j = 0; j < igrp_size; j++) {
       group_ptr[bounds_ptr[i] + j] = tmp_igroup[j];
     }
