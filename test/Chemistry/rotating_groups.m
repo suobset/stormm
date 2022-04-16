@@ -35,7 +35,7 @@ rotators_3 = reshape(transpose(rotators_3), 1, 144);
 rotators_3 = rotators_3(1:126);
 % Snapshot data, 7 int { INTEGER 24 4 } (24 x %4d per line).
 invertors_3 = [
-  24   0  34  35  36  37  38   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+  22  24  34  35  36  37  38   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
 ];
 invertors_3 = reshape(transpose(invertors_3), 1, 24);
 invertors_3 = invertors_3(1:7);
@@ -52,7 +52,7 @@ rotators_4 = reshape(transpose(rotators_4), 1, 144);
 rotators_4 = rotators_4(1:126);
 % Snapshot data, 7 int { INTEGER 24 4 } (24 x %4d per line).
 invertors_4 = [
-  24   0  34  35  36  37  38   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+  22  24  34  35  36  37  38   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
 ];
 invertors_4 = reshape(transpose(invertors_4), 1, 24);
 invertors_4 = invertors_4(1:7);
@@ -65,7 +65,7 @@ rotators_5 = reshape(transpose(rotators_5), 1, 48);
 rotators_5 = rotators_5(1:32);
 % Snapshot data, 7 int { INTEGER 24 4 } (24 x %4d per line).
 invertors_5 = [
-   6   0   9  10  11  12  13   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+  14   6   9  10  11  12  13   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
 ];
 invertors_5 = reshape(transpose(invertors_5), 1, 24);
 invertors_5 = invertors_5(1:7);
@@ -87,7 +87,7 @@ rotators_7 = reshape(transpose(rotators_7), 1, 72);
 rotators_7 = rotators_7(1:59);
 % Snapshot data, 11 int { INTEGER 24 4 } (24 x %4d per line).
 invertors_7 = [
-  24   0   0   1   2   3   4   5   6   7   9   0   0   0   0   0   0   0   0   0   0   0   0   0
+  10  24   0   1   2   3   4   5   6   7   9   0   0   0   0   0   0   0   0   0   0   0   0   0
 ];
 invertors_7 = reshape(transpose(invertors_7), 1, 24);
 invertors_7 = invertors_7(1:11);

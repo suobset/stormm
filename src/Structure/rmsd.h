@@ -56,16 +56,18 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
             int lower_limit, int upper_limit);
 
 double rmsd(const PhaseSpaceReader &psr_a, const PhaseSpaceReader &psr_b,
-            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit, int upper_limit);
+            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit = 0,
+            int upper_limit = 0);
 
 double rmsd(const PhaseSpace &ps_a, const PhaseSpace &ps_b, const AtomGraph &ag, RmsdMethod method,
-            int lower_limit, int upper_limit);
+            int lower_limit = 0, int upper_limit = 0);
 
 double rmsd(const CoordinateFrameReader &cfr_a, const CoordinateFrameReader &cfr_b,
-            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit, int upper_limit);
+            const ChemicalDetailsKit &cdk, RmsdMethod method, int lower_limit = 0,
+            int upper_limit = 0);
 
 double rmsd(const CoordinateFrame &cf_a, const CoordinateFrame &cf_b, const AtomGraph &ag,
-            RmsdMethod method, int lower_limit, int upper_limit);
+            RmsdMethod method, int lower_limit = 0, int upper_limit = 0);
 /// \}
 
 } // namespace structure

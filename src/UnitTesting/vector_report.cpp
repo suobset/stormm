@@ -122,10 +122,12 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
           else {
             result += "Deviations occur throughout the data.  ";
           }
-          result += "Pearson correlation between the vectors is " +
-                    realToString(pearson(dva, dvb), 4) + ".";
+          if (dva.size() > 1LLU) {
+            result += "Pearson correlation between the vectors is " +
+                      realToString(pearson(dva, dvb), 4) + ".  ";
+          }
           if (n_mismatch < 16) {
-            result += "  Mismatched entries:\n";
+            result += "Mismatched entries:\n";
             const int ndec = realDecimalPlaces(tol);
             for (int i = 0; i < n_va; i++) {
               if (dva[i] != Approx(dvb[i], ComparisonType::ABSOLUTE, tol)) {

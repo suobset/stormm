@@ -1877,11 +1877,11 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
   tmp_anchor_b_branches->resize(chiral_center_count);
   tmp_invertible_group_bounds->resize(chiral_center_count + 1);
   int* anchor_a_ptr = tmp_anchor_a_branches->data();
-  int* anchor_b_ptr = tmp_anchor_a_branches->data();
+  int* anchor_b_ptr = tmp_anchor_b_branches->data();
   int* bounds_ptr   = tmp_invertible_group_bounds->data();
   const size_t mask_len = (nbk.natom + uint_bit_count_int - 1) / uint_bit_count_int;
   std::vector<std::vector<uint>> marked(4);
-  std::vector<int2> branch_counts(4);
+  std::vector<int3> branch_counts(4);
   for (int i = 0; i < 4; i++) {
     marked[i].resize(mask_len);
   }
@@ -1900,6 +1900,7 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
       branch_counts[j].y = j;
     }
     int brpos = 0;
+    int nring = 0;
     for (int j = nbk.nb12_bounds[chatom]; j < nbk.nb12_bounds[chatom + 1]; j++) {
 
       // Skip "branches" that are actually virtual sites
@@ -1917,8 +1918,13 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
                                                  &ring_completed);
 
       // Search for one of the remaining branch roots in the marked atoms if there was a ring
-      // completion.  This will accomplish one of the following searches.
+      // completion.  This will accomplish one of the following searches.  Mark the fact that this
+      // branch (and its partner, form the other end of the ring) are part of the same ring.  If
+      // one of these two branches ends up as one of the ones that rotates, the other must rotate
+      // along with it.
       if (ring_completed) {
+        nring++;
+        branch_counts[brpos].z = nring;
         for (int k = j + 1; k < nbk.nb12_bounds[chatom + 1]; k++) {
           if (readBitFromMask(marked[brpos], nbk.nb12x[k])) {
             const size_t mirror_idx = k - nbk.nb12_bounds[chatom];
@@ -1926,8 +1932,12 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
               marked[mirror_idx][m] = marked[brpos][m];
             }
             branch_counts[mirror_idx].x = branch_counts[brpos].x;
+            branch_counts[mirror_idx].z = nring;
           }
         }
+      }
+      else {
+        branch_counts[brpos].z = 0;
       }
       brpos++;
     }
@@ -1943,12 +1953,52 @@ void ChemicalFeatures::findInvertibleGroups(const std::vector<int> &tmp_chiral_c
 
     // Sort the branches in descending order of size.  The list is only four elements long.
     std::sort(branch_counts.begin(), branch_counts.end(),
-              [](int2 a, int2 b) { return a.x > b.x; });
-    anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
-    anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
-    const int invr_a_branch = branch_counts[2].y;
-    const int invr_b_branch = branch_counts[3].y;
-    tmp_igroup.resize(branch_counts[2].x + branch_counts[3].x + 2);
+              [](int3 a, int3 b) { return a.x > b.x; });
+
+    // In absense of rings, the shortest two branches will do.  If one of the branches is part of
+    // a ring, however, the second branch in that ring must also be taken.
+    int invr_a_idx, invr_b_idx;
+    if (nring == 0 || (branch_counts[0].z == 0 && branch_counts[1].z == 0) ||
+        branch_counts[0].z == branch_counts[1].z) {
+      anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+      anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+      invr_a_idx = 2;
+      invr_b_idx = 3;
+    }
+    else if (nring == 1) {
+
+      // If there is one ring and branch zero were part of it, branch one would also be a part of
+      // the ring due to the ordering and the anchors would have been determined above.  Both
+      // branches of a ring will have the same number of dependencies and will therefor appear
+      // back-to-back in the ordered list.
+      if (branch_counts[0].x + branch_counts[3].x <= branch_counts[1].x + branch_counts[2].x) {
+        anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+        anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[3].y];  
+        invr_a_idx = 1;
+        invr_b_idx = 2;
+      }
+      else {
+        anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+        anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[2].y];  
+        invr_a_idx = 0;
+        invr_b_idx = 3;
+      }         
+    }
+    else if (nring >= 2) {
+
+      // If there are two rings that are fused in more places than just the chiral atom, the
+      // center will ultimately be marked for reflection rather than rotation.  Otherwise, take
+      // the ring with fewer atoms and mark that as the inversion group (this has already been
+      // done in the first case above).  If there are more than two rings, the center will have
+      // to be reflected.
+      anchor_a_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[0].y];
+      anchor_b_ptr[i] = nbk.nb12x[nbk.nb12_bounds[chatom] + branch_counts[1].y];
+      invr_a_idx = 2;
+      invr_b_idx = 3;
+    }
+    const int invr_a_branch = branch_counts[invr_a_idx].y;
+    const int invr_b_branch = branch_counts[invr_b_idx].y;
+    tmp_igroup.resize(branch_counts[invr_a_idx].x + branch_counts[invr_b_idx].x + 2);
     
     // Quickly scan the relevant masks for any marked atoms.  This uses the unsigned integers to
     // account for 32 atoms at a time.  In large topologies with relatively few atoms in the

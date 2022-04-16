@@ -177,6 +177,7 @@ void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int center
       // Unpack the appropriate inversion group
       const int root_a = inversion_groups[center_idx].root_atom;
       const int root_b = inversion_groups[center_idx].pivot_atom;
+      const int ccen   = chiral_centers[center_idx];
       
       // Find the bisector of the root_a : chiral_center : root_b angle.  Shift the root_b atom to
       // lie along the line of the bisector, rotate the moving atoms 180 degrees about this "bond,"
@@ -184,9 +185,23 @@ void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int center
       const double orig_bx = xcrd[root_b];
       const double orig_by = ycrd[root_b];
       const double orig_bz = zcrd[root_b];
-      const double midpoint_x = orig_bx - xcrd[root_a];
-      const double midpoint_y = orig_by - ycrd[root_a];
-      const double midpoint_z = orig_bz - zcrd[root_a];
+      double dbx = orig_bx - xcrd[ccen];
+      double dby = orig_by - ycrd[ccen];
+      double dbz = orig_bz - zcrd[ccen];
+      const double invrb = 1.0 / sqrt((dbx * dbx) + (dby * dby) + (dbz * dbz));
+      dbx = xcrd[ccen] + (dbx * invrb);
+      dby = ycrd[ccen] + (dby * invrb);
+      dbz = zcrd[ccen] + (dbz * invrb);
+      double dax = xcrd[root_a] - xcrd[ccen];
+      double day = ycrd[root_a] - ycrd[ccen];
+      double daz = zcrd[root_a] - zcrd[ccen];
+      const double invra = 1.0 / sqrt((dax * dax) + (day * day) + (daz * daz));
+      dax = xcrd[ccen] + (dax * invra);
+      day = ycrd[ccen] + (day * invra);
+      daz = zcrd[ccen] + (daz * invra);
+      const double midpoint_x = 0.5 * (dbx + dax);
+      const double midpoint_y = 0.5 * (dby + day);
+      const double midpoint_z = 0.5 * (dbz + daz);
       xcrd[root_b] = midpoint_x;
       ycrd[root_b] = midpoint_y;
       zcrd[root_b] = midpoint_z;
@@ -199,10 +214,11 @@ void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, const int center
     break;
   case ChiralInversionProtocol::REFLECT:
     {
+      // Find the molecule home of the present center and flip those atoms only.
       for (int i = 0; i < natom; i++) {
         xcrd[i] = -xcrd[i];
       }
-
+      
       // All centers have been flipped by the reflection.  Loop over all other chiral centers and
       // perform chiral inversions in order to flip the others back, where possible.  Infinite
       // recursion is limited by the fact that at most one chiral center in a molecule can be given
@@ -281,12 +297,32 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       const longlong4 tmp_roota = psynthw.xyz_qlj[root_a + system_offset];
       const longlong4 tmp_rootb = psynthw.xyz_qlj[root_b + system_offset];
       const longlong4 tmp_ccen  = psynthw.xyz_qlj[chiral_centers[center_idx] + system_offset];
-      xcrd[0] = static_cast<double>(tmp_roota.x + ((tmp_rootb.x - tmp_roota.x) / 2LL)) * inv_scl;
-      ycrd[0] = static_cast<double>(tmp_roota.y + ((tmp_rootb.y - tmp_roota.y) / 2LL)) * inv_scl;
-      zcrd[0] = static_cast<double>(tmp_roota.z + ((tmp_rootb.z - tmp_roota.z) / 2LL)) * inv_scl;
-      xcrd[1] = static_cast<double>(tmp_ccen.x) * inv_scl;
-      ycrd[1] = static_cast<double>(tmp_ccen.y) * inv_scl;
-      zcrd[1] = static_cast<double>(tmp_ccen.z) * inv_scl;
+      const double ccenx = static_cast<double>(tmp_ccen.x) * inv_scl;
+      const double cceny = static_cast<double>(tmp_ccen.y) * inv_scl;
+      const double ccenz = static_cast<double>(tmp_ccen.z) * inv_scl;
+      double dbx = static_cast<double>(tmp_rootb.x - tmp_ccen.x) * inv_scl;
+      double dby = static_cast<double>(tmp_rootb.y - tmp_ccen.y) * inv_scl;
+      double dbz = static_cast<double>(tmp_rootb.z - tmp_ccen.z) * inv_scl;
+      const double invrb = 1.0 / sqrt((dbx * dbx) + (dby * dby) + (dbz * dbz));
+      dbx = ccenx + (dbx * invrb);
+      dby = cceny + (dby * invrb);
+      dbz = ccenz + (dbz * invrb);
+      double dax = static_cast<double>(tmp_roota.x - tmp_ccen.x) * inv_scl;
+      double day = static_cast<double>(tmp_roota.y - tmp_ccen.y) * inv_scl;
+      double daz = static_cast<double>(tmp_roota.z - tmp_ccen.z) * inv_scl;
+      const double invra = 1.0 / sqrt((dax * dax) + (day * day) + (daz * daz));
+      dax = ccenx + (dax * invra);
+      day = cceny + (day * invra);
+      daz = ccenz + (daz * invra);
+      const double midpoint_x = 0.5 * (dbx + dax);
+      const double midpoint_y = 0.5 * (dby + day);
+      const double midpoint_z = 0.5 * (dbz + daz);
+      xcrd[0] = midpoint_x;
+      ycrd[0] = midpoint_y;
+      zcrd[0] = midpoint_z;
+      xcrd[1] = ccenx;
+      ycrd[1] = cceny;
+      zcrd[1] = ccenz;
       const int* moving_atoms = inversion_groups[center_idx].rotatable_atoms.data();
       for (int i = 0; i < nmove; i++) {
         const longlong4 tmpcrd = psynthw.xyz_qlj[moving_atoms[i] + system_offset];

@@ -1,13 +1,19 @@
 #include "Math/matrix_ops.h"
 #include "Math/summation.h"
 #include "rmsd.h"
+#include "structure_utils.h"
+
+// CHECK
+#include "Topology/atomgraph_enumerators.h"
+#include "global_manipulation.h"
+// END CHECK
 
 namespace omni {
 namespace structure {
 
 using math::sum;
 using math::jacobiEigensolver;
-
+  
 //-------------------------------------------------------------------------------------------------
 double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, const double* xcrd_b,
             const double* ycrd_b, const double* zcrd_b, const double* masses,
@@ -71,16 +77,20 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
       const double comb_y = sb_y * inv_mass_divisor;
       const double comb_z = sb_z * inv_mass_divisor;
 
-      // Assemble the Kabsch matrix and diagonalize it
-      const double aa = sab_xx - (sb_x * coma_x) - (sa_x * comb_x) + (coma_x * comb_x);
-      const double ab = sab_xy - (sb_y * coma_x) - (sa_x * comb_y) + (coma_x * comb_y);
-      const double ac = sab_xz - (sb_z * coma_x) - (sa_x * comb_z) + (coma_x * comb_z);
-      const double ba = sab_yx - (sb_x * coma_y) - (sa_y * comb_x) + (coma_y * comb_x);
-      const double bb = sab_yy - (sb_y * coma_y) - (sa_y * comb_y) + (coma_y * comb_y);
-      const double bc = sab_yz - (sb_z * coma_y) - (sa_y * comb_z) + (coma_y * comb_z);
-      const double ca = sab_zx - (sb_x * coma_z) - (sa_z * comb_x) + (coma_z * comb_x);
-      const double cb = sab_zy - (sb_y * coma_z) - (sa_z * comb_y) + (coma_z * comb_y);
-      const double cc = sab_zz - (sb_z * coma_z) - (sa_z * comb_z) + (coma_z * comb_z);
+      // Assemble the Kabsch matrix and diagonalize it.  The weighted product of the centers of
+      // mass is equal to the weighted sum sa_(x,y,z) or sb_(x,y,z) times the center of mass
+      // comb_(x,y,z) or coma_(x,y,z), so rather than evaluate the full F.O.I.L. to complete
+      // mass * ((x,y,z)crd_a - coma_(x,y,z)) * ((x,y,z)crd_b - comb_(x,y,z)), the final two
+      // terms cancel.
+      const double aa = sab_xx - (sb_x * coma_x);
+      const double ab = sab_xy - (sb_y * coma_x);
+      const double ac = sab_xz - (sb_z * coma_x);
+      const double ba = sab_yx - (sb_x * coma_y);
+      const double bb = sab_yy - (sb_y * coma_y);
+      const double bc = sab_yz - (sb_z * coma_y);
+      const double ca = sab_zx - (sb_x * coma_z);
+      const double cb = sab_zy - (sb_y * coma_z);
+      const double cc = sab_zz - (sb_z * coma_z);
       std::vector<double> rmat(16);
       rmat[ 0] = aa + bb + cc;
       rmat[ 1] = cb - bc;
@@ -125,7 +135,7 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
       umat[2] = 2.0 * ((x * z) + (a * y));
       umat[5] = 2.0 * ((y * z) - (a * x));
       umat[8] = (a * a) - (x * x) - (y * y) + (z * z);
-
+      
       // Shift and rotate the coordinates of the first frame (in temporary variables only) and
       // compare them to the shifted, unrotated coordinates of the second frame.
       for (int i = lower_limit; i < upper_limit; i++) {
@@ -143,7 +153,7 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
         const double dy = shftb_y - rota_y;
         const double dz = shftb_z - rota_z;
         result += tmass * ((dx * dx) + (dy * dy) + (dz * dz));
-      } 
+      }
     }
     break;
   case RmsdMethod::NO_ALIGN_MASS:
@@ -170,8 +180,10 @@ double rmsd(const double* xcrd_a, const double* ycrd_a, const double* zcrd_a, co
 double rmsd(const PhaseSpaceReader &psr_a, const PhaseSpaceReader &psr_b,
             const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
             const int upper_limit) {
+  coordinateBoundsCheck(lower_limit, upper_limit, cdk.natom, "rmsd");
+  const int actual_upper_limit = (upper_limit <= lower_limit) ? cdk.natom : upper_limit;
   return rmsd(psr_a.xcrd, psr_a.ycrd, psr_a.zcrd, psr_b.xcrd, psr_b.ycrd, psr_b.zcrd, cdk.masses,
-              method, lower_limit, upper_limit);
+              method, lower_limit, actual_upper_limit);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -180,16 +192,20 @@ double rmsd(const PhaseSpace &ps_a, const PhaseSpace &ps_b, const AtomGraph &ag,
   const PhaseSpaceReader psr_a = ps_a.data();
   const PhaseSpaceReader psr_b = ps_b.data();
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  coordinateBoundsCheck(lower_limit, upper_limit, cdk.natom, "rmsd");
+  const int actual_upper_limit = (upper_limit <= lower_limit) ? cdk.natom : upper_limit;
   return rmsd(psr_a.xcrd, psr_a.ycrd, psr_a.zcrd, psr_b.xcrd, psr_b.ycrd, psr_b.zcrd, cdk.masses,
-              method, lower_limit, upper_limit);
+              method, lower_limit, actual_upper_limit);
 }
 
 //-------------------------------------------------------------------------------------------------
 double rmsd(const CoordinateFrameReader &cfr_a, const CoordinateFrameReader &cfr_b,
             const ChemicalDetailsKit &cdk, const RmsdMethod method, const int lower_limit,
             const int upper_limit) {
+  coordinateBoundsCheck(lower_limit, upper_limit, cdk.natom, "rmsd");
+  const int actual_upper_limit = (upper_limit <= lower_limit) ? cdk.natom : upper_limit;
   return rmsd(cfr_a.xcrd, cfr_a.ycrd, cfr_a.zcrd, cfr_b.xcrd, cfr_b.ycrd, cfr_b.zcrd, cdk.masses,
-              method, lower_limit, upper_limit);
+              method, lower_limit, actual_upper_limit);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -198,8 +214,10 @@ double rmsd(const CoordinateFrame &cf_a, const CoordinateFrame &cf_b, const Atom
   const CoordinateFrameReader cfr_a = cf_a.data();
   const CoordinateFrameReader cfr_b = cf_b.data();
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
+  coordinateBoundsCheck(lower_limit, upper_limit, cdk.natom, "rmsd");
+  const int actual_upper_limit = (upper_limit <= lower_limit) ? cdk.natom : upper_limit;
   return rmsd(cfr_a.xcrd, cfr_a.ycrd, cfr_a.zcrd, cfr_b.xcrd, cfr_b.ycrd, cfr_b.zcrd, cdk.masses,
-              method, lower_limit, upper_limit);
+              method, lower_limit, actual_upper_limit);
 }
 
 } // namespace structure

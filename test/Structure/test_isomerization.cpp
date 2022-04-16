@@ -28,6 +28,7 @@ using omni::diskutil::PrintSituation;
 using omni::trajectory::TrajectoryKind;
 using omni::trajectory::CoordinateFileKind;
 using omni::trajectory::CoordinateSeries;
+using omni::parse::char4ToString;
 // END CHECK
 
 using omni::chemistry::ChemicalFeatures;
@@ -180,13 +181,6 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
   if (nchiral == 0) {
     return;
   }
-
-  // CHECK
-  const bool take_traj = (ps.getAtomCount() == 304);
-  CoordinateSeries<double> trpcage = (take_traj) ? CoordinateSeries<double>(ps, 1) :
-                                                   CoordinateSeries<double>();
-  // END CHECK
-  
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const ChemicalDetailsKit cdk = ag.getChemicalDetailsKit();
   const CoordinateFrameReader cfr(ps);
@@ -209,37 +203,16 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
       inverted_crd[invcpos] = psw.zcrd[cdk.mol_contents[j]];
       invcpos++;
     }
-
-    // CHECK
-    if (take_traj) {
-      trpcage.pushBack(inversion_copy);
-    }
-    // END CHECK
     
     // Record the bond and angle energies
     const double new_bond_e = evaluateBondTerms(vk, CoordinateFrameReader(inversion_copy), &sc, 0);
-
+    ubond_dev[i] = fabs(new_bond_e - orig_bond_e);
+    
     // Reverse the inversion to check that the molecule recovers its initial state
     flipChiralCenter(&inversion_copy, i, centers, protocols, inv_grp);
-    double rmsd = 0.0;
-    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
-      const size_t jatom = cdk.mol_contents[j];
-      const double dx = psw.xcrd[jatom] - psr.xcrd[jatom];
-      const double dy = psw.ycrd[jatom] - psr.ycrd[jatom];
-      const double dz = psw.zcrd[jatom] - psr.zcrd[jatom];
-      rmsd += (dx * dx) + (dy * dy) + (dz * dz);
-    }
-    rmsd = sqrt(rmsd / static_cast<double>(cdk.mol_limits[1] - cdk.mol_limits[0]));
-    repos_dev[i] = rmsd;    
+    repos_dev[i] = rmsd(ps, inversion_copy, ag, RmsdMethod::ALIGN_GEOM, cdk.mol_limits[0],
+                        cdk.mol_limits[1]);
   }
-
-  // CHECK
-  if (take_traj) {
-    //printf("The coordinate series has %2d frames.\n", trpcage.getFrameCount());
-    //trpcage.exportToFile("trpcage_frames.crd");
-  }
-  // END CHECK
-  
   const char osc = osSeparator();
   const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
   const std::string invcrd_snapshot = base_iso_path + osc + "inverted_coords.m";
