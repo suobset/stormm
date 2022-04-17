@@ -575,8 +575,7 @@ void CoordinateSeries<T>::importCoordinateSet(const PhaseSpace &ps, const int at
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void CoordinateSeries<T>::importCoordinateSet(const PhaseSpace *ps, const int frame_index) {
-  importCoordinateSet(CoordinateFrameReader(CoordinateFrameWriter(ps)), 0, ps->getAtomCount(),
-                      frame_index);
+  importCoordinateSet(CoordinateFrameReader(ps), 0, ps->getAtomCount(), frame_index);
 }
 
 //-------------------------------------------------------------------------------------------------

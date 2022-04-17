@@ -65,6 +65,7 @@ struct CoordinateFrameReader {
                         const double* invu_in, const double* boxdim_in);
   CoordinateFrameReader(const CoordinateFrameWriter &cfw);
   CoordinateFrameReader(const PhaseSpace &ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CoordinateFrameReader(const PhaseSpace *ps, HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
   /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.

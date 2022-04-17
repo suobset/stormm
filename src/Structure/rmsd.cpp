@@ -3,11 +3,6 @@
 #include "rmsd.h"
 #include "structure_utils.h"
 
-// CHECK
-#include "Topology/atomgraph_enumerators.h"
-#include "global_manipulation.h"
-// END CHECK
-
 namespace omni {
 namespace structure {
 

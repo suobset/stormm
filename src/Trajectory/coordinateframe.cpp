@@ -65,6 +65,18 @@ CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace &ps, const HybridT
 {}
 
 //-------------------------------------------------------------------------------------------------
+CoordinateFrameReader::CoordinateFrameReader(const PhaseSpace *ps, const HybridTargetLevel tier) :
+    natom{ps->getAtomCount()},
+    unit_cell{ps->getUnitCellType()},
+    xcrd{ps->getCoordinatePointer(CartesianDimension::X, TrajectoryKind::POSITIONS, tier)},
+    ycrd{ps->getCoordinatePointer(CartesianDimension::Y, TrajectoryKind::POSITIONS, tier)},
+    zcrd{ps->getCoordinatePointer(CartesianDimension::Z, TrajectoryKind::POSITIONS, tier)},
+    umat{ps->getBoxSpaceTransformPointer(tier)},
+    invu{ps->getInverseTransformPointer(tier)},
+    boxdim{ps->getBoxSizePointer(tier)}
+{}
+
+//-------------------------------------------------------------------------------------------------
 CoordinateFrame::CoordinateFrame(const int natom_in, const UnitCellType unit_cell_in) :
     file_name{std::string("")},
     frame_number{0},

@@ -25,7 +25,7 @@ void rotateAboutBond(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int atom_i,
     ycrd[mk] -= center_y;
     zcrd[mk] -= center_z;
   }
-
+  
   // Define the vector of rotation, then the matrix.  The coordinate data type is assumed to be
   // either a real numbered type (float, double), or a signed integral type (int, long long int),
   // a fact which will be enforced by the CoordinateSeries object, the only templated coordinate
@@ -68,7 +68,7 @@ void rotateAboutBond(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const int atom_i,
                                     (dx * dz * (1.0 - cos_ra)) + (dy * sin_ra),
                                     (dy * dz * (1.0 - cos_ra)) - (dx * sin_ra),
                                     cos_ra + (dz * dz * (value_one - cos_ra)) };
-
+  
   // Restore the original imaging and location of the bond atoms
   xcrd[atom_j] = center_x;
   ycrd[atom_j] = center_y;
