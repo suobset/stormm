@@ -1,5 +1,6 @@
 #include "systemcache.h"
 #include "FileManagement/file_listing.h"
+#include "Math/summation.h"
 #include "Parsing/parse.h"
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
@@ -13,6 +14,8 @@ using omni::diskutil::splitPath;
 using omni::energy::evaluateBondTerms;
 using omni::energy::evaluateAngleTerms;
 using omni::energy::ScoreCard;
+using omni::math::prefixSumInPlace;
+using omni::math::PrefixSumType;
 using omni::namelist::MoleculeSystem;
 using omni::parse::findStringInVector;
 using omni::topology::ValenceKit;
@@ -20,10 +23,8 @@ using omni::trajectory::detectCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
-    topology_cache{},
-    coordinates_cache{},
-    topology_indices{},
-    example_indices{}
+    topology_cache{}, coordinates_cache{}, topology_indices{}, example_indices{}, topology_cases{},
+    topology_case_bounds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -330,6 +331,23 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       example_indices[top_idx] = i;
     }
   }
+
+  // Make a list of all the systems making use of each topology, plus a bounds list to navigate it
+  topology_cases.resize(system_count);
+  topology_case_bounds.resize(top_count + 1, 0);
+  for (int i = 0; i < system_count; i++) {
+    topology_case_bounds[topology_indices[i]] += 1;
+  }
+  prefixSumInPlace<int>(&topology_case_bounds, PrefixSumType::EXCLUSIVE, "SystemCache");
+  for (int i = 0; i < system_count; i++) {
+    const int case_idx = topology_case_bounds[topology_indices[i]];
+    topology_cases[case_idx] = i;
+    topology_case_bounds[topology_indices[i]] = case_idx + 1;
+  }
+  for (int i = top_count; i > 0; i--) {
+    topology_case_bounds[i] = topology_case_bounds[i - 1];
+  }
+  topology_case_bounds[0] = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -507,5 +525,21 @@ std::vector<PhaseSpace>& SystemCache::getCoordinateReference() {
   return coordinates_cache;
 }
 
+//-------------------------------------------------------------------------------------------------
+int SystemCache::getTopologyCaseCount(const int topology_index) const {
+  return topology_case_bounds[topology_index + 1] - topology_case_bounds[topology_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> SystemCache::getTopologicalCases(const int topology_index) const {
+  const int llim = topology_case_bounds[topology_index];
+  const int hlim = topology_case_bounds[topology_index + 1];
+  std::vector<int> result(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
+    result[i - llim] = topology_cases[i];
+  }
+  return result;
+}
+                                      
 } // namespace synthesis
 } // namespace omni

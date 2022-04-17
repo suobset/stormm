@@ -10,16 +10,8 @@
 #include "chemical_features.h"
 #include "indigo.h"
 
-// CHECK
-#include "Parsing/parse.h"
-// END CHECK
-
 namespace omni {
 namespace chemistry {
-
-// CHECK
-using parse::char4ToString;
-// END CHECK
   
 using card::HybridKind;
 using topology::TorsionKind;

@@ -134,8 +134,17 @@ public:
   std::vector<PhaseSpace>& getCoordinateReference();
   /// \}
 
-  /// \brief Get the indexing of a given 
-  
+  /// \brief Get the number of systems described by a topology of the given index in this cache.
+  ///
+  /// \param topology_index  The index of the topology of interest
+  int getTopologyCaseCount(int topology_index) const;
+
+  /// \brief Get a list of indices for all systems in the cache described by the topology of
+  ///        interest.
+  ///
+  /// \param topology_index  The index of the topology of interest
+  std::vector<int> getTopologicalCases(int topology_index) const;
+
 private:
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.
@@ -153,6 +162,15 @@ private:
   /// Each topology describes one or more systems in the cache.  This array will store the index
   /// of a coordinate set which serves as an example of each topology.
   std::vector<int> example_indices;
+
+  /// Locations of all systems using a given topology.  This list is accessed using the bounds
+  /// array in the following member variable: the content between indices given by elements [k]
+  /// and [k + 1] of the bounds array shows all systems using the kth topology in the cache's
+  /// list.
+  std::vector<int> topology_cases;
+
+  /// Bounds array for topology_cases above
+  std::vector<int> topology_case_bounds;
 };
   
 } // namespace synthesis

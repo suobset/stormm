@@ -4,6 +4,8 @@
 
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
+#include "DataTypes/common_types.h"
+#include "Math/rounding.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/coordinate_series.h"
@@ -15,6 +17,8 @@ namespace structure {
 
 using chemistry::ChiralInversionProtocol;
 using chemistry::RotatorGroup;
+using data_types::isSignedIntegralScalarType;
+using math::roundUp;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using topology::AtomGraph;
@@ -33,30 +37,41 @@ using trajectory::PhaseSpaceWriter;
 ///        manipulations.
 ///
 /// Overloaded:
-///   - Take the X, Y, and Z particle coordinates directly
-///   - Take a CoordinateFrame or writeable abstract for the coordinates
-///   - Take a PhaseSpace object or writeable abstract for the coordinates
+///   - Take the X, Y, and Z particle coordinates directly, in a templated function that will
+///     handle the fixed-precision conversions internally if ndeed
+///   - Take a CoordinateFrame, PhaseSpace, PhaseSpaceSynthesis, or CoordinateSeries object, or
+///     any of their writeable abstracts, for the coordinates
 ///
-/// \param xcrd            Cartesian X coordinates of particles
-/// \param ycrd            Cartesian Y coordinates of particles
-/// \param zcrd            Cartesian Z coordinates of particles
-/// \param cf              Coordinates to manipulate (will be modified upon return)
-/// \param cfw             CoordianteFrame writer abstract
-/// \param ps              PhaseSpace object with coordinates, velocities, and forces (the
-///                        coordinates will be modified upon return)
-/// \param psw             PhaseSpace writer abstract
-/// \param psynth          Collection of systems, with coordinates, velocities, and forces
-///                        represented in fixed precision
-/// \param psynthw         PhaseSpaceSynthesis writer abstract
-/// \param atom_i          Root of the rotatable bond
-/// \param atom_j          Second atom of the rotatable bond.
-/// \param moving_atoms    Atoms branching from atom_j and distal to atom_i.  These will rotate.
-/// \param rotation_angle  The angle about which to rotate atoms indexed in moving_atoms.  The
-///                        angle is oriented by the right hand rule with one's hand on atom_i and
-///                        thumb pointed towards atom_j.
+/// \param xcrd                    Cartesian X coordinates of particles
+/// \param ycrd                    Cartesian Y coordinates of particles
+/// \param zcrd                    Cartesian Z coordinates of particles
+/// \param cf                      Coordinates to manipulate (will be modified upon return)
+/// \param cfw                     CoordianteFrame writer abstract
+/// \param ps                      PhaseSpace object with coordinates, velocities, and forces (the
+///                                coordinates will be modified upon return)
+/// \param psw                     PhaseSpace writer abstract
+/// \param psynth                  Collection of systems, with coordinates, velocities, and forces
+///                                represented in fixed precision
+/// \param psynthw                 PhaseSpaceSynthesis writeable abstract
+/// \param cs                      Collection of many replicas of one system, coordinates only
+/// \param csw                     CoordinateSeries writeable abstract
+/// \param system_index            System of interest, if coordinates come in a PhaseSpaceSynthesis
+/// \param frame_index             Frame of interest, if coordinates come in a CoordinateSeries
+/// \param atom_i                  Root of the rotatable bond
+/// \param atom_j                  Second atom of the rotatable bond.
+/// \param moving_atoms            Atoms branching from atom_j and distal to atom_i.  These will
+///                                rotate.
+/// \param rotation_angle          The angle about which to rotate atoms indexed in moving_atoms.
+///                                The angle is oriented by the right hand rule with one's hand on
+///                                atom_i and thumb pointed towards atom_j.
+/// \param globalpos_scale_factor  Position scaling factor for coordinates, if the coordinates
+///                                originated in a PhaseSpaceSynthesis or CoordinateSeries using
+///                                an integer representation
 /// \{
-void rotateAboutBond(double* xcrd, double* ycrd, double* zcrd, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, double rotation_angle);
+template <typename Tcoord, typename Tcalc>
+void rotateAboutBond(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, Tcalc rotation_angle,
+                     Tcalc globalpos_scale_factor = 1.0);
 
 void rotateAboutBond(CoordinateFrame *cf, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, double rotation_angle);
@@ -76,15 +91,53 @@ void rotateAboutBond(PsSynthesisWriter psynthw, int system_index, int atom_i, in
 void rotateAboutBond(PhaseSpaceSynthesis *psynth, int system_index, int atom_i, int atom_j,
                      const std::vector<int> &moving_atoms, double rotation_angle);
 
-void rotateAboutBond(CoordinateSeriesWriter<double> csw, int frame_index, int atom_i, int atom_j,
-                     const std::vector<int> &moving_atoms, double rotation_angle);
+template <typename Tcoord, typename Tcalc>
+void rotateAboutBond(CoordinateSeries<Tcoord> *cs, int frame_index, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, Tcalc rotation_angle);
+
+template <typename Tcoord, typename Tcalc>
+void rotateAboutBond(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int atom_i, int atom_j,
+                     const std::vector<int> &moving_atoms, Tcalc rotation_angle);
 /// \}
 
 /// \brief Rotate two branches of a chiral center 180 degrees, so as to invert the center.  
-void flipChiralCenter(double* xcrd, double* ycrd, double* zcrd, int center_idx,
+///
+/// Overloaded:
+///   - Take the X, Y, and Z particle coordinates directly, in a templated function that will
+///     handle the fixed-precision conversions internally if ndeed
+///   - Take a CoordinateFrame or writeable abstract for the coordinates
+///   - Take a PhaseSpace object or writeable abstract for the coordinates
+///
+/// \param xcrd                    Cartesian X coordinates of particles
+/// \param ycrd                    Cartesian Y coordinates of particles
+/// \param zcrd                    Cartesian Z coordinates of particles
+/// \param cf                      Coordinates to manipulate (will be modified upon return)
+/// \param cfw                     CoordianteFrame writer abstract
+/// \param ps                      PhaseSpace object with coordinates, velocities, and forces (the
+///                                coordinates will be modified upon return)
+/// \param psw                     PhaseSpace writer abstract
+/// \param psynth                  Collection of systems, with coordinates, velocities, and forces
+///                                represented in fixed precision
+/// \param psynthw                 PhaseSpaceSynthesis writer abstract
+/// \param system_index            System of interest, if coordinates come in a PhaseSpaceSynthesis
+/// \param frame_index             Frame of interest, if coordinates come in a CoordinateSeries
+/// \param center_idx              Index of the chiral center from within the following list
+/// \param chiral_centers          List of chiral centers in the molecule
+/// \param chiral_protocols        Instructions for how to invert each chiral center
+/// \param inversion_groups        List of anchor atom and moving atoms which, combined with the
+///                                information in chiral_protocols, set the atoms that move during
+///                                a chiral center inversion
+/// \param globalpos_scale_factor  Position scaling factor for coordinates, if the coordinates
+///                                originated in a PhaseSpaceSynthesis or CoordinateSeries using
+///                                an integer representation
+/// \{
+
+template <typename Tcoord, typename Tcalc>
+void flipChiralCenter(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, int center_idx,
                       const std::vector<int> &chiral_centers,
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
-                      const std::vector<RotatorGroup> &inversion_groups);
+                      const std::vector<RotatorGroup> &inversion_groups,
+                      Tcalc globalpos_scale_factor = 1.0);
 
 void flipChiralCenter(CoordinateFrame *cf, int center_idx,
                       const std::vector<int> &chiral_centers,
@@ -114,7 +167,22 @@ void flipChiralCenter(PhaseSpaceSynthesis *psynth, int system_index, int center_
                       const std::vector<ChiralInversionProtocol> &chiral_protocols,
                       const std::vector<RotatorGroup> &inversion_groups);
 
+template <typename Tcoord, typename Tcalc>
+void flipChiralCenter(CoordinateSeries<Tcoord> *cs, int frame_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
+
+template <typename Tcoord, typename Tcalc>
+void flipChiralCenter(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int center_idx,
+                      const std::vector<int> &chiral_centers,
+                      const std::vector<ChiralInversionProtocol> &chiral_protocols,
+                      const std::vector<RotatorGroup> &inversion_groups);
+/// \}
+  
 } // namespace structure
 } // namespace omni
+
+#include "isomerization.tpp"
 
 #endif
