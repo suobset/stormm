@@ -1,3 +1,4 @@
+#include <cmath>
 #include "../../../src/Constants/scaling.h"
 #include "../../../src/Constants/symbol_values.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
@@ -10,10 +11,6 @@
 #include "../../../src/Trajectory/coordinate_series.h"
 #include "user_settings.h"
 #include "setup.h"
-
-// CHECK
-#include "../../../src/FileManagement/file_listing.h"
-// END CHECK
 
 namespace conf_app {
 namespace setup {
@@ -36,10 +33,15 @@ using omni::trajectory::CoordinateFrameReader;
 using omni::trajectory::CoordinateSeries;
 using omni::trajectory::CoordinateSeriesWriter;
 
-// CHECK
-using omni::diskutil::getBaseName;
-// END CHECK
+//-------------------------------------------------------------------------------------------------
+double getLogOfPossibilities(const int ncases, const ChemicalFeatures &chemfe,
+                             const ConformerControls &conf_input) {
+  const int nrot_bond = std::min(chemfe.getRotatableBondCount(),
+                                 conf_input.getRotatableBondLimit());
+  const int nbond_rotations = conf_input.getRotationSampleCount();
   
+}
+
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
                                      StopWatch *tm) {
@@ -60,22 +62,39 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
                              MapRotatableGroups::YES);
   }
   tm->assignTime(2);
-
-  // CHECK
-  printf("There are %d topologies and %d systems.\n", ntop, nsys);
-  // END CHECK
   
   // Loop over all systems, grouping those with the same topology into a coherent group of
   // proto-conformers for coarse-grained sampling of rotatable bonds and chiral centers.
   const int nbond_rotations = conf_input.getRotationSampleCount();
-  int nconformer = 0;
+  int nneighborhood = 0;
   for (int i = 0; i < ntop; i++) {
-
-    // Determine the number of conformers in the coarse-grained search.  This includes bond
-    // rotation, chiral inversions, and multiple replicas of the compound in the list of starting
-    // coordinates.
+    
+    // Determine the combinatorial number of conformers that could populate the coarse-grained
+    // search.  This includes bond rotation, chiral inversions, and multiple replicas of the
+    // compound in the list of starting coordinates.
     const int nrot_bond = std::min(chemfe_list[i].getRotatableBondCount(),
                                    conf_input.getRotatableBondLimit());
+    double ln_choices = log(ncases);
+    if (nrot_bond > 0 && nbond_rotations > 0) {
+      ln_choices += nrot_bond * log(nbond_rotations);
+    }
+    const int nchiral = (conf_input.sampleChirality()) ? chemfe_list[i].getChiralCenterCount() : 0;
+    if (nchiral > 0) {
+      int np2 = 0;
+      for (int j = 0; j < nchiral; j++) {
+        switch (chiral_protocols[j]) {
+        case ChiralInversionProtocol::ROTATE:
+        case ChiralInversionProtocol::REFLECT:
+          np2++;
+          break;
+        case ChiralInversionProtocol::DO_NOT_INVERT:
+          break;
+        }
+      }
+      ln_choices += np2 * log(2.0);
+    }
+    
+    
     const int ncases = sc.getTopologyCaseCount(i);
     const int bond_rotation_reps = nrot_bond * nbond_rotations;
     int nproto_conf = ncases * bond_rotation_reps;
@@ -84,15 +103,6 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       const std::vector<ChiralInversionProtocol> chiral_protocols;
       const int nchiral = chemfe_list[i].getChiralCenterCount();
       for (int j = 0; j < nchiral; j++) {
-        switch (chiral_protocols[j]) {
-        case ChiralInversionProtocol::ROTATE:
-        case ChiralInversionProtocol::REFLECT:
-          nproto_conf *= 2;
-          nchiral_reps *= 2;
-          break;
-        case ChiralInversionProtocol::DO_NOT_INVERT:
-          break;
-        }
         if (nproto_conf > conf_input.getSystemTrialCount()) {
           break;
         }
@@ -117,7 +127,8 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     // sample each permutation, sample them all.  Otherwise, perform a round-robin sampling,
     // explicitly sampling each rotatable bond or chiral inversion in series, with random sampling
     // of other rotatable bonds and chiral centers.
-    
+    if (
+        
     // Manipulate this coordinate series using bond rotations as well as chiral inversions.
     // Compute the RMSD matrix and determine a set of diverse conformations.  Cull the results
     // to eliminate ring stabs or severe clashes between tetiary or quaternary atoms.

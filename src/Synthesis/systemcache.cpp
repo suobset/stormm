@@ -272,6 +272,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     if (top_idx >= current_topology_holdings.size()) {
       try {
         topology_cache.push_back(AtomGraph(sysvec[i].getTopologyFileName()));
+        current_topology_holdings.push_back(sysvec[i].getTopologyFileName());
         top_idx = topology_cache.size() - 1LLU;
         topology_ok = true;
       }

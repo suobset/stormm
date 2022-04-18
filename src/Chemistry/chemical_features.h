@@ -323,7 +323,7 @@ public:
   /// \param mol_index  The molecule for which to obtain chiral center inversion groups
   ///                   system may contain more than one molecule)
   std::vector<RotatorGroup> getChiralInversionGroups() const;
-
+  
   /// \brief Get the means for inverting one or more chiral centers.
   ///
   /// Overloaded:
@@ -358,6 +358,7 @@ private:
   int hbond_acceptor_count;    ///< Number of hydrogen bond acceptors, across all molecules
   int chiral_center_count;     ///< Number of chiral centers in the topology
   int rotatable_bond_count;    ///< Number of fully rotatable single bonds
+  int cis_trans_bond_count;    ///< Number of cis-trans invertible double bonds
   int double_bond_count;       ///< Number of detected double bonds
   int triple_bond_count;       ///< Number of detected triple bonds
   int max_ring_size;           ///< The maximum size of a ring, based on the size of a long long
@@ -433,6 +434,14 @@ private:
   /// twisting about the rotatable bond.
   Hybrid<int> rotatable_group_bounds;
 
+  /// List of atoms involved in cis-trans isomerization about relevant double bonds.  The format
+  /// follows rotatable_groups, above.
+  Hybrid<int> cis_trans_groups;
+
+  /// Bounds array for cis_trans_groups.  The format and size considerations follow form
+  /// rotatable_group_bounds, above.
+  Hybrid<int> cis_trans_group_bounds;
+  
   /// List of atoms that move (by a C2 symmetry operation) to invert a chiral center.  These groups
   /// are chosen to minimize the number of moving atoms involved in flipping a chiral center.  For
   /// some molecules like proteins, the list can get very long, so a flag is provided for disabling
@@ -576,6 +585,8 @@ private:
 
   /// \brief Find rotatable bonds in the system, those with bond order of 1.0 and nontrivial groups
   ///        sprouting from either end, and return a vector of the atom indices at either end.
+  ///        This routine also traces cis- and trans-groups that can invert if the bond "rotates"
+  ///        180 degrees.
   ///
   /// \param vk                          Valence term abstract from the original topology
   /// \param cdk                         Chemical details of the system (for atomic numbers)
@@ -587,12 +598,19 @@ private:
   ///                                    bond, including the endpoints of the bond itself in the
   ///                                    first two slots.  This vector is assembled and returned.
   /// \param tmp_rotatable_group_bounds  Bounds array for tmp_rotatable_groups, assembled and
+  ///                                    returned
+  /// \param tmp_cis_trans_groups        List of all atoms involved in flipping the cis- or trans-
+  ///                                    nature of a double bond.  This vector is assembled and
   ///                                    returned.
+  /// \param tmp_cis_trans_group_bounds  Bounds array for tmp_cis_trans_groups, assembled and
+  ///                                    returned
   void findRotatableBonds(const ValenceKit<double> &vk, const ChemicalDetailsKit &cdk,
                           const NonbondedKit<double> &nbk, const std::vector<int> &ring_atoms,
                           const std::vector<int> &ring_atom_bounds,
                           std::vector<int> *tmp_rotatable_groups,
-                          std::vector<int> *tmp_rotatable_group_bounds);
+                          std::vector<int> *tmp_rotatable_group_bounds,
+                          std::vector<int> *tmp_cis_trans_groups,
+                          std::vector<int> *tmp_cis_trans_group_bounds);
 
   /// \brief Find invertible groups in the system, those comprising two branches of a chiral center
   ///        that have the fewest possible atoms.  The number of invertible groups is the number of
@@ -632,6 +650,21 @@ private:
   ///        the copy constructor and copy assignment operator.
   void repairPointers();
 };
+
+/// \brief Concatenate the lists of rotating groups that define rotatable bonds as well as
+///        cis-trans isomerization.
+///
+/// \param bond_endpoints    List of endpoints for the relevant bonds, root atom (x member) and
+///                          pivot atom (y member)
+/// \param moving_lists      The list of lists for minimal rotating groups pertaining to all
+///                          relevant bonds (rotatable or cis-trans invertible)
+/// \param tmp_groups        Concatenated list of atoms involved in each rotatable group,
+///                          assembled and returned
+/// \param tmp_group_bounds  Bounds of rotatable or cis-trans invertible groups, assembled and
+///                          returned
+void unpackRotatableGroups(const std::vector<int2> &bond_endpoints,
+                           const std::vector<std::vector<int>> &moving_lists,
+                           std::vector<int> *tmp_groups, std::vector<int> *tmp_group_bounds);
 
 /// \brief Score the four branches of a chiral molecule.  This is called by the findChiralCenters()
 ///        member function of the ChemicalFeatures object, but written as a free function as it
