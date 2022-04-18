@@ -1102,19 +1102,19 @@ std::vector<std::string> separateText(const TextFile &tf,
 int findStringInVector(const std::vector<std::string> &vec, const std::string &query) {
 
   // Check for simple problems
+  const size_t qsize = query.size();
   const int vsize = vec.size();
   if (vsize == 0) {
-    rtErr("Vector contains no data to search.", "findStringInVector");
-  }
-  const size_t qsize = query.size();
-  if (qsize == 0) {
-    rtErr("Search string is empty.", "findStringInVector");
+    return 0;
   }
 
   // Peek at the first few characters to see if a match is possible.
   // There is at least one character in the query string.  Do a deeper search if warranted.
   const char first_char = query[0];  
   for (int i = 0; i < vsize; i++) {
+    if (qsize == 0LLU && vec[i].size() == qsize) {
+      return i;
+    }
     if (vec[i].size() == qsize && vec[i][0] == first_char && vec[i] == query) {
       return i;
     }
