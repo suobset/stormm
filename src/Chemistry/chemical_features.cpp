@@ -2215,6 +2215,11 @@ int ChemicalFeatures::getRotatableBondCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int ChemicalFeatures::getCisTransBondCount() const {
+  return cis_trans_bond_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<uint> ChemicalFeatures::getRingMask(const int min_ring_size,
                                                 const int max_ring_size) const {
   const int n_bits = sizeof(uint) * 8;
@@ -2445,6 +2450,25 @@ ChemicalFeatures::getRotatableBondGroups(const int cutoff, const int mol_index) 
               return a.rotatable_atoms.size() > b.rotatable_atoms.size();
             });
   
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<RotatorGroup> ChemicalFeatures::getCisTransIsomerizationGroups() const {
+  std::vector<RotatorGroup> result(cis_trans_bond_count);
+  const int* rg_ptr = cis_trans_groups.data();
+  for (int i = 0; i < cis_trans_bond_count; i++) {
+    const int llim = cis_trans_group_bounds.readHost(i);
+    const int hlim = cis_trans_group_bounds.readHost(i + 1);
+    result[i].root_atom  = rg_ptr[llim];
+    result[i].pivot_atom = rg_ptr[llim + 1];
+    result[i].rotatable_atoms.resize(hlim - llim - 2);
+    int k = 0;
+    for (int j = llim + 2; j < hlim; j++) {
+      result[i].rotatable_atoms[k] = rg_ptr[j];
+      k++;
+    }
+  }
   return result;
 }
 

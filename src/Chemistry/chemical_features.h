@@ -229,7 +229,10 @@ public:
 
   /// \brief Get the number of rotatable bonds in the system.
   int getRotatableBondCount() const;
-  
+
+  /// \brief Get the number of bonds involved in cis-trans isomerization.
+  int getCisTransBondCount() const;
+
   /// \brief Return a mask of rings within a given size range for this system.
   ///
   /// \param min_ring_size  The minimum number of atoms in the rings that will be reported
@@ -309,6 +312,11 @@ public:
   std::vector<RotatorGroup> getRotatableBondGroups(int cutoff, int mol_index = 0) const;
   /// \}
 
+  /// \brief Get the moving atom groups and bond endpoints involved in cis-trans isomerization.
+  ///        This function clones the simple form of getRotatableBondGroups but the reliance on
+  ///        so many different arrays and counters makes it fruitless to abstract.
+  std::vector<RotatorGroup> getCisTransIsomerizationGroups() const;
+  
   /// \brief Get the group of atoms that can invert a chiral center by a C2 symmetry rotation.
   ///        This re-uses the RotatorGroup struct, this time casting the root and pivot atoms as
   ///        the origins of the heaviest and second-heaviest branches, respectively, which will
