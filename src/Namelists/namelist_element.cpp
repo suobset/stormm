@@ -42,6 +42,8 @@ NamelistElement::NamelistElement(const std::string &keyword_in, const NamelistTy
   template_strings{},
   establishment{setEstablishment(std::vector<std::string>(1, default_in))[0]},
   template_establishment{},
+  template_requirements{},
+  instance_establishment{},
   sub_key_found{}
 {
   // Check that the keyword is valid
@@ -124,7 +126,8 @@ NamelistElement::NamelistElement(const std::string keyword_in,
                                  const std::vector<std::string> &default_list,
                                  const DefaultIsObligatory obligate, const InputRepeats rep_in,
                                  const std::string &help_in,
-                                 const std::vector<std::string> &sub_help_in) :
+                                 const std::vector<std::string> &sub_help_in,
+                                 const std::vector<SubkeyRequirement> &template_requirements_in) :
   label{keyword_in},
   kind{NamelistType::STRUCT},
   policy{ExceptionResponse::WARN},
@@ -145,11 +148,14 @@ NamelistElement::NamelistElement(const std::string keyword_in,
   template_ints{vectorStrtol(default_list, ExceptionResponse::SILENT)},
   template_reals{vectorStrtod(default_list, ExceptionResponse::SILENT)},
   template_strings{default_list},
-  establishment{InputStatus::DEFAULT},
+  establishment{InputStatus::MISSING},
   template_establishment{setEstablishment(default_list)},
+  template_requirements{template_requirements_in},
+  instance_establishment{static_cast<size_t>(next_entry_index + 1) * sub_keys_in.size(),
+                         InputStatus::MISSING},
   sub_key_found{std::vector<bool>(sub_keys_in.size(), false)}
 {
-  // Check that this namelist element is a struct
+  // Check that this namelist element is a struct.
   switch (kind) {
   case NamelistType::INTEGER:
   case NamelistType::REAL:
@@ -160,25 +166,30 @@ NamelistElement::NamelistElement(const std::string keyword_in,
     break;
   }
 
-  // Check that there is a member keyword for every member kind
+  // Check that there is a member keyword for every member kind.
   if (sub_keys.size() != sub_kinds.size()) {
     rtErr("The STRUCT keywords \"" + label + "\" has " + std::to_string(sub_keys.size()) +
           " sub-keys associated with it and " + std::to_string(sub_kinds.size()) +
           " data types for them.", "NamelistElement");
   }
 
+  // Fill out any remaining STRUCT template requirements--assume that all fields are required.
+  for (size_t i = template_requirements.size(); i < sub_kinds.size(); i++) {
+    template_requirements.push_back(SubkeyRequirement::REQUIRED);
+  }
+  
   // If the right number of help messages for sub-key was not provided, fill in that array with
-  // default values
+  // default values.
   for (size_t i = sub_help_messages.size(); i < sub_keys.size(); i++) {
     sub_help_messages.push_back("No description provided");
   }
 
-  // Fill out the remainder of the template establishment as missing a default value
+  // Fill out the remainder of the template establishment as missing a default value.
   for (size_t i = default_list.size(); i < sub_keys.size(); i++) {
     template_establishment.push_back(InputStatus::MISSING);
   }
 
-  // Resize vector storage and set default values
+  // Resize vector storage and set default values.
   sub_int_values.resize(2 * template_size);
   sub_real_values.resize(2 * template_size);
   sub_string_values.resize(2 * template_size);
@@ -439,13 +450,14 @@ std::vector<std::string> NamelistElement::getStringValue(const std::string &sub_
 }
 
 //-------------------------------------------------------------------------------------------------
-InputStatus NamelistElement::getEstablishment(const std::string &sub_key_query) const {
+InputStatus NamelistElement::getEstablishment(const std::string &sub_key_query,
+                                              const int repeat_no) const {
   if (sub_key_query.size() > 0) {
 
     // Need to use the sub-key names for the search, as the sub-key type is not known
     const size_t member_index = findStringInVector(sub_keys, sub_key_query);
     if (member_index < sub_keys.size()) {
-      return template_establishment[member_index];
+      return instance_establishment[(repeat_no * template_size) + member_index];
     }
     else {
       rtErr("No sub-key named \"" + sub_key_query + "\" is associated with STRUCT keyword \"" +
@@ -730,18 +742,24 @@ void NamelistElement::resizeBuffer() {
     string_values.resize(next_entry_index + 1);
     break;
   case NamelistType::STRUCT:
-    sub_int_values.resize(template_size * (next_entry_index + 1));
-    sub_real_values.resize(template_size * (next_entry_index + 1));
-    sub_string_values.resize(template_size * (next_entry_index + 1));
+    {
+      const size_t current_size = template_size * next_entry_index;
+      const size_t next_size = template_size * (next_entry_index + 1);
+      sub_int_values.resize(next_size);
+      sub_real_values.resize(next_size);
+      sub_string_values.resize(next_size);
+      instance_establishment.resize(next_size);
 
-    // STRUCT sub-keys must be initialized to their default values, as they may not all get set
-    // when a new STRUCT is added to the list of entries.  Also reset the read counters for the
-    // STRUCT at hand.
-    for (int i = 0; i < template_size; i++) {
-      sub_int_values[(template_size * next_entry_index) + i] = template_ints[i];
-      sub_real_values[(template_size * next_entry_index) + i] = template_reals[i];
-      sub_string_values[(template_size * next_entry_index) + i] = template_strings[i];
-      sub_key_found[i] = false;
+      // STRUCT sub-keys must be initialized to their default values, as they may not all get set
+      // when a new STRUCT is added to the list of entries.  Also reset the read counters for the
+      // STRUCT at hand.
+      for (int i = 0; i < template_size; i++) {
+        sub_int_values[current_size + i] = template_ints[i];
+        sub_real_values[current_size + i] = template_reals[i];
+        sub_string_values[current_size + i] = template_strings[i];
+        instance_establishment[current_size + i] = InputStatus::MISSING;
+        sub_key_found[i] = false;
+      }
     }
     break;
   }

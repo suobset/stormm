@@ -8,6 +8,7 @@ namespace conf_app {
 namespace user_input {
 
 using omni::constants::CaseSensitivity;
+using omni::namelist::InputStatus;
 using omni::namelist::NamelistElement;
 using omni::namelist::NamelistType;
 using omni::namelist::readNamelist;
@@ -19,8 +20,8 @@ using omni::parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
 ConformerControls::ConformerControls(const ExceptionResponse policy_in) :
-    policy{policy_in}, common_atom_mask{std::string("")}, sample_chirality{false},
-    sample_cis_trans{false}, prevent_hbonds{false},
+    policy{policy_in}, common_atom_mask{std::string("")}, anchor_conformation{std::string("")},
+    sample_chirality{false}, sample_cis_trans{false}, prevent_hbonds{false},
     running_states{default_conf_running_states},
     final_states{default_conf_final_states},
     rotation_samples{default_conf_rotation_samples},
@@ -35,7 +36,12 @@ ConformerControls::ConformerControls(const TextFile &tf, int *start_line,
     ConformerControls(policy_in)
 {
   const NamelistEmulator t_nml = conformerInput(tf, start_line, policy);
-  common_atom_mask = t_nml.getStringValue("commonmask");
+  if (t_nml.getKeywordStatus("commonmask") != InputStatus::MISSING) {
+    common_atom_mask = t_nml.getStringValue("commonmask");
+  }
+  if (t_nml.getKeywordStatus("anchor_conf") != InputStatus::MISSING) {
+    anchor_conformation = t_nml.getStringValue("anchor_conf");
+  }
   sample_chirality = strcmpCased(t_nml.getStringValue("sample_chirality"), "true",
                                  CaseSensitivity::NO);
   sample_cis_trans = strcmpCased(t_nml.getStringValue("sample_cis_trans"), "true",
@@ -234,7 +240,8 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line,
                                 const ExceptionResponse policy) {
   NamelistEmulator t_nml("conformer", CaseSensitivity::AUTOMATIC, policy,
                          "Collects instructions for conformer sampling in OMNI.");
-  t_nml.addKeyword(NamelistElement("commonmask", NamelistType::STRING, "MISSING"));
+  t_nml.addKeyword(NamelistElement("commonmask", NamelistType::STRING, std::string("")));
+  t_nml.addKeyword(NamelistElement("anchor_conf", NamelistType::STRING, std::string("")));
   t_nml.addKeyword(NamelistElement("sample_chirality", NamelistType::STRING,
                                    std::string(default_conf_chirality)));
   t_nml.addKeyword(NamelistElement("sample_cis_trans", NamelistType::STRING,

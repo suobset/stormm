@@ -99,13 +99,14 @@ InputStatus NamelistEmulator::getKeywordStatus(const std::string &keyword_query)
 
 //-------------------------------------------------------------------------------------------------
 InputStatus NamelistEmulator::getKeywordStatus(const std::string &keyword_query,
-                                               const std::string &sub_key) const {
+                                               const std::string &sub_key,
+                                               const int repeat_no) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getKeywordEntries");
   }
-  return keywords[p_index].getEstablishment(sub_key);
+  return keywords[p_index].getEstablishment(sub_key, repeat_no);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -445,20 +446,59 @@ void NamelistEmulator::triggerResizeBuffer(const std::string &key) {
     if (keywords[param_index].kind == NamelistType::STRUCT) {
       bool advance = false;
       bool problem = false;
+      const int est_offset = keywords[param_index].next_entry_index *
+                             keywords[param_index].template_size;
       for (int i = 0; i < keywords[param_index].template_size; i++) {
-        if (keywords[param_index].sub_key_found[i] == false &&
-            keywords[param_index].template_establishment[i] == InputStatus::MISSING) {
+        const size_t eopi = est_offset + i;
+        if (keywords[param_index].sub_key_found[i] == false) {
 
-          // Issue alerts until the entire STRUCT has been examined, then trigger a runtime error
-          rtAlert("Incomplete STRUCT entry for keyword \"" + key + "\" of namelist \"" + title +
-                  "\": sub-key \"" + keywords[param_index].sub_keys[i] + "\" does not have a "
-                  "user specification or a default value.", "NamelistEmulator",
-                  "triggerResizeBuffer");
-          problem = true;
+          // The subkey was not specified by the user.  Apply the template default, if available,
+          // or issue an alert.  Continue issuing alerts until the entire STRUCT has been examined,
+          // then trigger a runtime error.
+          if (keywords[param_index].template_establishment[i] == InputStatus::MISSING) {
+            keywords[param_index].instance_establishment[eopi] = InputStatus::MISSING;
+            if (keywords[param_index].template_requirements[i] == SubkeyRequirement::REQUIRED) {
+              rtAlert("Incomplete STRUCT entry for keyword \"" + key + "\" of namelist \"" +
+                      title + "\": sub-key \"" + keywords[param_index].sub_keys[i] +
+                      "\" does not have a user specification or a default value.",
+                      "NamelistEmulator", "triggerResizeBuffer");              
+              problem = true;
+            }
+          }
+          else {
+            keywords[param_index].instance_establishment[eopi] = InputStatus::DEFAULT;
+
+            // The STRUCT keyword, as a whole, will be described as USER_SPECIFIED if any subkey
+            // for at least one instance of the keyword has been specified by the user.
+            if (keywords[param_index].establishment == InputStatus::MISSING) {
+              keywords[param_index].establishment = InputStatus::DEFAULT;
+            }
+            
+            // Without checking which type of variable this subkey pertains to, apply all of the
+            // template values for the ith position to their respective arrays.
+            const int tmp_int_default         = keywords[param_index].template_ints[i];
+            const double tmp_real_default     = keywords[param_index].template_reals[i];
+            const std::string tmp_str_default = keywords[param_index].template_strings[i];
+            keywords[param_index].sub_int_values[eopi]    = tmp_int_default;
+            keywords[param_index].sub_real_values[eopi]   = tmp_real_default;
+            keywords[param_index].sub_string_values[eopi] = tmp_str_default;
+            advance = true;
+          }
         }
-        else if (keywords[param_index].sub_key_found[i]) {
-          keywords[param_index].establishment = InputStatus::USER_SPECIFIED;
-          advance = true;
+        else {
+
+          // Check that the subkey is valid, then mark the user-specified input
+          if (keywords[param_index].template_requirements[i] == SubkeyRequirement::BOGUS) {
+            rtAlert("Situational violation in STRUCT keyword \"" + key + "\" of namelist \"" +
+                    title + "\": sub-key \"" + keywords[param_index].sub_keys[i] +
+                    "\" is bogus in this context.", "NamelistEmulator", "triggerResizeBuffer");
+            problem = true;
+          }
+          else {
+            keywords[param_index].establishment = InputStatus::USER_SPECIFIED;
+            keywords[param_index].instance_establishment[eopi] = InputStatus::USER_SPECIFIED;
+            advance = true;
+          }
         }
       }
       if (problem) {

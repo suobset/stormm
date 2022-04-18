@@ -302,9 +302,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
                                          const int localpos_scale_bits_in,
                                          const int velocity_scale_bits_in,
                                          const int force_scale_bits_in) :
-    PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getTopologyPointerCC(), heat_baths_in,
-                        pistons_in, time_step_in, globalpos_scale_bits_in, localpos_scale_bits_in,
-                        velocity_scale_bits_in, force_scale_bits_in)
+    PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getSystemTopologyPointerCC(),
+                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------

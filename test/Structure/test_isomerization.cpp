@@ -119,16 +119,8 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
                     rt_grp[i].rotatable_atoms, -2.0 * omni::symbols::pi / 3.0);
 
     // Check that the molecule was returned to its original state
-    double rmsd = 0.0;
-    for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
-      const size_t jatom = cdk.mol_contents[j];
-      const double dx = psw.xcrd[jatom] - psr.xcrd[jatom];
-      const double dy = psw.ycrd[jatom] - psr.ycrd[jatom];
-      const double dz = psw.zcrd[jatom] - psr.zcrd[jatom];
-      rmsd += (dx * dx) + (dy * dy) + (dz * dz);
-    }
-    rmsd = sqrt(rmsd / static_cast<double>(cdk.mol_limits[1] - cdk.mol_limits[0]));
-    repos_dev[i] = rmsd;
+    repos_dev[i] = rmsd(ps, rotation_copy, ag, RmsdMethod::ALIGN_GEOM, cdk.mol_limits[0],
+                        cdk.mol_limits[1]);
   }
   const char osc = osSeparator();
   const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
@@ -336,10 +328,12 @@ int main(int argc, char* argv[]) {
   CoordinateFrameWriter strfb = starfish_b.data();
   rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.0, 0.0, omni::symbols::pi / 4.0, 0,
                     strfb.natom);
-  double rms_no_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                             strfb.zcrd, nullptr, RmsdMethod::NO_ALIGN_GEOM, 0, strfa.natom);
-  double rms_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                          strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+  double rms_no_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd,
+                                             strfb.ycrd, strfb.zcrd, nullptr,
+                                             RmsdMethod::NO_ALIGN_GEOM, 0, strfa.natom);
+  double rms_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd,
+                                          strfb.ycrd, strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM,
+                                          0, strfa.natom);
   check(rms_no_align, RelationalOperator::EQUAL, Approx(0.578562967).margin(1.0e-8),
         "Positional (non-aligned) RMSD computed for coordinates pre-shifted to their respective "
         "centers of mass does not produce the expected result.");
@@ -347,10 +341,11 @@ int main(int argc, char* argv[]) {
         "positional RMSD computed for coordinates pre-shifted to their respective centers of mass "
         "does not produce the expected result.");
   translateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 5.0, 4.8, 9.7, 0, strfb.natom);
-  rms_no_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                      strfb.zcrd, nullptr, RmsdMethod::NO_ALIGN_GEOM, 0, strfa.natom);
-  rms_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+  rms_no_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                                      strfb.zcrd, nullptr, RmsdMethod::NO_ALIGN_GEOM, 0,
+                                      strfa.natom);
+  rms_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
   check(rms_no_align, RelationalOperator::EQUAL, Approx(11.935859211).margin(1.0e-8),
         "Positional (non-aligned) RMSD computed for coordinates differing in their respective "
         "centers of mass does not produce the expected result.");
@@ -358,8 +353,8 @@ int main(int argc, char* argv[]) {
         "positional RMSD computed for coordinates differing in their respective centers of mass "
         "does not produce the expected result.");
   rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.1, -0.3, -0.25, 0, strfb.natom);
-  rms_align = rmsd(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
-                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
+  rms_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd, strfb.ycrd,
+                                   strfb.zcrd, nullptr, RmsdMethod::ALIGN_GEOM, 0, strfa.natom);
   check(rms_align, RelationalOperator::EQUAL, Approx(0.0).margin(1.0e-8), "Quaternion-aligned, "
         "positional RMSD computed for coordinates differing in their respective centers of mass, "
         "one rotated a second time for more frustration, does not produce the expected result.");

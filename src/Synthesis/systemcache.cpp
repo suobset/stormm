@@ -121,6 +121,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     if (topology_covered[i]) {
       continue;
     }
+
     // First, scan to see if any other topologies share the same number of atoms.
     topology_covered[i] = true;
     int n_samesize_topology = 1;
@@ -319,7 +320,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       }
     }
   }
-
+  
   // Collect examples of all systems, taking the first system in the list to use each topology
   // as the example of coordinates for that topology.
   const int top_count = topology_cache.size();
@@ -361,10 +362,10 @@ int SystemCache::getTopologyCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int SystemCache::getTopologyIndex(const int coord_index) const {
+int SystemCache::getSystemTopologyIndex(const int coord_index) const {
   if (coord_index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(coord_index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyIndex");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getSystemTopologyIndex");
   }
   return topology_indices[coord_index];
 }
@@ -373,29 +374,59 @@ int SystemCache::getTopologyIndex(const int coord_index) const {
 int SystemCache::getCoordinateExample(const int topology_index) const {
   return example_indices[topology_index];
 }
-                                      
+
 //-------------------------------------------------------------------------------------------------
-const AtomGraph* SystemCache::getTopologyPointer(const int index) const {
+const AtomGraph* SystemCache::getTopologyPointer(const int topology_index) const {
+  if (topology_index >= static_cast<int>(topology_cache.size())) {
+    rtErr("Index " + std::to_string(topology_index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
+  }
+  return &topology_cache[topology_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<const AtomGraph*> SystemCache::getTopologyPointer() const {
+  const size_t ntop = topology_cache.size();
+  std::vector<const AtomGraph*> result(ntop);
+  for (size_t i = 0; i < ntop; i++) {
+    result[i] = &topology_cache[i];
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph& SystemCache::getTopologyReference(const int topology_index) const {
+  if (topology_index >= static_cast<int>(topology_cache.size())) {
+    rtErr("Index " + std::to_string(topology_index) + " is invalid for an array of length " +
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyReference");
+  }
+  return topology_cache[topology_index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const AtomGraph* SystemCache::getSystemTopologyPointer(const int index) const {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
+          "getSystemTopologyPointer");
   }
   const AtomGraph* tp_cache_ptr = topology_cache.data();
   return &tp_cache_ptr[topology_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraph* SystemCache::getTopologyPointer(const int index) {
+AtomGraph* SystemCache::getSystemTopologyPointer(const int index) {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyPointer");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
+          "getSystemTopologyPointer");
   }
   AtomGraph* tp_cache_ptr = topology_cache.data();
   return &tp_cache_ptr[topology_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<const AtomGraph*> SystemCache::getTopologyPointer() const {
+std::vector<const AtomGraph*> SystemCache::getSystemTopologyPointer() const {
   const size_t nsys = coordinates_cache.size();
   std::vector<const AtomGraph*> result(nsys);
   const AtomGraph* tp_data = topology_cache.data();
@@ -406,7 +437,7 @@ std::vector<const AtomGraph*> SystemCache::getTopologyPointer() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<AtomGraph*> SystemCache::getTopologyPointer() {
+std::vector<AtomGraph*> SystemCache::getSystemTopologyPointer() {
   const size_t nsys = coordinates_cache.size();
   std::vector<AtomGraph*> result(nsys);
   AtomGraph* tp_data = topology_cache.data();
@@ -417,7 +448,7 @@ std::vector<AtomGraph*> SystemCache::getTopologyPointer() {
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph*> SystemCache::getTopologyPointerCC() const {
+const std::vector<AtomGraph*> SystemCache::getSystemTopologyPointerCC() const {
   const size_t nsys = coordinates_cache.size();
   std::vector<AtomGraph*> result(nsys);
   const AtomGraph* tp_data = topology_cache.data();
@@ -428,31 +459,23 @@ const std::vector<AtomGraph*> SystemCache::getTopologyPointerCC() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-const AtomGraph& SystemCache::getTopologyReference(const int index) const {
+const AtomGraph& SystemCache::getSystemTopologyReference(const int index) const {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyReference");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
+          "getSystemTopologyReference");
   }
   return topology_cache[topology_indices[index]];
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraph& SystemCache::getTopologyReference(const int index) {
+AtomGraph& SystemCache::getSystemTopologyReference(const int index) {
   if (index >= static_cast<int>(coordinates_cache.size())) {
     rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
-          std::to_string(coordinates_cache.size()) + ".", "SystemCache", "getTopologyReference");
+          std::to_string(coordinates_cache.size()) + ".", "SystemCache",
+          "getSystemTopologyReference");
   }
   return topology_cache[topology_indices[index]];
-}
-
-//-------------------------------------------------------------------------------------------------
-const std::vector<AtomGraph>& SystemCache::getTopologyReference() const {
-  return topology_cache;
-}
-
-//-------------------------------------------------------------------------------------------------
-std::vector<AtomGraph>& SystemCache::getTopologyReference() {
-  return topology_cache;
 }
 
 //-------------------------------------------------------------------------------------------------

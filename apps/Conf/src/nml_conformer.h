@@ -105,24 +105,31 @@ struct ConformerControls {
   void validateStateCounts();
   
 private:
-  ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
-                                  ///<   abort program, WARN = warn the user, and likely reset to
-                                  ///<   the default value if one is available, SILENT = do not
-                                  ///<   warn the user, but also likely reset to the default value
-                                  ///<   if one is available.
-  std::string common_atom_mask;   ///< Mask of common core atoms, applied to all systems
-  bool sample_chirality;          ///< Flag to have chiral enantiomers sampled
-  bool sample_cis_trans;          ///< Flag to have cis-trans isomers sampled
-  bool prevent_hbonds;            ///< Flag to apply restraints that will prevent hydrogen bonds
-                                  ///<   from forming during energy minimizations
-  int running_states;             ///< Number of states to try minimizing at one time
-  int final_states;               ///< Number of final states to collect
-  int rotation_samples;           ///< Number of times to sample about a rotatable bond
-  int rotatable_bond_limit;       ///< Maximum number of rotatable bonds to explicitly sample
-  int system_trials;              ///< Maximum number of distinct minimizations to attempt with
-                                  ///<   one molecule
-  double rmsd_tolerance;          ///< Minimum mass-weighted root-mean squared deviation between
-                                  ///<   unique conformers
+  ExceptionResponse policy;         ///< Set the behavior when bad inputs are encountered.  DIE =
+                                    ///<   abort program, WARN = warn the user, and likely reset to
+                                    ///<   the default value if one is available, SILENT = do not
+                                    ///<   warn the user, but also likely reset to the default
+                                    ///<   value if one is available.
+  std::string common_atom_mask;     ///< Mask of common core atoms, applied to all systems
+  std::string anchor_conformation;  ///< The other half of the common core mask, the thing to align
+                                    ///<   core atoms against.  This anchor conformation will be
+                                    ///<   docked or placed within the receptor of interest and
+                                    ///<   must contain atoms that register in the common atom
+                                    ///<   mask.  All conformations will be aligned against this
+                                    ///<   reference in order to bias the search towards results
+                                    ///<   that fit inside of the receptor.
+  bool sample_chirality;            ///< Flag to have chiral enantiomers sampled
+  bool sample_cis_trans;            ///< Flag to have cis-trans isomers sampled
+  bool prevent_hbonds;              ///< Flag to apply restraints that will prevent hydrogen bonds
+                                    ///<   from forming during energy minimizations
+  int running_states;               ///< Number of states to try minimizing at one time
+  int final_states;                 ///< Number of final states to collect
+  int rotation_samples;             ///< Number of times to sample about a rotatable bond
+  int rotatable_bond_limit;         ///< Maximum number of rotatable bonds to explicitly sample
+  int system_trials;                ///< Maximum number of distinct minimizations to attempt with
+                                    ///<   one molecule
+  double rmsd_tolerance;            ///< Minimum mass-weighted root-mean squared deviation between
+                                    ///<   unique conformers
 };
 
 /// \brief Free function to read the &conformer namelist.  This works in analogous fashion to

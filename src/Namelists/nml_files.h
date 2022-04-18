@@ -192,20 +192,34 @@ public:
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
   ///
-  /// \param policy_in       Requested error handling behavior
-  /// \param tf              Input file translated into RAM
-  /// \param start_line      Line of the input file to begin searching for the &solvent namelist
-  /// \param report_name_in  New default name of the report file (for application-specific naming
-  ///                        conventions)
-  /// \param coord_base_in   New default base name of trajectory or other coordinate files (for
-  ///                        application-specific naming conventions)
-  /// \param coord_ext_in    New default extension of trajectory or other coordinate files (for
-  ///                        application-specific naming conventions)
+  /// \param policy_in         Requested error handling behavior
+  /// \param tf                Input file translated into RAM
+  /// \param start_line        Line of the input file to begin searching for the &solvent namelist
+  /// \param report_name_in    New default name of the report file (for application-specific
+  ///                          naming conventions)
+  /// \param coord_base_in     New default base name of trajectory or other coordinate files (for
+  ///                          application-specific naming conventions)
+  /// \param coord_ext_in      New default extension of trajectory or other coordinate files (for
+  ///                          application-specific naming conventions)
+  /// \param sys_requirements  System requirements specifications.  The -sys keyword will be
+  ///                          critical under different circumstances and has no defaults.  Some
+  ///                          situations may not require the user to specify all four of the
+  ///                          files associated with the -sys keyword, and some situations will
+  ///                          require that certain files exist in addition to merely being
+  ///                          specified.  This array can hold four critical specifiers, -p, -c,
+  ///                          -x, and -r, for "topology", "input coordinates", "trajectory", and
+  ///                          "restart / checkpoint" files, respectively, and each can accept the
+  ///                          extension "e" to indicate that the file must exist.  Conversely, a
+  ///                          "g" extension indicates that, in that particular context, the file
+  ///                          subkey is bogus and should trigger an exception consistent with
+  ///                          the stated policy (policy_in).  Default requirements are a topology
+  ///                          and input coordinates, both of which must exist.
   /// \{
   FilesControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
   FilesControls(const TextFile &tf, int *start_line,
                 ExceptionResponse policy_in = ExceptionResponse::DIE,
-                const std::vector<std::string> &alternatives = {});
+                const std::vector<std::string> &alternatives = {},
+                const std::vector<std::string> &sys_requirements = {"-pe", "-ce"});
   /// \}
 
   /// \brief Get the structure count, based on the number of free coordinate files as well as the
@@ -438,12 +452,15 @@ private:
 /// \brief Produce a namelist for specifying basic input and output files, which can take the place
 ///        of a great deal of command line input in the Amber pmemd and sander programs.
 ///
-/// \param tf          Input text file to scan immediately after the namelist has been created
-/// \param start_line  Line at which to begin scanning the input file for the namelist (this will
-///                    wrap back to the beginning of the file in search of a unique &files
-///                    namelist)
-/// \param policy      Reaction to exceptions encountered during namelist reading
+/// \param tf                Input text file to scan immediately after the namelist is created
+/// \param start_line        Line at which to begin scanning the input file for the namelist (this
+///                          will wrap back to the beginning of the file in search of a unique
+///                          &files namelist)
+/// \param policy            Reaction to exceptions encountered during namelist reading
+/// \param sys_keyword_reqs  Requirements for the subkeys of the -sys keyword (constructed based on
+///                          input to the FilesControls object that calls this function)
 NamelistEmulator filesInput(const TextFile &tf, int *start_line,
+                            const std::vector<SubkeyRequirement> &sys_keyword_reqs,
                             ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist

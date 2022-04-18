@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "Constants/behavior.h"
+#include "namelist_enumerations.h"
 
 namespace omni {
 namespace namelist {
@@ -69,7 +70,8 @@ public:
                   InputRepeats rep_in = InputRepeats::NO,
                   const std::string &help_in = std::string("No description provided"),
                   const std::vector<std::string> &sub_help_in =
-                  std::vector<std::string>(1, "No description provided"));
+                  std::vector<std::string>(1, "No description provided"),
+                  const std::vector<SubkeyRequirement> &template_requirements_in = {});
   /// \}
 
   /// \brief Get the keyword for a namelist element, i.e. nstlim in Amber &ctrl
@@ -162,7 +164,14 @@ public:
   /// \}
 
   /// \brief Report whether a value has been assigned, read from input, to this namelist element.
-  InputStatus getEstablishment(const std::string &member_key = std::string("")) const;
+  ///
+  /// \param member_key  Name of the sub-key to search if the namelist element is a STRUCT
+  /// \param repeat_no   Index number of the repeated keyword application, if applicable.  The
+  ///                    establishment of a member keyword in the fourth application of a
+  ///                    repeatable STRUCT keyword will be found in element 4 * (template_size) +
+  ///                    member_idx of the input status array.
+  InputStatus getEstablishment(const std::string &member_key = std::string(""),
+                               int repeat_no = 0) const;
 
   /// \brief Report whether an element accepts multiple values
   bool getRepeatableValueState() const;
@@ -275,6 +284,17 @@ private:
   /// multiple input values, each new instance of the struct will have multiple int, real, or
   /// string variables which need to be specified or assigned default values from the template.
   std::vector<InputStatus> template_establishment;
+
+  /// Requirement settings for each subkey in a STRUCT kind namelist element.  STRUCTS can have
+  /// optional keywords with no defaults, and for reuseable code STRUCT elements can accept
+  /// different subkey requirements in different contexts.  Subkeys can be flagged as "bogus" if,
+  /// in some context, they should not be present.
+  std::vector<SubkeyRequirement> template_requirements;
+  
+  /// Current status of each member of every application of a STRUCT kind namelist element.
+  /// Check this array to see if a particular instance of a STRUCT keyword supplied by the user
+  /// has a default, user-specified, or missing subkey value.
+  std::vector<InputStatus> instance_establishment;
 
   /// Status of sub-key searches for the next instance of a STRUCT keyword.  This is kept on hand
   /// to catch double-specification of sub-keys within one set of STRUCT input.

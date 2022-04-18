@@ -1,3 +1,4 @@
+#include "../../../src/Constants/scaling.h"
 #include "../../../src/Constants/symbol_values.h"
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/Chemistry/chemical_features.h"
@@ -10,6 +11,10 @@
 #include "user_settings.h"
 #include "setup.h"
 
+// CHECK
+#include "../../../src/FileManagement/file_listing.h"
+// END CHECK
+
 namespace conf_app {
 namespace setup {
 
@@ -18,6 +23,7 @@ using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::ChiralInversionProtocol;
 using omni::chemistry::MapRotatableGroups;
 using omni::chemistry::RotatorGroup;
+using omni::constants::warp_size_int;
 using omni::math::roundUp;
 using omni::structure::rmsd;
 using omni::structure::RmsdMethod;
@@ -29,6 +35,10 @@ using omni::trajectory::CoordinateFrame;
 using omni::trajectory::CoordinateFrameReader;
 using omni::trajectory::CoordinateSeries;
 using omni::trajectory::CoordinateSeriesWriter;
+
+// CHECK
+using omni::diskutil::getBaseName;
+// END CHECK
   
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
@@ -37,18 +47,26 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
 
   // Count the expanded number of systems
   const int ntop = sc.getTopologyCount();
+  const int nsys = sc.getSystemCount();
+  const std::vector<const AtomGraph*> system_topologies = sc.getSystemTopologyPointer();
+  const std::vector<const PhaseSpace*> system_coords    = sc.getCoordinatePointer();
+  const std::vector<const AtomGraph*> unique_topologies = sc.getTopologyPointer();
   std::vector<ChemicalFeatures> chemfe_list;
   chemfe_list.reserve(ntop);
   for (int i = 0; i < ntop; i++) {
     const int example_system_idx = sc.getCoordinateExample(i);
-    chemfe_list.emplace_back(sc.getTopologyPointer(example_system_idx),
+    chemfe_list.emplace_back(sc.getTopologyPointer(i),
                              sc.getCoordinateReference(example_system_idx),
                              MapRotatableGroups::YES);
   }
+  tm->assignTime(2);
 
+  // CHECK
+  printf("There are %d topologies and %d systems.\n", ntop, nsys);
+  // END CHECK
+  
   // Loop over all systems, grouping those with the same topology into a coherent group of
   // proto-conformers for coarse-grained sampling of rotatable bonds and chiral centers.
-  const int nsys = sc.getSystemCount();
   const int nbond_rotations = conf_input.getRotationSampleCount();
   int nconformer = 0;
   for (int i = 0; i < ntop; i++) {
@@ -81,7 +99,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       }
     }
     nproto_conf = std::min(conf_input.getSystemTrialCount(), nproto_conf);
-
+    
     // Create a series to hold the conformers resulting from the coarse-grained search.
     CoordinateSeries<float> cseries(sc.getCoordinateReference(sc.getCoordinateExample(i)),
                                     nproto_conf);
@@ -121,26 +139,22 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     }
 
     // CHECK
+#if 0
     ChemicalDetailsKit cdk = sc.getTopologyPointer(i)->getChemicalDetailsKit();
     for (int j = 0; j < ncases * bond_rotation_reps * nchiral_reps; j++) {
-      const CoordinateFrame frm_j = cseries.exportFrame(j);
-      const CoordinateFrameReader frm_jr = frm_j.data();
       for (int k = 0; k < j; k++) {
-        const CoordinateFrame frm_k = cseries.exportFrame(k);
-        const CoordinateFrameReader frm_kr = frm_k.data();
-        printf("  %9.4lf", rmsd(frm_jr, frm_kr, cdk, RmsdMethod::ALIGN_MASS));
+        const double this_rmsd = rmsd<float, float>(cseries_w, j, k, cdk, RmsdMethod::ALIGN_MASS,
+                                                    0, cdk.natom);
+        //printf("  %9.4lf", this_rmsd);
       }
-      printf("\n");
+      //printf("\n");
     }
+#endif
     // END CHECK
   }
-  tm->assignTime(2);
-
-  // CHECK
-  exit(1);
-  // END CHECK
   
   // Create lists of PhaseSpace objects and topology pointers to show how to model each of them
+#if 0
   std::vector<PhaseSpace> ps_list;
   ps_list.reserve(nconformer);
   std::vector<AtomGraph*> ag_list(nconformer);
@@ -157,6 +171,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     }
   }
   return PhaseSpaceSynthesis(ps_list, ag_list);
+#endif
 }
 
 } // namespace setup

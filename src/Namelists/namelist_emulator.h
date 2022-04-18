@@ -71,9 +71,18 @@ public:
   ///
   /// \param keyword_query  The keyword of interest
   /// \param sub_key        The keyword of interest
+  /// \param repeat_no      The number of the repetition to check for its status.  This is needed
+  ///                       only in the case of STRUCT-type keywords, as a plain INTEGER, REAL,
+  ///                       or STRING keyword will be "established" if there is but one default
+  ///                       or user-specified value given--subsequent applications of such a
+  ///                       keyword are, by construction, established (status cannot be missing).
+  ///                       In contrast, a STRUCT keyword can be specified many times, but the
+  ///                       status of its individual members may still be inquestion if not all
+  ///                       components of the STRUCT are given in each application.
   /// \{
   InputStatus getKeywordStatus(const std::string &keyword_query) const;
-  InputStatus getKeywordStatus(const std::string &keyword_query, const std::string &sub_key) const;
+  InputStatus getKeywordStatus(const std::string &keyword_query, const std::string &sub_key,
+                               int repeat_no = 0) const;
   /// \}
   
   /// \brief Get a labeled integer value from within the namelist.

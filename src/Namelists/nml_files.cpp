@@ -190,7 +190,8 @@ FilesControls::FilesControls(const ExceptionResponse policy_in) :
 //-------------------------------------------------------------------------------------------------
 FilesControls::FilesControls(const TextFile &tf, int *start_line,
                              const ExceptionResponse policy_in,
-                             const std::vector<std::string> &alternatives) :
+                             const std::vector<std::string> &alternatives,
+                             const std::vector<std::string> &sys_requirements) :
     FilesControls(policy_in)
 {
   // Set some alternative defaults.  This takes a vector of strings, the even-numbered strings
@@ -226,31 +227,76 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
       }
     }
   }
-  NamelistEmulator t_nml = filesInput(tf, start_line, policy);
-  const int nsys = t_nml.getKeywordEntries("-sys") *
-                   (t_nml.getKeywordStatus("-sys") != InputStatus::MISSING);
 
-  // Get the systems in order
+  // Get the systems requirements in order
+  bool top_name_required = false;
+  bool crd_name_required = false;
+  bool trj_name_required = false;
+  bool rst_name_required = false;
+  bool top_must_exist = false;
+  bool crd_must_exist = false;
+  bool trj_must_exist = false;
+  bool rst_must_exist = false;
+  bool top_is_bogus = false;
+  bool crd_is_bogus = false;
+  bool trj_is_bogus = false;
+  bool rst_is_bogus = false;
+  for (size_t i = 0; i < sys_requirements.size(); i++) {
+    top_name_required = (top_name_required ||
+                         (sys_requirements[i] == "-p" || sys_requirements[i] == "-pe"));
+    crd_name_required = (crd_name_required ||
+                         (sys_requirements[i] == "-c" || sys_requirements[i] == "-ce"));
+    trj_name_required = (trj_name_required ||
+                         (sys_requirements[i] == "-x" || sys_requirements[i] == "-xe"));
+    rst_name_required = (rst_name_required ||
+                         (sys_requirements[i] == "-r" || sys_requirements[i] == "-re"));
+    top_must_exist = (top_must_exist || sys_requirements[i] == "-pe");
+    crd_must_exist = (crd_must_exist || sys_requirements[i] == "-ce");
+    trj_must_exist = (trj_must_exist || sys_requirements[i] == "-xe");
+    rst_must_exist = (rst_must_exist || sys_requirements[i] == "-re");
+    top_is_bogus = (top_is_bogus || sys_requirements[i] == "-pg");
+    crd_is_bogus = (crd_is_bogus || sys_requirements[i] == "-cg");
+    trj_is_bogus = (trj_is_bogus || sys_requirements[i] == "-xg");
+    rst_is_bogus = (rst_is_bogus || sys_requirements[i] == "-rg");
+  }
+  const SubkeyRequirement short_req = SubkeyRequirement::REQUIRED;
+  const SubkeyRequirement short_opt = SubkeyRequirement::OPTIONAL;
+  const SubkeyRequirement short_bog = SubkeyRequirement::BOGUS;
+  const std::vector<SubkeyRequirement> sys_keyword_reqs = {
+    (top_name_required) ? short_req : (top_is_bogus) ? short_bog : short_opt,
+    (crd_name_required) ? short_req : (crd_is_bogus) ? short_bog : short_opt,
+    (trj_name_required) ? short_req : (trj_is_bogus) ? short_bog : short_opt,
+    (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt
+  };
+  NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy);
+  const InputStatus stt_missing = InputStatus::MISSING;
+  const int nsys = t_nml.getKeywordEntries("-sys") *
+                   (t_nml.getKeywordStatus("-sys") != stt_missing);
+
   for (int i = 0; i < nsys; i++) {
     bool complete = true;
-    const std::string top_name = t_nml.getStringValue("-sys", "-p", i);
-    const std::string crd_name = t_nml.getStringValue("-sys", "-c", i);
-    const std::string trj_name = t_nml.getStringValue("-sys", "-x", i);
-    const std::string rst_name = t_nml.getStringValue("-sys", "-r", i);
+    const std::string top_name = (t_nml.getKeywordStatus("-sys", "-p", i) != stt_missing) ?
+                                 t_nml.getStringValue("-sys", "-p", i) : std::string("");
+    const std::string crd_name = (t_nml.getKeywordStatus("-sys", "-c", i) != stt_missing) ?
+                                 t_nml.getStringValue("-sys", "-c", i) : std::string("");
+    const std::string trj_name = (t_nml.getKeywordStatus("-sys", "-x", i) != stt_missing) ?
+                                 t_nml.getStringValue("-sys", "-x", i) : std::string("");
+    const std::string rst_name = (t_nml.getKeywordStatus("-sys", "-r", i) != stt_missing) ?
+                                 t_nml.getStringValue("-sys", "-r", i) : std::string("");
     std::string missing_elements("");
-    if (top_name.size() == 0LLU) {
+    if (top_name.size() == 0LLU && top_name_required) {
       missing_elements += "-p";
       complete = false;
     }
-    if (crd_name.size() == 0LLU) {
+    if (crd_name.size() == 0LLU && crd_name_required) {
       missing_elements += (missing_elements.size() > 0LLU) ? ", -c" : "-c";
       complete = false;
     }
-    if (trj_name.size() == 0LLU) {
+    if (trj_name.size() == 0LLU && trj_name_required) {
       missing_elements += (missing_elements.size() > 0LLU) ? ", -x" : "-x";
       complete = false;
     }
-    if (rst_name.size() == 0LLU) {
+    if (rst_name.size() == 0LLU && rst_name_required) {
       missing_elements += (missing_elements.size() > 0LLU) ? ", -r" : "-r";
       complete = false;
     }
@@ -268,47 +314,50 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
         break;
       }
     }
-    CoordinateFileKind c_kind, x_kind, r_kind;
-    c_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "c_kind", i));
-    x_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "x_kind", i));
-    r_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "r_kind", i));
-
-    // Check for the existence of critical files
-    if (getDrivePathType(t_nml.getStringValue("-sys", "-p", i)) != DrivePathType::FILE) {
-      switch (policy) {
-      case ExceptionResponse::DIE:
-        rtErr("System " + std::to_string(i + 1) + " names an invalid topology file " +
-              t_nml.getStringValue("-sys", "-p", i) + ".", "FilesControls");
-      case ExceptionResponse::WARN:
-        rtWarn("System " + std::to_string(i + 1) + " names an invalid topology file " +
-               t_nml.getStringValue("-sys", "-p", i) + " and will be omitted.", "FilesControls");
-        complete = false;
-        break;
-      case ExceptionResponse::SILENT:
-        complete = false;
-        break;
-      }
+    if (complete == false) {
+      continue;
     }
-    if (getDrivePathType(t_nml.getStringValue("-sys", "-c", i)) != DrivePathType::FILE) {
-      switch (policy) {
-      case ExceptionResponse::DIE:
-        rtErr("System " + std::to_string(i + 1) + " names an invalid starting coordinates file " +
-              t_nml.getStringValue("-sys", "-c", i) + ".", "FilesControls");
-      case ExceptionResponse::WARN:
-        rtWarn("System " + std::to_string(i + 1) + " names an invalid starting coordinates file " +
-               t_nml.getStringValue("-sys", "-c", i) + " and will be omitted.", "FilesControls");
-        complete = false;
-        break;
-      case ExceptionResponse::SILENT:
-        complete = false;
-        break;
+    CoordinateFileKind c_kind, x_kind, r_kind;
+    if (crd_name.size() > 0LLU) {
+      c_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "c_kind", i));
+    }
+    if (trj_name.size() > 0LLU) {
+      x_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "x_kind", i));
+    }
+    if (rst_name.size() > 0LLU) {
+      r_kind = translateCoordinateFileKind(t_nml.getStringValue("-sys", "r_kind", i));
+    }
+    
+    // Check for the existence of critical files
+    const std::vector<std::string> sys_components = { "-p", "-c", "-x", "-r" };
+    const std::vector<bool> existence_checks = { top_must_exist, crd_must_exist, trj_must_exist,
+                                                 rst_must_exist };
+    const std::vector<std::string> component_names = { "topology", "starting coordinates",
+                                                       "trajectory", "checkpoint" };
+    for (size_t j = 0; j < sys_components.size(); j++) {
+      if (existence_checks[j] &&
+          getDrivePathType(t_nml.getStringValue("-sys", sys_components[j], i)) !=
+          DrivePathType::FILE) {
+        switch (policy) {
+        case ExceptionResponse::DIE:
+          rtErr("System " + std::to_string(i + 1) + " names a non-existent " + component_names[j] +
+                " file " + t_nml.getStringValue("-sys", sys_components[j], i) + ".",
+                "FilesControls");
+        case ExceptionResponse::WARN:
+          rtWarn("System " + std::to_string(i + 1) + " names a non-existent " +
+                 component_names[j] + " file " +
+                 t_nml.getStringValue("-sys", sys_components[j], i) + " and will be omitted.",
+                 "FilesControls");
+          complete = false;
+          break;
+        case ExceptionResponse::SILENT:
+          complete = false;
+          break;
+        }
       }
     }
     if (complete) {
-      systems.push_back(MoleculeSystem(t_nml.getStringValue("-sys", "-p", i),
-                                       t_nml.getStringValue("-sys", "-c", i),
-                                       t_nml.getStringValue("-sys", "-x", i),
-                                       t_nml.getStringValue("-sys", "-r", i),
+      systems.push_back(MoleculeSystem(top_name, crd_name, trj_name, rst_name,
                                        t_nml.getIntValue("-sys", "frame_start", i),
                                        t_nml.getIntValue("-sys", "frame_end", i),
                                        t_nml.getIntValue("-sys", "-n", i),
@@ -582,7 +631,9 @@ void FilesControls::setWarningFileName(const std::string &file_name) {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator filesInput(const TextFile &tf, int *start_line, const ExceptionResponse policy) {
+NamelistEmulator filesInput(const TextFile &tf, int *start_line,
+                            const std::vector<SubkeyRequirement> &sys_keyword_reqs,
+                            const ExceptionResponse policy) {
   NamelistEmulator t_nml("files", CaseSensitivity::AUTOMATIC, policy, "Collects file names for "
                          "OMNI programs, offloading work that would otherwise require "
                          "command-line arguments.");
@@ -609,6 +660,8 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
     "automatically)", "Type of trajectory file to write", "Type of checkpoint (restart) "
     "coordinates file to write"
   };
+  
+  // Prepare the requirements list for the -sys keyword
   t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "-x", "-r", "frame_start", "frame_end",
                                              "-n", "c_kind", "x_kind", "r_kind" },
                                    { NamelistType::STRING, NamelistType::STRING,
@@ -617,12 +670,12 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line, const Exception
                                      NamelistType::INTEGER, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING },
                                    { std::string(""), std::string(""), std::string(""),
-                                     std::string(default_filecon_checkpoint_name), "0", "0", "1",
+                                     std::string(""), "0", "0", "1",
                                      std::string(default_filecon_inpcrd_type),
                                      std::string(default_filecon_outcrd_type),
                                      std::string(default_filecon_chkcrd_type) },
                                    DefaultIsObligatory::NO, InputRepeats::YES, sys_help,
-                                   sys_keys_help));
+                                   sys_keys_help, sys_keyword_reqs));
   t_nml.addKeyword(NamelistElement("-o", NamelistType::STRING,
                                    std::string(default_filecon_report_name)));
   t_nml.addKeyword(NamelistElement("-x", NamelistType::STRING,

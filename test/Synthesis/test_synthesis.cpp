@@ -642,7 +642,7 @@ int main(int argc, char* argv[]) {
         "expression searching did not meet expectations.  This may indicate a problem with the "
         "${OMNI_SOURCE} environment variable that did not show up in test program setup.",
         test_sysc);
-  const std::vector<AtomGraph*> ag_ptr = sysc.getTopologyPointer();
+  const std::vector<AtomGraph*> ag_ptr = sysc.getSystemTopologyPointer();
   const std::vector<PhaseSpace*> ps_ptr = sysc.getCoordinatePointer();
   std::vector<int> ag_atoms(nsys);
   std::vector<int> ps_atoms(nsys);
@@ -656,7 +656,7 @@ int main(int argc, char* argv[]) {
   std::vector<int> ag_ref_atoms(nsys);
   std::vector<int> ps_ref_atoms(nsys);
   for (int i = 0; i < nsys; i++) {
-    const AtomGraph  &ag_ref = sysc.getTopologyReference(i);
+    const AtomGraph  &ag_ref = sysc.getSystemTopologyReference(i);
     const PhaseSpace &ps_ref = sysc.getCoordinateReference(i);
     ag_ref_atoms[i] = ag_ref.getAtomCount();
     ps_ref_atoms[i] = ps_ref.getAtomCount();
@@ -817,8 +817,9 @@ int main(int argc, char* argv[]) {
   section(3);
   std::vector<RestraintApparatus> ra_vec;
   for (int i = 0; i < sysc.getTopologyCount(); i++) {
+    const int example_system_idx = sysc.getCoordinateExample(i);
     const AtomGraph *ag_i = sysc.getTopologyPointer(i);
-    const PhaseSpace &ps_i = sysc.getCoordinateReference(i);
+    const PhaseSpace &ps_i = sysc.getCoordinateReference(example_system_idx);
     const CoordinateFrameReader cfr_i(ps_i);
     const ChemicalFeatures chemfe_i(ag_i, ps_i, MapRotatableGroups::YES);
     const AtomMask bkbn_i(":* & @CA,N,C,O", ag_i, &chemfe_i, cfr_i);
@@ -851,7 +852,7 @@ int main(int argc, char* argv[]) {
         "alternative method.", do_tests);
 
   // Run diagnotics of the valence work units on a simple system, one with only a single work unit
-  runValenceWorkUnitTests(sysc.getTopologyReference(0).getFileName(),
+  runValenceWorkUnitTests(sysc.getSystemTopologyReference(0).getFileName(),
                           sysc.getCoordinateReference(0).getFileName(), oe, &my_prng);
 
   // Read a larger topology that will be forced to split its contents among several work units

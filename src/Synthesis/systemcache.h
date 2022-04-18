@@ -50,20 +50,40 @@ public:
 
   /// \brief Get the topology index of one of the coordinate sets contained in this cache.  This
   ///        will apply a bounds check to the coordinate index query.  This function should be used
-  ///        to access topologies in the output of a getTopologyReference() call when the full
-  ///        array is returned without function input arguments, but not to access the output og
-  ///        getTopologyPointer() as that array is returned indexing the topology pointers with
-  ///        the coordinate systems (just use coord_index as seen in input to this function to
-  ///        access that array directly).
+  ///        to access topologies in the output of a getTopologyReference() or getTopologyPointer()
+  ///        call when the full array is returned without function input arguments.  Calling either
+  ///        getTopologyReference() or getTopologyPointer() with an integer argument implicitly
+  ///        performs the operation of getting the appropriate topology list index, as would be
+  ///        found by this function, and thus returns a reference or pointer to the appropriate
+  ///        topology.
   ///
   /// \param int coord_index  Index of the PhaseSpace entry object of interest
-  int getTopologyIndex(int coord_index) const;
+  int getSystemTopologyIndex(int coord_index) const;
 
   /// \brief Get the index of a coordinate set which provides an example of the system that one of
   ///        the topologies in the cache describes.
   ///
   /// \param int topology_index  Index of the topology of interest
   int getCoordinateExample(int topology_index) const;
+
+  /// \brief Get pointers to one or all of the unique topologies from within the compact topology
+  ///        cache.
+  ///
+  /// Overloaded:
+  ///   - Get a pointer to one topology
+  ///   - Get a vector of pointers to all unique topologies in the SystemCache.
+  ///
+  /// \param int topology_index  Index of the topology of interest
+  /// \{
+  const AtomGraph* getTopologyPointer(int topology_index) const;
+  std::vector<const AtomGraph*> getTopologyPointer() const;
+  /// \}
+
+  /// \brief Get a reference to one of the unique topologies from within the topology cache, based
+  ///        on an index into the cache itself.
+  ///
+  /// \param int topology_index  Index of the topology of interes
+  const AtomGraph& getTopologyReference(int topology_index) const;  
   
   /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
   ///
@@ -73,35 +93,33 @@ public:
   ///   - Get pointers to topologies for all coordinate sets (this will not apply a bounds check)
   ///   - Const and non-const versions of each
   ///
-  /// \param int index  Index of the PhaseSpace entry object of interest
+  /// \param int index  Index of the PhaseSpace entry of interest
   /// \{
-  const AtomGraph* getTopologyPointer(int index) const;
-  AtomGraph* getTopologyPointer(int index);
-  std::vector<const AtomGraph*> getTopologyPointer() const;
-  std::vector<AtomGraph*> getTopologyPointer();
+  const AtomGraph* getSystemTopologyPointer(int index) const;
+  AtomGraph* getSystemTopologyPointer(int index);
+  std::vector<const AtomGraph*> getSystemTopologyPointer() const;
+  std::vector<AtomGraph*> getSystemTopologyPointer();
   /// \}
 
   /// \brief Get a const std::vector of non-const (const-casted) topology pointers.  This is for
   ///        the specific case of feeding other functions that require std::vectors of topology
   ///        pointers in this format.
-  const std::vector<AtomGraph*> getTopologyPointerCC() const;
+  const std::vector<AtomGraph*> getSystemTopologyPointerCC() const;
 
   /// \brief Return a reference to the topology that describes a particular set of coordinates
   ///        within the SystemCache.  All overloads apply a bounds check.
   ///
   /// Overloaded:
-  ///   - Return a const reference to a const SystemCache
-  ///   - Return a non-const reference to a non-const SystemCache
+  ///   - Return a const reference to the relevant topology in a const SystemCache
+  ///   - Return a non-const reference to the relevant topology in a non-const SystemCache
   ///   - Return a reference to the entire array of AtomGraph objects (this is a raw take on the
   ///     underlying topologies and will need to be accessed according to the indexing present in
   ///     the topology_indices array)
   ///
-  /// \param int index  Index of the PhaseSpace entry object of interest
+  /// \param int index  Index of the PhaseSpace entry of interest
   /// \{
-  const AtomGraph& getTopologyReference(const int index) const;
-  AtomGraph& getTopologyReference(const int index);
-  const std::vector<AtomGraph>& getTopologyReference() const;
-  std::vector<AtomGraph>& getTopologyReference();
+  const AtomGraph& getSystemTopologyReference(const int index) const;
+  AtomGraph& getSystemTopologyReference(const int index);
   /// \}
   
   /// \brief Get a pointer to a set of coordinates, velocities, and forces in the cache.
@@ -126,7 +144,7 @@ public:
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///   - Return a reference to the entire array of PhaseSpace objects
   ///
-  /// \param int index  Index of the PhaseSpace entry object of interest
+  /// \param int index  Index of the PhaseSpace object of interest
   /// \{
   const PhaseSpace& getCoordinateReference(const int index) const;
   PhaseSpace& getCoordinateReference(const int index);
