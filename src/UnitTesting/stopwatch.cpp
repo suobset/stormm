@@ -171,11 +171,10 @@ void StopWatch::assignTime(const std::string &target, const double reference_tim
 }
 
 //-------------------------------------------------------------------------------------------------
-void StopWatch::addCategory(const std::string &name) {
-  if (findStringInVector(category_names, name) < category_count) {
-    rtWarn(label + " already contains a category named \"" + name +
-           "\".  No new category will be created.", "StopWatch", "addCategory");
-    return;
+int StopWatch::addCategory(const std::string &name) {
+  const int cat_idx = findStringInVector(category_names, name);
+  if (cat_idx < category_count) {
+    return cat_idx;
   }
   category_count += 1;
   double current_time = translateCurrentTime();
@@ -187,6 +186,7 @@ void StopWatch::addCategory(const std::string &name) {
   category_max_interval.push_back(0.0);
   category_samples.push_back(0);
   category_names.push_back(name);
+  return category_count - 1;
 }
 
 //-------------------------------------------------------------------------------------------------

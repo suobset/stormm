@@ -189,13 +189,14 @@ ChemicalFeatures::ChemicalFeatures() :
     free_electrons{HybridKind::POINTER, "chemfe_free_e"},
     int_data{HybridKind::ARRAY, "chemfe_int"},
     double_data{HybridKind::ARRAY, "chemfe_double"},
-    ag_pointer{nullptr}
+    ag_pointer{nullptr},
+    timer{nullptr}
 {}
 
 //-------------------------------------------------------------------------------------------------
 ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
                                    const MapRotatableGroups map_group_in,
-                                   const double temperature_in) :
+                                   const double temperature_in, StopWatch *timer_in) :
     atom_count{ag_in->getAtomCount()}, planar_atom_count{0}, ring_count{0}, fused_ring_count{0},
     twistable_ring_count{0}, conjugated_group_count{0}, aromatic_group_count{0},
     polar_hydrogen_count{0}, hbond_donor_count{0}, hbond_acceptor_count{0}, chiral_center_count{0},
@@ -226,8 +227,23 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     free_electrons{HybridKind::POINTER, "chemfe_free_e"},
     int_data{HybridKind::ARRAY, "chemfe_int"},
     double_data{HybridKind::ARRAY, "chemfe_double"},
-    ag_pointer{ag_in}
+    ag_pointer{ag_in},
+    timer{timer_in}
 {
+  // Set up the StopWatch and obtain indices of the relevant timing bins
+  int chemfe_misc_timing, ring_trace_timing, aromatic_group_timing, lewis_timing;
+  int rotatable_bond_timing, chiral_center_timing, chiral_branch_timing;
+  if (timer != nullptr) {
+    timer->assignTime(0);
+    chemfe_misc_timing = timer->addCategory("[ChemicalFeatures] Miscellaneous");
+    ring_trace_timing = timer->addCategory("[ChemicalFeatures] Ring tracing");
+    lewis_timing = timer->addCategory("[ChemicalFeatures] Lewis structure drawing");
+    aromatic_group_timing = timer->addCategory("[ChemicalFeatures] Aromaticity detection");
+    rotatable_bond_timing = timer->addCategory("[ChemicalFeatures] Rotatable bond mapping");
+    chiral_center_timing = timer->addCategory("[ChemicalFeatures] Chiral center detection");
+    chiral_branch_timing = timer->addCategory("[ChemicalFeatures] Chiral branch mapping");
+  }  
+  
   // Obtain abstracts from the topology
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
@@ -241,7 +257,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   std::vector<ullint> tmp_ring_inclusion(atom_count, 0LLU);
   std::vector<int> tmp_ring_atom_bounds(1, 0);
   std::vector<int> tmp_ring_atoms;
+  if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
   traceTopologicalRings(nbk, cdk, &tmp_ring_inclusion, &tmp_ring_atoms, &tmp_ring_atom_bounds);
+  if (timer != nullptr) timer->assignTime(ring_trace_timing);
   ring_inclusion.resize(atom_count);
   ring_inclusion.putHost(tmp_ring_inclusion);
   ring_count = static_cast<int>(tmp_ring_atom_bounds.size()) - 1;
@@ -257,7 +275,9 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   // Draw a Lewis structure and record the results.  The formal_charges, bond orders, and
   // free_electrons arrays can now be allocated.  Lewis structures will be drawn for each unique
   // molecule and copied otherwise, but that requires a list of all unique molecules.
+  if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
   drawLewisStructures(vk, nbk, cdk);
+  if (timer != nullptr) timer->assignTime(lewis_timing);
   
   // Mark all aromatic atoms after dissecting numerous details about atoms in rings.
   std::vector<int> tmp_aromatic_group_bounds(1, 0);
@@ -265,6 +285,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   std::vector<int> tmp_aromatic_groups;
   findAromaticGroups(cdk, vk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_aromatic_group_bounds,
                      &tmp_aromatic_pi_electrons, &tmp_aromatic_groups);
+  if (timer != nullptr) timer->assignTime(aromatic_group_timing);
 
   // Mark polar hydrogens and hydrogen bond donors and acceptors
   std::vector<int> tmp_polar_hydrogens;
@@ -275,6 +296,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   polar_hydrogen_count = tmp_polar_hydrogens.size();
   hbond_donor_count = tmp_hydrogen_bond_donors.size();
   hbond_acceptor_count = tmp_hydrogen_bond_acceptors.size();
+  if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
   
   // Find chiral centers
   const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
@@ -282,6 +304,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   const std::vector<int>
     tmp_chiral_inversion_methods = findChiralInversionMethods(tmp_chiral_centers, tmp_ring_atoms,
                                                               tmp_ring_atom_bounds);
+  if (timer != nullptr) timer->assignTime(chiral_center_timing);
 
   // Find rotatable bonds, if group mapping is active, and map the invertible groups that will
   // flip the chirality of already detected chiral centers.
@@ -294,11 +317,13 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     findRotatableBonds(vk, cdk, nbk, tmp_ring_atoms, tmp_ring_atom_bounds, &tmp_rotatable_groups,
                        &tmp_rotatable_group_bounds, &tmp_cis_trans_groups,
                        &tmp_cis_trans_group_bounds);
+    if (timer != nullptr) timer->assignTime(rotatable_bond_timing);
     rotatable_bond_count = static_cast<int>(tmp_rotatable_group_bounds.size()) - 1;
     cis_trans_bond_count = static_cast<int>(tmp_cis_trans_group_bounds.size()) - 1;
     findInvertibleGroups(tmp_chiral_centers, tmp_chiral_inversion_methods, &tmp_anchor_a_branches,
                          &tmp_anchor_b_branches, &tmp_invertible_groups,
                          &tmp_invertible_group_bounds);
+    if (timer != nullptr) timer->assignTime(chiral_branch_timing);
     break;
   case MapRotatableGroups::NO:
     break;
@@ -341,20 +366,21 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ic = invertible_group_bounds.putHost(&int_data, tmp_invertible_group_bounds, ic, warp_size_zu);
   ic = anchor_a_branches.putHost(&int_data, tmp_anchor_a_branches, ic, warp_size_zu);
   ic = anchor_b_branches.putHost(&int_data, tmp_anchor_b_branches, ic, warp_size_zu);
+  if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
 }
 
 //-------------------------------------------------------------------------------------------------
 ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame &cf,
                                    const MapRotatableGroups map_group_in,
-                                   const double temperature_in) :
-  ChemicalFeatures(ag_in, cf.data(), map_group_in, temperature_in)
+                                   const double temperature_in, StopWatch *timer_in) :
+  ChemicalFeatures(ag_in, cf.data(), map_group_in, temperature_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
 ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
                                    const MapRotatableGroups map_group_in,
-                                   const double temperature_in) :
-  ChemicalFeatures(ag_in, CoordinateFrameReader(ps), map_group_in, temperature_in)
+                                   const double temperature_in, StopWatch *timer_in) :
+  ChemicalFeatures(ag_in, CoordinateFrameReader(ps), map_group_in, temperature_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -1766,8 +1792,8 @@ ChemicalFeatures::findChiralInversionMethods(const std::vector<int> &tmp_chiral_
     }
     else if (nrings == 2) {
       int nfusion = 0;
-      const int r1_idx = ring_occupancy[chatom];
-      const int r2_idx = ring_occupancy[chatom + 1];
+      const int r1_idx = ring_occupancy[ring_occupancy_bounds[chatom]];
+      const int r2_idx = ring_occupancy[ring_occupancy_bounds[chatom] + 1];
       for (int j = tmp_ring_atom_bounds[r1_idx]; j < tmp_ring_atom_bounds[r1_idx + 1]; j++) {
         const int jring_atom = tmp_ring_atoms[j];
         for (int k = tmp_ring_atom_bounds[r2_idx]; k < tmp_ring_atom_bounds[r2_idx + 1]; k++) {

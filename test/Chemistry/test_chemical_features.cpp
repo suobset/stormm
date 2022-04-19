@@ -10,6 +10,7 @@
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
+#include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::chemistry::ChiralOrientation;
@@ -37,6 +38,7 @@ int main(int argc, char* argv[]) {
 
   // Lay out the testing environment
   TestEnvironment oe(argc, argv);
+  StopWatch timer;
 
   // Test the existence of topology and coordinate files
   const char osc = osSeparator();
@@ -117,7 +119,7 @@ int main(int argc, char* argv[]) {
       const int2 first_mol_lims = sys_ag[i].getMoleculeLimits(0);
       first_mol_size[i] = first_mol_lims.y - first_mol_lims.x;
       sys_chem.emplace_back(&sys_ag[i], CoordinateFrameReader(sys_ps[i]),
-                            (first_mol_size[i] < 120) ? mapg_yes : mapg_no);
+                            (first_mol_size[i] < 120) ? mapg_yes : mapg_no, 300.0, &timer);
     }
   }
   else {
@@ -132,6 +134,7 @@ int main(int argc, char* argv[]) {
   std::vector<int> hbond_acceptor_counts(nsys);
   std::vector<int> chiral_center_counts(nsys);
   std::vector<int> rotatable_bond_counts(nsys);
+  std::vector<int> cis_trans_bond_counts(nsys);
   for (size_t i = 0; i < nsys; i++) {
     ring_counts[i] = sys_chem[i].getRingCount();
     fused_ring_counts[i] = sys_chem[i].getFusedRingCount();
@@ -142,6 +145,7 @@ int main(int argc, char* argv[]) {
     hbond_acceptor_counts[i] = sys_chem[i].getHydrogenBondAcceptorCount();
     chiral_center_counts[i] = sys_chem[i].getChiralCenterCount();
     rotatable_bond_counts[i] = sys_chem[i].getRotatableBondCount();
+    cis_trans_bond_counts[i] = sys_chem[i].getCisTransBondCount();
   }
   std::vector<int> ring_cnt_ans           = {    1,    1,    4, 1226, 1226,    0,    0,    1,
                                               1567,  486,  216 };
@@ -160,6 +164,8 @@ int main(int argc, char* argv[]) {
   std::vector<int> chiral_center_cnt_ans  = {    0,    0,    0,    1,    1,    1,    0,    1,
                                                 18,   82,    0 };
   std::vector<int> rotatable_bond_cnt_ans = {    1,    3,    9,    8,    8,    4,    7,    6,
+                                                 0,    0,    0 };
+  std::vector<int> cis_trans_bond_cnt_ans = {    0,    0,    0,    0,    0,    0,    0,    0,
                                                  0,    0,    0 };
   std::vector<int> trp_cage_lchir = sys_chem[8].getChiralCenters(ChiralOrientation::SINISTER);
   std::vector<int> trp_cage_lchir_ans;
@@ -190,6 +196,8 @@ int main(int argc, char* argv[]) {
         "centers in various systems do not agree.", do_tests);
   check(rotatable_bond_counts, RelationalOperator::EQUAL, rotatable_bond_cnt_ans, "Counts of "
         "rotatable bonds do not meet expectations.", do_tests);
+  check(cis_trans_bond_counts, RelationalOperator::EQUAL, cis_trans_bond_cnt_ans, "Counts of "
+        "cis-trans bonds do not meet expectations.", do_tests);
   check(trp_cage_lchir_ans, RelationalOperator::EQUAL, trp_cage_lchir, "Chiral center indices for "
         "L-chiral centers (should be amino acid CA atoms, excluding glycine, plus the isoleucine "
         "CB atom) do not meet expectations.", do_tests);
@@ -272,10 +280,76 @@ int main(int argc, char* argv[]) {
                oe.takeSnapshot(), 1.0e-8, NumberFormat::INTEGER,
                (ro_unwritten) ? PrintSituation::OVERWRITE : PrintSituation::APPEND, do_snps);
       ro_unwritten = false;
-    }
-    
+    }    
   }
+
+  // Ring detection in some polycyclic systems
+  const std::vector<std::string> ring_top_names = {
+    base_chem_name + osc + "anthracene_like.top",
+    base_chem_name + osc + "morphine_like.top",
+    base_chem_name + osc + "pyrene_like.top"
+  };
+  const std::vector<std::string> ring_crd_names = {
+    base_chem_name + osc + "anthracene_like.inpcrd",
+    base_chem_name + osc + "morphine_like.inpcrd",
+    base_chem_name + osc + "pyrene_like.inpcrd"
+  };
+  const size_t nring_mols = ring_top_names.size();
+  bool rings_exist = true;
+  for (size_t i = 0; i < nring_mols; i++) {
+    rings_exist = (rings_exist && getDrivePathType(ring_top_names[i]) == DrivePathType::FILE &&
+                   getDrivePathType(ring_top_names[i]) == DrivePathType::FILE);
+  }
+  if (rings_exist == false) {
+    rtWarn("Topologies and coordinates for polycyclic test molecules, i.e. " + ring_top_names[0] +
+           " and " + ring_crd_names[0] + ", were not found.  Check the ${OMNI_SOURCE} environment "
+           "variable for validity.  Subsequent tests will be skipped.", "test_chemical_features");
+  }
+  std::vector<AtomGraph> ring_ag(nring_mols);
+  std::vector<PhaseSpace> ring_ps(nring_mols);
+  for (size_t i = 0; i < nring_mols; i++) {
+    ring_ag[i].buildFromPrmtop(ring_top_names[i], ExceptionResponse::SILENT, amber_ancient_bioq,
+                               1.2, 2.0, 0.01);
+    ring_ps[i].buildFromFile(ring_crd_names[i], CoordinateFileKind::UNKNOWN);    
+  }
+  std::vector<ChemicalFeatures> ring_chem;
+  if (rings_exist) {
+    ring_chem.reserve(nring_mols);
+    for (size_t i = 0; i < nring_mols; i++) {
+      const int2 first_mol_lims = ring_ag[i].getMoleculeLimits(0);
+      first_mol_size[i] = first_mol_lims.y - first_mol_lims.x;
+      ring_chem.emplace_back(&ring_ag[i], CoordinateFrameReader(ring_ps[i]), mapg_yes, 300.0,
+                             &timer);
+    }
+  }
+  else {
+    ring_chem.resize(nring_mols);
+  }
+  const TestPriority do_rings = (rings_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  std::vector<int> polycyclic_ring_counts(nring_mols);
+  std::vector<int> polycyclic_rotator_counts(nring_mols);
+  std::vector<int> polycyclic_cistrans_counts(nring_mols);
+  for (size_t i = 0; i < nring_mols; i++) {
+    polycyclic_ring_counts[i] = ring_chem[i].getRingCount();
+    polycyclic_rotator_counts[i] = ring_chem[i].getRotatableBondCount();
+    polycyclic_cistrans_counts[i] = ring_chem[i].getCisTransBondCount();
+  }
+  const std::vector<int> polycyclic_ring_counts_answer = { 4, 5, 8 };
+  const std::vector<int> polycyclic_rotator_counts_answer = { 0, 0, 0 };
+  const std::vector<int> polycyclic_cistrans_counts_answer = { 0, 0, 0 };
+  check(polycyclic_ring_counts, RelationalOperator::EQUAL, polycyclic_ring_counts_answer,
+        "The number of rings detected in polycyclic systems does not meet expectations.",
+        do_rings);
+  check(polycyclic_rotator_counts, RelationalOperator::EQUAL, polycyclic_rotator_counts_answer,
+        "The number of rotatable bonds detected in polycyclic systems does not meet "
+        "expectations. (There should be no rotatable bonds.)", do_rings);
+  check(polycyclic_cistrans_counts, RelationalOperator::EQUAL, polycyclic_cistrans_counts_answer,
+        "The number of cis-trans isomerization sites detected in polycyclic systems does not meet "
+        "expectations. (There should be no bonds capable of cis-trans isomerization.)", do_rings);
   
   // Summary evaluation
+  if (oe.getDisplayTimingsOrder()) {
+    timer.printResults();
+  }
   printTestSummary(oe.getVerbosity());
 }

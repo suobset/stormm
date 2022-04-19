@@ -37,7 +37,8 @@ TestEnvironment::TestEnvironment(int argc, char* argv[], const TmpdirStatus tmpd
     files_created{},
     directories_created{},
     remove_files{true},
-    snapshot_behavior{SnapshotOperation::COMPARE}
+    snapshot_behavior{SnapshotOperation::COMPARE},
+    display_time{false}
 {
   // Loop over command line input and try to parse instructions
   bool cli_vbs = false;
@@ -130,6 +131,9 @@ TestEnvironment::TestEnvironment(int argc, char* argv[], const TmpdirStatus tmpd
              strcmp(argv_uppercased.c_str(), "--OPTIONS") == 0 ||
              strcmp(argv_uppercased.c_str(), "-OPTIONS") == 0) {
 
+    }
+    else if (strcmp(argv[i], "-timings") == 0) {
+      display_time = true;
     }
     else {
       rtWarn("Unrecognized flag " + std::string(argv[i]) + ".", "TestEnvironment");
@@ -389,6 +393,11 @@ SnapshotOperation TestEnvironment::takeSnapshot() const {
   return snapshot_behavior;
 }
 
+//-------------------------------------------------------------------------------------------------
+bool TestEnvironment::getDisplayTimingsOrder() const {
+  return display_time;
+}
+  
 //-------------------------------------------------------------------------------------------------
 void TestEnvironment::logFileCreated(const std::string &path) {
   std::string abs_path = makePathAbsolute(path);

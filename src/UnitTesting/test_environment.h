@@ -69,6 +69,9 @@ public:
   ///        compare the data to an existing file.
   SnapshotOperation takeSnapshot() const;
 
+  /// \brief Return the directive on displaying timings at the end of a test program.
+  bool getDisplayTimingsOrder() const;
+  
   /// \brief Catalog that a file has been created by the program.  This function will not actually
   ///        check that the file was created by code recently executed; it just serves as a way to
   ///        accumulate a list of files that should be regarded as the property of whatever program
@@ -143,6 +146,9 @@ private:
   /// specific test program, and this will cause the requested files to be written based on the
   /// available data rather than read for immediate comparison.
   SnapshotOperation snapshot_behavior;
+
+  /// Directive on whether to display timings at the end of a test program
+  bool display_time;
 };
 
 } // namespace testing

@@ -137,10 +137,11 @@ public:
   void assignTime(const std::string &target, double reference_time);
   /// \}
 
-  /// \brief Add a section to the current StopWatch.
+  /// \brief Add a section to the current StopWatch, if no such section already exists.  Return
+  ///        the index of the section, whether newly added or not.
   ///
-  /// \param name  Proposed name of the new section (throws an error if the section already exists)
-  void addCategory(const std::string &name);
+  /// \param name  Proposed name of the new section
+  int addCategory(const std::string &name);
 
   /// \brief Print the timings for this StopWatch.
   ///

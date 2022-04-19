@@ -6,6 +6,7 @@
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
+#include "UnitTesting/stopwatch.h"
 #include "chemistry_enumerators.h"
 
 namespace omni {
@@ -13,6 +14,7 @@ namespace chemistry {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
+using testing::StopWatch;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using topology::NonbondedKit;
@@ -167,15 +169,15 @@ public:
 
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrameReader &cfr,
                    MapRotatableGroups map_group_in = MapRotatableGroups::NO,
-                   double temperature_in = 300.0);
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame &cf,
                    MapRotatableGroups map_group_in = MapRotatableGroups::NO,
-                   double temperature_in = 300.0);
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
 
   ChemicalFeatures(const AtomGraph *ag_in, const PhaseSpace &ps,
                    MapRotatableGroups map_group_in = MapRotatableGroups::NO,
-                   double temperature_in = 300.0);
+                   double temperature_in = 300.0, StopWatch *timer_in = nullptr);
   /// \}
 
   /// \brief Copy and move constructors
@@ -209,7 +211,7 @@ public:
   /// \brief Get the number of fused rings in the system.
   int getFusedRingCount() const;
 
-  /// \brief Get the number of malleable, non-aromatic twistable ringsin the system.
+  /// \brief Get the number of malleable, non-aromatic twistable rings in the system.
   int getMutableRingCount() const;
 
   /// \brief Get the number of aromatic groups in the system.
@@ -488,6 +490,10 @@ private:
   /// obtain the actual atom indices by the various bonds enumerated in some of the lists above)
   const AtomGraph *ag_pointer;
 
+  /// Pointer to a timings object that, if not nullptr, will record the operations of this object
+  /// and help profile its contributions to the total wall time.
+  StopWatch *timer;
+  
   /// \brief Find all planar atoms in the system based on improper dihedral terms.  This prepares
   ///        data arrays that will later be loaded into the ChemicalFeatures object, but does not
   ///        directly modify the object's members.
