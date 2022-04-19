@@ -729,6 +729,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
   std::vector<int> subsystem_ring_atoms;
   std::vector<int> subsystem_ring_atom_bounds(1, 0);
   std::vector<int2> subsystem_ring_ranks;
+  std::vector<int> treaded_atoms(atom_count, 0);
   for (int i = 0; i < atom_count; i++) {
     valid_atom_mask[i] = false;
   }
@@ -836,7 +837,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       max_tree_depth++;
     }
     max_tree_depth -= (prospective_tree_size > max_fused_ring_tree_size);
-
+    
     // Reallocate the tree search arrays if more memory is needed
     if (static_cast<size_t>(prospective_tree_size) > tree_positions.size()) {
       tree_positions.resize(prospective_tree_size);
@@ -916,24 +917,33 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
         // katom twice.  If, in the same layer that katom was include twice, katom is included
         // additional times, this implies additional rings of equal size.  Log them all.
         int nk_found = 0;
-        int m = 0;
+        int lcon = 0;
         jk_path_bounds.resize(1);
         jk_path_bounds[0] = 0;
         jk_paths.resize(0);
-        while (m < layer_count) {
-          for (int node_idx = layer_bounds[m]; node_idx < layer_bounds[m + 1]; node_idx++) {
+        for (int m = 0; m < nfused_atoms; m++) {
+          treaded_atoms[fused_ring_atoms[m]] = 0;
+        }
+        int independent_paths = 0;
+        while (lcon < layer_count && independent_paths < fused_ring_atom_connections[k]) {
+          for (int node_idx = layer_bounds[lcon]; node_idx < layer_bounds[lcon + 1]; node_idx++) {
             if (links[node_idx].getAtom() == katom) {
               int prev_node = links[node_idx].getPreviousNode();
               jk_paths.push_back(links[node_idx].getAtom());
+              bool path_independent = true; 
               while (prev_node >= 0) {
-                jk_paths.push_back(links[prev_node].getAtom());
+                const int atom_on_path = links[prev_node].getAtom();
+                path_independent = (path_independent &&
+                                    (prev_node == 0 || treaded_atoms[atom_on_path] == 0));
+                jk_paths.push_back(atom_on_path);
                 prev_node = links[prev_node].getPreviousNode();
               }
+              independent_paths += path_independent;
               jk_path_bounds.push_back(jk_paths.size());
               nk_found++;
             }
           }
-          m++;
+          lcon++;
         }
 
         // With the possible paths computed, list out the rings for this subsystem.
@@ -944,7 +954,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
             for (int npos = jk_path_bounds[n]; npos < jk_path_bounds[n + 1]; npos++) {
               subsystem_ring_atoms.push_back(jk_paths[npos]);
             }
-
+            
             // Incorporate the second path, in reverse, omitting the endpoints, to complete the
             // ring in a sensible order (all paths proceed from katom to jatom, and include both
             // katom and jatom).
@@ -973,7 +983,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
   if (all_fused_rings.size() == 0LLU) {
     return;
   }
-  
+
   // Cull larger rings if they can be found to be a superset of two or more smaller rings.  This
   // is done by starting with the smallest rings in the set and marking the atoms of the fused
   // ring subsystem that they cover.  As larger and larger rings are added, those that do not
@@ -983,14 +993,37 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
             [](int2 a, int2 b) { return a.x < b.x; });
   const int nsubsys_rings = subsystem_ring_atom_bounds.size() - 1LLU;
   ullint* ring_inclusion_ptr = tmp_ring_inclusion->data();
+  const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
+  std::vector<bool> valid_bond_mask(vk.nbond, false);
   for (int i = 0; i < nsubsys_rings; i++) {
     const int ring_idx = subsystem_ring_ranks[i].y;
     bool ring_is_essential = false;
     for (int j = subsystem_ring_atom_bounds[ring_idx];
          j < subsystem_ring_atom_bounds[ring_idx + 1]; j++) {
+
+      // Mark the atoms covered by the ring--any ring that covers a new atom is essential.
       const int atom_idx = subsystem_ring_atoms[j];
       ring_is_essential = (ring_is_essential || valid_atom_mask[atom_idx] == false);
       valid_atom_mask[atom_idx] = true;
+
+      // Mark the bonds covered by the ring--any ring that covers a new bonds is essential.
+      const int other_idx = (j == subsystem_ring_atom_bounds[ring_idx + 1] - 1) ?
+                            subsystem_ring_atoms[subsystem_ring_atom_bounds[ring_idx]] :
+                            subsystem_ring_atoms[j + 1];
+      for (int k = vk.bond_asgn_bounds[atom_idx]; k < vk.bond_asgn_bounds[atom_idx + 1]; k++) {
+        if (vk.bond_asgn_atoms[k] == other_idx) {
+          ring_is_essential = (ring_is_essential ||
+                               valid_bond_mask[vk.bond_asgn_terms[k]] == false);
+          valid_bond_mask[vk.bond_asgn_terms[k]] = true;
+        }
+      }
+      for (int k = vk.bond_asgn_bounds[other_idx]; k < vk.bond_asgn_bounds[other_idx + 1]; k++) {
+        if (vk.bond_asgn_atoms[k] == atom_idx) {
+          ring_is_essential = (ring_is_essential ||
+                               valid_bond_mask[vk.bond_asgn_terms[k]] == false);
+          valid_bond_mask[vk.bond_asgn_terms[k]] = true;
+        }
+      }
     }
     if (ring_is_essential) {
       const int tring_size = subsystem_ring_atom_bounds[ring_idx + 1] -
@@ -1009,7 +1042,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
       tmp_ring_atom_bounds->push_back(tmp_ring_atoms->size());
     }
   }
-  
+
   // Cull the original fused ring systems--they are no longer necessary.  Reset the ring_bounds_ptr
   // and ring_atoms_ptr pointers, as the target arrays have been resized.
   const int tmp_overall_ring_count = static_cast<int>(tmp_ring_atom_bounds->size()) - 1;
@@ -1023,7 +1056,7 @@ void ChemicalFeatures::traceTopologicalRings(const NonbondedKit<double> &nbk,
   ring_bounds_ptr = tmp_ring_atom_bounds->data();
   ring_atoms_ptr  = tmp_ring_atoms->data();
   for (int i = 0; i < tmp_overall_ring_count; i++) {
-    if (cull_rings[i] == false) {
+    if (cull_rings[i] == false) {      
       for (int j = ring_bounds_ptr[i]; j < ring_bounds_ptr[i + 1]; j++) {
         ring_atoms_ptr[ratoms_counter] = ring_atoms_ptr[j];
         ratoms_counter++;
