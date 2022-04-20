@@ -531,6 +531,11 @@ int IndigoAtomCenter::getCharge(const int state_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int IndigoAtomCenter::getAtomicNumber() const {
+  return z_number;
+}
+
+//-------------------------------------------------------------------------------------------------
 int IndigoAtomCenter::getScore(const int state_index) const {
   return scores[state_index];
 }
@@ -756,12 +761,32 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     relevant_pair_bounds[i] = relevant_pair_bounds[i - 1];
   }
   relevant_pair_bounds[0] = 0;
+
+  // Make a table showing ones for all negative states of carbon atoms in the local arrangement
+  std::vector<int> center_state_bounds(ccenter_count + 1, 0);
+  for (int i = 0; i < ccenter_count; i++) {
+    const int atom_i = centers_list[i];
+    center_state_bounds[i] = all_centers[atom_i].getStateCount();
+  }
+  prefixSumInPlace<int>(&center_state_bounds, PrefixSumType::EXCLUSIVE, "IndigoFragment");
+  std::vector<int> negative_carbon_states(center_state_bounds[ccenter_count], 0);
+  for (int i = 0; i < ccenter_count; i++) {
+    const int atom_i = centers_list[i];
+    if (all_centers[atom_i].getAtomicNumber() == 6) {
+      int k = 0;
+      for (int j = center_state_bounds[i]; j < center_state_bounds[i + 1]; j++) {
+        negative_carbon_states[j] = (all_centers[atom_i].getCharge(k) < 0);
+        k++;
+      }
+    }
+  }
   
   // Create a vector to run through all states of the fragment.  Accumulate results in
   // preliminary arrays before commiting them to the actual object.
   std::vector<int> prelim_net_charges;
   std::vector<int> prelim_scores;
   int centers_participating = 0;
+  int negative_carbons = 0;
   do {
 
     // Test whether this combination of settings is viable.  For each pair, make sure that both
@@ -783,6 +808,7 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
         }
       }
     }
+    viable = (viable && negative_carbons <= maximum_negative_carbons);
     if (viable) {
 
       // If not all atom centers are participating, increment the number of centers that are
@@ -791,6 +817,15 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
       // those results and the state itself onto the stack for this fragment.
       if (centers_participating < ccenter_count) {
         settings[centers_participating] = 0;
+        
+        // Negatively charged carbon atoms, while physically possible, are highly unlikely and
+        // quickly push the fragment out of the range of acceptable charge states.  Flag any
+        // states of carbon atoms that have negative charge.  The number of negatively charged
+        // carbons in any given fragment is rationed at an arbitrary value.  Limiting the
+        // acceptable number of negative carbons drastically cuts down on the search space.
+        negative_carbons += negative_carbon_states[center_state_bounds[centers_participating]];
+
+        // Mark that there is now a new center participating.
         centers_participating++;
         continue;
       }
@@ -858,12 +893,22 @@ IndigoFragment::IndigoFragment(const std::vector<int> &centers_list_in,
     // whether the fragment state is viable, and roll forward again with a new attempt to add
     // atoms.
     int last_participant = centers_participating - 1;
+    int local_state_idx = center_state_bounds[last_participant] + settings[last_participant];
+    negative_carbons -= negative_carbon_states[local_state_idx];
     settings[last_participant] += 1;
+    if (settings[last_participant] < max_settings[last_participant]) {
+      negative_carbons += negative_carbon_states[local_state_idx + 1];
+    }
     while (centers_participating > 1 &&
            settings[last_participant] >= max_settings[last_participant]) {
       centers_participating--;
       last_participant--;
+      local_state_idx = center_state_bounds[last_participant] + settings[last_participant];
+      negative_carbons -= negative_carbon_states[local_state_idx];
       settings[last_participant] += 1;
+      if (settings[last_participant] < max_settings[last_participant]) {
+        negative_carbons += negative_carbon_states[local_state_idx + 1];
+      }
     }    
   } while (settings[0] < max_settings[0]);
 
@@ -1260,6 +1305,7 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
   // Identify fragments with atoms containing more than one possible state
   std::vector<bool> fragment_sweep(atom_count, false);
   std::vector<bool> layer_sweep(atom_count, false);
+  std::vector<std::vector<int>> proto_fragments;
   for (int i = 0; i < atom_count; i++) {
     if (fragment_sweep[i]) {
       continue;
@@ -1294,12 +1340,23 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
         }
       }
 
-      // Add this fragment to the growing list
-      mutable_fragments.push_back(IndigoFragment(fragment, atom_centers));
+      // Add this collection of atoms to a developing list.  The list will be pre-screened to
+      // do the smallest fragments first and hopefully arrive at a narrower spread for the overall
+      // charge of the largest fragment.
+      proto_fragments.push_back(fragment);
     }
   }
-  fragment_count = mutable_fragments.size();
 
+  // Sort the list of proto-fragments
+  fragment_count = proto_fragments.size();
+  std::vector<int2> proto_fragment_sizes(fragment_count);
+  for (int i = 0; i < fragment_count; i++) {
+    proto_fragment_sizes[i].x = proto_fragments[i].size();
+    proto_fragment_sizes[i].y = i;
+  }
+  std::sort(proto_fragment_sizes.begin(), proto_fragment_sizes.end(),
+            [](int2 a, int2 b) { return a.x < b.x; });  
+  
   // Compute the charge of all fixed atom centers
   int target_charge = round(sum<double>(ag_pointer->getPartialCharge<double>(mol_limits.x,
                                                                              mol_limits.y)));
@@ -1310,6 +1367,16 @@ IndigoTable::IndigoTable(const AtomGraph *ag_in, const int molecule_index,
     }
   }
   
+  // Loop over the proto-fragments
+  int min_initial_charge = 0;
+  int max_initial_charge = 0;
+  for (int i = 0; i < fragment_count; i++) {
+
+    // Add this fragment to the growing list
+    mutable_fragments.push_back(IndigoFragment(proto_fragments[i], atom_centers));
+  }
+  fragment_count = mutable_fragments.size();
+
   // Make an initial pass to cull fragment states that exceed the ground state energy for any
   // given charge state.
   std::vector<int> q_options;

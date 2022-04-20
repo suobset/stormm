@@ -27,6 +27,10 @@ constexpr int formal_charge_bits    = 4;
 
 /// \brief The maximum energy spacing for Indigo to consider is set at 10 kcal/mol by default.
 constexpr int default_indigo_energy_gap = 3187;
+
+/// \brief The maximum number of negatively charged carbon atoms that a fragment can have (some
+///        corner case might lead to this limit being increased under special circumstances)
+constexpr int maximum_negative_carbons = 1;
   
 /// \brief The maximum bond order is a triple bond
 constexpr int maximum_bond_order = 3;
@@ -93,6 +97,9 @@ public:
   ///
   /// \param state_index  Index of the state in question
   int getCharge(int state_index) const;
+
+  /// \brief Get the atomic number of the atom
+  int getAtomicNumber() const;
   
   /// \brief Return the score associated with a particular state of this atom center.
   ///
