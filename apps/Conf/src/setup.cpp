@@ -72,13 +72,20 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     // Determine the combinatorial number of conformers that could populate the coarse-grained
     // search.  This includes bond rotation, chiral inversions, and multiple replicas of the
     // compound in the list of starting coordinates.
+    const int ncases = sc.getTopologyCaseCount(i);
     const int nrot_bond = std::min(chemfe_list[i].getRotatableBondCount(),
                                    conf_input.getRotatableBondLimit());
+    const int nctx_bond = (conf_input.sampleCisTrans()) ? chemfe_list[i].getCisTransBondCount() :
+                                                          0;
     double ln_choices = log(ncases);
     if (nrot_bond > 0 && nbond_rotations > 0) {
       ln_choices += nrot_bond * log(nbond_rotations);
     }
+    if (nctx_bond > 0) {
+      ln_choices += nctx_bond * log(2.0);
+    }
     const int nchiral = (conf_input.sampleChirality()) ? chemfe_list[i].getChiralCenterCount() : 0;
+    const std::vector<ChiralInversionProtocol> chiral_protocols;
     if (nchiral > 0) {
       int np2 = 0;
       for (int j = 0; j < nchiral; j++) {
@@ -93,26 +100,23 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       }
       ln_choices += np2 * log(2.0);
     }
-    
-    
-    const int ncases = sc.getTopologyCaseCount(i);
-    const int bond_rotation_reps = nrot_bond * nbond_rotations;
-    int nproto_conf = ncases * bond_rotation_reps;
-    int nchiral_reps = 1;
-    if (conf_input.sampleChirality()) {
-      const std::vector<ChiralInversionProtocol> chiral_protocols;
-      const int nchiral = chemfe_list[i].getChiralCenterCount();
-      for (int j = 0; j < nchiral; j++) {
-        if (nproto_conf > conf_input.getSystemTrialCount()) {
-          break;
-        }
-      }
+    int nproto_conf;
+    SamplingStrategy strat;
+    if (ln_choices < log(conf_input.getSystemTrialCount())) {
+      nproto_conf = exp(ln_choices) + 0.99;
+      strat = SamplingStrategy::FULL;
     }
-    nproto_conf = std::min(conf_input.getSystemTrialCount(), nproto_conf);
+    else if (ln_choices < log(static_cast<double>(conf_input.getSystemTrialCount()) * 32.0)) {
+      nproto_conf = conf_input.getSystemTrialCount();
+      strat = SamplingStrategy::LIMITED;
+    }
+    else {
+      nproto_conf = conf_input.getSystemTrialCount();
+      strat = SamplingStrategy::SPARSE;
+    }
     
     // Create a series to hold the conformers resulting from the coarse-grained search.
-    CoordinateSeries<float> cseries(sc.getCoordinateReference(sc.getCoordinateExample(i)),
-                                    nproto_conf);
+    CoordinateSeries<float> cseries(sc.getTopologyPointer(i)->getAtomCount(), nproto_conf);
     const std::vector<int> top_cases = sc.getTopologicalCases(i);
     cseries.resize(0);
     int fc = 0;
@@ -122,16 +126,10 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       fc = std::min(fc, nproto_conf);
       cseries.resize(fc, sc.getCoordinateReference(top_cases[j]));
     }
-
-    // Determine how to sample bond rotations and chiral inversions.  If there are enough slots to
-    // sample each permutation, sample them all.  Otherwise, perform a round-robin sampling,
-    // explicitly sampling each rotatable bond or chiral inversion in series, with random sampling
-    // of other rotatable bonds and chiral centers.
-    if (
         
     // Manipulate this coordinate series using bond rotations as well as chiral inversions.
     // Compute the RMSD matrix and determine a set of diverse conformations.  Cull the results
-    // to eliminate ring stabs or severe clashes between tetiary or quaternary atoms.
+    // to eliminate ring stabs or severe clashes between tertiary or quaternary atoms.
     fc = 0;
     const std::vector<RotatorGroup> rotatable_groups  = chemfe_list[i].getRotatableBondGroups();
     const std::vector<RotatorGroup> invertible_groups = chemfe_list[i].getChiralInversionGroups();

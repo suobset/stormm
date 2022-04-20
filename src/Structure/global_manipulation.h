@@ -3,6 +3,7 @@
 #define OMNI_GLOBAL_MANIPULATION_H
 
 #include <vector>
+#include "DataTypes/common_types.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
@@ -28,14 +29,14 @@ using trajectory::PhaseSpaceWriter;
 /// \param om_x  Rotation about the lab frame X axis (also can be the Euler angle alpha)
 /// \param om_y  Rotation about the lab frame Y axis (also can be the Euler angle beta)
 /// \param om_z  Rotation about the lab frame Z axis (also can be the Euler angle gamma)
-std::vector<double> beardRotationMatrix(const double om_x, const double om_y, const double om_z);
+std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z);
 
 /// \brief Rotate coordinates or a subset of coordinates.  All overloaded forms of this function
 ///        can accept a VirtualSite kit abstract that will direct the repositioning of virtual
 ///        sites, in case one or more frames were subject to partial rotations.
 ///
 /// Overloaded:
-///   - Accept raw pointers
+///   - Accept raw pointers with templated types
 ///   - Accept a pointer to a PhaseSpace or CoordinateFrame object, or abstracts thereof
 ///
 /// \param xcrd         Cartesian X coordinates of the particles
@@ -53,9 +54,10 @@ std::vector<double> beardRotationMatrix(const double om_x, const double om_y, co
 /// \param vsk          Topology abstract governing virtual site placement
 /// \param ag           System topology (contains information on virtual site placement)
 /// \{
-void rotateCoordinates(double* xcrd, double* ycrd, double* zcrd, double alpha, double beta,
-                       double gamma, int lower_limit, int upper_limit,
-                       const VirtualSiteKit<double> *vsk = nullptr);
+template <typename Tcoord, typename Tcalc>
+void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tcalc alpha, Tcalc beta,
+                       Tcalc gamma, int lower_limit, int upper_limit,
+                       const VirtualSiteKit<Tcalc> *vsk = nullptr);
 
 void rotateCoordinates(CoordinateFrameWriter *cfw, const VirtualSiteKit<double> &vsk, double alpha,
                        double beta, double gamma, int lower_limit = 0, int upper_limit = 0);
@@ -75,7 +77,7 @@ void rotateCoordinates(PhaseSpace *ps, const AtomGraph &ag, double alpha, double
 ///        sites, in case one or more frames were subject to partial rotations.
 ///
 /// Overloaded:
-///   - Accept raw pointers
+///   - Accept raw pointers with templated types
 ///   - Accept a pointer to a PhaseSpace or CoordinateFrame object, or abstracts thereof
 ///
 /// \param xcrd         Cartesian X coordinates of the particles
@@ -93,9 +95,9 @@ void rotateCoordinates(PhaseSpace *ps, const AtomGraph &ag, double alpha, double
 /// \param vsk          Topology abstract governing virtual site placement
 /// \param ag           System topology (contains information on virtual site placement)
 /// \{
-void translateCoordinates(double* xcrd, double* ycrd, double* zcrd, double xmove, double ymove,
-                          double zmove, int lower_limit, int upper_limit,
-                          const VirtualSiteKit<double> *vsk = nullptr);
+void translateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tcalc xmove, Tcalc ymove,
+                          Tcalc zmove, int lower_limit, int upper_limit,
+                          const VirtualSiteKit<Tcalc> *vsk = nullptr);
 
 void translateCoordinates(CoordinateFrameWriter *cfw, const VirtualSiteKit<double> &vsk,
                           double xmove, double ymove, double zmove, int lower_limit = 0,
@@ -113,5 +115,7 @@ void translateCoordinates(PhaseSpace *ps, const AtomGraph &ag, double xmove, dou
 
 } // namespace structure
 } // namespace omni
+
+#include "global_manipulation.tpp"
 
 #endif

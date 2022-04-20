@@ -2,6 +2,9 @@
 #ifndef OMNI_VIRTUAL_SITE_PLACEMENT_H
 #define OMNI_VIRTUAL_SITE_PLACEMENT_H
 
+#include <cmath>
+include "Math/vector_ops.h"
+#include "local_arrangement.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -11,8 +14,12 @@
 namespace omni {
 namespace structure {
 
+using math::dot;
+using math::project;
+using math::crossProduct;
 using topology::AtomGraph;
 using topology::UnitCellType;
+using topology::VirtualSiteKind;
 using topology::VirtualSiteKit;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameWriter;

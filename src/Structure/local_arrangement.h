@@ -2,6 +2,11 @@
 #ifndef OMNI_LOCAL_ARRANGEMENT_H
 #define OMNI_LOCAL_ARRANGEMENT_H
 
+#include <cmath>
+#include "Math/vector_ops.h"
+#include "Reporting/error_format.h"
+#include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/coordinateframe.h"
 #include "Accelerator/hybrid.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"

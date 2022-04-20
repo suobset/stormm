@@ -15,6 +15,16 @@ using omni::synthesis::SystemCache;
 using omni::testing::StopWatch;
 using user_input::UserSettings;
 
+/// \brief Enumerate coarse-grained conformer sampling approaches: full if the combinatorial
+///        permutations are few enough, randomized without replacement if the combinatorial
+///        permutations are up to 32 times larger, and randomized with replacement if the
+///        combinatorial permutations are huge.
+enum class SamplingStrategy {
+  FULL,     ///< Sample all permutations of conformers
+  LIMITED,  ///< Randomly sample conformers without replacement
+  SPARSE    ///< Randomly sample conformers with no regard to whether replacement could occur
+};
+
 /// \brief Expand the initial list of systems into a complete list of initial states for the
 ///        population of conformers which conformer.omni will minimize in search of the
 ///        lowest-energy states.  This is done by parsing each topology into its chemical

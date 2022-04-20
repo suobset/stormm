@@ -10,6 +10,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::double2;
@@ -120,7 +121,12 @@ int main(int argc, char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
-
+  StopWatch timer;
+  const int input_timings  = timer.addCategory("Input file parsing");
+  const int sem_timings    = timer.addCategory("Static exclusion mask");
+  const int attn14_timings = timer.addCategory("Compute 1:4 electrostatics");
+  const int nb_timings     = timer.addCategory("Compute non-bonded interactions");
+  
   // Section 1
   section("Tests of the StaticExclusionMask object");
 
@@ -182,13 +188,15 @@ int main(int argc, char* argv[]) {
     trpw_ps.buildFromFile(trpw_crd_name, CoordinateFileKind::AMBER_INPCRD);
     trpp_ag.buildFromPrmtop(trpw_top_name, ExceptionResponse::SILENT);
   }
-
+  timer.assignTime(input_timings);
+  
   // Prepare exclusion masks for each system (the constructor will work even if the
   // system has zero atoms)
   const StaticExclusionMask trpi_semask(&trpi_ag);
   const StaticExclusionMask dhfr_semask(&dhfr_ag);
   const StaticExclusionMask alad_semask(&alad_ag);
   const StaticExclusionMask trpw_semask(&trpw_ag);
+  timer.assignTime(sem_timings);
 
   // Check exclusions for three systems against the original topologies
   section(1);
@@ -249,13 +257,17 @@ int main(int argc, char* argv[]) {
   // Compute 1:4 electrostatic and Lennard-Jones forces on the isolated Trp-cage system
   section(2);
   trpi_ps.initializeForces();
+  timer.assignTime(0);
   const double2 trpi_14_e = evaluateAttenuated14Terms(trpi_ag, &trpi_ps, &all_systems_sc,
                                                       EvaluateForce::YES, EvaluateForce::NO,
                                                       trpi_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> trpi_14_elec_frc = trpi_ps.getInterlacedCoordinates(tkind);
   trpi_ps.initializeForces();
+  timer.assignTime(0);
   evaluateAttenuated14Terms(trpi_ag, &trpi_ps, &secondary_sc, EvaluateForce::NO,
                             EvaluateForce::YES, trpi_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> trpi_14_vdw_frc = trpi_ps.getInterlacedCoordinates(tkind);
   check(trpi_14_e.x, RelationalOperator::EQUAL, Approx(1458.0998129).margin(1.0e-6),
         "Electrostatic 1:4 energy for Trp-cage (AMBER ff99SB force field) was not computed "
@@ -271,8 +283,10 @@ int main(int argc, char* argv[]) {
            NumberFormat::SCIENTIFIC, "Forces due to Lennard-Jones 1:4 non-bonded interactions in "
            "the Trp-cage (isolated boundary conditions) system do not meet expectations.",
            oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, snap_check);
+  timer.assignTime(0);
   const double2 trpi_14_e_ii = evaluateAttenuated14Terms(trpi_ag, CoordinateFrameReader(trpi_ps),
                                                          &secondary_sc, trpi_idx);
+  timer.assignTime(attn14_timings);
   check(trpi_14_e_ii.x, RelationalOperator::EQUAL, Approx(1458.0998129).margin(1.0e-6),
         "Electrostatic 1:4 energy for Trp-cage (AMBER ff99SB force field) was not computed "
         "correctly when evaluating energy only with a coordinate frame object.", do_tests);
@@ -282,13 +296,17 @@ int main(int argc, char* argv[]) {
   
   // Compute 1:4 electrostatic and Lennard-Jones forces on the DHFR system
   dhfr_ps.initializeForces();
+  timer.assignTime(0);
   const double2 dhfr_14_e = evaluateAttenuated14Terms(dhfr_ag, &dhfr_ps, &all_systems_sc,
                                                       EvaluateForce::YES, EvaluateForce::NO,
                                                       dhfr_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> dhfr_14_elec_frc = dhfr_ps.getInterlacedCoordinates(tkind);
   dhfr_ps.initializeForces();
+  timer.assignTime(0);
   evaluateAttenuated14Terms(dhfr_ag, &dhfr_ps, &secondary_sc, EvaluateForce::NO,
                             EvaluateForce::YES, dhfr_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> dhfr_14_vdw_frc = dhfr_ps.getInterlacedCoordinates(tkind);
   check(dhfr_14_e.x, RelationalOperator::EQUAL, Approx(6507.3376751).margin(1.0e-6),
         "Electrostatic 1:4 energy for DHFR (CHARMM force field) was not computed correctly.",
@@ -307,13 +325,17 @@ int main(int argc, char* argv[]) {
 
   // Compute 1:4 electrostatic and Lennard-Jones forces on the alanine dipeptide system
   alad_ps.initializeForces();
+  timer.assignTime(0);
   const double2 alad_14_e = evaluateAttenuated14Terms(alad_ag, &alad_ps, &all_systems_sc,
                                                       EvaluateForce::YES, EvaluateForce::NO,
                                                       alad_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> alad_14_elec_frc = alad_ps.getInterlacedCoordinates(tkind);
   alad_ps.initializeForces();
+  timer.assignTime(0);
   evaluateAttenuated14Terms(alad_ag, &alad_ps, &secondary_sc, EvaluateForce::NO,
                             EvaluateForce::YES, alad_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> alad_14_vdw_frc = alad_ps.getInterlacedCoordinates(tkind);
   check(alad_14_e.x, RelationalOperator::EQUAL, Approx(46.8072425).margin(1.0e-6), "Electrostatic "
         "1:4 energy for alanine dipeptide (ff19SB force field) was not computed correctly.",
@@ -332,13 +354,17 @@ int main(int argc, char* argv[]) {
 
   // Compute 1:4 electrostatic and Lennard-Jones forces on the solvated Trp-cage system
   trpw_ps.initializeForces();
+  timer.assignTime(0);
   const double2 trpw_14_e = evaluateAttenuated14Terms(trpw_ag, &trpw_ps, &all_systems_sc,
                                                       EvaluateForce::YES, EvaluateForce::NO,
                                                       trpw_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> trpw_14_elec_frc = trpw_ps.getInterlacedCoordinates(tkind);
   trpw_ps.initializeForces();
+  timer.assignTime(0);
   evaluateAttenuated14Terms(trpw_ag, &trpw_ps, &secondary_sc, EvaluateForce::YES,
                             EvaluateForce::NO, trpw_idx);
+  timer.assignTime(attn14_timings);
   const std::vector<double> trpw_14_vdw_frc = trpw_ps.getInterlacedCoordinates(tkind);
   check(trpw_14_e.x, RelationalOperator::EQUAL, Approx(1458.0996855).margin(1.0e-6),
         "Electrostatic 1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not "
@@ -346,8 +372,10 @@ int main(int argc, char* argv[]) {
   check(trpw_14_e.y, RelationalOperator::EQUAL, Approx(62.6481797).margin(1.0e-6), "van-der Waals "
         "1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not computed correctly.",
         do_tests);
+  timer.assignTime(0);
   const double2 trpw_14_e_ii = evaluateAttenuated14Terms(trpw_ag, CoordinateFrameReader(trpw_ps),
                                                          &all_systems_sc, trpw_idx);
+  timer.assignTime(attn14_timings);
   check(trpw_14_e_ii.x, RelationalOperator::EQUAL, Approx(1458.0996855).margin(1.0e-6),
         "Electrostatic 1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not "
         "computed correctly when evaluating energy only with a CoordinateFrame abstract.",
@@ -360,9 +388,11 @@ int main(int argc, char* argv[]) {
   // Compute 1:4 electrostatic energies on the Trp-cage system with no explicit scaling factors in
   // the topology
   trpi_ps.initializeForces();
+  timer.assignTime(0);
   const double2 trpp_14_e = evaluateAttenuated14Terms(trpp_ag, &trpi_ps, &all_systems_sc,
                                                       EvaluateForce::YES, EvaluateForce::NO,
                                                       trpp_idx);
+  timer.assignTime(attn14_timings);
   trpi_ps.initializeForces();
   check(trpp_14_e.x, RelationalOperator::EQUAL, Approx(1458.0996843).margin(1.0e-6),
         "Electrostatic 1:4 energy for Trp-cage (AMBER ff99SB force field) was not computed "
@@ -374,13 +404,17 @@ int main(int argc, char* argv[]) {
   // Compute non-bonded energy for the isolated Trp-cage system
   section(3);
   trpi_ps.initializeForces();
+  timer.assignTime(0);
   const double2 trpi_nonb_e = evaluateNonbondedEnergy(trpi_ag, trpi_semask, &trpi_ps,
                                                       &all_systems_sc, EvaluateForce::YES,
                                                       EvaluateForce::NO, trpi_idx);
+  timer.assignTime(nb_timings);
   const std::vector<double> trpi_elec_frc = trpi_ps.getInterlacedCoordinates(tkind);
   trpi_ps.initializeForces();
+  timer.assignTime(0);
   evaluateNonbondedEnergy(trpi_ag, trpi_semask, &trpi_ps, &secondary_sc, EvaluateForce::NO,
                           EvaluateForce::YES, trpi_idx);
+  timer.assignTime(nb_timings);
   const std::vector<double> trpi_vdw_frc = trpi_ps.getInterlacedCoordinates(tkind);
   check(trpi_nonb_e.x, RelationalOperator::EQUAL, Approx(-1816.1478854).margin(1.0e-6),
         "Electrostatic energy for isolated Trp-cage (AMBER ff99SB force field) was not computed "
@@ -391,13 +425,17 @@ int main(int argc, char* argv[]) {
 
   // Compute non-bonded energy for the DHFR system
   dhfr_ps.initializeForces();
+  timer.assignTime(0);
   const double2 dhfr_nonb_e = evaluateNonbondedEnergy(dhfr_ag, dhfr_semask, &dhfr_ps,
                                                       &all_systems_sc, EvaluateForce::YES,
                                                       EvaluateForce::NO, dhfr_idx);
+  timer.assignTime(nb_timings);
   const std::vector<double> dhfr_elec_frc = dhfr_ps.getInterlacedCoordinates(tkind);
   dhfr_ps.initializeForces();
+  timer.assignTime(0);
   evaluateNonbondedEnergy(dhfr_ag, dhfr_semask, &dhfr_ps, &secondary_sc, EvaluateForce::NO,
                           EvaluateForce::YES, dhfr_idx);
+  timer.assignTime(nb_timings);
   const std::vector<double> dhfr_vdw_frc = dhfr_ps.getInterlacedCoordinates(tkind);
   check(dhfr_nonb_e.x, RelationalOperator::EQUAL, Approx(-10036.4655324).margin(1.0e-6),
         "Electrostatic energy for DHFR (CHARMM force field) was not computed correctly.",
@@ -405,9 +443,11 @@ int main(int argc, char* argv[]) {
   check(dhfr_nonb_e.y, RelationalOperator::EQUAL, Approx(-1009.1558078).margin(1.0e-6),
         "van-der Waals energy for DHFR (CHARMM force field) was not computed correctly.",
         do_tests);
+  timer.assignTime(0);
   const double2 dhfr_nonb_e_ii = evaluateNonbondedEnergy(dhfr_ag, dhfr_semask,
                                                          CoordinateFrameReader(dhfr_ps),
                                                          &secondary_sc, dhfr_idx);
+  timer.assignTime(nb_timings);
   check(dhfr_nonb_e_ii.x, RelationalOperator::EQUAL, Approx(-10036.4655324).margin(1.0e-6),
         "Electrostatic energy for DHFR (CHARMM force field) was not computed correctly when "
         "evaluating energy only with a CoordinateFrame abstract.", do_tests);
@@ -417,13 +457,17 @@ int main(int argc, char* argv[]) {
 
   // Compute non-bonded energy for the alanine dipeptide system
   alad_ps.initializeForces();
+  timer.assignTime(0);
   const double2 alad_nonb_e = evaluateNonbondedEnergy(alad_ag, alad_semask, &alad_ps,
                                                       &all_systems_sc, EvaluateForce::YES,
                                                       EvaluateForce::NO, alad_idx);
+  timer.assignTime(nb_timings);
   const std::vector<double> alad_elec_frc = alad_ps.getInterlacedCoordinates(tkind);
   alad_ps.initializeForces();
+  timer.assignTime(0);
   evaluateNonbondedEnergy(alad_ag, alad_semask, &alad_ps, &secondary_sc, EvaluateForce::NO,
                           EvaluateForce::YES, alad_idx);
+  timer.assignTime(nb_timings);
   const std::vector<double> alad_vdw_frc = alad_ps.getInterlacedCoordinates(tkind);
   check(alad_nonb_e.x, RelationalOperator::EQUAL, Approx(-78.8463310).margin(1.0e-6),
         "Electrostatic energy for alanine dipeptide (ff19SB force field) was not computed "
@@ -431,9 +475,11 @@ int main(int argc, char* argv[]) {
   check(alad_nonb_e.y, RelationalOperator::EQUAL, Approx(-1.2452480).margin(1.0e-6),
         "van-der Waals energy for alanine dipeptide (ff19SB force field) was not computed "
         "correctly.", do_tests);
+  timer.assignTime(0);
   const double2 alad_nonb_e_ii = evaluateNonbondedEnergy(alad_ag, alad_semask,
                                                          CoordinateFrameReader(alad_ps),
                                                          &secondary_sc, alad_idx);
+  timer.assignTime(nb_timings);
   check(alad_nonb_e_ii.x, RelationalOperator::EQUAL, Approx(-78.8463310).margin(1.0e-6),
         "Electrostatic energy for alanine dipeptide (ff19SB force field) was not computed "
         "correctly when evaluating energy only with a CoordinateFrame abstract.", do_tests);
@@ -502,8 +548,12 @@ int main(int argc, char* argv[]) {
   check(alad_acc_result, RelationalOperator::EQUAL, Approx(alad_nbe_answer).margin(1.0e-5),
         "Alanine dipeptide non-bonded energy accumulators do not reproduce the double-precision "
         "targets to within tolerances.", do_tests);
+  timer.assignTime(0);
 
   // Print results
+  if (oe.getDisplayTimingsOrder()) {
+    timer.printResults();
+  }
   printTestSummary(oe.getVerbosity());
 
   return 0;

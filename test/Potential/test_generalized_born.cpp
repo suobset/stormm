@@ -94,7 +94,10 @@ int main(int argc, char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
-
+  StopWatch timer;
+  const int input_timings =  timer.addCategory("Input file parsing");
+  const int gb_timings    =  timer.addCategory("Generalized born");
+  
   // Section 1
   section("Test the ImplicitSolventRecipe abstract");
 
@@ -149,6 +152,7 @@ int main(int argc, char* argv[]) {
   const double charmm_default_qq14 = 1.0;
   const double charmm_default_lj14 = 1.0;
   const double sander_dielectric = 78.5;
+  timer.assignTime(0);
   if (systems_exist) {
     trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT, amber_coulomb_constant,
                             amber_default_qq14, amber_default_lj14, charge_rounding_tol,
@@ -163,6 +167,7 @@ int main(int argc, char* argv[]) {
                             charge_discretization_inc);
     alad_ps.buildFromFile(alad_crd_name, CoordinateFileKind::AMBER_INPCRD);
   }
+  timer.assignTime(input_timings);
 
   // Apply an implicit solvent model to each topology and check the result
   std::vector<AtomGraph*> all_topologies = { &trpi_ag, &dhfr_ag, &alad_ag };
@@ -212,8 +217,10 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < system_count; i++) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::HCT_GB, 78.5);
     all_coords[i]->initializeForces();
+    timer.assignTime(0);
     gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
+    timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
   }
   check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
@@ -234,8 +241,10 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < system_count; i++) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB, 78.5);
     all_coords[i]->initializeForces();
+    timer.assignTime(0);
     gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
+    timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
   }
   check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
@@ -256,8 +265,10 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < system_count; i++) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB_II, 78.5);
     all_coords[i]->initializeForces();
+    timer.assignTime(0);
     gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
+    timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
   }
   check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
@@ -288,8 +299,10 @@ int main(int argc, char* argv[]) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::NECK_GB, 78.5, 0.0,
                                                rset_apply);
     all_coords[i]->initializeForces();
+    timer.assignTime(0);
     gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
+    timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
   }
   check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
@@ -313,8 +326,10 @@ int main(int argc, char* argv[]) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::NECK_GB_II, 78.5, 0.0,
                                                rset_apply);
     all_coords[i]->initializeForces();
+    timer.assignTime(0);
     gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
+    timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
   }
   check(all_systems_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN),
@@ -356,8 +371,10 @@ int main(int argc, char* argv[]) {
       }
       all_topologies[j]->setImplicitSolventModel(conditions[i], 80.0, 0.0, shapes[i]);
       all_coords[j]->initializeForces();
+      timer.assignTime(0);
       gb_energy[j] = evaluateGeneralizedBornEnergy(*(all_topologies[j]), ngb_tab,
                                                    all_coords[j], &all_systems_sc, evfrc, j);
+      timer.assignTime(gb_timings);
       gb_forces[j] = all_coords[j]->getInterlacedCoordinates(tkind);
     }
 
@@ -392,6 +409,9 @@ int main(int argc, char* argv[]) {
   }
 
   // Print results
+  if (oe.getDisplayTimingsOrder()) {
+    timer.printResults();
+  }
   printTestSummary(oe.getVerbosity());
 
   return 0;
