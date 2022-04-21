@@ -8,10 +8,12 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
+#include "virtual_site_handling.h"
 
 namespace omni {
 namespace structure {
 
+using data_types::isSignedIntegralScalarType;
 using topology::AtomGraph;
 using topology::VirtualSiteKit;
 using trajectory::CoordinateFrame;
@@ -29,6 +31,7 @@ using trajectory::PhaseSpaceWriter;
 /// \param om_x  Rotation about the lab frame X axis (also can be the Euler angle alpha)
 /// \param om_y  Rotation about the lab frame Y axis (also can be the Euler angle beta)
 /// \param om_z  Rotation about the lab frame Z axis (also can be the Euler angle gamma)
+template <typename T>
 std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z);
 
 /// \brief Rotate coordinates or a subset of coordinates.  All overloaded forms of this function
@@ -57,7 +60,8 @@ std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z);
 template <typename Tcoord, typename Tcalc>
 void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tcalc alpha, Tcalc beta,
                        Tcalc gamma, int lower_limit, int upper_limit,
-                       const VirtualSiteKit<Tcalc> *vsk = nullptr);
+                       const VirtualSiteKit<Tcalc> *vsk = nullptr,
+                       Tcalc globalpos_scale_factor = 1.0);
 
 void rotateCoordinates(CoordinateFrameWriter *cfw, const VirtualSiteKit<double> &vsk, double alpha,
                        double beta, double gamma, int lower_limit = 0, int upper_limit = 0);
@@ -95,9 +99,11 @@ void rotateCoordinates(PhaseSpace *ps, const AtomGraph &ag, double alpha, double
 /// \param vsk          Topology abstract governing virtual site placement
 /// \param ag           System topology (contains information on virtual site placement)
 /// \{
+template <typename Tcoord, typename Tcalc>
 void translateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tcalc xmove, Tcalc ymove,
                           Tcalc zmove, int lower_limit, int upper_limit,
-                          const VirtualSiteKit<Tcalc> *vsk = nullptr);
+                          const VirtualSiteKit<Tcalc> *vsk = nullptr,
+                          Tcalc globalpos_scale_factor = 1.0);
 
 void translateCoordinates(CoordinateFrameWriter *cfw, const VirtualSiteKit<double> &vsk,
                           double xmove, double ymove, double zmove, int lower_limit = 0,

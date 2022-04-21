@@ -202,8 +202,11 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \
 		 $(SRCDIR)/Potential/scorecard.tpp \
+		 $(SRCDIR)/Structure/global_manipulation.tpp \
 		 $(SRCDIR)/Structure/isomerization.tpp \
+		 $(SRCDIR)/Structure/local_arrangement.tpp \
 		 $(SRCDIR)/Structure/rmsd.tpp \
+		 $(SRCDIR)/Structure/virtual_site_handling.tpp \
 		 $(SRCDIR)/Topology/atomgraph.tpp \
 		 $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
 		 $(SRCDIR)/Topology/topology_util.tpp \

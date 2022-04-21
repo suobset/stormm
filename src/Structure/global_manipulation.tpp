@@ -7,7 +7,7 @@ using topology::UnitCellType;
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 std::vector<T> beardRotationMatrix(const T om_x, const T om_y, const T om_z) {
-  const size_t ct = std::type_index(typeid(Tcalc)).hash_code();
+  const size_t ct = std::type_index(typeid(T)).hash_code();
   const bool t_is_double = (ct == double_type_index);
 
   std::vector<T> result(9);
@@ -75,7 +75,8 @@ void rotateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc alp
   // rotation.  Dereferencing the pointer is not costly so long as the abstract contains only
   // constants and pointers.
   if (vsk != nullptr) {
-    placeVirtualSites(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, *vsk);
+    placeVirtualSites<double, double>(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                      *vsk);
   }
 }
 
@@ -105,7 +106,8 @@ void translateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc 
   // rotation.  Dereferencing the pointer is not costly so long as the abstract contains only
   // constants and pointers.
   if (vsk != nullptr) {
-    placeVirtualSites(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, *vsk);
+    placeVirtualSites<double, double>(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                      *vsk);
   }
 }
 

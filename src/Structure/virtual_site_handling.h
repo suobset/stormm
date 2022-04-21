@@ -3,7 +3,7 @@
 #define OMNI_VIRTUAL_SITE_PLACEMENT_H
 
 #include <cmath>
-include "Math/vector_ops.h"
+#include "Math/vector_ops.h"
 #include "local_arrangement.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -29,25 +29,28 @@ using trajectory::PhaseSpaceWriter;
 /// \brief Reference function for placing virtual sites, using double-precision math throughout.
 ///
 /// Overloaded:
-///   - Take the raw coordinate and box transformation pointers plus a virtual sites abstract
-///   - Take a modifiable PhaseSpace object and the system topology
-///   - Take a modifiable CoordinateFrame object and the system topology
-///   - Accept the topology by const reference or by const pointer
+///   - Take templated pointers to raw coordinate and box transformation matrices, plus a virtual
+///     sites abstract from the topology matching the precision of the transformation matrices
+///   - Take modifiable forms of any of the coordinate objects or their abstracts (most will imply
+///     a specific coordinate representation)
 ///
-/// \param xcrd       Cartesian X coordinates of all atoms
-/// \param ycrd       Cartesian Y coordinates of all atoms
-/// \param zcrd       Cartesian Z coordinates of all atoms
-/// \param umat       Transformation matrix taking coordinates into unit cell fractional space
-/// \param invu       Transformation matrix taking coordinates back to real space
-/// \param unit_cell  The system's unit cell type
-/// \param ps         Coordinates of the system as a mutable PhaseSpace object
-/// \param cf         Coordinates of the system as a mutable CoordinateFrame object
-/// \param vsk        Virtual sites details abstracted from the original topology
-/// \param ag         System topology containing virtual site specifications        
+/// \param xcrd               Cartesian X coordinates of all particles
+/// \param ycrd               Cartesian Y coordinates of all particles
+/// \param zcrd               Cartesian Z coordinates of all particles
+/// \param umat               Transformation matrix taking coordinates into fractional space
+/// \param invu               Transformation matrix taking coordinates back to real space
+/// \param unit_cell          The system's unit cell type
+/// \param ps                 Coordinates of the system as a mutable PhaseSpace object
+/// \param cf                 Coordinates of the system as a mutable CoordinateFrame object
+/// \param vsk                Virtual sites details abstracted from the original topology
+/// \param ag                 System topology containing virtual site specifications        
+/// \param gpos_scale_factor  Scaling factor to convert real coordinates into a fixed-precision
+///                           representation (the inverse is computed internally)
 /// \{
-void placeVirtualSites(double* xcrd, double* ycrd, double* zcrd, const double* umat,
+template <typename Tcoord, typename Tcalc>
+void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* umat,
                        const double* invu, const UnitCellType unit_cell,
-                       const VirtualSiteKit<double> &vsk);
+                       const VirtualSiteKit<Tcalc> &vsk, Tcalc gpos_scale_factor = 1.0);
 
 void placeVirtualSites(PhaseSpace *ps, const AtomGraph &ag);
 
@@ -56,27 +59,59 @@ void placeVirtualSites(PhaseSpace *ps, const AtomGraph *ag);
 void placeVirtualSites(CoordinateFrame *cf, const AtomGraph &ag);
 
 void placeVirtualSites(CoordinateFrame *cf, const AtomGraph *ag);
+
+template <typename Tcalc>
+void placeVirtualSites(PhaseSpaceWriter psw, const VirtualSiteKit<Tcalc> vsk);
+
+template <typename Tcalc>
+void placeVirtualSites(CoordinateFrameWriter cfw, const VirtualSiteKit<Tcalc> vsk);
 /// \}
 
 /// \brief Transmit forces on virtual sites to their frame atoms, using double-precision math
 ///        throughout.
 ///
 /// Overloaded:
-///   - Pass the topology by const pointer or by const reference
-///   - Accept the virtual site abstract directly
+///   - Take templated pointers to raw coordinate and box transformation matrices, plus a virtual
+///     sites abstract from the topology matching the precision of the transformation matrices
+///   - Take modifiable forms of appropriate coordinate objects or their abstracts (each will imply
+///     a specific coordinate representation)
 ///
-/// \param ps   Coordinates and forces of the system
-/// \param ag   System topology containing virtual site specifications        
-/// \param vsk  Virtual site abstract (obtained from the original topology)
+/// \param xcrd                Cartesian X coordinates of all particles
+/// \param ycrd                Cartesian Y coordinates of all particles
+/// \param zcrd                Cartesian Z coordinates of all particles
+/// \param xfrc                Cartesian X forces acting on all particles
+/// \param yfrc                Cartesian Y forces acting on all particles
+/// \param zfrc                Cartesian Z forces acting on all particles
+/// \param umat                Transformation matrix taking coordinates into fractional space
+/// \param invu                Transformation matrix taking coordinates back to real space
+/// \param unit_cell           The system's unit cell type
+/// \param ps                  Coordinates of the system as a mutable PhaseSpace object
+/// \param cf                  Coordinates of the system as a mutable CoordinateFrame object
+/// \param vsk                 Virtual sites details abstracted from the original topology
+/// \param ag                  System topology containing virtual site specifications
+/// \param gpos_scale_factor   Scaling factor to convert real coordinates into a fixed-precision
+///                            representation (the inverse is computed internally)
+/// \param force_scale_factor  Scaling factor to convert real-valued force components into a
+///                            fixed-precision representation (the inverse is computed internally)
 /// \{
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                               Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, const double* umat,
+                               const double* invu, const UnitCellType unit_cell,
+                               const VirtualSiteKit<Tcalc> &vsk, Tcalc gpos_scale_factor = 1.0,
+                               Tcalc force_scale_factor = 1.0);
+
 void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph &ag);
 
 void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph *ag);
 
-void transmitVirtualSiteForces(PhaseSpace *ps, const VirtualSiteKit<double> &vsk);
+template <typename Tcalc>
+void transmitVirtualSiteForces(PhaseSpace psw, VirtualSiteKit<Tcalc> vsk);
 /// \}
   
 } // namespace structure
 } // namespace omni
+
+#include "virtual_site_handling.tpp"
 
 #endif

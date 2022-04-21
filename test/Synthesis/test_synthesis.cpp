@@ -107,8 +107,8 @@ bool checkSimpleTaskCoverage(const std::vector<uint> &accd, const std::vector<in
 //-------------------------------------------------------------------------------------------------
 bool checkNaiveDistance(const int i, const int j, const CoordinateFrameReader &cfr) {
   const double reim_dist  = distance(i, j, cfr);
-  const double naive_dist = distance(i, j, cfr.xcrd, cfr.ycrd, cfr.zcrd, nullptr, nullptr,
-                                     UnitCellType::NONE);
+  const double naive_dist = distance<double, double>(i, j, cfr.xcrd, cfr.ycrd, cfr.zcrd, nullptr,
+                                                     nullptr, UnitCellType::NONE);
   return (fabs(reim_dist - naive_dist) < omni::constants::tiny);
 }
 

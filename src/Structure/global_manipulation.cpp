@@ -1,6 +1,5 @@
 #include "global_manipulation.h"
 #include "structure_utils.h"
-#include "virtual_site_handling.h"
 
 namespace omni {
 namespace structure {
@@ -15,7 +14,8 @@ void rotateCoordinates(CoordinateFrameWriter *cfw, const VirtualSiteKit<double> 
   const int actual_upper_limit = (upper_limit <= lower_limit) ? cfw->natom : upper_limit;
   rotateCoordinates<double, double>(cfw->xcrd, cfw->ycrd, cfw->zcrd, alpha, beta, gamma,
                                     lower_limit, actual_upper_limit);
-  placeVirtualSites(cfw->xcrd, cfw->ycrd, cfw->zcrd, nullptr, nullptr, UnitCellType::NONE, vsk);
+  placeVirtualSites<double, double>(cfw->xcrd, cfw->ycrd, cfw->zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, vsk);
 }
 
 
@@ -28,8 +28,8 @@ void rotateCoordinates(CoordinateFrame *cf, const AtomGraph &ag, const double al
   const int actual_upper_limit = (upper_limit <= lower_limit) ? cfw.natom : upper_limit;
   rotateCoordinates<double, double>(cfw.xcrd, cfw.ycrd, cfw.zcrd, alpha, beta, gamma, lower_limit,
                                     actual_upper_limit);
-  placeVirtualSites(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr, UnitCellType::NONE,
-                    ag.getDoublePrecisionVirtualSiteKit());
+  placeVirtualSites<double, double>(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, ag.getDoublePrecisionVirtualSiteKit());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -40,7 +40,8 @@ void rotateCoordinates(PhaseSpaceWriter *psw, const VirtualSiteKit<double> &vsk,
   const int actual_upper_limit = (upper_limit <= lower_limit) ? psw->natom : upper_limit;
   rotateCoordinates<double, double>(psw->xcrd, psw->ycrd, psw->zcrd, alpha, beta, gamma,
                                     lower_limit, actual_upper_limit);
-  placeVirtualSites(psw->xcrd, psw->ycrd, psw->zcrd, nullptr, nullptr, UnitCellType::NONE, vsk);
+  placeVirtualSites<double, double>(psw->xcrd, psw->ycrd, psw->zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, vsk);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -51,8 +52,8 @@ void rotateCoordinates(PhaseSpace *ps, const AtomGraph &ag, const double alpha, 
   const int actual_upper_limit = (upper_limit <= lower_limit) ? psw.natom : upper_limit;
   rotateCoordinates<double, double>(psw.xcrd, psw.ycrd, psw.zcrd, alpha, beta, gamma, lower_limit,
                                     actual_upper_limit);
-  placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, nullptr, nullptr, UnitCellType::NONE,
-                    ag.getDoublePrecisionVirtualSiteKit());
+  placeVirtualSites<double, double>(psw.xcrd, psw.ycrd, psw.zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, ag.getDoublePrecisionVirtualSiteKit());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -63,7 +64,8 @@ void translateCoordinates(CoordinateFrameWriter *cfw, const VirtualSiteKit<doubl
   const int actual_upper_limit = (upper_limit <= lower_limit) ? cfw->natom : upper_limit;
   translateCoordinates<double, double>(cfw->xcrd, cfw->ycrd, cfw->zcrd, xmove, ymove, zmove,
                                        lower_limit, actual_upper_limit);
-  placeVirtualSites(cfw->xcrd, cfw->ycrd, cfw->zcrd, nullptr, nullptr, UnitCellType::NONE, vsk);
+  placeVirtualSites<double, double>(cfw->xcrd, cfw->ycrd, cfw->zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, vsk);
 }
 
 
@@ -76,8 +78,8 @@ void translateCoordinates(CoordinateFrame *cf, const AtomGraph &ag, const double
   const int actual_upper_limit = (upper_limit <= lower_limit) ? cfw.natom : upper_limit;
   translateCoordinates<double, double>(cfw.xcrd, cfw.ycrd, cfw.zcrd, xmove, ymove, zmove,
                                        lower_limit, actual_upper_limit);
-  placeVirtualSites(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr, UnitCellType::NONE,
-                    ag.getDoublePrecisionVirtualSiteKit());
+  placeVirtualSites<double, double>(cfw.xcrd, cfw.ycrd, cfw.zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, ag.getDoublePrecisionVirtualSiteKit());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -88,7 +90,8 @@ void translateCoordinates(PhaseSpaceWriter *psw, const VirtualSiteKit<double> &v
   const int actual_upper_limit = (upper_limit <= lower_limit) ? psw->natom : upper_limit;
   translateCoordinates<double, double>(psw->xcrd, psw->ycrd, psw->zcrd, xmove, ymove, zmove,
                                        lower_limit, actual_upper_limit);
-  placeVirtualSites(psw->xcrd, psw->ycrd, psw->zcrd, nullptr, nullptr, UnitCellType::NONE, vsk);
+  placeVirtualSites<double, double>(psw->xcrd, psw->ycrd, psw->zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, vsk);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -100,8 +103,8 @@ void translateCoordinates(PhaseSpace *ps, const AtomGraph &ag, const double xmov
   const int actual_upper_limit = (upper_limit <= lower_limit) ? psw.natom : upper_limit;
   translateCoordinates<double, double>(psw.xcrd, psw.ycrd, psw.zcrd, xmove, ymove, zmove,
                                        lower_limit, actual_upper_limit);
-  placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, nullptr, nullptr, UnitCellType::NONE,
-                    ag.getDoublePrecisionVirtualSiteKit());
+  placeVirtualSites<double, double>(psw.xcrd, psw.ycrd, psw.zcrd, nullptr, nullptr,
+                                    UnitCellType::NONE, ag.getDoublePrecisionVirtualSiteKit());
 }
 
 } // namespace structure
