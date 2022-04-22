@@ -6,8 +6,10 @@ namespace mm {
 
 //-------------------------------------------------------------------------------------------------
 void computeGradientMove(const double* xfrc, const double* yfrc, const double* zfrc,
-                         double* xmove, double* ymove, double* zmove, const int natom,
-                         const int step, const int sd_steps) {
+                         double* xmove, double* ymove, double* zmove, const double* umat,
+                         const double* invu, const UnitCellType unit_cell,
+                         const VirtualSiteKit<double> &vsk, const int natom, const int step,
+                         const int sd_steps) {
   if (step < sd_steps) {
     double msum = 0.0;
     for (int i = 0; i < natom; i++) {
@@ -34,17 +36,19 @@ void computeGradientMove(const double* xfrc, const double* yfrc, const double* z
 
 //-------------------------------------------------------------------------------------------------
 void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove,
-                   const double* ymove, const double* zmove, const int natom, const double dist) {
+                   const double* ymove, const double* zmove, const double* umat,
+                   const double* invu, const UnitCellType unit_cell,
+                   const VirtualSiteKit<double> &vsk, const int natom, const double dist) {
   for (int i = 0; i < natom; i++) {
     xcrd[i] += xmove[i] * dist;
     ycrd[i] += ymove[i] * dist;
     zcrd[i] += zmove[i] * dist;
   }
+  placeVirtualSites(xcrd, ycrd, zcrd, umat, invu, unit_cell, vsk);
 }
   
 //-------------------------------------------------------------------------------------------------
-void minimize(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-              const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc, double* zfrc,
               double* xmove, double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
               double* z_cg_temp, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
               const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
@@ -64,19 +68,22 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* umat, double* in
     }
     evalNonbValeRestMM(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, &sc, vk, nbk,
                        rar, EvaluateForce::YES);
+    transmitVirtualSiteForces<double, double>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, umat, invu,
+                                              unit_cell, vsk);
     evec[0] = sc.reportTotalEnergy();
     mvec[0] = 0.0;
 
     // Generate the move    
     computeGradientMove(xfrc, yfrc, zfrc, xmove, ymove, zmove, x_cg_temp, y_cg_temp, z_cg_temp,
-                        vk.natom, step, mincon.getSteepestDescentSteps);
+                        vk.natom, step, mincon.getSteepestDescentSteps());
 
     // Implement the move three times, compute the energy, and arrive at a minimum value.
     double move_scale_factor = 1.0;    
     for (int i = 0; i < 3; i++) {
-      moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, vk.natom, move_scale);
-      evalNonbValeRestMM(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, &sc, vk, nbk,
-                         rar, EvaluateForce::NO);
+      moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+                    vk.natom, vsk, move_scale);
+      evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
+                         &sc, vk, nbk, rar, EvaluateForce::NO);
       evec[i + 1] = sc.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {
@@ -118,7 +125,8 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* umat, double* in
       // The cubic equation has no minima or maxima.  Check the extrema of the range to
       // ascertain the correct move.
       if (evec[0] < evec[3]) {
-        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, vk.natom, -mvec[3] * move_scale);
+        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+                      vk.natom, vsk, -mvec[3] * move_scale);
       }
     }
     else {
@@ -128,8 +136,8 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* umat, double* in
       const double ext_i  = (-d_abcd[1] + sqrt(sqrt_arg)) / (2.0 * d_abcd[0]);
       const double ext_ii = (-d_abcd[1] - sqrt(sqrt_arg)) / (2.0 * d_abcd[0]);
       const double min_pos = ((2.0 * d_abcd[0] * ext_i) + d_abcd[1] > 0.0) ? ext_i : ext_ii;
-      moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, vk.natom,
-                    (min_pos - mvec[3]) * move_scale);
+      moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+                    vk.natom, vsk, (min_pos - mvec[3]) * move_scale);
     }
   }
 }
