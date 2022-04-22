@@ -147,8 +147,14 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       const double ext_i  = (-d_abcd[1] + sqrt(sqrt_arg)) / (2.0 * d_abcd[0]);
       const double ext_ii = (-d_abcd[1] - sqrt(sqrt_arg)) / (2.0 * d_abcd[0]);
       const double min_pos = ((2.0 * d_abcd[0] * ext_i) + d_abcd[1] > 0.0) ? ext_i : ext_ii;
-      moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
-                    vsk, vk.natom, (min_pos - mvec[3]) * move_scale);
+      if (min_pos <= 0.0) {
+        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+                      vsk, vk.natom, -mvec[3] * move_scale);
+      }
+      else if (min_pos < mvec[3]) {
+        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+                      vsk, vk.natom, (min_pos - mvec[3]) * move_scale);
+      }
     }
   }
 }
