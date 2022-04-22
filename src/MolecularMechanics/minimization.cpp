@@ -1,14 +1,25 @@
+#include <cmath>
+#include "Math/matrix_ops.h"
+#include "Potential/energy_enumerators.h"
+#include "Potential/scorecard.h"
+#include "Structure/virtual_site_handling.h"
 #include "minimization.h"
 #include "mm_evaluation.h"
 
 namespace omni {
 namespace mm {
 
+using energy::EvaluateForce;
+using energy::ScoreCard;
+using math::invertSquareMatrix;
+using math::matrixVectorMultiply;
+using structure::placeVirtualSites;
+using structure::transmitVirtualSiteForces;
+  
 //-------------------------------------------------------------------------------------------------
 void computeGradientMove(const double* xfrc, const double* yfrc, const double* zfrc,
-                         double* xmove, double* ymove, double* zmove, const double* umat,
-                         const double* invu, const UnitCellType unit_cell,
-                         const VirtualSiteKit<double> &vsk, const int natom, const int step,
+                         double* xmove, double* ymove, double* zmove, double* x_cg_temp,
+                         double* y_cg_temp, double* z_cg_temp, const int natom, const int step,
                          const int sd_steps) {
   if (step < sd_steps) {
     double msum = 0.0;
@@ -66,24 +77,24 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       yfrc[i] = 0.0;
       zfrc[i] = 0.0;
     }
-    evalNonbValeRestMM(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, &sc, vk, nbk,
-                       rar, EvaluateForce::YES);
-    transmitVirtualSiteForces<double, double>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, umat, invu,
-                                              unit_cell, vsk);
+    evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
+                       &sc, vk, nbk, se, rar, EvaluateForce::YES, step);
+    transmitVirtualSiteForces<double, double>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
+                                              UnitCellType::NONE, vsk);
     evec[0] = sc.reportTotalEnergy();
     mvec[0] = 0.0;
 
     // Generate the move    
     computeGradientMove(xfrc, yfrc, zfrc, xmove, ymove, zmove, x_cg_temp, y_cg_temp, z_cg_temp,
-                        vk.natom, step, mincon.getSteepestDescentSteps());
+                        vk.natom, step, mincon.getSteepestDescentCycles());
 
     // Implement the move three times, compute the energy, and arrive at a minimum value.
     double move_scale_factor = 1.0;    
     for (int i = 0; i < 3; i++) {
       moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
-                    vk.natom, vsk, move_scale);
+                    vsk, vk.natom, move_scale);
       evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
-                         &sc, vk, nbk, rar, EvaluateForce::NO);
+                         &sc, vk, nbk, se, rar, EvaluateForce::NO, step);
       evec[i + 1] = sc.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {
@@ -91,7 +102,7 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
         move_scale_factor *= 1.05;
       }
       else {
-        move_scale *= 0.90
+        move_scale *= 0.90;
         move_scale_factor *= 0.90;
       }
     }
@@ -102,13 +113,13 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
     // numerics of solving this system of linear equations as the step size becomes very small.
     for (int i = 0; i < 4; i++) {
       const double x = mvec[i];
-      amat[amcon + i     ] = x * x * x;
-      amat[amcon + i +  4] = x * x;
-      amat[amcon + i +  8] = x;
-      amat[amcon + i + 12] = 1.0;
+      amat[i     ] = x * x * x;
+      amat[i +  4] = x * x;
+      amat[i +  8] = x;
+      amat[i + 12] = 1.0;
     }
-    invertSquareMatrix(amat->data(), inva->data(), 4);
-    matrixVectorMultiply(inva->data(), evec->data(), abcd_coefs->data(), 4, 4);
+    invertSquareMatrix(amat, inva, 4);
+    matrixVectorMultiply(inva, evec, abcd_coefs, 4, 4);
 
     // The cubic polynomial will have at most one local minimum.  Find the local minimum, and if
     // it is in the range [mvec[0] = 0.0, mvec[3]] (inclusive of the endpoints), then take it by
@@ -126,7 +137,7 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       // ascertain the correct move.
       if (evec[0] < evec[3]) {
         moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
-                      vk.natom, vsk, -mvec[3] * move_scale);
+                      vsk, vk.natom, -mvec[3] * move_scale);
       }
     }
     else {
@@ -137,7 +148,7 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       const double ext_ii = (-d_abcd[1] - sqrt(sqrt_arg)) / (2.0 * d_abcd[0]);
       const double min_pos = ((2.0 * d_abcd[0] * ext_i) + d_abcd[1] > 0.0) ? ext_i : ext_ii;
       moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
-                    vk.natom, vsk, (min_pos - mvec[3]) * move_scale);
+                    vsk, vk.natom, (min_pos - mvec[3]) * move_scale);
     }
   }
 }

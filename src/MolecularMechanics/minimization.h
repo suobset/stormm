@@ -2,8 +2,30 @@
 #ifndef OMNI_MINIMIZATION_H
 #define OMNI_MINIMIZATION_H
 
+#include "Namelists/nml_minimize.h"
+#include "Potential/static_exclusionmask.h"
+#include "Restraints/restraint_apparatus.h"
+#include "Topology/atomgraph.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/phasespace.h"
+
 namespace omni {
 namespace mm {
+
+using energy::StaticExclusionMask;
+using namelist::MinimizeControls;
+using restraints::RestraintApparatusDpReader;
+using topology::AtomGraph;
+using topology::NonbondedKit;
+using topology::UnitCellType;
+using topology::ValenceKit;
+using topology::VirtualSiteKit;
+using trajectory::CoordinateFrame;
+using trajectory::CoordinateFrameReader;
+using trajectory::PhaseSpace;
+using trajectory::PhaseSpaceWriter;
 
 /// \brief Compute the move based on the computed forces.  This is a normalized unit vector along
 ///        the direction of the forces if the minimization is still in a steepest descent phase,
@@ -36,16 +58,18 @@ void computeGradientMove(const double* xfrc, const double* yfrc, const double* z
 /// \param xmove      Cartesian X moves to apply to each particle
 /// \param ymove      Cartesian Y moves to apply to each particle
 /// \param zmove      Cartesian Z moves to apply to each particle
+/// \param x_cg_temp  Cartesian X moves to apply to each particle
+/// \param y_cg_temp  Cartesian Y moves to apply to each particle
+/// \param z_cg_temp  Cartesian Z moves to apply to each particle
 /// \param umat       Transformation matrix taking coordinates into fractional space
 /// \param invu       Transformation matrix taking fractional coordinates back to real space
 /// \param unit_cell  Type of simulation cell, to direct re-imaging for virtual site placement
 /// \param vsk        Virtual site abstract from the original topology
 /// \param natom      Number of atoms (trusted length of xcrd, ycrd, ..., ymove, and zmove)
 /// \param dist       Distance along the gradient to travel (a multiplier for the unit vector)
-void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove,
-                   const double* ymove, const double* zmove, const double* umat,
-                   const double* invu, UnitCellType unit_cell, const VirtualSiteKit<double> &vsk,
-                   int natom, double dist);
+void moveParticles(const double* xcrd, const double* ycrd, const double* zcrd, double* xmove,
+                   double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
+                   double* z_cg_temp, int natom, double dist);
 
 /// \brief Minimize a set of coordinates governed by a single topology and restraint apparatus.
 ///        This routine carries out line minimizations.
