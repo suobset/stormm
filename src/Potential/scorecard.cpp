@@ -157,6 +157,40 @@ void ScoreCard::contribute(const StateVariable var, const llint amount, const in
 }
 
 //-------------------------------------------------------------------------------------------------
+std::vector<double> ScoreCard::reportTotalEnergies() {
+#ifdef OMNI_USE_HPC
+  instantaneous_accumulators.download();
+#endif
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  const int padded_nvar = roundUp(nvar, warp_size_int);
+  std::vector<double> result(system_count);
+  const llint* inst_acc_ptr = instantaneous_accumulators.data();
+  for (int i = 0; i < system_count; i++) {
+    llint lacc = 0LL;
+    for (int j = 0; j < nvar; j++) {
+      lacc += inst_acc_ptr[(i * padded_nvar) + j];
+    }
+    result[i] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::reportTotalEnergy(const int system_index) {
+#ifdef OMNI_USE_HPC
+  instantaneous_accumulators.download();
+#endif
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  const int padded_nvar = roundUp(nvar, warp_size_int);
+  const llint* inst_acc_ptr = instantaneous_accumulators.data();
+  llint lacc = 0LL;
+  for (int i = 0; i < nvar; i++) {
+    lacc += inst_acc_ptr[(system_index * padded_nvar) + i];
+  }
+  return inverse_nrg_scale_lf * static_cast<double>(lacc);
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<double> ScoreCard::reportInstantaneousStates() {
 #ifdef OMNI_USE_HPC
   instantaneous_accumulators.download();

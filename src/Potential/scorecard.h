@@ -122,6 +122,16 @@ public:
   ///                      contrbution describes
   void contribute(StateVariable var, llint amount, int system_index = 0);
 
+  /// \brief Report the total energy for all systems.  Each result will be summed in the internal
+  ///        fixed-point accumulation before conversion to real values in units of kcal/mol.
+  std::vector<double> reportTotalEnergies();
+  
+  /// \brief Report the total energy for one system in the list, following the summation protocol
+  ///        from reportTotalEnergies() above.
+  ///
+  /// \param system_index  Index of the system of interest
+  double reportTotalEnergy(int system_index = 0);
+  
   /// \brief Report instantaneous results in kcal/mol, as a double-precision vector.
   ///
   /// Overloaded:
