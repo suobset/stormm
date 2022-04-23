@@ -89,13 +89,17 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf) {
   if (line_two.size() == 0) {
     return CoordinateFileKind::UNKNOWN;
   }
-  if (line_two.size() == 2 &&
+  if (line_two.size() == 2 && verifyNumberFormat(line_two[0].c_str(), NumberFormat::INTEGER) &&
       (verifyNumberFormat(line_two[1].c_str(), NumberFormat::SCIENTIFIC) ||
        verifyNumberFormat(line_two[1].c_str(), NumberFormat::STANDARD_REAL))) {
     if (tfr.line_limits[3] - tfr.line_limits[2] >= 36 &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2], 12) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2] + 12, 12) &&
         verifyNumberFormat(tfr.text, NumberFormat::STANDARD_REAL, tfr.line_limits[2] + 24, 12)) {
+
+      // Some input files will still have a time stamp.  A check for the presence of actual
+      // velocities will be needed later, as this routine may have only been fed a stub from the
+      // head of the file.
       return CoordinateFileKind::AMBER_ASCII_RST;
     }
     else {

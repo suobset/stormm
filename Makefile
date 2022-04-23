@@ -344,7 +344,8 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_nonbonded_evaluation \
 	          $(TESTDIR)/bin/test_generalized_born \
 	          $(TESTDIR)/bin/test_neighbor_list \
-	          $(TESTDIR)/bin/test_restraints
+	          $(TESTDIR)/bin/test_restraints \
+	          $(TESTDIR)/bin/test_minimization
 
 # Test programs using omni.cuda
 OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
@@ -540,6 +541,13 @@ $(TESTDIR)/bin/test_restraints : $(LIBDIR)/libomni.so \
 	@echo "[OMNI]  Building test_restraints..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_restraints \
 	  $(TESTDIR)/Restraints/test_restraints.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: molecular mechanics minimization and execution by CPU routines
+$(TESTDIR)/bin/test_minimization : $(LIBDIR)/libomni.so \
+				   $(TESTDIR)/MolecularMechanics/test_minimization.cpp
+	@echo "[OMNI]  Building test_minimization..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_minimization \
+	  $(TESTDIR)/MolecularMechanics/test_minimization.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: HPC detection
 $(TESTDIR)/bin/test_hpc_status : $(LIBDIR)/libomni_cuda.so \

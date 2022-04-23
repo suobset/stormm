@@ -3,9 +3,9 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
-#include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 #include "../../src/UnitTesting/stopwatch.h"
+#include "../../src/UnitTesting/unit_test.h"
 #include "../../src/Random/random.h"
 
 using omni::data_types::int4;

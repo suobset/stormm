@@ -255,7 +255,13 @@ void PhaseSpace::buildFromFile(const std::string &file_name_in, const Coordinate
       allocate();
       getAmberInputCoordinates(tf, &x_coordinates, &y_coordinates, &z_coordinates,
                                &box_space_transform, &inverse_transform, &box_dimensions);
-      getAmberRestartVelocities(tf, &x_velocities, &y_velocities, &z_velocities);
+      const int data_line_count = (atom_count + 1) / 2;
+
+      // The file may have been marked as an Amber ASCII restart because of the presence of a time
+      // stamp on the second line when no velocities are actually present.  Check that here.
+      if (tf.getLineCount() >= 2 + (2 * data_line_count)) {
+        getAmberRestartVelocities(tf, &x_velocities, &y_velocities, &z_velocities);
+      }
 
       // Interpret the box transformation, updating the unit cell type based on the file
       unit_cell = determineUnitCellTypeByShape(inverse_transform.data());
