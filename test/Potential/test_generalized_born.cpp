@@ -54,7 +54,7 @@ using namespace omni::generalized_born_defaults;
 std::vector<double> forceByFiniteDifference(const AtomGraph &ag, PhaseSpace *ps,
                                             const NeckGeneralizedBornTable &ngb_tab,
                                             const int sample_interval) {
-  ScoreCard sc(1, 32);
+  ScoreCard sc(1, 1, 32);
   PhaseSpaceWriter psw = ps->data();
   const EvaluateForce evfrc = EvaluateForce::YES;
 
@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
   // 0.0002 kcal/mol of the sander results.  All systems can be brought into near perfect agreement
   // with the sander calculations by disabling charge discretization and normalization.
   const NeckGeneralizedBornTable ngb_tab;
-  ScoreCard all_systems_sc(3, 32);
+  ScoreCard all_systems_sc(3, 1, 32);
   const int trpi_idx = 0;
   const int dhfr_idx = 1;
   const int alad_idx = 2;

@@ -1,7 +1,6 @@
 #include <cmath>
 #include "Math/matrix_ops.h"
 #include "Potential/energy_enumerators.h"
-#include "Potential/scorecard.h"
 #include "Structure/virtual_site_handling.h"
 #include "minimization.h"
 #include "mm_evaluation.h"
@@ -10,7 +9,6 @@ namespace omni {
 namespace mm {
 
 using energy::EvaluateForce;
-using energy::ScoreCard;
 using math::invertSquareMatrix;
 using math::matrixVectorMultiply;
 using structure::placeVirtualSites;
@@ -59,14 +57,15 @@ void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove
 }
   
 //-------------------------------------------------------------------------------------------------
-void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc, double* zfrc,
-              double* xmove, double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
-              double* z_cg_temp, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-              const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
-              const StaticExclusionMaskReader &ser, const MinimizeControls &mincon) {
+ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc,
+                   double* zfrc, double* xmove, double* ymove, double* zmove, double* x_cg_temp,
+                   double* y_cg_temp, double* z_cg_temp, const ValenceKit<double> &vk,
+                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
+                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
+                   const MinimizeControls &mincon, const int nrg_scale_bits) {
   
   // Loop for the requested number of cycles
-  ScoreCard sc(1);
+  ScoreCard sc(1, mincon.getTotalCycles() + 1, nrg_scale_bits), sc_temp(1);
   double move_scale = mincon.getInitialStep();
   double evec[4], mvec[4], abcd_coefs[4], d_abcd[3], amat[16], inva[16];
   for (int step = 0; step < mincon.getTotalCycles(); step++) {
@@ -98,13 +97,13 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
                     vsk, vk.natom, move_scale);
       evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
-                         &sc, vk, nbk, ser, rar, EvaluateForce::NO, step);
+                         &sc_temp, vk, nbk, ser, rar, EvaluateForce::NO, step);
 
       // CHECK
       //printf("%12.4lf -> ", sc.reportTotalEnergy());
       // END CHECK
       
-      evec[i + 1] = sc.reportTotalEnergy();
+      evec[i + 1] = sc_temp.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {
         move_scale *= 1.05;
@@ -172,19 +171,33 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
                       vsk, vk.natom, (min_pos - mvec[3]) * move_scale);
       }
     }
+    sc.incrementSampleCount();
   }
+  return sc;
 }
 
 //-------------------------------------------------------------------------------------------------
-void minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
-              const StaticExclusionMask &se, const MinimizeControls &mincon) {
+ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
+                   const StaticExclusionMask &se, const MinimizeControls &mincon,
+                   const int nrg_scale_bits) {
   const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   PhaseSpaceWriter psw = ps->data();
-  minimize(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc, psw.xvel, psw.yvel,
-           psw.zvel, psw.xprv, psw.yprv, psw.zprv, vk, nbk, ra.dpData(), vsk, se.data(), mincon);
+  return minimize(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc, psw.xvel, psw.yvel,
+                  psw.zvel, psw.xprv, psw.yprv, psw.zprv, vk, nbk, ra.dpData(), vsk, se.data(),
+                  mincon, nrg_scale_bits);
 }
-              
+
+//-------------------------------------------------------------------------------------------------
+ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
+                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
+                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
+                   const MinimizeControls &mincon, int nrg_scale_bits) {
+  return minimize(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc, psw.xvel, psw.yvel,
+                  psw.zvel, psw.xprv, psw.yprv, psw.zprv, vk, nbk, rar, vsk, ser, mincon,
+                  nrg_scale_bits);
+}
+  
 } // namespace mm
 } // namespace omni

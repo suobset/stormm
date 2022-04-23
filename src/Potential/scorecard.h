@@ -23,7 +23,8 @@ struct ScoreCardReader {
   ScoreCardReader(int system_count_in, int data_stride_in, int sampled_step_count_in,
                   float nrg_scale_f_in, double nrg_scale_lf_in, float inverse_nrg_scale_f_in,
                   double inverse_nrg_scale_lf_in, const llint* instantaneous_accumulators_in,
-                  const double* running_accumulators_in, const double* squared_accumulators_in);
+                  const double* running_accumulators_in, const double* squared_accumulators_in,
+                  const llint* time_series_in);
 
   const int system_count;                  ///< Number of independent systems tracked
   const int data_stride;                   ///< Size of the StateVariable enumerator rounded up
@@ -40,6 +41,8 @@ struct ScoreCardReader {
   const double* running_accumulators;      ///< Running sums of state variables for each system
   const double* squared_accumulators;      ///< Running squared sums of state variables for each
                                            ///<   system
+  const llint* time_series;                ///< Details of energy values in each component's
+                                           ///<   accumulator at each time step
 };
 
 /// \brief Writeable abstract for the ScoreCard object, useful for accumulating energies in many
@@ -50,7 +53,8 @@ struct ScoreCardWriter {
   ScoreCardWriter(int system_count_in, int data_stride_in, int sampled_step_count_in,
                   float nrg_scale_f_in, double nrg_scale_lf_in, float inverse_nrg_scale_f_in,
                   double inverse_nrg_scale_lf_in, llint* instantaneous_accumulators_in,
-                  double* running_accumulators_in, double* squared_accumulators_in);
+                  double* running_accumulators_in, double* squared_accumulators_in,
+                  llint* time_series_in);
 
   const int system_count;             ///< Number of independent systems tracked
   const int data_stride;              ///< Size of the StateVariable enumerator rounded up to the
@@ -63,6 +67,8 @@ struct ScoreCardWriter {
   llint* instantaneous_accumulators;  ///< State variables for each system
   double* running_accumulators;       ///< Running sums of state variables for each system
   double* squared_accumulators;       ///< Running squared sums of state variables for each system
+  llint* time_series;                 ///< Details of energy values in each component's
+                                      ///<   accumulator at each time step
 };
 
 /// \brief Track the energy components of a collection of systems in an HPC-capable array.  This
@@ -74,8 +80,11 @@ public:
 
   /// \brief The constructor requires only the number of systems.
   ///
-  /// \param system_count_in  The number of systems to track
-  ScoreCard(int system_count_in, int nrg_scale_bits_in = default_energy_scale_bits);
+  /// \param system_count_in    The number of systems to track
+  /// \param capacity_in        The capacity to initially allocate for
+  /// \param nrg_scale_bits_in  Number of bits after the decimal with which to store energy values
+  ScoreCard(int system_count_in, int capacity_in = 16,
+            int nrg_scale_bits_in = default_energy_scale_bits);
 
   /// \brief Get the number of systems that this object is tracking
   int getSystemCount() const;
@@ -112,6 +121,11 @@ public:
   ScoreCardWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
+  /// \brief Reserve space for storing sampled energy component values.
+  ///
+  /// \param new_capacity  The new capacity to allocate for
+  void reserve(int new_capacity);
+  
   /// \brief Contribute a result into one of the instantaneous state variable accumulators.  This
   ///        is for CPU activity; the contributions will occur as part of each energy kernel using
   ///        pointers on the GPU.
@@ -122,6 +136,10 @@ public:
   ///                      contrbution describes
   void contribute(StateVariable var, llint amount, int system_index = 0);
 
+  /// \brief Increment the number of sampled steps.  This will automatically allocate additional
+  ///        capacity if the sampled step count reaches the object's capacity.
+  void incrementSampleCount();
+  
   /// \brief Report the total energy for all systems.  Each result will be summed in the internal
   ///        fixed-point accumulation before conversion to real values in units of kcal/mol.
   std::vector<double> reportTotalEnergies();
@@ -189,9 +207,13 @@ private:
                                              ///<   dU/dLambda) per system.  This indicates the
                                              ///<   length of each system's subset of the data in
                                              ///<   the following arrays.
-  int sampled_step_count;                    ///< The number of samples oging into running averages
+  int sampled_step_count;                    ///< The number of samples going into running averages
                                              ///<   and standard deviations
-
+  int sample_capacity;                       ///< The maximum number of samples available to this
+                                             ///<   ScoreCard (the time_series_accumulators array
+                                             ///<   will be resized if the sampled_step_count
+                                             ///<   reaches this capacity).
+  
   /// Scaling factors for fixed-precision accumulation and interpretation.  The defaults from
   /// Constants/fixed_precision.h are good suggestions, but the precision that the code works in
   /// may offer a tradeoff between speed and stability.  For energy accumulation, the question is
@@ -223,6 +245,9 @@ private:
                                              ///<   sampled time step.  In an HPC setting, these
                                              ///<   will be computed on the device after preparing
                                              ///<   the instantaneous accumulators.
+  Hybrid<llint> time_series_accumulators;    ///< A history of values for each energy accumulator
+                                             ///<   at each sampled time step.  This detailed
+                                             ///<   array is resized as needed, or can be reserved.
 };
 
 } // namespace energy

@@ -2,7 +2,9 @@
 #ifndef OMNI_MINIMIZATION_H
 #define OMNI_MINIMIZATION_H
 
+#include "Constants/fixed_precision.h"
 #include "Namelists/nml_minimize.h"
+#include "Potential/scorecard.h"
 #include "Potential/static_exclusionmask.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
@@ -14,9 +16,11 @@
 namespace omni {
 namespace mm {
 
+using energy::ScoreCard;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
 using namelist::MinimizeControls;
+using numerics::default_energy_scale_bits;
 using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
 using topology::AtomGraph;
@@ -85,40 +89,45 @@ void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove
 ///   - Accept a modifiable PhaseSpace object or one of its abstracts along with the relevant
 ///     topology and restraint apparatus, or abstracts thereof
 ///
-/// \param xcrd       Cartesian X coordinates of all particles
-/// \param ycrd       Cartesian Y coordinates of all particles
-/// \param zcrd       Cartesian Z coordinates of all particles
-/// \param xfrc       Forces acting on all atoms in the Cartesian X direction (pre-allocated for
-///                   speed, probably fed in from a PhaseSapce object or equivalent)
-/// \param yfrc       Forces acting on all atoms in the Cartesian Y direction
-/// \param zfrc       Forces acting on all atoms in the Cartesian Z direction
-/// \param xmove      Cartesian X moves to apply to each particle (pre-allocated for speed and to
-///                   replicate the layout of memory available on the GPU)
-/// \param ymove      Cartesian Y moves to apply to each particle
-/// \param zmove      Cartesian Z moves to apply to each particle
-/// \param x_cg_temp  Temporary array reserved for conjugate gradient computations (pre-allocated
-///                   for speed and to replicate the layout of memory available on the GPU)
-/// \param y_cg_temp  Temporary array reserved for conjugate gradient computations
-/// \param z_cg_temp  Temporary array reserved for conjugate gradient computations
-/// \param vk         Valence parameters abstract from the original topology
-/// \param nbk        Non-bonded parameters abstract from the original topology
-/// \param rar        Restraints applicable to the system (supplement to the topology)
-/// \param vsk        Virtual site abstract from the original topology
-/// \param se         Static exclusion mask for systems with isolated boundary conditions
-/// \param mincon     User input from a &minimize namelist
+/// \param xcrd            Cartesian X coordinates of all particles
+/// \param ycrd            Cartesian Y coordinates of all particles
+/// \param zcrd            Cartesian Z coordinates of all particles
+/// \param xfrc            Forces acting on all atoms in the Cartesian X direction (pre-allocated
+///                        for speed, probably fed in from a PhaseSapce object or equivalent)
+/// \param yfrc            Forces acting on all atoms in the Cartesian Y direction
+/// \param zfrc            Forces acting on all atoms in the Cartesian Z direction
+/// \param xmove           Cartesian X moves to apply to each particle (pre-allocated for speed
+///                        and to replicate the layout of memory available on the GPU)
+/// \param ymove           Cartesian Y moves to apply to each particle
+/// \param zmove           Cartesian Z moves to apply to each particle
+/// \param x_cg_temp       Temporary array reserved for conjugate gradient computations
+///                        (pre-allocated for speed and to replicate the layout of memory
+///                        available on the GPU)
+/// \param y_cg_temp       Temporary array reserved for conjugate gradient computations
+/// \param z_cg_temp       Temporary array reserved for conjugate gradient computations
+/// \param vk              Valence parameters abstract from the original topology
+/// \param nbk             Non-bonded parameters abstract from the original topology
+/// \param rar             Restraints applicable to the system (supplement to the topology)
+/// \param vsk             Virtual site abstract from the original topology
+/// \param se              Static exclusion mask for systems with isolated boundary conditions
+/// \param mincon          User input from a &minimize namelist
+/// \param nrg_scale_bits  Number of bits after the decimal with which to accumulate energy terms
 /// \{
-void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc, double* zfrc,
-              double* xmove, double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
-              double* z_cg_temp, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-              const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
-              const StaticExclusionMaskReader &ser, const MinimizeControls &mincon);
+ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc,
+                   double* zfrc, double* xmove, double* ymove, double* zmove, double* x_cg_temp,
+                   double* y_cg_temp, double* z_cg_temp, const ValenceKit<double> &vk,
+                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
+                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
+                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 
-void minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
-              const StaticExclusionMask &se, const MinimizeControls &mincon);
+ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
+                   const StaticExclusionMask &se, const MinimizeControls &mincon,
+                   int nrg_scale_bits = default_energy_scale_bits);
 
-void minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-              const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
-              const StaticExclusionMaskReader &ser, const MinimizeControls &mincon);
+ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
+                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
+                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
+                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 /// \}
   
 } // namespace mm
