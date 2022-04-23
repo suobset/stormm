@@ -20,17 +20,6 @@
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-// CHECK
-#include "../../src/FileManagement/file_util.h"
-#include "../../src/Trajectory/trajectory_enumerators.h"
-#include "../../src/Trajectory/coordinate_series.h"
-using omni::diskutil::PrintSituation;
-using omni::trajectory::TrajectoryKind;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::CoordinateSeries;
-using omni::parse::char4ToString;
-// END CHECK
-
 using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::MapRotatableGroups;
 using omni::chemistry::RotatorGroup;
@@ -358,7 +347,7 @@ int main(int argc, char* argv[]) {
   check(rms_align, RelationalOperator::EQUAL, Approx(0.0).margin(1.0e-8), "Quaternion-aligned, "
         "positional RMSD computed for coordinates differing in their respective centers of mass, "
         "one rotated a second time for more frustration, does not produce the expected result.");
-
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 }

@@ -136,6 +136,19 @@ CoordinateSeries<T>::CoordinateSeries(const CoordinateFrame &cf, const int nfram
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Toriginal>
+CoordinateSeries<T>::CoordinateSeries(const CoordinateSeries<Toriginal> &original,
+                                      const int globalpos_scale_bits_in) :
+    CoordinateSeries(original.getAtomCount(), original.getFrameCount(), original.getUnitCellType(),
+                     globalpos_scale_bits_in)
+{
+  for (int i = 0; i < frame_count; i++) {
+    const CoordinateFrame cf = original.exportFrame(i);
+    importCoordinateSet(cf, 0, cf.getAtomCount(), i);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T>
 int CoordinateSeries<T>::getAtomCount() const {
   return atom_count;
@@ -171,16 +184,17 @@ int CoordinateSeries<T>::getFixedPrecisionBits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> std::vector<T>
+template <typename T> template <typename Treport> std::vector<Treport>
 CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index,
+                                              const int globalpos_bits_out,
                                               const HybridTargetLevel tier) const {
-  return getInterlacedCoordinates(frame_index, 0, atom_count, tier);
+  return getInterlacedCoordinates<Treport>(frame_index, 0, atom_count, globalpos_bits_out, tier);
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> std::vector<T>
+template <typename T> template <typename Treport> std::vector<Treport>
 CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int low_index,
-                                              const int high_index,
+                                              const int high_index, const int globalpos_bits_out,
                                               const HybridTargetLevel tier) const {
 
   // Range check as this will use pointers
@@ -189,7 +203,8 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
           " in an object with " + std::to_string(atom_count) + " atoms.", "CoordinateSeries",
           "getInterlacedCoordinates");
   }
-  std::vector<T> result(3 * (high_index - low_index));
+  const int actual_bits_out = (globalpos_bits_out < 0) ? globalpos_scale_bits : globalpos_bits_out;
+  std::vector<Treport> result(3 * (high_index - low_index));
   const size_t fidx_zu  = static_cast<size_t>(frame_index);
   const size_t natom_zu = roundUp(static_cast<size_t>(atom_count), warp_size_zu);
   switch (tier) {
@@ -199,12 +214,66 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
       const T* yptr = y_coordinates.data();
       const T* zptr = z_coordinates.data();
       const size_t frame_offset = natom_zu * fidx_zu;
-      for (int i = low_index; i < high_index; i++) {
-        const int base_idx = 3 * (i - low_index);
-        const size_t access_idx = frame_offset + static_cast<size_t>(i);
-        result[base_idx    ] = xptr[access_idx];
-        result[base_idx + 1] = yptr[access_idx];
-        result[base_idx + 2] = zptr[access_idx];
+      if (isSignedIntegralScalarType<T>() && isSignedIntegralScalarType<Treport>()) {
+        if (globalpos_scale_bits >= actual_bits_out) {
+          llint divisor = 1LL;
+          for (int i = actual_bits_out; i < globalpos_scale_bits; i++) {
+            divisor *= 2LL;
+          }
+          for (int i = low_index; i < high_index; i++) {
+            const int base_idx = 3 * (i - low_index);
+            const size_t access_idx = frame_offset + static_cast<size_t>(i);
+            result[base_idx    ] = static_cast<llint>(xptr[access_idx]) / divisor;
+            result[base_idx + 1] = static_cast<llint>(yptr[access_idx]) / divisor;
+            result[base_idx + 2] = static_cast<llint>(zptr[access_idx]) / divisor;
+          }
+        }
+        else {
+          const int shift_left = actual_bits_out - globalpos_scale_bits;
+          llint multiplier = 1LL;
+          for (int i = globalpos_scale_bits; i < actual_bits_out; i++) {
+            multiplier *= 2LL;
+          }
+          for (int i = low_index; i < high_index; i++) {
+            const int base_idx = 3 * (i - low_index);
+            const size_t access_idx = frame_offset + static_cast<size_t>(i);
+            result[base_idx    ] = static_cast<llint>(xptr[access_idx]) * multiplier;
+            result[base_idx + 1] = static_cast<llint>(yptr[access_idx]) * multiplier;
+            result[base_idx + 2] = static_cast<llint>(zptr[access_idx]) * multiplier;
+          }
+        }
+      }
+      else if (isSignedIntegralScalarType<T>() && isFloatingPointScalarType<Treport>()) {
+        const Treport multiplier = 1.0 / pow(2.0, globalpos_scale_bits);
+        for (int i = low_index; i < high_index; i++) {
+          const int base_idx = 3 * (i - low_index);
+          const size_t access_idx = frame_offset + static_cast<size_t>(i);
+          result[base_idx    ]  = xptr[access_idx];
+          result[base_idx + 1]  = yptr[access_idx];
+          result[base_idx + 2]  = zptr[access_idx];
+          result[base_idx    ] *= multiplier;
+          result[base_idx + 1] *= multiplier;
+          result[base_idx + 2] *= multiplier;
+        }
+      }
+      else if (isFloatingPointScalarType<T>() && isSignedIntegralScalarType<Treport>()) {
+        const Treport multiplier = pow(2.0, actual_bits_out);
+        for (int i = low_index; i < high_index; i++) {
+          const int base_idx = 3 * (i - low_index);
+          const size_t access_idx = frame_offset + static_cast<size_t>(i);
+          result[base_idx    ]  = llround(xptr[access_idx] * multiplier);
+          result[base_idx + 1]  = llround(yptr[access_idx] * multiplier);
+          result[base_idx + 2]  = llround(zptr[access_idx] * multiplier);
+        }
+      }
+      else {
+        for (int i = low_index; i < high_index; i++) {
+          const int base_idx = 3 * (i - low_index);
+          const size_t access_idx = frame_offset + static_cast<size_t>(i);
+          result[base_idx    ] = xptr[access_idx];
+          result[base_idx + 1] = yptr[access_idx];
+          result[base_idx + 2] = zptr[access_idx];
+        }
       }
     }
     break;
@@ -216,11 +285,50 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
       const std::vector<T> xval = x_coordinates.readDevice(llim, hlim);
       const std::vector<T> yval = y_coordinates.readDevice(llim, hlim);
       const std::vector<T> zval = z_coordinates.readDevice(llim, hlim);
-      const size_t frame_offset = natom_zu * fidx_zu;
-      for (int i = 0; i < high_index - low_index; i++) {
-        result[(3 * i)    ] = xval[i];
-        result[(3 * i) + 1] = yval[i];
-        result[(3 * i) + 2] = zval[i];
+      const int irange = high_index - low_index;
+      if (isSignedIntegralScalarType<T>() && isSignedIntegralScalarType<Treport>()) {
+        if (globalpos_scale_bits >= actual_bits_out) {
+          const int shift_right = globalpos_scale_bits - actual_bits_out;
+          for (int i = 0; i < irange; i++) {
+            result[(3 * i)    ] = (static_cast<llint>(xval[i]) >> shift_right);
+            result[(3 * i) + 1] = (static_cast<llint>(yval[i]) >> shift_right);
+            result[(3 * i) + 2] = (static_cast<llint>(zval[i]) >> shift_right);
+          }
+        }
+        else {
+          const int shift_left = actual_bits_out - globalpos_scale_bits;
+          for (int i = 0; i < high_index - low-index; i++) {
+            result[(3 * i)    ] = (static_cast<llint>(xval[i]) << shift_left);
+            result[(3 * i) + 1] = (static_cast<llint>(yval[i]) << shift_left);
+            result[(3 * i) + 2] = (static_cast<llint>(zval[i]) << shift_left);
+          }
+        }
+      }
+      else if (isSignedIntegralScalarType<T>() && isFloatingPointScalarType<Treport>()) {
+        const Treport multiplier = 1.0 / pow(2.0, globalpos_scale_bits);
+        for (int i = 0; i < irange; i++) {
+          result[(3 * i)    ]  = xval[i];
+          result[(3 * i) + 1]  = yval[i];
+          result[(3 * i) + 2]  = zval[i];
+          result[(3 * i)    ] *= multiplier;
+          result[(3 * i) + 1] *= multiplier;
+          result[(3 * i) + 2] *= multiplier;
+        }
+      }
+      else if (isFloatingPointScalarType<T>() && isSignedIntegralScalarType<Treport>()) {
+        const Treport multiplier = pow(2.0, globalpos_scale_bits);
+        for (int i = 0; i < irange; i++) {
+          result[(3 * i)    ]  = llround(xval[i] * multiplier);
+          result[(3 * i) + 1]  = llround(yval[i] * multiplier);
+          result[(3 * i) + 2]  = llround(zval[i] * multiplier);
+        }
+      }
+      else {
+        for (int i = 0; i < irange; i++) {
+          result[(3 * i)    ] = xval[i];
+          result[(3 * i) + 1] = yval[i];
+          result[(3 * i) + 2] = zval[i];
+        }
       }
     }
     break;

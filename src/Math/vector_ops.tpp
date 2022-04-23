@@ -512,6 +512,40 @@ template <typename T> void addScalarToVector(Hybrid<T> *va, const T inc) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> void elementwiseMultiply(T* va, const size_t length, const T factor) {
+  for (size_t i = 0; i < length; i++) {
+    va[i] *= factor;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void elementwiseMultiply(std::vector<T> *va, const T factor) {
+  elementwiseMultiply(va->data(), va->size(), factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void elementwiseMultiply(Hybrid<T> *va, const T factor) {
+  elementwiseMultiply(va->data(), va->size(), factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void elementwiseDivide(T* va, const size_t length, const T factor) {
+  for (size_t i = 0; i < length; i++) {
+    va[i] /= factor;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void elementwiseDivide(std::vector<T> *va, const T factor) {
+  elementwiseDivide(va->data(), va->size(), factor);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> void elementwiseDivide(Hybrid<T> *va, const T factor) {
+  elementwiseDivide(va->data(), va->size(), factor);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> void crossProduct(const T* va, const T* vb, T* vc) {
   vc[0] = (va[1] * vb[2]) - (va[2] * vb[1]);
   vc[1] = (va[2] * vb[0]) - (va[0] * vb[2]);

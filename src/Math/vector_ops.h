@@ -269,6 +269,41 @@ template <typename T> void addScalarToVector(std::vector<T> *va, T inc);
 template <typename T> void addScalarToVector(Hybrid<T> *va, T inc);
 /// \}
 
+/// \brief Multiply all elements in a vector by a value.
+/// 
+/// Overloaded:
+///   - Operate on a C-style vectors of a stated (and trusted) length
+///   - Operate on a Standard Template Library vector
+///   - Operate on a Hybrid object
+///
+/// \param va      The vector of interest
+/// \param length  The length of the C-style array
+/// \param factor  The amount by which to scale the vector (passed in by value with an implicit
+///                conversion to the same type as the vector itself)
+/// \{
+template <typename T> void elementwiseMultiply(T* va, size_t length, T factor);
+template <typename T> void elementwiseMultiply(std::vector<T> *va, T factor);
+template <typename T> void elementwiseMultiply(Hybrid<T> *va, T factor);
+/// \}
+
+/// \brief Divide all elements in a vector by a value.  This is needed for integer representations
+///        which cannot work with non-integral divisors.
+/// 
+/// Overloaded:
+///   - Operate on a C-style vectors of a stated (and trusted) length
+///   - Operate on a Standard Template Library vector
+///   - Operate on a Hybrid object
+///
+/// \param va      The vector of interest
+/// \param length  The length of the C-style array
+/// \param factor  The amount by which to divide the vector (passed in by value with an implicit
+///                conversion to the same type as the vector itself)
+/// \{
+template <typename T> void elementwiseDivide(T* va, size_t length, T factor);
+template <typename T> void elementwiseDivide(std::vector<T> *va, T factor);
+template <typename T> void elementwiseDivide(Hybrid<T> *va, T factor);
+/// \}
+
 /// \brief Compute the cross product of two vectors.  Each should be of dimension 3, and if any of
 ///        the vectors have more than 3 elements, only the first three will be used.  If supplying
 ///        vectors, no check is made to ensure the float or double nature of the type (that's up to

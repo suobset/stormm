@@ -139,13 +139,28 @@ public:
   /// \brief Use the default copy and move constructors, copy and move assignment operators.  This
   ///        object has no const members to trigger implicit deletions and no POINTER-kind Hybrid
   ///        objects to repair.
+  ///
+  /// \param original  The original object, being copied or moved
+  /// \param other     The other object, being copied or moved by assignment
   /// \{
   CoordinateSeries(const CoordinateSeries &original) = default;
   CoordinateSeries(CoordinateSeries &&original) = default;
   CoordinateSeries& operator=(const CoordinateSeries &other) = default;
   CoordinateSeries& operator=(CoordinateSeries &&other) = default;
   /// \}
-  
+
+  /// \brief Special copy constructor to take a CoordinateSeries of one data type into another.
+  ///        The implementation requires a special declaration (template <typename T> template
+  ///        <typename Toriginal>...) with two uses of the template keyword because of the nested
+  ///        nature of these templates.  In other contexts template <typename T,
+  ///        typename Toriginal> would suffice.
+  ///
+  /// \param original  The original object, being copied or moved
+  /// \{
+  template <typename Toriginal>
+  CoordinateSeries(const CoordinateSeries<Toriginal> &original, int globalpos_scale_bits_in = 0);
+  /// \}
+
   /// \brief Get the number of atoms in each frame of the series.
   int getAtomCount() const;
 
@@ -173,10 +188,13 @@ public:
   /// \param high_index   The upper atom index of a range
   /// \param tier  The level at which to access coordinates
   /// \{
-  std::vector<T> getInterlacedCoordinates(int frame_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  std::vector<T> getInterlacedCoordinates(int frame_index, int low_index, int high_index,
-                                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  template <typename Treport> std::vector<Treport>
+  getInterlacedCoordinates(int frame_index, int globalpos_bits_out = -1,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  template <typename Treport> std::vector<Treport>
+  getInterlacedCoordinates(int frame_index, int low_index, int high_index,
+                           int globalpos_bits_out = -1,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
 
   /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The

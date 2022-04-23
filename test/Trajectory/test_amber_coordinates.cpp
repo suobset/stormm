@@ -1,6 +1,7 @@
-#include "../../src/FileManagement/file_listing.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
+#include "../../src/DataTypes/common_types.h"
+#include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/polynumeric.h"
@@ -14,12 +15,15 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::small;
+using omni::data_types::llint;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::diskutil::PrintSituation;
 using omni::errors::rtWarn;
 using omni::math::computeBoxTransform;
+using omni::math::elementwiseDivide;
+using omni::math::elementwiseMultiply;
 using omni::math::extractBoxDimensions;
 using omni::math::mean;
 using omni::parse::NumberFormat;
@@ -249,7 +253,7 @@ int main(int argc, char* argv[]) {
            polyNumericVector(tip5p.getInterlacedCoordinates(20, 100, TrajectoryKind::VELOCITIES)),
            "t5p_part_vel", 1.0e-4, "Reconstructed partial velocities of the TIP5P system are "
            "incorrect.", oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL,
-           PrintSituation::OVERWRITE, do_trpcage);
+           PrintSituation::OVERWRITE, snap_check);
   
   // Read ubiquitin, solvated in a very small octahedral cell (there is an odd number of atoms)
   const std::string ubiquitin_crd_name = base_crd_name + osc + "ubiquitin.inpcrd";
@@ -300,7 +304,7 @@ int main(int argc, char* argv[]) {
         "CoordinateFrame based on a PhaseSpace object obtains the wrong unit cell type.",
         do_tip5p);
  
-  // Try making a CoordinateFrameReader object based on an existing PhaseSpace object
+  // Try making a CoordinateFrameWriter object based on an existing PhaseSpace object
   section(3);
   CoordinateFrameWriter tip5p_access(&tip5p);
   check(tip5p_access.natom, RelationalOperator::EQUAL, tip5p.getAtomCount(), "Making a "
@@ -509,7 +513,7 @@ int main(int argc, char* argv[]) {
                                      CoordinateSeries<double>();
   std::vector<double> xyz_sum(3, 0.0);
   for (int i = 0; i < stro_cs.getFrameCount(); i++) {
-    std::vector<double> frm_crd = stro_cs.getInterlacedCoordinates(i, 0, 3);
+    std::vector<double> frm_crd = stro_cs.getInterlacedCoordinates<double>(i, 0, 3);
     for (int j = 0; j < 3; j++) {
       for (int k = 0; k < 3; k++) {
         xyz_sum[k] += frm_crd[(3 * j) + k];
@@ -525,7 +529,7 @@ int main(int argc, char* argv[]) {
         "atoms.", do_stereo);
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 20, "The trajectory read from " +
         stereo_trj_name + " does not contain the correct number of frames.", do_stereo);
-  std::vector<double> fr2_crd = stro_cs.getInterlacedCoordinates(2);
+  std::vector<double> fr2_crd = stro_cs.getInterlacedCoordinates<double>(2);
   for (int i = 0; i < 3; i++) {
     xyz_sum[i] = 0.0;
   }
@@ -542,7 +546,7 @@ int main(int argc, char* argv[]) {
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 21, "The pushBack() member function "
         "of the CoordinateSeries object does not extend the series as expected.", do_stereo);
   check(stro_cf.getInterlacedCoordinates(), RelationalOperator::EQUAL,
-        stro_cs.getInterlacedCoordinates(20), "The pushBack() member function of the "
+        stro_cs.getInterlacedCoordinates<double>(20), "The pushBack() member function of the "
         "CoordinateSeries object does not extend the series as expected.", do_stereo);
   if (stereo_exists) {
     stro_cs.importFromFile(stereo_trj_name);
@@ -550,20 +554,20 @@ int main(int argc, char* argv[]) {
   check(stro_cs.getFrameCount(), RelationalOperator::EQUAL, 41, "Importing a second time from a "
         "trajectory file did not extend a CoordinateSeries object in the expected manner.",
         do_stereo);
-  check(stro_cs.getInterlacedCoordinates(4), RelationalOperator::EQUAL,
-        stro_cs.getInterlacedCoordinates(25), "Correspondence between frames read from the same "
-        "trajectory file is not maintained in a CoordinateSeries object.", do_stereo);
+  check(stro_cs.getInterlacedCoordinates<double>(4), RelationalOperator::EQUAL,
+        stro_cs.getInterlacedCoordinates<double>(25), "Correspondence between frames read from "
+        "the same trajectory file is not maintained in a CoordinateSeries object.", do_stereo);
   for (int i = 0; i < 5; i++) {
     stro_cs.pushBack(stro_cf);
   }
   stro_cs.shrinkToFit();
-  check(stro_cs.getInterlacedCoordinates(20), RelationalOperator::EQUAL,
-        stro_cs.getInterlacedCoordinates(43), "Frames that should match exactly no longer do "
-        "after applying the CoordinateSeries object's shirnkToFit method.", do_stereo);
+  check(stro_cs.getInterlacedCoordinates<double>(20), RelationalOperator::EQUAL,
+        stro_cs.getInterlacedCoordinates<double>(43), "Frames that should match exactly no longer "
+        "do after applying the CoordinateSeries object's shirnkToFit method.", do_stereo);
   CoordinateSeries<int> istro_cs = changeCoordinateSeriesType<double, int>(stro_cs, 14);
   
   const CoordinateFrame frame17 = istro_cs.exportFrame(17);
-  const std::vector<double> stro_drep = stro_cs.getInterlacedCoordinates(17);
+  const std::vector<double> stro_drep = stro_cs.getInterlacedCoordinates<double>(17);
   const std::vector<double> stro_di14rep = frame17.getInterlacedCoordinates();
   check(maxAbsoluteDifference(stro_di14rep, stro_drep), RelationalOperator::LESS_THAN, 1.0e-4,
         "A 14 bit fixed-precision representation of the coordinate series does not reproduce the "
@@ -583,6 +587,52 @@ int main(int argc, char* argv[]) {
   CHECK_THROWS_SOFT(tip5p_cs.importFromFile(tip3p_crd_name), "A CoordinateSeries accepts new "
                     "coordinates from an Amber input coordinates file with the wrong particle "
                     "number.", do_tip3p);
+
+  // Check coordinate series construction from alternative template types
+  const CoordinateSeries<llint> tip5p_cs_64(tip5p_cs, 24);
+  const CoordinateFrame frame9_int64 = tip5p_cs_64.exportFrame(9);
+  check(tip5p_cs_64.getInterlacedCoordinates<double>(9), RelationalOperator::EQUAL,
+        Approx(tip5p_cs.getInterlacedCoordinates<double>(9)).margin(omni::constants::tiny),
+        "A CoordinateSeries constructed from another of a lower fixed precision representation "
+        "does not preserve the correct information.", do_tip5p);
+  Xoroshiro128pGenerator xrs_crd(1984232);
+  CoordinateSeries<double> tip5p_cs_dbl(tip5p_cs);
+  CoordinateSeriesWriter<double> tip5p_csw = tip5p_cs_dbl.data();
+  const size_t padded_natom_zu = roundUp<size_t>(tip5p_csw.natom, omni::constants::warp_size_zu);
+  for (size_t i = 0; i < tip5p_csw.nframe; i++) {
+    for (size_t j = 0; j < tip5p_csw.natom; j++) {
+      const size_t atom_idx = (padded_natom_zu * i) + j;
+      tip5p_csw.xcrd[atom_idx] += 0.05 * xrs_crd.gaussianRandomNumber();
+      tip5p_csw.ycrd[atom_idx] += 0.05 * xrs_crd.gaussianRandomNumber();
+      tip5p_csw.zcrd[atom_idx] += 0.05 * xrs_crd.gaussianRandomNumber();
+    }
+  }
+  CoordinateSeries<int> tip5p_cs_rng(tip5p_cs_dbl, 16);
+  std::vector<int> perturbation(3 * tip5p.getAtomCount());
+  const std::vector<int> orig_tip5p_crd = tip5p_cs.getInterlacedCoordinates<int>(5);
+  const std::vector<int> pert_tip5p_crd = tip5p_cs_rng.getInterlacedCoordinates<int>(5);
+  const std::vector<int> fp32_tip5p_crd = tip5p_cs_dbl.getInterlacedCoordinates<int>(5, 16);
+  for (int i = 0; i < perturbation.size(); i++) {
+    perturbation[i] = pert_tip5p_crd[i] - orig_tip5p_crd[i];
+  }
+  snapshot(tip5p_vel_snapshot, polyNumericVector(perturbation), "t5p_pert_xyz", 1.0e-4,
+           "Perturbations to TIP5P water positions do not meet expectations.", oe.takeSnapshot(),
+           1.0e-8, NumberFormat::INTEGER, PrintSituation::APPEND, snap_check);
+  check(pert_tip5p_crd, RelationalOperator::EQUAL, fp32_tip5p_crd, "Extracting coordinates from a "
+        "CoordinateSeries as fixed precision integers does not yield the same result as "
+        "converting the series to a different object in the same fixed precision format.",
+        do_tip5p);
+  const std::vector<int> highres_orig_tip5p_crd = tip5p_cs.getInterlacedCoordinates<int>(5, 18);
+  std::vector<int> mult_tip5p_crd(orig_tip5p_crd);
+  elementwiseMultiply(&mult_tip5p_crd, 4);
+  check(highres_orig_tip5p_crd, RelationalOperator::EQUAL, mult_tip5p_crd, "Conversion of data in "
+        "a CoordinateSeries with fixed-precision representation does not go to a deeper "
+        "fixed-precision representation with the expected result.", do_tip5p);
+  const std::vector<int> lowres_orig_tip5p_crd = tip5p_cs.getInterlacedCoordinates<int>(5, 14);
+  elementwiseDivide(&mult_tip5p_crd, 16);
+  check(lowres_orig_tip5p_crd, RelationalOperator::EQUAL, Approx(mult_tip5p_crd).margin(0.01),
+        "Conversion of data in a CoordinateSeries with fixed-precision representation does not go "
+        "to a shallower fixed-precision representation with the expected result.", do_tip5p);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

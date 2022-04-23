@@ -23,6 +23,7 @@ using parse::separateText;
 using parse::TextFileReader;
 using parse::TextOrigin;
 using math::maxAbsValue;
+using math::minValue;
 
 //-------------------------------------------------------------------------------------------------
 std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &label) {
@@ -212,7 +213,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
       const int maxv = maxAbsValue(icontent);
       const int n_digits = (abs(maxv) > 0) ?
                            ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
-      width = n_digits + 2;
+      width = n_digits + 2 + (minValue(icontent) < 0);
       digits_after_decimal = 0;
       name_of_the_type = getOmniScalarTypeName<int>();
     }
@@ -223,7 +224,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
       const llint maxv = maxAbsValue(llicontent);
       const int n_digits = (std::llabs(maxv) > 0) ?
                            ceil(fabs(log10(fabs(static_cast<double>(maxv) * 1.1)))) + 0.01 : 2;
-      width = n_digits + 2;
+      width = n_digits + 2 + (minValue(icontent) < 0);
       digits_after_decimal = 0;
       name_of_the_type = getOmniScalarTypeName<llint>();
     } 
