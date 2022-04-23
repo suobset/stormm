@@ -196,8 +196,8 @@ applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 
 std::vector<BoundedRestraint>
 applyHoldingRestraints(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                       const std::string &mask, double penalty, double flat_bottom_half_width = 0.0,
-                       double harmonic_maximum = 16.0);
+                       const std::string &mask, double penalty,
+                       double flat_bottom_half_width = 0.0, double harmonic_maximum = 16.0);
 /// \{
 
 /// \brief Apply a set of restraints to prevent the formation of hydrogen bonds between donors

@@ -78,7 +78,7 @@ public:
   ///
   /// \param ag  The topology to base this all-to-all pair list upon (fed in as a pointer so that
   ///            a private member variable may retain a pointer to the original topology)
-  StaticExclusionMask(const AtomGraph *ag_in);
+  StaticExclusionMask(const AtomGraph *ag_in = nullptr);
 
   /// \brief Get the total atom count
   int getAtomCount() const;

@@ -55,17 +55,18 @@ using namespace generalized_born_defaults;
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
-                                const double* xcrd, const double* ycrd, const double* zcrd,
-                                const double* umat, const double* invu,
-                                UnitCellType unit_cell, double* xfrc, double* yfrc,
-                                double* zfrc, ScoreCard *ecard,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser, const double* xcrd,
+                                const double* ycrd, const double* zcrd, const double* umat,
+                                const double* invu, UnitCellType unit_cell, double* xfrc,
+                                double* yfrc, double* zfrc, ScoreCard *ecard,
                                 EvaluateForce eval_elec_force = EvaluateForce::NO,
                                 EvaluateForce eval_vdw_force = EvaluateForce::NO,
                                 int system_index = 0);
 
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
-                                PhaseSpaceWriter psw, ScoreCard *ecard,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser, PhaseSpaceWriter psw,
+                                ScoreCard *ecard,
                                 EvaluateForce eval_elec_force = EvaluateForce::NO,
                                 EvaluateForce eval_vdw_force  = EvaluateForce::NO,
                                 int system_index = 0);
@@ -82,10 +83,12 @@ double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &
                                 EvaluateForce eval_vdw_force  = EvaluateForce::NO,
                                 int system_index = 0);
 
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
-                                CoordinateFrameReader cfr, ScoreCard *ecard, int system_index = 0);
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser, CoordinateFrameReader cfr,
+                                ScoreCard *ecard, int system_index = 0);
 
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser,
                                 const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                 int system_index = 0);
 

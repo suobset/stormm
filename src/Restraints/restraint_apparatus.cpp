@@ -104,11 +104,9 @@ RestraintApparatusSpReader(const int total_rst_in, const int nposn_in, const int
 {}
 
 //-------------------------------------------------------------------------------------------------
-RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbasis,
-                                       const AtomGraph *ag_in) :
-    total_restraint_count{static_cast<int>(rbasis.size())},
-    position_count{0}, distance_count{0}, angle_count{0}, dihedral_count{0},
-    time_based_restraints{false},
+RestraintApparatus::RestraintApparatus(const AtomGraph *ag_in) :
+    total_restraint_count{0}, position_count{0}, distance_count{0}, angle_count{0},
+    dihedral_count{0}, time_based_restraints{false},
     rposn_atoms{HybridKind::POINTER, "rst_position_i"},
     rbond_i_atoms{HybridKind::POINTER, "rst_bond_i"},
     rbond_j_atoms{HybridKind::POINTER, "rst_bond_i"},
@@ -174,8 +172,16 @@ RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbas
     float_data{HybridKind::ARRAY, "rst_float_data"},
     float2_data{HybridKind::ARRAY, "rst_float2_data"},
     float4_data{HybridKind::ARRAY, "rst_float4_data"},
-    ag_pointer{(total_restraint_count > 0) ? rbasis[0].getTopologyPointer() : ag_in}
+    ag_pointer{ag_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatus::RestraintApparatus(const std::vector<BoundedRestraint> &rbasis,
+                                       const AtomGraph *ag_in) :
+    RestraintApparatus((rbasis.size() > 0LLU) ? rbasis[0].getTopologyPointer() : ag_in)
 {
+  total_restraint_count = static_cast<int>(rbasis.size());
+  
   // Do not let a restraint apparatus be created with an empty vector of BoundedRestraints
   if (total_restraint_count == 0 && ag_pointer == nullptr) {
     rtErr("A restraint apparatus must be initialized with a topology pointer.  An empty vector "

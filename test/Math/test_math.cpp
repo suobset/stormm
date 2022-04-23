@@ -352,7 +352,7 @@ int main(int argc, char* argv[]) {
   snapshot(matrices_snp, polyNumericVector(tr_mat_d.readHost()), "tr_ata", 1.0e-5, "Matrix "
            "multiply result for [7 by 5](T) x [7 by 5] matrices is incorrect.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::APPEND, snp_found);
-
+  
   // Try inverting a positive definite matrix
   Hybrid<double> tr_mat_e(cols_a * rows_b, "inverse matrix");
   invertSquareMatrix(tr_mat_d.data(), tr_mat_e.data(), cols_a);

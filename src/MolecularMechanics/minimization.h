@@ -15,7 +15,9 @@ namespace omni {
 namespace mm {
 
 using energy::StaticExclusionMask;
+using energy::StaticExclusionMaskReader;
 using namelist::MinimizeControls;
+using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
 using topology::AtomGraph;
 using topology::NonbondedKit;
@@ -45,8 +47,8 @@ using trajectory::PhaseSpaceWriter;
 /// \param sd_step    Step number at which steepest descent optimization ends and conjugate
 ///                   gradient moves begin
 void computeGradientMove(const double* xfrc, const double* yfrc, const double* zfrc,
-                         double* xmove, double* ymove, double* zmove, int natom, int step,
-                         int sd_steps);
+                         double* xmove, double* ymove, double* zmove, double* x_cg_temp,
+                         double* y_cg_temp, double* z_cg_temp, int natom, int step, int sd_steps);
 
 /// \brief Move particles based on a direction and a specified distance.  The unit vector spread
 ///        across xmove, ymove, and zmove provides the direction and dist the length to travel
@@ -67,9 +69,10 @@ void computeGradientMove(const double* xfrc, const double* yfrc, const double* z
 /// \param vsk        Virtual site abstract from the original topology
 /// \param natom      Number of atoms (trusted length of xcrd, ycrd, ..., ymove, and zmove)
 /// \param dist       Distance along the gradient to travel (a multiplier for the unit vector)
-void moveParticles(const double* xcrd, const double* ycrd, const double* zcrd, double* xmove,
-                   double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
-                   double* z_cg_temp, int natom, double dist);
+void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove,
+                   const double* ymove, const double* zmove, const double* umat,
+                   const double* invu, UnitCellType unit_cell, const VirtualSiteKit<double> &vsk,
+                   int natom, double dist);
 
 /// \brief Minimize a set of coordinates governed by a single topology and restraint apparatus.
 ///        This routine carries out line minimizations.
@@ -108,9 +111,14 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
               double* xmove, double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
               double* z_cg_temp, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
               const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
+              const StaticExclusionMaskReader &ser, const MinimizeControls &mincon);
+
+void minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
               const StaticExclusionMask &se, const MinimizeControls &mincon);
 
-
+void minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
+              const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
+              const StaticExclusionMaskReader &ser, const MinimizeControls &mincon);
 /// \}
   
 } // namespace mm

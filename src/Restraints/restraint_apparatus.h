@@ -189,14 +189,22 @@ public:
 
   /// \brief The constructor takes a vector of individual restraints
   ///
+  /// Overloaded:
+  ///   - Take a pointer to a topology only (this will create a permanently empty object if the
+  ///     pointer is nullptr)
+  ///   - Take an array of restraints and a pointer to a topology
+  ///
   /// \param rbasis  A list of restraint objects with which to build the apparatus
   /// \param ag_in   Pointer to the topology for which this apparatus is built (if rbasis is of
   ///                nonzero length, the topology pointer from the first restraint will be
   ///                preferred, otherwise this must be supplied in order to initialize the const
   ///                member variable ag_pointer)
+  /// \{
+  RestraintApparatus(const AtomGraph *ag_in = nullptr);
   RestraintApparatus(const std::vector<BoundedRestraint> &rbasis,
                      const AtomGraph *ag_in = nullptr);
-
+  /// \}
+  
   /// \brief The copy constructor works like any other object containing POINTER-kind Hybrids.
   ///
   /// \param original  The object to copy

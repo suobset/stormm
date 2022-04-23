@@ -360,6 +360,20 @@ template <typename T> void invertSquareMatrix(T* matrix, T* inverse, const size_
       }
     }
   }
+
+  // While the result is now set, the arrays of pointers used to perform row swaps in the
+  // Gauss-Jordan elimination make the matrix incomprehensible.  The original matrix has been
+  // mangled anyway-use it as scratch space to re-arrange the columns of the inverse matrix for
+  // output.
+  for (size_t i = 0; i < rank; i++) {
+    for (size_t j = 0; j < rank; j++) {
+      matrix[(rank * i) + j] = s[i].ptr_b[j];
+    }
+  }
+  const size_t rank2 = rank * rank;
+  for (size_t i = 0; i < rank2; i++) {
+    inverse[i] = matrix[i];
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

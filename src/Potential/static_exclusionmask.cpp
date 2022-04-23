@@ -18,7 +18,7 @@ StaticExclusionMaskReader::StaticExclusionMaskReader(const int atom_count_in,
 
 //-------------------------------------------------------------------------------------------------
 StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
-    atom_count{ag_in->getAtomCount()},
+    atom_count{(ag_in == nullptr) ? 0 : ag_in->getAtomCount()},
     supertile_stride_count{(atom_count + supertile_length - 1) / supertile_length},
     tile_stride_count{(atom_count + tile_length - 1) / tile_length},
     unique_supertile_count{0},
@@ -27,6 +27,11 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
     supertile_map_indices{0, "exclmask_supertiles"},
     tile_map_indices{0, "exclmask_tiles"}
 {
+  // Return immediately if the nullptr was fed in
+  if (ag_in == nullptr) {
+    return;
+  }
+  
   // Check the system's idea of an int
   if (sizeof(int) < 4LLU) {
     rtErr("This architecture stores an int in " + std::to_string(sizeof(int) * 8) + "-bit format, "

@@ -17,7 +17,7 @@ namespace mm {
 
 using energy::EvaluateForce;
 using energy::ScoreCard;
-using energy::StaticExclusionMask;
+using energy::StaticExclusionMaskReader;
 using restraints::RestraintApparatusDpReader;
 using topology::AtomGraph;
 using topology::NonbondedKit;
@@ -71,7 +71,7 @@ void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, doub
 void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                         ScoreCard *sc, const ValenceKit<double> &vk,
-                        const NonbondedKit<double> &nbk, const StaticExclusionMask &se,
+                        const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
                         const RestraintApparatusDpReader &rar, EvaluateForce eval_force, int step);
 
 } // namespace mm

@@ -39,10 +39,10 @@ void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, doub
 void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
                         const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                         ScoreCard *sc, const ValenceKit<double> &vk,
-                        const NonbondedKit<double> &nbk, const StaticExclusionMask &se,
+                        const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
                         const RestraintApparatusDpReader &rar, const EvaluateForce eval_force,
                         const int step) {
-  evaluateNonbondedEnergy(nbk, se, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
+  evaluateNonbondedEnergy(nbk, ser, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
                           eval_force, eval_force);
   evalValeMM(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc, vk, nbk, eval_force);
   evaluateRestraints(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,

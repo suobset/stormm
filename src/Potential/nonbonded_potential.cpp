@@ -6,11 +6,11 @@ namespace omni {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
-                                const double* xcrd, const double* ycrd, const double* zcrd,
-                                const double* umat, const double* invu,
-                                const UnitCellType unit_cell, double* xfrc, double* yfrc,
-                                double* zfrc, ScoreCard *ecard,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser, const double* xcrd,
+                                const double* ycrd, const double* zcrd, const double* umat,
+                                const double* invu, const UnitCellType unit_cell, double* xfrc,
+                                double* yfrc, double* zfrc, ScoreCard *ecard,
                                 const EvaluateForce eval_elec_force,
                                 const EvaluateForce eval_vdw_force, const int system_index) {
 
@@ -22,7 +22,6 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExcl
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
 
   // Perform nested loops over all supertiles and all tiles within them
-  const StaticExclusionMaskReader ser = se.data();
   for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
     for (int stj = 0; stj <= sti; stj++) {
 
@@ -165,11 +164,11 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExcl
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
-                                PhaseSpaceWriter psw, ScoreCard *ecard,
-                                const EvaluateForce eval_elec_force,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser, PhaseSpaceWriter psw,
+                                ScoreCard *ecard, const EvaluateForce eval_elec_force,
                                 const EvaluateForce eval_vdw_force, const int system_index) {
-  return evaluateNonbondedEnergy(nbk, se, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
+  return evaluateNonbondedEnergy(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                  psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, ecard,
                                  eval_elec_force, eval_vdw_force, system_index);
 }
@@ -178,7 +177,7 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExcl
 double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se, PhaseSpace *ps,
                                 ScoreCard *ecard, const EvaluateForce eval_elec_force,
                                 const EvaluateForce eval_vdw_force, const int system_index) {
-  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se, ps->data(), ecard,
+  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(), ps->data(), ecard,
                                  eval_elec_force, eval_vdw_force, system_index);
 }
 
@@ -186,31 +185,32 @@ double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &
 double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se, PhaseSpace *ps,
                                 ScoreCard *ecard, const EvaluateForce eval_elec_force,
                                 const EvaluateForce eval_vdw_force, const int system_index) {
-  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se, ps->data(), ecard,
-                                 eval_elec_force, eval_vdw_force, system_index);
+  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(), ps->data(),
+                                 ecard, eval_elec_force, eval_vdw_force, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
-                                CoordinateFrameReader cfr, ScoreCard *ecard,
-                                const int system_index) {
-  return evaluateNonbondedEnergy(nbk, se, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser, CoordinateFrameReader cfr,
+                                ScoreCard *ecard, const int system_index) {
+  return evaluateNonbondedEnergy(nbk, ser, cfr.xcrd, cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
                                  cfr.unit_cell, nullptr, nullptr, nullptr, ecard,
                                  EvaluateForce::NO, EvaluateForce::NO, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk, const StaticExclusionMask &se,
+double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
+                                const StaticExclusionMaskReader ser,
                                 const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                 const int system_index) {
-  return evaluateNonbondedEnergy(nbk, se, CoordinateFrameReader(cfw), ecard, system_index);
+  return evaluateNonbondedEnergy(nbk, ser, CoordinateFrameReader(cfw), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
                                 const CoordinateFrameReader &cfr, ScoreCard *ecard,
                                 const int system_index) {
-  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se, cfr, ecard,
+  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(), cfr, ecard,
                                  system_index);
 }
 
@@ -218,7 +218,7 @@ double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &
 double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
                                 const CoordinateFrameReader &cfr, ScoreCard *ecard,
                                 const int system_index) {
-  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se, cfr, ecard,
+  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(), cfr, ecard,
                                  system_index);
 }
 

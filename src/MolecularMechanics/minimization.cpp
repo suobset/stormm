@@ -63,7 +63,7 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
               double* xmove, double* ymove, double* zmove, double* x_cg_temp, double* y_cg_temp,
               double* z_cg_temp, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
               const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
-              const StaticExclusionMask &se, const MinimizeControls &mincon) {
+              const StaticExclusionMaskReader &ser, const MinimizeControls &mincon) {
   
   // Loop for the requested number of cycles
   ScoreCard sc(1);
@@ -78,7 +78,7 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       zfrc[i] = 0.0;
     }
     evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
-                       &sc, vk, nbk, se, rar, EvaluateForce::YES, step);
+                       &sc, vk, nbk, ser, rar, EvaluateForce::YES, step);
     transmitVirtualSiteForces<double, double>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                               UnitCellType::NONE, vsk);
     evec[0] = sc.reportTotalEnergy();
@@ -88,13 +88,22 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
     computeGradientMove(xfrc, yfrc, zfrc, xmove, ymove, zmove, x_cg_temp, y_cg_temp, z_cg_temp,
                         vk.natom, step, mincon.getSteepestDescentCycles());
 
+    // CHECK
+    //printf("Step %4d: %12.4lf -> ", step, sc.reportTotalEnergy());
+    // END CHECK
+
     // Implement the move three times, compute the energy, and arrive at a minimum value.
     double move_scale_factor = 1.0;    
     for (int i = 0; i < 3; i++) {
       moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
                     vsk, vk.natom, move_scale);
       evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
-                         &sc, vk, nbk, se, rar, EvaluateForce::NO, step);
+                         &sc, vk, nbk, ser, rar, EvaluateForce::NO, step);
+
+      // CHECK
+      //printf("%12.4lf -> ", sc.reportTotalEnergy());
+      // END CHECK
+      
       evec[i + 1] = sc.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {
@@ -106,6 +115,10 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
         move_scale_factor *= 0.90;
       }
     }
+
+    // CHECK
+    //printf("(move scale %12.6lf)\n", move_scale);
+    // END CHECK
     
     // Solve the linear system of equations to arrive at a polynomial Ax^3 + Bx^2 + Cx + D = evec
     // to solve the energy surface for x = 0.0 (gets evec[0]), mvec[1] (gets evec[1]), mvec[2],
@@ -117,10 +130,11 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       amat[i +  4] = x * x;
       amat[i +  8] = x;
       amat[i + 12] = 1.0;
+      abcd_coefs[i] = 0.0;
     }
     invertSquareMatrix(amat, inva, 4);
     matrixVectorMultiply(inva, evec, abcd_coefs, 4, 4);
-
+    
     // The cubic polynomial will have at most one local minimum.  Find the local minimum, and if
     // it is in the range [mvec[0] = 0.0, mvec[3]] (inclusive of the endpoints), then take it by
     // moving all coordinates that distance from their origin at the outset of the move.
@@ -148,8 +162,10 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
       const double ext_ii = (-d_abcd[1] - sqrt(sqrt_arg)) / (2.0 * d_abcd[0]);
       const double min_pos = ((2.0 * d_abcd[0] * ext_i) + d_abcd[1] > 0.0) ? ext_i : ext_ii;
       if (min_pos <= 0.0) {
-        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
-                      vsk, vk.natom, -mvec[3] * move_scale);
+        if (evec[3] > evec[0]) {
+          moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr,
+                        UnitCellType::NONE, vsk, vk.natom, -mvec[3] * move_scale);
+        }
       }
       else if (min_pos < mvec[3]) {
         moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
@@ -159,5 +175,16 @@ void minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yf
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+void minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
+              const StaticExclusionMask &se, const MinimizeControls &mincon) {
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
+  PhaseSpaceWriter psw = ps->data();
+  minimize(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc, psw.xvel, psw.yvel,
+           psw.zvel, psw.xprv, psw.yprv, psw.zprv, vk, nbk, ra.dpData(), vsk, se.data(), mincon);
+}
+              
 } // namespace mm
 } // namespace omni
