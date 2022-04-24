@@ -299,7 +299,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
   
   // Find chiral centers
-  const std::vector<int> tmp_chiral_centers = findChiralCenters(nbk, vk, cdk, cfr);
+  const std::vector<int> tmp_chiral_centers = detailChiralCenters(nbk, vk, cdk);
   chiral_center_count = tmp_chiral_centers.size();
   const std::vector<int>
     tmp_chiral_inversion_methods = findChiralInversionMethods(tmp_chiral_centers, tmp_ring_atoms,
@@ -365,8 +365,12 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
   ic = invertible_groups.putHost(&int_data, tmp_invertible_groups, ic, warp_size_zu);
   ic = invertible_group_bounds.putHost(&int_data, tmp_invertible_group_bounds, ic, warp_size_zu);
   ic = anchor_a_branches.putHost(&int_data, tmp_anchor_a_branches, ic, warp_size_zu);
-  ic = anchor_b_branches.putHost(&int_data, tmp_anchor_b_branches, ic, warp_size_zu);
+  ic = anchor_b_branches.putHost(&int_data, tmp_anchor_b_branches, ic, warp_size_zu);  
   if (timer != nullptr) timer->assignTime(chemfe_misc_timing);
+
+  // Correct the chiral centers' orientations
+  findChiralOrientations(cfr);
+  if (timer != nullptr) timer->assignTime(chiral_center_timing);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1630,10 +1634,9 @@ void ChemicalFeatures::findAromaticGroups(const ChemicalDetailsKit &cdk,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> &nbk,
-                                                     const ValenceKit<double> &vk,
-                                                     const ChemicalDetailsKit &cdk,
-                                                     const CoordinateFrameReader &cfr) const {
+std::vector<int> ChemicalFeatures::detailChiralCenters(const NonbondedKit<double> &nbk,
+                                                       const ValenceKit<double> &vk,
+                                                       const ChemicalDetailsKit &cdk) {
   
   // Prepare to construct tree structures for each molecule, similar to what was done above.
   // However, the trees will not trace rings this time.  Rather, they will continue along the path
@@ -1658,6 +1661,7 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
   // initiated by some other atom.
   std::vector<std::vector<bool>> atom_touched(4, std::vector<bool>(atom_count, false));
   std::vector<int> result;
+  std::vector<int4> tmp_chiral_arms;
   std::vector<bool> valid_atom_mask(atom_count);
   for (int i = 0; i < atom_count; i++) {
     valid_atom_mask[i] = (cdk.z_numbers[i] > 0);
@@ -1767,15 +1771,21 @@ std::vector<int> ChemicalFeatures::findChiralCenters(const NonbondedKit<double> 
 
     // Make the coordinate origin the atom center.  Align the atoms with respect to the axis
     // extending between the center and the root of the lowest priority branch.
-    const int chiral_direction = getChiralOrientation(cfr, i, links[priority[0].y][0].getAtom(),
-                                                      links[priority[3].y][0].getAtom(),
-                                                      links[priority[2].y][0].getAtom(),
-                                                      links[priority[1].y][0].getAtom());
-    
-    // Combine the chirality determination with the atom index (offset by one to prevent the
-    // abiguity of zero and -zero), then contribute the result
-    result.push_back(chiral_direction * (i + 1));
+    int4 ichiral_arms = { links[priority[0].y][0].getAtom(),
+                          links[priority[3].y][0].getAtom(),
+                          links[priority[2].y][0].getAtom(),
+                          links[priority[1].y][0].getAtom() };
+    tmp_chiral_arms.push_back(ichiral_arms);
+    result.push_back(i + 1);
   }
+
+  // Post the chiral arm information now, in its own ARRAY-kind Hybrid object.
+  chiral_arm_atoms.resize(tmp_chiral_arms.size());
+  chiral_arm_atoms.putHost(tmp_chiral_arms);
+
+  // Return the list of chiral atom indices.  The atom indices have all been inflated by one, as
+  // if they are all L-orientation.  The orientations will be corrected in the next call to
+  // findChiralOrientations().
   return result;
 }
 
@@ -2568,6 +2578,20 @@ ChiralInversionProtocol ChemicalFeatures::getChiralInversionMethods(const int in
 //-------------------------------------------------------------------------------------------------
 const AtomGraph* ChemicalFeatures::getTopologyPointer() const {
   return ag_pointer;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ChemicalFeatures::findChiralOrientations(const CoordinateFrameReader &cfr) {
+  const int4* arm_ptr = chiral_arm_atoms.data();
+  for (int i = 0; i < chiral_center_count; i++) {
+    const int chatom = abs(chiral_centers.readHost(i) - 1);
+    const int chiral_direction = getChiralOrientation(cfr, chatom, arm_ptr[i].x, arm_ptr[i].y,
+                                                      arm_ptr[i].z, arm_ptr[i].w);
+
+    // Combine the chirality determination with the atom index (offset by one to prevent the
+    // abiguity of zero and -zero), then contribute the result.
+    chiral_centers.putHost(chiral_direction * (chatom + 1), i);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

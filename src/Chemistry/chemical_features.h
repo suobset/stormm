@@ -349,6 +349,14 @@ public:
 
   /// \brief Get a pointer to the AtomGraph which built this object.
   const AtomGraph* getTopologyPointer() const;
+
+  /// \brief Find the chiral orientations of the system's chiral centers.  This function will be
+  ///        called once by the constructor but can be called additional times if the coordinates
+  ///        of the system change.  It will update the object's internal array of chiral centers,
+  ///        which combines orientational information with the centers' topological indices.
+  ///
+  /// \param cfr  Present coordinates of the system
+  void findChiralOrientations(const CoordinateFrameReader &cfr);
   
 private:
   int atom_count;              ///< Number of atoms in the system
@@ -419,6 +427,12 @@ private:
 
   /// List of hydrogen bond acceptor atoms
   Hybrid<int> hydrogen_bond_acceptors;
+
+  /// List of topological indices for each of four atoms at the roots of chiral arms for each
+  /// chiral center.  The x member contains the lowest priority arm (the one which orients the
+  /// wheel), the y, z, and w members contain the highest, second highest, and third highest
+  /// priority arms.
+  Hybrid<int4> chiral_arm_atoms;
   
   /// List of chiral centers (needs no bounds array, but each center is a five-membered tuple
   /// consisting of the topological index of the center itself, followed by the four substituent
@@ -572,15 +586,17 @@ private:
   /// \brief Find chiral centers in the system.  This will use methods similar to the ring
   ///        detection system.  Apply IUPAC rules based on substituent atomic numbers and bond
   ///        orders.  Isotopes will not be applied.  This returns a list of detected chiral
-  ///        centers for later incorporation into the actual object.
+  ///        centers and assumes them all to be L-.  Atoms at the bases of their four distinct
+  ///        arms are recorded and posted to one of the internal object's ARRAY-kind Hybrids, for
+  ///        later reference.  The true orientations of each center are detected in a subsequent
+  ///        call to the public member function findChiralOrientations().
   ///
-  /// \param nbk  Nonbonded system details, abstract taken from the original topology
-  /// \param vk   Valence term abstract from the original topology
-  /// \param cdk  Chemical details abstract from the original topology
-  /// \param cf   Coordinates for the system, needed to eventually determine R- or S-chirality
-  std::vector<int> findChiralCenters(const NonbondedKit<double> &nbk, const ValenceKit<double> &vk,
-                                     const ChemicalDetailsKit &cdk,
-                                     const CoordinateFrameReader &cfr) const;
+  /// \param nbk                   Nonbonded system details abstract from the original topology
+  /// \param vk                    Valence term abstract from the original topology
+  /// \param cdk                   Chemical details abstract from the original topology
+  std::vector<int> detailChiralCenters(const NonbondedKit<double> &nbk,
+                                       const ValenceKit<double> &vk,
+                                       const ChemicalDetailsKit &cdk);
 
   /// \brief Determine whether each chiral center can be inverted, and whether that is best done by
   ///        rotating two chiral branches by C2 symmetry or reflecting the entire molecule across a

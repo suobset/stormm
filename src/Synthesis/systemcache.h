@@ -3,18 +3,24 @@
 #define OMNI_SYSTEM_PREP_H
 
 #include <vector>
+#include "Chemistry/chemical_features.h"
+#include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_files.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "Trajectory/trajectory_enumerators.h"
+#include "UnitTesting/stopwatch.h"
 
 namespace omni {
 namespace synthesis {
 
+using chemistry::ChemicalFeatures;
+using chemistry::MapRotatableGroups;
 using constants::ExceptionResponse;
 using namelist::FilesControls;
+using testing::StopWatch;
 using topology::AtomGraph;
 using trajectory::PhaseSpace;
 using trajectory::CoordinateFileKind;
@@ -39,9 +45,20 @@ public:
   /// \param policy         Response to bad user input, i.e. files of the wrong type
   /// \{
   SystemCache();
-  SystemCache(const FilesControls &fcon, ExceptionResponse policy);
+  SystemCache(const FilesControls &fcon, ExceptionResponse policy = ExceptionResponse::DIE,
+              MapRotatableGroups map_chemfe_rotators = MapRotatableGroups::NO,
+              StopWatch *timer_in = nullptr);
   /// \}
 
+  /// \brief The default copy and move constructors, copy and move assignment operators will be
+  ///        effective for this object based entirely on Standard Template Library components.  
+  /// \{
+  SystemCache(const SystemCache &original) = default;
+  SystemCache(SystemCache &&original) = default;
+  SystemCache& operator=(const SystemCache &other) = default;
+  SystemCache& operator=(SystemCache &&other) = default;
+  /// \}
+  
   /// \brief Get the number of systems
   int getSystemCount() const;
 
@@ -172,6 +189,9 @@ private:
   /// coordinates read as part of a MoleculeSystem.
   std::vector<PhaseSpace> coordinates_cache;
 
+  /// An array of chemical features objects to outline the important aspects of each system.
+  std::vector<ChemicalFeatures> features_cache;
+  
   /// The vector of all topology indices guiding each simulation.  This may contain repeats, if
   /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
   /// when composing the synthesis objects.

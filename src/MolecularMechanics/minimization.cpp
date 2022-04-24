@@ -115,10 +115,6 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
     computeGradientMove(xfrc, yfrc, zfrc, xprv_move, yprv_move, zprv_move, x_cg_temp, y_cg_temp,
                         z_cg_temp, vk.natom, step, mincon.getSteepestDescentCycles());
 
-    // CHECK
-    //printf("Step %4d: %12.4lf -> ", step, sc.reportTotalEnergy());
-    // END CHECK
-
     // Implement the move three times, compute the energy, and arrive at a minimum value.
     double move_scale_factor = 1.0;    
     for (int i = 0; i < 3; i++) {
@@ -126,26 +122,19 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
                     vsk, vk.natom, move_scale);
       evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
                          &sc_temp, vk, nbk, ser, rar, EvaluateForce::NO, step);
-
-      // CHECK
-      //printf("%12.4lf -> ", sc.reportTotalEnergy());
-      // END CHECK
-      
       evec[i + 1] = sc_temp.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {
-        move_scale *= 1.05;
-        move_scale_factor *= 1.05;
+        const double idecay = 0.01 * static_cast<double>(i);
+        move_scale *= 1.05 - idecay;
+        move_scale_factor *= 1.05 - idecay;
       }
       else {
-        move_scale *= 0.90;
-        move_scale_factor *= 0.90;
+        const double idecay = 0.025 * static_cast<double>(i);        
+        move_scale /= 1.05 - idecay;
+        move_scale_factor /= 1.05 - idecay;
       }
     }
-
-    // CHECK
-    //printf("(move scale %12.6lf)\n", move_scale);
-    // END CHECK
     
     // Solve the linear system of equations to arrive at a polynomial Ax^3 + Bx^2 + Cx + D = evec
     // to solve the energy surface for x = 0.0 (gets evec[0]), mvec[1] (gets evec[1]), mvec[2],

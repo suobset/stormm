@@ -23,12 +23,13 @@ using omni::trajectory::detectCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
-    topology_cache{}, coordinates_cache{}, topology_indices{}, example_indices{}, topology_cases{},
-    topology_case_bounds{}
+    topology_cache{}, coordinates_cache{}, features_cache{}, topology_indices{}, example_indices{},
+    topology_cases{}, topology_case_bounds{}
 {}
 
 //-------------------------------------------------------------------------------------------------
-SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy) :
+SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse policy,
+                         const MapRotatableGroups map_chemfe_rotators, StopWatch *timer_in) :
     SystemCache()
 {
   // Read all free topologies, using a try-catch block to filter out things that may not work.
@@ -350,6 +351,28 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     topology_case_bounds[i] = topology_case_bounds[i - 1];
   }
   topology_case_bounds[0] = 0;
+
+  // Create ChemicalFeatures objects to pair with each system--the majority of the work in
+  // computing the ChemicalFeatures lies in ring detection and drawing the Lewis structure to
+  // determine formal charges and bond orders, aspects which are invariant to coordinates.
+  // Compute the ChemicalFeatures for each topology and then reassess the chiralities for each
+  // system.
+  features_cache.reserve(system_count);
+  for (int i = 0; i < system_count; i++) {
+
+    // Determine whether chemical features have been computed for this topology already.
+    // If not, create them anew.  If so, copy the features and recompute chiral orientations.
+    const int top_idx = topology_indices[i];
+    if (i > example_indices[top_idx]) {
+      features_cache.emplace_back(features_cache[example_indices[top_idx]]);
+      features_cache[i].findChiralOrientations(CoordinateFrameReader(coordinates_cache[i]));
+    }
+    else {
+      features_cache.emplace_back(&topology_cache[top_idx],
+                                  CoordinateFrameReader(coordinates_cache[i]), map_chemfe_rotators,
+                                  300.0, timer_in);
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
