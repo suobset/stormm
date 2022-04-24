@@ -15,31 +15,50 @@ using structure::placeVirtualSites;
 using structure::transmitVirtualSiteForces;
   
 //-------------------------------------------------------------------------------------------------
-void computeGradientMove(const double* xfrc, const double* yfrc, const double* zfrc,
-                         double* xmove, double* ymove, double* zmove, double* x_cg_temp,
+void computeGradientMove(double* xfrc, double* yfrc, double* zfrc, double* xprv_move,
+                         double* yprv_move, double* zprv_move, double* x_cg_temp,
                          double* y_cg_temp, double* z_cg_temp, const int natom, const int step,
                          const int sd_steps) {
-  if (step < sd_steps) {
-    double msum = 0.0;
+
+  // Apply the conjugate gradient protocol
+  if (step >= sd_steps) {
+    double gg = 0.0;
+    double dgg = 0.0;
     for (int i = 0; i < natom; i++) {
-      const double fx = xfrc[i];
-      const double fy = yfrc[i];
-      const double fz = zfrc[i];
-      xmove[i] = fx;
-      ymove[i] = fy;
-      zmove[i] = fz;
-      msum += (fx * fx) + (fy * fy) + (fz * fz);
+      gg += (xprv_move[i] * xprv_move[i]) + (yprv_move[i] * yprv_move[i]) +
+            (zprv_move[i] * zprv_move[i]);
+      const double dfx = (xfrc[i] - xprv_move[i]) * xfrc[i];
+      const double dfy = (yfrc[i] - yprv_move[i]) * yfrc[i];
+      const double dfz = (zfrc[i] - zprv_move[i]) * zfrc[i];
+      dgg += dfx + dfy + dfz;
     }
-    msum = 1.0 / sqrt(msum);
+    const double gam = (step == sd_steps) ? 0.0 : dgg / gg;
     for (int i = 0; i < natom; i++) {
-      xmove[i] *= msum;
-      ymove[i] *= msum;
-      zmove[i] *= msum;
+      xprv_move[i] = xfrc[i];
+      yprv_move[i] = yfrc[i];
+      zprv_move[i] = zfrc[i];
+      x_cg_temp[i] = xprv_move[i] + (gam * x_cg_temp[i]);
+      y_cg_temp[i] = yprv_move[i] + (gam * y_cg_temp[i]);
+      z_cg_temp[i] = zprv_move[i] + (gam * z_cg_temp[i]);
+      xfrc[i] = x_cg_temp[i];
+      yfrc[i] = y_cg_temp[i];
+      zfrc[i] = z_cg_temp[i];
     }
   }
-  else {
 
-    // Apply the conjugate gradient protocol 
+  // Normalize the force vector to get the move
+  double msum = 0.0;
+  for (int i = 0; i < natom; i++) {
+    const double fx = xfrc[i];
+    const double fy = yfrc[i];
+    const double fz = zfrc[i];
+    msum += (fx * fx) + (fy * fy) + (fz * fz);
+  }
+  msum = 1.0 / sqrt(msum);
+  for (int i = 0; i < natom; i++) {
+    xfrc[i] *= msum;
+    yfrc[i] *= msum;
+    zfrc[i] *= msum;
   }
 }
 
@@ -58,16 +77,25 @@ void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove
   
 //-------------------------------------------------------------------------------------------------
 ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc,
-                   double* zfrc, double* xmove, double* ymove, double* zmove, double* x_cg_temp,
-                   double* y_cg_temp, double* z_cg_temp, const ValenceKit<double> &vk,
-                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
-                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
-                   const MinimizeControls &mincon, const int nrg_scale_bits) {
+                   double* zfrc, double* xprv_move, double* yprv_move, double* zprv_move,
+                   double* x_cg_temp, double* y_cg_temp, double* z_cg_temp,
+                   const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
+                   const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
+                   const StaticExclusionMaskReader &ser, const MinimizeControls &mincon,
+                   const int nrg_scale_bits) {
   
   // Loop for the requested number of cycles
   ScoreCard sc(1, mincon.getTotalCycles() + 1, nrg_scale_bits), sc_temp(1);
   double move_scale = mincon.getInitialStep();
   double evec[4], mvec[4], abcd_coefs[4], d_abcd[3], amat[16], inva[16];
+  for (int i = 0; i < vk.natom; i++) {
+    xprv_move[i] = 0.0;
+    yprv_move[i] = 0.0;
+    zprv_move[i] = 0.0;
+    x_cg_temp[i] = 0.0;
+    y_cg_temp[i] = 0.0;
+    z_cg_temp[i] = 0.0;
+  }
   for (int step = 0; step < mincon.getTotalCycles(); step++) {
 
     // Compute the forces on all particles
@@ -84,8 +112,8 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
     mvec[0] = 0.0;
 
     // Generate the move    
-    computeGradientMove(xfrc, yfrc, zfrc, xmove, ymove, zmove, x_cg_temp, y_cg_temp, z_cg_temp,
-                        vk.natom, step, mincon.getSteepestDescentCycles());
+    computeGradientMove(xfrc, yfrc, zfrc, xprv_move, yprv_move, zprv_move, x_cg_temp, y_cg_temp,
+                        z_cg_temp, vk.natom, step, mincon.getSteepestDescentCycles());
 
     // CHECK
     //printf("Step %4d: %12.4lf -> ", step, sc.reportTotalEnergy());
@@ -94,7 +122,7 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
     // Implement the move three times, compute the energy, and arrive at a minimum value.
     double move_scale_factor = 1.0;    
     for (int i = 0; i < 3; i++) {
-      moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+      moveParticles(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr, UnitCellType::NONE,
                     vsk, vk.natom, move_scale);
       evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
                          &sc_temp, vk, nbk, ser, rar, EvaluateForce::NO, step);
@@ -149,7 +177,7 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
       // The cubic equation has no minima or maxima.  Check the extrema of the range to
       // ascertain the correct move.
       if (evec[0] < evec[3]) {
-        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+        moveParticles(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr, UnitCellType::NONE,
                       vsk, vk.natom, -mvec[3] * move_scale);
       }
     }
@@ -162,12 +190,12 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
       const double min_pos = ((2.0 * d_abcd[0] * ext_i) + d_abcd[1] > 0.0) ? ext_i : ext_ii;
       if (min_pos <= 0.0) {
         if (evec[3] > evec[0]) {
-          moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr,
+          moveParticles(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                         UnitCellType::NONE, vsk, vk.natom, -mvec[3] * move_scale);
         }
       }
       else if (min_pos < mvec[3]) {
-        moveParticles(xcrd, ycrd, zcrd, xmove, ymove, zmove, nullptr, nullptr, UnitCellType::NONE,
+        moveParticles(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr, UnitCellType::NONE,
                       vsk, vk.natom, (min_pos - mvec[3]) * move_scale);
       }
     }

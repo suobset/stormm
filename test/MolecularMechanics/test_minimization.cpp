@@ -93,7 +93,9 @@ int main(int argc, char* argv[]) {
   // Try the dipeptide--this systems contains CMAPs in addition to basic Amber force field terms
   section(1);
   MinimizeControls mincon;
-  minimize(&all_ps[0], all_ag[0], all_ra[0], all_se[0], mincon);
+  const ScoreCard alad_ene = minimize(&all_ps[0], all_ag[0], all_ra[0], all_se[0], mincon);
+  const ScoreCard brbz_ene = minimize(&all_ps[1], all_ag[1], all_ra[1], all_se[1], mincon);
+  const ScoreCard bbvs_ene = minimize(&all_ps[2], all_ag[2], all_ra[2], all_se[2], mincon);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

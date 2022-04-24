@@ -39,19 +39,23 @@ using trajectory::PhaseSpaceWriter;
 ///
 /// \param xfrc       Forces acting on all atoms in the Cartesian X direction (forces acting on
 ///                   virtual sites must be transmitted to atoms with mass prior to calling this
-///                   function)
+///                   function).  Atoms will be moved in proportion to the forces acting on them.
+///                   in conjugate gradietn cycles, the prior moves will be stored in separate
+///                   arrays that are used to temper forces computed based on atomic interactions. 
 /// \param yfrc       Forces acting on all atoms in the Cartesian Y direction
 /// \param zfrc       Forces acting on all atoms in the Cartesian Z direction
-/// \param xmove      The move to apply to each atom in the Cartesian X direction, before scaling
-///                   with the step size which will be done by the calling function
-/// \param ymove      The move to apply to each atom in the Cartesian Y direction
-/// \param zmove      The move to apply to each atom in the Cartesian Z direction
+/// \param xprv_move  The move previsouly applied to each atom in the Cartesian X direction
+/// \param yprv_move  The move previously applied to each atom in the Cartesian Y direction
+/// \param zprv_move  The move previously applied to each atom in the Cartesian Z direction
+/// \param x_cg_temp  Cartesian X moves to apply to each particle
+/// \param y_cg_temp  Cartesian Y moves to apply to each particle
+/// \param z_cg_temp  Cartesian Z moves to apply to each particle
 /// \param natom      Number of atoms (trusted length of xcrd, ycrd, ..., ymove, and zmove)
 /// \param step       Current step number of the energy minimization
 /// \param sd_step    Step number at which steepest descent optimization ends and conjugate
 ///                   gradient moves begin
-void computeGradientMove(const double* xfrc, const double* yfrc, const double* zfrc,
-                         double* xmove, double* ymove, double* zmove, double* x_cg_temp,
+void computeGradientMove(double* xfrc, double* yfrc, double* zfrc, double* xprv_move,
+                         double* yprv_move, double* zprv_move, double* x_cg_temp,
                          double* y_cg_temp, double* z_cg_temp, int natom, int step, int sd_steps);
 
 /// \brief Move particles based on a direction and a specified distance.  The unit vector spread
@@ -64,9 +68,6 @@ void computeGradientMove(const double* xfrc, const double* yfrc, const double* z
 /// \param xmove      Cartesian X moves to apply to each particle
 /// \param ymove      Cartesian Y moves to apply to each particle
 /// \param zmove      Cartesian Z moves to apply to each particle
-/// \param x_cg_temp  Cartesian X moves to apply to each particle
-/// \param y_cg_temp  Cartesian Y moves to apply to each particle
-/// \param z_cg_temp  Cartesian Z moves to apply to each particle
 /// \param umat       Transformation matrix taking coordinates into fractional space
 /// \param invu       Transformation matrix taking fractional coordinates back to real space
 /// \param unit_cell  Type of simulation cell, to direct re-imaging for virtual site placement
@@ -114,11 +115,12 @@ void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove
 /// \param nrg_scale_bits  Number of bits after the decimal with which to accumulate energy terms
 /// \{
 ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc,
-                   double* zfrc, double* xmove, double* ymove, double* zmove, double* x_cg_temp,
-                   double* y_cg_temp, double* z_cg_temp, const ValenceKit<double> &vk,
-                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
-                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
-                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
+                   double* zfrc, double* xprv_move, double* yprv_move, double* zprv_move,
+                   double* x_cg_temp, double* y_cg_temp, double* z_cg_temp,
+                   const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
+                   const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
+                   const StaticExclusionMaskReader &ser, const MinimizeControls &mincon,
+                   int nrg_scale_bits = default_energy_scale_bits);
 
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
                    const StaticExclusionMask &se, const MinimizeControls &mincon,

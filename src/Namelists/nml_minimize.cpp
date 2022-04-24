@@ -15,7 +15,7 @@ using parse::realToString;
 MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
     policy{policy_in},
     total_cycles{default_minimize_maxcyc},
-    steepest_descent_cycles{default_minimize_maxcyc},
+    steepest_descent_cycles{default_minimize_ncyc},
     print_frequency{default_minimize_ntpr},
     electrostatic_cutoff{default_minimize_cut},
     lennard_jones_cutoff{default_minimize_cut},
