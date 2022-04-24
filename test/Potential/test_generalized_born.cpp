@@ -410,6 +410,7 @@ int main(int argc, char* argv[]) {
 
   // Print results
   if (oe.getDisplayTimingsOrder()) {
+    timer.assignTime(0);
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
