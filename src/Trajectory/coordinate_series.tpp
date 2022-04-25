@@ -522,6 +522,9 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
           "able to store both coordinates and velocities needed for checkpointing.",
           "CoordinateFrame", "exportToFile");
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("A trajectory format must be specified.", "CoordinateSeries", "exportToFile");
+    break;
   }
   foutp.close();
 }

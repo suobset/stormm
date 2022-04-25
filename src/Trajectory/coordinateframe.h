@@ -36,7 +36,6 @@ struct CoordinateFrameWriter {
   /// \{
   CoordinateFrameWriter(const CoordinateFrameWriter &original) = default;
   CoordinateFrameWriter(CoordinateFrameWriter &&original) = default;
-  CoordinateFrameWriter& operator=(const CoordinateFrameWriter &other) = default;
   /// \}
   
   const int natom;               ///< The number of atoms in the system
@@ -72,7 +71,6 @@ struct CoordinateFrameReader {
   /// \{
   CoordinateFrameReader(const CoordinateFrameReader &original) = default;
   CoordinateFrameReader(CoordinateFrameReader &&original) = default;
-  CoordinateFrameReader& operator=(const CoordinateFrameReader &other) = default;
   /// \}
   
   const int natom;               ///< The number of atoms in the system
