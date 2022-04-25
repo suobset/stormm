@@ -22,12 +22,17 @@ ForwardExclusionMaskReader::ForwardExclusionMaskReader(const int natom_in, const
 
 //-------------------------------------------------------------------------------------------------
 ForwardExclusionMask::ForwardExclusionMask(const AtomGraph *ag_in) :
-  atom_count{ag_in->getAtomCount()},
+  atom_count{(ag_in == nullptr) ? 0 : ag_in->getAtomCount()},
   primary_mask_indices{static_cast<size_t>(atom_count), "fwdmask_idx"},
   primary_masks{static_cast<size_t>(atom_count), "fwdmask_primary"},
   secondary_masks{0, "fwdmask_secondary"},
   ag_pointer{ag_in}
 {
+  // Return immediately if the pointer was null.
+  if (ag_in == nullptr) {
+    return;
+  }
+  
   // Step through each atom, assembling a list of exclusions whos atomic indices are ahead of it
   // in the topology list.  Determine whether the list will fit within a single 32-bit unsigned int
   // mask (the primary mask), and if not make additional masks (secondary masks).

@@ -30,6 +30,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
 	         $(SRCDIR)/Namelists/namelist_element.cpp \
 	         $(SRCDIR)/Namelists/namelist_emulator.cpp \
+	         $(SRCDIR)/Namelists/nml_conformer.cpp \
 	         $(SRCDIR)/Namelists/nml_dynamics.cpp \
 	         $(SRCDIR)/Namelists/nml_files.cpp \
 	         $(SRCDIR)/Namelists/nml_minimize.cpp \
@@ -37,6 +38,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/nml_random.cpp \
 	         $(SRCDIR)/Namelists/nml_restraint.cpp \
 	         $(SRCDIR)/Namelists/nml_solvent.cpp \
+	         $(SRCDIR)/Namelists/user_settings.cpp \
 	         $(SRCDIR)/Parsing/ascii_numbers.cpp \
 	         $(SRCDIR)/Parsing/citation.cpp \
 		 $(SRCDIR)/Parsing/parse.cpp \
@@ -128,6 +130,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/namelist_element.h \
 		   $(SRCDIR)/Namelists/namelist_emulator.h \
 		   $(SRCDIR)/Namelists/namelist_enumerations.h \
+		   $(SRCDIR)/Namelists/nml_conformer.h \
 		   $(SRCDIR)/Namelists/nml_dynamics.h \
 		   $(SRCDIR)/Namelists/nml_files.h \
 		   $(SRCDIR)/Namelists/nml_minimize.h \
@@ -135,6 +138,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/nml_random.h \
 		   $(SRCDIR)/Namelists/nml_restraint.h \
 		   $(SRCDIR)/Namelists/nml_solvent.h \
+		   $(SRCDIR)/Namelists/user_settings.h \
 		   $(SRCDIR)/Parsing/ascii_numbers.h \
 		   $(SRCDIR)/Parsing/citation.h \
 	           $(SRCDIR)/Parsing/parse.h \
@@ -240,12 +244,15 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Namelists/input.o \
 	        $(SRCDIR)/Namelists/namelist_element.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
+	        $(SRCDIR)/Namelists/nml_conformer.o \
+	        $(SRCDIR)/Namelists/nml_dynamics.o \
 	        $(SRCDIR)/Namelists/nml_files.o \
 	        $(SRCDIR)/Namelists/nml_minimize.o \
 	        $(SRCDIR)/Namelists/nml_precision.o \
 	        $(SRCDIR)/Namelists/nml_random.o \
 	        $(SRCDIR)/Namelists/nml_restraint.o \
 	        $(SRCDIR)/Namelists/nml_solvent.o \
+	        $(SRCDIR)/Namelists/user_settings.o \
 		$(SRCDIR)/Parsing/ascii_numbers.o \
 	        $(SRCDIR)/Parsing/citation.o \
 	        $(SRCDIR)/Parsing/parse.o \
@@ -356,7 +363,8 @@ OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
 
 # Applications using omni
-OMNI_APPS = $(APPDIR)/bin/conformer.omni
+OMNI_APPS = $(APPDIR)/bin/conformer.omni \
+	    $(APPDIR)/bin/dynamics.omni
 
 # Compilation variables
 CC=g++
@@ -580,16 +588,18 @@ $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
 	  $(BENCHDIR)/ForceAccumulation/valence.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: Benchmarking split accumulation of valence bond and angle forces 
-$(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so \
-			       $(APPDIR)/Conf/src/conformer.cpp \
-			       $(APPDIR)/Conf/src/nml_conformer.cpp \
-			       $(APPDIR)/Conf/src/setup.cpp \
-			       $(APPDIR)/Conf/src/user_settings.cpp
+$(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so $(APPDIR)/Conf/src/conformer.cpp \
+			       $(APPDIR)/Conf/src/setup.cpp
 	@echo "[OMNI]  Building conformer.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/conformer.omni \
-	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/nml_conformer.cpp \
-	  $(APPDIR)/Conf/src/setup.cpp $(APPDIR)/Conf/src/user_settings.cpp \
+	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/setup.cpp \
 	  -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: Benchmarking split accumulation of valence bond and angle forces 
+$(APPDIR)/bin/dynamics.omni : $(LIBDIR)/libomni.so $(APPDIR)/Dyna/src/dynamics.cpp
+	@echo "[OMNI]  Building dynamics.omni..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/dynamics.omni \
+	  $(APPDIR)/Dyna/src/dynamics.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 install : $(LIBDIR)/libomni.so
 

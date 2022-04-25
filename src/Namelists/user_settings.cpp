@@ -1,40 +1,38 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
-#include "../../../src/FileManagement/file_listing.h"
-#include "../../../src/Namelists/namelist_emulator.h"
-#include "../../../src/Namelists/namelist_element.h"
-#include "../../../src/Parsing/parse.h"
-#include "../../../src/Parsing/polynumeric.h"
-#include "../../../src/Reporting/error_format.h"
+#include "FileManagement/file_listing.h"
+#include "Namelists/namelist_emulator.h"
+#include "Namelists/namelist_element.h"
+#include "Parsing/parse.h"
+#include "Parsing/polynumeric.h"
+#include "Reporting/error_format.h"
 #include "user_settings.h"
 
-namespace conf_app {
-namespace user_input {
+namespace omni {
+namespace namelist {
 
-using omni::constants::CaseSensitivity;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::errors::rtErr;
-using omni::errors::rtWarn;
-using omni::namelist::NamelistElement;
-using omni::namelist::NamelistType;
-using omni::parse::NumberFormat;
-using omni::parse::TextOrigin;
-using omni::parse::verifyNumberFormat;
-using omni::parse::WrapTextSearch;
+using constants::CaseSensitivity;
+using diskutil::DrivePathType;
+using diskutil::getDrivePathType;
+using errors::rtErr;
+using errors::rtWarn;
+using namelist::NamelistElement;
+using namelist::NamelistType;
+using parse::NumberFormat;
+using parse::TextOrigin;
+using parse::verifyNumberFormat;
+using parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
-UserSettings::UserSettings(const int argc, const char* argv[]) :
+UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
     policy{ExceptionResponse::DIE},
     input_file{std::string(default_conformer_input_file)},
-    common_core_mask{std::string("")},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
-  std::string cval_report_file;
-  std::string cval_conf_file_name;
+  std::string cval_report_file, cval_traj_file_name;
   std::vector<std::string> cval_topology_file_names;
   std::vector<std::string> cval_coordinate_file_names;
   
@@ -74,7 +72,7 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
       i++;
     }
     else if (i < argc - 1 && strcmp(argv[i], "-xname") == 0) {
-      cval_conf_file_name = std::string(argv[i + 1]);
+      cval_traj_file_name = std::string(argv[i + 1]);
       cli_confname = true;
       i++;
     }
@@ -98,7 +96,7 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
     rtErr("The " + descriptor + " input file " + input_file + " was not found or could not be "
           "read.", "UserSettings");
   }
-  TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for conformer.omni", "UserSettings");
+  TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for OMNI executable", "UserSettings");
   int start_line = 0;
   file_io_input = FilesControls(inp_tf, &start_line, policy);
   start_line = 0;
@@ -107,8 +105,14 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
   solvent_input = SolventControls(inp_tf, &start_line, policy);
   start_line = 0;
   prng_input = RandomControls(inp_tf, &start_line, policy);
-  start_line = 0;
-  conf_input = ConformerControls(inp_tf, &start_line, policy);
+  switch (prog_set) {
+  case AppName::CONFORMER:
+    start_line = 0;
+    conf_input = ConformerControls(inp_tf, &start_line, policy);
+    break;
+  case AppName::DYNAMICS:
+    break;
+  }
 
   // Superimpose, or contribute, command line directives
   if (cli_igseed) {
@@ -118,7 +122,7 @@ UserSettings::UserSettings(const int argc, const char* argv[]) :
     file_io_input.setReportFileName(cval_report_file);
   }
   if (cli_confname) {
-    file_io_input.setGeneralTrajectoryFileName(cval_conf_file_name);
+    file_io_input.setGeneralTrajectoryFileName(cval_traj_file_name);
   }
   if (cval_topology_file_names.size() > 0LLU) {
     for (size_t i = 0; i < cval_topology_file_names.size(); i++) {
@@ -167,5 +171,5 @@ ConformerControls UserSettings::getConformerNamelistInfo() const {
   return conf_input;
 }
 
-} // namespace user_input
-} // namespace conf_app
+} // namespace namelist
+} // namespace omni

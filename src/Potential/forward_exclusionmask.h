@@ -42,7 +42,18 @@ struct ForwardExclusionMaskReader {
 class ForwardExclusionMask {
 public:
 
-  ForwardExclusionMask(const AtomGraph *ag_in);
+  /// \brief Constructor requires a topology, and creates a blank object if nullptr is supplied.
+  ForwardExclusionMask(const AtomGraph *ag_in = nullptr);
+
+  /// \brief The default copy and move constructors as well as the copy assignment operator will
+  ///        suffice for this object, which has no POINTER-kind Hybrid objects among its members.
+  ///        The move assignment operator will be implicitly deleted due to the presence of a
+  ///        const pointer to the original topology.
+  /// \{
+  ForwardExclusionMask(const ForwardExclusionMask &original) = default;
+  ForwardExclusionMask(ForwardExclusionMask &&original) = default;
+  ForwardExclusionMask& operator=(const ForwardExclusionMask &other) = default;
+  /// \}
 
   /// \brief Get the number of atoms in the system
   int getAtomCount() const;

@@ -297,7 +297,7 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
         }
         else {
           const int shift_left = actual_bits_out - globalpos_scale_bits;
-          for (int i = 0; i < high_index - low-index; i++) {
+          for (int i = 0; i < high_index - low_index; i++) {
             result[(3 * i)    ] = (static_cast<llint>(xval[i]) << shift_left);
             result[(3 * i) + 1] = (static_cast<llint>(yval[i]) << shift_left);
             result[(3 * i) + 2] = (static_cast<llint>(zval[i]) << shift_left);
@@ -528,7 +528,7 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
 
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::upload() {
+template <typename T> void CoordinateSeries<T>::upload() {
   x_coordinates.upload();
   y_coordinates.upload();
   z_coordinates.upload();
@@ -538,7 +538,7 @@ void CoordinateSeries::upload() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void CoordinateSeries::download() {
+template <typename T> void CoordinateSeries<T>::download() {
   x_coordinates.download();
   y_coordinates.download();
   z_coordinates.download();

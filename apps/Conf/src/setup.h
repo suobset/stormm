@@ -5,15 +5,15 @@
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
 #include "../../../src/UnitTesting/stopwatch.h"
-#include "user_settings.h"
+#include "../../../src/Namelists/user_settings.h"
 
 namespace conf_app {
 namespace setup {
 
+using omni::namelist::UserSettings;
 using omni::synthesis::PhaseSpaceSynthesis;
 using omni::synthesis::SystemCache;
 using omni::testing::StopWatch;
-using user_input::UserSettings;
 
 /// \brief Enumerate coarse-grained conformer sampling approaches: full if the combinatorial
 ///        permutations are few enough, randomized without replacement if the combinatorial

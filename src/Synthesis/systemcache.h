@@ -7,6 +7,9 @@
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_files.h"
+#include "Potential/forward_exclusionmask.h"
+#include "Potential/static_exclusionmask.h"
+#include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
@@ -19,7 +22,10 @@ namespace synthesis {
 using chemistry::ChemicalFeatures;
 using chemistry::MapRotatableGroups;
 using constants::ExceptionResponse;
+using energy::ForwardExclusionMask;
+using energy::StaticExclusionMask;
 using namelist::FilesControls;
+using restraints::RestraintApparatus;
 using testing::StopWatch;
 using topology::AtomGraph;
 using trajectory::PhaseSpace;
@@ -135,8 +141,8 @@ public:
   ///
   /// \param int index  Index of the PhaseSpace entry of interest
   /// \{
-  const AtomGraph& getSystemTopologyReference(const int index) const;
-  AtomGraph& getSystemTopologyReference(const int index);
+  const AtomGraph& getSystemTopologyReference(int index) const;
+  AtomGraph& getSystemTopologyReference(int index);
   /// \}
   
   /// \brief Get a pointer to a set of coordinates, velocities, and forces in the cache.
@@ -161,12 +167,112 @@ public:
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///   - Return a reference to the entire array of PhaseSpace objects
   ///
-  /// \param int index  Index of the PhaseSpace object of interest
+  /// \param int index  Index of the system, the PhaseSpace object of interest
   /// \{
-  const PhaseSpace& getCoordinateReference(const int index) const;
-  PhaseSpace& getCoordinateReference(const int index);
+  const PhaseSpace& getCoordinateReference(int index) const;
+  PhaseSpace& getCoordinateReference(int index);
   const std::vector<PhaseSpace>& getCoordinateReference() const;
   std::vector<PhaseSpace>& getCoordinateReference();
+  /// \}
+
+  /// \brief Get a pointer to the chemical features for a particular system.
+  ///
+  /// Overloaded:
+  ///   - Return a const pointer to an object in a const SystemCache
+  ///   - Return a non-const pointer to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const ChemicalFeatures* getFeaturesPointer(int index) const;
+  ChemicalFeatures* getFeaturesPointer(int index);
+  /// \}  
+
+  /// \brief Get a reference to the chemical features for a particular system.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to an object in a const SystemCache
+  ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const ChemicalFeatures& getFeaturesReference(int index) const;
+  ChemicalFeatures& getFeaturesReference(int index);
+  /// \}
+
+  /// \brief Get a pointer to the restraint apparatus for a particular system.
+  ///
+  /// Overloaded:
+  ///   - Return a const pointer to an object in a const SystemCache
+  ///   - Return a non-const pointer to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const RestraintApparatus* getRestraintPointer(int index) const;
+  RestraintApparatus* getRestraintPointer(int index);
+  /// \}
+
+  /// \brief Get a reference to the restraint apparatus for a particular system.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to an object in a const SystemCache
+  ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const RestraintApparatus& getRestraintReference(int index) const;
+  RestraintApparatus& getRestraintReference(int index);
+  /// \}
+
+  /// \brief Get a pointer to the static exclusion mask for a particular system.  These masks
+  ///        will only have been calculated for systems with isolated boundary conditions.
+  ///
+  /// Overloaded:
+  ///   - Return a const pointer to an object in a const SystemCache
+  ///   - Return a non-const pointer to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const StaticExclusionMask* getSystemStaticMaskPointer(int index) const;
+  StaticExclusionMask* getSystemStaticMaskPointer(int index);
+  /// \}  
+
+  /// \brief Get a reference to the static exclusion mask for a particular system.  These masks
+  ///        will only have been calculated for systems with isolated boundary conditions.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to an object in a const SystemCache
+  ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const StaticExclusionMask& getSystemStaticMaskReference(int index) const;
+  StaticExclusionMask& getSystemStaticMaskReference(int index);
+  /// \}
+
+  /// \brief Get a pointer to the forward exclusion mask for a particular system.  These masks
+  ///        will only have been calculated for systems with periodic boundary conditions.
+  ///
+  /// Overloaded:
+  ///   - Return a const pointer to an object in a const SystemCache
+  ///   - Return a non-const pointer to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const ForwardExclusionMask* getSystemForwardMaskPointer(int index) const;
+  ForwardExclusionMask* getSystemForwardMaskPointer(int index);
+  /// \}  
+
+  /// \brief Get a reference to the forward exclusion mask for a particular system.  These masks
+  ///        will only have been calculated for systems with periodic boundary conditions.
+  ///
+  /// Overloaded:
+  ///   - Return a const reference to an object in a const SystemCache
+  ///   - Return a non-const reference to an object in a non-const SystemCache
+  ///
+  /// \param int index  Index of the system of interest
+  /// \{
+  const ForwardExclusionMask& getSystemForwardMaskReference(int index) const;
+  ForwardExclusionMask& getSystemForwardMaskReference(int index);
   /// \}
 
   /// \brief Get the number of systems described by a topology of the given index in this cache.
@@ -189,9 +295,18 @@ private:
   /// coordinates read as part of a MoleculeSystem.
   std::vector<PhaseSpace> coordinates_cache;
 
-  /// An array of chemical features objects to outline the important aspects of each system.
+  /// Chemical features objects outline the important aspects of each system.
   std::vector<ChemicalFeatures> features_cache;
-  
+
+  /// Restraint collections supplement the topological energy surface in each system.
+  std::vector<RestraintApparatus> restraints_cache;
+
+  /// Static exclusion masks serve each topology, if appropriate
+  std::vector<StaticExclusionMask> static_masks_cache;
+
+  /// Forward exclusion masks serve each topology, if appropriate
+  std::vector<ForwardExclusionMask> forward_masks_cache;
+
   /// The vector of all topology indices guiding each simulation.  This may contain repeats, if
   /// the various MoleculeSystem objects contain the same topology, but the list will be reduced
   /// when composing the synthesis objects.

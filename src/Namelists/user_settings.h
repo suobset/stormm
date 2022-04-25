@@ -1,37 +1,46 @@
 // -*-c++-*-
-#ifndef CONFORMER_USER_SETTINGS_H
-#define CONFORMER_USER_SETTINGS_H
+#ifndef OMNI_USER_SETTINGS_H
+#define OMNI_USER_SETTINGS_H
 
-#include "../../../src/Constants/behavior.h"
-#include "../../../src/Namelists/nml_files.h"
-#include "../../../src/Namelists/nml_minimize.h"
-#include "../../../src/Namelists/nml_random.h"
-#include "../../../src/Namelists/nml_solvent.h"
-#include "../../../src/Parsing/textfile.h"
-#include "../../../src/Topology/atomgraph.h"
-#include "../../../src/Topology/atomgraph_enumerators.h"
-#include "../../../src/Trajectory/coordinateframe.h"
-#include "../../../src/Trajectory/trajectory_enumerators.h"
+#include "Constants/behavior.h"
+#include "Namelists/nml_files.h"
+#include "Namelists/nml_minimize.h"
+#include "Namelists/nml_random.h"
+#include "Namelists/nml_solvent.h"
+#include "Parsing/textfile.h"
+#include "Topology/atomgraph.h"
+#include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "nml_conformer.h"
 
-namespace conf_app {
-namespace user_input {
+namespace omni {
+namespace namelist {
 
-using omni::constants::ExceptionResponse;
-using omni::namelist::FilesControls;
-using omni::namelist::MinimizeControls;
-using omni::namelist::RandomControls;
-using omni::namelist::SolventControls;
-using omni::parse::TextFile;
-using omni::topology::AtomGraph;
-using omni::topology::ImplicitSolventModel;
-using omni::trajectory::CoordinateFrame;
-using omni::trajectory::CoordinateFileKind;
+using constants::ExceptionResponse;
+using namelist::FilesControls;
+using namelist::MinimizeControls;
+using namelist::RandomControls;
+using namelist::SolventControls;
+using parse::TextFile;
+using topology::AtomGraph;
+using topology::ImplicitSolventModel;
+using trajectory::CoordinateFrame;
+using trajectory::CoordinateFileKind;
 
 /// \brief Default input settings for conformer.omni
 /// \{
 constexpr char default_conformer_input_file[] = "cgen.in";
 /// \}
+
+/// \brief Enumerate the various apps using OMNI libraries, and which use this UserSettings object
+///        as a way to collect common namelists and other command line input.  This enumerator
+///        makes it possible to tailor the contents of UserSettings to a specific application, and
+///        to tune the behavior in response to particular inputs.
+enum class AppName {
+  CONFORMER,  ///< The OMNI conformer generator
+  DYNAMICS    ///< The OMNI molecular dynamics program
+};
   
 /// \brief Object to hold general user input data, including file names or regular expressions for
 ///        topology and coordinate files, energy minimization settings, analysis protocols, and
@@ -42,7 +51,7 @@ struct UserSettings {
   ///
   /// \param argc  Number of command-line variables
   /// \param argv  List of command line argument strings
-  UserSettings(int argc, const char* argv[]);
+  UserSettings(int argc, const char* argv[], AppName prog_set);
 
   /// \brief Get the policy (for passing to other operations that may trigger an exception).
   ExceptionResponse getExceptionBehavior() const;
@@ -79,14 +88,9 @@ private:
   SolventControls solvent_input;    ///< Implicit solvent specifications
   RandomControls prng_input;        ///< Random number generator specifications
   ConformerControls conf_input;     ///< Conformer generation instructions
-
-  /// Atom mask specifying common core atoms.  This will be applied to all systems to generate
-  /// some subset of the atoms, which will then be subject to additional restraints during
-  /// energy minimizations.
-  std::string common_core_mask;
 };
 
-} // namespace user_input
-} // namespace conf_app
+} // namespace namelist
+} // namespace omni
 
 #endif

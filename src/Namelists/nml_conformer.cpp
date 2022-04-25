@@ -1,22 +1,21 @@
+#include "Namelists/input.h"
+#include "Parsing/parse.h"
+#include "Reporting/error_format.h"
 #include "nml_conformer.h"
 
-#include "../../../src/Namelists/input.h"
-#include "../../../src/Parsing/parse.h"
-#include "../../../src/Reporting/error_format.h"
+namespace omni {
+namespace namelist {
 
-namespace conf_app {
-namespace user_input {
-
-using omni::constants::CaseSensitivity;
-using omni::namelist::InputStatus;
-using omni::namelist::NamelistElement;
-using omni::namelist::NamelistType;
-using omni::namelist::readNamelist;
-using omni::errors::rtErr;
-using omni::errors::rtWarn;
-using omni::parse::CaseSensitivity;
-using omni::parse::strcmpCased;
-using omni::parse::WrapTextSearch;
+using constants::CaseSensitivity;
+using namelist::InputStatus;
+using namelist::NamelistElement;
+using namelist::NamelistType;
+using namelist::readNamelist;
+using errors::rtErr;
+using errors::rtWarn;
+using parse::CaseSensitivity;
+using parse::strcmpCased;
+using parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
 ConformerControls::ConformerControls(const ExceptionResponse policy_in) :
@@ -289,5 +288,5 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line,
   return t_nml;
 }
 
-} // namespace user_input
-} // namespace conf_app
+} // namespace namelist
+} // namespace omni

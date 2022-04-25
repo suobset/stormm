@@ -174,6 +174,7 @@ ChemicalFeatures::ChemicalFeatures() :
     polar_hydrogens{HybridKind::POINTER, "chemfe_polar_h"},
     hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
     hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
+    chiral_arm_atoms{HybridKind::ARRAY, "chemfe_chiral_arms"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
     chiral_inversion_methods{HybridKind::POINTER, "chemfe_chiral_meth"},
     rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
@@ -212,6 +213,7 @@ ChemicalFeatures::ChemicalFeatures(const AtomGraph *ag_in, const CoordinateFrame
     polar_hydrogens{HybridKind::POINTER, "chemfe_polar_h"},
     hydrogen_bond_donors{HybridKind::POINTER, "chemfe_hbond_donor"},
     hydrogen_bond_acceptors{HybridKind::POINTER, "chemfe_hbond_accpt"},
+    chiral_arm_atoms{HybridKind::ARRAY, "chemfe_chiral_arms"},
     chiral_centers{HybridKind::POINTER, "chemfe_chirals"},
     chiral_inversion_methods{HybridKind::POINTER, "chemfe_chiral_meth"},
     rotatable_groups{HybridKind::POINTER, "chemfe_rotators"},
@@ -417,6 +419,7 @@ ChemicalFeatures::ChemicalFeatures(const ChemicalFeatures &original) :
     polar_hydrogens{original.polar_hydrogens},
     hydrogen_bond_donors{original.hydrogen_bond_donors},
     hydrogen_bond_acceptors{original.hydrogen_bond_acceptors},
+    chiral_arm_atoms{original.chiral_arm_atoms},
     chiral_centers{original.chiral_centers},
     chiral_inversion_methods{original.chiral_inversion_methods},
     rotatable_groups{original.rotatable_groups},
@@ -467,6 +470,7 @@ ChemicalFeatures::ChemicalFeatures(ChemicalFeatures &&original) :
     polar_hydrogens{std::move(original.polar_hydrogens)},
     hydrogen_bond_donors{std::move(original.hydrogen_bond_donors)},
     hydrogen_bond_acceptors{std::move(original.hydrogen_bond_acceptors)},
+    chiral_arm_atoms{std::move(original.chiral_arm_atoms)},
     chiral_centers{std::move(original.chiral_centers)},
     chiral_inversion_methods{std::move(original.chiral_inversion_methods)},
     rotatable_groups{std::move(original.rotatable_groups)},
@@ -522,6 +526,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(const ChemicalFeatures &other) {
   polar_hydrogens = other.polar_hydrogens;
   hydrogen_bond_donors = other.hydrogen_bond_donors;
   hydrogen_bond_acceptors = other.hydrogen_bond_acceptors;
+  chiral_arm_atoms = other.chiral_arm_atoms;
   chiral_centers = other.chiral_centers;
   chiral_inversion_methods = other.chiral_inversion_methods;
   rotatable_groups = other.rotatable_groups;
@@ -579,6 +584,7 @@ ChemicalFeatures& ChemicalFeatures::operator=(ChemicalFeatures &&other) {
   polar_hydrogens = std::move(other.polar_hydrogens);
   hydrogen_bond_donors = std::move(other.hydrogen_bond_donors);
   hydrogen_bond_acceptors = std::move(other.hydrogen_bond_acceptors);
+  chiral_arm_atoms = std::move(other.chiral_arm_atoms);
   chiral_centers = std::move(other.chiral_centers);
   chiral_inversion_methods = std::move(other.chiral_inversion_methods);
   rotatable_groups = std::move(other.rotatable_groups);

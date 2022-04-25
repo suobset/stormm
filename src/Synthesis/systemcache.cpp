@@ -5,6 +5,7 @@
 #include "Potential/scorecard.h"
 #include "Potential/valence_potential.h"
 #include "Topology/atomgraph_abstracts.h"
+#include "Topology/atomgraph_enumerators.h"
 
 namespace omni {
 namespace synthesis {
@@ -18,12 +19,14 @@ using omni::math::prefixSumInPlace;
 using omni::math::PrefixSumType;
 using omni::namelist::MoleculeSystem;
 using omni::parse::findStringInVector;
+using omni::topology::UnitCellType;
 using omni::topology::ValenceKit;
 using omni::trajectory::detectCoordinateFileKind;
 
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
-    topology_cache{}, coordinates_cache{}, features_cache{}, topology_indices{}, example_indices{},
+    topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
+    static_masks_cache{}, forward_masks_cache{}, topology_indices{}, example_indices{},
     topology_cases{}, topology_case_bounds{}
 {}
 
@@ -373,6 +376,38 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
                                   300.0, timer_in);
     }
   }
+
+  // Create Exclusion masks of the appropriate kind
+  std::vector<bool> need_static_mask(top_count, false);
+  std::vector<bool> need_forward_mask(top_count, false);
+  for (int i = 0; i < system_count; i++) {
+    const int top_idx = topology_indices[i];
+    switch (coordinates_cache[i].getUnitCellType()) {
+    case UnitCellType::NONE:
+      need_static_mask[top_idx] = true;
+      break;
+    case UnitCellType::ORTHORHOMBIC:
+    case UnitCellType::TRICLINIC:
+      need_forward_mask[top_idx] = true;
+      break;
+    }
+  }
+  static_masks_cache.reserve(top_count);
+  forward_masks_cache.reserve(top_count);
+  for (int i = 0; i < top_count; i++) {
+    if (need_static_mask[i]) {
+      static_masks_cache.emplace_back(&topology_cache[i]);
+    }
+    else {
+      static_masks_cache.emplace_back(nullptr);
+    }
+    if (need_forward_mask[i]) {
+      forward_masks_cache.emplace_back(&topology_cache[i]);
+    }
+    else {
+      forward_masks_cache.emplace_back(nullptr);
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -570,6 +605,164 @@ const std::vector<PhaseSpace>& SystemCache::getCoordinateReference() const {
 //-------------------------------------------------------------------------------------------------
 std::vector<PhaseSpace>& SystemCache::getCoordinateReference() {
   return coordinates_cache;
+}
+
+//-------------------------------------------------------------------------------------------------
+const ChemicalFeatures* SystemCache::getFeaturesPointer(const int index) const {
+  if (index >= static_cast<int>(features_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesPointer");
+  }
+  return &features_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures* SystemCache::getFeaturesPointer(const int index) {
+  if (index >= static_cast<int>(features_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesPointer");
+  }
+  return &features_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const ChemicalFeatures& SystemCache::getFeaturesReference(const int index) const {
+  if (index >= static_cast<int>(features_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesReference");
+  }
+  return features_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+ChemicalFeatures& SystemCache::getFeaturesReference(const int index) {
+  if (index >= static_cast<int>(features_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(features_cache.size()) + ".", "SystemCache", "getFeaturesReference");
+  }
+  return features_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const RestraintApparatus* SystemCache::getRestraintPointer(const int index) const {
+  if (index >= static_cast<int>(restraints_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
+  }
+  return &restraints_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatus* SystemCache::getRestraintPointer(const int index) {
+  if (index >= static_cast<int>(restraints_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintPointer");
+  }
+  return &restraints_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const RestraintApparatus& SystemCache::getRestraintReference(const int index) const {
+  if (index >= static_cast<int>(restraints_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
+  }
+  return restraints_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatus& SystemCache::getRestraintReference(const int index) {
+  if (index >= static_cast<int>(restraints_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(restraints_cache.size()) + ".", "SystemCache", "getRestraintReference");
+  }
+  return restraints_cache[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const StaticExclusionMask* SystemCache::getSystemStaticMaskPointer(const int index) const {
+  if (index >= static_cast<int>(static_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(static_masks_cache.size()) + ".", "SystemCache", "getStaticMaskPointer");
+  }
+  const int top_idx = topology_indices[index];
+  return &static_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMask* SystemCache::getSystemStaticMaskPointer(const int index) {
+  if (index >= static_cast<int>(static_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(static_masks_cache.size()) + ".", "SystemCache", "getStaticMaskPointer");
+  }
+  const int top_idx = topology_indices[index];
+  return &static_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+const StaticExclusionMask& SystemCache::getSystemStaticMaskReference(const int index) const {
+  if (index >= static_cast<int>(static_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(static_masks_cache.size()) + ".", "SystemCache",
+          "getStaticMaskReference");
+  }
+  const int top_idx = topology_indices[index];
+  return static_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMask& SystemCache::getSystemStaticMaskReference(const int index) {
+  if (index >= static_cast<int>(static_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(static_masks_cache.size()) + ".", "SystemCache",
+          "getStaticMaskReference");
+  }
+  const int top_idx = topology_indices[index];
+  return static_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+const ForwardExclusionMask* SystemCache::getSystemForwardMaskPointer(const int index) const {
+  if (index >= static_cast<int>(forward_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(forward_masks_cache.size()) + ".", "SystemCache",
+          "getForwardMaskPointer");
+  }
+  const int top_idx = topology_indices[index];
+  return &forward_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+ForwardExclusionMask* SystemCache::getSystemForwardMaskPointer(const int index) {
+  if (index >= static_cast<int>(forward_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(forward_masks_cache.size()) + ".", "SystemCache",
+          "getForwardMaskPointer");
+  }
+  const int top_idx = topology_indices[index];
+  return &forward_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+const ForwardExclusionMask& SystemCache::getSystemForwardMaskReference(const int index) const {
+  if (index >= static_cast<int>(forward_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(forward_masks_cache.size()) + ".", "SystemCache",
+          "getForwardMaskReference");
+  }
+  const int top_idx = topology_indices[index];
+  return forward_masks_cache[top_idx];
+}
+
+//-------------------------------------------------------------------------------------------------
+ForwardExclusionMask& SystemCache::getSystemForwardMaskReference(const int index) {
+  if (index >= static_cast<int>(forward_masks_cache.size())) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an array of length " +
+          std::to_string(forward_masks_cache.size()) + ".", "SystemCache",
+          "getForwardMaskReference");
+  }
+  const int top_idx = topology_indices[index];
+  return forward_masks_cache[top_idx];
 }
 
 //-------------------------------------------------------------------------------------------------

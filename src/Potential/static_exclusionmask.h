@@ -80,6 +80,16 @@ public:
   ///            a private member variable may retain a pointer to the original topology)
   StaticExclusionMask(const AtomGraph *ag_in = nullptr);
 
+  /// \brief The default copy and move constructors as well as the copy assignment operator will
+  ///        suffice for this object, which has no POINTER-kind Hybrid objects among its members.
+  ///        The move assignment operator will be implicitly deleted due to the presence of a
+  ///        const pointer to the original topology.
+  /// \{
+  StaticExclusionMask(const StaticExclusionMask &original) = default;
+  StaticExclusionMask(StaticExclusionMask &&original) = default;
+  StaticExclusionMask& operator=(const StaticExclusionMask &other) = default;
+  /// \}
+  
   /// \brief Get the total atom count
   int getAtomCount() const;
 

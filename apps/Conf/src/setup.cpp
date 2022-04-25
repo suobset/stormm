@@ -9,19 +9,18 @@
 #include "../../../src/Topology/atomgraph.h"
 #include "../../../src/Topology/atomgraph_abstracts.h"
 #include "../../../src/Trajectory/coordinate_series.h"
-#include "user_settings.h"
 #include "setup.h"
 
 namespace conf_app {
 namespace setup {
 
-using user_input::ConformerControls;
 using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::ChiralInversionProtocol;
 using omni::chemistry::MapRotatableGroups;
 using omni::chemistry::RotatorGroup;
 using omni::constants::warp_size_int;
 using omni::math::roundUp;
+using omni::namelist::ConformerControls;
 using omni::structure::rmsd;
 using omni::structure::RmsdMethod;
 using omni::structure::rotateAboutBond;

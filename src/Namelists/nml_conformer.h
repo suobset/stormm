@@ -1,18 +1,18 @@
 // -*-c++-*-
-#ifndef CONFORMER_NML_CONFORMER_H
-#define CONFORMER_NML_CONFORMER_H
+#ifndef OMNI_NML_CONFORMER_H
+#define OMNI_NML_CONFORMER_H
 
-#include "../../../src/Constants/behavior.h"
-#include "../../../src/Namelists/namelist_emulator.h"
-#include "../../../src/Namelists/namelist_element.h"
-#include "../../../src/Parsing/textfile.h"
+#include "Constants/behavior.h"
+#include "Namelists/namelist_emulator.h"
+#include "Namelists/namelist_element.h"
+#include "Parsing/textfile.h"
 
-namespace conf_app {
-namespace user_input {
+namespace omni {
+namespace namelist {
 
-using omni::constants::ExceptionResponse;
-using omni::namelist::NamelistEmulator;
-using omni::parse::TextFile;
+using constants::ExceptionResponse;
+using namelist::NamelistEmulator;
+using parse::TextFile;
 
 /// \brief Default input settings for the &conformer namelist
 /// \{
@@ -146,7 +146,7 @@ private:
 /// \param policy      Response to bad inputs
 NamelistEmulator conformerInput(const TextFile &tf, int *start_line, ExceptionResponse policy);
   
-} // namespace user_input
-} // namespace conf_app
+} // namespace namelist
+} // namespace omni
 
 #endif
