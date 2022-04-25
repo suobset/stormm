@@ -546,7 +546,7 @@ void PhaseSpace::initializeForces() {
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::exportToFile(const std::string &file_name, const double current_time,
                               const TrajectoryKind traj_kind, const CoordinateFileKind output_kind,
-                              const PrintSituation expectation) {
+                              const PrintSituation expectation) const {
 
   // Filter bad inputs on file appending behavior and an unknown file type
   const PrintSituation aexp = adjustTrajectoryOpeningProtocol(expectation, output_kind,

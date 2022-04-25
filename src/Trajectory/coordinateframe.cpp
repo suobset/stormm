@@ -496,7 +496,7 @@ std::vector<double> CoordinateFrame::getBoxDimensions(const HybridTargetLevel ti
 
 //-------------------------------------------------------------------------------------------------
 void CoordinateFrame::exportToFile(const std::string &file_name, const CoordinateFileKind kind,
-                                   const PrintSituation expectation) {
+                                   const PrintSituation expectation) const {
   const PrintSituation aexp = adjustTrajectoryOpeningProtocol(expectation, kind,
                                                               "CoordinateFrame", "exportToFile");
   const DataFormat style = getTrajectoryFormat(kind);

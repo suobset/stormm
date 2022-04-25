@@ -229,7 +229,7 @@ public:
   /// \param expectation   The condition in which the output file is expected to be found
   void exportToFile(const std::string &file_name,
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
-                    PrintSituation expectation = PrintSituation::UNKNOWN);
+                    PrintSituation expectation = PrintSituation::UNKNOWN) const;
 
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information

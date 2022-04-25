@@ -1,6 +1,7 @@
 #include <vector>
 #include "../../../src/Chemistry/chemistry_enumerators.h"
 #include "../../../src/MolecularMechanics/minimization.h"
+#include "../../../src/Namelists/nml_minimize.h"
 #include "../../../src/Namelists/user_settings.h"
 #include "../../../src/Synthesis/phasespace_synthesis.h"
 #include "../../../src/Synthesis/systemcache.h"
@@ -13,6 +14,7 @@ using omni::chemistry::MapRotatableGroups;
 using omni::energy::ScoreCard;
 using omni::mm::minimize;
 using omni::namelist::AppName;
+using omni::namelist::MinimizeControls;
 using omni::namelist::UserSettings;
 using omni::restraints::RestraintApparatus;
 using omni::synthesis::PhaseSpaceSynthesis;
@@ -40,6 +42,7 @@ int main(int argc, const char* argv[]) {
 
   // Perform minimizations as requested.
   const int system_count = sc.getSystemCount();
+  const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
   if (ui.getMinimizePresence()) {
     std::vector<ScoreCard> all_mme;
     all_mme.reserve(system_count);
@@ -53,8 +56,7 @@ int main(int argc, const char* argv[]) {
       switch(ps->getUnitCellType()) {
       case UnitCellType::NONE:
         all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
-                                      sc.getSystemStaticMaskReference(i),
-                                      ui.getMinimizeNamelistInfo()));
+                                      sc.getSystemStaticMaskReference(i), mincon));
       case UnitCellType::ORTHORHOMBIC:
       case UnitCellType::TRICLINIC:
         break;
@@ -62,8 +64,14 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  // Print restart files
-  
+  // Print restart files from energy minimization
+  if (mincon.getCheckpointProduction()) {
+    for (int i = 0; i < system_count; i++) {
+      const PhaseSpace ps = sc.getCoordinateReference(i);
+      ps.exportToFile(sc.getSystemCheckpointName(i));
+    }
+  }
+
   // Collate the topologies in preparation to operate on the new coordinate population
   timer.printResults();
   

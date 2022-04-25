@@ -12,12 +12,13 @@ namespace namelist {
 
 /// \brief Default values for energy minimization
 /// \{
-constexpr int default_minimize_maxcyc  = 200;
-constexpr int default_minimize_ncyc    = 50;
-constexpr int default_minimize_ntpr    = 50;
-constexpr double default_minimize_cut  = 8.0;
-constexpr double default_minimize_dx0  = 0.01;
-constexpr double default_minimize_drms = 0.0001;
+constexpr int default_minimize_maxcyc        = 200;
+constexpr int default_minimize_ncyc          = 50;
+constexpr int default_minimize_ntpr          = 50;
+constexpr char default_minimize_checkpoint[] = "true";
+constexpr double default_minimize_cut        = 8.0;
+constexpr double default_minimize_dx0        = 0.01;
+constexpr double default_minimize_drms       = 0.0001;
 /// \}
   
 /// \brief Object to encapsulate energy minimization control information.  Like other namelist
@@ -51,6 +52,10 @@ public:
   ///        and sander mdout files.
   int getDiagnosticPrintFrequency() const;
 
+  /// \brief Get the directive on whether to produce a checkpoint file for the final state of each
+  ///        energy minimization run.
+  bool getCheckpointProduction() const;
+  
   /// \brief Get the electrostatic cutoff.
   double getElectrostaticCutoff() const;
   
@@ -78,6 +83,11 @@ public:
   /// \param frequency_in  The chosen printing interval
   void setDiagnosticPrintFrequency(int frequency_in);
 
+  /// \brief Set the checkpoint production flag.
+  ///
+  /// \param produce_in  Whether to produce a checkpoint at the end of the run
+  void setCheckpointProduction(bool produce_in);
+  
   /// \brief Set the electrostatic cutoff
   void setElectrostaticCutoff(double cutoff_in);
   
@@ -108,6 +118,10 @@ private:
   int print_frequency;          ///< Print results at step 0 and, thereafter, after each interval
                                 ///<   of this many line minimizations.  The default of 0
                                 ///<   suppresses output except at the outset of the run.
+  bool produce_checkpoint;      ///< Indicate that a checkpoint file should be produced at the end
+                                ///<   of the energy minimization run (default TRUE), with the name
+                                ///<   of the checkpoint file for each system found in the &files
+                                ///<   namelist.
   double electrostatic_cutoff;  ///< Cutoff for (short-ranged) electrostatic interactions, or for
                                 ///<   all gas-phase Coulombic electrostatics in a non-periodic
                                 ///<   system.  Units of Angstroms (A).
@@ -130,6 +144,11 @@ private:
 
   /// \brief Validate the diagnostic printing frequency
   void validatePrintFrequency();
+
+  /// \brief Validate the checkpointing behavior.
+  ///
+  /// \param directive  The command given for whether to write a checkpoint file
+  void validateCheckpointProduction(const std::string &directive) const;
   
   /// \brief Validate the electrostatic cutoff.
   void validateElectrostaticCutoff();

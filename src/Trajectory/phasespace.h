@@ -284,7 +284,7 @@ public:
   void exportToFile(const std::string &file_name, double current_time = 0.0,
                     TrajectoryKind traj_kind = TrajectoryKind::POSITIONS,
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_INPCRD,
-                    PrintSituation expectation = PrintSituation::UNKNOWN);
+                    PrintSituation expectation = PrintSituation::UNKNOWN) const;
   
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information

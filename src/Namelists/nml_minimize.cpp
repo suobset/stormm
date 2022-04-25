@@ -10,6 +10,7 @@ namespace namelist {
 using constants::CaseSensitivity;
 using parse::NumberFormat;
 using parse::realToString;
+using parse::strcmpCased;
   
 //-------------------------------------------------------------------------------------------------
 MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
@@ -17,6 +18,7 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
     total_cycles{default_minimize_maxcyc},
     steepest_descent_cycles{default_minimize_ncyc},
     print_frequency{default_minimize_ntpr},
+    produce_checkpoint{true},
     electrostatic_cutoff{default_minimize_cut},
     lennard_jones_cutoff{default_minimize_cut},
     initial_step{default_minimize_dx0},
@@ -32,6 +34,9 @@ MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *fo
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   print_frequency = t_nml.getIntValue("ntpr");
+  const std::string chkp_behavior = t_nml.getStringValue("checkpoint");
+  validateCheckpointProduction(chkp_behavior);
+  produce_checkpoint = strcmpCased(chkp_behavior, "true");
   if (t_nml.getKeywordStatus("cut") != InputStatus::MISSING) {
     electrostatic_cutoff = t_nml.getRealValue("cut");
     lennard_jones_cutoff = t_nml.getRealValue("cut");
@@ -68,6 +73,11 @@ int MinimizeControls::getDiagnosticPrintFrequency() const {
   return print_frequency;
 }
 
+//-------------------------------------------------------------------------------------------------
+bool MinimizeControls::getCheckpointProduction() const {
+  return produce_checkpoint;
+}
+  
 //-------------------------------------------------------------------------------------------------
 double MinimizeControls::getElectrostaticCutoff() const {
   return electrostatic_cutoff;
@@ -106,6 +116,11 @@ void MinimizeControls::setDiagnosticPrintFrequency(const int frequency_in) {
   validatePrintFrequency();
 }
 
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::setCheckpointProduction(const bool produce_in) {
+  produce_checkpoint = produce_in;
+}
+  
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::setElectrostaticCutoff(const double cutoff_in) {
   electrostatic_cutoff = cutoff_in;
@@ -191,6 +206,17 @@ void MinimizeControls::validatePrintFrequency() {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+void MinimizeControls::validateCheckpointProduction(const std::string &directive) const {
+  if (strcmpCased(directive, "true", CaseSensitivity::NO) ||
+      strcmpCased(directive, "false", CaseSensitivity::NO)) {
+    return;
+  }
+  rtErr("Acceptable values for the checkpoint string are 'true' or 'false' (case-insensitive).  "
+        "The value of " + directive + " is invalid.", "MinimizeControls",
+        "validateCheckpointProduction");
+}
+    
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::validateElectrostaticCutoff() {
   if (electrostatic_cutoff < 0.0) {
@@ -281,6 +307,8 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                    std::to_string(default_minimize_ncyc)));
   t_nml.addKeyword(NamelistElement("ntpr", NamelistType::INTEGER,
                                    std::to_string(default_minimize_ntpr)));
+  t_nml.addKeyword(NamelistElement("checkpoint", NamelistType::STRING,
+                                   std::string(default_minimize_checkpoint)));
   t_nml.addKeyword(NamelistElement("cut", NamelistType::REAL, std::string("MISSING")));
   t_nml.addKeyword(NamelistElement("es_cutoff", NamelistType::REAL,
                                    std::to_string(default_minimize_cut)));

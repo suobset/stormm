@@ -242,7 +242,7 @@ public:
   void exportToFile(const std::string &file_name,
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN, int low_index = 0,
-                    int high_index = 0, HybridTargetLevel tier = HybridTargetLevel::HOST);
+                    int high_index = 0, HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 #ifdef OMNI_USE_HPC
   /// \brief Upload all information

@@ -480,7 +480,7 @@ CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
 template <typename T>
 void CoordinateSeries<T>::exportToFile(const std::string &file_name, const CoordinateFileKind kind,
                                        const PrintSituation expectation, const int low_index,
-                                       const int high_index, const HybridTargetLevel tier) {
+                                       const int high_index, const HybridTargetLevel tier) const {
   if (low_index < 0 || low_index >= frame_count || high_index < low_index ||
       high_index >= frame_count) {
     rtErr("The frame index range " + std::to_string(low_index) + " to " +

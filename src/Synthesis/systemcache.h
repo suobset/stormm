@@ -80,13 +80,13 @@ public:
   ///        found by this function, and thus returns a reference or pointer to the appropriate
   ///        topology.
   ///
-  /// \param int coord_index  Index of the PhaseSpace entry object of interest
+  /// \param coord_index  Index of the PhaseSpace entry object of interest
   int getSystemTopologyIndex(int coord_index) const;
 
   /// \brief Get the index of a coordinate set which provides an example of the system that one of
   ///        the topologies in the cache describes.
   ///
-  /// \param int topology_index  Index of the topology of interest
+  /// \param topology_index  Index of the topology of interest
   int getCoordinateExample(int topology_index) const;
 
   /// \brief Get pointers to one or all of the unique topologies from within the compact topology
@@ -96,7 +96,7 @@ public:
   ///   - Get a pointer to one topology
   ///   - Get a vector of pointers to all unique topologies in the SystemCache.
   ///
-  /// \param int topology_index  Index of the topology of interest
+  /// \param topology_index  Index of the topology of interest
   /// \{
   const AtomGraph* getTopologyPointer(int topology_index) const;
   std::vector<const AtomGraph*> getTopologyPointer() const;
@@ -105,7 +105,7 @@ public:
   /// \brief Get a reference to one of the unique topologies from within the topology cache, based
   ///        on an index into the cache itself.
   ///
-  /// \param int topology_index  Index of the topology of interes
+  /// \param topology_index  Index of the topology of interes
   const AtomGraph& getTopologyReference(int topology_index) const;  
   
   /// \brief Get a pointer to a topology in the cache associated with a particular coordinate set.
@@ -116,7 +116,7 @@ public:
   ///   - Get pointers to topologies for all coordinate sets (this will not apply a bounds check)
   ///   - Const and non-const versions of each
   ///
-  /// \param int index  Index of the PhaseSpace entry of interest
+  /// \param index  Index of the PhaseSpace entry of interest
   /// \{
   const AtomGraph* getSystemTopologyPointer(int index) const;
   AtomGraph* getSystemTopologyPointer(int index);
@@ -139,7 +139,7 @@ public:
   ///     underlying topologies and will need to be accessed according to the indexing present in
   ///     the topology_indices array)
   ///
-  /// \param int index  Index of the PhaseSpace entry of interest
+  /// \param index  Index of the PhaseSpace entry of interest
   /// \{
   const AtomGraph& getSystemTopologyReference(int index) const;
   AtomGraph& getSystemTopologyReference(int index);
@@ -152,7 +152,7 @@ public:
   ///   - Get a pointer to the array for all PhaseSpace objects (this will not check bounds)
   ///   - Const and non-const versions of each
   ///
-  /// \param int index  Index of the requested PhaseSpace object
+  /// \param index  Index of the requested PhaseSpace object
   /// \{
   const PhaseSpace* getCoordinatePointer(int index) const;
   PhaseSpace* getCoordinatePointer(int index);
@@ -167,7 +167,7 @@ public:
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///   - Return a reference to the entire array of PhaseSpace objects
   ///
-  /// \param int index  Index of the system, the PhaseSpace object of interest
+  /// \param index  Index of the system, the PhaseSpace object of interest
   /// \{
   const PhaseSpace& getCoordinateReference(int index) const;
   PhaseSpace& getCoordinateReference(int index);
@@ -181,7 +181,7 @@ public:
   ///   - Return a const pointer to an object in a const SystemCache
   ///   - Return a non-const pointer to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const ChemicalFeatures* getFeaturesPointer(int index) const;
   ChemicalFeatures* getFeaturesPointer(int index);
@@ -193,7 +193,7 @@ public:
   ///   - Return a const reference to an object in a const SystemCache
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const ChemicalFeatures& getFeaturesReference(int index) const;
   ChemicalFeatures& getFeaturesReference(int index);
@@ -205,7 +205,7 @@ public:
   ///   - Return a const pointer to an object in a const SystemCache
   ///   - Return a non-const pointer to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const RestraintApparatus* getRestraintPointer(int index) const;
   RestraintApparatus* getRestraintPointer(int index);
@@ -217,7 +217,7 @@ public:
   ///   - Return a const reference to an object in a const SystemCache
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const RestraintApparatus& getRestraintReference(int index) const;
   RestraintApparatus& getRestraintReference(int index);
@@ -230,7 +230,7 @@ public:
   ///   - Return a const pointer to an object in a const SystemCache
   ///   - Return a non-const pointer to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const StaticExclusionMask* getSystemStaticMaskPointer(int index) const;
   StaticExclusionMask* getSystemStaticMaskPointer(int index);
@@ -243,7 +243,7 @@ public:
   ///   - Return a const reference to an object in a const SystemCache
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const StaticExclusionMask& getSystemStaticMaskReference(int index) const;
   StaticExclusionMask& getSystemStaticMaskReference(int index);
@@ -256,7 +256,7 @@ public:
   ///   - Return a const pointer to an object in a const SystemCache
   ///   - Return a non-const pointer to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const ForwardExclusionMask* getSystemForwardMaskPointer(int index) const;
   ForwardExclusionMask* getSystemForwardMaskPointer(int index);
@@ -269,7 +269,7 @@ public:
   ///   - Return a const reference to an object in a const SystemCache
   ///   - Return a non-const reference to an object in a non-const SystemCache
   ///
-  /// \param int index  Index of the system of interest
+  /// \param index  Index of the system of interest
   /// \{
   const ForwardExclusionMask& getSystemForwardMaskReference(int index) const;
   ForwardExclusionMask& getSystemForwardMaskReference(int index);
@@ -286,6 +286,16 @@ public:
   /// \param topology_index  The index of the topology of interest
   std::vector<int> getTopologicalCases(int topology_index) const;
 
+  /// \brief Get the name of the trajectory file associated with one of the systems.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  std::string getSystemTrajectoryName(int system_index) const;
+  
+  /// \brief Get the name of the checkpoint (restart) file associated with one of the systems.
+  ///
+  /// \param system_index  Index of the system from within the coordinates cache
+  std::string getSystemCheckpointName(int system_index) const;
+  
 private:
   /// An array of all topologies to be read by the system: all free topologies and all topologies
   /// read as part of a MoleculeSystem.
