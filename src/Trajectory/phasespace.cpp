@@ -585,6 +585,8 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   case CoordinateFileKind::AMBER_NETCDF:
   case CoordinateFileKind::AMBER_NETCDF_RST:
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("Coordinate file format unspecified.", "PhaseSpace", "exportToFile");
   }
   foutp.close();
 }

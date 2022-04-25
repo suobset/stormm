@@ -524,7 +524,6 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
     break;
   case CoordinateFileKind::UNKNOWN:
     rtErr("A trajectory format must be specified.", "CoordinateSeries", "exportToFile");
-    break;
   }
   foutp.close();
 }

@@ -521,6 +521,8 @@ void CoordinateFrame::exportToFile(const std::string &file_name, const Coordinat
           "able to store both coordinates and velocities needed for checkpointing.",
           "CoordinateFrame", "exportToFile");
     break;
+  case CoordinateFileKind::UNKNOWN:
+    rtErr("Coordinate file format unspecified.", "CoordinateFrame", "exportToFile");
   }
   foutp.close();
 }
