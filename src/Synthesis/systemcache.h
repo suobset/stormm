@@ -324,6 +324,12 @@ private:
 
   /// Bounds array for topology_cases above
   std::vector<int> topology_case_bounds;
+
+  /// Names of trajectory files to write for each system
+  std::vector<std::string> system_trajectory_names;
+
+  /// Names of checkpoint files to write for each system
+  std::vector<std::string> system_checkpoint_names;
 };
   
 } // namespace synthesis

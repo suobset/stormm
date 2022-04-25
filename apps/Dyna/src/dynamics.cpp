@@ -62,9 +62,7 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  // CHECK
-  
-  // END CHECK
+  // Print restart files
   
   // Collate the topologies in preparation to operate on the new coordinate population
   timer.printResults();

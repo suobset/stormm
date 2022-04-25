@@ -27,7 +27,7 @@ using omni::trajectory::detectCoordinateFileKind;
 SystemCache::SystemCache() :
     topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
     static_masks_cache{}, forward_masks_cache{}, topology_indices{}, example_indices{},
-    topology_cases{}, topology_case_bounds{}
+    topology_cases{}, topology_case_bounds{}, system_trajectory_names{}, system_checkpoint_names{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -195,6 +195,14 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
   sysvec.reserve(nsys);
   for (int i = 0; i < nsys; i++) {
     sysvec.push_back(fcon.getSystem(i));
+    const std::string traj_str = sysvec[i].getTrajectoryFileName();
+    if (traj_str.size() == 0LLU) {
+      sysvec[i].setTrajectoryFileName(fcon.getTrajectoryFileName());
+    }
+    const std::string chkp_str = sysvec[i].getCheckpointFileName();
+    if (chkp_str.size() == 0LLU) {
+      sysvec[i].setCheckpointFileName(fcon.getCheckpointFileName());
+    }
   }
   
   // Test each coordinate set with respect to topologies of the appropriate size.  Evaluate bond
@@ -239,8 +247,9 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       const std::string orig_crd_file = tmp_coordinates_cache[icrdj].getFileName();
       std::string orig_base, orig_ext;
       splitPath(getBaseName(orig_crd_file), &orig_base, &orig_ext);
-      const std::string trajectory_middle = (orig_base.size() > 0) ? orig_base : orig_ext;
-
+      std::string trajectory_middle("_");
+      trajectory_middle += (orig_base.size() > 0) ? orig_base + "." : orig_ext + ".";
+      
       // Add this pair to the list of systems
       sysvec.push_back(MoleculeSystem(topology_cache[best_topology].getFileName(),
                                       tmp_coordinates_cache[icrdj].getFileName(),
@@ -256,6 +265,141 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     }
   }
 
+  // Loop back over systems and make sure that each has a unique restart file (even if these files
+  // are not to be written).  Systems with similar trajectory file names must all share the same
+  // original topology.
+  nsys = sysvec.size();
+  bool name_collision;
+  do {
+    name_collision = false;
+    std::vector<std::string> unique_restart_names;
+    std::vector<int> name_copies;
+    unique_restart_names.reserve(nsys);
+    name_copies.reserve(nsys);
+    int n_unique = 0;
+    for (int i = 0; i < nsys; i++) {
+      const int pos = findStringInVector(unique_restart_names, sysvec[i].getCheckpointFileName());
+      if (pos != n_unique) {
+        name_copies[pos] += 1;
+        name_collision = true;
+      }
+      else {
+        unique_restart_names.push_back(sysvec[i].getCheckpointFileName());
+        name_copies.push_back(1);
+        n_unique++;
+      }
+    }
+    if (name_collision) {
+      for (int i = 0; i < n_unique; i++) {
+        if (name_copies[i] == 1) {
+          continue;
+        }
+        const std::string overused_name = unique_restart_names[i];
+        std::string overused_base, overused_ext;
+        splitPath(overused_name, &overused_base, &overused_ext);
+        const bool base_substantial = (overused_base.size() > 0LLU);
+        const bool ext_substantial = (overused_ext.size() > 0LLU);
+        const bool both_substantial = (base_substantial && ext_substantial);
+        int overused_count = 0;
+        for (int j = 0; j < nsys; j++) {
+          if (sysvec[j].getCheckpointFileName() == overused_name) {
+            if (both_substantial) {
+              sysvec[j].setCheckpointFileName(overused_base + "_" +
+                                              std::to_string(overused_count) + "." + overused_ext);
+            }
+            else if (base_substantial) {
+              sysvec[j].setCheckpointFileName(overused_base + "_" +
+                                              std::to_string(overused_count));
+            }
+            else {
+              sysvec[j].setCheckpointFileName(overused_ext + "_" +
+                                              std::to_string(overused_count));
+            }
+            overused_count++;
+          }
+        }
+      }
+    }
+  } while (name_collision);
+  do {
+    name_collision = false;
+    std::vector<std::string> unique_trajectory_names;
+    std::vector<std::string> unique_trajectory_basis;
+    std::vector<int> divergent_topologies;
+    unique_trajectory_names.reserve(nsys);
+    unique_trajectory_basis.reserve(nsys);
+    divergent_topologies.reserve(nsys);
+    int n_unique = 0;
+    for (int i = 0; i < nsys; i++) {
+      const int pos = findStringInVector(unique_trajectory_names,
+                                         sysvec[i].getTrajectoryFileName());
+      if (pos != n_unique) {
+
+        // Two systems name the same trajectory, but is that a problem?  Not if the topologies
+        // describing each system are the same.
+        if (unique_trajectory_basis[pos] != sysvec[i].getTopologyFileName()) {
+          divergent_topologies[pos] += 1;
+          name_collision = true;
+        }
+      }
+      else {
+        unique_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
+        unique_trajectory_basis.push_back(sysvec[i].getTopologyFileName());
+        divergent_topologies.push_back(1);
+        n_unique++;
+      }
+    }
+    if (name_collision) {
+      for (int i = 0; i < n_unique; i++) {
+        if (divergent_topologies[i] == 1) {
+          continue;
+        }
+        const std::string overused_name = unique_trajectory_names[i];
+        std::string overused_base, overused_ext;
+        splitPath(overused_name, &overused_base, &overused_ext);
+        const bool base_substantial = (overused_base.size() > 0LLU);
+        const bool ext_substantial = (overused_ext.size() > 0LLU);
+        const bool both_substantial = (base_substantial && ext_substantial);
+        int overused_count = 0;
+        std::vector<std::string> new_trajectory_basis;
+        std::vector<std::string> new_trajectory_names;
+        for (int j = 0; j < nsys; j++) {
+          if (sysvec[j].getTrajectoryFileName() != overused_name) {
+            continue;
+          }
+          const std::string jtop_name = sysvec[j].getTopologyFileName();
+          if (jtop_name == unique_trajectory_basis[i]) {
+            continue;
+          }
+          bool new_basis_found = false;
+          for (int k = 0; k < overused_count; k++) {
+            if (jtop_name == new_trajectory_basis[k]) {
+              sysvec[j].setTrajectoryFileName(new_trajectory_names[k]);
+              new_basis_found = true;
+            }
+          }
+          if (new_basis_found == false) {
+            std::string ntraj_name;
+            if (both_substantial) {
+              ntraj_name = overused_base + "_" + std::to_string(overused_count) + "." +
+                           overused_ext;
+            }
+            else if (base_substantial) {
+              ntraj_name = overused_base + "_" + std::to_string(overused_count);
+            }
+            else {
+              ntraj_name = overused_ext + "_" + std::to_string(overused_count);
+            }
+            sysvec[j].setTrajectoryFileName(ntraj_name);
+            new_trajectory_names.push_back(ntraj_name);
+            new_trajectory_basis.push_back(jtop_name);
+            overused_count++;
+          }
+        }
+      }      
+    }
+  } while (name_collision);
+
   // Loop back over the systems (now representing all entries, including the paired free topologies
   // and coordinate sets).  If the topology has already been read, don't read it again.  Read
   // coordinates (and perhaps velocities, if available) into phase space objects.
@@ -269,7 +413,6 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       topology_cache.erase(topology_cache.begin() + i);
     }
   }
-  nsys = sysvec.size();
   for (int i = 0; i < nsys; i++) {
     int top_idx = findStringInVector(current_topology_holdings, sysvec[i].getTopologyFileName());
     bool topology_ok = false;
@@ -322,6 +465,8 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       }
       if (coordinates_ok) {
         topology_indices.push_back(top_idx);
+        system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
+        system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
       }
     }
   }
@@ -408,11 +553,6 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       forward_masks_cache.emplace_back(nullptr);
     }
   }
-
-  // CHECK
-  printf("There are %4d systems, %4zu static and %4zu forward masks.\n", system_count,
-         static_masks_cache.size(), forward_masks_cache.size());
-  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------
