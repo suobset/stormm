@@ -40,7 +40,7 @@ struct ConformerControls {
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
   /// \{
   ConformerControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
-  ConformerControls(const TextFile &tf, int *start_line,
+  ConformerControls(const TextFile &tf, int *start_line, bool *found_nml,
                     ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
@@ -143,8 +143,10 @@ private:
 ///
 /// \param tf          Text of file containing the input deck, read into RAM
 /// \param start_line  Line of the input file at which to begin the scan
+/// \param found       Indicator that the namelist was found in the input file
 /// \param policy      Response to bad inputs
-NamelistEmulator conformerInput(const TextFile &tf, int *start_line, ExceptionResponse policy);
+NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found,
+                                ExceptionResponse policy);
   
 } // namespace namelist
 } // namespace omni

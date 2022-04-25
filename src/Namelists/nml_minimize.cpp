@@ -24,11 +24,11 @@ MinimizeControls::MinimizeControls(const ExceptionResponse policy_in) :
 {}
 
 //-------------------------------------------------------------------------------------------------
-MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line,
+MinimizeControls::MinimizeControls(const TextFile &tf, int *start_line, bool *found_nml,
                                    const ExceptionResponse policy_in) :
     MinimizeControls(policy_in)
 {
-  NamelistEmulator t_nml = minimizeInput(tf, start_line, policy);
+  NamelistEmulator t_nml = minimizeInput(tf, start_line, found_nml, policy);
   total_cycles = t_nml.getIntValue("maxcyc");
   steepest_descent_cycles = t_nml.getIntValue("ncyc");
   print_frequency = t_nml.getIntValue("ntpr");
@@ -270,7 +270,7 @@ void MinimizeControls::validateConvergenceTarget() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
+NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                const ExceptionResponse policy) {
   NamelistEmulator t_nml("minimize", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to carry out energy minimization of a molecular system guided by an "
@@ -308,7 +308,8 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
   
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
+                             found);
 
   return t_nml;
 }

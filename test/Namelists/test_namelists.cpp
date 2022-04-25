@@ -83,7 +83,8 @@ int main(int argc, char* argv[]) {
   // The minimization namelist contains integer and real-valued numbers
   section(2);
   start_line = 0;
-  MinimizeControls mincon(tf, &start_line);
+  bool found_nml;
+  MinimizeControls mincon(tf, &start_line, &found_nml);
   check(mincon.getTotalCycles(), RelationalOperator::EQUAL, 1000, "The &minimize namelist did "
         "not convey the correct total number of cycles.", do_tests);
   check(mincon.getSteepestDescentCycles(), RelationalOperator::EQUAL, 100, "The &minimize "

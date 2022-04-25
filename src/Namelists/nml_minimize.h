@@ -31,12 +31,13 @@ public:
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
   ///
-  /// \param policy_in   Requested error handling behavior
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param found_nml   Indicator of whether namelist input was found
+  /// \param policy_in   Requested error handling behavior
   /// \{
   MinimizeControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
-  MinimizeControls(const TextFile &tf, int *start_line,
+  MinimizeControls(const TextFile &tf, int *start_line, bool *found_nml,
                    ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
@@ -152,8 +153,9 @@ private:
 /// \param start_line  Line at which to begin scanning the input file for the namelist (this
 ///                    function will wrap back to the beginning of the TextFile object, if needed,
 ///                    to find a &minimize namelist) 
+/// \param found       Indicate that the namelist was found
 /// \param policy      Reaction to exceptions encountered during namelist reading
-NamelistEmulator minimizeInput(const TextFile &tf, int *start_line,
+NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist

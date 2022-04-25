@@ -3,6 +3,7 @@
 #define OMNI_USER_SETTINGS_H
 
 #include "Constants/behavior.h"
+#include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_random.h"
@@ -18,6 +19,7 @@ namespace omni {
 namespace namelist {
 
 using constants::ExceptionResponse;
+using namelist::DynamicsControls;
 using namelist::FilesControls;
 using namelist::MinimizeControls;
 using namelist::RandomControls;
@@ -58,6 +60,12 @@ struct UserSettings {
 
   /// \brief Get the name of the input file.
   std::string getInputFileName() const;
+  
+  /// \brief Detect whether a &minimize namelist was present
+  bool getMinimizePresence() const;
+
+  /// \brief Detect whether a &conformer namelist was present
+  bool getConformerPresence() const;
 
   /// \brief Get the block of information associated with the &files namelist.
   FilesControls getFilesNamelistInfo() const;
@@ -76,8 +84,10 @@ struct UserSettings {
 
 private:
 
-  /// Action in the event of bad input
-  ExceptionResponse policy;
+  ExceptionResponse policy;   /// Action in the event of bad input
+  bool has_minimize_nml;      /// Indicate the presence of a &minimize namelist in the input file
+  bool has_conformer_nml;     /// Indicate the presence of a &conformer namelist in the input file
+  bool has_dynamics_nml;      /// Indicate the presence of a &dynamics namelist in the input file
   
   /// Name of the original input file
   std::string input_file;
@@ -88,6 +98,7 @@ private:
   SolventControls solvent_input;    ///< Implicit solvent specifications
   RandomControls prng_input;        ///< Random number generator specifications
   ConformerControls conf_input;     ///< Conformer generation instructions
+  DynamicsControls dyna_input;      ///< Molecular dynamics instructions
 };
 
 } // namespace namelist

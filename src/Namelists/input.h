@@ -68,8 +68,12 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
 ///                    indicating the end of the file.  Developers will probably not often use this
 ///                    parameter as its primary purpose is to stop a namelist search at the
 ///                    original start line after wrapping back around to the beginning of the file.
+/// \param found       A way to pass back the information that a namelist was found in the input
+///                    (much simpler and safer than trying to infer such a fact from changes in
+///                    start_line).  Leaving the variable set to nullptr disables this feature.
 int readNamelist(const TextFile &tf, NamelistEmulator *nml, int start_line = 0,
-                 WrapTextSearch wrap = WrapTextSearch::NO, int end_line = -1);
+                 WrapTextSearch wrap = WrapTextSearch::NO, int end_line = -1,
+                 bool *found = nullptr);
   
 } // namespace namelist
 } // namespace omni

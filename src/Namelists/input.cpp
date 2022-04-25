@@ -251,7 +251,7 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
 
 //-------------------------------------------------------------------------------------------------
 int readNamelist(const TextFile &tf, NamelistEmulator *nml, const int start_line,
-                 WrapTextSearch wrap, const int end_line)
+                 WrapTextSearch wrap, const int end_line, bool *found)
 {
   // Check that the namelist begins in its default state
   for (size_t i = 0; i < nml->getKeywordCount(); i++) {
@@ -277,6 +277,9 @@ int readNamelist(const TextFile &tf, NamelistEmulator *nml, const int start_line
   // any namelist's word vector will be the title card of the namelist itself, and the last word
   // will be "&end" or "/".  Neither needs interpretation.
   const int word_count = nml_words.size();
+  if (found != nullptr) {
+    *found = (word_count > 0);
+  }
   const int nparam = nml->getKeywordCount();
   for (int i = 1; i < word_count - 2; i++) {
 

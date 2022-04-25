@@ -30,11 +30,11 @@ ConformerControls::ConformerControls(const ExceptionResponse policy_in) :
 {}
 
 //-------------------------------------------------------------------------------------------------
-ConformerControls::ConformerControls(const TextFile &tf, int *start_line,
+ConformerControls::ConformerControls(const TextFile &tf, int *start_line, bool *found_nml,
                                      const ExceptionResponse policy_in) :
     ConformerControls(policy_in)
 {
-  const NamelistEmulator t_nml = conformerInput(tf, start_line, policy);
+  const NamelistEmulator t_nml = conformerInput(tf, start_line, found_nml, policy);
   if (t_nml.getKeywordStatus("commonmask") != InputStatus::MISSING) {
     common_atom_mask = t_nml.getStringValue("commonmask");
   }
@@ -235,7 +235,7 @@ void ConformerControls::validateStateCounts() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator conformerInput(const TextFile &tf, int *start_line,
+NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found,
                                 const ExceptionResponse policy) {
   NamelistEmulator t_nml("conformer", CaseSensitivity::AUTOMATIC, policy,
                          "Collects instructions for conformer sampling in OMNI.");
@@ -284,7 +284,8 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line,
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
+                             found);
   return t_nml;
 }
 

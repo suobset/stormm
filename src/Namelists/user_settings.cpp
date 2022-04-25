@@ -26,7 +26,8 @@ using parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
-    policy{ExceptionResponse::DIE},
+    policy{ExceptionResponse::DIE}, has_minimize_nml{false}, has_conformer_nml{false},
+    has_dynamics_nml{false},
     input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}
 {
@@ -100,20 +101,34 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   int start_line = 0;
   file_io_input = FilesControls(inp_tf, &start_line, policy);
   start_line = 0;
-  line_min_input = MinimizeControls(inp_tf, &start_line, policy);
+  line_min_input = MinimizeControls(inp_tf, &start_line, &has_minimize_nml, policy);
   start_line = 0;
   solvent_input = SolventControls(inp_tf, &start_line, policy);
   start_line = 0;
   prng_input = RandomControls(inp_tf, &start_line, policy);
+  start_line = 0;
+  conf_input = ConformerControls(inp_tf, &start_line, &has_conformer_nml, policy);
+  start_line = 0;
+  dyna_input = DynamicsControls(inp_tf, &start_line, &has_dynamics_nml, policy);
+
+  // Check the validity of input namelists
   switch (prog_set) {
   case AppName::CONFORMER:
-    start_line = 0;
-    conf_input = ConformerControls(inp_tf, &start_line, policy);
+    if (has_dynamics_nml) {
+      rtWarn("A &dynamics namelist was detected in the input, but content will be ignored by "
+             "this program.  The dynamics.omni application will make use of such input.",
+             "UserSettings");
+    }
     break;
   case AppName::DYNAMICS:
+    if (has_conformer_nml) {
+      rtWarn("A &conformer namelist was detected in the input, but content will be ignored by "
+             "this program.  The conformer.omni application will make use of such input.",
+             "UserSettings");
+    }
     break;
   }
-
+  
   // Superimpose, or contribute, command line directives
   if (cli_igseed) {
     prng_input.setRandomSeed(cval_igseed);    
@@ -144,6 +159,16 @@ ExceptionResponse UserSettings::getExceptionBehavior() const {
 //-------------------------------------------------------------------------------------------------
 std::string UserSettings::getInputFileName() const {
   return input_file;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getMinimizePresence() const {
+  return has_minimize_nml;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool UserSettings::getConformerPresence() const {
+  return has_conformer_nml;
 }
 
 //-------------------------------------------------------------------------------------------------
