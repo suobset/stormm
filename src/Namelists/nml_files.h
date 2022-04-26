@@ -41,13 +41,28 @@ public:
   /// Overloaded:
   ///   - Create a blank object
   ///   - Create an object with a complete list of files and read settings
+  ///
+  /// \param topology_file_in    Topology file for the system (its type will be detected later)
+  /// \param coordinate_file_in  Coordinate file for the system (input)
+  /// \param trajectory_file_in  Trajectory file for the system (output)
+  /// \param checkpoint_file_in  Restart file to write for the system (output)
+  /// \param label_in            System label, i.e. "MyBigProtein"
+  /// \param frame_start_in      Starting frame to begin reading input coordinates, if the input
+  ///                            coordinate file is a trajectory
+  /// \param frame_end_in        Frame at which to stop reading coordinates, if the input
+  ///                            coordinate file is a trajectory
+  /// \param replica_count_in    Number of replicas of this system to produce in the resulting
+  ///                            SystemCache object
+  /// \param coordinate_kind_in  File type of the input coordinates file
+  /// \param trajectory_kind_in  File type of the resulting trajectory file
+  /// \param checkpoint_kind_in  File type of the checkpoint file
   /// \{
   MoleculeSystem();
   MoleculeSystem(const std::string &topology_file_in, const std::string &coordinate_file_in,
                  const std::string &trajectory_file_in, const std::string &checkpoint_file_in,
-                 int frame_start_in, int frame_end_in, int replica_count_in,
-                 CoordinateFileKind coordinate_kind_in, CoordinateFileKind trajectory_kind_in,
-                 CoordinateFileKind checkpoint_kind_in);
+                 const std::string &label_in, int frame_start_in, int frame_end_in,
+                 int replica_count_in, CoordinateFileKind coordinate_kind_in,
+                 CoordinateFileKind trajectory_kind_in, CoordinateFileKind checkpoint_kind_in);
   /// \}
 
   /// \brief Get the name of the topology file in this system.
@@ -61,6 +76,9 @@ public:
 
   /// \brief Get the name of the checkpoint file to write for this system.
   std::string getCheckpointFileName() const;
+
+  /// \brief Get the assigned label for this system.
+  std::string getLabel() const;
 
   /// \brief Get the starting frame that this system will read for initial coordinate states.
   int getStartingFrame() const;
@@ -173,6 +191,7 @@ private:
   std::string checkpoint_name;         ///< Checkpoint file for this system (if not supplied, the
                                        ///<   name will be inferred based on directives in the
                                        ///<   containing FileControls object)
+  std::string label;                   ///< Label assigned to this system for future reference
   int frame_start;                     ///< Strating frame of the coordinates file to read
   int frame_end;                       ///< Final frame of the coordinates file to read (the
                                        ///<   program will read frames over the range

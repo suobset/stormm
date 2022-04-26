@@ -214,6 +214,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
   splitPath(fcon.getTrajectoryFileName(), &trajectory_base, &trajectory_ext);
   splitPath(fcon.getCheckpointFileName(), &restart_base, &restart_ext);
   std::vector<bool> topology_in_use(n_free_top, false);
+  int n_paired_systems = 0;
   for (int i = 0; i < n_unique_sizes; i++) {
 
     // Loop over all coordinates in this size group.  Try interpreting them with each topology.
@@ -251,14 +252,16 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
       trajectory_middle += (orig_base.size() > 0) ? orig_base + "." : orig_ext + ".";
       
       // Add this pair to the list of systems
+      const std::string syslabel = std::string("PairedSystem") + std::to_string(n_paired_systems);
       sysvec.push_back(MoleculeSystem(topology_cache[best_topology].getFileName(),
                                       tmp_coordinates_cache[icrdj].getFileName(),
                                       trajectory_base + trajectory_middle + trajectory_ext,
-                                      restart_base + trajectory_middle + restart_ext, 0,
+                                      restart_base + trajectory_middle + restart_ext, syslabel, 0,
                                       tmp_coordinates_frame_count[icrdj], 1,
                                       tmp_coordinates_kind[icrdj],
                                       fcon.getOutputCoordinateFormat(), 
                                       fcon.getCheckpointFormat()));
+      n_paired_systems++;
 
       // Note that the topology is used
       topology_in_use[best_topology] = true;

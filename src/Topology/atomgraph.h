@@ -933,6 +933,157 @@ public:
   ///        for a topology to be written to disk, but can also be used to "disguise" one topology
   ///        from another even if both are from the same original file.
   void setSource(const std::string &new_source);
+
+  /// \brief Alter the parameters for a bond parameter set.  This will alter the parameters in the
+  ///        topology and all bond terms that use the parameters will then be altered.  This
+  ///        function does not add or remove bond terms or parameter sets, nor does it change the
+  ///        mapping of bond terms to parameter sets.
+  ///
+  /// Overloaded:
+  ///   - Accept the atom types for each atom in the bond
+  ///   - Accept the parameter set index for the bond
+  ///
+  /// \param new_keq   The new stiffness constant to apply
+  /// \param new_leq   The new equilibrium constant to apply
+  /// \param set_keq   Whether to change the stiffness constant
+  /// \param set_leq   Whether to change the equilibrium
+  /// \param parm_idx  Index of the bond parameter set from within the topology's table (one cannot
+  ///                  depend on this index to be consistent across topologies of different systems
+  ///                  making use of the same force field)
+  /// \param type_a    Atom type of the first atom in the bond (this will be consistent across
+  ///                  multiple topologies using the same force field)
+  /// \param type_b    Atom type of the second atom in the bond
+  /// \param policy    Behavior if a bond parameter set matching the index or atom types is not
+  ///                  found in the topology
+  /// \{
+  void setBondParameters(double new_keq, double new_leq, bool set_keq, bool set_leq, int parm_idx,
+                         ExceptionResponse policy);
+
+  void setBondParameters(double new_keq, double new_leq, bool set_keq, bool set_leq, char4 type_a,
+                         char4 type_b, ExceptionResponse policy);
+  /// \}
+
+  /// \brief Alter the parameters for an angle parameter set.  This will alter the parameters in
+  ///        the topology and all angle terms that use the parameters will then be use the new
+  ///        parameters.  This function does not add or remove angle terms or parameter sets, nor
+  ///        does it change the mapping of angle terms to parameter sets.
+  ///
+  /// Overloaded:
+  ///   - Accept the atom types for each atom in the angle
+  ///   - Accept the parameter set index for the angle
+  ///
+  /// \param new_keq   The new stiffness constant to apply
+  /// \param new_teq   The new angular equilibrium constant to apply
+  /// \param set_keq   Whether to change the stiffness constant
+  /// \param set_teq   Whether to change the equilibrium
+  /// \param parm_idx  Index of the angle parameter set from within the topology's table (one
+  ///                  cannot depend on this index to be consistent across topologies of different
+  ///                  systems making use of the same force field)
+  /// \param type_a    Atom type of the first atom in the angle (this will be consistent across
+  ///                  multiple topologies using the same force field)
+  /// \param type_b    Atom type of the second atom in the angle
+  /// \param type_c    Atom type of the third atom in the angle
+  /// \param policy    Behavior if an angle parameter set matching the index or atom types is not
+  ///                  found in the topology
+  /// \{
+  void setAngleParameters(double new_keq, double new_teq, bool set_keq, bool set_teq, int parm_idx,
+                          ExceptionResponse policy);
+
+  void setAngleParameters(double new_keq, double new_teq, bool set_keq, bool set_teq, char4 type_a,
+                          char4 type_b, char4 type_c, ExceptionResponse policy);
+  /// \}
+
+  /// \brief Alter the parameters for a cosine-based dihedral angle parameter set.  This will alter
+  ///        the parameters in the topology and all dihedral terms that use the parameters will
+  ///        then be use the new parameters.  This function does not add or remove dihedral terms
+  ///        or parameter sets, nor does it change the mapping of dihedral terms to parameter sets.
+  ///
+  /// Overloaded:
+  ///   - Accept the atom types for each atom in the dihedral angle
+  ///   - Accept the parameter set index for the dihedral angle
+  ///
+  /// \param new_amplitude    The new cosine series term amplitude constant to apply
+  /// \param new_phase_angle  The new phase angle to apply
+  /// \param set_amplitude    Whether to change the amplitude constant
+  /// \param set_phase_angle  Whether to change the equilibrium
+  /// \param parm_idx         Index of the dihedral angle parameter set from within the topology's
+  ///                         table (one cannot depend on this index to be consistent across
+  ///                         topologies of different systems making use of the same force field)
+  /// \param type_a           Atom type of the first atom in the dihedral (this will be consistent
+  ///                         across multiple topologies using the same force field)
+  /// \param type_b           Atom type of the second atom in the dihedral
+  /// \param type_c           Atom type of the third atom in the dihedral
+  /// \param type_d           Atom type of the fourth atom in the dihedral
+  /// \param periodicity      Periodicity of the dihedral parameter set (this disambiguates
+  ///                         dihedral parameters that apply on top of one another to the same
+  ///                         four atom types)
+  /// \param policy           Behavior if a dihedral parameter set matching the index or atom types
+  ///                         and periodicity is not found in the topology
+  /// \{
+  void setDihedralParameters(double new_amplitude, double new_phase_angle, bool set_amplitude,
+                             bool set_phase_angle, int parm_idx, ExceptionResponse policy);
+
+  void setDihedralParameters(double new_amplitude, double new_phase_angle, bool set_amplitude,
+                             bool set_phase_angle, char4 type_a, char4 type_b, char4 type_c,
+                             char4 type_d, double periodicity, ExceptionResponse policy);
+  /// \}
+
+  /// \brief Alter the parameters for a Urey-Bradley parameter set.
+  ///
+  /// Overloaded:
+  ///   - Accept the atom types for each atom in the Urey-Bradley term
+  ///   - Accept the parameter set index for the Urey-Bradley term
+  ///
+  /// \param new_keq   The new stiffness constant to apply
+  /// \param new_leq   The new equilibrium constant to apply
+  /// \param set_keq   Whether to change the stiffness constant
+  /// \param set_leq   Whether to change the equilibrium
+  /// \param parm_idx  Index of the bond parameter set from within the topology's table (one cannot
+  ///                  depend on this index to be consistent across topologies of different systems
+  ///                  making use of the same force field)
+  /// \param type_a    Atom type of the first atom in the Urey-Bradley term, the I atom (this will
+  ///                  be consistent across multiple topologies using the same force field)
+  /// \param type_b    Atom type of the second atom in the Urey-Bradley term (the K atom)
+  /// \param policy    Behavior if a Urey-Bradley parameter set matching the index or atom types is
+  ///                  not found in the topology  
+  /// \{
+  void setUreyBradleyParameters(double new_keq, double new_leq, bool set_keq, bool set_leq,
+                                int parm_idx, ExceptionResponse policy);
+
+  void setUreyBradleyParameters(double new_keq, double new_leq, bool set_keq, bool set_leq,
+                                char4 type_a, char4 type_b, ExceptionResponse policy);
+  /// \}
+
+  /// \brief Alter the characteristics of a CHARMM improper dihedral parameter set.
+  ///
+  /// Overloaded:
+  ///   - Accept the atom types for each atom in the CHARMM improper term
+  ///   - Accept the parameter set index for the CHARMM improper term
+  ///
+  /// \param new_stiffness    The new stiffness constant to apply
+  /// \param new_phase_angle  The new phase angle constant to apply
+  /// \param set_stiffness    Whether to change the stiffness constant
+  /// \param set_phase_angle  Whether to change the equilibrium
+  /// \param parm_idx         Index of the CHARMM improper dihedral parameter set from within the
+  ///                         topology's table (one cannot depend on this index to be consistent
+  ///                         across topologies of different systems making use of the same force
+  ///                         field)
+  /// \param type_a           Atom type of the first atom in the improper (this will be consistent
+  ///                         across multiple topologies using the same force field)
+  /// \param type_b           Atom type of the second atom in the improper
+  /// \param type_c           Atom type of the third atom in the improper
+  /// \param type_d           Atom type of the fourth atom in the improper
+  /// \param policy           Behavior if a CHARMM improper dihedral parameter set matching the
+  ///                         index or atom types and periodicity is not found in the topology 
+  /// \{
+  void setCharmmImprParameters(double new_stiffness, double new_phase_angle, bool set_stiffness,
+                               bool set_phase_angle, int parm_idx, ExceptionResponse policy);
+
+  void setCharmmImprParameters(double new_stiffness, double new_phase_angle, bool set_stiffness,
+                               bool set_phase_angle, char4 type_a, char4 type_b, char4 type_c,
+                               char4 type_d, double periodicity, ExceptionResponse policy);
+  /// \}
+
   
   /// \brief Set the implicit solvent model.  This will leverage a lot of hard-coded constants
   ///        to fill out some allocated but otherwise blank arrays and impart one particular

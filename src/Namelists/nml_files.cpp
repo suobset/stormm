@@ -18,7 +18,8 @@ using trajectory::translateCoordinateFileKind;
 //-------------------------------------------------------------------------------------------------
 MoleculeSystem::MoleculeSystem() :
     topology_file_name{}, coordinate_file_name{}, coordinate_output_name{}, checkpoint_name{},
-    frame_start{0}, frame_end{0}, replica_count{0}, coordinate_kind{CoordinateFileKind::UNKNOWN},
+    label{}, frame_start{0}, frame_end{0}, replica_count{0},
+    coordinate_kind{CoordinateFileKind::UNKNOWN},
     trajectory_kind{CoordinateFileKind::AMBER_CRD},
     checkpoint_kind{CoordinateFileKind::AMBER_ASCII_RST}
 {}
@@ -27,8 +28,9 @@ MoleculeSystem::MoleculeSystem() :
 MoleculeSystem::MoleculeSystem(const std::string &topology_file_in,
                                const std::string &coordinate_file_in,
                                const std::string &trajectory_file_in,
-                               const std::string &checkpoint_file_in, const int frame_start_in,
-                               const int frame_end_in, const int replica_count_in,
+                               const std::string &checkpoint_file_in, const std::string &label_in,
+                               const int frame_start_in, const int frame_end_in,
+                               const int replica_count_in,
                                const CoordinateFileKind coordinate_kind_in,
                                const CoordinateFileKind trajectory_kind_in,
                                const CoordinateFileKind checkpoint_kind_in) :
@@ -36,6 +38,7 @@ MoleculeSystem::MoleculeSystem(const std::string &topology_file_in,
     coordinate_file_name{coordinate_file_in},
     coordinate_output_name{trajectory_file_in},
     checkpoint_name{checkpoint_file_in},
+    label{label_in},
     frame_start{frame_start_in},
     frame_end{(replica_count_in > 1) ? frame_start : frame_end_in},
     replica_count{replica_count_in},
@@ -62,6 +65,11 @@ std::string MoleculeSystem::getTrajectoryFileName() const {
 //-------------------------------------------------------------------------------------------------
 std::string MoleculeSystem::getCheckpointFileName() const {
   return checkpoint_name;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string MoleculeSystem::getLabel() const {
+  return label;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -266,7 +274,8 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
     (top_name_required) ? short_req : (top_is_bogus) ? short_bog : short_opt,
     (crd_name_required) ? short_req : (crd_is_bogus) ? short_bog : short_opt,
     (trj_name_required) ? short_req : (trj_is_bogus) ? short_bog : short_opt,
-    (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt
+    (rst_name_required) ? short_req : (rst_is_bogus) ? short_bog : short_opt,
+    short_opt
   };
   NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy);
   const InputStatus stt_missing = InputStatus::MISSING;
@@ -283,6 +292,8 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
                                  t_nml.getStringValue("-sys", "-x", i) : std::string("");
     const std::string rst_name = (t_nml.getKeywordStatus("-sys", "-r", i) != stt_missing) ?
                                  t_nml.getStringValue("-sys", "-r", i) : std::string("");
+    const std::string sys_label = (t_nml.getKeywordStatus("-sys", "-label", i) != stt_missing) ?
+                                  t_nml.getStringValue("-sys", "-label", i) : std::string("");
     std::string missing_elements("");
     if (top_name.size() == 0LLU && top_name_required) {
       missing_elements += "-p";
@@ -357,7 +368,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
       }
     }
     if (complete) {
-      systems.push_back(MoleculeSystem(top_name, crd_name, trj_name, rst_name,
+      systems.push_back(MoleculeSystem(top_name, crd_name, trj_name, rst_name, sys_label,
                                        t_nml.getIntValue("-sys", "frame_start", i),
                                        t_nml.getIntValue("-sys", "frame_end", i),
                                        t_nml.getIntValue("-sys", "-n", i),
@@ -653,24 +664,24 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                              "specifiers in this namelist, this keyword is repeatable.");
   const std::vector<std::string> sys_keys_help = {
     "Topology file", "Starting coordinates file", "Output trajectory file", "Checkpoint file",
-    "Starting frame (if the coordinates are a trajectory)", "Ending frame (if the coordinates are "
-    "a trajectory).  If unspecified, only the starting frame will be read.  Otherwise, distinct "
-    "systems will be made for the given topology and every frame between frame_start and "
-    "frame_end.", "Type of coordinates file to expect (if unspecified, the type will be detected "
-    "automatically)", "Type of trajectory file to write", "Type of checkpoint (restart) "
-    "coordinates file to write"
-  };
+    "System label", "Starting frame (if the coordinates are a trajectory)", "Ending frame (if the "
+    "coordinates are a trajectory).  If unspecified, only the starting frame will be read.  "
+    "Otherwise, distinct systems will be made for the given topology and every frame between "
+    "frame_start and frame_end.", "Type of coordinates file to expect (if unspecified, the type "
+    "will be detected automatically)", "Type of trajectory file to write", "Type of checkpoint "
+    "(restart) coordinates file to write" };
   
   // Prepare the requirements list for the -sys keyword
-  t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "-x", "-r", "frame_start", "frame_end",
-                                             "-n", "c_kind", "x_kind", "r_kind" },
+  t_nml.addKeyword(NamelistElement("-sys", { "-p", "-c", "-x", "-r", "-label", "frame_start",
+                                             "frame_end", "-n", "c_kind", "x_kind", "r_kind" },
                                    { NamelistType::STRING, NamelistType::STRING,
                                      NamelistType::STRING, NamelistType::STRING,
+                                     NamelistType::STRING, NamelistType::INTEGER,
                                      NamelistType::INTEGER, NamelistType::INTEGER,
-                                     NamelistType::INTEGER, NamelistType::STRING,
-                                     NamelistType::STRING, NamelistType::STRING },
+                                     NamelistType::STRING, NamelistType::STRING,
+                                     NamelistType::STRING },
                                    { std::string(""), std::string(""), std::string(""),
-                                     std::string(""), "0", "0", "1",
+                                     std::string(""), std::string(""), "0", "0", "1",
                                      std::string(default_filecon_inpcrd_type),
                                      std::string(default_filecon_outcrd_type),
                                      std::string(default_filecon_chkcrd_type) },

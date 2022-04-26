@@ -4,6 +4,8 @@
 #include "Constants/generalized_born.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
+#include "UnitTesting/approx.h"
+#include "UnitTesting/unit_test_enumerators.h"
 #include "atomgraph.h"
 
 namespace omni {
@@ -11,8 +13,12 @@ namespace topology {
 
 using parse::CaseSensitivity;
 using parse::char4ToString;
+using parse::realToString;
 using parse::stringToChar4;
 using parse::strncmpCased;
+using parse::operator==;
+using testing::Approx;
+using testing::ComparisonType;
 using namespace generalized_born_defaults;
 
 //-------------------------------------------------------------------------------------------------
@@ -75,6 +81,486 @@ void AtomGraph::modifyAtomMobility(const int index, const MobilitySetting moveme
 //-------------------------------------------------------------------------------------------------
 void AtomGraph::setSource(const std::string &new_source) {
   source = new_source;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setBondParameters(const double new_keq, const double new_leq, const bool set_keq,
+                                  const bool set_leq, const int parm_idx,
+                                  const ExceptionResponse policy) {
+  if (set_keq == false && set_leq == false) {
+    return;
+  }
+  if (parm_idx < 0 || parm_idx >= bond_parameter_count) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A bond with parameter index " + std::to_string(parm_idx) + " does not exist in a "
+            "topology with " + std::to_string(bond_parameter_count) + " unique bond types.",
+            "AtomGraph", "setBondParameters");
+    case ExceptionResponse::WARN:
+      {
+        std::string action_str("");
+        if (set_keq && set_leq) {
+          action_str += "stiffness to " + realToString(new_keq) + " and the equilibrium to " +
+                        realToString(new_leq);
+        }
+        else if (set_keq) {
+          action_str += "stiffness to " + realToString(new_keq);
+        }
+        else if (set_leq) {
+          action_str += "equilibrium to " + realToString(new_leq);
+        }
+        rtWarn("A bond with parameter index " + std::to_string(parm_idx) + " does not exist in a "
+               "topology with " + std::to_string(bond_parameter_count) + " unique bond types.  No "
+               "action will be taken to change the " + action_str + ".", "AtomGraph",
+               "setBondParameters");
+      }
+      break;
+    case ExceptionResponse::SILENT:
+      break;      
+    }
+  }
+  else {
+    if (set_keq) {
+      bond_stiffnesses.putHost(new_keq, parm_idx);
+      sp_bond_stiffnesses.putHost(new_keq, parm_idx);
+    }
+    if (set_leq) {
+      bond_equilibria.putHost(new_leq, parm_idx);
+      sp_bond_equilibria.putHost(new_leq, parm_idx);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setBondParameters(const double new_keq, const double new_leq, const bool set_keq,
+                                  const bool set_leq, const char4 type_a, const char4 type_b,
+                                  const ExceptionResponse policy) {
+  const char4* atom_type_ptr = atom_types.data();
+  const int* bond_i_atom_ptr = bond_i_atoms.data();
+  const int* bond_j_atom_ptr = bond_j_atoms.data();
+  const int* atom_type_idx_ptr = lennard_jones_indices.data();
+  int bond_parm_idx = -1;
+  for (int pos = 0; pos < bond_term_count; pos++) {
+    const int atom_i = bond_i_atom_ptr[pos];
+    const int atom_j = bond_j_atom_ptr[pos];
+    const int atyp_i = atom_type_idx_ptr[atom_i];
+    const int atyp_j = atom_type_idx_ptr[atom_j];
+    if ((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_j] == type_b) ||
+        (atom_type_ptr[atyp_j] == type_a && atom_type_ptr[atyp_i] == type_b)) {
+      bond_parm_idx = bond_parameter_indices.readHost(pos);
+      break;
+    }
+  }
+  if (bond_parm_idx < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No bond between atom types " + char4ToString(type_a) + " and " +
+            char4ToString(type_b) + " was found in topology " + source + ".", "AtomGraph",
+            "setBondParameters");
+    case ExceptionResponse::WARN:
+      rtWarn("No bond between atom types " + char4ToString(type_a) + " and " +
+             char4ToString(type_b) + " was found in topology " + source + ".  No action will be "
+             "taken.", "AtomGraph", "setBondParameters");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Do not report the spurious parameter index if a warning about the types has already been
+  // issued.
+  setBondParameters(new_keq, new_leq, set_keq, set_leq, bond_parm_idx,
+                    (policy == ExceptionResponse::WARN) ? ExceptionResponse::SILENT : policy); 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setAngleParameters(const double new_keq, const double new_teq, const bool set_keq,
+                                   const bool set_teq, const int parm_idx,
+                                   const ExceptionResponse policy) {
+  if (set_keq == false && set_teq == false) {
+    return;
+  }
+  if (parm_idx < 0 || parm_idx >= angl_parameter_count) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A harmonic angle term with parameter index " + std::to_string(parm_idx) + " does not "
+            "exist in a topology with " + std::to_string(angl_parameter_count) + " unique angle "
+            "types.", "AtomGraph", "setAngleParameters");
+    case ExceptionResponse::WARN:
+      {
+        std::string action_str("");
+        if (set_keq && set_teq) {
+          action_str += "stiffness to " + realToString(new_keq) + " and the equilibrium to " +
+                        realToString(new_teq);
+        }
+        else if (set_keq) {
+          action_str += "stiffness to " + realToString(new_keq);
+        }
+        else if (set_teq) {
+          action_str += "equilibrium to " + realToString(new_teq);
+        }
+        rtWarn("A harmonic angle with parameter index " + std::to_string(parm_idx) + " does not "
+               "exist in a topology with " + std::to_string(angl_parameter_count) + " unique "
+               "angle types.  No action will be taken to change the " + action_str + ".",
+               "AtomGraph", "setAngleParameters");
+      }
+      break;
+    case ExceptionResponse::SILENT:
+      break;      
+    }
+  }
+  else {
+    if (set_keq) {
+      angl_stiffnesses.putHost(new_keq, parm_idx);
+      sp_angl_stiffnesses.putHost(new_keq, parm_idx);
+    }
+    if (set_teq) {
+      angl_equilibria.putHost(new_teq, parm_idx);
+      sp_angl_equilibria.putHost(new_teq, parm_idx);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setAngleParameters(const double new_keq, const double new_teq, const bool set_keq,
+                                   const bool set_teq, const char4 type_a, const char4 type_b,
+                                   const char4 type_c, const ExceptionResponse policy) {
+  const char4* atom_type_ptr = atom_types.data();
+  const int* angl_i_atom_ptr = angl_i_atoms.data();
+  const int* angl_j_atom_ptr = angl_j_atoms.data();
+  const int* angl_k_atom_ptr = angl_k_atoms.data();
+  const int* atom_type_idx_ptr = lennard_jones_indices.data();
+  int angl_parm_idx = -1;
+  for (int pos = 0; pos < angl_term_count; pos++) {
+    const int atom_i = angl_i_atom_ptr[pos];
+    const int atom_j = angl_j_atom_ptr[pos];
+    const int atom_k = angl_k_atom_ptr[pos];
+    const int atyp_i = atom_type_idx_ptr[atom_i];
+    const int atyp_j = atom_type_idx_ptr[atom_j];
+    const int atyp_k = atom_type_idx_ptr[atom_k];
+    if (atom_type_ptr[atyp_j] == type_b &&
+        ((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_k] == type_c) ||
+         (atom_type_ptr[atyp_k] == type_a && atom_type_ptr[atyp_i] == type_c))) {
+      angl_parm_idx = angl_parameter_indices.readHost(pos);
+      break;
+    }
+  }
+  if (angl_parm_idx < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No angle between atom types " + char4ToString(type_a) + ", " + char4ToString(type_b) +
+            " and " + char4ToString(type_c) + " was found in topology " + source + ".",
+            "AtomGraph", "setAngleParameters");
+    case ExceptionResponse::WARN:
+      rtWarn("No angle between atom types " + char4ToString(type_a) + ", " +
+             char4ToString(type_b) + ", and " + char4ToString(type_c) + " was found in topology " +
+             source + ".  No action will be taken.", "AtomGraph", "setAngleParameters");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Do not report the spurious parameter index if a warning about the types has already been
+  // issued.
+  setAngleParameters(new_keq, new_teq, set_keq, set_teq, angl_parm_idx,
+                     (policy == ExceptionResponse::WARN) ? ExceptionResponse::SILENT : policy); 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setDihedralParameters(const double new_amplitude, const double new_phase_angle,
+                                      const bool set_amplitude, const bool set_phase_angle,
+                                      const int parm_idx, const ExceptionResponse policy) {
+  if (parm_idx < 0 || parm_idx >= dihe_parameter_count) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A cosine-based dihedral term with parameter index " + std::to_string(parm_idx) +
+            " does not exist in a topology with " + std::to_string(dihe_parameter_count) +
+            " unique dihedral types.", "AtomGraph", "setDihedralParameters");
+    case ExceptionResponse::WARN:
+      {
+        std::string action_str("");
+        if (set_amplitude && set_phase_angle) {
+          action_str += "amplitude to " + realToString(new_amplitude) + " and the phase angle "
+                        "to " + realToString(new_phase_angle);
+        }
+        else if (set_amplitude) {
+          action_str += "amplitude to " + realToString(new_amplitude);
+        }
+        else if (set_phase_angle) {
+          action_str += "phase angle to " + realToString(new_phase_angle);
+        }
+        rtWarn("A cosine-based dihedral term with parameter index " + std::to_string(parm_idx) +
+               " does not exist in a topology with " + std::to_string(dihe_parameter_count) +
+               " unique dihedral types.  No action will be taken to change the " + action_str +
+               ".", "AtomGraph", "setDihedralParameters");
+      }
+      break;
+    case ExceptionResponse::SILENT:
+      break;      
+    }
+  }
+  else {
+    if (set_amplitude) {
+      dihe_amplitudes.putHost(new_amplitude, parm_idx);
+      sp_dihe_amplitudes.putHost(new_amplitude, parm_idx);
+    }
+    if (set_phase_angle) {
+      dihe_phase_angles.putHost(new_phase_angle, parm_idx);
+      sp_dihe_phase_angles.putHost(new_phase_angle, parm_idx);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setDihedralParameters(const double new_amplitude, const double new_phase_angle,
+                                      const bool set_amplitude, const bool set_phase_angle,
+                                      const char4 type_a, const char4 type_b, const char4 type_c,
+                                      const char4 type_d, const double periodicity,
+                                      const ExceptionResponse policy) {
+  const char4* atom_type_ptr = atom_types.data();
+  const int* dihe_i_atom_ptr = dihe_i_atoms.data();
+  const int* dihe_j_atom_ptr = dihe_j_atoms.data();
+  const int* dihe_k_atom_ptr = dihe_k_atoms.data();
+  const int* dihe_l_atom_ptr = dihe_l_atoms.data();
+  const double* dihe_per_ptr = dihe_periodicities.data();
+  const int* atom_type_idx_ptr = lennard_jones_indices.data();
+  int dihe_parm_idx = -1;
+  const Approx pdval(periodicity, ComparisonType::ABSOLUTE, 1.0e-4);
+  for (int pos = 0; pos < dihe_term_count; pos++) {
+    const int atom_i = dihe_i_atom_ptr[pos];
+    const int atom_j = dihe_j_atom_ptr[pos];
+    const int atom_k = dihe_k_atom_ptr[pos];
+    const int atom_l = dihe_l_atom_ptr[pos];
+    const int atyp_i = atom_type_idx_ptr[atom_i];
+    const int atyp_j = atom_type_idx_ptr[atom_j];
+    const int atyp_k = atom_type_idx_ptr[atom_k];
+    const int atyp_l = atom_type_idx_ptr[atom_l];
+    if (pdval.test(dihe_per_ptr[pos]) && 
+        ((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_j] == type_b &&
+          atom_type_ptr[atyp_k] == type_c && atom_type_ptr[atyp_l] == type_d) ||
+         (atom_type_ptr[atyp_l] == type_a && atom_type_ptr[atyp_k] == type_b &&
+          atom_type_ptr[atyp_j] == type_c && atom_type_ptr[atyp_i] == type_d))) {
+      dihe_parm_idx = dihe_parameter_indices.readHost(pos);
+      break;
+    }
+  }
+  if (dihe_parm_idx < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No dihedral angle between atom types " + char4ToString(type_a) + ", " +
+            char4ToString(type_b) + ", " + char4ToString(type_c) + ", and " +
+            char4ToString(type_d) + " was found in topology " + source + ".", "AtomGraph",
+            "setDihedralParameters");
+    case ExceptionResponse::WARN:
+      rtWarn("No dihedral angle between atom types " + char4ToString(type_a) + ", " +
+             char4ToString(type_b) + ", " + char4ToString(type_c) + ", and " +
+             char4ToString(type_d) + " was found in topology " + source + ".  No action will be "
+             "taken.", "AtomGraph", "setDihedralParameters");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Do not report the spurious parameter index if a warning about the types has already been
+  // issued.
+  setDihedralParameters(new_amplitude, new_phase_angle, set_amplitude, set_phase_angle,
+                        dihe_parm_idx,
+                        (policy == ExceptionResponse::WARN) ? ExceptionResponse::SILENT : policy); 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setUreyBradleyParameters(const double new_keq, const double new_leq,
+                                         const bool set_keq, const bool set_leq,
+                                         const int parm_idx, const ExceptionResponse policy) {
+  if (set_keq == false && set_leq == false) {
+    return;
+  }
+  if (parm_idx < 0 || parm_idx >= urey_bradley_parameter_count) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A Urey-Bradley term with parameter index " + std::to_string(parm_idx) + " does not "
+            "exist in a topology with " + std::to_string(urey_bradley_parameter_count) +
+            " unique Urey-Bradley types.", "AtomGraph", "setUreyBradleyParameters");
+    case ExceptionResponse::WARN:
+      {
+        std::string action_str("");
+        if (set_keq && set_leq) {
+          action_str += "stiffness to " + realToString(new_keq) + " and the equilibrium to " +
+                        realToString(new_leq);
+        }
+        else if (set_keq) {
+          action_str += "stiffness to " + realToString(new_keq);
+        }
+        else if (set_leq) {
+          action_str += "equilibrium to " + realToString(new_leq);
+        }
+        rtWarn("A Urey-Bradley term with parameter index " + std::to_string(parm_idx) + " does "
+               "not exist in a topology with " + std::to_string(urey_bradley_parameter_count) +
+               " unique Urey-Bradley types.  No action will be taken to change the " +
+               action_str + ".", "AtomGraph", "setUreyBradleyParameters");
+      }
+      break;
+    case ExceptionResponse::SILENT:
+      break;      
+    }
+  }
+  else {
+    if (set_keq) {
+      urey_bradley_stiffnesses.putHost(new_keq, parm_idx);
+      sp_urey_bradley_stiffnesses.putHost(new_keq, parm_idx);
+    }
+    if (set_leq) {
+      urey_bradley_equilibria.putHost(new_leq, parm_idx);
+      sp_urey_bradley_equilibria.putHost(new_leq, parm_idx);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setUreyBradleyParameters(const double new_keq, const double new_leq,
+                                         const bool set_keq, const bool set_leq,
+                                         const char4 type_a, const char4 type_b,
+                                         const ExceptionResponse policy) {
+  const char4* atom_type_ptr = atom_types.data();
+  const int* ubrd_i_atom_ptr = urey_bradley_i_atoms.data();
+  const int* ubrd_k_atom_ptr = urey_bradley_k_atoms.data();
+  const int* atom_type_idx_ptr = lennard_jones_indices.data();
+  int ubrd_parm_idx = -1;
+  for (int pos = 0; pos < urey_bradley_term_count; pos++) {
+    const int atom_i = ubrd_i_atom_ptr[pos];
+    const int atom_k = ubrd_k_atom_ptr[pos];
+    const int atyp_i = atom_type_idx_ptr[atom_i];
+    const int atyp_k = atom_type_idx_ptr[atom_k];
+    if ((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_k] == type_b) ||
+        (atom_type_ptr[atyp_k] == type_a && atom_type_ptr[atyp_i] == type_b)) {
+      ubrd_parm_idx = urey_bradley_parameter_indices.readHost(pos);
+      break;
+    }
+  }
+  if (ubrd_parm_idx < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No Urey-Bradley angle between atom types " + char4ToString(type_a) + " and " +
+            char4ToString(type_b) + " was found in topology " + source + ".", "AtomGraph",
+            "setUreyBradleyParameters");
+    case ExceptionResponse::WARN:
+      rtWarn("No Urey-Bradley angle between atom types " + char4ToString(type_a) + " and " +
+             char4ToString(type_b) + " was found in topology " + source + ".  No action will be "
+             "taken.", "AtomGraph", "setUreyBradleyParameters");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Do not report the spurious parameter index if a warning about the types has already been
+  // issued.
+  setUreyBradleyParameters(new_keq, new_leq, set_keq, set_leq, ubrd_parm_idx,
+                           (policy == ExceptionResponse::WARN) ? ExceptionResponse::SILENT :
+                                                                 policy); 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setCharmmImprParameters(const double new_stiffness, const double new_phase_angle,
+                                        const bool set_stiffness, const bool set_phase_angle,
+                                        const int parm_idx, const ExceptionResponse policy) {
+  if (parm_idx < 0 || parm_idx >= charmm_impr_parameter_count) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A CHARMM improper dihedral term with parameter index " + std::to_string(parm_idx) +
+            " does not exist in a topology with " + std::to_string(charmm_impr_parameter_count) +
+            " unique parameter sets.", "AtomGraph", "setCharmmImproperParameters");
+    case ExceptionResponse::WARN:
+      {
+        std::string action_str("");
+        if (set_stiffness && set_phase_angle) {
+          action_str += "stiffness to " + realToString(new_stiffness) + " and the phase angle "
+                        "to " + realToString(new_phase_angle);
+        }
+        else if (set_stiffness) {
+          action_str += "stiffness to " + realToString(new_stiffness);
+        }
+        else if (set_phase_angle) {
+          action_str += "phase angle to " + realToString(new_phase_angle);
+        }
+        rtWarn("A CHARMM improper dihedral term with parameter index " + std::to_string(parm_idx) +
+               " does not exist in a topology with " + std::to_string(dihe_parameter_count) +
+               " unique dihedral types.  No action will be taken to change the " + action_str +
+               ".", "AtomGraph", "setCharmmImproperParameters");
+      }
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+  else {
+    if (set_stiffness) {
+      charmm_impr_stiffnesses.putHost(new_stiffness, parm_idx);
+      sp_charmm_impr_stiffnesses.putHost(new_stiffness, parm_idx);
+    }
+    if (set_phase_angle) {
+      charmm_impr_phase_angles.putHost(new_phase_angle, parm_idx);
+      sp_charmm_impr_phase_angles.putHost(new_phase_angle, parm_idx);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraph::setCharmmImprParameters(const double new_stiffness, const double new_phase_angle,
+                                        const bool set_stiffness, const bool set_phase_angle,
+                                        const char4 type_a, const char4 type_b, const char4 type_c,
+                                        const char4 type_d, const double periodicity,
+                                        const ExceptionResponse policy) {
+  const char4* atom_type_ptr = atom_types.data();
+  const int* cimp_i_atom_ptr = charmm_impr_i_atoms.data();
+  const int* cimp_j_atom_ptr = charmm_impr_j_atoms.data();
+  const int* cimp_k_atom_ptr = charmm_impr_k_atoms.data();
+  const int* cimp_l_atom_ptr = charmm_impr_l_atoms.data();
+  const int* atom_type_idx_ptr = lennard_jones_indices.data();
+  int cimp_parm_idx = -1;
+  for (int pos = 0; pos < charmm_impr_term_count; pos++) {
+    const int atom_i = cimp_i_atom_ptr[pos];
+    const int atom_j = cimp_j_atom_ptr[pos];
+    const int atom_k = cimp_k_atom_ptr[pos];
+    const int atom_l = cimp_l_atom_ptr[pos];
+    const int atyp_i = atom_type_idx_ptr[atom_i];
+    const int atyp_j = atom_type_idx_ptr[atom_j];
+    const int atyp_k = atom_type_idx_ptr[atom_k];
+    const int atyp_l = atom_type_idx_ptr[atom_l];
+    if (((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_j] == type_b &&
+          atom_type_ptr[atyp_k] == type_c && atom_type_ptr[atyp_l] == type_d) ||
+         (atom_type_ptr[atyp_l] == type_a && atom_type_ptr[atyp_k] == type_b &&
+          atom_type_ptr[atyp_j] == type_c && atom_type_ptr[atyp_i] == type_d))) {
+      cimp_parm_idx = charmm_impr_parameter_indices.readHost(pos);
+      break;
+    }
+  }
+  if (cimp_parm_idx < 0) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("No CHARMM improper dihedral between atom types " + char4ToString(type_a) + ", " +
+            char4ToString(type_b) + ", " + char4ToString(type_c) + ", and " +
+            char4ToString(type_d) + " was found in topology " + source + ".", "AtomGraph",
+            "setCharmmImprParameters");
+    case ExceptionResponse::WARN:
+      rtWarn("No CHARMM improper dihedral between atom types " + char4ToString(type_a) + ", " +
+             char4ToString(type_b) + ", " + char4ToString(type_c) + ", and " +
+             char4ToString(type_d) + " was found in topology " + source + ".  No action will be "
+             "taken.", "AtomGraph", "setCharmmImprParameters");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+
+  // Do not report the spurious parameter index if a warning about the types has already been
+  // issued.
+  setCharmmImprParameters(new_stiffness, new_phase_angle, set_stiffness, set_phase_angle,
+                          cimp_parm_idx,
+                          (policy == ExceptionResponse::WARN) ? ExceptionResponse::SILENT :
+                                                                policy); 
 }
 
 //-------------------------------------------------------------------------------------------------
