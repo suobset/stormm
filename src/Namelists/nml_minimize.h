@@ -33,7 +33,7 @@ public:
   ///        namelist to accept user input.
   ///
   /// \param tf          Input file translated into RAM
-  /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param start_line  Line of the input file to begin searching for the &minimize namelist
   /// \param found_nml   Indicator of whether namelist input was found
   /// \param policy_in   Requested error handling behavior
   /// \{
