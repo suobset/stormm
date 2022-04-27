@@ -487,6 +487,7 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
   t_nml.addKeyword(NamelistElement("rx0a", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("ry0a", NamelistType::REAL, "MISSING"));
   t_nml.addKeyword(NamelistElement("rz0a", NamelistType::REAL, "MISSING"));
+  t_nml.addKeyword(NamelistElement("system", NamelistType::STRING, "MISSING"));
   t_nml.addHelp("iat1", "The first atom in the restraint (this or mask_i is required)");
   t_nml.addHelp("iat2", "The second atom in the restraint (this or mask_j is required)");
   t_nml.addHelp("iat3", "The third atom in the restraint (optional, will convert a distance "
@@ -544,7 +545,12 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                 "positional restraint, given appropriate nstep values.");
   t_nml.addHelp("rz0a", "Final value of the Cartesian Z coordinate of the anchor point for a "
                 "positional restraint, given appropriate nstep values.");
-
+  t_nml.addHelp("system", "The system to which this restraint shall apply.  The value of this "
+                "keyword should match one of the labels given to a system with the -sys keyword "
+                "of the &files namelist, or use one of the reserved values 'all' or "
+                "'all_possible' (both case-insensitive) to apply the restraint to all systems, or "
+                "all systems meeting the atom requirements.");
+  
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
   *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());

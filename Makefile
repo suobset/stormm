@@ -19,6 +19,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/FileManagement/directory_util.cpp \
 		 $(SRCDIR)/FileManagement/file_listing.cpp \
 		 $(SRCDIR)/FileManagement/file_util.cpp \
+		 $(SRCDIR)/ForceField/forcefield_element.cpp \
 		 $(SRCDIR)/Math/matrix_ops.cpp \
 		 $(SRCDIR)/Math/rounding.cpp \
 		 $(SRCDIR)/Math/series_ops.cpp \
@@ -115,6 +116,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/FileManagement/directory_util.h \
 		   $(SRCDIR)/FileManagement/file_listing.h \
 		   $(SRCDIR)/FileManagement/file_util.h \
+		   $(SRCDIR)/ForceField/forcefield_element.h \
 		   $(SRCDIR)/Math/matrix.h \
 		   $(SRCDIR)/Math/matrix_ops.h \
 		   $(SRCDIR)/Math/rounding.h \
@@ -233,6 +235,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/FileManagement/directory_util.o \
 		$(SRCDIR)/FileManagement/file_listing.o \
 		$(SRCDIR)/FileManagement/file_util.o \
+		$(SRCDIR)/ForceField/forcefield_element.o \
 		$(SRCDIR)/Math/matrix_ops.o \
 		$(SRCDIR)/Math/rounding.o \
 	        $(SRCDIR)/Math/series_ops.o \

@@ -3,11 +3,15 @@
 #define OMNI_FORCEFIELD_ELEMENT_H
 
 #include <vector>
+#include "DataTypes/omni_vector_types.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "forcefield_enumerators.h"
 
 namespace omni {
 namespace modeling {
-  
+
+using topology::VirtualSiteKind;
+
 /// \brief A versatile object for collecting the parameters and scope of applicability of any
 ///        molecular mechanics force field term.  This relies on enumerations to inform whether
 ///        the term applies to atom types or atom and residue names and the nature of the term.
@@ -45,6 +49,9 @@ public:
   /// \{
   ForceFieldElement(ParameterKind kind_in = ParameterKind::NONE);
   
+  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, double prop_a_in,
+                    double prop_b_in = 0.0, double prop_c_in = 0.0);
+
   ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, double prop_a_in,
                     double prop_b_in = 0.0, double prop_c_in = 0.0);
 
@@ -55,27 +62,25 @@ public:
                     char4 atom_l_in, double prop_a_in, double prop_b_in = 0.0,
                     double prop_c_in = 0.0);
 
-  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 resi_i_in, double prop_a_in,
-                    double prop_b_in = 0.0, double prop_c_in = 0.0);
-
   ForceFieldElement(ParameterKind kind_in, VirtualSiteKind frame_type_in, char4 atom_i_in,
-                    char4 atom_j_in, char4 atom_k_in, char4 resi_i_in, char4 resi_j_in,
-                    char4 resi_k_in, double prop_a_in, double prop_b_in = 0.0,
+                    char4 atom_j_in, char4 atom_k_in, char4 residue_i_in, char4 residue_j_in,
+                    char4 residue_k_in, double prop_a_in, double prop_b_in = 0.0,
                     double prop_c_in = 0.0);
 
   ForceFieldElement(ParameterKind kind_in, VirtualSiteKind frame_type_in, char4 atom_i_in,
-                    char4 atom_j_in, char4 atom_k_in, char4 atom_l_in, char4 resi_i_in,
-                    char4 resi_j_in, char4 resi_k_in, char4 resi_l_in, double prop_a_in,
+                    char4 atom_j_in, char4 atom_k_in, char4 atom_l_in, char4 residue_i_in,
+                    char4 residue_j_in, char4 residue_k_in, char4 residue_l_in, double prop_a_in,
                     double prop_b_in = 0.0, double prop_c_in = 0.0);
 
   ForceFieldElement(ParameterKind kind_in, VirtualSiteKind frame_type_in, char4 atom_i_in,
                     char4 atom_j_in, char4 atom_k_in, char4 atom_l_in, char4 atom_m_in,
-                    char4 resi_i_in, char4 resi_j_in, char4 resi_k_in, char4 resi_l_in,
-                    char4 resi_m_in, double prop_a_in, double prop_b_in, double prop_c_in);
+                    char4 residue_i_in, char4 residue_j_in, char4 residue_k_in, char4 residue_l_in,
+                    char4 residue_m_in, double prop_a_in = 0.0, double prop_b_in = 0.0,
+                    double prop_c_in = 0.0);
 
   ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, char4 atom_k_in,
-                    char4 atom_l_in, char4 atom_m_in, char4 resi_i_in, char4 resi_j_in,
-                    char4 resi_k_in, char4 resi_l_in, char4 resi_m_in,
+                    char4 atom_l_in, char4 atom_m_in, char4 residue_i_in, char4 residue_j_in,
+                    char4 residue_k_in, char4 residue_l_in, char4 residue_m_in,
                     const std::vector<double> &surface_in);
   /// \}
 
@@ -144,7 +149,7 @@ public:
   double getStiffnessConstant() const;
 
   /// \brief Get the equilibrium constant of a bond, angle, or Urey-Bradley term.
-  double getStiffnessConstant() const;
+  double getEquilibriumConstant() const;
 
   /// \brief Get the amplitude of a cosine-based dihedral term.
   double getAmplitude() const;

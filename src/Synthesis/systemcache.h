@@ -340,6 +340,9 @@ private:
 
   /// Names of checkpoint files to write for each system
   std::vector<std::string> system_checkpoint_names;
+
+  /// Labels applied to each system (whether from user input or auto-generated)
+  std::vector<std::string> system_labels;
 };
   
 } // namespace synthesis

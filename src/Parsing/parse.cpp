@@ -291,8 +291,7 @@ bool strncmpCased(const std::string &sa, const char* sb, const CaseSensitivity c
                   const int length) {
   const int actual_length = (length < 0) ? sa.size() : length;
   if (length > static_cast<int>(sa.size())) {
-    rtErr("A string of length " + std::to_string(sa.size()) + " cannot be subjected to a "
-          "comparison of " + std::to_string(length) + " characters.", "strncmpCased");
+    return false;
   }
   return strncmpCased(sa.c_str(), sb, actual_length, csen);
 }
@@ -302,8 +301,7 @@ bool strncmpCased(const char* sa, const std::string &sb, const CaseSensitivity c
                   const int length) {
   const int actual_length = (length < 0) ? sb.size() : length;
   if (length > static_cast<int>(sb.size())) {
-    rtErr("A string of length " + std::to_string(sb.size()) + " cannot be subjected to a "
-          "comparison of " + std::to_string(length) + " characters.", "strncmpCased");
+    return false;
   }
   return strncmpCased(sa, sb.c_str(), actual_length, csen);
 }

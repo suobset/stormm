@@ -27,7 +27,8 @@ using omni::trajectory::detectCoordinateFileKind;
 SystemCache::SystemCache() :
     topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
     static_masks_cache{}, forward_masks_cache{}, topology_indices{}, example_indices{},
-    topology_cases{}, topology_case_bounds{}, system_trajectory_names{}, system_checkpoint_names{}
+    topology_cases{}, topology_case_bounds{}, system_trajectory_names{}, system_checkpoint_names{},
+    system_labels{}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -470,6 +471,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
         topology_indices.push_back(top_idx);
         system_trajectory_names.push_back(sysvec[i].getTrajectoryFileName());
         system_checkpoint_names.push_back(sysvec[i].getCheckpointFileName());
+        system_labels.push_back(sysvec[i].getLabel());
       }
     }
   }

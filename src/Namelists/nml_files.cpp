@@ -1,3 +1,4 @@
+#include "Constants/behavior.h"
 #include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"
 #include "Trajectory/trajectory_enumerators.h"
@@ -6,12 +7,15 @@
 namespace omni {
 namespace namelist {
 
+using constants::CaseSensitivity;
 using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
 using diskutil::listDirectory;
 using diskutil::listFilesInPath;
 using diskutil::SearchStyle;
 using parse::findStringInVector;
+using parse::strcmpCased;
+using parse::strncmpCased;
 using parse::WrapTextSearch;
 using trajectory::translateCoordinateFileKind;
 
@@ -366,8 +370,14 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
           break;
         }
       }
-    }
+    }  
     if (complete) {
+      if (strcmpCased(sys_label, "all", CaseSensitivity::NO) ||
+          strcmpCased(sys_label, "all_possible", CaseSensitivity::NO) ||
+          strncmpCased(sys_label, "pairedsystem", CaseSensitivity::NO, 12)) {
+        rtErr("The system built from topology " + top_name + " has a label '" + sys_label +
+              "', which collides with a reserved value for labelling systems.", "MoleculeSystem");
+      }
       systems.push_back(MoleculeSystem(top_name, crd_name, trj_name, rst_name, sys_label,
                                        t_nml.getIntValue("-sys", "frame_start", i),
                                        t_nml.getIntValue("-sys", "frame_end", i),
