@@ -33,15 +33,6 @@ using omni::trajectory::CoordinateSeries;
 using omni::trajectory::CoordinateSeriesWriter;
 
 //-------------------------------------------------------------------------------------------------
-double getLogOfPossibilities(const int ncases, const ChemicalFeatures &chemfe,
-                             const ConformerControls &conf_input) {
-  const int nrot_bond = std::min(chemfe.getRotatableBondCount(),
-                                 conf_input.getRotatableBondLimit());
-  const int nbond_rotations = conf_input.getRotationSampleCount();
-  
-}
-
-//-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
                                      StopWatch *tm) {
   const ConformerControls conf_input = ui.getConformerNamelistInfo();
@@ -162,10 +153,9 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
   }
   
   // Create lists of PhaseSpace objects and topology pointers to show how to model each of them
+  std::vector<PhaseSpace> ps_list; 
+  std::vector<AtomGraph*> ag_list;
 #if 0
-  std::vector<PhaseSpace> ps_list;
-  ps_list.reserve(nconformer);
-  std::vector<AtomGraph*> ag_list(nconformer);
   int conf_counter = 0;
   for (int i = 0; i < nsys; i++) {
     const int top_idx = sc.getTopologyIndex(i);
@@ -178,8 +168,8 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
       conf_counter++;
     }
   }
-  return PhaseSpaceSynthesis(ps_list, ag_list);
 #endif
+  return PhaseSpaceSynthesis(ps_list, ag_list);
 }
 
 } // namespace setup

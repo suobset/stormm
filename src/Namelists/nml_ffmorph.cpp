@@ -82,6 +82,7 @@ int FFMorphControls::getEditCount(const ParameterKind kind) const {
   case ParameterKind::NONE:
     rtErr("A valid parameter kind must be specified.", "FFMorphControls", "getEditCount");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

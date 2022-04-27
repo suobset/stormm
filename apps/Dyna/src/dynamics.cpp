@@ -43,6 +43,7 @@ int main(int argc, const char* argv[]) {
   // Perform minimizations as requested.
   const int system_count = sc.getSystemCount();
   const MinimizeControls mincon = ui.getMinimizeNamelistInfo();
+  const int mini_timings = timer.addCategory("Minimization");
   if (ui.getMinimizePresence()) {
     std::vector<ScoreCard> all_mme;
     all_mme.reserve(system_count);
@@ -57,6 +58,7 @@ int main(int argc, const char* argv[]) {
       case UnitCellType::NONE:
         all_mme.emplace_back(minimize(ps, sc.getSystemTopologyReference(i), ra,
                                       sc.getSystemStaticMaskReference(i), mincon));
+        timer.assignTime(mini_timings);
       case UnitCellType::ORTHORHOMBIC:
       case UnitCellType::TRICLINIC:
         break;
@@ -73,6 +75,7 @@ int main(int argc, const char* argv[]) {
   }
 
   // Collate the topologies in preparation to operate on the new coordinate population
+  timer.assignTime(0);
   timer.printResults();
   
   return 0;

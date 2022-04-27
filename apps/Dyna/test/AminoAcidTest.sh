@@ -35,8 +35,8 @@ cat > cgen.in << EOF
 &end
 
 &minimize
-  ncyc 10,
-  maxcyc 50,
+  ncyc 100,
+  maxcyc 500,
 &end
 EOF
 
@@ -44,4 +44,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-valgrind ${OMNI_HOME}/apps/bin/dynamics.omni -i cgen.in -warn
+${OMNI_HOME}/apps/bin/dynamics.omni -i cgen.in -warn

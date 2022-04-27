@@ -266,6 +266,7 @@ char4 ForceFieldElement::getNameOfAtom(const char atom_rank) const {
     rtErr("There is no valid atom " + std::to_string(atom_rank) + " named in a parameter of "
           "type \"" + getParameterKindName(kind) + "\".", "ForceFieldElement", "getNameOfAtom");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -356,6 +357,7 @@ char4 ForceFieldElement::getTypeOfAtom(const char atom_rank) const {
     rtErr("There is no valid atom " + std::to_string(atom_rank) + " named in a parameter of "
           "type \"" + getParameterKindName(kind) + "\".", "ForceFieldElement", "getTypeOfAtom");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -441,6 +443,7 @@ char4 ForceFieldElement::getNameOfResidue(const char atom_rank) const {
     rtErr("There is no valid atom " + std::to_string(atom_rank) + " named in a parameter of "
           "type \"" + getParameterKindName(kind) + "\".", "ForceFieldElement", "getNameOfResidue");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -462,6 +465,7 @@ double ForceFieldElement::getCharge() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no charge property.",
           "ForceFieldElement", "getCharge");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -483,6 +487,7 @@ double ForceFieldElement::getSigma() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no sigma property.",
           "ForceFieldElement", "getSigma");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -504,6 +509,7 @@ double ForceFieldElement::getEpsilon() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no epsilon property.",
           "ForceFieldElement", "getEpsilon");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -525,6 +531,7 @@ double ForceFieldElement::getRho() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no rho property.",
           "ForceFieldElement", "getRho");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -550,6 +557,7 @@ double ForceFieldElement::getStiffnessConstant() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no stiffness constant.",
           "ForceFieldElement", "getStiffnessConstant");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -571,6 +579,7 @@ double ForceFieldElement::getEquilibriumConstant() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no equilibrium "
           "constant.", "ForceFieldElement", "getEquilibriumConstant");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -592,6 +601,7 @@ double ForceFieldElement::getAmplitude() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no amplitude.",
           "ForceFieldElement", "getAmplitude");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -613,6 +623,7 @@ double ForceFieldElement::getPhaseAngle() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no phase angle.",
           "ForceFieldElement", "getPhaseAngle");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -634,6 +645,7 @@ double ForceFieldElement::getPeriodicity() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
           "ForceFieldElement", "getPeriodicity");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -655,6 +667,7 @@ double ForceFieldElement::getElectrostaticScaling() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no 1:4 scaling factor.",
           "ForceFieldElement", "getElectrostaticScaling");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -676,6 +689,7 @@ double ForceFieldElement::getVanDerWaalsScaling() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no 1:4 scaling factor.",
           "ForceFieldElement", "getVanDerWaalsScaling");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -697,6 +711,7 @@ std::vector<double> ForceFieldElement::getSurface() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
           "two-dimensional potential surface.", "ForceFieldElement", "getSurface");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -718,6 +733,7 @@ int ForceFieldElement::getSurfaceDimension() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
           "two-dimensional potential surface.", "ForceFieldElement", "getSurface");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -739,6 +755,7 @@ VirtualSiteKind ForceFieldElement::getVirtualSiteFrameType() const {
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
           "virtual site frame type.", "ForceFieldElement", "getVirtualSiteFrameType");
   }
+  __builtin_unreachable();
 }
 
 } // namespace modeling
