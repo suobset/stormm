@@ -88,62 +88,26 @@ public:
   ParameterKind getKind() const;
   
   /// \brief Get the atom name of the I atom in the term
-  char4 getNameOfAtomI() const;
-  
-  /// \brief Get the atom name of the J atom in the term
-  char4 getNameOfAtomJ() const;
-  
-  /// \brief Get the atom name of the K atom in the term
-  char4 getNameOfAtomK() const;
-  
-  /// \brief Get the atom name of the L atom in the term
-  char4 getNameOfAtomL() const;
-  
-  /// \brief Get the atom name of the M atom in the term
-  char4 getNameOfAtomM() const;
+  char4 getNameOfAtom(char atom_rank = 'I') const;
   
   /// \brief Get the atom type of atom I in the term
-  char4 getTypeOfAtomI() const;
-  
-  /// \brief Get the atom type of atom J in the term
-  char4 getTypeOfAtomJ() const;
-  
-  /// \brief Get the atom type of atom K in the term
-  char4 getTypeOfAtomK() const;
-  
-  /// \brief Get the atom type of atom L in the term
-  char4 getTypeOfAtomL() const;
-  
-  /// \brief Get the atom type of atom M in the term
-  char4 getTypeOfAtomM() const;
-  
+  char4 getTypeOfAtom(char atom_rank = 'I') const;
+    
   /// \brief Get the resiude name of atom I in the term
-  char4 getResidueOfAtomI() const;
+  char4 getNameOfResidue(char atom_rank = 'I') const;
 
-  /// \brief Get the residue name of atom J in the term
-  char4 getResidueOfAtomJ() const;
-
-  /// \brief Get the residue name of atom K in the term
-  char4 getResidueOfAtomK() const;
-
-  /// \brief Get the residue name of atom L in the term
-  char4 getResidueOfAtomL() const;
-
-  /// \brief Get the residue name of atom M in the term
-  char4 getResidueOfAtomM() const;
-  
   /// \brief Get the charge of an atom with a given atom name and residue nam
   double getCharge() const;
 
   /// \brief Get the Lennard-Jones sigma parameter of an atom
-  double getLennardJonesSigma() const;
+  double getSigma() const;
 
   /// \brief Get the Lennard-Jones epsilon parameter of an atom
-  double getLennardJonesEpsilon() const;
+  double getEpsilon() const;
 
   /// \brief Get the Lennard-Jones rho parameter of an atom (the third parameter, for 12-6-4
   ///        potentials)
-  double getLennardJonesRho() const;
+  double getRho() const;
 
   /// \brief Get the stiffness constant of a bond, angle, Urey-Bradley, or CHARMM improper term.
   double getStiffnessConstant() const;
@@ -160,9 +124,19 @@ public:
   /// \brief Get the periodicity of a cosine-based dihedral term
   double getPeriodicity() const;
 
+  /// \brief Get the electrostatic scaling factor for an attenuated 1:4 non-bonded interaction.
+  double getElectrostaticScaling() const;
+  
+  /// \brief Get the van-der Waals scaling factor for an attenuated 1:4 non-bonded interaction.
+  double getVanDerWaalsScaling() const;
+  
   /// \brief Get the surface associated with a CMAP term.
   std::vector<double> getSurface() const;
-
+  
+  /// \brief Get the dimension of a CMAP term's energy surface.  This property is inferred from the
+  ///        square root of the size of the input array.
+  int getSurfaceDimension() const;  
+  
   /// \brief Get the virtual site frame type
   VirtualSiteKind getVirtualSiteFrameType() const;
 
@@ -190,15 +164,16 @@ private:
                          ///<   virtual site frame's fourth atom
 
   // General-purpose real-values numbers for keeping this parameter's details
-  double prop_a;   ///< Charge, Lennard-Jones sigma, valence parameter stiffness or amplitude, or
-                   ///<   virtual site frame dimension 1
-  double prop_b;   ///< Lennard-Jones epsilon, valence parameter equilibrium or phase angle, or
-                   ///<   virtual site frame dimension 2
-  double prop_c;   ///< Lennard-Jones tertiary parameter (12-6-4 or Buckingham potential),
-                   ///<   dihedral periodicity, or virtual site frame dimension 3
+  double property_a;  ///< Charge, Lennard-Jones sigma, valence parameter stiffness or amplitude,
+                      ///<   or virtual site frame dimension 1
+  double property_b;  ///< Lennard-Jones epsilon, valence parameter equilibrium or phase angle, or
+                      ///<   virtual site frame dimension 2
+  double property_c;  ///< Lennard-Jones tertiary parameter (12-6-4 or Buckingham potential),
+                      ///<   dihedral periodicity, or virtual site frame dimension 3
 
   // Miscellaneous properties
   std::vector<double> surface;  ///< Surface values for an entire CMAP
+  int surface_dimension;        ///< Width and length of the square CMAP surface
   VirtualSiteKind frame_type;   ///< Frame type of the virtual site, if that is what this object
                                 ///<   contains.
 };

@@ -4,6 +4,7 @@
 
 #include "Constants/behavior.h"
 #include "ForceField/forcefield_element.h"
+#include "ForceField/forcefield_enumerators.h"
 #include "Parsing/textfile.h"
 #include "input.h"
 #include "namelist_emulator.h"
@@ -12,6 +13,7 @@ namespace omni {
 namespace namelist {
 
 using modeling::ForceFieldElement;
+using modeling::ParameterKind;
   
 /// \brief Object to encapsulate force field morphing operations.  Take information from an input
 ///        file or a series of setters and validate each piece of data as it appears with private
@@ -32,13 +34,24 @@ public:
                   ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
+  /// \brief Get the number of edits for a particular force field term.
+  ///
+  /// \param kind  The type of force field parameter edit of interest
+  int getEditCount(ParameterKind kind) const;
+
+  /// \brief Get a specific edit from within the namelist's holdings.
+  ///
+  /// \param kind   The type of force field parameter edit of interest
+  /// \param index  Index of the edit from the appropriate list
+  ForceFieldElement getModelEdit(ParameterKind kind, int index) const;
+
 private:
   ExceptionResponse policy;       ///< Set the behavior when bad inputs are encountered.  DIE =
                                   ///<   abort program, WARN = warn the user, and likely reset to
                                   ///<   the default value if one is available, SILENT = do not
                                   ///<   warn the user, but also likely reset to the default value
                                   ///<   if one is available.
-
+  
   /// Harmonic bond parameters
   std::vector<ForceFieldElement> harmonic_bonds;
 
@@ -59,16 +72,31 @@ private:
   /// CMAP bicubic spline surface terms
   std::vector<ForceFieldElement> cmap_surfaces;
 
-  /// Lennard-Jones parameters, or other van-der Waals approximations
-  std::vector<ForceFieldElement> van_der_waals_properties;
+  /// Attenuated 1:4 interaction scaling factor pairs
+  std::vector<ForceFieldElement> attn14_scalings;
 
   /// Charge parameters
   std::vector<ForceFieldElement> charge_properties;
+
+  /// Lennard-Jones parameters, or other van-der Waals approximations
+  std::vector<ForceFieldElement> van_der_waals_properties;
 
   /// Virtual site frames--the non-bonded properties of the virtual site are controlled by
   /// entries in van_der_waals_properties and charge_properties, respectively.
   std::vector<ForceFieldElement> virtual_sites;
 };
+
+/// \brief Produce a namelist for translating user input into lists of ForceFieldElement objects,
+///        which can then be applied to topologies to experiment with new parameter settings.
+///
+/// \param tf                Input text file to scan immediately after the namelist is created
+/// \param start_line        Line at which to begin scanning the input file for the namelist (this
+///                          will wrap back to the beginning of the file in search of a unique
+///                          &files namelist)
+/// \param found             Indicator that the namelist was detected in the input file (returned)
+/// \param policy            Reaction to exceptions encountered during namelist reading
+NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
+                              const ExceptionResponse policy);
   
 } // namespace namelist
 } // namespave omni

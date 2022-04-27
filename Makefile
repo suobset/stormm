@@ -20,6 +20,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/FileManagement/file_listing.cpp \
 		 $(SRCDIR)/FileManagement/file_util.cpp \
 		 $(SRCDIR)/ForceField/forcefield_element.cpp \
+		 $(SRCDIR)/ForceField/forcefield_enumerators.cpp \
 		 $(SRCDIR)/Math/matrix_ops.cpp \
 		 $(SRCDIR)/Math/rounding.cpp \
 		 $(SRCDIR)/Math/series_ops.cpp \
@@ -33,6 +34,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/namelist_emulator.cpp \
 	         $(SRCDIR)/Namelists/nml_conformer.cpp \
 	         $(SRCDIR)/Namelists/nml_dynamics.cpp \
+	         $(SRCDIR)/Namelists/nml_ffmorph.cpp \
 	         $(SRCDIR)/Namelists/nml_files.cpp \
 	         $(SRCDIR)/Namelists/nml_minimize.cpp \
 	         $(SRCDIR)/Namelists/nml_precision.cpp \
@@ -117,6 +119,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/FileManagement/file_listing.h \
 		   $(SRCDIR)/FileManagement/file_util.h \
 		   $(SRCDIR)/ForceField/forcefield_element.h \
+		   $(SRCDIR)/ForceField/forcefield_enumerators.h \
 		   $(SRCDIR)/Math/matrix.h \
 		   $(SRCDIR)/Math/matrix_ops.h \
 		   $(SRCDIR)/Math/rounding.h \
@@ -134,6 +137,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Namelists/namelist_enumerations.h \
 		   $(SRCDIR)/Namelists/nml_conformer.h \
 		   $(SRCDIR)/Namelists/nml_dynamics.h \
+		   $(SRCDIR)/Namelists/nml_ffmorph.h \
 		   $(SRCDIR)/Namelists/nml_files.h \
 		   $(SRCDIR)/Namelists/nml_minimize.h \
 		   $(SRCDIR)/Namelists/nml_precision.h \
@@ -236,6 +240,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/FileManagement/file_listing.o \
 		$(SRCDIR)/FileManagement/file_util.o \
 		$(SRCDIR)/ForceField/forcefield_element.o \
+		$(SRCDIR)/ForceField/forcefield_enumerators.o \
 		$(SRCDIR)/Math/matrix_ops.o \
 		$(SRCDIR)/Math/rounding.o \
 	        $(SRCDIR)/Math/series_ops.o \
@@ -249,6 +254,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
 	        $(SRCDIR)/Namelists/nml_conformer.o \
 	        $(SRCDIR)/Namelists/nml_dynamics.o \
+	        $(SRCDIR)/Namelists/nml_ffmorph.o \
 	        $(SRCDIR)/Namelists/nml_files.o \
 	        $(SRCDIR)/Namelists/nml_minimize.o \
 	        $(SRCDIR)/Namelists/nml_precision.o \
