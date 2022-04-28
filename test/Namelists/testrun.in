@@ -26,3 +26,12 @@ This should be a comment, but placed here to ensure that test outside of a namel
   igseed = 67108863    igstreams = 128
   igstride = 32        igwarmup = 63
 &end
+
+// Force field morphing
+&ffmorph
+  bond { -ti CX -tj C -k 100.0 -l0 1.25 }
+  bond { -ti CX -tj H1 }
+  angle { -ti CX -tj CT -tk OH -k 50.0 -theta0 109.5 }
+  dihedral { -ti CX -tj CT -tk OH -tl HO -amp 1.38 -phi 0.0 -n 2 }
+  dihedral { -ti CT -tj CX -tk OH -tl HO -amp 1.38 -phi 0.0 -n 2 }
+&end

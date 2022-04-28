@@ -1,6 +1,8 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/ForceField/forcefield_enumerators.h"
 #include "../../src/Namelists/input.h"
+#include "../../src/Namelists/nml_ffmorph.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Namelists/nml_minimize.h"
 #include "../../src/Namelists/nml_random.h"
@@ -17,6 +19,8 @@ using omni::diskutil::osSeparator;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::errors::rtWarn;
+using omni::modeling::ForceFieldElement;
+using omni::modeling::ParameterKind;
 using omni::parse::separateText;
 using omni::topology::AtomGraph;
 using omni::trajectory::CoordinateFrame;
@@ -102,17 +106,21 @@ int main(int argc, char* argv[]) {
   start_line = 0;
   RandomControls rngcon(tf, &start_line);
   check(rngcon.getRandomSeed(), RelationalOperator::EQUAL, 67108863, "The &random namelist did "
-        "not convey the correct random seed.");
+        "not convey the correct random seed.", do_tests);
   check(rngcon.getStreamCount(), RelationalOperator::EQUAL, 128, "The &random namelist did "
-        "not convey the correct stream count.");
+        "not convey the correct stream count.", do_tests);
   check(rngcon.getProductionStride(), RelationalOperator::EQUAL, 32, "The &random namelist did "
-        "not convey the correct production stride.");
+        "not convey the correct production stride.", do_tests);
   check(rngcon.getWarmupCycleCount(), RelationalOperator::EQUAL, 63, "The &random namelist did "
-        "not convey the correct warmup cycle count.");
+        "not convey the correct warmup cycle count.", do_tests);
   start_line = 0;
   SolventControls watcon(tf, &start_line);
 
-  
+  // The force field morphing namelist allows parameter modifications at run time
+  start_line = 0;
+  FFMorphControls ffmcon(tf, &start_line, &found_nml);
+  check(ffmcon.getEditCount(ParameterKind::BOND), RelationalOperator::EQUAL, 2, "The &ffmorph "
+        "namelist does not convey the expected number of bond parameter edits.", do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

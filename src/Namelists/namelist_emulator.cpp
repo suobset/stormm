@@ -410,11 +410,11 @@ int NamelistEmulator::assignElement(const std::string &key, const std::string &s
         switch(policy) {
         case ExceptionResponse::DIE:
           rtErr("In namelist \"" + title + "\", keyword \"" + key + "\", sub-key \"" +
-                sub_key + "\" accepts " + getNamelistTypeName(param_type) + " values.  " +
+                sub_key + "\" accepts " + getNamelistTypeName(subtype) + " values.  " +
                 value + " is invalid.", "NamelistEmulator", "assignElement");
         case ExceptionResponse::WARN:
           rtWarn("In namelist \"" + title + "\", keyword \"" + key + "\", sub-key \"" +
-                 sub_key + "\" accepts " + getNamelistTypeName(param_type) + " values.  " +
+                 sub_key + "\" accepts " + getNamelistTypeName(subtype) + " values.  " +
                  value + " is invalid and no new value will be assigned.", "NamelistEmulator",
                  "assignElement");
           return 0;

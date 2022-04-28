@@ -14,64 +14,47 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in) :
     atom_name_m{' ', ' ', ' ', ' '}, residue_name_i{' ', ' ', ' ', ' '},
     residue_name_j{' ', ' ', ' ', ' '}, residue_name_k{' ', ' ', ' ', ' '},
     residue_name_l{' ', ' ', ' ', ' '}, residue_name_m{' ', ' ', ' ', ' '}, property_a{0.0},
-    property_b{0.0}, property_c{0.0}, surface{}, surface_dimension{0},
-    frame_type{VirtualSiteKind::NONE}
+    property_b{0.0}, property_c{0.0}, activate_a{false}, activate_b{false}, activate_c{false},
+    surface{}, surface_dimension{0}, frame_type{VirtualSiteKind::NONE}
 {}
 
 //-------------------------------------------------------------------------------------------------
-ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 atom_i_in,
-                                     const double prop_a_in, const double prop_b_in,
-                                     const double prop_c_in) :
-  ForceFieldElement(kind_in)
+ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 atom_i_in) :
+    ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
 }
 
 //-------------------------------------------------------------------------------------------------
 ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 atom_i_in,
-                                     const char4 atom_j_in, const double prop_a_in,
-                                     const double prop_b_in, const double prop_c_in) :
-  ForceFieldElement(kind_in)
+                                     const char4 atom_j_in) :
+    ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
 }
 
 //-------------------------------------------------------------------------------------------------
 ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 atom_i_in,
-                                     const char4 atom_j_in, const char4 atom_k_in,
-                                     const double prop_a_in, const double prop_b_in,
-                                     const double prop_c_in) :
-  ForceFieldElement(kind_in)
+                                     const char4 atom_j_in, const char4 atom_k_in) :
+    ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
 }
 
 //-------------------------------------------------------------------------------------------------
 ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 atom_i_in,
                                      const char4 atom_j_in, const char4 atom_k_in,
-                                     const char4 atom_l_in, const double prop_a_in,
-                                     const double prop_b_in, const double prop_c_in) :
-  ForceFieldElement(kind_in)
+                                     const char4 atom_l_in, const TorsionKind tkind_in) :
+    ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
   atom_name_l = atom_l_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
+  torsion_kind = tkind_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -79,9 +62,8 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
                                      const VirtualSiteKind frame_type_in, const char4 atom_i_in,
                                      const char4 atom_j_in, const char4 atom_k_in,
                                      const char4 residue_i_in, const char4 residue_j_in,
-                                     const char4 residue_k_in, const double prop_a_in,
-                                     const double prop_b_in, const double prop_c_in) :
-  ForceFieldElement(kind_in)
+                                     const char4 residue_k_in) :
+    ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
@@ -89,9 +71,6 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
   residue_name_i = residue_i_in;
   residue_name_j = residue_j_in;
   residue_name_k = residue_k_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
   frame_type = frame_type_in;
 }
 
@@ -101,8 +80,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
                                      const char4 atom_j_in, const char4 atom_k_in,
                                      const char4 atom_l_in, const char4 residue_i_in,
                                      const char4 residue_j_in, const char4 residue_k_in,
-                                     const char4 residue_l_in, const double prop_a_in,
-                                     const double prop_b_in, const double prop_c_in) :
+                                     const char4 residue_l_in) :
   ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
@@ -113,9 +91,6 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
   residue_name_j = residue_j_in;
   residue_name_k = residue_k_in;
   residue_name_l = residue_l_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
   frame_type = frame_type_in;
 }
 
@@ -126,8 +101,7 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
                                      const char4 atom_l_in, const char4 atom_m_in,
                                      const char4 residue_i_in, const char4 residue_j_in,
                                      const char4 residue_k_in, const char4 residue_l_in,
-                                     const char4 residue_m_in, const double prop_a_in,
-                                     const double prop_b_in, const double prop_c_in) :
+                                     const char4 residue_m_in) :
   ForceFieldElement(kind_in)
 {
   atom_name_i = atom_i_in;
@@ -140,9 +114,6 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
   residue_name_k = residue_k_in;
   residue_name_l = residue_l_in;
   residue_name_m = residue_m_in;
-  property_a = prop_a_in;
-  property_b = prop_b_in;
-  property_c = prop_c_in;
   frame_type = frame_type_in;
 }
 
@@ -693,6 +664,28 @@ double ForceFieldElement::getVanDerWaalsScaling() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+TorsionKind ForceFieldElement::getTorsionKind() const {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+    return torsion_kind;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
+          "torsion kind associated with it.", "ForceFieldElement", "getTorsionKind");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<double> ForceFieldElement::getSurface() const {
   switch (kind) {
   case ParameterKind::CMAP:
@@ -756,6 +749,213 @@ VirtualSiteKind ForceFieldElement::getVirtualSiteFrameType() const {
           "virtual site frame type.", "ForceFieldElement", "getVirtualSiteFrameType");
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setStiffness(const double stiffness_in) {
+  switch (kind) {
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+    property_a = stiffness_in;
+    activate_a = true;
+    break;
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no stiffness property.",
+          "ForceFieldElement", "setStiffness");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setEquilibrium(const double equilibrium_in) {
+  switch (kind) {
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+    property_b = equilibrium_in;
+    activate_b = true;
+    break;
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no equilibrium "
+          "property.", "ForceFieldElement", "setEquilibrium");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setPhaseAngle(const double phase_angle_in) {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CHARMM_IMPROPER:
+    property_b = phase_angle_in;
+    activate_b = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no phase angle "
+          "property.", "ForceFieldElement", "setPhaseAngle");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setAmplitude(const double amplitude_in) {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+    property_a = amplitude_in;
+    activate_a = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no amplitude property.",
+          "ForceFieldElement", "setAmplitude");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setPeriodicity(const double periodicity_in) {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+    property_c = periodicity_in;
+    activate_c = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
+          "ForceFieldElement", "setPeriodicity");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setCharge(const double charge_in) {
+  switch (kind) {
+  case ParameterKind::CHARGE:
+    property_a = charge_in;
+    activate_a = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no charge property.",
+          "ForceFieldElement", "setCharge");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setSigma(const double sigma_in) {
+  switch (kind) {
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+    property_a = sigma_in;
+    activate_a = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no Sigma property.",
+          "ForceFieldElement", "setSigma");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setEpsilon(const double epsilon_in) {
+  switch (kind) {
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+    property_b = epsilon_in;
+    activate_b = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no Epsilon property.",
+          "ForceFieldElement", "setEpsilon");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setRho(const double rho_in) {
+  switch (kind) {
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+    property_c = rho_in;
+    activate_c = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no Rho property.",
+          "ForceFieldElement", "setRho");
+  }
 }
 
 } // namespace modeling

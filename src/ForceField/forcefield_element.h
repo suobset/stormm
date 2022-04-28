@@ -10,6 +10,7 @@
 namespace omni {
 namespace modeling {
 
+using topology::TorsionKind;
 using topology::VirtualSiteKind;
 
 /// \brief A versatile object for collecting the parameters and scope of applicability of any
@@ -38,45 +39,32 @@ public:
   /// \param resi_k_in      Name or type of residue K in the term
   /// \param resi_l_in      Name or type of residue L in the term
   /// \param resi_m_in      Name or type of residue M in the term
-  /// \param prop_a_in      Charge, Lennard-Jones sigma, valence parameter stiffness or amplitude,
-  ///                         or virtual site frame dimension 1
-  /// \param prop_b_in      Lennard-Jones epsilon, valence parameter equilibrium or phase angle, or
-  ///                         virtual site frame dimension 2
-  /// \param prop_c_in      Lennard-Jones tertiary parameter (12-6-4 or Buckingham potential),
-  ///                         dihedral periodicity, or virtual site frame dimension 3
   /// \param surface_in     Surface values for an entire CMAP
   /// \param frame_type_in  Frame type of the virtual site, if that is what this object contains
   /// \{
   ForceFieldElement(ParameterKind kind_in = ParameterKind::NONE);
   
-  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, double prop_a_in,
-                    double prop_b_in = 0.0, double prop_c_in = 0.0);
+  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in);
 
-  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, double prop_a_in,
-                    double prop_b_in = 0.0, double prop_c_in = 0.0);
+  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in);
 
-  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, char4 atom_k_in,
-                    double prop_a_in, double prop_b_in = 0.0, double prop_c_in = 0.0);
+  ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, char4 atom_k_in);
 
   ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, char4 atom_k_in,
-                    char4 atom_l_in, double prop_a_in, double prop_b_in = 0.0,
-                    double prop_c_in = 0.0);
+                    char4 atom_l_in, TorsionKind tkind_in = TorsionKind::PROPER);
 
   ForceFieldElement(ParameterKind kind_in, VirtualSiteKind frame_type_in, char4 atom_i_in,
                     char4 atom_j_in, char4 atom_k_in, char4 residue_i_in, char4 residue_j_in,
-                    char4 residue_k_in, double prop_a_in, double prop_b_in = 0.0,
-                    double prop_c_in = 0.0);
+                    char4 residue_k_in);
 
   ForceFieldElement(ParameterKind kind_in, VirtualSiteKind frame_type_in, char4 atom_i_in,
                     char4 atom_j_in, char4 atom_k_in, char4 atom_l_in, char4 residue_i_in,
-                    char4 residue_j_in, char4 residue_k_in, char4 residue_l_in, double prop_a_in,
-                    double prop_b_in = 0.0, double prop_c_in = 0.0);
+                    char4 residue_j_in, char4 residue_k_in, char4 residue_l_in);
 
   ForceFieldElement(ParameterKind kind_in, VirtualSiteKind frame_type_in, char4 atom_i_in,
                     char4 atom_j_in, char4 atom_k_in, char4 atom_l_in, char4 atom_m_in,
                     char4 residue_i_in, char4 residue_j_in, char4 residue_k_in, char4 residue_l_in,
-                    char4 residue_m_in, double prop_a_in = 0.0, double prop_b_in = 0.0,
-                    double prop_c_in = 0.0);
+                    char4 residue_m_in);
 
   ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, char4 atom_k_in,
                     char4 atom_l_in, char4 atom_m_in, char4 residue_i_in, char4 residue_j_in,
@@ -129,6 +117,10 @@ public:
   
   /// \brief Get the van-der Waals scaling factor for an attenuated 1:4 non-bonded interaction.
   double getVanDerWaalsScaling() const;
+
+  /// \brief Get the torsion kind, indicating whether these four atoms describe a proper or
+  ///        improper torsion interaction.
+  TorsionKind getTorsionKind() const;
   
   /// \brief Get the surface associated with a CMAP term.
   std::vector<double> getSurface() const;
@@ -140,6 +132,33 @@ public:
   /// \brief Get the virtual site frame type
   VirtualSiteKind getVirtualSiteFrameType() const;
 
+  /// \brief Set the stiffness property of one of the valence terms.
+  void setStiffness(double stiffness_in);
+
+  /// \brief Set the equilibrium property of one of the valence terms.
+  void setEquilibrium(double equilbrium_in);
+
+  /// \brief Set the phase angle property of one of the valence terms.
+  void setPhaseAngle(double phase_angle_in);
+
+  /// \brief Set the amplitude of a cosine-based dihedral term.
+  void setAmplitude(double amplitude_in);
+
+  /// \brief Set the periodicity of a cosine-based dihedral term.
+  void setPeriodicity(double periodicity_in);
+  
+  /// \brief Set the charge parameter of an atom.
+  void setCharge(double charge_in);
+
+  /// \brief Set the sigma parameter of an atom.
+  void setSigma(double sigma_in);
+  
+  /// \brief Set the epsilon parameter of an atom.
+  void setEpsilon(double epsilon_in);
+  
+  /// \brief Set the rho parameter of an atom.
+  void setRho(double rho_in);
+  
 private:
   ParameterKind kind;    ///< The type of parameter, i.e. BOND or VIRTUAL_SITE_FRAME
   char4 atom_name_i;     ///< Atom or atom type name for atom I of some valence term's arrangement,
@@ -163,15 +182,24 @@ private:
   char4 residue_name_m;  ///< Residue name for atom J of some valence term arrangement, or a 
                          ///<   virtual site frame's fourth atom
 
-  // General-purpose real-values numbers for keeping this parameter's details
+  // General-purpose real-values numbers for keeping this parameter's details.  The information in
+  // any of these parameters is optional in the namelist, but it may be necessary to specify at
+  // least one in order to alter anything about a parameter.  Each of these properties begins with
+  // its "activation" set to false, and the flag must be set, post-construction, in order to show
+  // that one of the properties was specified by the user.
   double property_a;  ///< Charge, Lennard-Jones sigma, valence parameter stiffness or amplitude,
                       ///<   or virtual site frame dimension 1
   double property_b;  ///< Lennard-Jones epsilon, valence parameter equilibrium or phase angle, or
                       ///<   virtual site frame dimension 2
   double property_c;  ///< Lennard-Jones tertiary parameter (12-6-4 or Buckingham potential),
                       ///<   dihedral periodicity, or virtual site frame dimension 3
-
+  bool activate_a;    ///< Indication that property_a is a quantity actively specified by the user
+  bool activate_b;    ///< Indication that property_b is a quantity actively specified by the user
+  bool activate_c;    ///< Indication that property_c is a quantity actively specified by the user
+  
+  
   // Miscellaneous properties
+  TorsionKind torsion_kind;     ///< Kind of torsion parameter this describes: PROPER or IMPROPER
   std::vector<double> surface;  ///< Surface values for an entire CMAP
   int surface_dimension;        ///< Width and length of the square CMAP surface
   VirtualSiteKind frame_type;   ///< Frame type of the virtual site, if that is what this object
