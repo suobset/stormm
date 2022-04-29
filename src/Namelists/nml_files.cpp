@@ -283,9 +283,7 @@ FilesControls::FilesControls(const TextFile &tf, int *start_line,
   };
   NamelistEmulator t_nml = filesInput(tf, start_line, sys_keyword_reqs, policy);
   const InputStatus stt_missing = InputStatus::MISSING;
-  const int nsys = t_nml.getKeywordEntries("-sys") *
-                   (t_nml.getKeywordStatus("-sys") != stt_missing);
-
+  const int nsys = t_nml.getKeywordEntries("-sys");
   for (int i = 0; i < nsys; i++) {
     bool complete = true;
     const std::string top_name = (t_nml.getKeywordStatus("-sys", "-p", i) != stt_missing) ?

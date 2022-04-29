@@ -12,29 +12,6 @@ namespace namelist {
 
 using constants::ExceptionResponse;
 
-/// \brief Enumerator to describe all types of namelist variables
-enum class NamelistType {
-  INTEGER, REAL, STRING, STRUCT
-};
-
-/// \brief Enumerate choices on whether to accept multiple values (this exists to make the code
-///        more legible and is otherwise translated into a boolean variable)
-enum class InputRepeats {
-  NO, YES
-};
-
-/// \brief Spell out the choice being made when supplying optional input to the various
-///        setDefault(...) methods.  A "YES" value will cause the entry_index counter to
-///        increment with each contributed default setting.
-enum class DefaultIsObligatory {
-  NO, YES
-};
-  
-/// \brief Enumerate the possible ways that input could have come in (or failed to be obtained)
-enum class InputStatus {
-  USER_SPECIFIED, DEFAULT, MISSING
-};
-
 /// \brief One keyword found in a namelist, ready to store the namelist variable moniker, the
 ///        type, and the value read from the input file.
 class NamelistElement {
@@ -333,11 +310,6 @@ private:
   // to search and access data
   friend struct NamelistEmulator;
 };
-
-/// \brief Return a string corresponding to the namelist data type enumerations.
-///
-/// \param param_type  The type of namelist keyword in question
-std::string getNamelistTypeName(NamelistType param_type);
 
 } // namespace namelist
 } // namespace omni

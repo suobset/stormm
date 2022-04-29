@@ -32,6 +32,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
 	         $(SRCDIR)/Namelists/namelist_element.cpp \
 	         $(SRCDIR)/Namelists/namelist_emulator.cpp \
+	         $(SRCDIR)/Namelists/namelist_enumerations.cpp \
 	         $(SRCDIR)/Namelists/nml_conformer.cpp \
 	         $(SRCDIR)/Namelists/nml_dynamics.cpp \
 	         $(SRCDIR)/Namelists/nml_ffmorph.cpp \
@@ -252,6 +253,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Namelists/input.o \
 	        $(SRCDIR)/Namelists/namelist_element.o \
 	        $(SRCDIR)/Namelists/namelist_emulator.o \
+	        $(SRCDIR)/Namelists/namelist_enumerations.o \
 	        $(SRCDIR)/Namelists/nml_conformer.o \
 	        $(SRCDIR)/Namelists/nml_dynamics.o \
 	        $(SRCDIR)/Namelists/nml_ffmorph.o \
@@ -381,7 +383,7 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
 CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \

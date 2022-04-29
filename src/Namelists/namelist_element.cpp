@@ -457,7 +457,14 @@ InputStatus NamelistElement::getEstablishment(const std::string &sub_key_query,
     // Need to use the sub-key names for the search, as the sub-key type is not known
     const size_t member_index = findStringInVector(sub_keys, sub_key_query);
     if (member_index < sub_keys.size()) {
-      return instance_establishment[(repeat_no * template_size) + member_index];
+      if (repeat_no < entry_count) {
+        return instance_establishment[(repeat_no * template_size) + member_index];
+      }
+      else {
+        rtErr("The sub-key \"" + sub_key_query + "\" has " + std::to_string(entry_count) +
+              " entries, not enough to serve a request for entry index " +
+              std::to_string(repeat_no) + ".", "NamelistElement", "getEstablishment");
+      }
     }
     else {
       rtErr("No sub-key named \"" + sub_key_query + "\" is associated with STRUCT keyword \"" +
@@ -763,25 +770,6 @@ void NamelistElement::resizeBuffer() {
     }
     break;
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-std::string getNamelistTypeName(const NamelistType param_type) {
-  switch (param_type) {
-  case NamelistType::INTEGER:
-    return std::string("INTEGER");
-    break;
-  case NamelistType::REAL:
-    return std::string("REAL");
-    break;
-  case NamelistType::STRING:
-    return std::string("STRING");
-    break;
-  case NamelistType::STRUCT:
-    return std::string("STRUCT");
-    break; 
-  }
-  __builtin_unreachable();
 }
 
 } // namespace namelist

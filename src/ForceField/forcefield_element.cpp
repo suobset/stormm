@@ -15,13 +15,30 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in) :
     residue_name_j{' ', ' ', ' ', ' '}, residue_name_k{' ', ' ', ' ', ' '},
     residue_name_l{' ', ' ', ' ', ' '}, residue_name_m{' ', ' ', ' ', ' '}, property_a{0.0},
     property_b{0.0}, property_c{0.0}, activate_a{false}, activate_b{false}, activate_c{false},
-    surface{}, surface_dimension{0}, frame_type{VirtualSiteKind::NONE}
+    surface{}, locations{}, frame_type{VirtualSiteKind::NONE}
 {}
 
 //-------------------------------------------------------------------------------------------------
 ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 atom_i_in) :
     ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::NONE:
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+    rtErr("Construction with only one atom type is not acceptable for a parameter of type \"" +
+          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
 }
 
@@ -30,6 +47,23 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
                                      const char4 atom_j_in) :
     ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::BOND:
+    break;
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("Construction with two atom types is not acceptable for a parameter of type \"" +
+          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
 }
@@ -39,6 +73,23 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
                                      const char4 atom_j_in, const char4 atom_k_in) :
     ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("Construction with three atom types is not acceptable for a parameter of type \"" +
+          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
@@ -50,6 +101,23 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
                                      const char4 atom_l_in, const TorsionKind tkind_in) :
     ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::ATTN_14_SCALE:
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CMAP:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("Construction with four atom types is not acceptable for a parameter of type \"" +
+          getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
@@ -65,6 +133,37 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
                                      const char4 residue_k_in) :
     ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+    switch (frame_type_in) {
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+      break;
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+    case VirtualSiteKind::FIXED_4:
+    case VirtualSiteKind::NONE:
+      rtErr("Construction with three atom and residue names does not properly specify a virtual "
+            "site of frame type " + getVirtualSiteFrameName(frame_type_in)+ ".",
+            "ForceFieldElement");
+    }
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::NONE:
+    rtErr("Construction with three atom and residue names is not acceptable for a parameter of "
+          "type \"" + getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
@@ -83,6 +182,37 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
                                      const char4 residue_l_in) :
   ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+    switch (frame_type_in) {
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      break;
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::FIXED_4:
+    case VirtualSiteKind::NONE:
+      rtErr("Construction with three atom and residue names does not properly specify a virtual "
+            "site of frame type " + getVirtualSiteFrameName(frame_type_in)+ ".",
+            "ForceFieldElement");
+    }
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::NONE:
+    rtErr("Construction with four atom and residue names is not acceptable for a parameter of "
+          "type \"" + getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
@@ -104,6 +234,38 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in,
                                      const char4 residue_m_in) :
   ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+    switch (frame_type_in) {
+    case VirtualSiteKind::FLEX_3:
+    case VirtualSiteKind::FIXED_3:
+    case VirtualSiteKind::FAD_3:
+    case VirtualSiteKind::OUT_3:
+      break;
+    case VirtualSiteKind::FLEX_2:
+    case VirtualSiteKind::FIXED_2:
+    case VirtualSiteKind::FIXED_4:
+    case VirtualSiteKind::NONE:
+      rtErr("Construction with five atom and residue names does not properly specify a virtual "
+            "site of frame type " + getVirtualSiteFrameName(frame_type_in)+ ".",
+            "ForceFieldElement");
+    }
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::NONE:
+    rtErr("Construction with five atom and residue names plus a virtual site frame type is not "
+          "acceptable for a parameter of type \"" + getParameterKindName(kind_in) + "\".",
+          "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
@@ -124,9 +286,27 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
                                      const char4 residue_i_in, const char4 residue_j_in,
                                      const char4 residue_k_in, const char4 residue_l_in,
                                      const char4 residue_m_in,
-                                     const std::vector<double> &surface_in) :
+                                     const std::vector<double> &surface_in,
+                                     const std::vector<int2> &locations_in) :
   ForceFieldElement(kind_in)
 {
+  switch (kind_in) {
+  case ParameterKind::CMAP:
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("Construction with five atom and residue names is not acceptable for a parameter of "
+          "type \"" + getParameterKindName(kind_in) + "\".", "ForceFieldElement");
+  }
   atom_name_i = atom_i_in;
   atom_name_j = atom_j_in;
   atom_name_k = atom_k_in;
@@ -139,13 +319,14 @@ ForceFieldElement::ForceFieldElement(const ParameterKind kind_in, const char4 at
   residue_name_m = residue_m_in;
   const size_t nsurf = surface_in.size();
   surface.resize(nsurf);
+  locations.resize(nsurf);
+  if (surface_in.size() != locations_in.size()) {
+    rtErr("The provided surface of " + std::to_string(nsurf) + " elements does not have phi / psi "
+          "indices for all points.", "ForceFieldElement");
+  }
   for (size_t i = 0; i < nsurf; i++) {
     surface[i] = surface_in[i];
-  }
-  surface_dimension = round(sqrt(static_cast<double>(nsurf))) + 0.0001;
-  if (surface_dimension * surface_dimension != nsurf) {
-    rtErr("The provided surface of " + std::to_string(nsurf) + " elements cannot be formed into a "
-          "square array.", "ForceFieldElement");
+    locations[i] = locations_in[i];
   }
 }
 
@@ -686,7 +867,7 @@ TorsionKind ForceFieldElement::getTorsionKind() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> ForceFieldElement::getSurface() const {
+std::vector<double> ForceFieldElement::getSurfaceValues() const {
   switch (kind) {
   case ParameterKind::CMAP:
     return surface;
@@ -701,17 +882,17 @@ std::vector<double> ForceFieldElement::getSurface() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
-          "two-dimensional potential surface.", "ForceFieldElement", "getSurface");
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have any "
+          "two-dimensional potential surface elements.", "ForceFieldElement", "getSurfaceValues");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-int ForceFieldElement::getSurfaceDimension() const {
+std::vector<int2> ForceFieldElement::getSurfaceIndices() const {
   switch (kind) {
   case ParameterKind::CMAP:
-    return surface_dimension;
+    return locations;
   case ParameterKind::BOND:
   case ParameterKind::ANGLE:
   case ParameterKind::DIHEDRAL:
@@ -723,8 +904,8 @@ int ForceFieldElement::getSurfaceDimension() const {
   case ParameterKind::BUCKINGHAM:
   case ParameterKind::VIRTUAL_SITE_FRAME:
   case ParameterKind::NONE:
-    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have a "
-          "two-dimensional potential surface.", "ForceFieldElement", "getSurface");
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" does not have any "
+          "two-dimensional potential surface elements.", "ForceFieldElement", "getSurface");
   }
   __builtin_unreachable();
 }
@@ -863,6 +1044,52 @@ void ForceFieldElement::setPeriodicity(const double periodicity_in) {
   case ParameterKind::NONE:
     rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
           "ForceFieldElement", "setPeriodicity");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setChargeScaling(const double scaling_in) {
+  switch (kind) {
+  case ParameterKind::ATTN_14_SCALE:
+    property_a = scaling_in;
+    activate_a = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no scaling factors.",
+          "ForceFieldElement", "setChargeScaling");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::setVanDerWaalsScaling(const double scaling_in) {
+  switch (kind) {
+  case ParameterKind::ATTN_14_SCALE:
+    property_b = scaling_in;
+    activate_b = true;
+    break;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no scaling factors.",
+          "ForceFieldElement", "setVanDerWaalsScaling");
   }
 }
 

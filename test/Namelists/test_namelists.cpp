@@ -44,7 +44,10 @@ int main(int argc, char* argv[]) {
 
   // Section 4
   section("Test the &solvent namelist");
-  
+
+  // Section 5
+  section("Test the &ffmorph namelist");
+
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
   // will be critical to the operation of any OMNI app
   section(1);
@@ -103,6 +106,7 @@ int main(int argc, char* argv[]) {
         "The &minimize namelist did not convey the correct convergence criterion.", do_tests);
 
   // The random number control namelist provides a number of useful options
+  section(3);
   start_line = 0;
   RandomControls rngcon(tf, &start_line);
   check(rngcon.getRandomSeed(), RelationalOperator::EQUAL, 67108863, "The &random namelist did "
@@ -117,10 +121,18 @@ int main(int argc, char* argv[]) {
   SolventControls watcon(tf, &start_line);
 
   // The force field morphing namelist allows parameter modifications at run time
+  section(5);
   start_line = 0;
   FFMorphControls ffmcon(tf, &start_line, &found_nml);
   check(ffmcon.getEditCount(ParameterKind::BOND), RelationalOperator::EQUAL, 2, "The &ffmorph "
         "namelist does not convey the expected number of bond parameter edits.", do_tests);
+  check(ffmcon.getEditCount(ParameterKind::ANGLE), RelationalOperator::EQUAL, 1, "The &ffmorph "
+        "namelist does not convey the expected number of angle parameter edits.", do_tests);
+  check(ffmcon.getEditCount(ParameterKind::DIHEDRAL), RelationalOperator::EQUAL, 3, "The &ffmorph "
+        "namelist does not convey the expected number of dihedral parameter edits.", do_tests);
+  check(ffmcon.getEditCount(ParameterKind::UREY_BRADLEY), RelationalOperator::EQUAL, 1,
+        "The &ffmorph namelist does not convey the expected number of Urey-bradley interaction "
+        "edits.", do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

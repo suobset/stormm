@@ -74,7 +74,16 @@ int NamelistEmulator::getKeywordEntries(const std::string &keyword_query) const 
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",
           "NamelistEmulator", "getKeywordEntries");
   }
-  return keywords[p_index].getEntryCount();
+  switch (keywords[p_index].kind) {
+  case NamelistType::INTEGER:
+  case NamelistType::REAL:
+  case NamelistType::STRING:
+    return keywords[p_index].getEntryCount();
+  case NamelistType::STRUCT:
+    return keywords[p_index].getEntryCount() *
+           (keywords[p_index].getEstablishment() != InputStatus::MISSING);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

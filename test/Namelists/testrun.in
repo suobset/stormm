@@ -30,8 +30,10 @@ This should be a comment, but placed here to ensure that test outside of a namel
 // Force field morphing
 &ffmorph
   bond { -ti CX -tj C -k 100.0 -l0 1.25 }
-  bond { -ti CX -tj H1 }
+  bond { -ti CX -tj H1 -k 78.0 -l0 1.01 }
   angle { -ti CX -tj CT -tk OH -k 50.0 -theta0 109.5 }
   dihedral { -ti CX -tj CT -tk OH -tl HO -amp 1.38 -phi 0.0 -n 2 }
-  dihedral { -ti CT -tj CX -tk OH -tl HO -amp 1.38 -phi 0.0 -n 2 }
+  dihedral { -ti H1 -tj CX -tk OH -tl HO -amp 2.07 -phi 0.0 -n 2 }
+  dihedral { -ti N  -tj CX -tk OH -tl HO -amp 1.00 -phi 0.0 -n 2 }
+  urey_bradley { -ti O2 -tj C -tk O2 -k 50.0 -l0 1.94 }
 &end

@@ -69,7 +69,7 @@ public:
   ForceFieldElement(ParameterKind kind_in, char4 atom_i_in, char4 atom_j_in, char4 atom_k_in,
                     char4 atom_l_in, char4 atom_m_in, char4 residue_i_in, char4 residue_j_in,
                     char4 residue_k_in, char4 residue_l_in, char4 residue_m_in,
-                    const std::vector<double> &surface_in);
+                    const std::vector<double> &surface_in, const std::vector<int2> &locations_in);
   /// \}
 
   /// \brief Get the force field parameter kind
@@ -122,12 +122,11 @@ public:
   ///        improper torsion interaction.
   TorsionKind getTorsionKind() const;
   
-  /// \brief Get the surface associated with a CMAP term.
-  std::vector<double> getSurface() const;
+  /// \brief Get the surface value edits associated with a CMAP term.
+  std::vector<double> getSurfaceValues() const;
   
-  /// \brief Get the dimension of a CMAP term's energy surface.  This property is inferred from the
-  ///        square root of the size of the input array.
-  int getSurfaceDimension() const;  
+  /// \brief Get the locations of point edits on a CMAP term's energy surface.
+  std::vector<int2> getSurfaceIndices() const;  
   
   /// \brief Get the virtual site frame type
   VirtualSiteKind getVirtualSiteFrameType() const;
@@ -146,7 +145,13 @@ public:
 
   /// \brief Set the periodicity of a cosine-based dihedral term.
   void setPeriodicity(double periodicity_in);
-  
+
+  /// \brief Set the electrostatic scaling factor for an attenuated 1:4 interaction.
+  void setChargeScaling(double scaling_in);
+
+  /// \brief Set the van-der Waals scaling factor for an attenuated 1:4 interaction.
+  void setVanDerWaalsScaling(double scaling_in);
+
   /// \brief Set the charge parameter of an atom.
   void setCharge(double charge_in);
 
@@ -200,8 +205,8 @@ private:
   
   // Miscellaneous properties
   TorsionKind torsion_kind;     ///< Kind of torsion parameter this describes: PROPER or IMPROPER
-  std::vector<double> surface;  ///< Surface values for an entire CMAP
-  int surface_dimension;        ///< Width and length of the square CMAP surface
+  std::vector<double> surface;  ///< Values for up to four selected points on a CMAP surface
+  std::vector<int2> locations;  ///< Location of up to four points on the CMAP surface
   VirtualSiteKind frame_type;   ///< Frame type of the virtual site, if that is what this object
                                 ///<   contains.
 };
