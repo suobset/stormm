@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/ForceField/forcefield_enumerators.h"
@@ -22,10 +25,53 @@ using omni::errors::rtWarn;
 using omni::modeling::ForceFieldElement;
 using omni::modeling::ParameterKind;
 using omni::parse::separateText;
+using omni::parse::strcmpCased;
+using omni::parse::TextOrigin;
 using omni::topology::AtomGraph;
 using omni::trajectory::CoordinateFrame;
 using namespace omni::namelist;
 using namespace omni::testing;
+
+//-------------------------------------------------------------------------------------------------
+// Test what should be bad namelist input and make sure that it throws.
+//
+// Arguments:
+//   nml_name:       Name of the namelist to test (i.e. &files)
+//   content:        Content of the erroneous namelist.  This function add the trailing &end card.
+//   error_message:  Error message to display if the content does NOT throw an exception.  This
+//                   function adds "in the (namelist name) namelist" to the end.
+//-------------------------------------------------------------------------------------------------
+void testBadNamelist(const std::string &nml_name, const std::string &content,
+                     const std::string &error_message) {
+  const std::string bad_idea = nml_name + " " + content + " &end";
+  const TextFile bad_input(bad_idea, TextOrigin::RAM);
+  int start_line = 0;
+  bool found_nml;
+
+  // Redirect stdout and record the number of test failures thus far.  This is to suppress Alert
+  // messages that occur leading up to an ultimate namelist failure, which is supposed to happen
+  // and thus should not call for any attention.
+  FILE fp_old = *stdout;
+  *stdout = *fopen("/dev/null", "w");
+  const int initial_failures = gbl_test_results.getFailureCount();
+  
+  // Run the test, which may send messages to stdout
+  if (strcmpCased(nml_name, "&ffmorph")) {
+    CHECK_THROWS(FFMorphControls t_ffmcon(bad_input, &start_line, &found_nml), error_message + 
+                 "in the " + nml_name + " namelist.");
+  }
+  else {
+    rtErr("The namelist " + nml_name + " does not pair with any known case.", "test_namelists");
+  }
+
+  // Reset stdout and reprint the error message if there was a new failure.
+  *stdout = fp_old;
+  if (gbl_test_results.getFailureCount() > initial_failures) {
+    const std::string parsed_msg = terminalFormat(error_message + "in the " + nml_name +
+                                                  " namelist.", "", "", 14, 0, 14);
+    printf("Check FAILED: %s\n", parsed_msg.c_str());
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
@@ -88,6 +134,7 @@ int main(int argc, char* argv[]) {
         "the &files namelist do not contain the expected, combined number of atoms.", do_tests);
 
   // The minimization namelist contains integer and real-valued numbers
+  std::string bad;
   section(2);
   start_line = 0;
   bool found_nml;
@@ -124,15 +171,25 @@ int main(int argc, char* argv[]) {
   section(5);
   start_line = 0;
   FFMorphControls ffmcon(tf, &start_line, &found_nml);
-  check(ffmcon.getEditCount(ParameterKind::BOND), RelationalOperator::EQUAL, 2, "The &ffmorph "
+  check(ffmcon.getEditCount(ParameterKind::BOND), RelationalOperator::EQUAL, 3, "The &ffmorph "
         "namelist does not convey the expected number of bond parameter edits.", do_tests);
-  check(ffmcon.getEditCount(ParameterKind::ANGLE), RelationalOperator::EQUAL, 1, "The &ffmorph "
+  check(ffmcon.getEditCount(ParameterKind::ANGLE), RelationalOperator::EQUAL, 2, "The &ffmorph "
         "namelist does not convey the expected number of angle parameter edits.", do_tests);
   check(ffmcon.getEditCount(ParameterKind::DIHEDRAL), RelationalOperator::EQUAL, 3, "The &ffmorph "
         "namelist does not convey the expected number of dihedral parameter edits.", do_tests);
   check(ffmcon.getEditCount(ParameterKind::UREY_BRADLEY), RelationalOperator::EQUAL, 1,
         "The &ffmorph namelist does not convey the expected number of Urey-bradley interaction "
         "edits.", do_tests);
+  testBadNamelist("&ffmorph", "bond { -ti CX -tj CT }", "An incomplete bond keyword entry was "
+                  "accepted");
+  testBadNamelist("&ffmorph", "bond { -ti CX -tj CT -blah }", "A bond keyword entry with a "
+                  "spurious subkey was accepted");
+  testBadNamelist("&ffmorph", "angle { -ti CX -tj CT -k 57.0 }", "An angle keyword entry with "
+                  "too few atom types was accepted");
+  testBadNamelist("&ffmorph", "angle { -ti CX -tk CT -theta0 107.8 }", "An angle keyword entry "
+                  "with too few atom types was accepted");
+  testBadNamelist("&ffmorph", "angle { -ti CX -tj CT -tk CT -theta0 107.8 }", "An angle keyword entry "
+                  "with too few atom types was accepted");
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -162,7 +162,7 @@ void CheckList::changeSection(const int section_index) {
 }
 
 //-------------------------------------------------------------------------------------------------
-int CheckList::getSectionIndex(const std::string &section_name) {
+int CheckList::getSectionIndex(const std::string &section_name) const {
   const int index = findStringInVector(sections, section_name);
   if (index < 0 || index >= static_cast<int>(sections.size())) {
     rtErr("There is no section " + section_name + ".", "CheckList", "getSectionIndex");
@@ -171,7 +171,7 @@ int CheckList::getSectionIndex(const std::string &section_name) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string CheckList::getSectionName(const int index) {
+std::string CheckList::getSectionName(const int index) const {
   if (index < 0 || index >= static_cast<int>(sections.size())) {
     rtErr("Index " + std::to_string(index) + " dos not exist (there are " +
           std::to_string(sections.size()) + " sections in all).", "CheckList", "getSectionName");
@@ -180,7 +180,56 @@ std::string CheckList::getSectionName(const int index) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void CheckList::printSummary(const TestVerbosity verbosity) {
+int CheckList::getCurrentSection() const {
+  return current_section;
+}
+
+//-------------------------------------------------------------------------------------------------
+int CheckList::getSuccessCount(const int section_index) const {
+  if (section_index == -1) {
+    return successes[current_section];
+  }
+  else {
+    return successes[section_index];
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int CheckList::getFailureCount(const int section_index) const {
+  if (section_index == -1) {
+    return failures[current_section];
+  }
+  else {
+    return failures[section_index];
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int CheckList::getSkipCount(const int section_index) const {
+  if (section_index == -1) {
+    return skips[current_section];
+  }
+  else {
+    return skips[section_index];
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int CheckList::getIgnoredFailureCount(const int section_index) const {
+  if (section_index == -1) {
+    return ignored_failures[current_section];
+  }
+  else {
+    return ignored_failures[section_index];
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void CheckList::printSummary(const TestVerbosity verbosity) const {
 
   // Pre-determine the number of sections containing actual tests
   const int n_section = sections.size(); 

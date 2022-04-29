@@ -40,17 +40,44 @@ public:
   /// \brief Get the index of a test section based on its name
   ///
   /// \param name  The name of the section of interest
-  int getSectionIndex(const std::string &section_name);
+  int getSectionIndex(const std::string &section_name) const;
 
   /// \brief Get the name of a test section based on its index
   ///
   /// \param index  The index of the section of interest
-  std::string getSectionName(const int section_index);
+  std::string getSectionName(const int section_index) const;
+
+  /// \brief Get the current section number
+  int getCurrentSection() const;
+
+  /// \brief Get the current number of successes in a particular section.  The default value of -1
+  ///        returns the count for the current section.
+  ///
+  /// \param section_index  Index of the section of interest
+  int getSuccessCount(int section_index = -1) const;
+
+  /// \brief Get the current number of failures in a particular section.  The default value of -1
+  ///        returns the count for the current section.
+  ///
+  /// \param section_index  Index of the section of interest
+  int getFailureCount(int section_index = -1) const;
+
+  /// \brief Get the current number of skipped tests in a particular section.  The default value
+  ///        of -1 returns the count for the current section.
+  ///
+  /// \param section_index  Index of the section of interest
+  int getSkipCount(int section_index = -1) const;
+
+  /// \brief Get the current number of ignored test failures in a particular section.  The default
+  ///        value of -1 returns the count for the current section.
+  ///
+  /// \param section_index  Index of the section of interest
+  int getIgnoredFailureCount(int section_index = -1) const;
 
   /// \brief Print a summary of test results from this checklist
   ///
   /// \param verbosity  The level of verboseness at which to report
-  void printSummary(TestVerbosity verbosity = TestVerbosity::COMPACT);
+  void printSummary(TestVerbosity verbosity = TestVerbosity::COMPACT) const;
 
 private:
   int current_section;                ///< Index of the current section, for which successes and
