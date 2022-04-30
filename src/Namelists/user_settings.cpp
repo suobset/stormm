@@ -26,10 +26,12 @@ using parse::WrapTextSearch;
 
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
-    policy{ExceptionResponse::DIE}, has_minimize_nml{false}, has_conformer_nml{false},
-    has_dynamics_nml{false}, has_random_nml{false}, has_solvent_nml{false},
+    policy{ExceptionResponse::DIE}, has_minimize_nml{false}, has_solvent_nml{false},
+    has_random_nml{false}, has_conformer_nml{false}, has_dynamics_nml{false},
+    has_ffmorph_nml{false}, 
     input_file{std::string(default_conformer_input_file)},
-    file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}
+    file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}, conf_input{}, dyna_input{},
+    ffmod_input{}
 {
   // Local variables to store command line arguments
   int cval_igseed = 0;
@@ -110,6 +112,8 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   conf_input = ConformerControls(inp_tf, &start_line, &has_conformer_nml, policy);
   start_line = 0;
   dyna_input = DynamicsControls(inp_tf, &start_line, &has_dynamics_nml, policy);
+  start_line = 0;
+  ffmod_input = FFMorphControls(inp_tf, &start_line, &has_ffmorph_nml, policy);
 
   // Check the validity of input namelists
   switch (prog_set) {
@@ -121,6 +125,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     }
     break;
   case AppName::DYNAMICS:
+  case AppName::FFREFINE:
     if (has_conformer_nml) {
       rtWarn("A &conformer namelist was detected in the input, but content will be ignored by "
              "this program.  The conformer.omni application will make use of such input.",

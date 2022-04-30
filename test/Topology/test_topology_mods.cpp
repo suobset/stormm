@@ -1,6 +1,10 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/ForceField/forcefield_element.h"
+#include "../../src/ForceField/forcefield_enumerators.h"
+#include "../../src/MolecularMechanics/minimization.h"
 #include "../../src/MolecularMechanics/mm_evaluation.h"
+#include "../../src/Namelists/nml_minimize.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/static_exclusionmask.h"
 #include "../../src/Reporting/error_format.h"
@@ -14,6 +18,9 @@ using namespace omni::diskutil;
 using namespace omni::energy;
 using namespace omni::errors;
 using namespace omni::mm;
+using namespace omni::modeling;
+using namespace omni::namelist;
+using namespace omni::parse;
 using namespace omni::topology;
 using namespace omni::trajectory;
 using namespace omni::testing;
@@ -98,26 +105,83 @@ int main(const int argc, const char* argv[]) {
   }
 
   // Evaluate energies with the canonical topologies
-  ScoreCard sc(system_count);
+  ScoreCard sc_orig(system_count);
+  MinimizeControls mincon;
+  mincon.setSteepestDescentCycles(25);
+  mincon.setTotalCycles(50);
   for (size_t i = 0; i < system_count; i++) {
-    evalNonbValeMM(&ps_list[i], &sc, ag_list[i], se_list[i], EvaluateForce::NO, i);
+    RestraintApparatus ra(&ag_list[i]);
+    ScoreCard min_sc = minimize(&ps_list[i], &ag_list[i], se_list[i], mincon, 30);
+    evalNonbValeMM(&ps_list[i], &sc_orig, ag_list[i], se_list[i], EvaluateForce::NO, i);
   }
-  const std::vector<double> bond_e0 = sc.reportInstantaneousStates(StateVariable::BOND);
-  const std::vector<double> angl_e0 = sc.reportInstantaneousStates(StateVariable::ANGLE);
-  const std::vector<double> dihe_e0 = sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
+  const std::vector<double> bond_e0 = sc_orig.reportInstantaneousStates(StateVariable::BOND);
+  const std::vector<double> angl_e0 = sc_orig.reportInstantaneousStates(StateVariable::ANGLE);
+  const std::vector<double> dihe_e0 =
+    sc_orig.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
   const std::vector<double> impr_e0 =
-    sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
+    sc_orig.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
 
-  
-  
   // CHECK
+#if 0
   printf("Energies = [\n");
   for (size_t i = 0; i < system_count; i++) {
     printf("  %9.4lf %9.4lf %9.4lf %9.4lf\n", bond_e0[i], angl_e0[i], dihe_e0[i], impr_e0[i]);
   }
+  for (size_t i = 0; i < system_count; i++) {
+    const ChemicalDetailsKit cdk = ag_list[i].getChemicalDetailsKit();
+    const ValenceKit<double> vk = ag_list[i].getDoublePrecisionValenceKit();
+    printf("%s :\n", getBaseName(ag_list[i].getFileName()).c_str());
+    for (int pos = 0; pos < vk.nbond; pos++) {
+      const int atomi = vk.bond_i_atoms[pos];
+      const int atomj = vk.bond_j_atoms[pos];
+      printf("  %4.4s %4.4s   %4d %4d   %4.4s %4.4s\n",
+             char4ToString(cdk.atom_names[atomi]).c_str(),
+             char4ToString(cdk.atom_names[atomj]).c_str(), atomi + 1, atomj + 1,
+             char4ToString(cdk.atom_types[atomi]).c_str(),
+             char4ToString(cdk.atom_types[atomj]).c_str());
+    }
+  }
   printf("];\n");
+#endif
   // END CHECK
   
+  ForceFieldElement ca_ha_bond(ParameterKind::BOND, stringToChar4("ca"), stringToChar4("ha"));
+  ForceFieldElement bl_bm_bond(ParameterKind::BOND, stringToChar4("bl"), stringToChar4("bm"));
+  ca_ha_bond.setStiffness(100.0);
+  ca_ha_bond.setEquilibrium(1.5);
+  bl_bm_bond.setStiffness(120.0);
+  bl_bm_bond.setEquilibrium(1.7);
+  std::vector<AtomGraph> ag_mods;
+  std::vector<PhaseSpace> ps_mods;
+  for (size_t i = 0; i < system_count; i++) {
+    ag_mods.emplace_back(ag_list[i]);
+    ps_mods.emplace_back(ps_list[i]);
+  }
+  ScoreCard sc_mods(system_count);
+  for (size_t i = 0; i < system_count; i++) {
+    ca_ha_bond.apply(&ag_mods[i]);
+    bl_bm_bond.apply(&ag_mods[i]);
+    RestraintApparatus ra(&ag_mods[i]);
+    ScoreCard min_sc = minimize(&ps_mods[i], &ag_mods[i], se_list[i], mincon, 30);
+    evalNonbValeMM(&ps_mods[i], &sc_mods, ag_mods[i], se_list[i], EvaluateForce::NO, i);
+  }
+  const std::vector<double> bond_em = sc_mods.reportInstantaneousStates(StateVariable::BOND);
+  const std::vector<double> angl_em= sc_mods.reportInstantaneousStates(StateVariable::ANGLE);
+  const std::vector<double> dihe_em =
+    sc_mods.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
+  const std::vector<double> impr_em =
+    sc_mods.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
+  
+  // CHECK
+#if 0
+  printf("Energies = [\n");
+  for (size_t i = 0; i < system_count; i++) {
+    printf("  %9.4lf %9.4lf %9.4lf %9.4lf\n", bond_em[i], angl_em[i], dihe_em[i], impr_em[i]);
+  }
+  printf("];\n");
+#endif
+  // END CHECK
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

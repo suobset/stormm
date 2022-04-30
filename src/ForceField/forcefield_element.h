@@ -3,13 +3,17 @@
 #define OMNI_FORCEFIELD_ELEMENT_H
 
 #include <vector>
+#include "Constants/behavior.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Topology/atomgraph.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "forcefield_enumerators.h"
 
 namespace omni {
 namespace modeling {
 
+using constants::ExceptionResponse;
+using topology::AtomGraph;
 using topology::TorsionKind;
 using topology::VirtualSiteKind;
 
@@ -187,6 +191,12 @@ public:
   
   /// \brief Set the rho parameter of an atom.
   void setRho(double rho_in);
+
+  /// \brief Apply these force field parameters to any terms found in a specific topology.
+  ///
+  /// \param ag      The topology to modify
+  /// \param policy  The way to respond if the topology has no such parameters
+  void apply(AtomGraph *ag, ExceptionResponse policy = ExceptionResponse::SILENT) const;
   
 private:
   ParameterKind kind;    ///< The type of parameter, i.e. BOND or VIRTUAL_SITE_FRAME

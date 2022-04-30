@@ -1369,5 +1369,34 @@ void ForceFieldElement::setRho(const double rho_in) {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+void ForceFieldElement::apply(AtomGraph *ag, const ExceptionResponse policy) const {
+  switch (kind) {
+  case ParameterKind::BOND:
+    ag->setBondParameters(property_a, property_b, activate_a, activate_b, atom_name_i,
+                          atom_name_j, policy);
+  case ParameterKind::ANGLE:
+    ag->setAngleParameters(property_a, property_b, activate_a, activate_b, atom_name_i,
+                           atom_name_j, atom_name_k, policy);
+  case ParameterKind::DIHEDRAL:
+    ag->setDihedralParameters(property_a, property_b, activate_a, activate_b, atom_name_i,
+                              atom_name_j, atom_name_k, atom_name_l, property_c, policy);
+  case ParameterKind::UREY_BRADLEY:
+    ag->setUreyBradleyParameters(property_a, property_b, activate_a, activate_b, atom_name_i,
+                                 atom_name_j, atom_name_k, policy);
+  case ParameterKind::CHARMM_IMPROPER:
+    ag->setCharmmImprParameters(property_a, property_b, activate_a, activate_b, atom_name_i,
+                                atom_name_j, atom_name_k, atom_name_l, policy);
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    break;
+  }
+}
+
 } // namespace modeling
 } // namespace omni

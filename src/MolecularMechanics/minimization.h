@@ -89,6 +89,7 @@ void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove
 ///     parameter abstracts
 ///   - Accept a modifiable PhaseSpace object or one of its abstracts along with the relevant
 ///     topology and restraint apparatus, or abstracts thereof
+///   - Call with or without a restraint apparatus
 ///
 /// \param xcrd            Cartesian X coordinates of all particles
 /// \param ycrd            Cartesian Y coordinates of all particles
@@ -125,6 +126,9 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
                    const StaticExclusionMask &se, const MinimizeControls &mincon,
                    int nrg_scale_bits = default_energy_scale_bits);
+
+ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask &se,
+                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 
 ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
                    const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,

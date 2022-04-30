@@ -376,7 +376,8 @@ OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
 
 # Applications using omni
 OMNI_APPS = $(APPDIR)/bin/conformer.omni \
-	    $(APPDIR)/bin/dynamics.omni
+	    $(APPDIR)/bin/dynamics.omni \
+	    $(APPDIR)/bin/ffrefine.omni
 
 # Compilation variables
 CC=g++
@@ -618,6 +619,12 @@ $(APPDIR)/bin/dynamics.omni : $(LIBDIR)/libomni.so $(APPDIR)/Dyna/src/dynamics.c
 	@echo "[OMNI]  Building dynamics.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/dynamics.omni \
 	  $(APPDIR)/Dyna/src/dynamics.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: Benchmarking split accumulation of valence bond and angle forces 
+$(APPDIR)/bin/ffrefine.omni : $(LIBDIR)/libomni.so $(APPDIR)/Ffrn/src/ffrefine.cpp
+	@echo "[OMNI]  Building ffrefine.omni..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/ffrefine.omni \
+	  $(APPDIR)/Ffrn/src/ffrefine.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 install : $(LIBDIR)/libomni.so
 

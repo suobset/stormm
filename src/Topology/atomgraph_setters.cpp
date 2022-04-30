@@ -166,7 +166,7 @@ void AtomGraph::setBondParameters(const double new_keq, const double new_leq, co
       break;
     }
   }
-
+  
   // Do not report the spurious parameter index if a warning about the types has already been
   // issued.
   setBondParameters(new_keq, new_leq, set_keq, set_leq, bond_parm_idx,
@@ -422,7 +422,7 @@ void AtomGraph::setUreyBradleyParameters(const double new_keq, const double new_
 void AtomGraph::setUreyBradleyParameters(const double new_keq, const double new_leq,
                                          const bool set_keq, const bool set_leq,
                                          const char4 type_a, const char4 type_b,
-                                         const ExceptionResponse policy) {
+                                         const char4 type_c, const ExceptionResponse policy) {
   const char4* atom_type_ptr = atom_types.data();
   const int* ubrd_i_atom_ptr = urey_bradley_i_atoms.data();
   const int* ubrd_k_atom_ptr = urey_bradley_k_atoms.data();
@@ -433,9 +433,25 @@ void AtomGraph::setUreyBradleyParameters(const double new_keq, const double new_
     const int atom_k = ubrd_k_atom_ptr[pos];
     const int atyp_i = atom_type_idx_ptr[atom_i];
     const int atyp_k = atom_type_idx_ptr[atom_k];
-    if ((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_k] == type_b) ||
-        (atom_type_ptr[atyp_k] == type_a && atom_type_ptr[atyp_i] == type_b)) {
-      ubrd_parm_idx = urey_bradley_parameter_indices.readHost(pos);
+    if ((atom_type_ptr[atyp_i] == type_a && atom_type_ptr[atyp_k] == type_c) ||
+        (atom_type_ptr[atyp_k] == type_a && atom_type_ptr[atyp_i] == type_c)) {
+
+      // Check that the central atom between atoms I and K has the correct type
+      const int atom_i_llim = nb12_exclusion_bounds.readHost(atom_i);
+      const int atom_i_hlim = nb12_exclusion_bounds.readHost(atom_i + 1);
+      bool atyp_j_match = false;
+      for (int i = atom_i_llim; i < atom_i_hlim; i++) {
+        const int atom_j = nb12_exclusion_list.readHost(i);
+        const int atom_j_llim = nb12_exclusion_bounds.readHost(atom_j);
+        const int atom_j_hlim = nb12_exclusion_bounds.readHost(atom_j + 1);
+        for (int j = atom_j_llim; j < atom_j_hlim; j++) {
+          atyp_j_match = (atyp_j_match || (nb12_exclusion_list.readHost(j) == atom_k &&
+                                           atom_type_ptr[atom_type_idx_ptr[atom_j]] == type_b));
+        }
+      }
+      if (atyp_j_match) {
+        ubrd_parm_idx = urey_bradley_parameter_indices.readHost(pos);
+      }
       break;
     }
   }
@@ -511,8 +527,7 @@ void AtomGraph::setCharmmImprParameters(const double new_stiffness, const double
 void AtomGraph::setCharmmImprParameters(const double new_stiffness, const double new_phase_angle,
                                         const bool set_stiffness, const bool set_phase_angle,
                                         const char4 type_a, const char4 type_b, const char4 type_c,
-                                        const char4 type_d, const double periodicity,
-                                        const ExceptionResponse policy) {
+                                        const char4 type_d, const ExceptionResponse policy) {
   const char4* atom_type_ptr = atom_types.data();
   const int* cimp_i_atom_ptr = charmm_impr_i_atoms.data();
   const int* cimp_j_atom_ptr = charmm_impr_j_atoms.data();

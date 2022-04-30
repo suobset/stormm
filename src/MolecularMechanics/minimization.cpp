@@ -207,6 +207,19 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus
 }
 
 //-------------------------------------------------------------------------------------------------
+ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMask &se,
+                   const MinimizeControls &mincon, const int nrg_scale_bits) {
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
+  const VirtualSiteKit<double> vsk = ag->getDoublePrecisionVirtualSiteKit();
+  const RestraintApparatus ra(ag);
+  PhaseSpaceWriter psw = ps->data();
+  return minimize(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc, psw.zfrc, psw.xvel, psw.yvel,
+                  psw.zvel, psw.xprv, psw.yprv, psw.zprv, vk, nbk, ra.dpData(), vsk, se.data(),
+                  mincon, nrg_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
 ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
                    const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
                    const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,

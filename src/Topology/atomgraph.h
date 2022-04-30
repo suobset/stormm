@@ -957,10 +957,10 @@ public:
   ///                  found in the topology
   /// \{
   void setBondParameters(double new_keq, double new_leq, bool set_keq, bool set_leq, int parm_idx,
-                         ExceptionResponse policy);
+                         ExceptionResponse policy = ExceptionResponse::SILENT);
 
   void setBondParameters(double new_keq, double new_leq, bool set_keq, bool set_leq, char4 type_a,
-                         char4 type_b, ExceptionResponse policy);
+                         char4 type_b, ExceptionResponse policy = ExceptionResponse::SILENT);
   /// \}
 
   /// \brief Alter the parameters for an angle parameter set.  This will alter the parameters in
@@ -987,10 +987,11 @@ public:
   ///                  found in the topology
   /// \{
   void setAngleParameters(double new_keq, double new_teq, bool set_keq, bool set_teq, int parm_idx,
-                          ExceptionResponse policy);
+                          ExceptionResponse policy = ExceptionResponse::SILENT);
 
   void setAngleParameters(double new_keq, double new_teq, bool set_keq, bool set_teq, char4 type_a,
-                          char4 type_b, char4 type_c, ExceptionResponse policy);
+                          char4 type_b, char4 type_c,
+                          ExceptionResponse policy = ExceptionResponse::SILENT);
   /// \}
 
   /// \brief Alter the parameters for a cosine-based dihedral angle parameter set.  This will alter
@@ -1021,11 +1022,13 @@ public:
   ///                         and periodicity is not found in the topology
   /// \{
   void setDihedralParameters(double new_amplitude, double new_phase_angle, bool set_amplitude,
-                             bool set_phase_angle, int parm_idx, ExceptionResponse policy);
+                             bool set_phase_angle, int parm_idx,
+                             ExceptionResponse policy = ExceptionResponse::SILENT);
 
   void setDihedralParameters(double new_amplitude, double new_phase_angle, bool set_amplitude,
                              bool set_phase_angle, char4 type_a, char4 type_b, char4 type_c,
-                             char4 type_d, double periodicity, ExceptionResponse policy);
+                             char4 type_d, double periodicity,
+                             ExceptionResponse policy = ExceptionResponse::SILENT);
   /// \}
 
   /// \brief Alter the parameters for a Urey-Bradley parameter set.
@@ -1048,10 +1051,12 @@ public:
   ///                  not found in the topology  
   /// \{
   void setUreyBradleyParameters(double new_keq, double new_leq, bool set_keq, bool set_leq,
-                                int parm_idx, ExceptionResponse policy);
+                                int parm_idx,
+                                ExceptionResponse policy = ExceptionResponse::SILENT);
 
   void setUreyBradleyParameters(double new_keq, double new_leq, bool set_keq, bool set_leq,
-                                char4 type_a, char4 type_b, ExceptionResponse policy);
+                                char4 type_a, char4 type_b, char4 type_c,
+                                ExceptionResponse policy = ExceptionResponse::SILENT);
   /// \}
 
   /// \brief Alter the characteristics of a CHARMM improper dihedral parameter set.
@@ -1077,11 +1082,12 @@ public:
   ///                         index or atom types and periodicity is not found in the topology 
   /// \{
   void setCharmmImprParameters(double new_stiffness, double new_phase_angle, bool set_stiffness,
-                               bool set_phase_angle, int parm_idx, ExceptionResponse policy);
+                               bool set_phase_angle, int parm_idx,
+                               ExceptionResponse policy = ExceptionResponse::SILENT);
 
   void setCharmmImprParameters(double new_stiffness, double new_phase_angle, bool set_stiffness,
                                bool set_phase_angle, char4 type_a, char4 type_b, char4 type_c,
-                               char4 type_d, double periodicity, ExceptionResponse policy);
+                               char4 type_d, ExceptionResponse policy = ExceptionResponse::SILENT);
   /// \}
 
   

@@ -4,6 +4,7 @@
 
 #include "Constants/behavior.h"
 #include "Namelists/nml_dynamics.h"
+#include "Namelists/nml_ffmorph.h"
 #include "Namelists/nml_files.h"
 #include "Namelists/nml_minimize.h"
 #include "Namelists/nml_random.h"
@@ -20,6 +21,7 @@ namespace namelist {
 
 using constants::ExceptionResponse;
 using namelist::DynamicsControls;
+using namelist::FFMorphControls;
 using namelist::FilesControls;
 using namelist::MinimizeControls;
 using namelist::RandomControls;
@@ -41,7 +43,8 @@ constexpr char default_conformer_input_file[] = "cgen.in";
 ///        to tune the behavior in response to particular inputs.
 enum class AppName {
   CONFORMER,  ///< The OMNI conformer generator
-  DYNAMICS    ///< The OMNI molecular dynamics program
+  DYNAMICS,   ///< The OMNI molecular dynamics program
+  FFREFINE    ///< The OMNI force field refinement tool
 };
   
 /// \brief Object to hold general user input data, including file names or regular expressions for
@@ -86,10 +89,11 @@ private:
 
   ExceptionResponse policy;   /// Action in the event of bad input
   bool has_minimize_nml;      /// Indicate the presence of a &minimize namelist in the input file
+  bool has_solvent_nml;       /// Indicate the presence of a &solvent namelist in the input file
+  bool has_random_nml;        /// Indicate the presence of a &random namelist in the input file
   bool has_conformer_nml;     /// Indicate the presence of a &conformer namelist in the input file
   bool has_dynamics_nml;      /// Indicate the presence of a &dynamics namelist in the input file
-  bool has_random_nml;        /// Indicate the presence of a &random namelist in the input file
-  bool has_solvent_nml;       /// Indicate the presence of a &solvent namelist in the input file
+  bool has_ffmorph_nml;       /// Indicate the presence of an &ffmorph namelist in the input file
   
   /// Name of the original input file
   std::string input_file;
@@ -101,6 +105,7 @@ private:
   RandomControls prng_input;        ///< Random number generator specifications
   ConformerControls conf_input;     ///< Conformer generation instructions
   DynamicsControls dyna_input;      ///< Molecular dynamics instructions
+  FFMorphControls ffmod_input;      ///< Force field modification instructions
 };
 
 } // namespace namelist
