@@ -29,7 +29,7 @@ using omni::trajectory::PhaseSpace;
 using namespace omni::chemistry;
 using namespace omni::testing;
 
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);

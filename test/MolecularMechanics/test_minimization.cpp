@@ -53,7 +53,7 @@ void testLocalMinimum(PhaseSpace *ps, const AtomGraph &ag, const RestraintAppara
   std::vector<int> local_minimum(3 * cdk.natom, 1);
   const double test_displacement = 0.0005;
   ScoreCard lsc(1);
-  evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+  evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
   const double e0 = lsc.reportTotalEnergy();
   for (int i = 0; i < cdk.natom; i++) {
 
@@ -65,33 +65,33 @@ void testLocalMinimum(PhaseSpace *ps, const AtomGraph &ag, const RestraintAppara
     // Perturb the system along the X direction
     psw.xcrd[i] += test_displacement;
     placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, vsk);    
-    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
     const double epx = lsc.reportTotalEnergy();
     psw.xcrd[i] -= 2.0 * test_displacement;
     placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, vsk);    
-    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
     const double enx = lsc.reportTotalEnergy();
     psw.xcrd[i] += test_displacement;
 
     // Perturb the system along the Y direction
     psw.ycrd[i] += test_displacement;
     placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, vsk);    
-    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
     const double epy = lsc.reportTotalEnergy();
     psw.ycrd[i] -= 2.0 * test_displacement;
     placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, vsk);    
-    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
     const double eny = lsc.reportTotalEnergy();
     psw.ycrd[i] += test_displacement;
 
     // Perturb the system along the Z direction
     psw.zcrd[i] += test_displacement;
     placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, vsk);    
-    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
     const double epz = lsc.reportTotalEnergy();
     psw.zcrd[i] -= 2.0 * test_displacement;
     placeVirtualSites(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, vsk);    
-    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, final_step_no);
+    evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
     const double enz = lsc.reportTotalEnergy();
     psw.zcrd[i] += test_displacement;
 
@@ -106,7 +106,7 @@ void testLocalMinimum(PhaseSpace *ps, const AtomGraph &ag, const RestraintAppara
 }
 
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv, TmpdirStatus::REQUIRED);

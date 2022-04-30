@@ -105,7 +105,7 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
       zfrc[i] = 0.0;
     }
     evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
-                       &sc, vk, nbk, ser, rar, EvaluateForce::YES, step);
+                       &sc, vk, nbk, ser, rar, EvaluateForce::YES, 0, step);
     transmitVirtualSiteForces<double, double>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                               UnitCellType::NONE, vsk);
     evec[0] = sc.reportTotalEnergy();
@@ -121,7 +121,7 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
       moveParticles(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr, UnitCellType::NONE,
                     vsk, vk.natom, move_scale);
       evalNonbValeRestMM(xcrd, ycrd, zcrd, nullptr, nullptr, UnitCellType::NONE, xfrc, yfrc, zfrc,
-                         &sc_temp, vk, nbk, ser, rar, EvaluateForce::NO, step);
+                         &sc_temp, vk, nbk, ser, rar, EvaluateForce::NO, 0, step);
       evec[i + 1] = sc_temp.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {

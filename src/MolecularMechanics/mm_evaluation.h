@@ -39,35 +39,38 @@ using trajectory::PhaseSpaceWriter;
 ///     to the required parameters
 ///   - Take a PhaseSpace object and the relevant topology, or abstracts thereof
 ///
-/// \param xcrd        Cartesian X positions of all particles
-/// \param ycrd        Cartesian Y positions of all particles
-/// \param zcrd        Cartesian Z positions of all particles
-/// \param umat        Transformation matrix taking coordinates into fractional (unit cell) space
-/// \param invu        Transformation matrix to take fractional coordinates back into real space
-/// \param unit_cell   The type of simulation cell, to guide re-imaging considerations
-/// \param xfrc        Forces acting on all particles in the Cartesian X direction (accumulated
-///                    and returned)
-/// \param yfrc        Forces acting on all particles in the Cartesian Y direction
-/// \param zfrc        Forces acting on all particles in the Cartesian Z direction
-/// \param ps          PhaseSpace object with all coordinates, box information, and forces
-/// \param psw         PhaseSpace object abstract with coordinates, box information, and forces
-/// \param sc          Object to hold the resulting energies (also keeps running sums)
-/// \param vk          Valence parameters abstract from the original topology
-/// \param nbk         Non-bonded parameter abstract from the original topology
-/// \param ag          System topology from which relevant parameter abstracts can be obtained
-/// \param eval_force  Directive to have forces evaluated or not
+/// \param xcrd          Cartesian X positions of all particles
+/// \param ycrd          Cartesian Y positions of all particles
+/// \param zcrd          Cartesian Z positions of all particles
+/// \param umat          Transformation matrix taking coordinates into fractional (unit cell) space
+/// \param invu          Transformation matrix to take fractional coordinates back into real space
+/// \param unit_cell     The type of simulation cell, to guide re-imaging considerations
+/// \param xfrc          Forces acting on all particles in the Cartesian X direction (accumulated
+///                      and returned)
+/// \param yfrc          Forces acting on all particles in the Cartesian Y direction
+/// \param zfrc          Forces acting on all particles in the Cartesian Z direction
+/// \param ps            PhaseSpace object with all coordinates, box information, and forces
+/// \param psw           PhaseSpace object abstract with coordinates, box information, and forces
+/// \param sc            Object to hold the resulting energies (also keeps running sums)
+/// \param vk            Valence parameters abstract from the original topology
+/// \param nbk           Non-bonded parameter abstract from the original topology
+/// \param ag            System topology from which relevant parameter abstracts can be obtained
+/// \param eval_force    Directive to have forces evaluated or not
+/// \param system_index  Index of the system within the score card
 /// \{
 void evalValeMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
                 UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc, ScoreCard *sc,
                 const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                EvaluateForce eval_force);
+                EvaluateForce eval_force, int system_index = 0);
 
 void evalValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
-                const NonbondedKit<double> &nbk, EvaluateForce eval_force);
+                const NonbondedKit<double> &nbk, EvaluateForce eval_force, int system_index = 0);
 
-void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag, EvaluateForce eval_force);
+void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag, EvaluateForce eval_force,
+                int system_index = 0);
 
-void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForce eval_force);
+void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForce eval_force,
+                int system_index = 0);
 /// \}
 
 /// \brief Evaluate molecular mechanics energies and forces due to valence interactions and
@@ -90,23 +93,54 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForc
 void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
                     UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                     ScoreCard *sc, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                    const RestraintApparatusDpReader &rar, EvaluateForce eval_force, int step);
+                    const RestraintApparatusDpReader &rar, EvaluateForce eval_force,
+                    int system_index = 0, int step = 0);
 
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
-                    EvaluateForce eval_force, int step);
+                    EvaluateForce eval_force, int system_index = 0, int step = 0);
 
 void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
-                    const RestraintApparatus &ra, EvaluateForce eval_force, int step);
+                    const RestraintApparatus &ra, EvaluateForce eval_force, int system_index = 0,
+                    int step = 0);
 
 void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
-                    const RestraintApparatus &ra, EvaluateForce eval_force, int step);
+                    const RestraintApparatus &ra, EvaluateForce eval_force, int system_index = 0,
+                    int step = 0);
+/// \}
+  
+/// \brief Evaluate the molecular mechanics energies and forces due to valence and non-bonded
+///        pair interactions.  Energy results are collected in fixed precision in the ScoreCard
+///        object fed to this routine.
+///
+/// Overloaded:
+///   - Take raw pointers to coordinates, box transformations, and forces, along with abstracts
+///     to the required parameters
+///   - Take a PhaseSpace object and the relevant topology plus restraint collection, or abstracts
+///     thereof
+///
+/// Descriptions of input variables follow from evalValeMM() and evalValeRestMM() above.
+/// \{
+void evalNonbValeMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
+                    UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                    ScoreCard *sc, const ValenceKit<double> &vk,
+                    const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
+                    EvaluateForce eval_force, int system_index = 0);
+
+void evalNonbValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
+                    const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
+                    EvaluateForce eval_force, int system_index = 0);
+
+void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
+                    const StaticExclusionMask &se, EvaluateForce eval_force, int system_index = 0);
+
+void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
+                    const StaticExclusionMask &se, EvaluateForce eval_force, int system_index = 0);
 /// \}
   
 /// \brief Evaluate molecular mechanics energies and forces due to valence interactions, NMR
 ///        restraints, and non-bonded interactions in a single system.  Energy results are
-///        collected in fixed precision in the ScoreCard object fed to this routine.  Descriptions
-///        of input variables follow from evalValeMM() and evalValeRestMM() above.
+///        collected in fixed precision in the ScoreCard object fed to this routine.
 ///
 /// Overloaded:
 ///   - Take raw pointers to coordinates, box transformations, and forces, along with abstracts
@@ -124,19 +158,21 @@ void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, 
                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                         ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintApparatusDpReader &rar, EvaluateForce eval_force, int step);
+                        const RestraintApparatusDpReader &rar, EvaluateForce eval_force,
+                        int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintApparatusDpReader &rar, EvaluateForce eval_force, int step);
+                        const RestraintApparatusDpReader &rar, EvaluateForce eval_force,
+                        int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                         const StaticExclusionMask &se, const RestraintApparatus &ra,
-                        EvaluateForce eval_force, int step);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                         const StaticExclusionMask &se, const RestraintApparatus &ra,
-                        EvaluateForce eval_force, int step);
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
 /// \}
 
 } // namespace mm

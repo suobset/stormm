@@ -25,7 +25,8 @@ using parse::uppercase;
 using parse::NumberFormat;
 
 //-------------------------------------------------------------------------------------------------
-TestEnvironment::TestEnvironment(int argc, char* argv[], const TmpdirStatus tmpdir_required) :
+TestEnvironment::TestEnvironment(const int argc, const char* argv[],
+                                 const TmpdirStatus tmpdir_required) :
     verbose_level{TestVerbosity::COMPACT},
     general_tolerance{1.0e-4},
     random_seed{827493},

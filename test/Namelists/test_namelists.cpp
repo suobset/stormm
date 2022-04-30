@@ -86,7 +86,7 @@ void testBadNamelist(const std::string &nml_name, const std::string &content,
 }
 
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
@@ -189,6 +189,7 @@ int main(int argc, char* argv[]) {
   testBadNamelist("random", "igstride = -2", "A negative random production stride was accepted");
 
   // The solvent namelist provides a means of specifying the solvent model
+  section(4);
   start_line = 0;
   SolventControls watcon(tf, &start_line, &found_nml);
   check(watcon.getBornRadiiCutoff(), RelationalOperator::EQUAL, Approx(25.0).margin(tiny),

@@ -351,6 +351,7 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_math \
 	          $(TESTDIR)/bin/test_numerics \
 	          $(TESTDIR)/bin/test_amber_prmtop \
+	          $(TESTDIR)/bin/test_topology_mods \
 	          $(TESTDIR)/bin/test_amber_coordinates \
 	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_chemical_features \
@@ -471,6 +472,12 @@ $(TESTDIR)/bin/test_amber_prmtop : $(LIBDIR)/libomni.so $(TESTDIR)/Topology/test
 	@echo "[OMNI]  Building test_amber_prmtop..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_amber_prmtop \
 	  $(TESTDIR)/Topology/test_amber_prmtop.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: prmtop reading program
+$(TESTDIR)/bin/test_topology_mods : $(LIBDIR)/libomni.so $(TESTDIR)/Topology/test_topology_mods.cpp
+	@echo "[OMNI]  Building test_topology_mods..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_topology_mods \
+	  $(TESTDIR)/Topology/test_topology_mods.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: prmtop collating object test program
 $(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libomni.so \

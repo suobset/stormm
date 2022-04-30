@@ -25,7 +25,7 @@ public:
   ///                         not required and the temporary directory cannot be created or written
   ///                         to, no warnings will be printed.  The directory's status will still
   ///                         be noted.
-  TestEnvironment(int argc, char* argv[],
+  TestEnvironment(int argc, const char* argv[],
                   TmpdirStatus tmpdir_required = TmpdirStatus::NOT_REQUIRED);
 
   /// \brief Destructor for the TestEnvironment object must delete the temporary directory if it

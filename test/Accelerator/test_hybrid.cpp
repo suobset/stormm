@@ -61,7 +61,7 @@ Hybrid<double> makeDoubleHybrid(int length) {
 //-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Fill two Hybrid objects, one with integers and the other with near integer values
   const int n_pts = 100;

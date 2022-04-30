@@ -429,8 +429,9 @@ void showAnswer(const std::vector<AtomGraph*> &topols, const CharInfoCode method
   }
   printf("];\n");
 }
+
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // The temporary directory will not be needed.  Results will be compared against snapshots.
   TestEnvironment oe(argc, argv);

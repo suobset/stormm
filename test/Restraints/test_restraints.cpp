@@ -147,7 +147,7 @@ void digestRestraintList(const std::vector<BoundedRestraint> &rst_in, std::vecto
 }
 
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);

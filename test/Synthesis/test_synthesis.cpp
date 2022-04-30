@@ -601,7 +601,7 @@ std::vector<std::vector<int>> getAtomForceContributors(const AtomGraph &ag,
 //-------------------------------------------------------------------------------------------------
 // Main
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv);

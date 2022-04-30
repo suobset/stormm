@@ -18,7 +18,7 @@ using namespace omni::synthesis;
 using namespace omni::topology;
 using namespace omni::testing;
 
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv);
