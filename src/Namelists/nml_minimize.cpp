@@ -167,7 +167,7 @@ void MinimizeControls::validateTotalCycles() {
 
 //-------------------------------------------------------------------------------------------------
 void MinimizeControls::validateSteepestDescentCycles() {
-  if (total_cycles < 0) {
+  if (steepest_descent_cycles < 0) {
     switch (policy) {
     case ExceptionResponse::DIE:
       rtErr("The cycle count of " + std::to_string(steepest_descent_cycles) + " is invalid for "
@@ -178,10 +178,28 @@ void MinimizeControls::validateSteepestDescentCycles() {
              "the steepest descent phase and will be reset to the default value of " +
              std::to_string(default_minimize_ncyc) + ".", "MinimizeControls",
              "validateTotalCycles");      
-      steepest_descent_cycles = default_minimize_ncyc;
+      steepest_descent_cycles = std::min(default_minimize_ncyc, total_cycles);
       break;
     case ExceptionResponse::SILENT:
-      steepest_descent_cycles = default_minimize_ncyc;
+      steepest_descent_cycles = std::min(default_minimize_ncyc, total_cycles);
+      break;
+    }
+  }
+  if (steepest_descent_cycles > total_cycles) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("The cycle count of " + std::to_string(steepest_descent_cycles) + " is greater than "
+            "the stated number of total cycles " + std::to_string(total_cycles) + ".",
+            "MinimizeControls", "validateTotalCycles");
+    case ExceptionResponse::WARN:
+      rtErr("The cycle count of " + std::to_string(steepest_descent_cycles) + " is greater than "
+            "the stated number of total cycles " + std::to_string(total_cycles) + " and will be "
+            "reduced to the maximum overall cycle count.", "MinimizeControls",
+            "validateTotalCycles");
+      steepest_descent_cycles = total_cycles;
+      break;
+    case ExceptionResponse::SILENT:
+      steepest_descent_cycles = total_cycles;
       break;
     }
   }

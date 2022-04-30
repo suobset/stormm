@@ -131,6 +131,30 @@ public:
   /// \brief Get the virtual site frame type
   VirtualSiteKind getVirtualSiteFrameType() const;
 
+  /// \brief Test whether the sigma value of a van-der Waals parameter is being modified.
+  bool testSigmaModification() const;
+  
+  /// \brief Test whether the epsilon value of a van-der Waals parameter is being modified.
+  bool testEpsilonModification() const;
+
+  /// \brief Test whether the rho value of a van-der Waals parameter is being modified.
+  bool testRhoModification() const;
+
+  /// \brief Test whether the stiffness constant of a valence parameter is being modified.
+  bool testStiffnessModification() const;
+
+  /// \brief Test whether the equilibrium constant of a valence parameter is being modified.
+  bool testEquilibriumModification() const;
+
+  /// \brief Test whether the amplitude of a dihedral parameter is being modified.
+  bool testAmplitudeModification() const;
+
+  /// \brief Test whether the phase angle of a dihedral or improper dihedral is being modified.
+  bool testPhaseAngleModification() const;
+
+  /// \brief Test whether the periodicity of a dihedral parameter is being modified.
+  bool testPeriodicityModification() const;
+  
   /// \brief Set the stiffness property of one of the valence terms.
   void setStiffness(double stiffness_in);
 

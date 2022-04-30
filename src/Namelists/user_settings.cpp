@@ -27,7 +27,7 @@ using parse::WrapTextSearch;
 //-------------------------------------------------------------------------------------------------
 UserSettings::UserSettings(const int argc, const char* argv[], const AppName prog_set) :
     policy{ExceptionResponse::DIE}, has_minimize_nml{false}, has_conformer_nml{false},
-    has_dynamics_nml{false},
+    has_dynamics_nml{false}, has_random_nml{false}, has_solvent_nml{false},
     input_file{std::string(default_conformer_input_file)},
     file_io_input{}, line_min_input{}, solvent_input{}, prng_input{}
 {
@@ -103,9 +103,9 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   start_line = 0;
   line_min_input = MinimizeControls(inp_tf, &start_line, &has_minimize_nml, policy);
   start_line = 0;
-  solvent_input = SolventControls(inp_tf, &start_line, policy);
+  solvent_input = SolventControls(inp_tf, &start_line, &has_solvent_nml, policy);
   start_line = 0;
-  prng_input = RandomControls(inp_tf, &start_line, policy);
+  prng_input = RandomControls(inp_tf, &start_line, &has_random_nml, policy);
   start_line = 0;
   conf_input = ConformerControls(inp_tf, &start_line, &has_conformer_nml, policy);
   start_line = 0;

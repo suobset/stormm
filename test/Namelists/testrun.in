@@ -27,6 +27,12 @@ This should be a comment, but placed here to ensure that test outside of a namel
   igstride = 32        igwarmup = 63
 &end
 
+// Implicit solvent specification
+&solvent
+  igb = 5, intdiel = 1.5, extdiel = 77.9, saltcon = 0.15, rgbmax = 25.0,
+  pbradii = MBONDI2,
+&end
+
 // Force field morphing
 &ffmorph
   bond { -ti CX -tj C   -k 100.00  -l0 1.25 }
@@ -34,7 +40,7 @@ This should be a comment, but placed here to ensure that test outside of a namel
   bond { -ti N  -tj C  -l0   1.25 }
   angle { -ti CX -tj CT -tk OH -k 50.0 -theta0 109.5 }
   angle { -ti CT -tj OH -tk HO -theta0 108.7 }
-  dihedral { -ti CX -tj CT -tk OH -tl HO -amp 1.38 -phi 0.0 -n 2 }
+  dihedral { -ti CX -tj CT -tk OH -tl HO -amp 1.38 -phi 0.24 -n 2 }
   dihedral { -ti H1 -tj CX -tk OH -tl HO -amp 2.07 -n 2 }
   dihedral { -ti N  -tj CX -tk OH -tl HO -phi 0.0 -n 2 }
   urey_bradley { -ti O2 -tj C -tk O2 -k 50.0 -l0 1.94 }

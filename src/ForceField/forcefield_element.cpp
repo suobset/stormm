@@ -1,4 +1,5 @@
 #include <cmath>
+#include "Constants/symbol_values.h"
 #include "Parsing/parse.h"
 #include "forcefield_element.h"
 
@@ -6,7 +7,7 @@ namespace omni {
 namespace modeling {
 
 using parse::uppercase;
-
+  
 //-------------------------------------------------------------------------------------------------
 ForceFieldElement::ForceFieldElement(const ParameterKind kind_in) :
     kind{kind_in}, atom_name_i{' ', ' ', ' ', ' '}, atom_name_j{' ', ' ', ' ', ' '},
@@ -933,6 +934,186 @@ VirtualSiteKind ForceFieldElement::getVirtualSiteFrameType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testSigmaModification() const {
+  switch (kind) {
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+    return activate_a;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no sigma property.",
+          "ForceFieldElement", "testSigmaModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testEpsilonModification() const {
+  switch (kind) {
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+    return activate_b;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no epsilon property.",
+          "ForceFieldElement", "testEpsilonModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testRhoModification() const {
+  switch (kind) {
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+    return activate_c;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no rho property.",
+          "ForceFieldElement", "testRhoModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testStiffnessModification() const {
+  switch (kind) {
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+    return activate_a;
+  case ParameterKind::DIHEDRAL:
+    rtWarn("A " + getParameterKindName(kind) + "\" has an amplitude, which is more correctly "
+           "accessed with getAmplitude(), but the amplitude is equivalent to a stiffness.",
+           "ForceFieldElement", "testStiffnessModification");
+    return activate_a;
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no stiffness constant.",
+          "ForceFieldElement", "testStiffnessModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testEquilibriumModification() const {
+  switch (kind) {
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+    return activate_b;
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no equilibrium "
+          "constant.", "ForceFieldElement", "testEquilibriumModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testAmplitudeModification() const {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+    return property_a;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no amplitude.",
+          "ForceFieldElement", "testAmplitudeModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testPhaseAngleModification() const {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+  case ParameterKind::CHARMM_IMPROPER:
+    return property_b;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no phase angle.",
+          "ForceFieldElement", "testPhaseAngleModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+bool ForceFieldElement::testPeriodicityModification() const {
+  switch (kind) {
+  case ParameterKind::DIHEDRAL:
+    return property_c;
+  case ParameterKind::BOND:
+  case ParameterKind::ANGLE:
+  case ParameterKind::UREY_BRADLEY:
+  case ParameterKind::CHARMM_IMPROPER:
+  case ParameterKind::CMAP:
+  case ParameterKind::ATTN_14_SCALE:
+  case ParameterKind::CHARGE:
+  case ParameterKind::LENNARD_JONES:
+  case ParameterKind::BUCKINGHAM:
+  case ParameterKind::VIRTUAL_SITE_FRAME:
+  case ParameterKind::NONE:
+    rtErr("A parameter of type \"" + getParameterKindName(kind) + "\" has no periodicity.",
+          "ForceFieldElement", "testPeriodicityModification");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 void ForceFieldElement::setStiffness(const double stiffness_in) {
   switch (kind) {
   case ParameterKind::BOND:
@@ -959,9 +1140,12 @@ void ForceFieldElement::setStiffness(const double stiffness_in) {
 void ForceFieldElement::setEquilibrium(const double equilibrium_in) {
   switch (kind) {
   case ParameterKind::BOND:
-  case ParameterKind::ANGLE:
   case ParameterKind::UREY_BRADLEY:
     property_b = equilibrium_in;
+    activate_b = true;
+    break;
+  case ParameterKind::ANGLE:
+    property_b = equilibrium_in * symbols::pi / 180.0;
     activate_b = true;
     break;
   case ParameterKind::DIHEDRAL:
@@ -983,7 +1167,7 @@ void ForceFieldElement::setPhaseAngle(const double phase_angle_in) {
   switch (kind) {
   case ParameterKind::DIHEDRAL:
   case ParameterKind::CHARMM_IMPROPER:
-    property_b = phase_angle_in;
+    property_b = phase_angle_in * symbols::pi / 180.0;
     activate_b = true;
     break;
   case ParameterKind::BOND:

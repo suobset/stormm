@@ -19,11 +19,11 @@ RandomControls::RandomControls(const ExceptionResponse policy_in) :
 {}
 
 //-------------------------------------------------------------------------------------------------
-RandomControls::RandomControls(const TextFile &tf, int *start_line,
+RandomControls::RandomControls(const TextFile &tf, int *start_line, bool *found_nml,
                                const ExceptionResponse policy_in) :
     RandomControls(policy_in)
 {
-  NamelistEmulator t_nml = randomInput(tf, start_line, policy);
+  NamelistEmulator t_nml = randomInput(tf, start_line, found_nml, policy);
   igseed = t_nml.getIntValue("igseed");
   stream_count = t_nml.getIntValue("igstreams");
   production_stride = t_nml.getIntValue("igstride");
@@ -166,7 +166,8 @@ void RandomControls::validateProductionStride() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator randomInput(const TextFile &tf, int *start_line, const ExceptionResponse policy) {
+NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
+                             const ExceptionResponse policy) {
   NamelistEmulator t_nml("random", CaseSensitivity::AUTOMATIC, policy, "Namelist containing "
                          "parameters for the random number generator and its updates throughout "
                          "a simulation.");
@@ -203,7 +204,8 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line, const Exceptio
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
+                             found);
   return t_nml;
 }
 

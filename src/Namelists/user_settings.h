@@ -88,6 +88,8 @@ private:
   bool has_minimize_nml;      /// Indicate the presence of a &minimize namelist in the input file
   bool has_conformer_nml;     /// Indicate the presence of a &conformer namelist in the input file
   bool has_dynamics_nml;      /// Indicate the presence of a &dynamics namelist in the input file
+  bool has_random_nml;        /// Indicate the presence of a &random namelist in the input file
+  bool has_solvent_nml;       /// Indicate the presence of a &solvent namelist in the input file
   
   /// Name of the original input file
   std::string input_file;

@@ -24,11 +24,11 @@ SolventControls::SolventControls(const ExceptionResponse policy_in) :
 {}
 
 //-------------------------------------------------------------------------------------------------
-SolventControls::SolventControls(const TextFile &tf, int *start_line,
+SolventControls::SolventControls(const TextFile &tf, int *start_line, bool *found_nml,
                                  const ExceptionResponse policy_in) :
   SolventControls(policy_in)
 {
-  NamelistEmulator t_nml = solventInput(tf, start_line, policy);
+  NamelistEmulator t_nml = solventInput(tf, start_line, found_nml, policy);
   gb_style            = translateImplicitSolventModel(t_nml.getIntValue("igb"));
   born_radii_cutoff   = t_nml.getRealValue("rgbmax");
   internal_dielectric = t_nml.getRealValue("intdiel");
@@ -206,7 +206,7 @@ void SolventControls::validateSaltConcentration() {
 }
 
 //-------------------------------------------------------------------------------------------------
-NamelistEmulator solventInput(const TextFile &tf, int *start_line,
+NamelistEmulator solventInput(const TextFile &tf, int *start_line, bool *found,
                               const ExceptionResponse policy) {
   NamelistEmulator t_nml("solvent", CaseSensitivity::AUTOMATIC, policy, "Wraps directives needed "
                          "to define the solvent model of a molecular mechanical system.  This is "
@@ -242,7 +242,8 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line,
 
   // Search the input file, read the namelist if it can be found, and update the current line
   // for subsequent calls to this function or other namelists.
-  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount());
+  *start_line = readNamelist(tf, &t_nml, *start_line, WrapTextSearch::YES, tf.getLineCount(),
+                             found);
   
   return t_nml;
 }

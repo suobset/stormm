@@ -32,12 +32,13 @@ public:
   /// \brief The constructor can prepare an object with default settings or read the corresponding
   ///        namelist to accept user input.
   ///
-  /// \param policy_in   Requested error handling behavior
   /// \param tf          Input file translated into RAM
   /// \param start_line  Line of the input file to begin searching for the &solvent namelist
+  /// \param found_nml   Indication that the namelist was found (passed back to calling function)
+  /// \param policy_in   Requested error handling behavior
   /// \{
   RandomControls(ExceptionResponse policy_in = ExceptionResponse::DIE);
-  RandomControls(const TextFile &tf, int *start_line,
+  RandomControls(const TextFile &tf, int *start_line, bool *found_nml,
                  ExceptionResponse policy_in = ExceptionResponse::DIE);
   /// \}
 
@@ -110,8 +111,9 @@ private:
 /// \param start_line  Line at which to begin scanning the input file for the namelist (this
 ///                    function will wrap back to the beginning of the TextFile object, if
 ///                    necessary, to find a &random namelist)
+/// \param found       Indication that the namelist was found (passed back to calling function)
 /// \param policy      Reaction to exceptions encountered during namelist reading
-NamelistEmulator randomInput(const TextFile &tf, int *start_line,
+NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
                              ExceptionResponse policy = ExceptionResponse::DIE);
 
 /// \brief 
