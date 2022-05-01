@@ -126,9 +126,10 @@ public:
   /// \param new_capacity  The new capacity to allocate for
   void reserve(int new_capacity);
   
-  /// \brief Contribute a result into one of the instantaneous state variable accumulators.  This
-  ///        is for CPU activity; the contributions will occur as part of each energy kernel using
-  ///        pointers on the GPU.
+  /// \brief Commit a result into one of the instantaneous state variable accumulators.  This is
+  ///        for CPU activity; on the GPU, the contributions will occur as part of each energy
+  ///        kernel using pointers.  This will automatically update running accumulators for
+  ///        statistical tracking.  It is add + commit, below.
   ///
   /// \param var           The state variable to which this contribution belongs, i.e. bond energy
   /// \param amount        Amount to contribute to said state variable (in fixed precision format)
@@ -136,6 +137,49 @@ public:
   ///                      contrbution describes
   void contribute(StateVariable var, llint amount, int system_index = 0);
 
+  /// \brief Initialize some or all instantaneous state variable accumulators.  This is for CPU
+  ///        activity; on the GPU, the contributions will occur as part of each energy kernel
+  ///        using pointers.
+  ///
+  /// Overloaded:
+  ///   - Initialize a single state variable accumulator
+  ///   - Initialize a list of state variable accumulators
+  ///   - Initialize all state variable accumulators
+  ///
+  /// \param var           The state variable to initialize
+  /// \param system_index  Index of the system (among a list of those being tracked) that the
+  ///                      contrbution describes
+  /// \{
+  void initialize(StateVariable var, int system_index = 0);
+  void initialize(const std::vector<StateVariable> &var, int system_index = 0);
+  void initialize(int system_index = 0);
+  /// \}
+  
+  /// \brief Add a result to a growing total in one of the instantaneous state variable
+  ///        accumulators.  This is for CPU activity; on the GPU, the contributions will occur as
+  ///        part of each energy kernel using pointers.
+  ///
+  /// \param var           The state variable to which this contribution belongs, i.e. bond energy
+  /// \param amount        Amount to contribute to said state variable (in fixed precision format)
+  /// \param system_index  Index of the system (among a list of those being tracked) that the
+  ///                      contrbution describes
+  void add(StateVariable var, llint amount, int system_index = 0);  
+
+  /// \brief Commit the (assumed complete), accumulated results in one or more state variables to
+  ///        the running tallies and time series kept for statistical purposes.
+  ///
+  /// Overloaded:
+  ///   - Commit results for a single state variable
+  ///   - Commit results for a list of state variables
+  ///
+  /// \param var           The state variable to which this contribution belongs, i.e. bond energy
+  /// \param system_index  Index of the system (among a list of those being tracked) that the
+  ///                      contrbution describes
+  /// \{
+  void commit(StateVariable var, int system_index = 0);
+  void commit(const std::vector<StateVariable> &var, int system_index = 0);    
+  /// \}
+  
   /// \brief Increment the number of sampled steps.  This will automatically allocate additional
   ///        capacity if the sampled step count reaches the object's capacity.
   void incrementSampleCount();

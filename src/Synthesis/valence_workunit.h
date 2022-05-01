@@ -59,6 +59,24 @@ enum class VwuTask {
   ALL_TASKS  ///< Total number of distinct tasks that the ValenceWorkUnit can perform (for array
              ///<   sizing purposes
 };
+
+/// \brief There are two modes in which an evaluation of ValenceWorkUnit instructions can proceed.
+enum class VwuGoal {
+  ACCUMULATE_FORCES,  ///< The objective is a global ccumulation of forces.  This case, the bit
+                      ///<   strings that dictact whether a ValenceWorkUnit logs the energy due to
+                      ///<   a particular interaction will dictate whether the ValenceWorkUnit
+                      ///<   evaluates a term at all.  The local force accumulations will be
+                      ///<   added back to a global array.  Particles cannot be moved under this
+                      ///<   mode.
+  MOVE_PARTICLES      ///< The objective to is to move particles.  In this mode, global energy
+                      ///<   accumulators will still be valid as the work units continue to follow
+                      ///<   their bit strings dictating which interactions they are responsible
+                      ///<   for logging, but forces accumulated locally may contain redundant
+                      ///<   effects needed to carry out a local atom move and therefore cannot be
+                      ///<   pooled at the end of the calculation.  Atoms will move and their
+                      ///<   global positions will be updated according to separate bit strings
+                      ///<   dictating which work units are responsible for each update.
+};
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or

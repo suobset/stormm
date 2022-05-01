@@ -15,7 +15,8 @@ enum class EvaluateVirial {
   NO, YES
 };
 
-/// \brief Enumerate all state variables that OMNI will track
+/// \brief Enumerate all state variables that OMNI will track.  This must always increment by one
+///        from one enumeration to the next, start at zero, and always end with ALL_STATES.
 enum class StateVariable {
   BOND = 0,               ///< Harmonic bond stretching energy
   ANGLE,                  ///< Harmonic angle bending energy

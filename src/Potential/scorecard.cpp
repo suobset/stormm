@@ -182,6 +182,55 @@ void ScoreCard::contribute(const StateVariable var, const llint amount, const in
 }
 
 //-------------------------------------------------------------------------------------------------
+void ScoreCard::initialize(const StateVariable var, const int system_index) {
+  const size_t slot = static_cast<int>(var) + (data_stride * system_index);
+  instantaneous_accumulators.putHost(0LL, slot);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::initialize(const std::vector<StateVariable> &var, const int system_index) {
+  const size_t nvar = var.size();
+  for (size_t i = 0LLU; i < nvar; i++) {
+    initialize(var[i], system_index);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::initialize(const int system_index) {
+  const int last = static_cast<int>(StateVariable::ALL_STATES);
+  for (int i = 0; i < last; i++) {
+    initialize(static_cast<StateVariable>(i), system_index);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::add(const StateVariable var, const llint amount, const int system_index) {
+  const size_t slot = static_cast<int>(var) + (data_stride * system_index);
+  instantaneous_accumulators.putHost(instantaneous_accumulators.readHost(slot) + amount, slot);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::commit(const StateVariable var, const int system_index) {
+  const size_t slot = static_cast<int>(var) + (data_stride * system_index);
+  const llint amount = instantaneous_accumulators.readHost(slot);
+  const double dbl_amount = static_cast<double>(amount) * inverse_nrg_scale_lf;
+  running_accumulators.putHost(running_accumulators.readHost(slot) + dbl_amount, slot);
+  squared_accumulators.putHost(squared_accumulators.readHost(slot) + dbl_amount * dbl_amount,
+                               slot);
+  const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_index) *
+                                 static_cast<size_t>(sampled_step_count));
+  time_series_accumulators.putHost(amount, ts_slot);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::commit(const std::vector<StateVariable> &var, const int system_index) {
+  const size_t nvar = var.size();
+  for (size_t i = 0LLU; i < nvar; i++) {
+    commit(var[i], system_index);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 void ScoreCard::incrementSampleCount() {
   sampled_step_count += 1;
   if (sampled_step_count == sample_capacity) {
