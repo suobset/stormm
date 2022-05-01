@@ -836,28 +836,32 @@ public:
   ///        responsible for accumulating into the official energy outputs.
   ///
   /// \param vtask  The type of task accumulator
-  std::vector<uint> getAccumulationFlags(VwuTask vtask) const;
+  const std::vector<uint>& getAccumulationFlags(VwuTask vtask) const;
 
+  /// \brief Get the bitstrings indicating which of the imported (cached) atoms this work unit is
+  ///        responsible for updating in the global postion and velocity arrays.
+  const std::vector<uint>& getAtomUpdateFlags() const;
+  
   /// \brief Get the topological indices of each task assigned to this work unit.  Assignment of
   ///        an energy / force-producing term or constraint group does not imply that a work unit
   ///        is responsible for updating the final positions of all atoms involved.  Composite
   ///        task lists must be accessed with the special-purpose functions below.
   ///
   /// \param vtask  The type of task, i.e. bonded interactions, or SETTLE constraint groups
-  std::vector<int> getSimpleTaskList(VwuTask vtask) const;
+  const std::vector<int>& getSimpleTaskList(VwuTask vtask) const;
 
   /// \brief Get the composite bond tasks assigned to this work unit.  This will return a vector
   ///        of concatenated bond and Urey-Bradley term indices into the original topology.
   ///        Interpreting which is which requires the corresponding vector of composite bond term
   ///        instructions.
-  std::vector<int> getCompositeBondTaskList() const;
+  const std::vector<int>& getCompositeBondTaskList() const;
 
   /// \brief Get the composite dihedral tasks assigned to this work unit.  This will return a
   ///        vector of tuples containing the topological indices of dihedrals or CHARMM impropers
   ///        that the work unit evaluates.  Interpretation of the tuples will depend on knowing
   ///        whether each term index pertains to a standard cosine-based dihedral or a CHARMM
   ///        improper dihedral, for which the corresponding instructions list must be accessed.
-  std::vector<int2> getCompositeDihedralTaskList() const;
+  const std::vector<int2>& getCompositeDihedralTaskList() const;
   
   /// \brief Get the pointer to the ValenceDelegator managing the creation of this object.
   ValenceDelegator* getDelegatorPointer();
@@ -902,6 +906,10 @@ public:
   ///        for mapping valence terms / atom groups to the local list.
   void sortAtomSets();
 
+  /// \brief Create a bit mask spanning the atom imports, marking all of those that the work unit
+  ///        is responsible for updating in the global position and velocity arrays.
+  void makeAtomUpdateMask();
+  
   /// \brief Log all activities of this work unit: valence terms, restraints, virtual sites, and
   ///        constraints.  This will translate the topological indices of atoms into indices of
   ///        the local import list.
@@ -952,6 +960,16 @@ private:
   /// work unit will be responsible for doing that.
   std::vector<int> atom_update_list;
 
+  /// A mask of local atoms that the work unit is responsible for updating in the global position
+  /// arrays.  All local atoms, except virtual sites, will be moved according to the forces acting
+  /// upon them (it is faster to move the 1-2% of atoms that do not absolutely need to move than
+  /// to try and figure out a detail like that).  Once the particles are moved, however, and
+  /// perhaps processed with bond length constraints or virtual site placement, the question of
+  /// whether to update the particle positions in the global array is critical.  Traversing the
+  /// list of imported atoms while accessing the corresponding bits of this mask answers that
+  /// question.
+  std::vector<uint> atom_update_mask;
+  
   // Valence terms for the work unit, typical force field elements
   std::vector<int> bond_term_list;    ///< List of harmonic bonds for which this work unit is
                                       ///<   responsible (more than one work unit may be tasked

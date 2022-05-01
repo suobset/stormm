@@ -878,11 +878,11 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
     rposn_term_count{0}, rbond_term_count{0}, rangl_term_count{0}, rdihe_term_count{0},
     cnst_group_count{0}, sett_group_count{0}, vste_count{0}, list_index{list_index_in},
     min_atom_index{-1}, max_atom_index{-1}, atom_limit{max_atoms_in}, atom_import_list{},
-    bond_term_list{}, angl_term_list{}, dihe_term_list{}, ubrd_term_list{}, cimp_term_list{},
-    cmap_term_list{}, infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{}, angl_i_atoms{},
-    angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{}, dihe_l_atoms{},
-    ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{}, cimp_l_atoms{},
-    cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
+    atom_update_mask{}, bond_term_list{}, angl_term_list{}, dihe_term_list{}, ubrd_term_list{},
+    cimp_term_list{}, cmap_term_list{}, infr14_term_list{}, bond_i_atoms{}, bond_j_atoms{},
+    angl_i_atoms{}, angl_j_atoms{}, angl_k_atoms{}, dihe_i_atoms{}, dihe_j_atoms{}, dihe_k_atoms{},
+    dihe_l_atoms{}, ubrd_i_atoms{}, ubrd_k_atoms{}, cimp_i_atoms{}, cimp_j_atoms{}, cimp_k_atoms{},
+    cimp_l_atoms{}, cmap_i_atoms{}, cmap_j_atoms{}, cmap_k_atoms{}, cmap_l_atoms{}, cmap_m_atoms{},
     infr14_i_atoms{}, infr14_l_atoms{}, cbnd_term_list{}, cbnd_is_ubrd{}, cbnd_i_atoms{},
     cbnd_jk_atoms{}, cdhe_term_list{}, cdhe_is_cimp{}, cdhe_i_atoms{}, cdhe_j_atoms{},
     cdhe_k_atoms{}, cdhe_l_atoms{}, rposn_term_list{}, rbond_term_list{}, rangl_term_list{},
@@ -914,7 +914,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
 
   // Reserve space for atoms
   atom_import_list.reserve(atom_limit);
-  
+
   // Unpack the original topology
   ChemicalDetailsKit cdk = ag_pointer->getChemicalDetailsKit();
   NonbondedKit<double> nbk = ag_pointer->getDoublePrecisionNonbondedKit();
@@ -1672,7 +1672,7 @@ uint2 ValenceWorkUnit::getConstraintGroupInstruction(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint> ValenceWorkUnit::getAccumulationFlags(const VwuTask vtask) const {
+const std::vector<uint>& ValenceWorkUnit::getAccumulationFlags(const VwuTask vtask) const {
   switch (vtask) {
   case VwuTask::BOND:
     return acc_bond_energy;
@@ -1712,7 +1712,12 @@ std::vector<uint> ValenceWorkUnit::getAccumulationFlags(const VwuTask vtask) con
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> ValenceWorkUnit::getSimpleTaskList(const VwuTask vtask) const {
+const std::vector<uint>& ValenceWorkUnit::getAtomUpdateFlags() const {
+  return atom_update_mask;
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& ValenceWorkUnit::getSimpleTaskList(const VwuTask vtask) const {
   switch (vtask) {
   case VwuTask::BOND:
     return bond_term_list;
@@ -1753,12 +1758,12 @@ std::vector<int> ValenceWorkUnit::getSimpleTaskList(const VwuTask vtask) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> ValenceWorkUnit::getCompositeBondTaskList() const {
+const std::vector<int>& ValenceWorkUnit::getCompositeBondTaskList() const {
   return cbnd_term_list;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int2> ValenceWorkUnit::getCompositeDihedralTaskList() const {
+const std::vector<int2>& ValenceWorkUnit::getCompositeDihedralTaskList() const {
   return cdhe_term_list;
 }
 
@@ -1900,6 +1905,22 @@ void ValenceWorkUnit::sortAtomSets() {
             std::to_string(list_index) + " but not present in the movement list of " +
             std::to_string(moved_atom_count) + " atoms.", "ValenceWorkUnit", "sortAtomSets");
     }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ValenceWorkUnit::makeAtomUpdateMask() {
+  atom_update_mask.resize((imported_atom_count + uint_bit_count_int - 1) / uint_bit_count_int, 0U);
+  size_t import_pos = 0;
+  const size_t uac_zu = updated_atom_count;
+  for (size_t i = 0; i < uac_zu; i++) {
+
+    // With imported and updated atom lists sorted, it is possible to seek the position of each
+    // successive atom update within the list of atom imports by simply advancing a counter.
+    while (atom_import_list[import_pos] != atom_update_list[i]) {
+      import_pos++;
+    }
+    accumulateBitmask(&atom_update_mask, import_pos);
   }
 }
 
@@ -2417,6 +2438,7 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   for (int i = 0; i < nvwu; i++) {
     result[i].makeAtomMoveList();
     result[i].sortAtomSets();
+    result[i].makeAtomUpdateMask();
   }
   
   // With the atom update assignments of each work unit known and the import list furnishing any

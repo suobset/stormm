@@ -611,6 +611,10 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
 
   // Initialize accumulators
   evalVwuInitEnergy(ecard, activity, sysid);
+
+  // Declare arrays outside the loop to avoid unecessary reallocations
+  std::vector<double> sh_xcrd, sh_ycrd, sh_zcrd, sh_xfrc, sh_yfrc, sh_zfrc, sh_charges;
+  std::vector<int> sh_lj_idx;
   
   // Loop over each work unit
   for (size_t vidx = 0LLU; vidx < vwu_list.size(); vidx++) {
@@ -618,43 +622,72 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     // Make local arrays of the coordinates and forces.  Import coordinates and extant forces
     // from the global arrays.
     const int max_atoms = vwu_list[vidx].getMaxAtoms();
-    std::vector<double> sh_xcrd(max_atoms), sh_ycrd(max_atoms), sh_zcrd(max_atoms);
-    std::vector<double> sh_xfrc(max_atoms), sh_yfrc(max_atoms), sh_zfrc(max_atoms);
-    std::vector<double> sh_charges(max_atoms);
-    std::vector<int> sh_lj_idx(max_atoms);
+    sh_xcrd.resize(max_atoms);
+    sh_ycrd.resize(max_atoms);
+    sh_zcrd.resize(max_atoms);
+    sh_charges.resize(max_atoms);
+    sh_lj_idx.resize(max_atoms);
+    if (eval_force == EvaluateForce::YES) {
+      sh_xfrc.resize(max_atoms);
+      sh_yfrc.resize(max_atoms);
+      sh_zfrc.resize(max_atoms);
+    }
     const int n_imp_atoms = vwu_list[vidx].getImportedAtomCount();
     for (int i = 0; i < n_imp_atoms; i++) {
       const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
       sh_xcrd[i] = xcrd[atom_idx];
       sh_ycrd[i] = ycrd[atom_idx];
       sh_zcrd[i] = zcrd[atom_idx];
-      sh_xfrc[i] = xfrc[atom_idx];
-      sh_yfrc[i] = yfrc[atom_idx];
-      sh_zfrc[i] = zfrc[atom_idx];
       sh_charges[i] = nbk.charge[atom_idx];
       sh_lj_idx[i] = nbk.lj_idx[atom_idx];
     }
-
-    // Evaluate the work unit using the locally cached data
+    if (eval_force == EvaluateForce::YES) {
+      for (int i = 0; i < n_imp_atoms; i++) {    
+        sh_xfrc[i] = 0.0;
+        sh_yfrc[i] = 0.0;
+        sh_zfrc[i] = 0.0;
+      }
+    }
+    
+    // Evaluate the work unit using the locally cached data.  If force evaluation is not requested,
+    // it still works to feed the unallocated vectors' data pointers as they will not be used.
     localVwuEvaluation(vk, vsk, nbk, rar, sh_charges.data(), sh_lj_idx.data(), sh_xcrd.data(),
                        sh_ycrd.data(), sh_zcrd.data(), sh_xfrc.data(), sh_yfrc.data(),
                        sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force, activity, purpose,
                        step_number);
-    
-    // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
-    // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
-    // zero'ed for atoms they are responsible for moving).  It is only possible to write these
-    // forces back because one and only one work unit is assigned to log the force due to any
-    // particular interaction.  If any two work units import the same atoms for any reason (i.e.
-    // they are needed to support certain forces that both work units must know in order to move
-    // some of their imported atoms) it is not possible to move atoms in a valid way and write
-    // back the accumulated forces.  GPU kernels will generally move atoms and not write back
-    // forces.  This function writes back forces but does not (cannot, safely) move atoms.
-    for (int i = 0; i < n_imp_atoms; i++) {
-      const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
-      xfrc[atom_idx] = sh_xfrc[i];
-      yfrc[atom_idx] = sh_yfrc[i];
-      zfrc[atom_idx] = sh_zfrc[i];
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE_FORCES:
+
+      // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
+      // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
+      // zero'ed for atoms they are responsible for moving).  It is only possible to write these
+      // forces back because one and only one work unit is assigned to log the force due to any
+      // particular interaction.  If any two work units import the same atoms for any reason (i.e.
+      // they are needed to support certain forces that both work units must know in order to move
+      // some of their imported atoms) it is not possible to move atoms in a valid way and write
+      // back the accumulated forces.  GPU kernels will generally move atoms and not write back
+      // forces.  This function writes back forces but does not (cannot, safely) move atoms.
+      for (int i = 0; i < n_imp_atoms; i++) {
+        const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
+        xfrc[atom_idx] += sh_xfrc[i];
+        yfrc[atom_idx] += sh_yfrc[i];
+        zfrc[atom_idx] += sh_zfrc[i];
+      }
+      break;
+    case VwuGoal::MOVE_PARTICLES:
+
+      // Copy back the modified, cached coordinates if this work unit is responsible for moving
+      // the particle.
+      const std::vector<uint> updates = vwu_list[vidx].getAtomUpdateFlags();
+      for (int i = 0; i < n_imp_atoms; i++) {
+        if (readBitFromMask(updates, i) == 1) {
+          const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
+          xcrd[atom_idx] = sh_xcrd[i];
+          ycrd[atom_idx] = sh_ycrd[i];
+          zcrd[atom_idx] = sh_zcrd[i];
+        }
+      }
+      break;
     }
   }
 }
@@ -685,16 +718,24 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
   // Initialize accumulators
   evalVwuInitEnergy(ecard, activity, sysid);
 
+  // Declare arrays outside the loop to avoid unecessary reallocations
+  std::vector<double> sh_xcrd, sh_ycrd, sh_zcrd, sh_xfrc, sh_yfrc, sh_zfrc, sh_charges;
+  std::vector<int> sh_lj_idx;
+
   // Loop over each work unit
   for (size_t vidx = 0LLU; vidx < vwu_list.size(); vidx++) {
 
     // Make local arrays of the coordinates and forces.  Import coordinates and extant forces
     // from the global arrays.
     const int max_atoms = vwu_list[vidx].getMaxAtoms();
-    std::vector<double> sh_xcrd(max_atoms), sh_ycrd(max_atoms), sh_zcrd(max_atoms);
-    std::vector<double> sh_xfrc(max_atoms), sh_yfrc(max_atoms), sh_zfrc(max_atoms);
-    std::vector<double> sh_charges(max_atoms);
-    std::vector<int> sh_lj_idx(max_atoms);
+    sh_xcrd.resize(max_atoms);
+    sh_ycrd.resize(max_atoms);
+    sh_zcrd.resize(max_atoms);
+    sh_xfrc.resize(max_atoms);
+    sh_yfrc.resize(max_atoms);
+    sh_zfrc.resize(max_atoms);
+    sh_charges.resize(max_atoms);
+    sh_lj_idx.resize(max_atoms);
     const int n_imp_atoms = vwu_list[vidx].getImportedAtomCount();
     for (int i = 0; i < n_imp_atoms; i++) {
       const size_t atom_idx = vwu_list[vidx].getImportedAtomIndex(i);
