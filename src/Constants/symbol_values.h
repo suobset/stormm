@@ -11,6 +11,10 @@ constexpr double pi = 3.141592653589793115997963468544185161590576171875;
 constexpr double twopi = 2.0 * pi;
 constexpr double inverse_pi = 1.0 / pi;
 constexpr double inverse_twopi = 1.0 / twopi;
+constexpr float pi_f = 3.1415927410125732421875f;
+constexpr float twopi_f = 6.283185482025146484375f;
+constexpr float inverse_pi_f = 0.3183098733425140380859375f;
+constexpr float inverse_twopi_f = 0.15915493667125701904296875f;
 
 /// The tetrahedral bond angle, in radians to twenty decimal places
 constexpr double tetrahedral_angle = 1.91063323624901859610;

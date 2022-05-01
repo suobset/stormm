@@ -327,5 +327,374 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const int surf_idx,
+               const int surf_dim, const int i_atom, const int j_atom, const int k_atom,
+               const int l_atom, const int m_atom, const Tcoord* xcrd, const Tcoord* ycrd,
+               const Tcoord* zcrd, const double* umat, const double* invu,
+               const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+               const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
+               const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc value_one = 1.0;
+
+  // Compute displacements
+  std::vector<Tcalc> acoef(16);
+  Tcalc ab[3], bc[3], cd[3], de[3], crabbc[3], crbccd[3], crcdde[3], scr_phi[3], scr_psi[3];
+  Tcalc phi_progression[4], psi_progression[4], acoef_psi[4];
+  for (int i = 0; i < 4; i++) {
+    acoef_psi[i] = 0.0;
+  }
+  if (isSignedIntegralScalarType<Tcoord>()) {
+    ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+    ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+    ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+    cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
+    cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
+    cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+    de[0] = static_cast<Tcalc>(xcrd[m_atom] - xcrd[l_atom]) * inv_gpos_factor;
+    de[1] = static_cast<Tcalc>(ycrd[m_atom] - ycrd[l_atom]) * inv_gpos_factor;
+    de[2] = static_cast<Tcalc>(zcrd[m_atom] - zcrd[l_atom]) * inv_gpos_factor;
+  }
+  else {
+    ab[0] = xcrd[j_atom] - xcrd[i_atom];
+    ab[1] = ycrd[j_atom] - ycrd[i_atom];
+    ab[2] = zcrd[j_atom] - zcrd[i_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+    cd[0] = xcrd[l_atom] - xcrd[k_atom];
+    cd[1] = ycrd[l_atom] - ycrd[k_atom];
+    cd[2] = zcrd[l_atom] - zcrd[k_atom];
+    de[0] = xcrd[m_atom] - xcrd[l_atom];
+    de[1] = ycrd[m_atom] - ycrd[l_atom];
+    de[2] = zcrd[m_atom] - zcrd[l_atom];
+  }
+  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&de[0], &de[1], &de[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+    
+  // Compute the first dihedral
+  crossProduct(ab, bc, crabbc);
+  crossProduct(bc, cd, crbccd);
+  Tcalc cos_phi = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
+  if (tcalc_is_double) {
+    cos_phi /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                    (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+  }
+  else {
+    cos_phi /= sqrtf((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                     (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+  }
+  crossProduct(crabbc, crbccd, scr_phi);
+  cos_phi = (cos_phi < -value_one) ? -value_one : (cos_phi > value_one) ? value_one : cos_phi;
+  Tcalc phi;
+  if (tcalc_is_double) {
+    phi = (scr_phi[0]*bc[0] + scr_phi[1]*bc[1] + scr_phi[2]*bc[2] > 0.0) ?  acos(cos_phi) :
+                                                                           -acos(cos_phi);
+    phi += pi;
+    phi = (phi < 0.0) ? phi + twopi : (phi >= twopi) ? phi - twopi : phi;
+  }
+  else {
+    phi = (scr_phi[0]*bc[0] + scr_phi[1]*bc[1] + scr_phi[2]*bc[2] > 0.0f) ?  acosf(cos_phi) :
+                                                                            -acosf(cos_phi);
+    phi += pi_f;
+    phi = (phi < 0.0f) ? phi + twopi_f : (phi >= twopi_f) ? phi - twopi_f : phi;
+  }
+
+  // Compute the second dihedral
+  crossProduct(cd, de, crcdde);
+  Tcalc cos_psi = crbccd[0]*crcdde[0] + crbccd[1]*crcdde[1] + crbccd[2]*crcdde[2];
+  if (tcalc_is_double) {
+    cos_psi /= sqrt((crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]) *
+                    (crcdde[0]*crcdde[0] + crcdde[1]*crcdde[1] + crcdde[2]*crcdde[2]));
+  }
+  else {
+    cos_psi /= sqrtf((crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]) *
+                     (crcdde[0]*crcdde[0] + crcdde[1]*crcdde[1] + crcdde[2]*crcdde[2]));
+  }
+  crossProduct(crbccd, crcdde, scr_psi);
+  cos_psi = (cos_psi < -value_one) ? -value_one : (cos_psi > value_one) ? value_one : cos_psi;
+  Tcalc psi;
+  if (tcalc_is_double) {
+    psi = (scr_psi[0]*bc[0] + scr_psi[1]*bc[1] + scr_psi[2]*bc[2] > 0.0) ?  acos(cos_psi) :
+                                                                           -acos(cos_psi);
+    psi += pi;
+    psi = (psi < 0.0) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
+  }
+  else {
+    psi = (scr_psi[0]*bc[0] + scr_psi[1]*bc[1] + scr_psi[2]*bc[2] > 0.0f) ?  acosf(cos_psi) :
+                                                                            -acosf(cos_psi);
+    psi += pi_f;
+    psi = (psi < 0.0f) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
+  }
+  
+  // Compute the patch index (idx_phi, idx_psi) of the CMAP
+  const Tcalc dsurf_dim = static_cast<Tcalc>(surf_dim);
+  Tcalc phi_grid, psi_grid;
+  if (tcalc_is_double) {
+    phi_grid = phi * dsurf_dim * inverse_twopi;
+    psi_grid = psi * dsurf_dim * inverse_twopi;
+  }
+  else {
+    phi_grid = phi * dsurf_dim * inverse_twopi_f;
+    psi_grid = psi * dsurf_dim * inverse_twopi_f;
+  }
+  const int idx_phi = phi_grid;
+  const int idx_psi = psi_grid;
+  const Tcalc phifrac = phi_grid - idx_phi;
+  const Tcalc psifrac = psi_grid - idx_psi;
+
+  // Draw in the matrix of spline values and derivatives
+  const int patch_idx = cmap_patch_bounds[surf_idx] + (((idx_psi * surf_dim) + idx_phi) * 16);
+  for (int i = 0; i < 16; i++) {
+    acoef[i] = cmap_patches[patch_idx + i];
+  }
+
+  // Perform the matrix multiplications to obtain the bicubic spline coefficients
+  phi_progression[0] = 1.0;
+  psi_progression[0] = 1.0;
+  for (int i = 1; i < 4; i++) {
+    phi_progression[i] = phi_progression[i - 1] * phifrac;
+    psi_progression[i] = psi_progression[i - 1] * psifrac;
+  }
+  matrixVectorMultiply(acoef.data(), psi_progression, acoef_psi, 4, 4, 1.0, 1.0, 0.0);
+  const Tcalc contrib = (phi_progression[0] * acoef_psi[0]) + (phi_progression[1] * acoef_psi[1]) +
+                        (phi_progression[2] * acoef_psi[2]) + (phi_progression[3] * acoef_psi[3]);
+
+  // Compute forces, if requested
+  if (eval_force == EvaluateForce::YES) {
+
+    // The derivatives along phi and psi follow from the energy expression, evaluation of the
+    // guiding matrix equation for the bicubic spline potential:
+    //
+    //                                                    [ a00 a01 a02 a03     [ 1
+    // Energy = [ 1 + phifrac + phifrac^2 + phifrac^3 ] *   a10 a11 a12 a13  *    psifrac
+    //                                                      a20 a21 a22 a23       psifrac^2
+    //                                                      a30 a31 a32 a33 ]     psifrac^3 ]
+    Tcalc dphi, dpsi, mgab, mgbc, mgcd, mgde;
+    if (tcalc_is_double) {
+      dphi  = (((3.0 * acoef[15] * phifrac) + (2.0 * acoef[14])) * phifrac) + acoef[13];
+      dphi *= psifrac;
+      dphi +=       (((3.0 * acoef[11] * phifrac) + (2.0 * acoef[10])) * phifrac) + acoef[ 9];
+      dphi *= psifrac;
+      dphi +=       (((3.0 * acoef[ 7] * phifrac) + (2.0 * acoef[ 6])) * phifrac) + acoef[ 5];
+      dphi *= psifrac;
+      dphi +=       (((3.0 * acoef[ 3] * phifrac) + (2.0 * acoef[ 2])) * phifrac) + acoef[ 1];
+      dpsi  = (((3.0 * acoef[15] * psifrac) + (2.0 * acoef[11])) * psifrac) + acoef[ 7];
+      dpsi *= phifrac;
+      dpsi +=       (((3.0 * acoef[14] * psifrac) + (2.0 * acoef[10])) * psifrac) + acoef[ 6];
+      dpsi *= phifrac;
+      dpsi +=       (((3.0 * acoef[13] * psifrac) + (2.0 * acoef[ 9])) * psifrac) + acoef[ 5];
+      dpsi *= phifrac;
+      dpsi +=       (((3.0 * acoef[12] * psifrac) + (2.0 * acoef[ 8])) * psifrac) + acoef[ 4];
+      dphi *= dsurf_dim / twopi;
+      dpsi *= dsurf_dim / twopi;
+      mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+      mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+      mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+      mgde = sqrt(de[0]*de[0] + de[1]*de[1] + de[2]*de[2]);
+    }
+    else {
+      dphi  = (((3.0f * acoef[15] * phifrac) + (2.0f * acoef[14])) * phifrac) + acoef[13];
+      dphi *= psifrac;
+      dphi +=       (((3.0f * acoef[11] * phifrac) + (2.0f * acoef[10])) * phifrac) + acoef[ 9];
+      dphi *= psifrac;
+      dphi +=       (((3.0f * acoef[ 7] * phifrac) + (2.0f * acoef[ 6])) * phifrac) + acoef[ 5];
+      dphi *= psifrac;
+      dphi +=       (((3.0f * acoef[ 3] * phifrac) + (2.0f * acoef[ 2])) * phifrac) + acoef[ 1];
+      dpsi  = (((3.0f * acoef[15] * psifrac) + (2.0f * acoef[11])) * psifrac) + acoef[ 7];
+      dpsi *= phifrac;
+      dpsi +=       (((3.0f * acoef[14] * psifrac) + (2.0f * acoef[10])) * psifrac) + acoef[ 6];
+      dpsi *= phifrac;
+      dpsi +=       (((3.0f * acoef[13] * psifrac) + (2.0f * acoef[ 9])) * psifrac) + acoef[ 5];
+      dpsi *= phifrac;
+      dpsi +=       (((3.0f * acoef[12] * psifrac) + (2.0f * acoef[ 8])) * psifrac) + acoef[ 4];
+      dphi *= dsurf_dim / twopi;
+      dpsi *= dsurf_dim / twopi;
+      mgab = sqrtf(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+      mgbc = sqrtf(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+      mgcd = sqrtf(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+      mgde = sqrtf(de[0]*de[0] + de[1]*de[1] + de[2]*de[2]);
+    }
+
+    // With the derivative in hand, evaluate the transformation of coordinates for either the
+    // phi or psi dihedrals.
+    const Tcalc invab = value_one / mgab;
+    const Tcalc invbc = value_one / mgbc;
+    const Tcalc invcd = value_one / mgcd;
+    const Tcalc invde = value_one / mgde;
+    const Tcalc invabc = invab * invbc;
+    const Tcalc invbcd = invbc * invcd;
+    const Tcalc invcde = invcd * invde;
+    for (int i = 0; i < 3; i++) {
+      crabbc[i] *= invabc;
+      crbccd[i] *= invbcd;
+      crcdde[i] *= invcde;
+    }
+
+    // Feed the gradient, negative of the derivative, into the functions below
+    dphi *= -value_one;
+    dpsi *= -value_one;
+
+    // Phi accumulation: transform the rotational derivatives to cartesian coordinates
+    const Tcalc phi_cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
+    const Tcalc phi_cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+    Tcalc phi_isinb2, phi_isinc2;
+    if (tcalc_is_double) {
+      phi_isinb2 = (phi_cosb * phi_cosb < asymptotic_to_one_lf) ?
+                   dphi / (1.0 - (phi_cosb * phi_cosb)) : dphi * inverse_one_minus_asymptote_lf;
+      phi_isinc2 = (phi_cosc * phi_cosc < asymptotic_to_one_lf) ?
+                   dphi / (1.0 - (phi_cosc * phi_cosc)) : dphi * inverse_one_minus_asymptote_lf;
+    }
+    else {
+      phi_isinb2 = (phi_cosb * phi_cosb < asymptotic_to_one_f) ?
+                   dphi / (value_one - (phi_cosb * phi_cosb)) :
+                   dphi * inverse_one_minus_asymptote_f;
+      phi_isinc2 = (phi_cosc * phi_cosc < asymptotic_to_one_f) ?
+                   dphi / (value_one - (phi_cosc * phi_cosc)) :
+                   dphi * inverse_one_minus_asymptote_f;      
+    }
+    const Tcalc phi_fa = -invab * phi_isinb2;
+    const Tcalc phi_fb1 = (mgbc - (mgab * phi_cosb)) * invabc * phi_isinb2;
+    const Tcalc phi_fb2 = phi_cosc * invbc * phi_isinc2;
+    const Tcalc phi_fc1 = (mgbc - (mgcd * phi_cosc)) * invbcd * phi_isinc2;
+    const Tcalc phi_fc2 = phi_cosb * invbc * phi_isinb2;
+    const Tcalc phi_fd = -invcd * phi_isinc2;
+
+    // Psi accumulation: transform the rotational derivatives to cartesian coordinates
+    const Tcalc psi_cosb = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+    const Tcalc psi_cosc = -(cd[0]*de[0] + cd[1]*de[1] + cd[2]*de[2]) * invcd * invde;
+    Tcalc psi_isinb2, psi_isinc2;
+    if (tcalc_is_double) {
+      psi_isinb2 = (psi_cosb * psi_cosb < asymptotic_to_one_lf) ?
+                   dpsi / (1.0 - (psi_cosb * psi_cosb)) : dpsi * inverse_one_minus_asymptote_lf;
+      psi_isinc2 = (psi_cosc * psi_cosc < asymptotic_to_one_lf) ?
+                   dpsi / (1.0 - (psi_cosc * psi_cosc)) : dpsi * inverse_one_minus_asymptote_lf;
+    }
+    else {
+      psi_isinb2 = (psi_cosb * psi_cosb < asymptotic_to_one_f) ?
+                   dpsi / (value_one - (psi_cosb * psi_cosb)) :
+                   dpsi * inverse_one_minus_asymptote_f;
+      psi_isinc2 = (psi_cosc * psi_cosc < asymptotic_to_one_f) ?
+                   dpsi / (value_one - (psi_cosc * psi_cosc)) :
+                   dpsi * inverse_one_minus_asymptote_f;
+    }
+    const Tcalc psi_fa = -invbc * psi_isinb2;
+    const Tcalc psi_fb1 = (mgcd - (mgbc * psi_cosb)) * invbcd * psi_isinb2;
+    const Tcalc psi_fb2 = psi_cosc * invcd * psi_isinc2;
+    const Tcalc psi_fc1 = (mgcd - (mgde * psi_cosc)) * invcde * psi_isinc2;
+    const Tcalc psi_fc2 = psi_cosb * invcd * psi_isinb2;
+    const Tcalc psi_fd = -invde * psi_isinc2;
+
+    if (isSignedIntegralScalarType<Tforce>()) {
+
+      // Accumulate the phi dihedral forces
+      Tforce ifrc_ix = llround(crabbc[0] * phi_fa * force_factor);
+      Tforce ifrc_jx = llround(((phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0])) * force_factor);
+      Tforce ifrc_lx = llround(-phi_fd * crbccd[0] * force_factor);
+      xfrc[i_atom] += ifrc_ix;
+      xfrc[j_atom] += ifrc_jx;
+      xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
+      xfrc[l_atom] += ifrc_lx;
+      Tforce ifrc_iy = llround(crabbc[1] * phi_fa * force_factor);
+      Tforce ifrc_jy = llround(((phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1])) * force_factor);
+      Tforce ifrc_ly = llround(-phi_fd * crbccd[1] * force_factor);
+      yfrc[i_atom] += ifrc_iy;
+      yfrc[j_atom] += ifrc_jy;
+      yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
+      yfrc[l_atom] += ifrc_ly;
+      Tforce ifrc_iz = llround(crabbc[2] * phi_fa * force_factor);
+      Tforce ifrc_jz = llround(((phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2])) * force_factor);
+      Tforce ifrc_lz = llround(-phi_fd * crbccd[2] * force_factor);
+      zfrc[i_atom] += ifrc_iz;
+      zfrc[j_atom] += ifrc_jz;
+      zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
+      zfrc[l_atom] += ifrc_lz;
+
+      // Accumulate the psi dihedral forces
+      ifrc_jx = llround(crbccd[0] * psi_fa * force_factor);
+      Tforce ifrc_kx = llround(((psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0])) * force_factor);
+      Tforce ifrc_mx = llround(-psi_fd * crcdde[0] * force_factor);
+      xfrc[j_atom] += ifrc_jx;
+      xfrc[k_atom] += ifrc_kx;
+      xfrc[l_atom] -= ifrc_jx + ifrc_kx + ifrc_mx;
+      xfrc[m_atom] += ifrc_mx;
+      ifrc_jy = llround(crbccd[1] * psi_fa * force_factor);
+      Tforce ifrc_ky = llround(((psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1])) * force_factor);
+      Tforce ifrc_my = llround(-psi_fd * crcdde[1] * force_factor);
+      yfrc[j_atom] += ifrc_jy;
+      yfrc[k_atom] += ifrc_ky;
+      yfrc[l_atom] -= ifrc_jy + ifrc_ky + ifrc_my;
+      yfrc[m_atom] += ifrc_my;
+      ifrc_jz = llround(crbccd[2] * psi_fa * force_factor);
+      Tforce ifrc_kz = llround(((psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2])) * force_factor);
+      Tforce ifrc_mz = llround(-psi_fd * crcdde[2] * force_factor);
+      zfrc[j_atom] += ifrc_jz;
+      zfrc[k_atom] += ifrc_kz;
+      zfrc[l_atom] -= ifrc_jz + ifrc_kz + ifrc_mz;
+      zfrc[m_atom] += ifrc_mz;
+    }
+    else {
+      
+      // Accumulate the phi dihedral forces
+      Tforce frc_ix = crabbc[0] * phi_fa;
+      Tforce frc_jx = (phi_fb1 * crabbc[0]) - (phi_fb2 * crbccd[0]);
+      Tforce frc_lx = -phi_fd * crbccd[0];
+      xfrc[i_atom] += frc_ix;
+      xfrc[j_atom] += frc_jx;
+      xfrc[k_atom] -= frc_ix + frc_jx + frc_lx;
+      xfrc[l_atom] += frc_lx;
+      Tforce frc_iy = crabbc[1] * phi_fa;
+      Tforce frc_jy = (phi_fb1 * crabbc[1]) - (phi_fb2 * crbccd[1]);
+      Tforce frc_ly = -phi_fd * crbccd[1];
+      yfrc[i_atom] += frc_iy;
+      yfrc[j_atom] += frc_jy;
+      yfrc[k_atom] -= frc_iy + frc_jy + frc_ly;
+      yfrc[l_atom] += frc_ly;
+      Tforce frc_iz = crabbc[2] * phi_fa;
+      Tforce frc_jz = (phi_fb1 * crabbc[2]) - (phi_fb2 * crbccd[2]);
+      Tforce frc_lz = -phi_fd * crbccd[2];
+      zfrc[i_atom] += frc_iz;
+      zfrc[j_atom] += frc_jz;
+      zfrc[k_atom] -= frc_iz + frc_jz + frc_lz;
+      zfrc[l_atom] += frc_lz;
+
+      // Accumulate the psi dihedral forces
+      frc_jx = crbccd[0] * psi_fa;
+      Tforce frc_kx = (psi_fb1 * crbccd[0]) - (psi_fb2 * crcdde[0]);
+      Tforce frc_mx = -psi_fd * crcdde[0];
+      xfrc[j_atom] += frc_jx;
+      xfrc[k_atom] += frc_kx;
+      xfrc[l_atom] -= frc_jx + frc_kx + frc_mx;
+      xfrc[m_atom] += frc_mx;
+      frc_jy = crbccd[1] * psi_fa;
+      Tforce frc_ky = (psi_fb1 * crbccd[1]) - (psi_fb2 * crcdde[1]);
+      Tforce frc_my = -psi_fd * crcdde[1];
+      yfrc[j_atom] += frc_jy;
+      yfrc[k_atom] += frc_ky;
+      yfrc[l_atom] -= frc_jy + frc_ky + frc_my;
+      yfrc[m_atom] += frc_my;
+      frc_jz = crbccd[2] * psi_fa;
+      Tforce frc_kz = (psi_fb1 * crbccd[2]) - (psi_fb2 * crcdde[2]);
+      Tforce frc_mz = -psi_fd * crcdde[2];
+      zfrc[j_atom] += frc_jz;
+      zfrc[k_atom] += frc_kz;
+      zfrc[l_atom] -= frc_jz + frc_kz + frc_mz;
+      zfrc[m_atom] += frc_mz;
+    }
+  }
+
+  // Return the double-precision energy result.  It will be converted to a fixed-precision
+  // quantity later.
+  return contrib;
+}
+
 } // namespace energy
 } // namespace omni

@@ -3,7 +3,9 @@
 #define OMNI_VALENCE_POTENTIAL_H
 
 #include <cmath>
+#include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "Math/matrix_ops.h"
 #include "Math/vector_ops.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Structure/local_arrangement.h"
@@ -20,10 +22,18 @@ namespace energy {
 
 using data_types::isSignedIntegralScalarType;
 using math::crossProduct;
+using math::matrixMultiply;
+using math::matrixVectorMultiply;
 using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
 using structure::imageCoordinates;
 using structure::ImagingMethod;
+using symbols::pi;
+using symbols::pi_f;
+using symbols::twopi;
+using symbols::twopi_f;
+using symbols::inverse_twopi;
+using symbols::inverse_twopi_f;
 using topology::AtomGraph;
 using topology::ValenceKit;
 using topology::NonbondedKit;
@@ -437,11 +447,13 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameRea
 /// \param yfrc               Cartesian X forces acting on all particles
 /// \param zfrc               Cartesian X forces acting on all particles
 /// \param eval_force         Flag to have forces also evaluated
-double evalCmap(const double* cmap_patches, const int* cmap_patch_bounds, int surf_idx,
-                int surf_dim, int i_atom, int j_atom, int k_atom, int l_atom, int m_atom,
-                const double* xcrd, const double* ycrd, const double* zcrd, const double* umat,
-                const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
-                double* zfrc, EvaluateForce eval_force);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, int surf_idx,
+               int surf_dim, int i_atom, int j_atom, int k_atom, int l_atom, int m_atom,
+               const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+               const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+               Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+               Tcalc force_factor = 1.0);
   
 /// \brief Evaluate CHARMM CMAP two-dimensional cubic spline potentials.  As with all other
 ///        functions in this library, the results of double-precision accumulation are returned
