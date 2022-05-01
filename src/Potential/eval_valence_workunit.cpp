@@ -114,9 +114,10 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const double keq = (is_urey_bradley) ? vk.ubrd_keq[param_idx] : vk.bond_keq[param_idx];
       const double leq = (is_urey_bradley) ? vk.ubrd_leq[param_idx] :
                                              fabs(vk.bond_leq[param_idx]);
-      const double du = evalHarmonicStretch(i_atom, j_atom, keq, leq, sh_xcrd, sh_ycrd, sh_zcrd,
-                                            nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc,
-                                            sh_zfrc, eval_force);
+      const double du =
+        evalHarmonicStretch<double, double, double>(i_atom, j_atom, keq, leq, sh_xcrd, sh_ycrd,
+                                                    sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                                    sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         if (is_urey_bradley) {
           ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
@@ -151,9 +152,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int param_idx = tinsr.y;
       const double keq = vk.angl_keq[param_idx];
       const double theta0 = vk.angl_theta[param_idx];
-      const double du = evalHarmonicBend(i_atom, j_atom, k_atom, keq, theta0, sh_xcrd, sh_ycrd,
-                                         sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                         sh_yfrc, sh_zfrc, eval_force);
+      const double du =
+        evalHarmonicBend<double, double, double>(i_atom, j_atom, k_atom, keq, theta0, sh_xcrd,
+                                                 sh_ycrd, sh_zcrd, nullptr, nullptr,
+                                                 UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                                                 eval_force);
       if (log_term) {
         angl_acc += static_cast<llint>(llround(du * nrg_scale_factor));
       }

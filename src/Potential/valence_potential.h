@@ -2,7 +2,11 @@
 #ifndef OMNI_VALENCE_POTENTIAL_H
 #define OMNI_VALENCE_POTENTIAL_H
 
+#include <cmath>
+#include "DataTypes/common_types.h"
+#include "Math/vector_ops.h"
 #include "Restraints/restraint_apparatus.h"
+#include "Structure/local_arrangement.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -14,8 +18,12 @@
 namespace omni {
 namespace energy {
 
+using data_types::isSignedIntegralScalarType;
+using math::crossProduct;
 using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
+using structure::imageCoordinates;
+using structure::ImagingMethod;
 using topology::AtomGraph;
 using topology::ValenceKit;
 using topology::NonbondedKit;
@@ -45,24 +53,29 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \brief Evaluate the energy and forces dur to a harmonic stretching term (both harmonic bonds
 ///        and Urey-Bradley terms can be evaluated with this function).
 ///
-/// \param i_atom       Index of the first atom in the interaction
-/// \param j_atom       Index of the second atom in the interaction
-/// \param stiffness    Stiffness of the stretching potential (units of kcal/mol-Angstrom)
-/// \param equilibrium  Equilibrium value of the stretching function (units of Angstroms)
-/// \param xcrd         Cartesian X coordinates of all particles
-/// \param ycrd         Cartesian Y coordinates of all particles
-/// \param zcrd         Cartesian Z coordinates of all particles
-/// \param umat         Box space transformation matrix
-/// \param invu         Inverse transformation matrix, fractional coordinates back to real space
-/// \param unit_cell    The unit cell type, i.e. triclinic
-/// \param xfrc         Cartesian X forces acting on all particles
-/// \param yfrc         Cartesian X forces acting on all particles
-/// \param zfrc         Cartesian X forces acting on all particles
-/// \param eval_force   Flag to have forces also evaluated
-double evalHarmonicStretch(int i_atom, int j_atom, double stiffness, double equilibrium,
-                           const double* xcrd, const double* ycrd, const double* zcrd,
-                           const double* umat, const double* invu, UnitCellType unit_cell,
-                           double* xfrc, double* yfrc, double* zfrc, EvaluateForce eval_force);
+/// \param i_atom           Index of the first atom in the interaction
+/// \param j_atom           Index of the second atom in the interaction
+/// \param stiffness        Stiffness of the stretching potential (units of kcal/mol-Angstrom)
+/// \param equilibrium      Equilibrium value of the stretching function (units of Angstroms)
+/// \param xcrd             Cartesian X coordinates of all particles
+/// \param ycrd             Cartesian Y coordinates of all particles
+/// \param zcrd             Cartesian Z coordinates of all particles
+/// \param umat             Box space transformation matrix, real coordinates to fractional space
+/// \param invu             Inverse transformation matrix, fractional coordinates to real space
+/// \param unit_cell        The unit cell type, i.e. triclinic
+/// \param xfrc             Cartesian X forces acting on all particles
+/// \param yfrc             Cartesian X forces acting on all particles
+/// \param zfrc             Cartesian X forces acting on all particles
+/// \param eval_force       Flag to have forces also evaluated
+/// \param inv_gpos_factor  Inverse positional scaling factor (for signed integer, fixed-precision
+///                         coordinate representations)
+/// \param force_factor     Force scaling factor for fixed-precision force accumulation
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalHarmonicStretch(int i_atom, int j_atom, Tcalc stiffness, Tcalc equilibrium,
+                          const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                          const double* umat, const double* invu, UnitCellType unit_cell,
+                          Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
+                          Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 /// \brief Evaluate the bond energy contributions based on a topology and a coordinate set.
 ///        These simple routines can serve as a check on much more complex routines involving
@@ -128,10 +141,12 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 /// \param k_atom       Index of the third atom in the interaction
 /// \param stiffness    Stiffness constant for the bending function, units of kcal/mol-radian
 /// \param equilibrium  Equilibrium value for the bending function, units of radians
-double evalHarmonicBend(int i_atom, int j_atom, int k_atom, double stiffness, double equilibrium,
-                        const double* xcrd, const double* ycrd, const double* zcrd,
-                        const double* umat, const double* invu, UnitCellType unit_cell,
-                        double* xfrc, double* yfrc, double* zfrc, EvaluateForce eval_force);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalHarmonicBend(int i_atom, int j_atom, int k_atom, Tcalc stiffness, Tcalc equilibrium,
+                       const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                       const double* umat, const double* invu, UnitCellType unit_cell,
+                       Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
+                       Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
 ///        topology and a coordinate set.  These simple routines can serve as a check on much more
@@ -191,18 +206,22 @@ double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                           ScoreCard *ecard, int system_index = 0);
 /// \}
 
-/// \brief Evalaute the energy and forces due to a cosine-based diehdral term.  Parameters for
-///        this function follow evalHarmonicBend, with the addition of:
+/// \brief Evalaute the energy and forces due to a cosine-based or harmonic dihedral term.
+///        Parameters for this function follow evalHarmonicBend, with the addition of:
 ///
 /// \param l_atom       Index of the fourth atom in the interaction
 /// \param amplitude    Amplitude of the cosine wave, units of kcal/mol
 /// \param phase_angle  Phase shift of the cosine function argument, units of radians
 /// \param frequency    Periodicity (frequency) in the cosine function argument
-double evalCosineTwist(int i_atom, int j_atom, int k_atom, int l_atom, double amplitude,
-                       double phase_angle, double frequency, const double* xcrd,
-                       const double* ycrd, const double* zcrd, const double* umat,
-                       const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
-                       double* zfrc, EvaluateForce eval_force);
+/// \param kind         Specifies that the dihedral potential is either a cosine series term or a
+///                     harmonic penalty function
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalDihedralTwist(int i_atom, int j_atom, int k_atom, int l_atom, Tcalc amplitude,
+                        Tcalc phase_angle, Tcalc frequency, DihedralStyle kind,
+                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
+                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 /// \brief Evaluate the proper and improper dihedral energy contributions with a simple routine
 ///        based on a topology and a PhaseSpace object to store forces in double precision.  The
@@ -732,5 +751,7 @@ double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameRea
   
 } // namespace energy
 } // namespace omni
+
+#include "valence_potential.tpp"
 
 #endif

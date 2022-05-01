@@ -15,6 +15,12 @@ enum class EvaluateVirial {
   NO, YES
 };
 
+/// \brief Enumerate the types of dihedral potentials that can be evaluated in the context of the
+///        abstracted routine.
+enum class DihedralStyle {
+  COSINE, HARMONIC
+};
+
 /// \brief Enumerate all state variables that OMNI will track.  This must always increment by one
 ///        from one enumeration to the next, start at zero, and always end with ALL_STATES.
 enum class StateVariable {
