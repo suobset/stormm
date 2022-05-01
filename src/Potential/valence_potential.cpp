@@ -24,6 +24,35 @@ using topology::TorsionKind;
 using topology::UnitCellType;
 
 //-------------------------------------------------------------------------------------------------
+double evalHarmonicStretch(const int i_atom, const int j_atom, const double stiffness,
+                           const double equilibrium, const double* xcrd, const double* ycrd,
+                           const double* zcrd, const double* umat, const double* invu,
+                           const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                           const EvaluateForce eval_force) {
+  double dx = xcrd[j_atom] - xcrd[i_atom];
+  double dy = ycrd[j_atom] - ycrd[i_atom];
+  double dz = zcrd[j_atom] - zcrd[i_atom];
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+  const double dl = dr - equilibrium;
+
+  // Compute forces
+  if (eval_force == EvaluateForce::YES) {
+    const double fmag = 2.0 * stiffness * dl / dr;
+    const double fmag_dx = fmag * dx;
+    const double fmag_dy = fmag * dy;
+    const double fmag_dz = fmag * dz;
+    xfrc[i_atom] += fmag_dx;
+    yfrc[i_atom] += fmag_dy;
+    zfrc[i_atom] += fmag_dz;
+    xfrc[j_atom] -= fmag_dx;
+    yfrc[j_atom] -= fmag_dy;
+    zfrc[j_atom] -= fmag_dz;
+  }
+  return stiffness * dl * dl;
+}
+  
+//-------------------------------------------------------------------------------------------------
 double evaluateBondTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                          const double* zcrd, const double* umat, const double* invu,
                          const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
@@ -39,34 +68,13 @@ double evaluateBondTerms(const ValenceKit<double> vk, const double* xcrd, const 
 
   // Accumulate the results (energy in both precision models)
   for (int pos = 0; pos < vk.nbond; pos++) {
-    const int i_atom = vk.bond_i_atoms[pos];
-    const int j_atom = vk.bond_j_atoms[pos];
     const int param_idx = vk.bond_param_idx[pos];
-    const double keq = vk.bond_keq[param_idx];
-    const double leq = fabs(vk.bond_leq[param_idx]);
-    double dx = xcrd[j_atom] - xcrd[i_atom];
-    double dy = ycrd[j_atom] - ycrd[i_atom];
-    double dz = zcrd[j_atom] - zcrd[i_atom];
-    imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-    const double dl = dr - leq;
-    const double du = keq * dl * dl;
+    const double du = evalHarmonicStretch(vk.bond_i_atoms[pos], vk.bond_j_atoms[pos],
+                                          vk.bond_keq[param_idx], fabs(vk.bond_leq[param_idx]),
+                                          xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                                          zfrc, eval_force);
     bond_energy += du;
     bond_acc += static_cast<llint>(llround(du * nrg_scale_factor));
-
-    // Compute forces
-    if (eval_force == EvaluateForce::YES) {
-      const double fmag = 2.0 * keq * dl / dr;
-      const double fmag_dx = fmag * dx;
-      const double fmag_dy = fmag * dy;
-      const double fmag_dz = fmag * dz;
-      xfrc[i_atom] += fmag_dx;
-      yfrc[i_atom] += fmag_dy;
-      zfrc[i_atom] += fmag_dz;
-      xfrc[j_atom] -= fmag_dx;
-      yfrc[j_atom] -= fmag_dy;
-      zfrc[j_atom] -= fmag_dz;
-    }
   }
 
   // Contribute results
@@ -127,6 +135,57 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
+double evalHarmonicBend(const int i_atom, const int j_atom, const int k_atom,
+                        const double stiffness, const double equilibrium, const double* xcrd,
+                        const double* ycrd, const double* zcrd, const double* umat,
+                        const double* invu, const UnitCellType unit_cell, double* xfrc,
+                        double* yfrc, double* zfrc, const EvaluateForce eval_force) {
+
+  // Compute displacements
+  double ba[3], bc[3];
+  ba[0] = xcrd[i_atom] - xcrd[j_atom];
+  ba[1] = ycrd[i_atom] - ycrd[j_atom];
+  ba[2] = zcrd[i_atom] - zcrd[j_atom];
+  bc[0] = xcrd[k_atom] - xcrd[j_atom];
+  bc[1] = ycrd[k_atom] - ycrd[j_atom];
+  bc[2] = zcrd[k_atom] - zcrd[j_atom];
+  imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+
+  // On to the angle force computation
+  const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
+  const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
+  const double invbabc = 1.0 / sqrt(mgba * mgbc);
+  double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
+  costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
+  const double theta = acos(costheta);
+  const double dtheta = theta - equilibrium;
+
+  // Compute forces
+  if (eval_force == EvaluateForce::YES) {
+    const double dA = -2.0 * stiffness * dtheta / sqrt(1.0 - (costheta * costheta));
+    const double sqba = dA / mgba;
+    const double sqbc = dA / mgbc;
+    const double mbabc = dA * invbabc;
+    double adf[3], cdf[3];
+    for (int i = 0; i < 3; i++) {
+      adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
+      cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
+    }
+    xfrc[i_atom] -= adf[0];
+    yfrc[i_atom] -= adf[1];
+    zfrc[i_atom] -= adf[2];
+    xfrc[j_atom] += adf[0] + cdf[0];
+    yfrc[j_atom] += adf[1] + cdf[1];
+    zfrc[j_atom] += adf[2] + cdf[2];
+    xfrc[k_atom] -= cdf[0];
+    yfrc[k_atom] -= cdf[1];
+    zfrc[k_atom] -= cdf[2];
+  }
+  return stiffness * dtheta * dtheta;
+}
+  
+//-------------------------------------------------------------------------------------------------
 double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                           const double* zcrd, const double* umat, const double* invu,
                           const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
@@ -144,60 +203,14 @@ double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
 
   // Accumulate results by looping over all angle bending terms.
-  double ba[3], bc[3];
   for (int pos = 0; pos < vk.nangl; pos++) {
-
-    // Get parameters for an angle between atoms i, j, and k
-    const int i_atom = vk.angl_i_atoms[pos];
-    const int j_atom = vk.angl_j_atoms[pos];
-    const int k_atom = vk.angl_k_atoms[pos];
     const int param_idx = vk.angl_param_idx[pos];
-    const double keq = vk.angl_keq[param_idx];
-    const double theta0 = vk.angl_theta[param_idx];
-
-    // Compute displacements
-    ba[0] = xcrd[i_atom] - xcrd[j_atom];
-    ba[1] = ycrd[i_atom] - ycrd[j_atom];
-    ba[2] = zcrd[i_atom] - zcrd[j_atom];
-    bc[0] = xcrd[k_atom] - xcrd[j_atom];
-    bc[1] = ycrd[k_atom] - ycrd[j_atom];
-    bc[2] = zcrd[k_atom] - zcrd[j_atom];
-    imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-
-    // On to the angle force computation
-    const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
-    const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
-    const double invbabc = 1.0 / sqrt(mgba * mgbc);
-    double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
-    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-    const double theta = acos(costheta);
-    const double dtheta = theta - theta0;
-    const double du = keq * dtheta * dtheta;
+    const double du = evalHarmonicBend(vk.angl_i_atoms[pos], vk.angl_j_atoms[pos],
+                                       vk.angl_k_atoms[pos], vk.angl_keq[param_idx],
+                                       vk.angl_theta[param_idx], xcrd, ycrd, zcrd, umat, invu,
+                                       unit_cell, xfrc, yfrc, zfrc, eval_force);
     angl_energy += du;
     angl_acc += static_cast<llint>(llround(du * nrg_scale_factor));
-
-    // Compute forces
-    if (eval_force == EvaluateForce::YES) {
-      const double dA = -2.0 * keq * dtheta / sqrt(1.0 - (costheta * costheta));
-      const double sqba = dA / mgba;
-      const double sqbc = dA / mgbc;
-      const double mbabc = dA * invbabc;
-      double adf[3], cdf[3];
-      for (int i = 0; i < 3; i++) {
-        adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
-        cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
-      }
-      xfrc[i_atom] -= adf[0];
-      yfrc[i_atom] -= adf[1];
-      zfrc[i_atom] -= adf[2];
-      xfrc[j_atom] += adf[0] + cdf[0];
-      yfrc[j_atom] += adf[1] + cdf[1];
-      zfrc[j_atom] += adf[2] + cdf[2];
-      xfrc[k_atom] -= cdf[0];
-      yfrc[k_atom] -= cdf[1];
-      zfrc[k_atom] -= cdf[2];
-    }
   }
 
   // Contribute results
@@ -255,6 +268,85 @@ double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
+double evalCosineTwist(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
+                       const double amplitude, const double phase_angle, double frequency,
+                       const double* xcrd, const double* ycrd, const double* zcrd,
+                       const double* umat, const double* invu, const UnitCellType unit_cell,
+                       double* xfrc, double* yfrc, double* zfrc, const EvaluateForce eval_force) {
+
+  // Compute displacements
+  double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
+  ab[0] = xcrd[j_atom] - xcrd[i_atom];
+  ab[1] = ycrd[j_atom] - ycrd[i_atom];
+  ab[2] = zcrd[j_atom] - zcrd[i_atom];
+  bc[0] = xcrd[k_atom] - xcrd[j_atom];
+  bc[1] = ycrd[k_atom] - ycrd[j_atom];
+  bc[2] = zcrd[k_atom] - zcrd[j_atom];
+  cd[0] = xcrd[l_atom] - xcrd[k_atom];
+  cd[1] = ycrd[l_atom] - ycrd[k_atom];
+  cd[2] = zcrd[l_atom] - zcrd[k_atom];
+  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+
+  // Compute cross products and then the angle between the planes
+  crossProduct(ab, bc, crabbc);
+  crossProduct(bc, cd, crbccd);
+  double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
+  costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                   (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+  crossProduct(crabbc, crbccd, scr);
+  costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
+  const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
+                                                                            -acos(costheta);
+  const double sangle = (frequency * theta) - phase_angle;
+
+  // Compute forces, if requested
+  if (eval_force == EvaluateForce::YES) {
+    const double fr = amplitude * frequency * sin(sangle);
+    const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+    const double invab = 1.0 / mgab;
+    const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+    const double invbc = 1.0 / mgbc;
+    const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+    const double invcd = 1.0 / mgcd;
+    const double cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
+    const double isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
+                          fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
+    const double cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+    const double isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
+                          fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
+    const double invabc = invab * invbc;
+    const double invbcd = invbc * invcd;
+    for (int i = 0; i < 3; i++) {
+      crabbc[i] *= invabc;
+      crbccd[i] *= invbcd;
+    }
+
+    // Transform the rotational derivatives to cartesian coordinates
+    const double fa = -invab * isinb2;
+    const double fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
+    const double fb2 = cosc * invbc * isinc2;
+    const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
+    const double fc2 = cosb * invbc * isinb2;
+    const double fd = -invcd * isinc2;
+    xfrc[i_atom] += crabbc[0] * fa;
+    xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
+    xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
+    xfrc[l_atom] -= fd * crbccd[0];
+    yfrc[i_atom] += crabbc[1] * fa;
+    yfrc[j_atom] += (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
+    yfrc[k_atom] += (fc2 * crabbc[1]) - (fc1 * crbccd[1]);
+    yfrc[l_atom] -= fd * crbccd[1];
+    zfrc[i_atom] += crabbc[2] * fa;
+    zfrc[j_atom] += (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
+    zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
+    zfrc[l_atom] -= fd * crbccd[2];
+  }
+  return amplitude * (1.0 + cos(sangle));
+}
+
+//-------------------------------------------------------------------------------------------------
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
                               const double* zcrd, const double* umat, const double* invu,
                               const UnitCellType unit_cell, double* xfrc, double* yfrc,
@@ -266,102 +358,27 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, c
   const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
 
   // Accumulate results by looping over all dihedral terms.
-  double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
   for (int pos = 0; pos < vk.ndihe; pos++) {
-
-    // Get parameters for an angle between atoms i, j, and k
-    const int i_atom = vk.dihe_i_atoms[pos];
-    const int j_atom = vk.dihe_j_atoms[pos];
-    const int k_atom = vk.dihe_k_atoms[pos];
-    const int l_atom = vk.dihe_l_atoms[pos];
     const int param_idx = vk.dihe_param_idx[pos];
-    const double ampl = vk.dihe_amp[param_idx];
-    const double freq = vk.dihe_freq[param_idx];
-    const double phi  = vk.dihe_phi[param_idx];
     const TorsionKind kind = static_cast<TorsionKind>(vk.dihe_modifiers[pos].w);
-
-    // Compute displacements
-    ab[0] = xcrd[j_atom] - xcrd[i_atom];
-    ab[1] = ycrd[j_atom] - ycrd[i_atom];
-    ab[2] = zcrd[j_atom] - zcrd[i_atom];
-    bc[0] = xcrd[k_atom] - xcrd[j_atom];
-    bc[1] = ycrd[k_atom] - ycrd[j_atom];
-    bc[2] = zcrd[k_atom] - zcrd[j_atom];
-    cd[0] = xcrd[l_atom] - xcrd[k_atom];
-    cd[1] = ycrd[l_atom] - ycrd[k_atom];
-    cd[2] = zcrd[l_atom] - zcrd[k_atom];
-    imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-
-    // Compute cross products and then the angle between the planes
-    crossProduct(ab, bc, crabbc);
-    crossProduct(bc, cd, crbccd);
-    double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
-    costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
-                     (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
-    crossProduct(crabbc, crbccd, scr);
-    costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-    const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
-                                                                              -acos(costheta);
-    const double sangle = freq * theta - phi;
+    const double du = evalCosineTwist(vk.dihe_i_atoms[pos], vk.dihe_j_atoms[pos],
+                                      vk.dihe_k_atoms[pos], vk.dihe_l_atoms[pos],
+                                      vk.dihe_amp[param_idx], vk.dihe_phi[param_idx],
+                                      vk.dihe_freq[param_idx], xcrd, ycrd, zcrd, umat, invu,
+                                      unit_cell, xfrc, yfrc, zfrc, eval_force);
 
     // Contribute the result to the correct pile: proper or improper
-    const double contrib = ampl * (1.0 + cos(sangle));
     switch (kind) {
     case TorsionKind::PROPER:
     case TorsionKind::PROPER_NO_14:
-      dihe_energy.x += contrib;
-      proper_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+      dihe_energy.x += du;
+      proper_acc += static_cast<llint>(llround(du * nrg_scale_factor));
       break;
     case TorsionKind::IMPROPER:
     case TorsionKind::IMPROPER_NO_14:
-      dihe_energy.y += contrib;
-      improper_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+      dihe_energy.y += du;
+      improper_acc += static_cast<llint>(llround(du * nrg_scale_factor));
       break;
-    }
-
-    // Compute forces, if requested
-    if (eval_force == EvaluateForce::YES) {
-      const double fr = ampl * freq * sin(sangle);
-      const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
-      const double invab = 1.0 / mgab;
-      const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
-      const double invbc = 1.0 / mgbc;
-      const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
-      const double invcd = 1.0 / mgcd;
-      const double cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
-      const double isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
-                            fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
-      const double cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
-      const double isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
-                            fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
-      const double invabc = invab * invbc;
-      const double invbcd = invbc * invcd;
-      for (int i = 0; i < 3; i++) {
-        crabbc[i] *= invabc;
-        crbccd[i] *= invbcd;
-      }
-
-      // Transform the rotational derivatives to cartesian coordinates
-      const double fa = -invab * isinb2;
-      const double fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
-      const double fb2 = cosc * invbc * isinc2;
-      const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
-      const double fc2 = cosb * invbc * isinb2;
-      const double fd = -invcd * isinc2;
-      xfrc[i_atom] += crabbc[0] * fa;
-      xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
-      xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
-      xfrc[l_atom] -= fd * crbccd[0];
-      yfrc[i_atom] += crabbc[1] * fa;
-      yfrc[j_atom] += (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
-      yfrc[k_atom] += (fc2 * crabbc[1]) - (fc1 * crbccd[1]);
-      yfrc[l_atom] -= fd * crbccd[1];
-      zfrc[i_atom] += crabbc[2] * fa;
-      zfrc[j_atom] += (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
-      zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
-      zfrc[l_atom] -= fd * crbccd[2];
     }
   }
 
@@ -433,34 +450,13 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const double* xcrd,
 
   // Accumulate the results (energy in both precision models)
   for (int pos = 0; pos < vk.nubrd; pos++) {
-    const int i_atom = vk.ubrd_i_atoms[pos];
-    const int k_atom = vk.ubrd_k_atoms[pos];
     const int param_idx = vk.ubrd_param_idx[pos];
-    const double keq = vk.ubrd_keq[param_idx];
-    const double leq = vk.ubrd_leq[param_idx];
-    double dx = xcrd[k_atom] - xcrd[i_atom];
-    double dy = ycrd[k_atom] - ycrd[i_atom];
-    double dz = zcrd[k_atom] - zcrd[i_atom];
-    imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-    const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-    const double dl = dr - leq;
-    const double du = keq * dl * dl;
+    const double du = evalHarmonicStretch(vk.ubrd_i_atoms[pos], vk.ubrd_k_atoms[pos],
+                                          vk.ubrd_keq[param_idx], vk.ubrd_leq[param_idx],
+                                          xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                                          zfrc, eval_force);
     ubrd_energy += du;
     ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
-
-    // Compute forces
-    if (eval_force == EvaluateForce::YES) {
-      const double fmag = 2.0 * keq * dl / dr;
-      const double fmag_dx = fmag * dx;
-      const double fmag_dy = fmag * dy;
-      const double fmag_dz = fmag * dz;
-      xfrc[i_atom] += fmag_dx;
-      yfrc[i_atom] += fmag_dy;
-      zfrc[i_atom] += fmag_dz;
-      xfrc[k_atom] -= fmag_dx;
-      yfrc[k_atom] -= fmag_dy;
-      zfrc[k_atom] -= fmag_dz;
-    }
   }
 
   // Contribute results

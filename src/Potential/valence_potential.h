@@ -42,6 +42,28 @@ constexpr double inverse_one_minus_asymptote_lf = 1048576.0;
 constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \}
 
+/// \brief Evaluate the energy and forces dur to a harmonic stretching term (both harmonic bonds
+///        and Urey-Bradley terms can be evaluated with this function).
+///
+/// \param i_atom       Index of the first atom in the interaction
+/// \param j_atom       Index of the second atom in the interaction
+/// \param stiffness    Stiffness of the stretching potential (units of kcal/mol-Angstrom)
+/// \param equilibrium  Equilibrium value of the stretching function (units of Angstroms)
+/// \param xcrd         Cartesian X coordinates of all particles
+/// \param ycrd         Cartesian Y coordinates of all particles
+/// \param zcrd         Cartesian Z coordinates of all particles
+/// \param umat         Box space transformation matrix
+/// \param invu         Inverse transformation matrix, fractional coordinates back to real space
+/// \param unit_cell    The unit cell type, i.e. triclinic
+/// \param xfrc         Cartesian X forces acting on all particles
+/// \param yfrc         Cartesian X forces acting on all particles
+/// \param zfrc         Cartesian X forces acting on all particles
+/// \param eval_force   Flag to have forces also evaluated
+double evalHarmonicStretch(int i_atom, int j_atom, double stiffness, double equilibrium,
+                           const double* xcrd, const double* ycrd, const double* zcrd,
+                           const double* umat, const double* invu, UnitCellType unit_cell,
+                           double* xfrc, double* yfrc, double* zfrc, EvaluateForce eval_force);
+
 /// \brief Evaluate the bond energy contributions based on a topology and a coordinate set.
 ///        These simple routines can serve as a check on much more complex routines involving
 ///        streamlined data structures and GPU execution.
@@ -99,7 +121,18 @@ double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
 double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                          ScoreCard *ecard, int system_index = 0);
 /// \}
-  
+
+/// \brief Evaluate the energy and forces due to a harmonic bending interaction.  Parameters for
+///        this function follow evalHarmonicStretch, with the addition of:
+///
+/// \param k_atom       Index of the third atom in the interaction
+/// \param stiffness    Stiffness constant for the bending function, units of kcal/mol-radian
+/// \param equilibrium  Equilibrium value for the bending function, units of radians
+double evalHarmonicBend(int i_atom, int j_atom, int k_atom, double stiffness, double equilibrium,
+                        const double* xcrd, const double* ycrd, const double* zcrd,
+                        const double* umat, const double* invu, UnitCellType unit_cell,
+                        double* xfrc, double* yfrc, double* zfrc, EvaluateForce eval_force);
+
 /// \brief Evaluate the angle bending energy contributions with a simple routine based on a
 ///        topology and a coordinate set.  These simple routines can serve as a check on much more
 ///        complex routines involving streamlined data structures and GPU execution.
@@ -157,6 +190,19 @@ double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
 double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                           ScoreCard *ecard, int system_index = 0);
 /// \}
+
+/// \brief Evalaute the energy and forces due to a cosine-based diehdral term.  Parameters for
+///        this function follow evalHarmonicBend, with the addition of:
+///
+/// \param l_atom       Index of the fourth atom in the interaction
+/// \param amplitude    Amplitude of the cosine wave, units of kcal/mol
+/// \param phase_angle  Phase shift of the cosine function argument, units of radians
+/// \param frequency    Periodicity (frequency) in the cosine function argument
+double evalCosineTwist(int i_atom, int j_atom, int k_atom, int l_atom, double amplitude,
+                       double phase_angle, double frequency, const double* xcrd,
+                       const double* ycrd, const double* zcrd, const double* umat,
+                       const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
+                       double* zfrc, EvaluateForce eval_force);
 
 /// \brief Evaluate the proper and improper dihedral energy contributions with a simple routine
 ///        based on a topology and a PhaseSpace object to store forces in double precision.  The
