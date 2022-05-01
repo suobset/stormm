@@ -13,11 +13,56 @@ using trajectory::PhaseSpaceReader;
 using trajectory::PhaseSpaceWriter;
 
 //-------------------------------------------------------------------------------------------------
+void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid) {
+  switch (activity) {
+  case VwuTask::BOND:
+    ecard->initialize(StateVariable::BOND, sysid);
+    break;
+  case VwuTask::ANGL:
+    ecard->initialize(StateVariable::ANGLE, sysid);
+    break;
+  case VwuTask::DIHE:
+    ecard->initialize(StateVariable::PROPER_DIHEDRAL, sysid);
+    ecard->initialize(StateVariable::IMPROPER_DIHEDRAL, sysid);
+    break;
+  case VwuTask::UBRD:
+    ecard->initialize(StateVariable::UREY_BRADLEY, sysid);
+    break;
+  case VwuTask::CIMP:
+    ecard->initialize(StateVariable::CHARMM_IMPROPER, sysid);
+    break;
+  case VwuTask::CMAP:
+    ecard->initialize(StateVariable::CMAP, sysid);
+    break;
+  case VwuTask::INFR14:
+    ecard->initialize(StateVariable::ELECTROSTATIC_ONE_FOUR, sysid);
+    ecard->initialize(StateVariable::VDW_ONE_FOUR, sysid);
+    break;
+  case VwuTask::RPOSN:
+  case VwuTask::RBOND:
+  case VwuTask::RANGL:
+  case VwuTask::RDIHE:
+    ecard->initialize(StateVariable::RESTRAINT, sysid);
+    break;
+  case VwuTask::SETTLE:
+  case VwuTask::CGROUP:
+  case VwuTask::VSITE:
+  case VwuTask::CDHE:
+  case VwuTask::CBND:
+    break;
+  case VwuTask::ALL_TASKS:
+    ecard->initialize({ StateVariable::BOND, StateVariable::ANGLE, StateVariable::PROPER_DIHEDRAL,
+                        StateVariable::IMPROPER_DIHEDRAL, StateVariable::UREY_BRADLEY,
+                        StateVariable::CHARMM_IMPROPER }, sysid);
+    break;
+  }  
+}
+  
+//-------------------------------------------------------------------------------------------------
 void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
                         const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
                         const double* sh_charges, const int* sh_lj_idx, double* sh_xcrd,
-                        double* sh_ycrd, double* sh_zcrd, const double* umat, const double* invu,
-                        const UnitCellType unit_cell, double* sh_xfrc, double* sh_yfrc,
+                        double* sh_ycrd, double* sh_zcrd, double* sh_xfrc, double* sh_yfrc,
                         double* sh_zfrc, ScoreCard *ecard, const int sysid,
                         const ValenceWorkUnit &my_vwu, const EvaluateForce eval_force,
                         const VwuTask activity, const VwuGoal purpose, const int step_number) {
@@ -43,7 +88,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int ncbnd = task_counts[static_cast<int>(VwuTask::CBND)];
     const std::vector<uint> cbnd_acc_mask = my_vwu.getAccumulationFlags(VwuTask::CBND);
     for (int pos = 0; pos < ncbnd; pos++) {
-      bool log_term;
+      bool log_term = true;
       switch (purpose) {
       case VwuGoal::ACCUMULATE_FORCES:
         if (readBitFromMask(cbnd_acc_mask, pos) == 0) {
@@ -72,11 +117,13 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const double du = evalHarmonicStretch(i_atom, j_atom, keq, leq, sh_xcrd, sh_ycrd, sh_zcrd,
                                             nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc,
                                             sh_zfrc, eval_force);
-      if (is_urey_bradley) {
-        ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
-      }
-      else {
-        bond_acc += static_cast<llint>(llround(du * nrg_scale_factor));
+      if (log_term) {
+        if (is_urey_bradley) {
+          ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
+        }
+        else {
+          bond_acc += static_cast<llint>(llround(du * nrg_scale_factor));
+        }
       }
     }
   }
@@ -86,6 +133,17 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int nangl = task_counts[static_cast<int>(VwuTask::ANGL)];
     const std::vector<uint> angl_acc_mask = my_vwu.getAccumulationFlags(VwuTask::ANGL);
     for (int pos = 0; pos < nangl; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(angl_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(angl_acc_mask, pos);
+        break;
+      }
       const uint2 tinsr = my_vwu.getAngleInstruction(pos);
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
@@ -93,49 +151,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int param_idx = tinsr.y;
       const double keq = vk.angl_keq[param_idx];
       const double theta0 = vk.angl_theta[param_idx];
-
-      // Compute displacements
-      double ba[3], bc[3];
-      ba[0] = sh_xcrd[i_atom] - sh_xcrd[j_atom];
-      ba[1] = sh_ycrd[i_atom] - sh_ycrd[j_atom];
-      ba[2] = sh_zcrd[i_atom] - sh_zcrd[j_atom];
-      bc[0] = sh_xcrd[k_atom] - sh_xcrd[j_atom];
-      bc[1] = sh_ycrd[k_atom] - sh_ycrd[j_atom];
-      bc[2] = sh_zcrd[k_atom] - sh_zcrd[j_atom];
-
-      // On to the angle force computation
-      const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
-      const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
-      const double invbabc = 1.0 / sqrt(mgba * mgbc);
-      double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
-      costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-      const double theta = acos(costheta);
-      const double dtheta = theta - theta0;
-      const double du = keq * dtheta * dtheta;
-      if (readBitFromMask(angl_acc_mask, pos) == 1) {
+      const double du = evalHarmonicBend(i_atom, j_atom, k_atom, keq, theta0, sh_xcrd, sh_ycrd,
+                                         sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
+                                         sh_yfrc, sh_zfrc, eval_force);
+      if (log_term) {
         angl_acc += static_cast<llint>(llround(du * nrg_scale_factor));
-      
-        // Compute forces
-        if (eval_force == EvaluateForce::YES) {
-          const double dA = -2.0 * keq * dtheta / sqrt(1.0 - costheta * costheta);
-          const double sqba = dA / mgba;
-          const double sqbc = dA / mgbc;
-          const double mbabc = dA * invbabc;
-          double adf[3], cdf[3];
-          for (int i = 0; i < 3; i++) {
-            adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
-            cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
-          }
-          sh_xfrc[i_atom] -= adf[0];
-          sh_yfrc[i_atom] -= adf[1];
-          sh_zfrc[i_atom] -= adf[2];
-          sh_xfrc[j_atom] += adf[0] + cdf[0];
-          sh_yfrc[j_atom] += adf[1] + cdf[1];
-          sh_zfrc[j_atom] += adf[2] + cdf[2];
-          sh_xfrc[k_atom] -= cdf[0];
-          sh_yfrc[k_atom] -= cdf[1];
-          sh_zfrc[k_atom] -= cdf[2];
-        }
       }
     }
   }
@@ -146,6 +166,17 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int ncdhe = task_counts[static_cast<int>(VwuTask::CDHE)];
     const std::vector<uint> cdhe_acc_mask = my_vwu.getAccumulationFlags(VwuTask::CDHE);
     for (int pos = 0; pos < ncdhe; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(cdhe_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(cdhe_acc_mask, pos);
+        break;
+      }
       const uint3 tinsr = my_vwu.getCompositeDihedralInstruction(pos);
 
       // Compute 1:4 interactions and go on if that is all that is required.  Here, the
@@ -154,19 +185,17 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       // energy quantities.
       const int i_atom = (tinsr.x & 0x3ff);
       const int l_atom = (tinsr.y & 0x3ff);
-      const bool log_term = readBitFromMask(cdhe_acc_mask, pos);
       if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
         const int attn_idx = ((tinsr.y >> 10) & 0x1f);
         if (attn_idx > 0) {
-          const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
           const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx,
                                                       nbk.coulomb_constant, sh_charges, sh_lj_idx,
                                                       vk.attn14_elec, vk.attn14_vdw,
                                                       nbk.lja_14_coeff, nbk.ljb_14_coeff,
                                                       nbk.n_lj_types, sh_xcrd, sh_ycrd, sh_zcrd,
                                                       nullptr, nullptr, UnitCellType::NONE,
-                                                      sh_xfrc, sh_yfrc, sh_zfrc, lcl_eval_force,
-                                                      lcl_eval_force);
+                                                      sh_xfrc, sh_yfrc, sh_zfrc, eval_force,
+                                                      eval_force);
           if (log_term) {
             qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
             lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
@@ -248,7 +277,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       }
 
       // Compute forces, if requested
-      if (log_term && eval_force == EvaluateForce::YES) {
+      if (eval_force == EvaluateForce::YES) {
         double fr;
         if (is_charmm_improper) {
           fr = -2.0 * stiffness * sangle;
@@ -306,6 +335,17 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int ncmap = task_counts[static_cast<int>(VwuTask::CMAP)];
     const std::vector<uint> cmap_acc_mask = my_vwu.getAccumulationFlags(VwuTask::CMAP);
     for (int pos = 0; pos < ncmap; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(cmap_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(cmap_acc_mask, pos);
+        break;
+      }
       const uint2 tinsr = my_vwu.getCmapInstruction(pos);
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
@@ -317,13 +357,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       // Assume that, by this point, the imported atoms in the ValenceWorkUnit have been
       // arranged into an image that can be trusted for all interactions.  Avoid further
       // re-imaging of displacements inside the CMAP calculation.
-      const bool log_term = readBitFromMask(cmap_acc_mask, pos);
-      const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
       const double contrib = evalCmap(vk.cmap_patches, vk.cmap_patch_bounds, surf_idx,
                                       vk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom,
                                       m_atom, sh_xcrd, sh_ycrd, sh_zcrd,
                                       nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                      sh_yfrc, sh_zfrc, lcl_eval_force);
+                                      sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         cmap_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -343,6 +381,17 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int ninfr14 = task_counts[static_cast<int>(VwuTask::INFR14)];
     const std::vector<uint> infr_acc_mask = my_vwu.getAccumulationFlags(VwuTask::INFR14);
     for (int pos = 0; pos < ninfr14; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(infr_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(infr_acc_mask, pos);
+        break;
+      }
       const uint tinsr = my_vwu.getInferred14Instruction(pos);
       const int i_atom = (tinsr & 0x3ff);
       const int l_atom = ((tinsr >> 10) & 0x3ff);
@@ -350,15 +399,13 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       if (attn_idx == 0) {
         continue;
       }
-      const bool log_term = readBitFromMask(infr_acc_mask, pos);
-      const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
       const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant,
                                                   sh_charges, sh_lj_idx, vk.attn14_elec,
                                                   vk.attn14_vdw, nbk.lja_14_coeff,
                                                   nbk.ljb_14_coeff, nbk.n_lj_types, sh_xcrd,
                                                   sh_ycrd, sh_zcrd, nullptr, nullptr,
                                                   UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                                                  lcl_eval_force, lcl_eval_force);
+                                                  eval_force, eval_force);
       if (log_term) {
         qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
         lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
@@ -372,12 +419,21 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int nrposn = task_counts[static_cast<int>(VwuTask::RPOSN)];
     const std::vector<uint> rposn_acc_mask = my_vwu.getAccumulationFlags(VwuTask::RPOSN);
     for (int pos = 0; pos < nrposn; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(rposn_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(rposn_acc_mask, pos);
+        break;
+      }
       const uint2 tinsr = my_vwu.getPositionalRestraintInstruction(pos);
       const int p_atom = (tinsr.x & 0x3ff);
       const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
       const int xyz_param_idx = tinsr.y;
-      const bool log_term = readBitFromMask(rposn_acc_mask, pos);
-      const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
       const double contrib = evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number,
                                                kr_param_idx, xyz_param_idx, rar.rposn_init_step,
                                                rar.rposn_finl_step, rar.rposn_init_xy,
@@ -386,7 +442,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                                rar.rposn_finl_keq, rar.rposn_init_r,
                                                rar.rposn_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
                                                nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, lcl_eval_force);
+                                               sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -398,19 +454,28 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int nrbond = task_counts[static_cast<int>(VwuTask::RBOND)];
     const std::vector<uint> rbond_acc_mask = my_vwu.getAccumulationFlags(VwuTask::RBOND);
     for (int pos = 0; pos < nrbond; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(rbond_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(rbond_acc_mask, pos);
+        break;
+      }
       const uint2 tinsr = my_vwu.getDistanceRestraintInstruction(pos);
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int param_idx = tinsr.y;
-      const bool log_term = readBitFromMask(rbond_acc_mask, pos);
-      const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
       const double contrib = evalBondRestraint(i_atom, j_atom, (tinsr.x >> 31), step_number,
                                                param_idx, rar.rbond_init_step,
                                                rar.rbond_finl_step, rar.rbond_init_keq,
                                                rar.rbond_finl_keq, rar.rbond_init_r,
                                                rar.rbond_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
                                                nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, lcl_eval_force);
+                                               sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -422,20 +487,29 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int nrangl = task_counts[static_cast<int>(VwuTask::RANGL)];
     const std::vector<uint> rangl_acc_mask = my_vwu.getAccumulationFlags(VwuTask::RANGL);
     for (int pos = 0; pos < nrangl; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(rangl_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(rangl_acc_mask, pos);
+        break;
+      }
       const uint2 tinsr = my_vwu.getAngleRestraintInstruction(pos);
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int param_idx = tinsr.y;
-      const bool log_term = readBitFromMask(rangl_acc_mask, pos);
-      const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
       const double contrib = evalAnglRestraint(i_atom, j_atom, k_atom, (tinsr.x >> 31),
                                                step_number, param_idx, rar.rangl_init_step,
                                                rar.rangl_finl_step, rar.rangl_init_keq,
                                                rar.rangl_finl_keq, rar.rangl_init_r,
                                                rar.rangl_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
                                                nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, lcl_eval_force);
+                                               sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -447,21 +521,30 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     const int nrdihe = task_counts[static_cast<int>(VwuTask::RDIHE)];
     const std::vector<uint> rdihe_acc_mask = my_vwu.getAccumulationFlags(VwuTask::RDIHE);
     for (int pos = 0; pos < nrdihe; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(rdihe_acc_mask, pos) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(rdihe_acc_mask, pos);
+        break;
+      }
       const uint2 tinsr = my_vwu.getDihedralRestraintInstruction(pos);
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int l_atom = (tinsr.y & 0x3ff);
       const int param_idx = (tinsr.y >> 10);
-      const bool log_term = readBitFromMask(rdihe_acc_mask, pos);
-      const EvaluateForce lcl_eval_force = (log_term) ? eval_force : EvaluateForce::NO;
       const double contrib = evalDiheRestraint(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31),
                                                step_number, param_idx, rar.rdihe_init_step,
                                                rar.rdihe_finl_step, rar.rdihe_init_keq,
                                                rar.rdihe_finl_keq, rar.rdihe_init_r,
                                                rar.rdihe_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
                                                nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, lcl_eval_force);
+                                               sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -517,52 +600,6 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
 }
 
 //-------------------------------------------------------------------------------------------------
-void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid) {
-  switch (activity) {
-  case VwuTask::BOND:
-    ecard->initialize(StateVariable::BOND, sysid);
-    break;
-  case VwuTask::ANGL:
-    ecard->initialize(StateVariable::ANGLE, sysid);
-    break;
-  case VwuTask::DIHE:
-    ecard->initialize(StateVariable::PROPER_DIHEDRAL, sysid);
-    ecard->initialize(StateVariable::IMPROPER_DIHEDRAL, sysid);
-    break;
-  case VwuTask::UBRD:
-    ecard->initialize(StateVariable::UREY_BRADLEY, sysid);
-    break;
-  case VwuTask::CIMP:
-    ecard->initialize(StateVariable::CHARMM_IMPROPER, sysid);
-    break;
-  case VwuTask::CMAP:
-    ecard->initialize(StateVariable::CMAP, sysid);
-    break;
-  case VwuTask::INFR14:
-    ecard->initialize(StateVariable::ELECTROSTATIC_ONE_FOUR, sysid);
-    ecard->initialize(StateVariable::VDW_ONE_FOUR, sysid);
-    break;
-  case VwuTask::RPOSN:
-  case VwuTask::RBOND:
-  case VwuTask::RANGL:
-  case VwuTask::RDIHE:
-    ecard->initialize(StateVariable::RESTRAINT, sysid);
-    break;
-  case VwuTask::SETTLE:
-  case VwuTask::CGROUP:
-  case VwuTask::VSITE:
-  case VwuTask::CDHE:
-  case VwuTask::CBND:
-    break;
-  case VwuTask::ALL_TASKS:
-    ecard->initialize({ StateVariable::BOND, StateVariable::ANGLE, StateVariable::PROPER_DIHEDRAL,
-                        StateVariable::IMPROPER_DIHEDRAL, StateVariable::UREY_BRADLEY,
-                        StateVariable::CHARMM_IMPROPER }, sysid);
-    break;
-  }  
-}
-  
-//-------------------------------------------------------------------------------------------------
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
                           const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
                           double* xcrd, double* ycrd, double* zcrd, const double* umat,
@@ -600,9 +637,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
 
     // Evaluate the work unit using the locally cached data
     localVwuEvaluation(vk, vsk, nbk, rar, sh_charges.data(), sh_lj_idx.data(), sh_xcrd.data(),
-                       sh_ycrd.data(), sh_zcrd.data(), umat, invu, unit_cell, sh_xfrc.data(),
-                       sh_yfrc.data(), sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force,
-                       activity, purpose, step_number);
+                       sh_ycrd.data(), sh_zcrd.data(), sh_xfrc.data(), sh_yfrc.data(),
+                       sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force, activity, purpose,
+                       step_number);
     
     // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
     // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
@@ -673,9 +710,9 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
 
     // Evaluate the work unit using the locally cached data
     localVwuEvaluation(vk, vsk, nbk, rar, sh_charges.data(), sh_lj_idx.data(), sh_xcrd.data(),
-                       sh_ycrd.data(), sh_zcrd.data(), umat, invu, unit_cell, sh_xfrc.data(),
-                       sh_yfrc.data(), sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force,
-                       activity, VwuGoal::ACCUMULATE_FORCES, step_number);
+                       sh_ycrd.data(), sh_zcrd.data(), sh_xfrc.data(), sh_yfrc.data(),
+                       sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force, activity,
+                       VwuGoal::ACCUMULATE_FORCES, step_number);
     
     // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
     // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
