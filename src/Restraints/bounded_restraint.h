@@ -388,19 +388,6 @@ private:
   void checkDisplacementLimits(double4 *rval);
 };
 
-/// \brief Compute the mixture of end-point values that will determine the actual strength and
-///        displacement settings of a flat-bottom bimodal harmonic restraint.  The flag about a
-///        RestraintApparatus having time-dependent restraints is mostly for convenience, a way to
-///        tell whether there is any time-dependent restraint in the collection at all.  Initial
-///        and final settings of the steps for each restraint encode whether there is actual time
-///        dependence in the result.
-///
-/// \param step_number  The current step number of the simulation (may include energy minimization
-///                     step counts)
-/// \param init_step    The initial step at which the restraint engages
-/// \param final_step   The final step at which the restraint becomes mature
-double2 computeRestraintMixture(int step_number, int init_step, int final_step);
-
 } // namespace restraints
 } // namespace omni
 

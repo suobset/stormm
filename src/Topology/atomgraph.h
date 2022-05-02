@@ -14,6 +14,7 @@
 #include "atomgraph_abstracts.h"
 #include "atomgraph_enumerators.h"
 #include "atomgraph_refinement.h"
+#include "topology_limits.h"
 
 namespace omni {
 namespace topology {

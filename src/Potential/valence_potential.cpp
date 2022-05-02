@@ -1,4 +1,3 @@
-#include "Restraints/bounded_restraint.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "Topology/atomgraph.h"
@@ -7,7 +6,6 @@
 namespace omni {
 namespace energy {
 
-using restraints::computeRestraintMixture;
 using topology::TorsionKind;
 using topology::UnitCellType;
 
@@ -515,54 +513,6 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
-                                 const double coulomb_constant, const double* charges,
-                                 const int* lj_param_idx, const double* attn14_elec_factors,
-                                 const double* attn14_vdw_factors, const double* lja_14_coeff,
-                                 const double* ljb_14_coeff, const int n_lj_types,
-                                 const double* xcrd, const double* ycrd, const double* zcrd,
-                                 const double* umat, const double* invu,
-                                 const UnitCellType unit_cell, double* xfrc, double* yfrc,
-                                 double* zfrc, const EvaluateForce eval_elec_force,
-                                 const EvaluateForce eval_vdw_force) {
-  const int ilj_t = lj_param_idx[i_atom];
-  const int jlj_t = lj_param_idx[l_atom];
-  double dx = xcrd[l_atom] - xcrd[i_atom];
-  double dy = ycrd[l_atom] - ycrd[i_atom];
-  double dz = zcrd[l_atom] - zcrd[i_atom];
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  const double invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
-  const double invr = sqrt(invr2);
-  const double invr4 = invr2 * invr2;
-  const double ele_scale = attn14_elec_factors[attn_idx];
-  const double vdw_scale = attn14_vdw_factors[attn_idx];
-  const double qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
-  const double lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
-  const double ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
-  const double ele_contrib = qiqj * invr;
-  const double vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
-
-  // Evaluate the force, if requested
-  if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
-    double fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) : 0.0;
-    if (eval_vdw_force == EvaluateForce::YES) {
-      fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
-    }
-    const double fmag_dx = fmag * dx;
-    const double fmag_dy = fmag * dy;
-    const double fmag_dz = fmag * dz;
-    xfrc[i_atom] += fmag_dx;
-    yfrc[i_atom] += fmag_dy;
-    zfrc[i_atom] += fmag_dz;
-    xfrc[l_atom] -= fmag_dx;
-    yfrc[l_atom] -= fmag_dy;
-    zfrc[l_atom] -= fmag_dz;
-  }
-
-  return { ele_contrib, vdw_contrib };
-}
-  
-//-------------------------------------------------------------------------------------------------
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   const double* xcrd, const double* ycrd, const double* zcrd,
                                   const double* umat, const double* invu,
@@ -592,12 +542,12 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
     if (attn_idx == 0) {
       continue;
     }
-    const double2 uc = evaluateAttenuated14Pair(vk.dihe_i_atoms[pos], vk.dihe_l_atoms[pos],
-                                                attn_idx, nbk.coulomb_constant, nbk.charge,
-                                                nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
-                                                nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
-                                                xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
-                                                yfrc, zfrc, eval_elec_force, eval_vdw_force);
+    const Vec2<double> uc =
+      evaluateAttenuated14Pair(vk.dihe_i_atoms[pos], vk.dihe_l_atoms[pos], attn_idx,
+                               nbk.coulomb_constant, nbk.charge, nbk.lj_idx, vk.attn14_elec,
+                               vk.attn14_vdw, nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
+                               xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
+                               eval_elec_force, eval_vdw_force);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
@@ -611,12 +561,12 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
     if (attn_idx == 0) {
       continue;
     }
-    const double2 uc = evaluateAttenuated14Pair(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos],
-                                                attn_idx, nbk.coulomb_constant, nbk.charge,
-                                                nbk.lj_idx, vk.attn14_elec, vk.attn14_vdw,
-                                                nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
-                                                xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
-                                                yfrc, zfrc, eval_elec_force, eval_vdw_force);
+    const Vec2<double> uc =
+      evaluateAttenuated14Pair(vk.infr14_i_atoms[pos], vk.infr14_l_atoms[pos], attn_idx,
+                               nbk.coulomb_constant, nbk.charge, nbk.lj_idx, vk.attn14_elec,
+                               vk.attn14_vdw, nbk.lja_14_coeff, nbk.ljb_14_coeff, nbk.n_lj_types,
+                               xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
+                               eval_elec_force, eval_vdw_force);
     ele_energy += uc.x;
     vdw_energy += uc.y;
     ele_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
@@ -690,44 +640,6 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameRead
 }
 
 //-------------------------------------------------------------------------------------------------
-double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
-                       const double4 final_r, const double2 mixwt, const double dr) {
-  const double r1 = (mixwt.x * init_r.x) + (mixwt.y * final_r.x);
-  const double r2 = (mixwt.x * init_r.y) + (mixwt.y * final_r.y);
-  const double r3 = (mixwt.x * init_r.z) + (mixwt.y * final_r.z);
-  const double r4 = (mixwt.x * init_r.w) + (mixwt.y * final_r.w);
-  const double k2 = (mixwt.x * init_k.x) + (mixwt.y * final_k.x);
-  const double k3 = (mixwt.x * init_k.y) + (mixwt.y * final_k.y);
-  double dl, du, keq;
-  if (dr < r1) {
-    dl = r1 - r2;
-    du = k2 * ((dl * dl) + (2.0 * dl * (dr - r1)));
-    keq = k2;
-  }
-  else if (dr < r2) {
-    dl = dr - r2;
-    du = k2 * dl * dl;
-    keq = k2;
-  }
-  else if (dr < r3) {
-    dl = 0.0;
-    du = 0.0;
-    keq = 0.0;
-  }
-  else if (dr < r4) {
-    dl = dr - r3;
-    du = k3 * dl * dl;
-    keq = k3;
-  }
-  else {
-    dl = r4 - r3;
-    du = k3 * ((dl * dl) + (2.0 * dl * (dr - r4)));
-    keq = k3;
-  }
-  return { keq, dl, du };
-}
-
-//-------------------------------------------------------------------------------------------------
 double evalPosnRestraint(const int p_atom, const bool time_dependence, const int step_number,
                          const int kr_param_idx, const int xyz_param_idx, const int* init_step,
                          const int* finl_step, const double2* init_xy, const double2* finl_xy,
@@ -739,10 +651,8 @@ double evalPosnRestraint(const int p_atom, const bool time_dependence, const int
                          const EvaluateForce eval_force) {
 
   // Determine the weight to give to each endpoint of the restraint
-  double2 mixwt = { 1.0, 0.0 };
-  if (time_dependence) {
-    mixwt = computeRestraintMixture(step_number, init_step[kr_param_idx], finl_step[kr_param_idx]);
-  }
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[kr_param_idx],
+                                                             finl_step[kr_param_idx]);
   double dx = xcrd[p_atom] - ((mixwt.x * init_xy[xyz_param_idx].x) +
                               (mixwt.y * finl_xy[xyz_param_idx].x));
   double dy = ycrd[p_atom] - ((mixwt.x * init_xy[xyz_param_idx].y) +
@@ -751,8 +661,10 @@ double evalPosnRestraint(const int p_atom, const bool time_dependence, const int
                               (mixwt.y * finl_z[xyz_param_idx]));
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-  const double3 rst_eval = restraintDelta(init_keq[kr_param_idx], finl_keq[kr_param_idx],
-                                          init_r[kr_param_idx], finl_r[kr_param_idx], mixwt, dr);
+  const Vec3<double> rst_eval =
+    restraintDelta(Vec2<double>(init_keq[kr_param_idx]), Vec2<double>(finl_keq[kr_param_idx]),
+                   Vec4<double>(init_r[kr_param_idx]), Vec4<double>(finl_r[kr_param_idx]),
+                   Vec2<double>(mixwt), dr);
 
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
@@ -787,17 +699,17 @@ double evalBondRestraint(const int i_atom, const int j_atom, const bool time_dep
                          const double* ycrd, const double* zcrd, const double* umat,
                          const double* invu, const UnitCellType unit_cell, double* xfrc,
                          double* yfrc, double* zfrc, const EvaluateForce eval_force) {
-  double2 mixwt = { 1.0, 0.0 };
-  if (time_dependence) {
-    mixwt = computeRestraintMixture(step_number, init_step[param_idx], finl_step[param_idx]);
-  }
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[param_idx],
+                                                             finl_step[param_idx]);
   double dx = xcrd[j_atom] - xcrd[i_atom];
   double dy = ycrd[j_atom] - ycrd[i_atom];
   double dz = zcrd[j_atom] - zcrd[i_atom];
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-  const double3 rst_eval = restraintDelta(init_keq[param_idx], finl_keq[param_idx],
-                                          init_r[param_idx], finl_r[param_idx], mixwt, dr);
+  const Vec3<double> rst_eval =
+    restraintDelta(Vec2<double>(init_keq[param_idx]), Vec2<double>(finl_keq[param_idx]),
+                   Vec4<double>(init_r[param_idx]), Vec4<double>(finl_r[param_idx]),
+                   Vec2<double>(mixwt), dr);
   if (eval_force == EvaluateForce::YES) {
     const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
     const double fmag_dx = fmag * dx;
@@ -839,10 +751,12 @@ double evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
   double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
   costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
   const double theta = acos(costheta);
-  const double2 mixwt = computeRestraintMixture(step_number, init_step[param_idx],
-                                                finl_step[param_idx]);
-  const double3 rst_eval = restraintDelta(init_keq[param_idx], finl_keq[param_idx],
-                                          init_r[param_idx], finl_r[param_idx], mixwt, theta);
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[param_idx],
+                                                             finl_step[param_idx]);
+  const Vec3<double> rst_eval =
+    restraintDelta(Vec2<double>(init_keq[param_idx]), Vec2<double>(finl_keq[param_idx]),
+                   Vec4<double>(init_r[param_idx]), Vec4<double>(finl_r[param_idx]),
+                   Vec2<double>(mixwt), theta);
 
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
@@ -901,8 +815,8 @@ double evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, c
   costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
   double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
                                                                       -acos(costheta);
-  const double2 mixwt = computeRestraintMixture(step_number, init_step[param_idx],
-                                                finl_step[param_idx]);
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[param_idx],
+                                                             finl_step[param_idx]);
 
   // As part of the setup, the restraint has been arranged so that r1, r2, r3, and r4 are
   // monotonically increasing and span at most two pi radians.  The center of this arrangement
@@ -912,8 +826,10 @@ double evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, c
                                  mixwt.y * (finl_r[param_idx].y + finl_r[param_idx].z));
   double midpoint_delta = imageValue(theta - midpoint, twopi, ImagingMethod::MINIMUM_IMAGE);
   theta += midpoint_delta - (theta - midpoint);
-  const double3 rst_eval = restraintDelta(init_keq[param_idx], finl_keq[param_idx],
-                                          init_r[param_idx], finl_r[param_idx], mixwt, theta);
+  const Vec3<double> rst_eval =
+    restraintDelta(Vec2<double>(init_keq[param_idx]), Vec2<double>(finl_keq[param_idx]),
+                   Vec4<double>(init_r[param_idx]), Vec4<double>(finl_r[param_idx]),
+                   Vec2<double>(mixwt), theta);
   
   // Compute forces
   if (eval_force == EvaluateForce::YES) {

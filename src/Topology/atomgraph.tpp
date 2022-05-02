@@ -10,13 +10,7 @@ template <typename T> std::vector<T> AtomGraph::getPartialCharge() const {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 std::vector<T> AtomGraph::getPartialCharge(const int low_index, const int high_index) const {
-#if 0
-  if (low_index < 0 || high_index > atom_count || high_index < low_index) {
-    rtErr("A topology with " + std::to_string(atom_count) + " atoms cannot produce partial "
-          "charges for indices " + std::to_string(low_index) + " to " +
-          std::to_string(high_index) + ".", "AtomGraph", "getPartialCharge");
-  }
-#endif
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getPartialCharge");
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
     {
@@ -62,11 +56,7 @@ template <typename T> std::vector<T> AtomGraph::getAtomicMass(const MassForm rep
 template <typename T>
 std::vector<T> AtomGraph::getAtomicMass(const int low_index, const int high_index,
                                         const MassForm rep) const {
-  if (low_index < 0 || high_index > atom_count || high_index < low_index) {
-    rtErr("A topology with " + std::to_string(atom_count) + " atoms cannot produce atomic masses "
-          "for indices " + std::to_string(low_index) + " to " +
-          std::to_string(high_index) + ".", "AtomGraph", "getAtomicMass");
-  }
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getAtomicMass");
   const size_t ct = std::type_index(typeid(T)).hash_code();
   const int* znum_ptr = atomic_numbers.data();
   if (ct == float_type_index) {
@@ -428,6 +418,7 @@ template <typename T> std::vector<T> AtomGraph::getAtomPBRadius() const {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 std::vector<T> AtomGraph::getAtomPBRadius(const int low_index, const int high_index) const {
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getAtomPBRadius");
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
     std::vector<float> tmpr = sp_atomic_pb_radii.readHost(low_index, high_index - low_index);
@@ -468,6 +459,7 @@ template <typename T> std::vector<T> AtomGraph::getGBScreeningFactor() const {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 std::vector<T> AtomGraph::getGBScreeningFactor(const int low_index, const int high_index) const {
+  atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getGBScreeningFactor");
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
     std::vector<float> tmpf = sp_gb_screening_factors.readHost(low_index, high_index - low_index);

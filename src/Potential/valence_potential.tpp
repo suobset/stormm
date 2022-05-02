@@ -696,5 +696,83 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
   return contrib;
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
+                                     const Tcalc coulomb_constant, const Tcalc* charges,
+                                     const int* lj_param_idx, const Tcalc* attn14_elec_factors,
+                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                     const Tcalc* ljb_14_coeff, const int n_lj_types,
+                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                                     const double* umat, const double* invu,
+                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                     Tforce* zfrc, const EvaluateForce eval_elec_force,
+                                     const EvaluateForce eval_vdw_force,
+                                     const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc value_one = 1.0;
+  const int ilj_t = lj_param_idx[i_atom];
+  const int jlj_t = lj_param_idx[l_atom];
+  Tcalc dx, dy, dz;
+  if (isSignedIntegralScalarType<Tcoord>()) {
+    dx = static_cast<Tcalc>(xcrd[l_atom] - xcrd[i_atom]) * inv_gpos_factor;
+    dy = static_cast<Tcalc>(ycrd[l_atom] - ycrd[i_atom]) * inv_gpos_factor;
+    dz = static_cast<Tcalc>(zcrd[l_atom] - zcrd[i_atom]) * inv_gpos_factor;
+  }
+  else {
+    dx = xcrd[l_atom] - xcrd[i_atom];
+    dy = ycrd[l_atom] - ycrd[i_atom];
+    dz = zcrd[l_atom] - zcrd[i_atom];
+  }
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  const Tcalc invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+  const Tcalc invr = (tcalc_is_double) ? sqrt(invr2) : sqrtf(invr2);
+  const Tcalc invr4 = invr2 * invr2;
+  const Tcalc ele_scale = attn14_elec_factors[attn_idx];
+  const Tcalc vdw_scale = attn14_vdw_factors[attn_idx];
+  const Tcalc qiqj = (coulomb_constant * charges[i_atom] * charges[l_atom]) / ele_scale;
+  const Tcalc lja = lja_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
+  const Tcalc ljb = ljb_14_coeff[(ilj_t * n_lj_types) + jlj_t] / vdw_scale;
+  const Tcalc ele_contrib = qiqj * invr;
+  const Tcalc vdw_contrib = (lja * invr4 * invr4 * invr4) - (ljb * invr4 * invr2);
+
+  // Evaluate the force, if requested
+  if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
+    Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) : 0.0;
+    if (eval_vdw_force == EvaluateForce::YES) {
+      if (tcalc_is_double) {
+        fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+      }
+      else {
+        fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+      }
+    }
+    if (isSignedIntegralScalarType<Tforce>()) {
+      const Tforce ifmag_dx = llround(fmag * dx * force_factor);
+      const Tforce ifmag_dy = llround(fmag * dy * force_factor);
+      const Tforce ifmag_dz = llround(fmag * dz * force_factor);
+      xfrc[i_atom] += ifmag_dx;
+      yfrc[i_atom] += ifmag_dy;
+      zfrc[i_atom] += ifmag_dz;
+      xfrc[l_atom] -= ifmag_dx;
+      yfrc[l_atom] -= ifmag_dy;
+      zfrc[l_atom] -= ifmag_dz;
+    }
+    else {
+      const Tcalc fmag_dx = fmag * dx;
+      const Tcalc fmag_dy = fmag * dy;
+      const Tcalc fmag_dz = fmag * dz;
+      xfrc[i_atom] += fmag_dx;
+      yfrc[i_atom] += fmag_dy;
+      zfrc[i_atom] += fmag_dz;
+      xfrc[l_atom] -= fmag_dx;
+      yfrc[l_atom] -= fmag_dy;
+      zfrc[l_atom] -= fmag_dz;
+    }
+  } 
+  return Vec2<Tcalc>(ele_contrib, vdw_contrib);
+}
+
 } // namespace energy
 } // namespace omni

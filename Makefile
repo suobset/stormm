@@ -84,6 +84,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Topology/atomgraph_analysis.cpp \
 	         $(SRCDIR)/Topology/atomgraph_enumerators.cpp \
 	         $(SRCDIR)/Topology/atomgraph_refinement.cpp \
+	         $(SRCDIR)/Topology/topology_limits.cpp \
 	         $(SRCDIR)/Topology/topology_util.cpp \
 	         $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	         $(SRCDIR)/Trajectory/barostat.cpp \
@@ -168,6 +169,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Restraints/bounded_restraint.h \
 	           $(SRCDIR)/Restraints/restraint_apparatus.h \
 	           $(SRCDIR)/Restraints/restraint_builder.h \
+	           $(SRCDIR)/Restraints/restraint_util.h \
 		   $(SRCDIR)/Structure/global_manipulation.h \
 		   $(SRCDIR)/Structure/isomerization.h \
 		   $(SRCDIR)/Structure/local_arrangement.h \
@@ -186,6 +188,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Topology/atomgraph_analysis.h \
 		   $(SRCDIR)/Topology/atomgraph_enumerators.h \
 		   $(SRCDIR)/Topology/atomgraph_refinement.h \
+		   $(SRCDIR)/Topology/topology_limits.h \
 		   $(SRCDIR)/Topology/topology_util.h \
 		   $(SRCDIR)/Trajectory/amber_ascii.h \
 		   $(SRCDIR)/Trajectory/barostat.h \
@@ -218,6 +221,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \
 		 $(SRCDIR)/Potential/scorecard.tpp \
 		 $(SRCDIR)/Potential/valence_potential.tpp \
+		 $(SRCDIR)/Restraints/restraint_util.tpp \
 		 $(SRCDIR)/Structure/global_manipulation.tpp \
 		 $(SRCDIR)/Structure/isomerization.tpp \
 		 $(SRCDIR)/Structure/local_arrangement.tpp \
@@ -306,6 +310,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Topology/atomgraph_analysis.o \
 		$(SRCDIR)/Topology/atomgraph_enumerators.o \
 		$(SRCDIR)/Topology/atomgraph_refinement.o \
+		$(SRCDIR)/Topology/topology_limits.o \
 		$(SRCDIR)/Topology/topology_util.o \
 		$(SRCDIR)/Trajectory/amber_ascii.o \
 		$(SRCDIR)/Trajectory/barostat.o \

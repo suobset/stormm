@@ -191,14 +191,12 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
         const int attn_idx = ((tinsr.y >> 10) & 0x1f);
         if (attn_idx > 0) {
-          const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx,
-                                                      nbk.coulomb_constant, sh_charges, sh_lj_idx,
-                                                      vk.attn14_elec, vk.attn14_vdw,
-                                                      nbk.lja_14_coeff, nbk.ljb_14_coeff,
-                                                      nbk.n_lj_types, sh_xcrd, sh_ycrd, sh_zcrd,
-                                                      nullptr, nullptr, UnitCellType::NONE,
-                                                      sh_xfrc, sh_yfrc, sh_zfrc, eval_force,
-                                                      eval_force);
+          const Vec2<double> uc =
+            evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
+                                     sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
+                                     nbk.ljb_14_coeff, nbk.n_lj_types, sh_xcrd, sh_ycrd, sh_zcrd,
+                                     nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc,
+                                     sh_zfrc, eval_force, eval_force);
           if (log_term) {
             qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
             lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
@@ -402,13 +400,12 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       if (attn_idx == 0) {
         continue;
       }
-      const double2 uc = evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant,
-                                                  sh_charges, sh_lj_idx, vk.attn14_elec,
-                                                  vk.attn14_vdw, nbk.lja_14_coeff,
-                                                  nbk.ljb_14_coeff, nbk.n_lj_types, sh_xcrd,
-                                                  sh_ycrd, sh_zcrd, nullptr, nullptr,
-                                                  UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                                                  eval_force, eval_force);
+      const Vec2<double> uc =
+        evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
+                                 sh_lj_idx, vk.attn14_elec, vk.attn14_vdw, nbk.lja_14_coeff,
+                                 nbk.ljb_14_coeff, nbk.n_lj_types, sh_xcrd, sh_ycrd, sh_zcrd,
+                                 nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                                 eval_force, eval_force);
       if (log_term) {
         qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
         lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));

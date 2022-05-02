@@ -257,6 +257,52 @@ template <typename T> int getHpcVectorTypeSize();
 /// \brief Produce a platform-independent name by which to identify one of the scalar data types.
 template <typename T> std::string getOmniHpcVectorTypeName();
 
+/// \brief A template-compatible class for implementing vectorized two-tuples in C++ code, based
+///        on a single scalar type.
+template <typename T> struct Vec2 {
+
+  /// \brief Constructors will accept two scalars or one of the defined vector tuples.
+  /// \{
+  explicit Vec2(T x_in, T y_in);
+  template <typename Tinput> Vec2(const Tinput v_in);
+  /// \}
+
+  // Public member variables
+  T x;  ///< The first member, equivalent to the x member of a float2 or longlong2 tuple
+  T y;  ///< The second member, equivalent to the y member of a float2 or longlong2 tuple
+};
+
+/// \brief A template-compatible class for implementing vectorized three-tuples in C++ code, based
+///        on a single scalar type.
+template <typename T> struct Vec3 {
+
+  /// \brief Constructors will accept three scalars or one of the defined vector tuples.
+  /// \{
+  explicit Vec3(T x_in, T y_in, T z_in);
+  template <typename Tinput> Vec3(const Tinput v_in);
+  /// \}
+  
+  T x;  ///< The first member, equivalent to the x member of a double3 or uint3 tuple
+  T y;  ///< The second member, equivalent to the y member of a double3 or uint3 tuple
+  T z;  ///< The third member, equivalent to the z member of a double3 or uint3 tuple
+};
+
+/// \brief A template-compatible class for implementing vectorized four-tuples in C++ code, based
+///        on a single scalar type.
+template <typename T> struct Vec4 {
+
+  /// \brief Constructors will accept four scalars or one of the defined vector tuples.
+  /// \{
+  explicit Vec4(T x_in, T y_in, T z_in, T w_in);
+  template <typename Tinput> Vec4(const Tinput v_in);
+  /// \}
+  
+  T x;  ///< The first member, equivalent to the x member of a float4 or int4 tuple
+  T y;  ///< The second member, equivalent to the y member of a float4 or int4 tuple
+  T z;  ///< The third member, equivalent to the z member of a float4 or int4 tuple
+  T w;  ///< The fourth member, equivalent to the w member of a float4 or int4 tuple
+};
+
 /// \brief Provide options for selected vector type conversions, and vector forms thereof:
 ///        double(2,3,4) <--> float(2,3,4), double(2,3,4) <-- int(2,3,4),
 ///        double(2,3,4) <-- uint(2,3,4), double(2,3,4) <-- llint(2,3,4),
@@ -281,7 +327,7 @@ template <typename T> std::vector<float2> vtConv2f(const std::vector<T> &rhs);
 template <typename T> std::vector<float3> vtConv3f(const std::vector<T> &rhs);
 template <typename T> std::vector<float4> vtConv4f(const std::vector<T> &rhs);
 /// \}
-  
+
 } // namespace data_types
 } // namespace omni
 
@@ -364,6 +410,11 @@ using data_types::ushort2_type_index;
 using data_types::ushort3_type_index;
 using data_types::ushort4_type_index;
 
+// Template-compatible vector types for C++ code
+using data_types::Vec2;
+using data_types::Vec3;
+using data_types::Vec4;
+
 // Templated conversion functions for getting anything of the right tuple complexity into a float
 // or double tuple
 using data_types::vtConv2;
@@ -372,7 +423,7 @@ using data_types::vtConv4;
 using data_types::vtConv2f;
 using data_types::vtConv3f;
 using data_types::vtConv4f;
-  
+
 } // namespace omni
 
 #endif

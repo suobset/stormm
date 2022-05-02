@@ -8,6 +8,7 @@
 #include "Math/matrix_ops.h"
 #include "Math/vector_ops.h"
 #include "Restraints/restraint_apparatus.h"
+#include "Restraints/restraint_util.h"
 #include "Structure/local_arrangement.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -24,8 +25,10 @@ using data_types::isSignedIntegralScalarType;
 using math::crossProduct;
 using math::matrixMultiply;
 using math::matrixVectorMultiply;
+using restraints::computeRestraintMixture;
 using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
+using restraints::restraintDelta;
 using structure::imageCoordinates;
 using structure::ImagingMethod;
 using symbols::pi;
@@ -540,16 +543,18 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, 
 /// \param unit_cell            The unit cell type, i.e. triclinic
 /// \param eval_elec_force      Flag to have electrostatic forces evaluated
 /// \param eval_vdw_force       Flag to have van-der Waals (Lennard-Jones) forces evaluated
-double2 evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, double coulomb_constant,
-                                 const double* charges, const int* lj_param_idx,
-                                 const double* attn14_elec_factors,
-                                 const double* attn14_vdw_factors, const double* lja_14_coeff,
-                                 const double* ljb_14_coeff, int n_lj_types, const double* xcrd,
-                                 const double* ycrd, const double* zcrd, const double* umat,
-                                 const double* invu, UnitCellType unit_cell, double* xfrc,
-                                 double* yfrc, double* zfrc, EvaluateForce eval_elec_force,
-                                 EvaluateForce eval_vdw_force);
-
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
+                                     const Tcalc* charges, const int* lj_param_idx,
+                                     const Tcalc* attn14_elec_factors,
+                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                     const Tcalc* ljb_14_coeff, int n_lj_types, const Tcoord* xcrd,
+                                     const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                                     const double* invu, UnitCellType unit_cell, Tforce* xfrc,
+                                     Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
+                                     EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
+                                     Tcalc force_factor = 1.0);
+  
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
 ///        bookkeeping to make it performant, but the result is straightforward and this reference
 ///        routine will work from that setup.
@@ -623,19 +628,6 @@ double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrameRead
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
                                   ScoreCard *ecard, int system_index = 0);
 /// \}
-
-/// \brief Compute critical elements of the restraining potential: its difference from the target
-///        value that determines some harmonic stiffness penalty, the harmonic penalty stiffness,
-///        and the energy contribution.
-///
-/// \param init_k   Initial stiffness parameters
-/// \param final_k  Final stiffness parameters
-/// \param init_r   Initial displacement parameters
-/// \param final_r  Final displacement parameters
-/// \param mixwt    Pre-calculated mixing factor for combining initial and final parameters
-/// \param dr       The measured value of the restraint coordinate among its participating atoms
-double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
-                       const double4 final_r, const double2 mixwt, double dr);
 
 /// \brief Evaluate a positional restraint.  Return the energy penalty.
 ///

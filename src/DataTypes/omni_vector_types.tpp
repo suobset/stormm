@@ -113,6 +113,36 @@ template <typename T> std::string getOmniHpcVectorTypeName() {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> Vec2<T>::Vec2(const T x_in, const T y_in) :
+    x{x_in}, y{y_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tinput> Vec2<T>::Vec2(const Tinput v_in) :
+    x{v_in.x}, y{v_in.y}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> Vec3<T>::Vec3(const T x_in, const T y_in, const T z_in) :
+    x{x_in}, y{y_in}, z{z_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tinput> Vec3<T>::Vec3(const Tinput v_in) :
+  x{v_in.x}, y{v_in.y}, z{v_in.z}
+{}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> Vec4<T>::Vec4(const T x_in, const T y_in, const T z_in, const T w_in) :
+    x{x_in}, y{y_in}, z{z_in}, w{w_in}
+{}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T> template <typename Tinput> Vec4<T>::Vec4(const Tinput v_in) :
+  x{v_in.x}, y{v_in.y}, z{v_in.z}, w{v_in.w}
+{}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> double2 vtConv2(const T rhs) {
   return { rhs.x, rhs.y };
 }

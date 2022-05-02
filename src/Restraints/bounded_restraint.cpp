@@ -4,6 +4,7 @@
 #include "Parsing/polynumeric.h"
 #include "Structure/local_arrangement.h"
 #include "bounded_restraint.h"
+#include "restraint_util.h"
 
 namespace omni {
 namespace restraints {
@@ -411,7 +412,8 @@ int BoundedRestraint::getFinalStep() const {
 
 //-------------------------------------------------------------------------------------------------
 double2 BoundedRestraint::getStiffness(const int step_number) const {
-  const double2 mixwt = computeRestraintMixture(step_number, initial_step, final_step);
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, initial_step,
+                                                             final_step);
   double2 td_keq;
   td_keq.x = (mixwt.x * initial_keq.x) + (mixwt.y * final_keq.x);
   td_keq.y = (mixwt.x * initial_keq.y) + (mixwt.y * final_keq.y);
@@ -430,7 +432,8 @@ double2 BoundedRestraint::getFinalStiffness() const {
 
 //-------------------------------------------------------------------------------------------------
 double4 BoundedRestraint::getDisplacements(const int step_number) const {
-  const double2 mixwt = computeRestraintMixture(step_number, initial_step, final_step);
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, initial_step,
+                                                             final_step);
   double4 td_r;
   td_r.x = (mixwt.x * initial_r.x) + (mixwt.y * final_r.x);
   td_r.y = (mixwt.x * initial_r.y) + (mixwt.y * final_r.y);
@@ -457,7 +460,8 @@ double3 BoundedRestraint::getTargetSite(const int step_number) const {
     rtErr("The target site is meaningless outside of positional restraints on individual atoms.",
           "BoundedRestraint", "getInitialTargetSite");
   }
-  const double2 mixwt = computeRestraintMixture(step_number, initial_step, final_step);
+  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, initial_step,
+                                                             final_step);
   double3 td_center;
   td_center.x = (mixwt.x * initial_center.x) + (mixwt.y * final_center.x);
   td_center.y = (mixwt.x * initial_center.y) + (mixwt.y * final_center.y);
@@ -711,35 +715,6 @@ void BoundedRestraint::checkDisplacementLimits(double4 *rval) {
     rval->z += midpt_copy - midpoint;
     rval->w += midpt_copy - midpoint;
   }
-}
-
-//-------------------------------------------------------------------------------------------------
-double2 computeRestraintMixture(const int step_number, const int init_step, const int final_step) {
-  if (step_number < init_step) {
-
-    // If the restraint has not yet engaged, neither its initial or final values have any weight
-    return { 0.0, 0.0 };
-  }
-  else if (init_step == final_step) {
-
-    // The step count is far enough along that the restraint has been engaged, and it is constant.
-    // Only the initial value matters.
-    return { 1.0, 0.0 };
-  }
-  else if (step_number < final_step) {
-    const double wslide = static_cast<double>(step_number - init_step) /
-                          static_cast<double>(final_step - init_step);
-
-    // The difference between the initial and final steps is nonzero.  The mixture is a linear
-    // combination of the two end points.
-    return { 1.0 - wslide, wslide };
-  }
-  else {
-
-    // The step number has advanced beyond the point at which the restraint is mature.
-    return { 0.0, 1.0 };
-  }
-  __builtin_unreachable();
 }
 
 } // namespace restraints
