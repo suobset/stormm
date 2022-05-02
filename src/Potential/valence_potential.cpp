@@ -640,157 +640,6 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameRead
 }
 
 //-------------------------------------------------------------------------------------------------
-double evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
-                         const bool time_dependence, const int step_number, const int param_idx,
-                         const int* init_step, const int* finl_step, const double2* init_keq,
-                         const double2* finl_keq, const double4* init_r, const double4* finl_r,
-                         const double* xcrd, const double* ycrd, const double* zcrd,
-                         const double* umat, const double* invu, const UnitCellType unit_cell,
-                         double* xfrc, double* yfrc, double* zfrc,
-                         const EvaluateForce eval_force) {
-  double ba[3], bc[3];
-  ba[0] = xcrd[i_atom] - xcrd[j_atom];
-  ba[1] = ycrd[i_atom] - ycrd[j_atom];
-  ba[2] = zcrd[i_atom] - zcrd[j_atom];
-  bc[0] = xcrd[k_atom] - xcrd[j_atom];
-  bc[1] = ycrd[k_atom] - ycrd[j_atom];
-  bc[2] = zcrd[k_atom] - zcrd[j_atom];
-  imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-
-  // On to the angle force computation
-  const double mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
-  const double mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
-  const double invbabc = 1.0 / sqrt(mgba * mgbc);
-  double costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
-  costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-  const double theta = acos(costheta);
-  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[param_idx],
-                                                             finl_step[param_idx]);
-  const Vec3<double> rst_eval =
-    restraintDelta(Vec2<double>(init_keq[param_idx]), Vec2<double>(finl_keq[param_idx]),
-                   Vec4<double>(init_r[param_idx]), Vec4<double>(finl_r[param_idx]),
-                   Vec2<double>(mixwt), theta);
-
-  // Compute forces
-  if (eval_force == EvaluateForce::YES) {
-    const double dA = -2.0 * rst_eval.x * rst_eval.y / sqrt(1.0 - (costheta * costheta));
-    const double sqba = dA / mgba;
-    const double sqbc = dA / mgbc;
-    const double mbabc = dA * invbabc;
-    double adf[3], cdf[3];
-    for (int i = 0; i < 3; i++) {
-      adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
-      cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
-    }
-    xfrc[i_atom] -= adf[0];
-    yfrc[i_atom] -= adf[1];
-    zfrc[i_atom] -= adf[2];
-    xfrc[j_atom] += adf[0] + cdf[0];
-    yfrc[j_atom] += adf[1] + cdf[1];
-    zfrc[j_atom] += adf[2] + cdf[2];
-    xfrc[k_atom] -= cdf[0];
-    yfrc[k_atom] -= cdf[1];
-    zfrc[k_atom] -= cdf[2];
-  }    
-  return rst_eval.z;
-}
-
-//-------------------------------------------------------------------------------------------------
-double evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
-                         const bool time_dependence, const int step_number, const int param_idx,
-                         const int* init_step, const int* finl_step, const double2* init_keq,
-                         const double2* finl_keq, const double4* init_r, const double4* finl_r,
-                         const double* xcrd, const double* ycrd, const double* zcrd,
-                         const double* umat, const double* invu, const UnitCellType unit_cell,
-                         double* xfrc, double* yfrc, double* zfrc,
-                         const EvaluateForce eval_force) {
-  double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
-  ab[0] = xcrd[j_atom] - xcrd[i_atom];
-  ab[1] = ycrd[j_atom] - ycrd[i_atom];
-  ab[2] = zcrd[j_atom] - zcrd[i_atom];
-  bc[0] = xcrd[k_atom] - xcrd[j_atom];
-  bc[1] = ycrd[k_atom] - ycrd[j_atom];
-  bc[2] = zcrd[k_atom] - zcrd[j_atom];
-  cd[0] = xcrd[l_atom] - xcrd[k_atom];
-  cd[1] = ycrd[l_atom] - ycrd[k_atom];
-  cd[2] = zcrd[l_atom] - zcrd[k_atom];
-  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-
-  // Compute cross products and then the angle between the planes
-  crossProduct(ab, bc, crabbc);
-  crossProduct(bc, cd, crbccd);    
-  double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
-  costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
-                   (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
-  crossProduct(crabbc, crbccd, scr);
-  costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
-  double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
-                                                                      -acos(costheta);
-  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[param_idx],
-                                                             finl_step[param_idx]);
-
-  // As part of the setup, the restraint has been arranged so that r1, r2, r3, and r4 are
-  // monotonically increasing and span at most two pi radians.  The center of this arrangement
-  // may not be at zero, but will be within the range [-pi, pi).  Image the angle to align with
-  // the center of the restraint displacements r2 and r3.
-  const double midpoint = 0.5 * (mixwt.x * (init_r[param_idx].y + init_r[param_idx].z) +
-                                 mixwt.y * (finl_r[param_idx].y + finl_r[param_idx].z));
-  double midpoint_delta = imageValue(theta - midpoint, twopi, ImagingMethod::MINIMUM_IMAGE);
-  theta += midpoint_delta - (theta - midpoint);
-  const Vec3<double> rst_eval =
-    restraintDelta(Vec2<double>(init_keq[param_idx]), Vec2<double>(finl_keq[param_idx]),
-                   Vec4<double>(init_r[param_idx]), Vec4<double>(finl_r[param_idx]),
-                   Vec2<double>(mixwt), theta);
-  
-  // Compute forces
-  if (eval_force == EvaluateForce::YES) {
-    const double fr = -2.0 * rst_eval.x * rst_eval.y;
-    const double mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
-    const double invab = 1.0 / mgab;
-    const double mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
-    const double invbc = 1.0 / mgbc;
-    const double mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
-    const double invcd = 1.0 / mgcd;
-    const double cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
-    const double isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
-                          fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
-    const double cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
-    const double isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
-                          fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
-    const double invabc = invab * invbc;
-    const double invbcd = invbc * invcd;
-    for (int i = 0; i < 3; i++) {
-      crabbc[i] *= invabc;
-      crbccd[i] *= invbcd;
-    }
-
-    // Transform the rotational derivatives to Cartesian coordinates
-    const double fa = -invab * isinb2;
-    const double fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
-    const double fb2 = cosc * invbc * isinc2;
-    const double fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
-    const double fc2 = cosb * invbc * isinb2;
-    const double fd = -invcd * isinc2;
-    xfrc[i_atom] += crabbc[0] * fa;
-    xfrc[j_atom] += (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
-    xfrc[k_atom] += (fc2 * crabbc[0]) - (fc1 * crbccd[0]);
-    xfrc[l_atom] -= fd * crbccd[0];
-    yfrc[i_atom] += crabbc[1] * fa;
-    yfrc[j_atom] += (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
-    yfrc[k_atom] += (fc2 * crabbc[1]) - (fc1 * crbccd[1]);
-    yfrc[l_atom] -= fd * crbccd[1];
-    zfrc[i_atom] += crabbc[2] * fa;
-    zfrc[j_atom] += (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
-    zfrc[k_atom] += (fc2 * crabbc[2]) - (fc1 * crbccd[2]);
-    zfrc[l_atom] -= fd * crbccd[2];
-  }
-  return rst_eval.z;  
-}
-
-//-------------------------------------------------------------------------------------------------
 double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xcrd,
                           const double* ycrd, const double* zcrd, const double* umat,
                           const double* invu, const UnitCellType unit_cell, double* xfrc,
@@ -826,24 +675,25 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
     rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
   for (int pos = 0; pos < rar.nangl; pos++) {
-    const double contrib = evalAnglRestraint(rar.rangl_i_atoms[pos], rar.rangl_j_atoms[pos],
-                                             rar.rangl_k_atoms[pos], rar.time_dependence,
-                                             step_number, pos, rar.rangl_init_step,
-                                             rar.rangl_finl_step, rar.rangl_init_keq,
-                                             rar.rangl_finl_keq, rar.rangl_init_r,
-                                             rar.rangl_finl_r, xcrd, ycrd, zcrd, umat, invu,
-                                             unit_cell, xfrc, yfrc, zfrc, eval_force);
+    const double contrib =
+      evalAnglRestraint(rar.rangl_i_atoms[pos], rar.rangl_j_atoms[pos], rar.rangl_k_atoms[pos],
+                        rar.time_dependence, step_number, rar.rangl_init_step[pos],
+                        rar.rangl_finl_step[pos], Vec2<double>(rar.rangl_init_keq[pos]),
+                        Vec2<double>(rar.rangl_finl_keq[pos]), Vec4<double>(rar.rangl_init_r[pos]),
+                        Vec4<double>(rar.rangl_finl_r[pos]), xcrd, ycrd, zcrd, umat, invu,
+                        unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
     rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
   for (int pos = 0; pos < rar.ndihe; pos++) {
-    const double contrib = evalDiheRestraint(rar.rdihe_i_atoms[pos], rar.rdihe_j_atoms[pos],
-                                             rar.rdihe_k_atoms[pos], rar.rdihe_l_atoms[pos],
-                                             rar.time_dependence, step_number, pos,
-                                             rar.rdihe_init_step, rar.rdihe_finl_step,
-                                             rar.rdihe_init_keq, rar.rdihe_finl_keq,
-                                             rar.rdihe_init_r, rar.rdihe_finl_r, xcrd, ycrd, zcrd,
-                                             umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
+    const double contrib =
+      evalDiheRestraint(rar.rdihe_i_atoms[pos], rar.rdihe_j_atoms[pos], rar.rdihe_k_atoms[pos],
+                        rar.rdihe_l_atoms[pos], rar.time_dependence, step_number,
+                        rar.rdihe_init_step[pos], rar.rdihe_finl_step[pos],
+                        Vec2<double>(rar.rdihe_init_keq[pos]),
+                        Vec2<double>(rar.rdihe_finl_keq[pos]),
+                        Vec4<double>(rar.rdihe_init_r[pos]), Vec4<double>(rar.rdihe_finl_r[pos]),
+                        xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
     rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }

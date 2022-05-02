@@ -787,9 +787,6 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
                         const Tcalc inv_gpos_factor, const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
-  const Tcalc value_one = 1.0;
-
-  // Determine the weight to give to each endpoint of the restraint
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
@@ -808,9 +805,9 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   const double dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                         sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-  const Vec3<double> rst_eval =
-    restraintDelta(Vec2<double>(init_keq), Vec2<double>(finl_keq), Vec4<double>(init_r),
-                   Vec4<double>(finl_r), Vec2<double>(mixwt), dr);
+  const Vec3<double> rst_eval = restraintDelta(Vec2<double>(init_keq), Vec2<double>(finl_keq),
+                                               Vec4<double>(init_r), Vec4<double>(finl_r),
+                                               Vec2<double>(mixwt), dr);
 
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
@@ -866,7 +863,6 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_depe
                         const Tcalc inv_gpos_factor, const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
-  const Tcalc value_one = 1.0;
   const Vec2<Tcalc> mixwt = computeRestraintMixture<double>(step_number, init_step, finl_step);
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
@@ -882,9 +878,9 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_depe
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   const Tcalc dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-  const Vec3<Tcalc> rst_eval =
-    restraintDelta(Vec2<Tcalc>(init_keq), Vec2<Tcalc>(finl_keq), Vec4<Tcalc>(init_r),
-                   Vec4<Tcalc>(finl_r), Vec2<Tcalc>(mixwt), dr);
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq), Vec2<Tcalc>(finl_keq),
+                                              Vec4<Tcalc>(init_r), Vec4<Tcalc>(finl_r),
+                                              Vec2<Tcalc>(mixwt), dr);
   if (eval_force == EvaluateForce::YES) {
     const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
                                            2.0f * rst_eval.x * rst_eval.y / dr;
@@ -914,5 +910,275 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_depe
   return rst_eval.z;
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
+                        const bool time_dependence, const int step_number, const int init_step,
+                        const int finl_step, const Vec2<Tcalc> init_keq,
+                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
+                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
+                        const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc value_one = 1.0;
+  Tcalc ba[3], bc[3];
+  if (isSignedIntegralScalarType<Tcoord>()) {
+    ba[0] = static_cast<Tcalc>(xcrd[i_atom] - xcrd[j_atom]) *inv_gpos_factor;
+    ba[1] = static_cast<Tcalc>(ycrd[i_atom] - ycrd[j_atom]) *inv_gpos_factor;
+    ba[2] = static_cast<Tcalc>(zcrd[i_atom] - zcrd[j_atom]) *inv_gpos_factor;
+    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) *inv_gpos_factor;
+    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) *inv_gpos_factor;
+    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) *inv_gpos_factor;
+  }
+  else {
+    ba[0] = xcrd[i_atom] - xcrd[j_atom];
+    ba[1] = ycrd[i_atom] - ycrd[j_atom];
+    ba[2] = zcrd[i_atom] - zcrd[j_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+  }
+  imageCoordinates(&ba[0], &ba[1], &ba[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+
+  // On to the angle force computation
+  const Tcalc mgba = (ba[0] * ba[0]) + (ba[1] * ba[1]) + (ba[2] * ba[2]);
+  const Tcalc mgbc = (bc[0] * bc[0]) + (bc[1] * bc[1]) + (bc[2] * bc[2]);
+  const Tcalc invbabc = (tcalc_is_double) ? value_one / sqrt(mgba * mgbc) :
+                                            value_one / sqrtf(mgba * mgbc);
+  Tcalc costheta = ((ba[0] * bc[0]) + (ba[1] * bc[1]) + (ba[2] * bc[2])) * invbabc;
+  costheta = (costheta < -value_one) ? -value_one : (costheta > value_one) ? value_one : costheta;
+  const Tcalc theta = (tcalc_is_double) ? acos(costheta) : acosf(costheta);
+  const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<double>(init_keq), Vec2<double>(finl_keq),
+                                              Vec4<double>(init_r), Vec4<double>(finl_r),
+                                              Vec2<double>(mixwt), theta);
+
+  // Compute forces
+  if (eval_force == EvaluateForce::YES) {
+    const Tcalc dA = (tcalc_is_double) ?
+                     -2.0  * rst_eval.x * rst_eval.y / sqrt(1.0 - (costheta * costheta)) :
+                     -2.0f * rst_eval.x * rst_eval.y / sqrtf(value_one - (costheta * costheta));
+    const Tcalc sqba = dA / mgba;
+    const Tcalc sqbc = dA / mgbc;
+    const Tcalc mbabc = dA * invbabc;
+    if (isSignedIntegralScalarType<Tforce>()) {
+      Tforce iadf[3], icdf[3];
+      for (int i = 0; i < 3; i++) {
+        iadf[i] = llround(((bc[i] * mbabc) - (costheta * ba[i] * sqba)) * force_factor);
+        icdf[i] = llround(((ba[i] * mbabc) - (costheta * bc[i] * sqbc)) * force_factor);
+      }
+      xfrc[i_atom] -= iadf[0];
+      yfrc[i_atom] -= iadf[1];
+      zfrc[i_atom] -= iadf[2];
+      xfrc[j_atom] += iadf[0] + icdf[0];
+      yfrc[j_atom] += iadf[1] + icdf[1];
+      zfrc[j_atom] += iadf[2] + icdf[2];
+      xfrc[k_atom] -= icdf[0];
+      yfrc[k_atom] -= icdf[1];
+      zfrc[k_atom] -= icdf[2];
+    }
+    else {
+      Tcalc adf[3], cdf[3];
+      for (int i = 0; i < 3; i++) {
+        adf[i] = (bc[i] * mbabc) - (costheta * ba[i] * sqba);
+        cdf[i] = (ba[i] * mbabc) - (costheta * bc[i] * sqbc);
+      }
+      xfrc[i_atom] -= adf[0];
+      yfrc[i_atom] -= adf[1];
+      zfrc[i_atom] -= adf[2];
+      xfrc[j_atom] += adf[0] + cdf[0];
+      yfrc[j_atom] += adf[1] + cdf[1];
+      zfrc[j_atom] += adf[2] + cdf[2];
+      xfrc[k_atom] -= cdf[0];
+      yfrc[k_atom] -= cdf[1];
+      zfrc[k_atom] -= cdf[2];
+    }
+  }
+  return rst_eval.z;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
+                        const bool time_dependence, const int step_number, const int init_step,
+                        const int finl_step, const Vec2<Tcalc> init_keq,
+                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
+                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
+                        const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc value_one = 1.0;
+  Tcalc ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
+  if (isSignedIntegralScalarType<Tcoord>()) {
+    ab[0] = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+    ab[1] = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+    ab[2] = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+    bc[0] = static_cast<Tcalc>(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_factor;
+    bc[1] = static_cast<Tcalc>(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_factor;
+    bc[2] = static_cast<Tcalc>(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_factor;
+    cd[0] = static_cast<Tcalc>(xcrd[l_atom] - xcrd[k_atom]) * inv_gpos_factor;
+    cd[1] = static_cast<Tcalc>(ycrd[l_atom] - ycrd[k_atom]) * inv_gpos_factor;
+    cd[2] = static_cast<Tcalc>(zcrd[l_atom] - zcrd[k_atom]) * inv_gpos_factor;
+  }
+  else {
+    ab[0] = xcrd[j_atom] - xcrd[i_atom];
+    ab[1] = ycrd[j_atom] - ycrd[i_atom];
+    ab[2] = zcrd[j_atom] - zcrd[i_atom];
+    bc[0] = xcrd[k_atom] - xcrd[j_atom];
+    bc[1] = ycrd[k_atom] - ycrd[j_atom];
+    bc[2] = zcrd[k_atom] - zcrd[j_atom];
+    cd[0] = xcrd[l_atom] - xcrd[k_atom];
+    cd[1] = ycrd[l_atom] - ycrd[k_atom];
+    cd[2] = zcrd[l_atom] - zcrd[k_atom];
+  }
+  imageCoordinates(&ab[0], &ab[1], &ab[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&bc[0], &bc[1], &bc[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  imageCoordinates(&cd[0], &cd[1], &cd[2], umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+
+  // Compute cross products and then the angle between the planes
+  crossProduct(ab, bc, crabbc);
+  crossProduct(bc, cd, crbccd);
+  Tcalc costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
+  if (tcalc_is_double) {
+    costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                     (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+  }
+  else {
+    costheta /= sqrtf((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
+                      (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
+  }
+  crossProduct(crabbc, crbccd, scr);
+  costheta = (costheta < -value_one) ? -value_one : (costheta > value_one) ? value_one : costheta;
+  Tcalc theta;
+  if (tcalc_is_double) {
+    theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ? acos(costheta) : -acos(costheta);
+  }
+  else {
+    theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ?  acosf(costheta) :
+                                                                  -acosf(costheta);
+  }
+  const Vec2<Tcalc> mixwt = computeRestraintMixture<double>(step_number, init_step, finl_step);
+
+  // As part of the setup, the restraint has been arranged so that r1, r2, r3, and r4 are
+  // monotonically increasing and span at most two pi radians.  The center of this arrangement
+  // may not be at zero, but will be within the range [-pi, pi).  Image the angle to align with
+  // the center of the restraint displacements r2 and r3.
+  Tcalc midpoint, midpoint_delta;
+  if (tcalc_is_double) {
+    midpoint = 0.5 * (mixwt.x * (init_r.y + init_r.z) + mixwt.y * (finl_r.y + finl_r.z));
+    midpoint_delta = imageValue(theta - midpoint, twopi, ImagingMethod::MINIMUM_IMAGE);
+  }
+  else {
+    midpoint = 0.5f * (mixwt.x * (init_r.y + init_r.z) + mixwt.y * (finl_r.y + finl_r.z));
+    midpoint_delta = imageValue(theta - midpoint, twopi_f, ImagingMethod::MINIMUM_IMAGE);
+  }
+  theta += midpoint_delta - (theta - midpoint);
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq), Vec2<Tcalc>(finl_keq),
+                                              Vec4<Tcalc>(init_r), Vec4<Tcalc>(finl_r),
+                                              Vec2<Tcalc>(mixwt), theta);
+  
+  // Compute forces
+  if (eval_force == EvaluateForce::YES) {
+    const Tcalc fr = -2.0 * rst_eval.x * rst_eval.y;
+    Tcalc mgab, mgbc, mgcd;
+    if (tcalc_is_double) {
+      mgab = sqrt(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+      mgbc = sqrt(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+      mgcd = sqrt(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+    }
+    else {
+      mgab = sqrtf(ab[0]*ab[0] + ab[1]*ab[1] + ab[2]*ab[2]);
+      mgbc = sqrtf(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
+      mgcd = sqrtf(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
+    }
+    const Tcalc invab = 1.0 / mgab;
+    const Tcalc invbc = 1.0 / mgbc;
+    const Tcalc invcd = 1.0 / mgcd;
+    const Tcalc cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
+    const Tcalc cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
+    Tcalc isinb2, isinc2;
+    if (tcalc_is_double) {
+      isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
+               fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
+      isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
+               fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
+    }
+    else {
+      isinb2 = (cosb * cosb < asymptotic_to_one_f) ?
+               fr / (value_one - (cosb * cosb)) : fr * inverse_one_minus_asymptote_f;
+      isinc2 = (cosc * cosc < asymptotic_to_one_f) ?
+               fr / (value_one - (cosc * cosc)) : fr * inverse_one_minus_asymptote_f;
+    }
+    const Tcalc invabc = invab * invbc;
+    const Tcalc invbcd = invbc * invcd;
+    for (int i = 0; i < 3; i++) {
+      crabbc[i] *= invabc;
+      crbccd[i] *= invbcd;
+    }
+
+    // Transform the rotational derivatives to Cartesian coordinates
+    const Tcalc fa = -invab * isinb2;
+    const Tcalc fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
+    const Tcalc fb2 = cosc * invbc * isinc2;
+    const Tcalc fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
+    const Tcalc fc2 = cosb * invbc * isinb2;
+    const Tcalc fd = -invcd * isinc2;
+    if (isSignedIntegralScalarType<Tforce>()) {
+      const Tforce ifrc_ix = llround(crabbc[0] * fa * force_factor);
+      const Tforce ifrc_jx = llround(((fb1 * crabbc[0]) - (fb2 * crbccd[0])) * force_factor);
+      const Tforce ifrc_lx = llround(-fd * crbccd[0] * force_factor);
+      xfrc[i_atom] += ifrc_ix;
+      xfrc[j_atom] += ifrc_jx;
+      xfrc[k_atom] -= ifrc_ix + ifrc_jx + ifrc_lx;
+      xfrc[l_atom] += ifrc_lx;
+      const Tforce ifrc_iy = llround(crabbc[1] * fa * force_factor);
+      const Tforce ifrc_jy = llround(((fb1 * crabbc[1]) - (fb2 * crbccd[1])) * force_factor);
+      const Tforce ifrc_ly = llround(-fd * crbccd[1] * force_factor);
+      yfrc[i_atom] += ifrc_iy;
+      yfrc[j_atom] += ifrc_jy;
+      yfrc[k_atom] -= ifrc_iy + ifrc_jy + ifrc_ly;
+      yfrc[l_atom] += ifrc_ly;
+      const Tforce ifrc_iz = llround(crabbc[2] * fa * force_factor);
+      const Tforce ifrc_jz = llround(((fb1 * crabbc[2]) - (fb2 * crbccd[2])) * force_factor);
+      const Tforce ifrc_lz = llround(-fd * crbccd[2] * force_factor);
+      zfrc[i_atom] += ifrc_iz;
+      zfrc[j_atom] += ifrc_jz;
+      zfrc[k_atom] -= ifrc_iz + ifrc_jz + ifrc_lz;
+      zfrc[l_atom] += ifrc_lz;
+    }
+    else {
+      const Tforce frc_ix = crabbc[0] * fa;
+      const Tforce frc_jx = (fb1 * crabbc[0]) - (fb2 * crbccd[0]);
+      const Tforce frc_lx = -fd * crbccd[0];
+      xfrc[i_atom] += frc_ix;
+      xfrc[j_atom] += frc_jx;
+      xfrc[k_atom] -= frc_ix + frc_jx + frc_lx;
+      xfrc[l_atom] += frc_lx;
+      const Tforce frc_iy = crabbc[1] * fa;
+      const Tforce frc_jy = (fb1 * crabbc[1]) - (fb2 * crbccd[1]);
+      const Tforce frc_ly = -fd * crbccd[1];
+      yfrc[i_atom] += frc_iy;
+      yfrc[j_atom] += frc_jy;
+      yfrc[k_atom] -= frc_iy + frc_jy + frc_ly;
+      yfrc[l_atom] += frc_ly;
+      const Tforce frc_iz = crabbc[2] * fa;
+      const Tforce frc_jz = (fb1 * crabbc[2]) - (fb2 * crbccd[2]);
+      const Tforce frc_lz = -fd * crbccd[2];
+      zfrc[i_atom] += frc_iz;
+      zfrc[j_atom] += frc_jz;
+      zfrc[k_atom] -= frc_iz + frc_jz + frc_lz;
+      zfrc[l_atom] += frc_lz;
+    }
+  }
+  return rst_eval.z;
+}
+    
 } // namespace energy
 } // namespace omni

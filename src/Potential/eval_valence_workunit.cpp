@@ -508,13 +508,15 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int param_idx = tinsr.y;
-      const double contrib = evalAnglRestraint(i_atom, j_atom, k_atom, (tinsr.x >> 31),
-                                               step_number, param_idx, rar.rangl_init_step,
-                                               rar.rangl_finl_step, rar.rangl_init_keq,
-                                               rar.rangl_finl_keq, rar.rangl_init_r,
-                                               rar.rangl_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
-                                               nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, eval_force);
+      const double contrib =
+        evalAnglRestraint(i_atom, j_atom, k_atom, (tinsr.x >> 31), step_number,
+                          rar.rangl_init_step[param_idx], rar.rangl_finl_step[param_idx],
+                          Vec2<double>(rar.rangl_init_keq[param_idx]),
+                          Vec2<double>(rar.rangl_finl_keq[param_idx]),
+                          Vec4<double>(rar.rangl_init_r[param_idx]),
+                          Vec4<double>(rar.rangl_finl_r[param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
+                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                          eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -543,13 +545,15 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int l_atom = (tinsr.y & 0x3ff);
       const int param_idx = (tinsr.y >> 10);
-      const double contrib = evalDiheRestraint(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31),
-                                               step_number, param_idx, rar.rdihe_init_step,
-                                               rar.rdihe_finl_step, rar.rdihe_init_keq,
-                                               rar.rdihe_finl_keq, rar.rdihe_init_r,
-                                               rar.rdihe_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
-                                               nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, eval_force);
+      const double contrib =
+        evalDiheRestraint(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31), step_number,
+                          rar.rdihe_init_step[param_idx], rar.rdihe_finl_step[param_idx],
+                          Vec2<double>(rar.rdihe_init_keq[param_idx]),
+                          Vec2<double>(rar.rdihe_finl_keq[param_idx]),
+                          Vec4<double>(rar.rdihe_init_r[param_idx]),
+                          Vec4<double>(rar.rdihe_finl_r[param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
+                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                          eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }

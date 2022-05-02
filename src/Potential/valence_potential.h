@@ -685,25 +685,29 @@ Tcalc evalBondRestraint(int i_atom, int j_atom, bool time_dependence, int step_n
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
-double evalAnglRestraint(int i_atom, int j_atom, int k_atom, bool time_dependence, int step_number,
-                         int param_idx, const int* init_step, const int* finl_step,
-                         const double2* init_keq, const double2* finl_keq, const double4* init_r,
-                         const double4* finl_r, const double* xcrd, const double* ycrd,
-                         const double* zcrd, const double* umat, const double* invu,
-                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                         EvaluateForce eval_force);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalAnglRestraint(int i_atom, int j_atom, int k_atom, bool time_dependence, int step_number,
+                        const int init_step, const int finl_step, const Vec2<Tcalc> init_keq,
+                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
+                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+                        Tcalc force_factor = 1.0);
 
 /// \brief Evaluate four-point dihedral restraints.  See the descriptions in evalPosnRestraint
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
-double evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, bool time_dependence,
-                         int step_number, int param_idx, const int* init_step,
-                         const int* finl_step, const double2* init_keq, const double2* finl_keq,
-                         const double4* init_r, const double4* finl_r, const double* xcrd,
-                         const double* ycrd, const double* zcrd, const double* umat,
-                         const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
-                         double* zfrc, EvaluateForce eval_force);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, bool time_dependence,
+                        int step_number, const int init_step, const int finl_step,
+                        const Vec2<Tcalc> init_keq, const Vec2<Tcalc> finl_keq,
+                        const Vec4<Tcalc> init_r, const Vec4<Tcalc> finl_r, const Tcoord* xcrd,
+                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+                        Tcalc force_factor = 1.0);
 
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
 ///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is
