@@ -640,92 +640,6 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameRead
 }
 
 //-------------------------------------------------------------------------------------------------
-double evalPosnRestraint(const int p_atom, const bool time_dependence, const int step_number,
-                         const int kr_param_idx, const int xyz_param_idx, const int* init_step,
-                         const int* finl_step, const double2* init_xy, const double2* finl_xy,
-                         const double* init_z, const double* finl_z, const double2* init_keq,
-                         const double2* finl_keq, const double4* init_r, const double4* finl_r,
-                         const double* xcrd, const double* ycrd, const double* zcrd,
-                         const double* umat, const double* invu, const UnitCellType unit_cell,
-                         double* xfrc, double* yfrc, double* zfrc,
-                         const EvaluateForce eval_force) {
-
-  // Determine the weight to give to each endpoint of the restraint
-  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[kr_param_idx],
-                                                             finl_step[kr_param_idx]);
-  double dx = xcrd[p_atom] - ((mixwt.x * init_xy[xyz_param_idx].x) +
-                              (mixwt.y * finl_xy[xyz_param_idx].x));
-  double dy = ycrd[p_atom] - ((mixwt.x * init_xy[xyz_param_idx].y) +
-                              (mixwt.y * finl_xy[xyz_param_idx].y));
-  double dz = zcrd[p_atom] - ((mixwt.x * init_z[xyz_param_idx]) +
-                              (mixwt.y * finl_z[xyz_param_idx]));
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-  const Vec3<double> rst_eval =
-    restraintDelta(Vec2<double>(init_keq[kr_param_idx]), Vec2<double>(finl_keq[kr_param_idx]),
-                   Vec4<double>(init_r[kr_param_idx]), Vec4<double>(finl_r[kr_param_idx]),
-                   Vec2<double>(mixwt), dr);
-
-  // Compute forces
-  if (eval_force == EvaluateForce::YES) {
-    if (dr < constants::tiny) {
-
-      // The case of positional restraints has a wrinkle when particles are already at their
-      // exact target locations.  The force will likely be zero anyway, but it's possible to
-      // define a positional restraint that forces a particle to be some finite distance away
-      // from the target point, which would imply a non-zero force when the particle is at
-      // the target location.  The proper direction of that force is an arbitrary thing in
-      // such a case, so subdivide it among all three dimensions.
-      const double fmag = 2.0 * rst_eval.x * rst_eval.y / sqrt(3.0);
-      xfrc[p_atom] -= fmag;
-      yfrc[p_atom] -= fmag;
-      zfrc[p_atom] -= fmag;
-    }
-    else {
-      const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
-      xfrc[p_atom] -= fmag * dx;
-      yfrc[p_atom] -= fmag * dy;
-      zfrc[p_atom] -= fmag * dz;
-    }
-  }
-  return rst_eval.z;
-}
-
-//-------------------------------------------------------------------------------------------------
-double evalBondRestraint(const int i_atom, const int j_atom, const bool time_dependence,
-                         const int step_number, const int param_idx, const int* init_step,
-                         const int* finl_step, const double2* init_keq, const double2* finl_keq,
-                         const double4* init_r, const double4* finl_r, const double* xcrd,
-                         const double* ycrd, const double* zcrd, const double* umat,
-                         const double* invu, const UnitCellType unit_cell, double* xfrc,
-                         double* yfrc, double* zfrc, const EvaluateForce eval_force) {
-  const Vec2<double> mixwt = computeRestraintMixture<double>(step_number, init_step[param_idx],
-                                                             finl_step[param_idx]);
-  double dx = xcrd[j_atom] - xcrd[i_atom];
-  double dy = ycrd[j_atom] - ycrd[i_atom];
-  double dz = zcrd[j_atom] - zcrd[i_atom];
-  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  const double dr = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-  const Vec3<double> rst_eval =
-    restraintDelta(Vec2<double>(init_keq[param_idx]), Vec2<double>(finl_keq[param_idx]),
-                   Vec4<double>(init_r[param_idx]), Vec4<double>(finl_r[param_idx]),
-                   Vec2<double>(mixwt), dr);
-  if (eval_force == EvaluateForce::YES) {
-    const double fmag = 2.0 * rst_eval.x * rst_eval.y / dr;
-    const double fmag_dx = fmag * dx;
-    const double fmag_dy = fmag * dy;
-    const double fmag_dz = fmag * dz;
-    xfrc[i_atom] += fmag_dx;
-    yfrc[i_atom] += fmag_dy;
-    zfrc[i_atom] += fmag_dz;
-    xfrc[j_atom] -= fmag_dx;
-    yfrc[j_atom] -= fmag_dy;
-    zfrc[j_atom] -= fmag_dz;
-  }    
-  return rst_eval.z;
-}
-
-//-------------------------------------------------------------------------------------------------
 double evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
                          const bool time_dependence, const int step_number, const int param_idx,
                          const int* init_step, const int* finl_step, const double2* init_keq,
@@ -889,23 +803,25 @@ double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xc
 
   // Accumulate results by looping over all restraint terms
   for (int i = 0; i < rar.nposn; i++) {
-    const double contrib = evalPosnRestraint(rar.rposn_atoms[i], rar.time_dependence, step_number,
-                                             i, i, rar.rposn_init_step, rar.rposn_finl_step,
-                                             rar.rposn_init_xy, rar.rposn_finl_xy,
-                                             rar.rposn_init_z, rar.rposn_finl_z,
-                                             rar.rposn_init_keq, rar.rposn_finl_keq,
-                                             rar.rposn_init_r, rar.rposn_finl_r, xcrd, ycrd, zcrd,
-                                             umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
+    const double contrib =
+      evalPosnRestraint(rar.rposn_atoms[i], rar.time_dependence, step_number,
+                        rar.rposn_init_step[i], rar.rposn_finl_step[i],
+                        Vec2<double>(rar.rposn_init_xy[i]), Vec2<double>(rar.rposn_finl_xy[i]),
+                        rar.rposn_init_z[i], rar.rposn_finl_z[i],
+                        Vec2<double>(rar.rposn_init_keq[i]), Vec2<double>(rar.rposn_finl_keq[i]),
+                        Vec4<double>(rar.rposn_init_r[i]), Vec4<double>(rar.rposn_finl_r[i]), xcrd,
+                        ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
     rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }
   for (int pos = 0; pos < rar.nbond; pos++) {
-    const double contrib = evalBondRestraint(rar.rbond_i_atoms[pos], rar.rbond_j_atoms[pos],
-                                             rar.time_dependence, step_number, pos,
-                                             rar.rbond_init_step, rar.rbond_finl_step,
-                                             rar.rbond_init_keq, rar.rbond_finl_keq,
-                                             rar.rbond_init_r, rar.rbond_finl_r, xcrd, ycrd, zcrd,
-                                             umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force);
+    const double contrib =
+      evalBondRestraint(rar.rbond_i_atoms[pos], rar.rbond_j_atoms[pos], rar.time_dependence,
+                        step_number, rar.rbond_init_step[pos], rar.rbond_finl_step[pos],
+                        Vec2<double>(rar.rbond_init_keq[pos]),
+                        Vec2<double>(rar.rbond_finl_keq[pos]), Vec4<double>(rar.rbond_init_r[pos]),
+                        Vec4<double>(rar.rbond_finl_r[pos]), xcrd, ycrd, zcrd, umat, invu,
+                        unit_cell, xfrc, yfrc, zfrc, eval_force);
     rest_energy += contrib;
     rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
   }

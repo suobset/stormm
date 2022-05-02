@@ -434,15 +434,18 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int p_atom = (tinsr.x & 0x3ff);
       const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
       const int xyz_param_idx = tinsr.y;
-      const double contrib = evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number,
-                                               kr_param_idx, xyz_param_idx, rar.rposn_init_step,
-                                               rar.rposn_finl_step, rar.rposn_init_xy,
-                                               rar.rposn_finl_xy, rar.rposn_init_z,
-                                               rar.rposn_finl_z, rar.rposn_init_keq,
-                                               rar.rposn_finl_keq, rar.rposn_init_r,
-                                               rar.rposn_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
-                                               nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, eval_force);
+      const double contrib =
+        evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number, rar.rposn_init_step[kr_param_idx],
+                          rar.rposn_finl_step[kr_param_idx],
+                          Vec2<double>(rar.rposn_init_xy[xyz_param_idx]),
+                          Vec2<double>(rar.rposn_finl_xy[xyz_param_idx]),
+                          rar.rposn_init_z[xyz_param_idx], rar.rposn_finl_z[xyz_param_idx],
+                          Vec2<double>(rar.rposn_init_keq[kr_param_idx]),
+                          Vec2<double>(rar.rposn_finl_keq[kr_param_idx]),
+                          Vec4<double>(rar.rposn_init_r[kr_param_idx]),
+                          Vec4<double>(rar.rposn_finl_r[kr_param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
+                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                          eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -469,13 +472,15 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int param_idx = tinsr.y;
-      const double contrib = evalBondRestraint(i_atom, j_atom, (tinsr.x >> 31), step_number,
-                                               param_idx, rar.rbond_init_step,
-                                               rar.rbond_finl_step, rar.rbond_init_keq,
-                                               rar.rbond_finl_keq, rar.rbond_init_r,
-                                               rar.rbond_finl_r, sh_xcrd, sh_ycrd, sh_zcrd,
-                                               nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                                               sh_yfrc, sh_zfrc, eval_force);
+      const double contrib =
+        evalBondRestraint(i_atom, j_atom, (tinsr.x >> 31), step_number,
+                          rar.rbond_init_step[param_idx], rar.rbond_finl_step[param_idx],
+                          Vec2<double>(rar.rbond_init_keq[param_idx]),
+                          Vec2<double>(rar.rbond_finl_keq[param_idx]),
+                          Vec4<double>(rar.rbond_init_r[param_idx]),
+                          Vec4<double>(rar.rbond_finl_r[param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
+                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                          eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }

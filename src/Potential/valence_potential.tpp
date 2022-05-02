@@ -774,5 +774,145 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   return Vec2<Tcalc>(ele_contrib, vdw_contrib);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int step_number,
+                        const int init_step, const int finl_step, const Vec2<Tcalc> init_xy,
+                        const Vec2<Tcalc> finl_xy, const Tcalc init_z, const Tcalc finl_z,
+                        const Vec2<Tcalc> init_keq, const Vec2<Tcalc> finl_keq,
+                        const Vec4<Tcalc> init_r, const Vec4<Tcalc> finl_r, const Tcoord* xcrd,
+                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                        const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
+                        Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
+                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc value_one = 1.0;
+
+  // Determine the weight to give to each endpoint of the restraint
+  const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
+  Tcalc dx, dy, dz;
+  if (isSignedIntegralScalarType<Tcoord>()) {
+    dx = (static_cast<Tcalc>(xcrd[p_atom]) * inv_gpos_factor) -
+         ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
+    dy = (static_cast<Tcalc>(ycrd[p_atom]) * inv_gpos_factor) -
+         ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
+    dz = (static_cast<Tcalc>(zcrd[p_atom]) * inv_gpos_factor) -
+         ((mixwt.x * init_z) + (mixwt.y * finl_z));
+  }
+  else {
+    dx = xcrd[p_atom] - ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
+    dy = ycrd[p_atom] - ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
+    dz = zcrd[p_atom] - ((mixwt.x * init_z) + (mixwt.y * finl_z));
+  }
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  const double dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+  const Vec3<double> rst_eval =
+    restraintDelta(Vec2<double>(init_keq), Vec2<double>(finl_keq), Vec4<double>(init_r),
+                   Vec4<double>(finl_r), Vec2<double>(mixwt), dr);
+
+  // Compute forces
+  if (eval_force == EvaluateForce::YES) {
+    if (dr < constants::tiny) {
+
+      // The case of positional restraints has a wrinkle when particles are already at their
+      // exact target locations.  The force will likely be zero anyway, but it's possible to
+      // define a positional restraint that forces a particle to be some finite distance away
+      // from the target point, which would imply a non-zero force when the particle is at
+      // the target location.  The proper direction of that force is an arbitrary thing in
+      // such a case, so subdivide it among all three dimensions.
+      const double fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / sqrt(3.0) :
+                                              2.0f * rst_eval.x * rst_eval.y / sqrtf(3.0f);
+      if (isSignedIntegralScalarType<Tforce>()) {
+        const Tforce ifmag = llround(fmag * force_factor);
+        xfrc[p_atom] -= ifmag;
+        yfrc[p_atom] -= ifmag;
+        zfrc[p_atom] -= ifmag;        
+      }
+      else {
+        xfrc[p_atom] -= fmag;
+        yfrc[p_atom] -= fmag;
+        zfrc[p_atom] -= fmag;
+      }
+    }
+    else {
+      const double fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
+                                              2.0f * rst_eval.x * rst_eval.y / dr;
+      if (isSignedIntegralScalarType<Tforce>()) {
+        xfrc[p_atom] -= llround(fmag * dx * force_factor);
+        yfrc[p_atom] -= llround(fmag * dy * force_factor);
+        zfrc[p_atom] -= llround(fmag * dz * force_factor);
+      }
+      else {
+        xfrc[p_atom] -= fmag * dx;
+        yfrc[p_atom] -= fmag * dy;
+        zfrc[p_atom] -= fmag * dz;
+      }
+    }
+  }
+  return rst_eval.z;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_dependence,
+                        const int step_number, const int init_step, const int finl_step,
+                        const Vec2<Tcalc> init_keq, const Vec2<Tcalc> finl_keq,
+                        const Vec4<Tcalc> init_r, const Vec4<Tcalc> finl_r, const Tcoord* xcrd,
+                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                        const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
+                        Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
+                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc value_one = 1.0;
+  const Vec2<Tcalc> mixwt = computeRestraintMixture<double>(step_number, init_step, finl_step);
+  Tcalc dx, dy, dz;
+  if (isSignedIntegralScalarType<Tcoord>()) {
+    dx = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+    dy = static_cast<Tcalc>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+    dz = static_cast<Tcalc>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+  }
+  else {
+    dx = xcrd[j_atom] - xcrd[i_atom];
+    dy = ycrd[j_atom] - ycrd[i_atom];
+    dz = zcrd[j_atom] - zcrd[i_atom];
+  }
+  imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
+  const Tcalc dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                       sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+  const Vec3<Tcalc> rst_eval =
+    restraintDelta(Vec2<Tcalc>(init_keq), Vec2<Tcalc>(finl_keq), Vec4<Tcalc>(init_r),
+                   Vec4<Tcalc>(finl_r), Vec2<Tcalc>(mixwt), dr);
+  if (eval_force == EvaluateForce::YES) {
+    const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
+                                           2.0f * rst_eval.x * rst_eval.y / dr;
+    if (isSignedIntegralScalarType<Tforce>()) {
+      const Tforce ifmag_dx = llround(fmag * dx * force_factor);
+      const Tforce ifmag_dy = llround(fmag * dy * force_factor);
+      const Tforce ifmag_dz = llround(fmag * dz * force_factor);
+      xfrc[i_atom] += ifmag_dx;
+      yfrc[i_atom] += ifmag_dy;
+      zfrc[i_atom] += ifmag_dz;
+      xfrc[j_atom] -= ifmag_dx;
+      yfrc[j_atom] -= ifmag_dy;
+      zfrc[j_atom] -= ifmag_dz;
+    }
+    else {
+      const Tcalc fmag_dx = fmag * dx;
+      const Tcalc fmag_dy = fmag * dy;
+      const Tcalc fmag_dz = fmag * dz;
+      xfrc[i_atom] += fmag_dx;
+      yfrc[i_atom] += fmag_dy;
+      zfrc[i_atom] += fmag_dz;
+      xfrc[j_atom] -= fmag_dx;
+      yfrc[j_atom] -= fmag_dy;
+      zfrc[j_atom] -= fmag_dz;
+    }
+  }
+  return rst_eval.z;
+}
+
 } // namespace energy
 } // namespace omni
