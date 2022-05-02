@@ -327,7 +327,7 @@ double pinpointXoshiro256pp(std::vector<ullint4> &rng_states, const int generato
 //-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
