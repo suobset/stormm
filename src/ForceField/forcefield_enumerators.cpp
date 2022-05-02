@@ -32,6 +32,7 @@ std::string getParameterKindName(const ParameterKind kind) {
   case ParameterKind::NONE:
     return std::string("no parameter");
   }
+  __builtin_unreachable();
 }
   
 } // namespace modeling

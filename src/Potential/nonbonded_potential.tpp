@@ -1,74 +1,274 @@
-#include "Constants/generalized_born.h"
-#include "nonbonded_potential.h"
-#include "energy_abstracts.h"
-
+// -*-c++-*-
 namespace omni {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
-                                const StaticExclusionMaskReader ser, PhaseSpaceWriter psw,
-                                ScoreCard *ecard, const EvaluateForce eval_elec_force,
-                                const EvaluateForce eval_vdw_force, const int system_index) {
-  return evaluateNonbondedEnergy<double, double, double>(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd,
-                                                         psw.umat, psw.invu, psw.unit_cell,
-                                                         psw.xfrc, psw.yfrc, psw.zfrc, ecard,
-                                                         eval_elec_force, eval_vdw_force,
-                                                         system_index);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclusionMaskReader ser,
+                                const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                                const double* umat, const double* invu,
+                                const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                Tforce* zfrc, ScoreCard *ecard,
+                                const EvaluateForce eval_elec_force,
+                                const EvaluateForce eval_vdw_force, const int system_index,
+                                const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const bool tcoord_is_sgnint = isSignedIntegralScalarType<Tcoord>();
+  const bool tforce_is_sgnint = isSignedIntegralScalarType<Tforce>();
+  const Tcalc value_one = 1.0;
+  
+  // Initialize the energy result as two separate accumulators for each of a pair of quantities
+  double ele_energy = 0.0;
+  double vdw_energy = 0.0;
+  llint ele_acc = 0LL;
+  llint vdw_acc = 0LL;
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+
+  // Allocate arrays for tile coordinates and accumulated forces, akin to GPU protocols.
+  std::vector<Tcalc> cachi_xcrd(tile_length), cachi_ycrd(tile_length), cachi_zcrd(tile_length);
+  std::vector<Tcalc> cachj_xcrd(tile_length), cachj_ycrd(tile_length), cachj_zcrd(tile_length);
+  std::vector<Tcalc> cachi_q(tile_length), cachj_q(tile_length);
+  std::vector<int> cachi_ljidx(tile_length), cachj_ljidx(tile_length);
+  std::vector<Tcalc> cachi_xfrc(tile_length), cachi_yfrc(tile_length), cachi_zfrc(tile_length);
+  std::vector<Tcalc> cachj_xfrc(tile_length), cachj_yfrc(tile_length), cachj_zfrc(tile_length);
+  
+  // Perform nested loops over all supertiles and all tiles within them
+  for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
+    for (int stj = 0; stj <= sti; stj++) {
+
+      // Tile dimensions and locations
+      const int stni_atoms = std::min(ser.atom_count - (supertile_length * sti), supertile_length);
+      const int stnj_atoms = std::min(ser.atom_count - (supertile_length * stj), supertile_length);
+      const int ni_tiles = (stni_atoms + tile_length - 1) / tile_length;
+      const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
+
+      // Access the supertile's map index: if zero, there are no exclusions to worry about
+      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
+      const int diag_supertile = (sti == stj);
+
+      // The outer loops can proceed until the branch about exclusions
+      for (int ti = 0; ti < ni_tiles; ti++) {
+        const int ni_atoms = std::min(stni_atoms - (ti * tile_length), tile_length);
+        const int tjlim = (nj_tiles * (1 - diag_supertile)) + (diag_supertile * ti);
+        for (int tj = 0; tj <= tjlim; tj++) {
+          const int nj_atoms = std::min(stnj_atoms - (tj * tile_length), tile_length);
+          const int diag_tile = diag_supertile * (ti == tj);
+
+          // Pre-cache the atom positions to avoid conversions in the inner loops.  Pre-cache
+          // properties and local force accumulators to mimic GPU activity.
+          for (int i = 0; i < ni_atoms; i++) {
+            const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+            if (tcoord_is_sgnint) {
+              cachi_xcrd[i] = static_cast<Tcalc>(xcrd[atom_i]) * inv_gpos_factor;
+              cachi_ycrd[i] = static_cast<Tcalc>(ycrd[atom_i]) * inv_gpos_factor;
+              cachi_zcrd[i] = static_cast<Tcalc>(zcrd[atom_i]) * inv_gpos_factor;
+            }
+            else {
+              cachi_xcrd[i] = xcrd[atom_i];
+              cachi_ycrd[i] = ycrd[atom_i];
+              cachi_zcrd[i] = zcrd[atom_i];
+            }
+            cachi_xfrc[i] = 0.0;
+            cachi_yfrc[i] = 0.0;
+            cachi_zfrc[i] = 0.0;
+            cachi_q[i] = nbk.coulomb_constant * nbk.charge[atom_i];
+            cachi_ljidx[i] = nbk.lj_idx[atom_i];
+          }
+          for (int j = 0; j < nj_atoms; j++) {
+            const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+            if (tcoord_is_sgnint) {
+              cachj_xcrd[j] = static_cast<Tcalc>(xcrd[atom_j]) * inv_gpos_factor;
+              cachj_ycrd[j] = static_cast<Tcalc>(ycrd[atom_j]) * inv_gpos_factor;
+              cachj_zcrd[j] = static_cast<Tcalc>(zcrd[atom_j]) * inv_gpos_factor;
+            }
+            else {
+              cachj_xcrd[j] = xcrd[atom_j];
+              cachj_ycrd[j] = ycrd[atom_j];
+              cachj_zcrd[j] = zcrd[atom_j];
+            }
+            cachj_xfrc[j] = 0.0;
+            cachj_yfrc[j] = 0.0;
+            cachj_zfrc[j] = 0.0;
+            cachj_q[j] = nbk.charge[atom_j];
+            cachj_ljidx[j] = nbk.lj_idx[atom_j];              
+          }
+
+          // Branch for different types of tiles
+          if (stij_map_index == 0) {
+
+            // Exclusion-free loops
+            for (int i = 0; i < ni_atoms; i++) {
+              const Tcalc qi = cachi_q[i];
+              const int ljt_i = cachi_ljidx[i];
+              const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+              const Tcalc atomi_x = cachi_xcrd[i];
+              const Tcalc atomi_y = cachi_ycrd[i];
+              const Tcalc atomi_z = cachi_zcrd[i];
+              for (int j = 0; j < jlim; j++) {
+                const Tcalc dx = cachj_xcrd[j] - atomi_x;
+                const Tcalc dy = cachj_ycrd[j] - atomi_y;
+                const Tcalc dz = cachj_zcrd[j] - atomi_z;
+                Tcalc invr2, invr;
+                if (tcalc_is_double) {
+                  invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+                  invr = sqrt(invr2);
+                }
+                else {
+                  invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+                  invr = sqrtf(invr2);
+                }
+                const Tcalc invr4 = invr2 * invr2;
+                const Tcalc qiqj = qi * cachj_q[j];
+                const Tcalc ele_contrib = qiqj * invr;
+                ele_energy += ele_contrib;
+                ele_acc += static_cast<llint>(llround(ele_contrib * nrg_scale_factor));
+                const int ljt_j = cachj_ljidx[j];
+                const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                const Tcalc vdw_contrib = ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
+                vdw_energy += vdw_contrib;
+                vdw_acc += static_cast<llint>(llround(vdw_contrib * nrg_scale_factor));
+
+                // Evaluate the force, if requested
+                if (eval_elec_force == EvaluateForce::YES ||
+                    eval_vdw_force == EvaluateForce::YES) {
+                  Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
+                                                                         0.0;
+                  if (eval_vdw_force == EvaluateForce::YES) {
+                    if (tcalc_is_double) {
+                      fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+                    }
+                    else {
+                      fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                    }
+                  }
+                  const Tcalc fmag_dx = fmag * dx;
+                  const Tcalc fmag_dy = fmag * dy;
+                  const Tcalc fmag_dz = fmag * dz;
+                  cachi_xfrc[i] += fmag_dx;
+                  cachi_yfrc[i] += fmag_dy;
+                  cachi_zfrc[i] += fmag_dz;
+                  cachj_xfrc[j] -= fmag_dx;
+                  cachj_yfrc[j] -= fmag_dy;
+                  cachj_zfrc[j] -= fmag_dz;
+                }
+              }
+            }
+          }
+          else {
+
+            // Get the tile's mask and check exclusions with each interaction
+            const int tij_map_index = ser.tile_map_idx[stij_map_index +
+                                                       (tj * tile_lengths_per_supertile) + ti];
+            for (int i = 0; i < ni_atoms; i++) {
+              const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+              const uint mask_i = ser.mask_data[tij_map_index + i];
+              const Tcalc atomi_x = cachi_xcrd[i];
+              const Tcalc atomi_y = cachi_ycrd[i];
+              const Tcalc atomi_z = cachi_zcrd[i];
+              const Tcalc qi = cachi_q[i];
+              const int ljt_i = cachi_ljidx[i];
+              const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+              for (int j = 0; j < jlim; j++) {
+                if ((mask_i >> j) & 0x1) {
+                  continue;
+                }
+                const Tcalc dx = cachj_xcrd[j] - atomi_x;
+                const Tcalc dy = cachj_ycrd[j] - atomi_y;
+                const Tcalc dz = cachj_zcrd[j] - atomi_z;
+                Tcalc invr2, invr;
+                if (tcalc_is_double) {
+                  invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+                  invr = sqrt(invr2);
+                }
+                else {
+                  invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
+                  invr = sqrtf(invr2);
+                }
+                const Tcalc invr4 = invr2 * invr2;
+                const Tcalc qiqj = qi * cachj_q[j];
+                const Tcalc ele_contrib = qiqj * invr;
+                ele_energy += ele_contrib;
+                ele_acc += static_cast<llint>(llround(ele_contrib * nrg_scale_factor));
+                const int ljt_j = cachj_ljidx[j];
+                const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
+                const Tcalc vdw_contrib = ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
+                vdw_energy += vdw_contrib;
+                vdw_acc += static_cast<llint>(llround(vdw_contrib * nrg_scale_factor));
+
+                // Evaluate the force, if requested
+                if (eval_elec_force == EvaluateForce::YES ||
+                    eval_vdw_force == EvaluateForce::YES) {
+                  Tcalc fmag = (eval_elec_force == EvaluateForce::YES) ? -(qiqj * invr * invr2) :
+                                                                          0.0;
+                  if (eval_vdw_force == EvaluateForce::YES) {
+                    if (tcalc_is_double) {
+                      fmag += ((6.0 * ljb) - (12.0 * lja * invr4 * invr2)) * invr4 * invr4;
+                    }
+                    else {
+                      fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
+                    }
+                  }
+                  const Tcalc fmag_dx = fmag * dx;
+                  const Tcalc fmag_dy = fmag * dy;
+                  const Tcalc fmag_dz = fmag * dz;
+                  cachi_xfrc[i] += fmag_dx;
+                  cachi_yfrc[i] += fmag_dy;
+                  cachi_zfrc[i] += fmag_dz;
+                  cachj_xfrc[j] -= fmag_dx;
+                  cachj_yfrc[j] -= fmag_dy;
+                  cachj_zfrc[j] -= fmag_dz;
+                }                
+              }
+            }
+          }
+
+          // Contribute cached forces back to global arrays.
+          if (eval_elec_force == EvaluateForce::YES || eval_vdw_force == EvaluateForce::YES) {
+            for (int i = 0; i < ni_atoms; i++) {
+              const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+              if (tforce_is_sgnint) {
+                xfrc[atom_i] += llround(cachi_xfrc[i] * force_factor);              
+                yfrc[atom_i] += llround(cachi_yfrc[i] * force_factor);
+                zfrc[atom_i] += llround(cachi_zfrc[i] * force_factor);
+              }
+              else {
+                xfrc[atom_i] += cachi_xfrc[i];
+                yfrc[atom_i] += cachi_yfrc[i];
+                zfrc[atom_i] += cachi_zfrc[i];
+              }
+            }
+            for (int j = 0; j < nj_atoms; j++) {
+              const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+              if (tforce_is_sgnint) {
+                xfrc[atom_j] += llround(cachj_xfrc[j] * force_factor);              
+                yfrc[atom_j] += llround(cachj_yfrc[j] * force_factor);
+                zfrc[atom_j] += llround(cachj_zfrc[j] * force_factor);
+              }
+              else {
+                xfrc[atom_j] += cachj_xfrc[j];
+                yfrc[atom_j] += cachj_yfrc[j];
+                zfrc[atom_j] += cachj_zfrc[j];
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Contribute results
+  ecard->contribute(StateVariable::ELECTROSTATIC, ele_acc, system_index);
+  ecard->contribute(StateVariable::VDW, vdw_acc, system_index);
+
+  // Return the double-precision energy sums, if of interest
+  return { ele_energy, vdw_energy };
 }
 
 //-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se, PhaseSpace *ps,
-                                ScoreCard *ecard, const EvaluateForce eval_elec_force,
-                                const EvaluateForce eval_vdw_force, const int system_index) {
-  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(), ps->data(), ecard,
-                                 eval_elec_force, eval_vdw_force, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se, PhaseSpace *ps,
-                                ScoreCard *ecard, const EvaluateForce eval_elec_force,
-                                const EvaluateForce eval_vdw_force, const int system_index) {
-  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(), ps->data(),
-                                 ecard, eval_elec_force, eval_vdw_force, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
-                                const StaticExclusionMaskReader ser, CoordinateFrameReader cfr,
-                                ScoreCard *ecard, const int system_index) {
-  return evaluateNonbondedEnergy<double, double, double>(nbk, ser, cfr.xcrd, cfr.ycrd, cfr.zcrd,
-                                                         cfr.umat, cfr.invu, cfr.unit_cell,
-                                                         nullptr, nullptr, nullptr, ecard,
-                                                         EvaluateForce::NO, EvaluateForce::NO,
-                                                         system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
-                                const StaticExclusionMaskReader ser,
-                                const CoordinateFrameWriter &cfw, ScoreCard *ecard,
-                                const int system_index) {
-  return evaluateNonbondedEnergy(nbk, ser, CoordinateFrameReader(cfw), ecard, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
-                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                const int system_index) {
-  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(), cfr, ecard,
-                                 system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
-                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                const int system_index) {
-  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(), cfr, ecard,
-                                 system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
+#if 0
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
@@ -427,78 +627,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
   // Return the double-precision energy sum, if of interest
   return egb_energy;
 }
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
-                                     const ImplicitSolventKit<double> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
-                                     PhaseSpaceWriter psw, ScoreCard *ecard,
-                                     const EvaluateForce eval_force, const int system_index) {
-  return evaluateGeneralizedBornEnergy(nbk, isk, ngb_tables, psw.xcrd, psw.ycrd, psw.zcrd,
-                                       psw.umat, psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
-                                       psw.zfrc, ecard, eval_force, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
-                                     const NeckGeneralizedBornTable &ngb_tables, PhaseSpace *ps,
-                                     ScoreCard *ecard, const EvaluateForce eval_force,
-                                     const int system_index) {
-  return evaluateGeneralizedBornEnergy(ag.getDoublePrecisionNonbondedKit(),
-                                       ag.getDoublePrecisionImplicitSolventKit(),
-                                       ngb_tables, ps->data(), ecard, eval_force, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
-                                     const NeckGeneralizedBornTable &ngb_tables, PhaseSpace *ps,
-                                     ScoreCard *ecard, const EvaluateForce eval_force,
-                                     const int system_index) {
-  return evaluateGeneralizedBornEnergy(ag->getDoublePrecisionNonbondedKit(),
-                                       ag->getDoublePrecisionImplicitSolventKit(),
-                                       ngb_tables, ps->data(), ecard, eval_force, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
-                                     const ImplicitSolventKit<double> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader cfr, ScoreCard *ecard,
-                                     const int system_index) {
-  return evaluateGeneralizedBornEnergy(nbk, isk, ngb_tables, cfr.xcrd, cfr.ycrd, cfr.zcrd,
-                                       cfr.umat, cfr.invu, cfr.unit_cell, nullptr, nullptr,
-                                       nullptr, ecard, EvaluateForce::NO, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
-                                     const ImplicitSolventKit<double> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameWriter &cfw, ScoreCard *ecard,
-                                     const int system_index) {
-  return evaluateGeneralizedBornEnergy(nbk, isk, ngb_tables, CoordinateFrameReader(cfw), ecard,
-                                       system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
-                                     const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                     const int system_index) {
-  return evaluateGeneralizedBornEnergy(ag.getDoublePrecisionNonbondedKit(),
-                                       ag.getDoublePrecisionImplicitSolventKit(), ngb_tables,
-                                       cfr, ecard, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
-double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
-                                     const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                     const int system_index) {
-  return evaluateGeneralizedBornEnergy(ag->getDoublePrecisionNonbondedKit(),
-                                       ag->getDoublePrecisionImplicitSolventKit(), ngb_tables,
-                                       cfr, ecard, system_index);
-}
+#endif
 
 } // namespace energy
 } // namespace omni

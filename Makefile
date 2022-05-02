@@ -219,6 +219,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Math/vector_ops.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \
+		 $(SRCDIR)/Potential/nonbonded_potential.tpp \
 		 $(SRCDIR)/Potential/scorecard.tpp \
 		 $(SRCDIR)/Potential/valence_potential.tpp \
 		 $(SRCDIR)/Restraints/restraint_util.tpp \

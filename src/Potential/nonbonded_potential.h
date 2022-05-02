@@ -3,6 +3,7 @@
 #define OMNI_NONBONDED_POTENTIAL_H
 
 #include "Constants/generalized_born.h"
+#include "DataTypes/common_types.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
@@ -13,6 +14,7 @@
 namespace omni {
 namespace energy {
 
+using data_types::isSignedIntegralScalarType;
 using topology::AtomGraph;
 using topology::ImplicitSolventKit;
 using topology::NonbondedKit;
@@ -55,6 +57,16 @@ using namespace generalized_born_defaults;
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclusionMaskReader ser,
+                                const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                                const double* umat, const double* invu, UnitCellType unit_cell,
+                                Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
+                                EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                                int system_index, Tcalc inv_gpos_factor = 1.0,
+                                Tcalc force_factor = 1.0);
+
+#if 0
 double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
                                 const StaticExclusionMaskReader ser, const double* xcrd,
                                 const double* ycrd, const double* zcrd, const double* umat,
@@ -63,6 +75,7 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
                                 EvaluateForce eval_elec_force = EvaluateForce::NO,
                                 EvaluateForce eval_vdw_force = EvaluateForce::NO,
                                 int system_index = 0);
+#endif
 
 double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
                                 const StaticExclusionMaskReader ser, PhaseSpaceWriter psw,
@@ -186,5 +199,7 @@ double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
 
 } // namespace energy
 } // namespace omni
+
+#include "nonbonded_potential.tpp"
 
 #endif

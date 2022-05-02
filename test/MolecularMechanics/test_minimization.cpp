@@ -51,7 +51,7 @@ void testLocalMinimum(PhaseSpace *ps, const AtomGraph &ag, const RestraintAppara
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   PhaseSpaceWriter psw = ps->data();
   std::vector<int> local_minimum(3 * cdk.natom, 1);
-  const double test_displacement = 0.0005;
+  const double test_displacement = 0.0006;
   ScoreCard lsc(1);
   evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
   const double e0 = lsc.reportTotalEnergy();

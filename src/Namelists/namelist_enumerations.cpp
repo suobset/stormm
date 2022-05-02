@@ -32,6 +32,7 @@ std::string getInputStatusString(const InputStatus stt) {
   case InputStatus::MISSING:
     return std::string("MISSING");
   }
+  __builtin_unreachable();
 }
 
 } // namespace namelist
