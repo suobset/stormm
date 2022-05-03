@@ -45,13 +45,17 @@ using namespace omni::generalized_born_defaults;
 //
 // Arguments:
 //   ag:               System topology
+//   se:               Static exclusion mask (the exclusions apply only to the non-bonded
+//                     electrostatic and van-der Waals interactions, but this object also holds
+//                     information on the tile sizes to help organize the loop structure)
 //   ps:               System coordinates and forces
 //   ngb_tab:          Tables of constants for "Neck" GB
 //   sample_interval:  Sampling interval for computing finite-difference forces (the calculation
 //                     scales as 4 * (N / sampling interval) * (1/2) N^2, so for larger systems not
 //                     every atom's forces can be evaluated in a cost-effective test!)
 //-------------------------------------------------------------------------------------------------
-std::vector<double> forceByFiniteDifference(const AtomGraph &ag, PhaseSpace *ps,
+std::vector<double> forceByFiniteDifference(const AtomGraph &ag, const StaticExclusionMask &se,
+                                            PhaseSpace *ps,
                                             const NeckGeneralizedBornTable &ngb_tab,
                                             const int sample_interval) {
   ScoreCard sc(1, 1, 32);
@@ -65,15 +69,15 @@ std::vector<double> forceByFiniteDifference(const AtomGraph &ag, PhaseSpace *ps,
   // Get the baseline energy, then do perturbations in X, Y, and Z for selected atoms
   std::vector<double> result;
   for (int i = 0; i < psw.natom; i += sample_interval) {
-    const double midpt = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    const double midpt = evaluateGeneralizedBornEnergy(ag, se, ngb_tab, ps, &sc, evfrc, 0);
     psw.xcrd[i] += disc;
-    const double plusx = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    const double plusx = evaluateGeneralizedBornEnergy(ag, se, ngb_tab, ps, &sc, evfrc, 0);
     psw.xcrd[i] -= disc;
     psw.ycrd[i] += disc;
-    const double plusy = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    const double plusy = evaluateGeneralizedBornEnergy(ag, se, ngb_tab, ps, &sc, evfrc, 0);
     psw.ycrd[i] -= disc;
     psw.zcrd[i] += disc;
-    const double plusz = evaluateGeneralizedBornEnergy(ag, ngb_tab, ps, &sc, evfrc, 0);
+    const double plusz = evaluateGeneralizedBornEnergy(ag, se, ngb_tab, ps, &sc, evfrc, 0);
     psw.zcrd[i] -= disc;
 
     // Gradient is rise over run, but force is the negative of gradient: if the particle moves
@@ -168,10 +172,17 @@ int main(const int argc, const char* argv[]) {
     alad_ps.buildFromFile(alad_crd_name, CoordinateFileKind::AMBER_INPCRD);
   }
   timer.assignTime(input_timings);
+  const StaticExclusionMask trpi_se = (systems_exist) ? StaticExclusionMask(&trpi_ag) :
+                                                        StaticExclusionMask();
+  const StaticExclusionMask dhfr_se = (systems_exist) ? StaticExclusionMask(&dhfr_ag) :
+                                                        StaticExclusionMask();
+  const StaticExclusionMask alad_se = (systems_exist) ? StaticExclusionMask(&alad_ag) :
+                                                        StaticExclusionMask();
 
   // Apply an implicit solvent model to each topology and check the result
   std::vector<AtomGraph*> all_topologies = { &trpi_ag, &dhfr_ag, &alad_ag };
   std::vector<PhaseSpace*> all_coords = { &trpi_ps, &dhfr_ps, &alad_ps };
+  std::vector<StaticExclusionMask> all_semasks = { trpi_se, dhfr_se, alad_se };
   const size_t system_count = all_topologies.size();
   for (size_t i = 0; i < system_count; i++) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::HCT_GB, sander_dielectric);
@@ -218,7 +229,7 @@ int main(const int argc, const char* argv[]) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::HCT_GB, 78.5);
     all_coords[i]->initializeForces();
     timer.assignTime(0);
-    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), all_semasks[i], ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
     timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
@@ -242,7 +253,7 @@ int main(const int argc, const char* argv[]) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB, 78.5);
     all_coords[i]->initializeForces();
     timer.assignTime(0);
-    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), all_semasks[i], ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
     timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
@@ -266,7 +277,7 @@ int main(const int argc, const char* argv[]) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB_II, 78.5);
     all_coords[i]->initializeForces();
     timer.assignTime(0);
-    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), all_semasks[i], ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
     timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
@@ -300,7 +311,7 @@ int main(const int argc, const char* argv[]) {
                                                rset_apply);
     all_coords[i]->initializeForces();
     timer.assignTime(0);
-    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), all_semasks[i], ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
     timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
@@ -327,7 +338,7 @@ int main(const int argc, const char* argv[]) {
                                                rset_apply);
     all_coords[i]->initializeForces();
     timer.assignTime(0);
-    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), ngb_tab,
+    gb_energy[i] = evaluateGeneralizedBornEnergy(*(all_topologies[i]), all_semasks[i], ngb_tab,
                                                  all_coords[i], &all_systems_sc, evfrc, i);
     timer.assignTime(gb_timings);
     gb_forces[i] = all_coords[i]->getInterlacedCoordinates(tkind);
@@ -372,7 +383,7 @@ int main(const int argc, const char* argv[]) {
       all_topologies[j]->setImplicitSolventModel(conditions[i], 80.0, 0.0, shapes[i]);
       all_coords[j]->initializeForces();
       timer.assignTime(0);
-      gb_energy[j] = evaluateGeneralizedBornEnergy(*(all_topologies[j]), ngb_tab,
+      gb_energy[j] = evaluateGeneralizedBornEnergy(*(all_topologies[j]), all_semasks[j], ngb_tab,
                                                    all_coords[j], &all_systems_sc, evfrc, j);
       timer.assignTime(gb_timings);
       gb_forces[j] = all_coords[j]->getInterlacedCoordinates(tkind);
@@ -394,8 +405,10 @@ int main(const int argc, const char* argv[]) {
       alad_fsample.push_back(gb_forces[2][(3 * j) + 1]);
       alad_fsample.push_back(gb_forces[2][(3 * j) + 2]);
     }
-    const std::vector<double> trpi_fd = forceByFiniteDifference(trpi_ag, &trpi_ps, ngb_tab, 60);
-    const std::vector<double> alad_fd = forceByFiniteDifference(alad_ag, &alad_ps, ngb_tab, 1);
+    const std::vector<double> trpi_fd = forceByFiniteDifference(trpi_ag, trpi_se, &trpi_ps,
+                                                                ngb_tab, 60);
+    const std::vector<double> alad_fd = forceByFiniteDifference(alad_ag, alad_se, &alad_ps,
+                                                                ngb_tab, 1);
     check(trpi_fsample, RelationalOperator::EQUAL, Approx(trpi_fd).margin(1.0e-4),
           "Forces computed in the Trp-cage system with " +
           getImplicitSolventModelName(conditions[i]) + " and " +

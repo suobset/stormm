@@ -136,53 +136,58 @@ double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
 template <typename Tcoord, typename Tforce, typename Tcalc>
-double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
-                                     const ImplicitSolventKit<double> isk,
+double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
+                                     const StaticExclusionMaskReader ser,
+                                     const ImplicitSolventKit<Tcalc> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                                      const double* umat, const double* invu,
-                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, Tcalc *effective_gb_radii, Tcalc *psi,
-                                     Tcalc *sumdeijda, ScoreCard *ecard,
-                                     const EvaluateForce eval_force, const int system_index);
+                                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                     Tforce* zfrc, Tforce *effective_gb_radii, Tforce *psi,
+                                     Tforce *sumdeijda, ScoreCard *ecard, EvaluateForce eval_force,
+                                     int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                                     Tcalc force_factor = 1.0);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
+                                     const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      PhaseSpaceWriter psw, ScoreCard *ecard,
                                      EvaluateForce eval_force = EvaluateForce::NO,
                                      int system_index = 0);
 
-double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
+double evaluateGeneralizedBornEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables, PhaseSpace *ps,
                                      ScoreCard *ecard,
                                      EvaluateForce eval_force = EvaluateForce::NO,
                                      int system_index = 0);
 
-double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
+double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables, PhaseSpace *ps,
                                      ScoreCard *ecard,
                                      EvaluateForce eval_force = EvaluateForce::NO,
                                      int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
+                                     const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameReader cfr, ScoreCard *ecard,
                                      int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
+                                     const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                      int system_index = 0);
 
-double evaluateGeneralizedBornEnergy(const AtomGraph &ag,
+double evaluateGeneralizedBornEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameReader &cfr, ScoreCard *ecard,
                                      int system_index = 0);
 
-double evaluateGeneralizedBornEnergy(const AtomGraph *ag,
+double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const CoordinateFrameReader &cfr, ScoreCard *ecard,
                                      int system_index = 0);
