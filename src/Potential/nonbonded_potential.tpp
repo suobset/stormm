@@ -745,192 +745,296 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     }
   }
 
+  // Contribute results
+  ecard->contribute(StateVariable::GENERALIZED_BORN, egb_acc, system_index);
+
+  // Return immediately if forces are not required, obviating the need for further indentation
+  if (eval_force == EvaluateForce::NO) {
+    return egb_energy;
+  }
+  
   // A second pair of nested loops over all atoms is needed to fold in derivatives of the
   // effective Born radii to the forces on each atom.
-  if (eval_force == EvaluateForce::YES) {
-    switch (isr.igb) {
-    case ImplicitSolventModel::HCT_GB:
-    case ImplicitSolventModel::NONE:
-      break;
-    case ImplicitSolventModel::OBC_GB:
-    case ImplicitSolventModel::OBC_GB_II:
-    case ImplicitSolventModel::NECK_GB:
-    case ImplicitSolventModel::NECK_GB_II:
-      for (int i = 0; i < nbk.natom; i++) {
-        const Tcalc atomi_radius = isr.pb_radii[i] - isr.gb_offset;
-        const Tcalc fipsi = psi[i] * (-atomi_radius);
-        Tcalc thi;
-        if (tcalc_is_double) {
-          thi = tanh((isr.gb_alpha[i] -
-                      (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);
-        }
-        else {
-          thi = tanhf((isr.gb_alpha[i] -
-                       (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);          
-        }
-        sumdeijda[i] *= (isr.gb_alpha[i] -
-                         ((v_two * isr.gb_beta[i]) - (3.0 * isr.gb_gamma[i] * fipsi)) * fipsi) *
-                        (v_one - thi * thi) * atomi_radius / isr.pb_radii[i];
-      }
-    }
-    for (int i = 1; i < nbk.natom; i++) {
-      const Tcalc atomi_x = xcrd[i];
-      const Tcalc atomi_y = ycrd[i];
-      const Tcalc atomi_z = zcrd[i];
+  switch (isr.igb) {
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::NONE:
+    break;
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    for (int i = 0; i < nbk.natom; i++) {
       const Tcalc atomi_radius = isr.pb_radii[i] - isr.gb_offset;
-      const Tcalc atomi_inv_radius = v_one / atomi_radius;
-      for (int j = 0; j < i; j++) {
-        const Tcalc dx = xcrd[j] - atomi_x;
-        const Tcalc dy = ycrd[j] - atomi_y;
-        const Tcalc dz = zcrd[j] - atomi_z;
-        const Tcalc atomj_radius = isr.pb_radii[j] - isr.gb_offset;
-        const Tcalc atomj_inv_radius = v_one / atomj_radius;
-        const Tcalc r2 = (dx * dx) + (dy * dy) + (dz * dz);
-        const Tcalc invr = (tcalc_is_double) ? v_one / sqrt(r2) : v_one / sqrtf(r2);
-        const Tcalc invr2 = invr * invr;
-        const Tcalc r = r2 * invr;
-
-        // First computation: atom I -> atom J
-        const Tcalc sj = isr.gb_screen[j] * atomj_radius;
-        const Tcalc sj2 = sj * sj;
-        Tcalc datmpi, datmpj;
-        if (r > v_four * sj) {
-          const Tcalc tmpsd  = sj2 * invr2;
-          const Tcalc dumbo  = gte + tmpsd*(gtf + tmpsd*(gtg + tmpsd*(gth + tmpsd*gthh)));
-          datmpi = tmpsd * sj * invr2 * invr2 * dumbo;
-        }
-        else if (r > atomi_radius + sj) {
-          const Tcalc temp1  = v_one / (r2 - sj2);
-          if (tcalc_is_double) {
-            datmpi = (temp1 * sj * (-v_half * invr2 + temp1)) +
-                     (v_qrtr * invr * invr2 * log((r - sj) / (r + sj)));
-          }
-          else {
-            datmpi = (temp1 * sj * (-v_half * invr2 + temp1)) +
-                     (v_qrtr * invr * invr2 * logf((r - sj) / (r + sj)));
-          }
-        }
-        else if (r > fabs(atomi_radius - sj)) {
-          const Tcalc temp1  = v_one / (r + sj);
-          const Tcalc invr3  = invr2 * invr;
-          if (tcalc_is_double) {
-            datmpi = -v_qrtr * ((-v_half * (r2 - atomi_radius * atomi_radius + sj2) *
-                                 invr3 * atomi_inv_radius * atomi_inv_radius) +
-                                (invr * temp1 * (temp1 - invr)) -
-                                (invr3 * log(atomi_radius * temp1)));
-          }
-          else {
-            datmpi = -v_qrtr * ((-v_half * (r2 - atomi_radius * atomi_radius + sj2) *
-                                 invr3 * atomi_inv_radius * atomi_inv_radius) +
-                                (invr * temp1 * (temp1 - invr)) -
-                                (invr3 * logf(atomi_radius * temp1)));
-          }
-        }
-        else if (atomi_radius < sj) {
-          const Tcalc temp1  = v_one / (r2 - sj2);
-          if (tcalc_is_double) {
-            datmpi = -v_half * ((sj * invr2 * temp1) - (v_two * sj * temp1 * temp1) -
-                                (v_half * invr2 * invr * log((sj - r) / (sj + r))));
-          }
-          else {
-            datmpi = -v_half * ((sj * invr2 * temp1) - (v_two * sj * temp1 * temp1) -
-                                (v_half * invr2 * invr * logf((sj - r) / (sj + r))));
-          }
-        }
-        else {
-          datmpi = v_zero;
-        }
-
-        // Second computation: atom J -> atom I
-        const Tcalc si = isr.gb_screen[i] * atomi_radius;
-        const Tcalc si2 = si * si;
-        if (r > v_four * si) {
-          const Tcalc tmpsd  = si2 * invr2;
-          const Tcalc dumbo  = gte + tmpsd*(gtf + tmpsd*(gtg + tmpsd*(gth + tmpsd*gthh)));
-          datmpj = tmpsd * si * invr2 * invr2 * dumbo;
-        }
-        else if (r > atomj_radius + si) {
-          const Tcalc temp1  = v_one / (r2 - si2);
-          if (tcalc_is_double) {
-            datmpj = (temp1 * si * (-v_half * invr2 + temp1)) +
-                     (v_qrtr * invr * invr2 * log((r - si) / (r + si)));
-          }
-          else {
-            datmpj = (temp1 * si * (-v_half * invr2 + temp1)) +
-                     (v_qrtr * invr * invr2 * logf((r - si) / (r + si)));
-          }
-        }
-        else if (r > fabs(atomj_radius - si)) {
-          const Tcalc temp1 = v_one / (r + si);
-          const Tcalc invr3 = invr2 * invr;
-          if (tcalc_is_double) {
-            datmpj = -v_qrtr * ((-v_half * (r2 - atomj_radius * atomj_radius + si2) *
-                                 invr3 * atomj_inv_radius * atomj_inv_radius) +
-                                (invr * temp1 * (temp1 - invr)) -
-                                (invr3 * log(atomj_radius * temp1)));
-          }
-          else {
-            datmpj = -v_qrtr * ((-v_half * (r2 - atomj_radius * atomj_radius + si2) *
-                                 invr3 * atomj_inv_radius * atomj_inv_radius) +
-                                (invr * temp1 * (temp1 - invr)) -
-                                (invr3 * logf(atomj_radius * temp1)));
-          }
-        }
-        else if (atomj_radius < si) {
-          const Tcalc temp1  = v_one / (r2 - si2);
-          if (tcalc_is_double) {
-            datmpj = -v_half * ((si * invr2 * temp1) - (v_two * si * temp1 * temp1) -
-                                (v_half * invr2 * invr * log((si - r) / (si + r))));
-          }
-          else {
-            datmpj = -v_half * ((si * invr2 * temp1) - (v_two * si * temp1 * temp1) -
-                                (v_half * invr2 * invr * logf((si - r) / (si + r))));
-          }
-        }
-        else {
-          datmpj = v_zero;
-        }
-
-        // Neck GB contributions
-        if ((isr.igb == ImplicitSolventModel::NECK_GB ||
-             isr.igb == ImplicitSolventModel::NECK_GB_II) &&
-            r < isr.pb_radii[i] + isr.pb_radii[j] + isr.gb_neckcut) {
-
-          // First computation: atom I -> atom J
-          const int ij_table_idx = (isr.table_size * isr.neck_gb_idx[j]) + isr.neck_gb_idx[i];
-          Tcalc mdist = r - isr.neck_max_sep[ij_table_idx];
-          Tcalc mdist2 = mdist * mdist;
-          Tcalc mdist6 = mdist2 * mdist2 * mdist2;
-          Tcalc temp1 = v_one + mdist2 + (v_pthr * mdist6);
-          temp1 = temp1 * temp1 * r;
-          datmpi += (((v_two * mdist) + (v_opei * mdist2 * mdist2 * mdist)) *
-                     isr.neck_max_val[ij_table_idx] * isr.gb_neckscale) / temp1;
-
-          // Second computation: atom J -> atom I
-          const int ji_table_idx = (isr.table_size * isr.neck_gb_idx[i]) + isr.neck_gb_idx[j];
-          mdist = r - isr.neck_max_sep[ji_table_idx];
-          mdist2 = mdist * mdist;
-          mdist6 = mdist2 * mdist2 * mdist2;
-          temp1 = v_one + mdist2 + (v_pthr * mdist6);
-          temp1 = temp1 * temp1 * r;
-          datmpj += (((v_two * mdist) + (v_opei * mdist2 * mdist2 * mdist)) *
-                     isr.neck_max_val[ji_table_idx] * isr.gb_neckscale) / temp1;
-        }
-
-        // Contribute the derivatives to the force arrays
-        const Tcalc fmag = (datmpi * sumdeijda[i]) + (datmpj * sumdeijda[j]);
-        xfrc[i] -= fmag * dx;
-        yfrc[i] -= fmag * dy;
-        zfrc[i] -= fmag * dz;
-        xfrc[j] += fmag * dx;
-        yfrc[j] += fmag * dy;
-        zfrc[j] += fmag * dz;
+      const Tcalc fipsi = psi[i] * (-atomi_radius);
+      Tcalc thi;
+      if (tcalc_is_double) {
+        thi = tanh((isr.gb_alpha[i] -
+                    (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);
       }
+      else {
+        thi = tanhf((isr.gb_alpha[i] -
+                     (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);          
+      }
+      sumdeijda[i] *= (isr.gb_alpha[i] -
+                       ((v_two * isr.gb_beta[i]) - (3.0 * isr.gb_gamma[i] * fipsi)) * fipsi) *
+                      (v_one - thi * thi) * atomi_radius / isr.pb_radii[i];
     }
   }
 
-  // Contribute results
-  ecard->contribute(StateVariable::GENERALIZED_BORN, egb_acc, system_index);
+  // One final tile-based loop
+  for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
+    for (int stj = 0; stj <= sti; stj++) {
+
+      // Tile dimensions and locations
+      const int stni_atoms = std::min(ser.atom_count - (supertile_length * sti), supertile_length);
+      const int stnj_atoms = std::min(ser.atom_count - (supertile_length * stj), supertile_length);
+      const int ni_tiles = (stni_atoms + tile_length - 1) / tile_length;
+      const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
+
+      // Access the supertile's map index: if zero, there are no exclusions to worry about
+      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
+      const int diag_supertile = (sti == stj);
+
+      // The outer loops can proceed until the branch about exclusions
+      for (int ti = 0; ti < ni_tiles; ti++) {
+        const int ni_atoms = std::min(stni_atoms - (ti * tile_length), tile_length);
+        const int tjlim = (nj_tiles * (1 - diag_supertile)) + (diag_supertile * ti);
+        for (int tj = 0; tj <= tjlim; tj++) {
+          const int nj_atoms = std::min(stnj_atoms - (tj * tile_length), tile_length);
+          const int diag_tile = diag_supertile * (ti == tj);
+
+          // Pre-cache the atom positions to avoid conversions in the inner loops.  Pre-cache
+          // properties and initialize local force accumulators to mimic GPU activity.
+          for (int i = 0; i < ni_atoms; i++) {
+            const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+            if (tcoord_is_sgnint) {
+              cachi_xcrd[i] = static_cast<Tcalc>(xcrd[atom_i]) * inv_gpos_factor;
+              cachi_ycrd[i] = static_cast<Tcalc>(ycrd[atom_i]) * inv_gpos_factor;
+              cachi_zcrd[i] = static_cast<Tcalc>(zcrd[atom_i]) * inv_gpos_factor;
+            }
+            else {
+              cachi_xcrd[i] = xcrd[atom_i];
+              cachi_ycrd[i] = ycrd[atom_i];
+              cachi_zcrd[i] = zcrd[atom_i];
+            }
+            cachi_xfrc[i] = 0.0;
+            cachi_yfrc[i] = 0.0;
+            cachi_zfrc[i] = 0.0;
+
+            // The cachi_radii array returns to its original role caching the offset intrinsic
+            // Born radii and the cachi_screen array caches the GB screening factors.  Neck GB
+            // factors return to their cache home.  However, the cachi_psi array handles
+            // sum_deijda once more.
+            cachi_radii[i]  = isr.pb_radii[atom_i] - isr.gb_offset;
+            cachi_screen[i] = isr.gb_screen[atom_i];
+            if (isr.igb == ImplicitSolventModel::NECK_GB ||
+                isr.igb == ImplicitSolventModel::NECK_GB_II) {
+              cachi_neck_idx[i] = isr.neck_gb_idx[atom_i];
+            }
+            cachi_psi[i] = sumdeijda[atom_i];
+          }
+          for (int j = 0; j < nj_atoms; j++) {
+            const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+            if (tcoord_is_sgnint) {
+              cachj_xcrd[j] = static_cast<Tcalc>(xcrd[atom_j]) * inv_gpos_factor;
+              cachj_ycrd[j] = static_cast<Tcalc>(ycrd[atom_j]) * inv_gpos_factor;
+              cachj_zcrd[j] = static_cast<Tcalc>(zcrd[atom_j]) * inv_gpos_factor;
+            }
+            else {
+              cachj_xcrd[j] = xcrd[atom_j];
+              cachj_ycrd[j] = ycrd[atom_j];
+              cachj_zcrd[j] = zcrd[atom_j];
+            }
+            cachj_xfrc[j] = 0.0;
+            cachj_yfrc[j] = 0.0;
+            cachj_zfrc[j] = 0.0;
+
+            // See above for the re-use of these local detail caches and accumulators.
+            cachj_radii[j]  = isr.pb_radii[atom_j] - isr.gb_offset;
+            cachj_screen[j] = isr.gb_screen[atom_j];
+            if (isr.igb == ImplicitSolventModel::NECK_GB ||
+                isr.igb == ImplicitSolventModel::NECK_GB_II) {
+              cachj_neck_idx[j] = isr.neck_gb_idx[atom_j];
+            }
+            cachj_psi[j] = sumdeijda[atom_j];
+          }
+          for (int i = 0; i < ni_atoms; i++) {
+            const Tcalc atomi_x = cachi_xcrd[i];
+            const Tcalc atomi_y = cachi_ycrd[i];
+            const Tcalc atomi_z = cachi_zcrd[i];
+            const Tcalc atomi_radius = cachi_radii[i];
+            const Tcalc atomi_inv_radius = v_one / atomi_radius;
+            const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+            for (int j = 0; j < jlim; j++) {
+              const Tcalc dx = cachj_xcrd[j] - atomi_x;
+              const Tcalc dy = cachj_ycrd[j] - atomi_y;
+              const Tcalc dz = cachj_zcrd[j] - atomi_z;
+              const Tcalc atomj_radius = cachj_radii[j];
+              const Tcalc atomj_inv_radius = v_one / atomj_radius;
+              const Tcalc r2 = (dx * dx) + (dy * dy) + (dz * dz);
+              const Tcalc invr = (tcalc_is_double) ? v_one / sqrt(r2) : v_one / sqrtf(r2);
+              const Tcalc invr2 = invr * invr;
+              const Tcalc r = r2 * invr;
+
+              // First computation: atom I -> atom J
+              const Tcalc sj = cachj_screen[j] * atomj_radius;
+              const Tcalc sj2 = sj * sj;
+              Tcalc datmpi, datmpj;
+              if (r > v_four * sj) {
+                const Tcalc tmpsd  = sj2 * invr2;
+                const Tcalc dumbo  = gte +
+                                     tmpsd * (gtf + tmpsd * (gtg + tmpsd * (gth + tmpsd * gthh)));
+                datmpi = tmpsd * sj * invr2 * invr2 * dumbo;
+              }
+              else if (r > atomi_radius + sj) {
+                const Tcalc temp1  = v_one / (r2 - sj2);
+                if (tcalc_is_double) {
+                  datmpi = (temp1 * sj * (-v_half * invr2 + temp1)) +
+                           (v_qrtr * invr * invr2 * log((r - sj) / (r + sj)));
+                }
+                else {
+                  datmpi = (temp1 * sj * (-v_half * invr2 + temp1)) +
+                           (v_qrtr * invr * invr2 * logf((r - sj) / (r + sj)));
+                }
+              }
+              else if (r > fabs(atomi_radius - sj)) {
+                const Tcalc temp1  = v_one / (r + sj);
+                const Tcalc invr3  = invr2 * invr;
+                if (tcalc_is_double) {
+                  datmpi = -v_qrtr * ((-v_half * (r2 - atomi_radius * atomi_radius + sj2) *
+                                       invr3 * atomi_inv_radius * atomi_inv_radius) +
+                                      (invr * temp1 * (temp1 - invr)) -
+                                      (invr3 * log(atomi_radius * temp1)));
+                }
+                else {
+                  datmpi = -v_qrtr * ((-v_half * (r2 - atomi_radius * atomi_radius + sj2) *
+                                       invr3 * atomi_inv_radius * atomi_inv_radius) +
+                                      (invr * temp1 * (temp1 - invr)) -
+                                      (invr3 * logf(atomi_radius * temp1)));
+                }
+              }
+              else if (atomi_radius < sj) {
+                const Tcalc temp1  = v_one / (r2 - sj2);
+                if (tcalc_is_double) {
+                  datmpi = -v_half * ((sj * invr2 * temp1) - (v_two * sj * temp1 * temp1) -
+                                      (v_half * invr2 * invr * log((sj - r) / (sj + r))));
+                }
+                else {
+                  datmpi = -v_half * ((sj * invr2 * temp1) - (v_two * sj * temp1 * temp1) -
+                                      (v_half * invr2 * invr * logf((sj - r) / (sj + r))));
+                }
+              }
+              else {
+                datmpi = v_zero;
+              }
+
+              // Second computation: atom J -> atom I
+              const Tcalc si = cachi_screen[i] * atomi_radius;
+              const Tcalc si2 = si * si;
+              if (r > v_four * si) {
+                const Tcalc tmpsd  = si2 * invr2;
+                const Tcalc dumbo  = gte +
+                                     tmpsd * (gtf + tmpsd * (gtg + tmpsd * (gth + tmpsd * gthh)));
+                datmpj = tmpsd * si * invr2 * invr2 * dumbo;
+              }
+              else if (r > atomj_radius + si) {
+                const Tcalc temp1  = v_one / (r2 - si2);
+                if (tcalc_is_double) {
+                  datmpj = (temp1 * si * (-v_half * invr2 + temp1)) +
+                           (v_qrtr * invr * invr2 * log((r - si) / (r + si)));
+                }
+                else {
+                  datmpj = (temp1 * si * (-v_half * invr2 + temp1)) +
+                           (v_qrtr * invr * invr2 * logf((r - si) / (r + si)));
+                }
+              }
+              else if (r > fabs(atomj_radius - si)) {
+                const Tcalc temp1 = v_one / (r + si);
+                const Tcalc invr3 = invr2 * invr;
+                if (tcalc_is_double) {
+                  datmpj = -v_qrtr * ((-v_half * (r2 - atomj_radius * atomj_radius + si2) *
+                                       invr3 * atomj_inv_radius * atomj_inv_radius) +
+                                      (invr * temp1 * (temp1 - invr)) -
+                                      (invr3 * log(atomj_radius * temp1)));
+                }
+                else {
+                  datmpj = -v_qrtr * ((-v_half * (r2 - atomj_radius * atomj_radius + si2) *
+                                       invr3 * atomj_inv_radius * atomj_inv_radius) +
+                                      (invr * temp1 * (temp1 - invr)) -
+                                      (invr3 * logf(atomj_radius * temp1)));
+                }
+              }
+              else if (atomj_radius < si) {
+                const Tcalc temp1  = v_one / (r2 - si2);
+                if (tcalc_is_double) {
+                  datmpj = -v_half * ((si * invr2 * temp1) - (v_two * si * temp1 * temp1) -
+                                      (v_half * invr2 * invr * log((si - r) / (si + r))));
+                }
+                else {
+                  datmpj = -v_half * ((si * invr2 * temp1) - (v_two * si * temp1 * temp1) -
+                                      (v_half * invr2 * invr * logf((si - r) / (si + r))));
+                }
+              }
+              else {
+                datmpj = v_zero;
+              }
+
+              // Neck GB contributions
+              if ((isr.igb == ImplicitSolventModel::NECK_GB ||
+                   isr.igb == ImplicitSolventModel::NECK_GB_II) &&
+                  r < cachi_radii[i] + cachj_radii[j] + (v_two * isr.gb_offset) + isr.gb_neckcut) {
+
+                // First computation: atom I -> atom J
+                const int ij_table_idx = (isr.table_size * cachj_neck_idx[j]) +
+                                         cachi_neck_idx[i];
+                Tcalc mdist = r - isr.neck_max_sep[ij_table_idx];
+                Tcalc mdist2 = mdist * mdist;
+                Tcalc mdist6 = mdist2 * mdist2 * mdist2;
+                Tcalc temp1 = v_one + mdist2 + (v_pthr * mdist6);
+                temp1 = temp1 * temp1 * r;
+                datmpi += (((v_two * mdist) + (v_opei * mdist2 * mdist2 * mdist)) *
+                           isr.neck_max_val[ij_table_idx] * isr.gb_neckscale) / temp1;
+
+                // Second computation: atom J -> atom I
+                const int ji_table_idx = (isr.table_size * cachi_neck_idx[i]) +
+                                         cachj_neck_idx[j];
+                mdist = r - isr.neck_max_sep[ji_table_idx];
+                mdist2 = mdist * mdist;
+                mdist6 = mdist2 * mdist2 * mdist2;
+                temp1 = v_one + mdist2 + (v_pthr * mdist6);
+                temp1 = temp1 * temp1 * r;
+                datmpj += (((v_two * mdist) + (v_opei * mdist2 * mdist2 * mdist)) *
+                           isr.neck_max_val[ji_table_idx] * isr.gb_neckscale) / temp1;
+              }
+
+              // Contribute the derivatives to the force arrays
+              const Tcalc fmag = (datmpi * cachi_psi[i]) + (datmpj * cachj_psi[j]);
+              cachi_xfrc[i] -= fmag * dx;
+              cachi_yfrc[i] -= fmag * dy;
+              cachi_zfrc[i] -= fmag * dz;
+              cachj_xfrc[j] += fmag * dx;
+              cachj_yfrc[j] += fmag * dy;
+              cachj_zfrc[j] += fmag * dz;
+            }
+          }
+
+          // Contribute local force accumulators back to the global arrays
+          for (int i = 0; i < ni_atoms; i++) {
+            const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+            xfrc[atom_i] += cachi_xfrc[i];
+            yfrc[atom_i] += cachi_yfrc[i];
+            zfrc[atom_i] += cachi_zfrc[i];
+          }
+          for (int j = 0; j < nj_atoms; j++) {
+            const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+            xfrc[atom_j] += cachj_xfrc[j];
+            yfrc[atom_j] += cachj_yfrc[j];
+            zfrc[atom_j] += cachj_zfrc[j];
+          }
+        }
+      }
+    }
+  }
 
   // Return the double-precision energy sum, if of interest
   return egb_energy;
