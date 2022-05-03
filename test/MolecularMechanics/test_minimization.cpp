@@ -51,8 +51,8 @@ void testLocalMinimum(PhaseSpace *ps, const AtomGraph &ag, const RestraintAppara
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
   PhaseSpaceWriter psw = ps->data();
   std::vector<int> local_minimum(3 * cdk.natom, 1);
-  const double test_displacement = 0.0006;
-  ScoreCard lsc(1);
+  const double test_displacement = 0.0008;
+  ScoreCard lsc(1, 16, 32);
   evalNonbValeRestMM(ps, &lsc, ag, se, ra, EvaluateForce::NO, 0, final_step_no);
   const double e0 = lsc.reportTotalEnergy();
   for (int i = 0; i < cdk.natom; i++) {
@@ -172,7 +172,7 @@ int main(const int argc, const char* argv[]) {
   // Try the dipeptide--this systems contains CMAPs in addition to basic Amber force field terms
   section(1);
   MinimizeControls mincon;
-  mincon.setTotalCycles(500);
+  mincon.setTotalCycles(600);
   if (files_exist) {
     timer.assignTime(0);
     const int alad_timings = timer.addCategory("Minimize Ala dipeptide");

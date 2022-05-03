@@ -105,6 +105,8 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
               const Tcalc atomi_x = cachi_xcrd[i];
               const Tcalc atomi_y = cachi_ycrd[i];
               const Tcalc atomi_z = cachi_zcrd[i];
+              Tcalc ele_contrib = 0.0;
+              Tcalc vdw_contrib = 0.0;
               for (int j = 0; j < jlim; j++) {
                 const Tcalc dx = cachj_xcrd[j] - atomi_x;
                 const Tcalc dy = cachj_ycrd[j] - atomi_y;
@@ -120,15 +122,11 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                 }
                 const Tcalc invr4 = invr2 * invr2;
                 const Tcalc qiqj = qi * cachj_q[j];
-                const Tcalc ele_contrib = qiqj * invr;
-                ele_energy += ele_contrib;
-                ele_acc += static_cast<llint>(llround(ele_contrib * nrg_scale_factor));
+                ele_contrib += qiqj * invr;
                 const int ljt_j = cachj_ljidx[j];
                 const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                const Tcalc vdw_contrib = ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
-                vdw_energy += vdw_contrib;
-                vdw_acc += static_cast<llint>(llround(vdw_contrib * nrg_scale_factor));
+                vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
 
                 // Evaluate the force, if requested
                 if (eval_elec_force == EvaluateForce::YES ||
@@ -154,6 +152,12 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                   cachj_zfrc[j] -= fmag_dz;
                 }
               }
+
+              // Contribute what would be thread-accumulated energies to the totals
+              ele_energy += ele_contrib;
+              ele_acc += llround(ele_contrib * nrg_scale_factor);
+              vdw_energy += vdw_contrib;
+              vdw_acc += llround(vdw_contrib * nrg_scale_factor);
             }
           }
           else {
@@ -170,6 +174,8 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
               const Tcalc qi = cachi_q[i];
               const int ljt_i = cachi_ljidx[i];
               const int jlim = (nj_atoms * (1 - diag_tile)) + (diag_tile * i);
+              Tcalc ele_contrib = 0.0;
+              Tcalc vdw_contrib = 0.0;
               for (int j = 0; j < jlim; j++) {
                 if ((mask_i >> j) & 0x1) {
                   continue;
@@ -188,15 +194,11 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                 }
                 const Tcalc invr4 = invr2 * invr2;
                 const Tcalc qiqj = qi * cachj_q[j];
-                const Tcalc ele_contrib = qiqj * invr;
-                ele_energy += ele_contrib;
-                ele_acc += static_cast<llint>(llround(ele_contrib * nrg_scale_factor));
+                ele_contrib += qiqj * invr;
                 const int ljt_j = cachj_ljidx[j];
                 const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
-                const Tcalc vdw_contrib = ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
-                vdw_energy += vdw_contrib;
-                vdw_acc += static_cast<llint>(llround(vdw_contrib * nrg_scale_factor));
+                vdw_contrib += ((lja * invr4 * invr4) - (ljb * invr2)) * invr4;
 
                 // Evaluate the force, if requested
                 if (eval_elec_force == EvaluateForce::YES ||
@@ -222,6 +224,12 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                   cachj_zfrc[j] -= fmag_dz;
                 }                
               }
+
+              // Contribute what would be thread-accumulated energies to the totals
+              ele_energy += ele_contrib;
+              ele_acc += llround(ele_contrib * nrg_scale_factor);
+              vdw_energy += vdw_contrib;
+              vdw_acc += llround(vdw_contrib * nrg_scale_factor);
             }
           }
 
