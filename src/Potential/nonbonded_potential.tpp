@@ -268,22 +268,40 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
 }
 
 //-------------------------------------------------------------------------------------------------
-#if 0
+template <typename Tcoord, typename Tforce, typename Tcalc>
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const ImplicitSolventKit<double> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
-                                     const double* xcrd, const double* ycrd, const double* zcrd,
+                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                                      const double* umat, const double* invu,
-                                     const UnitCellType unit_cell, double* xfrc, double* yfrc,
-                                     double* zfrc, ScoreCard *ecard,
+                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                     Tforce* zfrc, Tcalc *effective_gb_radii, Tcalc *psi,
+                                     Tcalc *sumdeijda, ScoreCard *ecard,
                                      const EvaluateForce eval_force, const int system_index) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const bool tcoord_is_sgnint = isSignedIntegralScalarType<Tcoord>();
+  const bool tforce_is_sgnint = isSignedIntegralScalarType<Tforce>();
+  const Tcalc v_zero = 0.0;
+  const Tcalc v_one  = 1.0;
+  const Tcalc v_four = 4.0;
+  const Tcalc v_half = 0.5;
+  const Tcalc v_qrtr = 0.25;
+  const Tcalc v_two  = 2.0;
+  const Tcalc v_pthr = 0.3;
+  const Tcalc v_opei = 1.8;
 
   // Complete the implicit solvent model and initialize the energy result
   const ImplicitSolventRecipe<double> isr(isk, ngb_tables.getDoublePrecisionAbstract());
   double egb_energy = 0.0;
   llint egb_acc = 0LL;
-  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
 
+  // Initialize psi
+  for (int i = 0; i < nbk.natom; i++) {
+    psi[i] = 0.0;
+  }
+  
   // Return zero if there is no implicit solvent model.  This is a reference calculation and
   // intended to keep clean code.
   if (isr.igb == ImplicitSolventModel::NONE) {
@@ -291,86 +309,115 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
     return egb_energy;
   }
 
-  // Allocate space for the calculation
-  std::vector<double> effective_gb_radii(nbk.natom);
-  std::vector<double> psi(nbk.natom, 0.0);
-  std::vector<double> sumdeijda(nbk.natom);
-
   // Shorthand for some constants defined in Constants/generalized_born.h
-  const double gta  = gb_taylor_a_lf;
-  const double gtb  = gb_taylor_b_lf;
-  const double gtc  = gb_taylor_c_lf;
-  const double gtd  = gb_taylor_d_lf;
-  const double gtdd = gb_taylor_dd_lf;
-  const double gte  = gb_taylor_e_lf;
-  const double gtf  = gb_taylor_f_lf;
-  const double gtg  = gb_taylor_g_lf;
-  const double gth  = gb_taylor_h_lf;
-  const double gthh = gb_taylor_hh_lf;
+  const Tcalc gta  = gb_taylor_a_lf;
+  const Tcalc gtb  = gb_taylor_b_lf;
+  const Tcalc gtc  = gb_taylor_c_lf;
+  const Tcalc gtd  = gb_taylor_d_lf;
+  const Tcalc gtdd = gb_taylor_dd_lf;
+  const Tcalc gte  = gb_taylor_e_lf;
+  const Tcalc gtf  = gb_taylor_f_lf;
+  const Tcalc gtg  = gb_taylor_g_lf;
+  const Tcalc gth  = gb_taylor_h_lf;
+  const Tcalc gthh = gb_taylor_hh_lf;
 
   // Perform nested loops over all atoms to compute the GB radii
   for (int i = 1; i < nbk.natom; i++) {
-    const double atomi_x = xcrd[i];
-    const double atomi_y = ycrd[i];
-    const double atomi_z = zcrd[i];
-    const double atomi_radius = isr.pb_radii[i] - isr.gb_offset;
-    const double atomi_inv_radius = 1.0 / atomi_radius;
+    const Tcalc atomi_x = xcrd[i];
+    const Tcalc atomi_y = ycrd[i];
+    const Tcalc atomi_z = zcrd[i];
+    const Tcalc atomi_radius = isr.pb_radii[i] - isr.gb_offset;
+    const Tcalc atomi_inv_radius = v_one / atomi_radius;
     for (int j = 0; j < i; j++) {
-      const double dx   = atomi_x - xcrd[j];
-      const double dy   = atomi_y - ycrd[j];
-      const double dz   = atomi_z - zcrd[j];
-      const double r2   = (dx * dx) + (dy * dy) + (dz * dz);
-      const double r    = sqrt(r2);
-      const double invr = 1.0 / r;
-      const double atomj_radius = isr.pb_radii[j] - isr.gb_offset;
-      const double atomj_inv_radius = 1.0 / atomj_radius;
+      const Tcalc dx   = atomi_x - xcrd[j];
+      const Tcalc dy   = atomi_y - ycrd[j];
+      const Tcalc dz   = atomi_z - zcrd[j];
+      const Tcalc r2   = (dx * dx) + (dy * dy) + (dz * dz);
+      const Tcalc r = (tcalc_is_double) ? sqrt(r2) : sqrtf(r2);
+      const Tcalc invr = v_one / r;
+      const Tcalc atomj_radius = isr.pb_radii[j] - isr.gb_offset;
+      const Tcalc atomj_inv_radius = v_one / atomj_radius;
 
       // First computation: atom I -> atom J
-      const double sj = isr.gb_screen[j] * atomj_radius;
-      const double sj2 = sj * sj;
-      if (r > 4.0 * sj) {
-        const double invr2 = invr * invr;
-        const double tmpsd = sj2 * invr2;
-        const double dumbo = gta + tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd))); 
+      const Tcalc sj = isr.gb_screen[j] * atomj_radius;
+      const Tcalc sj2 = sj * sj;
+      if (r > v_four * sj) {
+        const Tcalc invr2 = invr * invr;
+        const Tcalc tmpsd = sj2 * invr2;
+        const Tcalc dumbo = gta + tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd))); 
         psi[i] -= sj * tmpsd * invr2 * dumbo;
       }
       else if (r > atomi_radius + sj) {
-        psi[i] -= 0.5 * ((sj / (r2 - sj2)) + (0.5 * invr * log((r - sj) / (r + sj))));
+        if (tcalc_is_double) {
+          psi[i] -= v_half * ((sj / (r2 - sj2)) + (0.5 * invr * log((r - sj) / (r + sj))));
+        }
+        else {
+          psi[i] -= v_half * ((sj / (r2 - sj2)) + (0.5 * invr * logf((r - sj) / (r + sj))));
+        }
       }
       else if (r > fabs(atomi_radius - sj)) {
-        const double theta = 0.5 * atomi_inv_radius * invr *
-                             (r2 + (atomi_radius * atomi_radius) - sj2);
-        const double uij   = 1.0 / (r + sj);
-        psi[i] -= 0.25 * (atomi_inv_radius * (2.0 - theta) -
-                            uij + invr * log(atomi_radius * uij));
+        const Tcalc theta = v_half * atomi_inv_radius * invr *
+                            (r2 + (atomi_radius * atomi_radius) - sj2);
+        const Tcalc uij   = v_one / (r + sj);
+        if (tcalc_is_double) {
+          psi[i] -= v_qrtr * ((atomi_inv_radius * (v_two - theta)) -
+                              uij + (invr * log(atomi_radius * uij)));
+        }
+        else {
+          psi[i] -= v_qrtr * ((atomi_inv_radius * (v_two - theta)) -
+                              uij + (invr * logf(atomi_radius * uij)));
+        }
       }
       else if (atomi_radius < sj) {
-        psi[i] -= 0.5 * ((sj / (r2 - sj2)) + (2.0 * atomi_inv_radius) +
-                         (0.5 * invr * log((sj - r) / (sj + r))));
+        if (tcalc_is_double) {
+          psi[i] -= v_half * ((sj / (r2 - sj2)) + (v_two * atomi_inv_radius) +
+                              (v_half * invr * log((sj - r) / (sj + r))));
+        }
+        else {
+          psi[i] -= v_half * ((sj / (r2 - sj2)) + (v_two * atomi_inv_radius) +
+                              (v_half * invr * logf((sj - r) / (sj + r))));
+        }
       }
 
       // Second computation: atom J -> atom I
-      const double si = isr.gb_screen[i] * atomi_radius;
-      const double si2 = si * si;
-      if (r > 4.0 * si) {
-        const double invr2  = invr * invr;
-        const double tmpsd  = si2 * invr2;
-        const double dumbo  = gta + tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd)));
+      const Tcalc si = isr.gb_screen[i] * atomi_radius;
+      const Tcalc si2 = si * si;
+      if (r > v_four * si) {
+        const Tcalc invr2  = invr * invr;
+        const Tcalc tmpsd  = si2 * invr2;
+        const Tcalc dumbo  = gta + tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd)));
         psi[j] -= si * tmpsd * invr2 * dumbo;
       }
       else if (r > atomj_radius + si) {
-        psi[j] -= 0.5 * ((si / (r2 - si2)) + (0.5 * invr * log((r - si) / (r + si))));
+        if (tcalc_is_double) {
+          psi[j] -= v_half * ((si / (r2 - si2)) + (v_half * invr * log((r - si) / (r + si))));
+        }
+        else {
+          psi[j] -= v_half * ((si / (r2 - si2)) + (v_half * invr * logf((r - si) / (r + si))));
+        }
       }
       else if (r > fabs(atomj_radius - si)) {
-        const double theta = 0.5 * atomj_inv_radius * invr *
-                             (r2 + (atomj_radius * atomj_radius) - si2);
-        const double uij   = 1.0 / (r + si);
-        psi[j] -= 0.25 * (atomj_inv_radius * (2.0 - theta) - uij +
-                          invr * log(atomj_radius * uij));
+        const Tcalc theta = v_half * atomj_inv_radius * invr *
+                            (r2 + (atomj_radius * atomj_radius) - si2);
+        const Tcalc uij   = v_one / (r + si);
+        if (tcalc_is_double) {
+          psi[j] -= v_qrtr * (atomj_inv_radius * (v_two - theta) - uij +
+                              invr * log(atomj_radius * uij));
+        }
+        else {
+          psi[j] -= v_qrtr * (atomj_inv_radius * (v_two - theta) - uij +
+                              invr * logf(atomj_radius * uij));
+        }
       }
       else if (atomj_radius < si) {
-        psi[j] -= 0.5 * ((si / (r2 - si2)) + (2.0 * atomj_inv_radius) +
-                         (0.5 * invr * log((si - r) / (si + r))));
+        if (tcalc_is_double) {
+          psi[j] -= v_half * ((si / (r2 - si2)) + (v_two * atomj_inv_radius) +
+                              (v_half * invr * log((si - r) / (si + r))));
+        }
+        else {
+          psi[j] -= v_half * ((si / (r2 - si2)) + (v_two * atomj_inv_radius) +
+                              (v_half * invr * logf((si - r) / (si + r))));
+        }
       }
 
       // Neck GB contribution
@@ -380,10 +427,11 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
 
         // First computation: atom I -> atom J
         const int ij_table_idx = (isr.table_size * isr.neck_gb_idx[j]) + isr.neck_gb_idx[i];
-        double mdist  = r - isr.neck_max_sep[ij_table_idx];
-        double mdist2 = mdist * mdist;
-        double mdist6 = mdist2 * mdist2 * mdist2;
-        const double ij_neck = isr.neck_max_val[ij_table_idx] / (1.0 + mdist2 + (0.3 * mdist6));
+        Tcalc mdist  = r - isr.neck_max_sep[ij_table_idx];
+        Tcalc mdist2 = mdist * mdist;
+        Tcalc mdist6 = mdist2 * mdist2 * mdist2;
+        const Tcalc ij_neck = isr.neck_max_val[ij_table_idx] /
+                              (v_one + mdist2 + (v_pthr * mdist6));
         psi[i] -= isr.gb_neckscale * ij_neck;
 
         // Second computation: atom J -> atom I
@@ -391,7 +439,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
         mdist  = r - isr.neck_max_sep[ji_table_idx];
         mdist2 = mdist * mdist;
         mdist6 = mdist2 * mdist2 * mdist2;
-        const double ji_neck = isr.neck_max_val[ji_table_idx] / (1.0 + mdist2 + (0.3 * mdist6));
+        const Tcalc ji_neck = isr.neck_max_val[ji_table_idx] /
+                              (v_one + mdist2 + (v_pthr * mdist6));
         psi[j] -= isr.gb_neckscale * ji_neck;
       }
     }
@@ -403,9 +452,9 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
     case ImplicitSolventModel::HCT_GB:
       {
         // Original (Hawkins-Craemer-Truhlar) effective radii
-        const double atomi_inv_radius = 1.0 / (isr.pb_radii[i] - isr.gb_offset);
-        effective_gb_radii[i] = 1.0 / (atomi_inv_radius + psi[i]);
-        if (effective_gb_radii[i] < 0.0) {
+        const Tcalc atomi_inv_radius = v_one / (isr.pb_radii[i] - isr.gb_offset);
+        effective_gb_radii[i] = v_one / (atomi_inv_radius + psi[i]);
+        if (effective_gb_radii[i] < v_zero) {
           effective_gb_radii[i] = 30.0;
         }
       }
@@ -416,13 +465,21 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
     case ImplicitSolventModel::NECK_GB_II:
       {
         // "GBAO" formulas
-        const double atomi_radius = isr.pb_radii[i] - isr.gb_offset;
-        const double atomi_inv_radius = 1.0 / atomi_radius;
-        const double fipsi = psi[i] * (-atomi_radius);
-        effective_gb_radii[i] = 1.0 / (atomi_inv_radius -
-                                       tanh((isr.gb_alpha[i] - (isr.gb_beta[i] * fipsi) +
-                                             (isr.gb_gamma[i] * fipsi * fipsi)) * fipsi) / 
-                                       isr.pb_radii[i]);
+        const Tcalc atomi_radius = isr.pb_radii[i] - isr.gb_offset;
+        const Tcalc atomi_inv_radius = v_one / atomi_radius;
+        const Tcalc fipsi = psi[i] * (-atomi_radius);
+        if (tcalc_is_double) {
+          effective_gb_radii[i] = v_one / (atomi_inv_radius -
+                                           tanh((isr.gb_alpha[i] - (isr.gb_beta[i] * fipsi) +
+                                                 (isr.gb_gamma[i] * fipsi * fipsi)) * fipsi) / 
+                                           isr.pb_radii[i]);
+        }
+        else {
+          effective_gb_radii[i] = v_one / (atomi_inv_radius -
+                                           tanhf((isr.gb_alpha[i] - (isr.gb_beta[i] * fipsi) +
+                                                  (isr.gb_gamma[i] * fipsi * fipsi)) * fipsi) / 
+                                           isr.pb_radii[i]);
+        }
       }
       break;
     case ImplicitSolventModel::NONE:
@@ -432,13 +489,15 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
 
   // Compute inherent Generalized Born energies and initialize an array for solvent forces
   for (int i = 0; i < nbk.natom; i++) {
-    const double atomi_q = nbk.charge[i];
-    const double atomi_radius = effective_gb_radii[i];
-    const double expmkf = exp(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric;
-    const double dielfac = 1.0 - expmkf;
-    const double atmq2h = 0.5 * atomi_q * atomi_q * nbk.coulomb_constant;
-    const double atmqd2h = atmq2h * dielfac;
-    const double contrib = -atmqd2h / atomi_radius;
+    const Tcalc atomi_q = nbk.charge[i];
+    const Tcalc atomi_radius = effective_gb_radii[i];
+    const Tcalc expmkf = (tcalc_is_double) ?
+                         exp(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric :
+                         expf(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric;
+    const Tcalc dielfac = v_one - expmkf;
+    const Tcalc atmq2h = v_half * atomi_q * atomi_q * nbk.coulomb_constant;
+    const Tcalc atmqd2h = atmq2h * dielfac;
+    const Tcalc contrib = -atmqd2h / atomi_radius;
     egb_energy += contrib;
     egb_acc += static_cast<llint>(contrib * nrg_scale_factor);
     if (eval_force == EvaluateForce::YES) {
@@ -449,31 +508,40 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.
   for (int i = 1; i < nbk.natom; i++) {
-    const double atomi_x = xcrd[i];
-    const double atomi_y = ycrd[i];
-    const double atomi_z = zcrd[i];
-    const double atomi_q = nbk.coulomb_constant * nbk.charge[i];
-    const double atomi_radius = effective_gb_radii[i];
+    const Tcalc atomi_x = xcrd[i];
+    const Tcalc atomi_y = ycrd[i];
+    const Tcalc atomi_z = zcrd[i];
+    const Tcalc atomi_q = nbk.coulomb_constant * nbk.charge[i];
+    const Tcalc atomi_radius = effective_gb_radii[i];
     for (int j = 0; j < i; j++) {
-      const double dx = xcrd[j] - atomi_x;
-      const double dy = ycrd[j] - atomi_y;
-      const double dz = zcrd[j] - atomi_z;
-      const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
-      const double qiqj = atomi_q * nbk.charge[j];
-      const double ij_born_radius = atomi_radius * effective_gb_radii[j];
-      const double efac = exp(-r2 / (4.0 * ij_born_radius));
-      const double fgbi = 1.0 / sqrt(r2 + ij_born_radius * efac);
-      const double fgbk = -isr.kappa * gb_kscale / fgbi;
-      const double expmkf = exp(fgbk) / isr.dielectric;
-      const double dielfac = 1.0 - expmkf;
-      const double contrib = -qiqj * dielfac * fgbi;
+      const Tcalc dx = xcrd[j] - atomi_x;
+      const Tcalc dy = ycrd[j] - atomi_y;
+      const Tcalc dz = zcrd[j] - atomi_z;
+      const Tcalc r2 = (dx * dx) + (dy * dy) + (dz * dz);
+      const Tcalc qiqj = atomi_q * nbk.charge[j];
+      const Tcalc ij_born_radius = atomi_radius * effective_gb_radii[j];
+      Tcalc efac, fgbi, fgbk, expmkf;
+      if (tcalc_is_double) {
+        efac = exp(-r2 / (v_four * ij_born_radius));
+        fgbi = v_one / sqrt(r2 + ij_born_radius * efac);
+        fgbk = -isr.kappa * gb_kscale / fgbi;
+        expmkf = exp(fgbk) / isr.dielectric;
+      }
+      else {
+        efac = expf(-r2 / (v_four * ij_born_radius));
+        fgbi = v_one / sqrtf(r2 + ij_born_radius * efac);
+        fgbk = -isr.kappa * gb_kscale / fgbi;
+        expmkf = expf(fgbk) / isr.dielectric;
+      }
+      const Tcalc dielfac = v_one - expmkf;
+      const Tcalc contrib = -qiqj * dielfac * fgbi;
       egb_energy += contrib;
       egb_acc += static_cast<llint>(contrib * nrg_scale_factor);
       if (eval_force == EvaluateForce::YES) {
-        const double temp4 = fgbi * fgbi * fgbi;
-        const double temp6 = qiqj * temp4 * (dielfac + fgbk * expmkf);
-        const double fmag = temp6 * (1.0 - (0.25 * efac));
-        const double temp5 = 0.5 * efac * temp6 * (ij_born_radius + (0.25 * r2));
+        const Tcalc temp4 = fgbi * fgbi * fgbi;
+        const Tcalc temp6 = qiqj * temp4 * (dielfac + fgbk * expmkf);
+        const Tcalc fmag = temp6 * (v_one - (v_qrtr * efac));
+        const Tcalc temp5 = v_half * efac * temp6 * (ij_born_radius + (v_qrtr * r2));
         sumdeijda[i] += atomi_radius * temp5;
         sumdeijda[j] += effective_gb_radii[j] * temp5;
         xfrc[i] += fmag * dx;
@@ -498,89 +566,138 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
     case ImplicitSolventModel::NECK_GB:
     case ImplicitSolventModel::NECK_GB_II:
       for (int i = 0; i < nbk.natom; i++) {
-        const double atomi_radius = isr.pb_radii[i] - isr.gb_offset;
-        const double fipsi = psi[i] * (-atomi_radius);
-        const double thi = tanh((isr.gb_alpha[i] -
-                                 (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);
+        const Tcalc atomi_radius = isr.pb_radii[i] - isr.gb_offset;
+        const Tcalc fipsi = psi[i] * (-atomi_radius);
+        Tcalc thi;
+        if (tcalc_is_double) {
+          thi = tanh((isr.gb_alpha[i] -
+                      (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);
+        }
+        else {
+          thi = tanhf((isr.gb_alpha[i] -
+                       (isr.gb_beta[i] - (isr.gb_gamma[i] * fipsi)) * fipsi) * fipsi);          
+        }
         sumdeijda[i] *= (isr.gb_alpha[i] -
-                         ((2.0 * isr.gb_beta[i]) - (3.0 * isr.gb_gamma[i] * fipsi)) * fipsi) *
-                        (1.0 - thi * thi) * atomi_radius / isr.pb_radii[i];
+                         ((v_two * isr.gb_beta[i]) - (3.0 * isr.gb_gamma[i] * fipsi)) * fipsi) *
+                        (v_one - thi * thi) * atomi_radius / isr.pb_radii[i];
       }
     }
     for (int i = 1; i < nbk.natom; i++) {
-      const double atomi_x = xcrd[i];
-      const double atomi_y = ycrd[i];
-      const double atomi_z = zcrd[i];
-      const double atomi_radius = isr.pb_radii[i] - isr.gb_offset;
-      const double atomi_inv_radius = 1.0 / atomi_radius;
+      const Tcalc atomi_x = xcrd[i];
+      const Tcalc atomi_y = ycrd[i];
+      const Tcalc atomi_z = zcrd[i];
+      const Tcalc atomi_radius = isr.pb_radii[i] - isr.gb_offset;
+      const Tcalc atomi_inv_radius = v_one / atomi_radius;
       for (int j = 0; j < i; j++) {
-        const double dx = xcrd[j] - atomi_x;
-        const double dy = ycrd[j] - atomi_y;
-        const double dz = zcrd[j] - atomi_z;
-        const double atomj_radius = isr.pb_radii[j] - isr.gb_offset;
-        const double atomj_inv_radius = 1.0 / atomj_radius;
-        const double r2 = (dx * dx) + (dy * dy) + (dz * dz);
-        const double invr = 1.0 / sqrt(r2);
-        const double invr2 = invr * invr;
-        const double r = r2 * invr;
+        const Tcalc dx = xcrd[j] - atomi_x;
+        const Tcalc dy = ycrd[j] - atomi_y;
+        const Tcalc dz = zcrd[j] - atomi_z;
+        const Tcalc atomj_radius = isr.pb_radii[j] - isr.gb_offset;
+        const Tcalc atomj_inv_radius = v_one / atomj_radius;
+        const Tcalc r2 = (dx * dx) + (dy * dy) + (dz * dz);
+        const Tcalc invr = (tcalc_is_double) ? v_one / sqrt(r2) : v_one / sqrtf(r2);
+        const Tcalc invr2 = invr * invr;
+        const Tcalc r = r2 * invr;
 
         // First computation: atom I -> atom J
-        const double sj = isr.gb_screen[j] * atomj_radius;
-        const double sj2 = sj * sj;
-        double datmpi, datmpj;
-        if (r > 4.0 * sj) {
-          const double tmpsd  = sj2 * invr2;
-          const double dumbo  = gte + tmpsd*(gtf + tmpsd*(gtg + tmpsd*(gth + tmpsd*gthh)));
+        const Tcalc sj = isr.gb_screen[j] * atomj_radius;
+        const Tcalc sj2 = sj * sj;
+        Tcalc datmpi, datmpj;
+        if (r > v_four * sj) {
+          const Tcalc tmpsd  = sj2 * invr2;
+          const Tcalc dumbo  = gte + tmpsd*(gtf + tmpsd*(gtg + tmpsd*(gth + tmpsd*gthh)));
           datmpi = tmpsd * sj * invr2 * invr2 * dumbo;
         }
         else if (r > atomi_radius + sj) {
-          const double temp1  = 1.0 / (r2 - sj2);
-          datmpi = (temp1 * sj * (-0.5 * invr2 + temp1)) +
-                   (0.25 * invr * invr2 * log((r - sj) / (r + sj)));
+          const Tcalc temp1  = v_one / (r2 - sj2);
+          if (tcalc_is_double) {
+            datmpi = (temp1 * sj * (-v_half * invr2 + temp1)) +
+                     (v_qrtr * invr * invr2 * log((r - sj) / (r + sj)));
+          }
+          else {
+            datmpi = (temp1 * sj * (-v_half * invr2 + temp1)) +
+                     (v_qrtr * invr * invr2 * logf((r - sj) / (r + sj)));
+          }
         }
         else if (r > fabs(atomi_radius - sj)) {
-          const double temp1  = 1.0 / (r + sj);
-          const double invr3  = invr2 * invr;
-          datmpi = -0.25 * ((-0.5 * (r2 - atomi_radius * atomi_radius + sj2) *
-                             invr3 * atomi_inv_radius * atomi_inv_radius) +
-                            (invr * temp1 * (temp1 - invr)) - (invr3 * log(atomi_radius * temp1)));
+          const Tcalc temp1  = v_one / (r + sj);
+          const Tcalc invr3  = invr2 * invr;
+          if (tcalc_is_double) {
+            datmpi = -v_qrtr * ((-v_half * (r2 - atomi_radius * atomi_radius + sj2) *
+                                 invr3 * atomi_inv_radius * atomi_inv_radius) +
+                                (invr * temp1 * (temp1 - invr)) -
+                                (invr3 * log(atomi_radius * temp1)));
+          }
+          else {
+            datmpi = -v_qrtr * ((-v_half * (r2 - atomi_radius * atomi_radius + sj2) *
+                                 invr3 * atomi_inv_radius * atomi_inv_radius) +
+                                (invr * temp1 * (temp1 - invr)) -
+                                (invr3 * logf(atomi_radius * temp1)));
+          }
         }
         else if (atomi_radius < sj) {
-          const double temp1  = 1.0 / (r2 - sj2);
-          datmpi = -0.5 * ((sj * invr2 * temp1) - (2.0 * sj * temp1 * temp1) -
-                           (0.5 * invr2 * invr * log((sj - r) / (sj + r))));
+          const Tcalc temp1  = v_one / (r2 - sj2);
+          if (tcalc_is_double) {
+            datmpi = -v_half * ((sj * invr2 * temp1) - (v_two * sj * temp1 * temp1) -
+                                (v_half * invr2 * invr * log((sj - r) / (sj + r))));
+          }
+          else {
+            datmpi = -v_half * ((sj * invr2 * temp1) - (v_two * sj * temp1 * temp1) -
+                                (v_half * invr2 * invr * logf((sj - r) / (sj + r))));
+          }
         }
         else {
-          datmpi = 0.0;
+          datmpi = v_zero;
         }
 
         // Second computation: atom J -> atom I
-        const double si = isr.gb_screen[i] * atomi_radius;
-        const double si2 = si * si;
-        if (r > 4.0 * si) {
-          const double tmpsd  = si2 * invr2;
-          const double dumbo  = gte + tmpsd*(gtf + tmpsd*(gtg + tmpsd*(gth + tmpsd*gthh)));
+        const Tcalc si = isr.gb_screen[i] * atomi_radius;
+        const Tcalc si2 = si * si;
+        if (r > v_four * si) {
+          const Tcalc tmpsd  = si2 * invr2;
+          const Tcalc dumbo  = gte + tmpsd*(gtf + tmpsd*(gtg + tmpsd*(gth + tmpsd*gthh)));
           datmpj = tmpsd * si * invr2 * invr2 * dumbo;
         }
         else if (r > atomj_radius + si) {
-          const double temp1  = 1.0 / (r2 - si2);
-          datmpj = (temp1 * si * (-0.5 * invr2 + temp1)) +
-                   (0.25 * invr * invr2 * log((r - si) / (r + si)));
+          const Tcalc temp1  = v_one / (r2 - si2);
+          if (tcalc_is_double) {
+            datmpj = (temp1 * si * (-v_half * invr2 + temp1)) +
+                     (v_qrtr * invr * invr2 * log((r - si) / (r + si)));
+          }
+          else {
+            datmpj = (temp1 * si * (-v_half * invr2 + temp1)) +
+                     (v_qrtr * invr * invr2 * logf((r - si) / (r + si)));
+          }
         }
         else if (r > fabs(atomj_radius - si)) {
-          const double temp1 = 1.0 / (r + si);
-          const double invr3 = invr2 * invr;
-          datmpj = -0.25 * ((-0.5 * (r2 - atomj_radius * atomj_radius + si2) *
-                             invr3 * atomj_inv_radius * atomj_inv_radius) +
-                            (invr * temp1 * (temp1 - invr)) - (invr3 * log(atomj_radius * temp1)));
+          const Tcalc temp1 = v_one / (r + si);
+          const Tcalc invr3 = invr2 * invr;
+          if (tcalc_is_double) {
+            datmpj = -v_qrtr * ((-v_half * (r2 - atomj_radius * atomj_radius + si2) *
+                                 invr3 * atomj_inv_radius * atomj_inv_radius) +
+                                (invr * temp1 * (temp1 - invr)) -
+                                (invr3 * log(atomj_radius * temp1)));
+          }
+          else {
+            datmpj = -v_qrtr * ((-v_half * (r2 - atomj_radius * atomj_radius + si2) *
+                                 invr3 * atomj_inv_radius * atomj_inv_radius) +
+                                (invr * temp1 * (temp1 - invr)) -
+                                (invr3 * logf(atomj_radius * temp1)));
+          }
         }
         else if (atomj_radius < si) {
-          const double temp1  = 1.0 / (r2 - si2);
-          datmpj = -0.5 * ((si * invr2 * temp1) - (2.0 * si * temp1 * temp1) -
-                           (0.5 * invr2 * invr * log((si - r) / (si + r))));
+          const Tcalc temp1  = v_one / (r2 - si2);
+          if (tcalc_is_double) {
+            datmpj = -v_half * ((si * invr2 * temp1) - (v_two * si * temp1 * temp1) -
+                                (v_half * invr2 * invr * log((si - r) / (si + r))));
+          }
+          else {
+            datmpj = -v_half * ((si * invr2 * temp1) - (v_two * si * temp1 * temp1) -
+                                (v_half * invr2 * invr * logf((si - r) / (si + r))));
+          }
         }
         else {
-          datmpj = 0.0;
+          datmpj = v_zero;
         }
 
         // Neck GB contributions
@@ -590,12 +707,12 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
 
           // First computation: atom I -> atom J
           const int ij_table_idx = (isr.table_size * isr.neck_gb_idx[j]) + isr.neck_gb_idx[i];
-          double mdist = r - isr.neck_max_sep[ij_table_idx];
-          double mdist2 = mdist * mdist;
-          double mdist6 = mdist2 * mdist2 * mdist2;
-          double temp1 = 1.0 + mdist2 + (0.3 * mdist6);
+          Tcalc mdist = r - isr.neck_max_sep[ij_table_idx];
+          Tcalc mdist2 = mdist * mdist;
+          Tcalc mdist6 = mdist2 * mdist2 * mdist2;
+          Tcalc temp1 = v_one + mdist2 + (v_pthr * mdist6);
           temp1 = temp1 * temp1 * r;
-          datmpi += (((2.0 * mdist) + (1.8 * mdist2 * mdist2 * mdist)) *
+          datmpi += (((v_two * mdist) + (v_opei * mdist2 * mdist2 * mdist)) *
                      isr.neck_max_val[ij_table_idx] * isr.gb_neckscale) / temp1;
 
           // Second computation: atom J -> atom I
@@ -603,14 +720,14 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
           mdist = r - isr.neck_max_sep[ji_table_idx];
           mdist2 = mdist * mdist;
           mdist6 = mdist2 * mdist2 * mdist2;
-          temp1 = 1.0 + mdist2 + 0.3*mdist6;
+          temp1 = v_one + mdist2 + (v_pthr * mdist6);
           temp1 = temp1 * temp1 * r;
-          datmpj += (((2.0 * mdist) + (1.8 * mdist2 * mdist2 * mdist)) *
+          datmpj += (((v_two * mdist) + (v_opei * mdist2 * mdist2 * mdist)) *
                      isr.neck_max_val[ji_table_idx] * isr.gb_neckscale) / temp1;
         }
 
         // Contribute the derivatives to the force arrays
-        const double fmag = (datmpi * sumdeijda[i]) + (datmpj * sumdeijda[j]);
+        const Tcalc fmag = (datmpi * sumdeijda[i]) + (datmpj * sumdeijda[j]);
         xfrc[i] -= fmag * dx;
         yfrc[i] -= fmag * dy;
         zfrc[i] -= fmag * dz;
@@ -627,7 +744,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
   // Return the double-precision energy sum, if of interest
   return egb_energy;
 }
-#endif
 
 } // namespace energy
 } // namespace omni
