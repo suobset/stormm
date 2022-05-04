@@ -563,9 +563,18 @@ int main(const int argc, const char* argv[]) {
   // Read a Trp-cage trajectory and evaluate the results in double, single, and fixed-precision
   // representations.
   const std::string trpcage_traj = base_crd_name + osc + "trpcage.crd";
-  const bool traj_exists = (getDrivePathType(trpcage_traj) == DrivePathType::FILE);
+  const bool traj_exists = (getDrivePathType(trpcage_traj) == DrivePathType::FILE &&
+                            systems_exist);
+  if (getDrivePathType(trpcage_traj) != DrivePathType::FILE) {
+    rtWarn("A trajectory of Trp-cage conformations (isolated boundary conditions) was not found "
+           "in " + trpcage_traj	+ ".  Check the ${OMNI_SOURCE} environment variable for "
+           "validity.  Subsequent tests will be skipped.", "test_generalized_born");
+  }
   const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  const CoordinateSeries<double> trpcage_csd(trpcage_traj, trpi_ag.getAtomCount());
+  const CoordinateSeries<double> trpcage_csd = (traj_exists) ?
+                                               CoordinateSeries<double>(trpcage_traj,
+                                                                        trpi_ag.getAtomCount()) :
+                                               CoordinateSeries<double>();
   const CoordinateSeries<float> trpcage_csf(trpcage_csd);
   const CoordinateSeries<llint> trpcage_csi(trpcage_csd, 26);
   timer.assignTime(0);

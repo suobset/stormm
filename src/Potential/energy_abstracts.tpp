@@ -10,9 +10,12 @@ ImplicitSolventRecipe<T>::ImplicitSolventRecipe(const ImplicitSolventKit<T> &isk
     igb{isk.igb},
     table_size{ngbk.table_size},
     dielectric{isk.dielectric},
-    kappa{(isk.saltcon > constants::tiny) ? sqrt(0.10806 * isk.saltcon) : 0.0},
-    gb_offset{(igb == ImplicitSolventModel::NECK_GB_II) ? 0.195141 : 0.09},
-    gb_neckscale{(igb == ImplicitSolventModel::NECK_GB_II) ? 0.826836 : 0.361825},
+    kappa{(isk.saltcon > static_cast<T>(constants::tiny)) ?
+          static_cast<T>(sqrt(0.10806 * isk.saltcon)) : static_cast<T>(0.0)},
+    gb_offset{(igb == ImplicitSolventModel::NECK_GB_II) ? static_cast<T>(0.195141) :
+                                                          static_cast<T>(0.09)},
+    gb_neckscale{(igb == ImplicitSolventModel::NECK_GB_II) ? static_cast<T>(0.826836) :
+                                                             static_cast<T>(0.361825)},
     gb_neckcut{ngbk.neck_cut},
     neck_gb_idx{isk.neck_gb_idx},
     pb_radii{isk.pb_radii},

@@ -298,7 +298,7 @@ template <typename Tcoord, typename Tforce, typename Tcalc>
 double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<Tcalc> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<Tcalc> ngb_kit,
                                      const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                                      Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                                      Tforce *effective_gb_radii, Tforce *psi, Tforce *sumdeijda,
@@ -320,7 +320,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   const Tcalc v_opei = 1.8;
 
   // Complete the implicit solvent model and initialize the energy result
-  const ImplicitSolventRecipe<Tcalc> isr(isk, ngb_tables.getDoublePrecisionAbstract());
+  const ImplicitSolventRecipe<Tcalc> isr(isk, ngb_kit);
   double egb_energy = 0.0;
   llint egb_acc = 0LL;
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
@@ -780,35 +780,37 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
             egb_energy += contrib;
           }
 
-          // Contribute local force accumulators back to global arrays
-          for (int i = 0; i < ni_atoms; i++) {
-            const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
-            if (tforce_is_sgnint) {
-              xfrc[atom_i] += llround(cachi_xfrc[i] * force_factor);
-              yfrc[atom_i] += llround(cachi_yfrc[i] * force_factor);
-              zfrc[atom_i] += llround(cachi_zfrc[i] * force_factor);
-              sumdeijda[atom_i] += llround(cachi_psi[i] * force_factor);
+          // Contribute local force accumulators back to global arrays, if appropriate
+          if (eval_force == EvaluateForce::YES) {
+            for (int i = 0; i < ni_atoms; i++) {
+              const int atom_i = i + (ti * tile_length) + (sti * supertile_length);
+              if (tforce_is_sgnint) {
+                xfrc[atom_i] += llround(cachi_xfrc[i] * force_factor);
+                yfrc[atom_i] += llround(cachi_yfrc[i] * force_factor);
+                zfrc[atom_i] += llround(cachi_zfrc[i] * force_factor);
+                sumdeijda[atom_i] += llround(cachi_psi[i] * force_factor);
+              }
+              else {
+                xfrc[atom_i] += cachi_xfrc[i];
+                yfrc[atom_i] += cachi_yfrc[i];
+                zfrc[atom_i] += cachi_zfrc[i];
+                sumdeijda[atom_i] += cachi_psi[i];
+              }
             }
-            else {
-              xfrc[atom_i] += cachi_xfrc[i];
-              yfrc[atom_i] += cachi_yfrc[i];
-              zfrc[atom_i] += cachi_zfrc[i];
-              sumdeijda[atom_i] += cachi_psi[i];
-            }
-          }
-          for (int j = 0; j < nj_atoms; j++) {
-            const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
-            if (tforce_is_sgnint) {
-              xfrc[atom_j] += llround(cachj_xfrc[j] * force_factor);
-              yfrc[atom_j] += llround(cachj_yfrc[j] * force_factor);
-              zfrc[atom_j] += llround(cachj_zfrc[j] * force_factor);
-              sumdeijda[atom_j] += llround(cachj_psi[j] * force_factor);
-            }
-            else {
-              xfrc[atom_j] += cachj_xfrc[j];
-              yfrc[atom_j] += cachj_yfrc[j];
-              zfrc[atom_j] += cachj_zfrc[j];
-              sumdeijda[atom_j] += cachj_psi[j];
+            for (int j = 0; j < nj_atoms; j++) {
+              const int atom_j = j + (tj * tile_length) + (stj * supertile_length);
+              if (tforce_is_sgnint) {
+                xfrc[atom_j] += llround(cachj_xfrc[j] * force_factor);
+                yfrc[atom_j] += llround(cachj_yfrc[j] * force_factor);
+                zfrc[atom_j] += llround(cachj_zfrc[j] * force_factor);
+                sumdeijda[atom_j] += llround(cachj_psi[j] * force_factor);
+              }
+              else {
+                xfrc[atom_j] += cachj_xfrc[j];
+                yfrc[atom_j] += cachj_yfrc[j];
+                zfrc[atom_j] += cachj_zfrc[j];
+                sumdeijda[atom_j] += cachj_psi[j];
+              }
             }
           }
         }
@@ -1142,7 +1144,7 @@ template <typename Tcoord, typename Tcalc>
 double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<Tcalc> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<Tcalc> ngb_kit,
                                      const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
                                      int system_index) {
   const size_t atom_os = static_cast<size_t>(system_index) *
@@ -1152,14 +1154,13 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   std::vector<Tcoord> psi(csr.natom);
   std::vector<Tcoord> sumdeijda(csr.natom);
   return evaluateGeneralizedBornEnergy<Tcoord,
-                                       Tcoord, Tcalc>(nbk, ser, isk, ngb_tables,
+                                       Tcoord, Tcalc>(nbk, ser, isk, ngb_kit,
                                                       &csr.xcrd[atom_os], &csr.ycrd[atom_os],
-                                                      &csr.zcrd[atom_os], &csr.umat[xfrm_os],
-                                                      &csr.invu[xfrm_os], csr.unit_cell, nullptr,
-                                                      nullptr, nullptr, effective_gb_radii, psi,
-                                                      sumdeijda, ecard, EvaluateForce::NO,
-                                                      system_index, csr.inv_gpos_factor,
-                                                      csr.gpos_factor);
+                                                      &csr.zcrd[atom_os], nullptr,
+                                                      nullptr, nullptr, effective_gb_radii.data(),
+                                                      psi.data(), sumdeijda.data(), ecard,
+                                                      EvaluateForce::NO, system_index,
+                                                      csr.inv_gpos_scale, csr.gpos_scale);
 }
   
 } // namespace energy

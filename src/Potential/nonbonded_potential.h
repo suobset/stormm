@@ -146,7 +146,7 @@ template <typename Tcoord, typename Tforce, typename Tcalc>
 double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<Tcalc> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<Tcalc> ngb_kit,
                                      const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                                      Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                                      Tforce *effective_gb_radii, Tforce *psi, Tforce *sumdeijda,
@@ -157,7 +157,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<double> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<double> ngb_kit,
                                      PhaseSpaceWriter psw, ScoreCard *ecard,
                                      EvaluateForce eval_force = EvaluateForce::NO,
                                      int system_index = 0);
@@ -177,14 +177,14 @@ double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionM
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<double> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<double> ngb_kit,
                                      const CoordinateFrameReader cfr, ScoreCard *ecard,
                                      int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<double> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<double> ngb_kit,
                                      const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                      int system_index = 0);
 
@@ -202,7 +202,7 @@ template <typename Tcoord, typename Tcalc>
 double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<Tcalc> isk,
-                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const NeckGeneralizedBornKit<Tcalc> ngb_kit,
                                      const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
                                      int system_index = 0);
 /// \}

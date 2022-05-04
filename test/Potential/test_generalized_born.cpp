@@ -13,6 +13,7 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
+using omni::llint;
 using omni::double2;
 using omni::int2;
 using omni::int3;
@@ -103,17 +104,20 @@ int main(const int argc, const char* argv[]) {
   const int gb_timings    =  timer.addCategory("Generalized born");
   
   // Section 1
-  section("Test the ImplicitSolventRecipe abstract");
+  section("ImplicitSolventRecipe abstract");
 
   // Section 2
-  section("Test HCT GB");
+  section("HCT GB");
 
   // Section 3
-  section("Test OBC GB");
+  section("OBC GB");
 
   // Section 4
-  section("Test Neck GB");
+  section("Neck GB");
 
+  // Section 5
+  section("Coordinate representations");
+  
   // Locate topologies and coordinate files
   const char osc = osSeparator();
   const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -446,6 +450,66 @@ int main(const int argc, const char* argv[]) {
           "approximations.", do_tests);
   }
 
+  // Read a Trp-cage trajectory and evaluate the results in double, single, and fixed-precision
+  // representations.
+  const std::string trpcage_traj = base_crd_name + osc + "trpcage.crd";
+  const bool traj_exists = (getDrivePathType(trpcage_traj) == DrivePathType::FILE &&
+                            systems_exist);
+  if (getDrivePathType(trpcage_traj) != DrivePathType::FILE) {
+    rtWarn("A trajectory of Trp-cage conformations (isolated boundary conditions) was not found "
+           "in " + trpcage_traj + ".  Check the ${OMNI_SOURCE} environment variable for "
+           "validity.  Subsequent tests will be skipped.", "test_generalized_born");
+  }
+  const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  const CoordinateSeries<double> trpcage_csd = traj_exists ?
+                                               CoordinateSeries<double>(trpcage_traj,
+                                                                        trpi_ag.getAtomCount()) :
+                                               CoordinateSeries<double>();
+  const CoordinateSeries<float> trpcage_csf(trpcage_csd);
+  const CoordinateSeries<llint> trpcage_csi(trpcage_csd, 26);
+  timer.assignTime(0);
+  const int nframe = trpcage_csd.getFrameCount();
+  std::vector<double> gbe_dd(nframe), gbe_fd(nframe), gbe_id(nframe);
+  std::vector<double> gbe_df(nframe), gbe_ff(nframe), gbe_if(nframe);
+  ScoreCard traj_sc(20, 1, 32);
+  const NonbondedKit<double> trpi_nbk_d = trpi_ag.getDoublePrecisionNonbondedKit();
+  const ImplicitSolventKit<double> trpi_isk_d = trpi_ag.getDoublePrecisionImplicitSolventKit();
+  const NeckGeneralizedBornKit<double> ngb_kit_d = ngb_tab.getDoublePrecisionAbstract();
+  for (int i = 0; i < nframe; i++) {
+    gbe_dd[i] = evaluateGeneralizedBornEnergy<double, double>(trpi_nbk_d, trpi_se.data(),
+                                                              trpi_isk_d, ngb_kit_d,
+                                                              trpcage_csd.data(), &traj_sc, i);
+    gbe_fd[i] = evaluateGeneralizedBornEnergy<float, double>(trpi_nbk_d, trpi_se.data(),
+                                                             trpi_isk_d, ngb_kit_d,
+                                                             trpcage_csf.data(), &traj_sc, i);
+    gbe_id[i] = evaluateGeneralizedBornEnergy<llint, double>(trpi_nbk_d, trpi_se.data(),
+                                                             trpi_isk_d, ngb_kit_d,
+                                                             trpcage_csi.data(), &traj_sc, i);
+  }
+  const NonbondedKit<float> trpi_nbk_f = trpi_ag.getSinglePrecisionNonbondedKit();
+  const ImplicitSolventKit<float> trpi_isk_f = trpi_ag.getSinglePrecisionImplicitSolventKit();
+  const NeckGeneralizedBornKit<float> ngb_kit_f = ngb_tab.getSinglePrecisionAbstract();
+  for (int i = 0; i < nframe; i++) {
+    gbe_df[i] = evaluateGeneralizedBornEnergy<double, float>(trpi_nbk_f, trpi_se.data(),
+                                                             trpi_isk_f, ngb_kit_f,
+                                                             trpcage_csd.data(), &traj_sc, i);
+    gbe_ff[i] = evaluateGeneralizedBornEnergy<float, float>(trpi_nbk_f, trpi_se.data(),
+                                                            trpi_isk_f, ngb_kit_f,
+                                                            trpcage_csf.data(), &traj_sc, i);
+    gbe_if[i] = evaluateGeneralizedBornEnergy<llint, float>(trpi_nbk_f, trpi_se.data(),
+                                                            trpi_isk_f, ngb_kit_f,
+                                                            trpcage_csi.data(), &traj_sc, i);
+  }
+
+  // CHECK
+  for (int i = 0; i < nframe; i++) {
+    printf("  %11.5lf %9.6lf %9.6lf %9.6lf %9.6lf %9.6lf\n", gbe_dd[i], gbe_fd[i] - gbe_dd[i],
+           gbe_id[i] - gbe_dd[i], gbe_df[i] - gbe_dd[i], gbe_ff[i] - gbe_dd[i],
+           gbe_if[i] - gbe_dd[i]);
+  }
+  // END CHECK
+  
+  
   // Print results
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);
