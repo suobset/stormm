@@ -43,27 +43,25 @@ void rotateAboutBond(PsSynthesisWriter psynthw, const int system_index, const in
   }
   std::vector<double> xcrd(nmove + 2), ycrd(nmove + 2), zcrd(nmove + 2);
   const double inv_scl = psynthw.inv_gpos_scale;
-  const longlong4 tmpcrdi = psynthw.xyz_qlj[atom_i + system_offset];
-  xcrd[0] = static_cast<double>(tmpcrdi.x) * inv_scl;
-  ycrd[0] = static_cast<double>(tmpcrdi.y) * inv_scl;
-  zcrd[0] = static_cast<double>(tmpcrdi.z) * inv_scl;
-  const longlong4 tmpcrdj = psynthw.xyz_qlj[atom_j + system_offset];
-  xcrd[1] = static_cast<double>(tmpcrdj.x) * inv_scl;
-  ycrd[1] = static_cast<double>(tmpcrdj.y) * inv_scl;
-  zcrd[1] = static_cast<double>(tmpcrdj.z) * inv_scl;
+  xcrd[0] = static_cast<double>(psynthw.xcrd[atom_i + system_offset]) * inv_scl;
+  ycrd[0] = static_cast<double>(psynthw.ycrd[atom_i + system_offset]) * inv_scl;
+  zcrd[0] = static_cast<double>(psynthw.zcrd[atom_i + system_offset]) * inv_scl;
+  xcrd[1] = static_cast<double>(psynthw.xcrd[atom_j + system_offset]) * inv_scl;
+  ycrd[1] = static_cast<double>(psynthw.ycrd[atom_j + system_offset]) * inv_scl;
+  zcrd[1] = static_cast<double>(psynthw.zcrd[atom_j + system_offset]) * inv_scl;
   for (int i = 0; i < nmove; i++) {
-    const longlong4 tmpcrd = psynthw.xyz_qlj[moving_atoms[i] + system_offset];
-    xcrd[i + 2] = static_cast<double>(tmpcrd.x) * inv_scl;
-    ycrd[i + 2] = static_cast<double>(tmpcrd.y) * inv_scl;
-    zcrd[i + 2] = static_cast<double>(tmpcrd.z) * inv_scl;
+    const int ixyz_orig = moving_atoms[i] + system_offset;
+    xcrd[i + 2] = static_cast<double>(psynthw.xcrd[ixyz_orig]) * inv_scl;
+    ycrd[i + 2] = static_cast<double>(psynthw.ycrd[ixyz_orig]) * inv_scl;
+    zcrd[i + 2] = static_cast<double>(psynthw.zcrd[ixyz_orig]) * inv_scl;
   }
   rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), 0, 1, local_atoms, rotation_angle);
   const double pos_scl = psynthw.gpos_scale;
   for (int i = 0; i < nmove; i++) {
     const int ixyz_dest = moving_atoms[i] + system_offset;
-    psynthw.xyz_qlj[ixyz_dest].x = llround(xcrd[i + 2] * pos_scl);
-    psynthw.xyz_qlj[ixyz_dest].y = llround(ycrd[i + 2] * pos_scl);
-    psynthw.xyz_qlj[ixyz_dest].z = llround(zcrd[i + 2] * pos_scl);
+    psynthw.xcrd[ixyz_dest] = llround(xcrd[i + 2] * pos_scl);
+    psynthw.ycrd[ixyz_dest] = llround(ycrd[i + 2] * pos_scl);
+    psynthw.zcrd[ixyz_dest] = llround(zcrd[i + 2] * pos_scl);
   }
 }
 
@@ -131,22 +129,28 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       // itself.
       const int root_a = inversion_groups[center_idx].root_atom;
       const int root_b = inversion_groups[center_idx].pivot_atom;
-      const longlong4 tmp_roota = psynthw.xyz_qlj[root_a + system_offset];
-      const longlong4 tmp_rootb = psynthw.xyz_qlj[root_b + system_offset];
-      const longlong4 tmp_ccen  = psynthw.xyz_qlj[chiral_centers[center_idx] + system_offset];
-      const double ccenx = static_cast<double>(tmp_ccen.x) * inv_scl;
-      const double cceny = static_cast<double>(tmp_ccen.y) * inv_scl;
-      const double ccenz = static_cast<double>(tmp_ccen.z) * inv_scl;
-      double dbx = static_cast<double>(tmp_rootb.x - tmp_ccen.x) * inv_scl;
-      double dby = static_cast<double>(tmp_rootb.y - tmp_ccen.y) * inv_scl;
-      double dbz = static_cast<double>(tmp_rootb.z - tmp_ccen.z) * inv_scl;
+      const llint tmp_roota_x = psynthw.xcrd[root_a + system_offset];
+      const llint tmp_roota_y = psynthw.ycrd[root_a + system_offset];
+      const llint tmp_roota_z = psynthw.zcrd[root_a + system_offset];
+      const llint tmp_rootb_x = psynthw.xcrd[root_b + system_offset];
+      const llint tmp_rootb_y = psynthw.ycrd[root_b + system_offset];
+      const llint tmp_rootb_z = psynthw.zcrd[root_b + system_offset];
+      const llint tmp_ccen_x  = psynthw.xcrd[chiral_centers[center_idx] + system_offset];
+      const llint tmp_ccen_y  = psynthw.ycrd[chiral_centers[center_idx] + system_offset];
+      const llint tmp_ccen_z  = psynthw.zcrd[chiral_centers[center_idx] + system_offset];
+      const double ccenx = static_cast<double>(tmp_ccen_x) * inv_scl;
+      const double cceny = static_cast<double>(tmp_ccen_y) * inv_scl;
+      const double ccenz = static_cast<double>(tmp_ccen_z) * inv_scl;
+      double dbx = static_cast<double>(tmp_rootb_x - tmp_ccen_x) * inv_scl;
+      double dby = static_cast<double>(tmp_rootb_y - tmp_ccen_y) * inv_scl;
+      double dbz = static_cast<double>(tmp_rootb_z - tmp_ccen_z) * inv_scl;
       const double invrb = 1.0 / sqrt((dbx * dbx) + (dby * dby) + (dbz * dbz));
       dbx = ccenx + (dbx * invrb);
       dby = cceny + (dby * invrb);
       dbz = ccenz + (dbz * invrb);
-      double dax = static_cast<double>(tmp_roota.x - tmp_ccen.x) * inv_scl;
-      double day = static_cast<double>(tmp_roota.y - tmp_ccen.y) * inv_scl;
-      double daz = static_cast<double>(tmp_roota.z - tmp_ccen.z) * inv_scl;
+      double dax = static_cast<double>(tmp_roota_x - tmp_ccen_x) * inv_scl;
+      double day = static_cast<double>(tmp_roota_y - tmp_ccen_y) * inv_scl;
+      double daz = static_cast<double>(tmp_roota_z - tmp_ccen_z) * inv_scl;
       const double invra = 1.0 / sqrt((dax * dax) + (day * day) + (daz * daz));
       dax = ccenx + (dax * invra);
       day = cceny + (day * invra);
@@ -162,18 +166,20 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       zcrd[1] = ccenz;
       const int* moving_atoms = inversion_groups[center_idx].rotatable_atoms.data();
       for (int i = 0; i < nmove; i++) {
-        const longlong4 tmpcrd = psynthw.xyz_qlj[moving_atoms[i] + system_offset];
-        xcrd[i + 2] = static_cast<double>(tmpcrd.x) * inv_scl;
-        ycrd[i + 2] = static_cast<double>(tmpcrd.y) * inv_scl;
-        zcrd[i + 2] = static_cast<double>(tmpcrd.z) * inv_scl;
+        const llint tmpcrd_x = psynthw.xcrd[moving_atoms[i] + system_offset];
+        const llint tmpcrd_y = psynthw.ycrd[moving_atoms[i] + system_offset];
+        const llint tmpcrd_z = psynthw.zcrd[moving_atoms[i] + system_offset];
+        xcrd[i + 2] = static_cast<double>(tmpcrd_x) * inv_scl;
+        ycrd[i + 2] = static_cast<double>(tmpcrd_y) * inv_scl;
+        zcrd[i + 2] = static_cast<double>(tmpcrd_z) * inv_scl;
       }
       rotateAboutBond(xcrd.data(), ycrd.data(), zcrd.data(), 0, 1, local_atoms, symbols::pi);
       const double pos_scl = psynthw.gpos_scale;
       for (int i = 0; i < nmove; i++) {
         const int ixyz_dest = moving_atoms[i] + system_offset;
-        psynthw.xyz_qlj[ixyz_dest].x = llround(xcrd[i + 2] * pos_scl);
-        psynthw.xyz_qlj[ixyz_dest].y = llround(ycrd[i + 2] * pos_scl);
-        psynthw.xyz_qlj[ixyz_dest].z = llround(zcrd[i + 2] * pos_scl);
+        psynthw.xcrd[ixyz_dest] = llround(xcrd[i + 2] * pos_scl);
+        psynthw.ycrd[ixyz_dest] = llround(ycrd[i + 2] * pos_scl);
+        psynthw.zcrd[ixyz_dest] = llround(zcrd[i + 2] * pos_scl);
       }
     }
     break;
@@ -182,10 +188,8 @@ void flipChiralCenter(PsSynthesisWriter psynthw, const int system_index, const i
       const int system_offset = psynthw.atom_starts[system_index];
       const int natom = inversion_groups[center_idx].rotatable_atoms.size();
       for (int i = 0; i < natom; i++) {
-        const int atom_idx = inversion_groups[center_idx].rotatable_atoms[i];
-        const longlong4 tmp_crd = psynthw.xyz_qlj[atom_idx + system_offset];
-        const longlong4 tmp_rfl = { -tmp_crd.x, tmp_crd.y, tmp_crd.z, tmp_crd.w };
-        psynthw.xyz_qlj[atom_idx + system_offset] = tmp_rfl;
+        const int atom_idx = inversion_groups[center_idx].rotatable_atoms[i] + system_offset;
+        psynthw.xcrd[atom_idx] = -psynthw.xcrd[atom_idx];
       }
 
       // All centers have been flipped by the reflection.  Loop over all other chiral centers and

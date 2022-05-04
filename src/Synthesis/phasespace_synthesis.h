@@ -52,9 +52,9 @@ struct PsSynthesisReader {
                     int frc_bits_in, const llint* boxvecs_in, const double* umat_in,
                     const double* invu_in, const double* boxdims_in, const float* sp_umat_in,
                     const float* sp_invu_in, const float* sp_boxdims_in,
-                    const longlong4* xyz_qlj_in, const llint* xvel_in, const llint* yvel_in,
-                    const llint* zvel_in, const llint* xfrc_in, const llint* yfrc_in,
-                    const llint* zfrc_in);
+                    const llint* xcrd_in, const llint* ycrd_in, const llint* zcrd_in,
+                    const llint* xvel_in, const llint* yvel_in, const llint* zvel_in,
+                    const llint* xfrc_in, const llint* yfrc_in, const llint* zfrc_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -107,14 +107,15 @@ struct PsSynthesisReader {
 
   // Pointers to the coordinate, velocity, and force data--these are mutable for accumulating
   // forces and letting a trajectory evolve.
-  const longlong4* xyz_qlj;  ///< Non-wrapped coordinates with non-bonded property indices,
-                             ///<   including non-bonded exclusions
-  const llint* xvel;         ///< Cartesian X velocities
-  const llint* yvel;         ///< Cartesian Y velocities
-  const llint* zvel;         ///< Cartesian Z velocities
-  const llint* xfrc;         ///< Discretized Cartesian X forces
-  const llint* yfrc;         ///< Discretized Cartesian Y forces
-  const llint* zfrc;         ///< Discretized Cartesian Z forces
+  const llint* xcrd;  ///< Non-wrapped Cartesian X coordinates of all particles
+  const llint* ycrd;  ///< Non-wrapped Cartesian Y coordinates of all particles
+  const llint* zcrd;  ///< Non-wrapped Cartesian Z coordinates of all particles
+  const llint* xvel;  ///< Cartesian X velocities
+  const llint* yvel;  ///< Cartesian Y velocities
+  const llint* zvel;  ///< Cartesian Z velocities
+  const llint* xfrc;  ///< Discretized Cartesian X forces
+  const llint* yfrc;  ///< Discretized Cartesian Y forces
+  const llint* zfrc;  ///< Discretized Cartesian Z forces
 };
 
 /// \brief The writer for a PhaseSpaceSynthesis object, containing all of the data relevant for
@@ -130,8 +131,8 @@ struct PsSynthesisWriter {
                     double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
                     int frc_bits_in, llint* boxvecs_in, double* umat_in, double* invu_in,
                     double* boxdims_in, float* sp_umat_in, float* sp_invu_in, float* sp_boxdims_in,
-                    longlong4* xyz_qlj_in, llint* xvel_in, llint* yvel_in, llint* zvel_in,
-                    llint* xfrc_in, llint* yfrc_in, llint* zfrc_in);
+                    llint* xcrd_in, llint* ycrd_in, llint* zcrd_in, llint* xvel_in, llint* yvel_in,
+                    llint* zvel_in, llint* xfrc_in, llint* yfrc_in, llint* zfrc_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -185,13 +186,15 @@ struct PsSynthesisWriter {
 
   // Pointers to the coordinate, velocity, and force data--these are mutable for accumulating
   // forces and letting a trajectory evolve.
-  longlong4* xyz_qlj;  ///< Non-wrapped coordinates
-  llint* xvel;         ///< Cartesian X velocities
-  llint* yvel;         ///< Cartesian Y velocities
-  llint* zvel;         ///< Cartesian Z velocities
-  llint* xfrc;         ///< Discretized Cartesian X forces
-  llint* yfrc;         ///< Discretized Cartesian Y forces
-  llint* zfrc;         ///< Discretized Cartesian Z forces
+  llint* xcrd;  ///< Non-wrapped Cartesian X coordinates of all particles
+  llint* ycrd;  ///< Non-wrapped Cartesian Y coordinates of all particles
+  llint* zcrd;  ///< Non-wrapped Cartesian Z coordinates of all particles
+  llint* xvel;  ///< Cartesian X velocities
+  llint* yvel;  ///< Cartesian Y velocities
+  llint* zvel;  ///< Cartesian Z velocities
+  llint* xfrc;  ///< Discretized Cartesian X forces
+  llint* yfrc;  ///< Discretized Cartesian Y forces
+  llint* zfrc;  ///< Discretized Cartesian Z forces
 };
 
 /// \brief A fixed-precision representation of coordinates, velocities, and forces to manage a set
@@ -421,12 +424,10 @@ private:
   ///< The numbers of atoms in each system
   Hybrid<int> atom_counts;
 
-  /// Non-wrapped Cartesian X, Y, and Z coordinates of the system, fused with non-bonded properties
-  /// for streamlined access in the majority of situations where they will be needed
-  /// simultaneously.  This is its own array.
-  Hybrid<longlong4> xyz_qlj;
-
   // These variables are POINTER-kind Hybrid objects targeting the llint_data array
+  Hybrid<llint> x_coordinates;  ///< Cartesian coordinates of all particles in the X direction
+  Hybrid<llint> y_coordinates;  ///< Cartesian coordinates of all particles in the Y direction
+  Hybrid<llint> z_coordinates;  ///< Cartesian coordinates of all particles in the Z direction
   Hybrid<llint> x_velocities;   ///< Cartesian velocities of all particles in the X direction
   Hybrid<llint> y_velocities;   ///< Cartesian velocities of all particles in the Y direction
   Hybrid<llint> z_velocities;   ///< Cartesian velocities of all particles in the Z direction
@@ -474,7 +475,10 @@ private:
   const std::vector<AtomGraph*> topologies;
 
   /// \brief Allocate private array data
-  void allocate(int atom_stride);
+  ///
+  /// \param atom_stride  The total number of padded atoms in the system (sum over all individual
+  ///                     systems with warp size padding in each of them)
+  void allocate(size_t atom_stride);
 };
 
 } // namespace trajectory
