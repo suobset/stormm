@@ -276,18 +276,35 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> &nbk,
+                                const StaticExclusionMaskReader &ser,
+                                const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                const int system_index) {
+  const size_t atom_os = static_cast<size_t>(system_index) *
+                         roundUp<size_t>(csr.natom, warp_size_zu);
+  const size_t xfrm_os = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
+  return evaluateNonbondedEnergy<Tcoord, Tcoord, Tcalc>(nbk, ser, &csr.xcrd[atom_os],
+                                                        &csr.ycrd[atom_os], &csr.zcrd[atom_os],
+                                                        &csr.umat[xfrm_os], &csr.invu[xfrm_os],
+                                                        csr.unit_cell, nullptr, nullptr, nullptr,
+                                                        ecard, EvaluateForce::NO,
+                                                        EvaluateForce::NO, system_index,
+                                                        csr.inv_gpos_scale);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const StaticExclusionMaskReader ser,
                                      const ImplicitSolventKit<Tcalc> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                                     const double* umat, const double* invu,
-                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, Tforce *effective_gb_radii, Tforce *psi,
-                                     Tforce *sumdeijda, ScoreCard *ecard,
-                                     const EvaluateForce eval_force, const int system_index,
-                                     const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                                     Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                                     Tforce *effective_gb_radii, Tforce *psi, Tforce *sumdeijda,
+                                     ScoreCard *ecard, const EvaluateForce eval_force,
+                                     const int system_index, const Tcalc inv_gpos_factor,
+                                     const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const bool tcoord_is_sgnint = isSignedIntegralScalarType<Tcoord>();
@@ -1120,5 +1137,30 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   return egb_energy;
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
+                                     const StaticExclusionMaskReader ser,
+                                     const ImplicitSolventKit<Tcalc> isk,
+                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                     int system_index) {
+  const size_t atom_os = static_cast<size_t>(system_index) *
+                         roundUp<size_t>(csr.natom, warp_size_zu);
+  const size_t xfrm_os = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
+  std::vector<Tcoord> effective_gb_radii(csr.natom);
+  std::vector<Tcoord> psi(csr.natom);
+  std::vector<Tcoord> sumdeijda(csr.natom);
+  return evaluateGeneralizedBornEnergy<Tcoord,
+                                       Tcoord, Tcalc>(nbk, ser, isk, ngb_tables,
+                                                      &csr.xcrd[atom_os], &csr.ycrd[atom_os],
+                                                      &csr.zcrd[atom_os], &csr.umat[xfrm_os],
+                                                      &csr.invu[xfrm_os], csr.unit_cell, nullptr,
+                                                      nullptr, nullptr, effective_gb_radii, psi,
+                                                      sumdeijda, ecard, EvaluateForce::NO,
+                                                      system_index, csr.inv_gpos_factor,
+                                                      csr.gpos_factor);
+}
+  
 } // namespace energy
 } // namespace omni

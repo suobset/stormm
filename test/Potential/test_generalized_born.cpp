@@ -108,6 +108,12 @@ int main(const int argc, const char* argv[]) {
   // Section 2
   section("Test HCT GB");
 
+  // Section 3
+  section("Test OBC GB");
+
+  // Section 4
+  section("Test Neck GB");
+
   // Locate topologies and coordinate files
   const char osc = osSeparator();
   const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -180,6 +186,7 @@ int main(const int argc, const char* argv[]) {
                                                         StaticExclusionMask();
 
   // Apply an implicit solvent model to each topology and check the result
+  section(1);
   std::vector<AtomGraph*> all_topologies = { &trpi_ag, &dhfr_ag, &alad_ag };
   std::vector<PhaseSpace*> all_coords = { &trpi_ps, &dhfr_ps, &alad_ps };
   std::vector<StaticExclusionMask> all_semasks = { trpi_se, dhfr_se, alad_se };
@@ -222,6 +229,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<double> neck2_gb_answer = { -328.6694773, -2686.2812806, -14.8989435 };
 
   // Check energy and force computations for each successive GB model
+  section(2);
   std::vector<double> gb_energy(system_count);
   std::vector<std::vector<double>> gb_forces(system_count);
   const TrajectoryKind tkind = TrajectoryKind::FORCES;
@@ -249,6 +257,7 @@ int main(const int argc, const char* argv[]) {
            NumberFormat::STANDARD_REAL, "Forces due to Hawkins / Cramer / Truhlar Generalized "
            "Born interactions in the alanine dipeptide system do not meet expectations.",
            oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::OVERWRITE, do_snaps);  
+  section(3);
   for (size_t i = 0; i < system_count; i++) {
     all_topologies[i]->setImplicitSolventModel(ImplicitSolventModel::OBC_GB, 78.5);
     all_coords[i]->initializeForces();
@@ -304,6 +313,7 @@ int main(const int argc, const char* argv[]) {
   // which cannot be undone by simply reverting to a different implicit solvent model that is
   // agnostic to the radii.  Do this to all topologies except alanine dipeptide, which already has
   // acceptable (albeit not Bondi) radii for the "neck" GB calculations.
+  section(4);
   for (size_t i = 0; i < system_count; i++) {
     const AtomicRadiusSet rset_apply = (all_topologies[i]->getFileName() == alad_top_name) ?
                                        AtomicRadiusSet::NONE : AtomicRadiusSet::BONDI;
@@ -372,7 +382,22 @@ int main(const int argc, const char* argv[]) {
                                                 AtomicRadiusSet::BONDI,
                                                 AtomicRadiusSet::MBONDI3 };
   for (size_t i = 0; i < shapes.size(); i++) {
-
+    switch(conditions[i]) {
+    case ImplicitSolventModel::HCT_GB:
+      section(2);
+      break;
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+      section(3);
+      break;
+    case ImplicitSolventModel::NECK_GB:
+    case ImplicitSolventModel::NECK_GB_II:
+      section(4);
+      break;
+    case ImplicitSolventModel::NONE:
+      break;
+    }
+    
     // Set conditions and re-evaluate Generalized Born forces in each system.  Skip DHFR as it
     // is expensive, less stable for comparing finite difference results, and not telling us much
     // at this stage.

@@ -2,7 +2,7 @@
 
 namespace omni {
 namespace energy {
-
+  
 //-------------------------------------------------------------------------------------------------
 double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
                                 const StaticExclusionMaskReader ser, PhaseSpaceWriter psw,
@@ -52,17 +52,17 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
-                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                const CoordinateFrame &cf, ScoreCard *ecard,
                                 const int system_index) {
-  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(), cfr, ecard,
+  return evaluateNonbondedEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(), cf.data(), ecard,
                                  system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
-                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                const CoordinateFrame &cf, ScoreCard *ecard,
                                 const int system_index) {
-  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(), cfr, ecard,
+  return evaluateNonbondedEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(), cf.data(), ecard,
                                  system_index);
 }
 
@@ -74,8 +74,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
                                      PhaseSpaceWriter psw, ScoreCard *ecard,
                                      const EvaluateForce eval_force, const int system_index) {
   return evaluateGeneralizedBornEnergy<double, double, double>(nbk, ser, isk, ngb_tables, psw.xcrd,
-                                                               psw.ycrd, psw.zcrd, psw.umat,
-                                                               psw.invu, psw.unit_cell, psw.xfrc,
+                                                               psw.ycrd, psw.zcrd, psw.xfrc,
                                                                psw.yfrc, psw.zfrc, psw.xprv,
                                                                psw.yprv, psw.zprv, ecard,
                                                                eval_force, system_index);
@@ -112,8 +111,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
   std::vector<double>psi(nbk.natom);
   std::vector<double>sumdeijda(nbk.natom);
   return evaluateGeneralizedBornEnergy<double, double, double>(nbk, ser, isk, ngb_tables, cfr.xcrd,
-                                                               cfr.ycrd, cfr.zcrd, cfr.umat,
-                                                               cfr.invu, cfr.unit_cell, nullptr,
+                                                               cfr.ycrd, cfr.zcrd, nullptr,
                                                                nullptr, nullptr,
                                                                effective_gb_radii.data(),
                                                                psi.data(), sumdeijda.data(), ecard,
@@ -134,21 +132,21 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
 //-------------------------------------------------------------------------------------------------
 double evaluateGeneralizedBornEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                     const CoordinateFrame &cf, ScoreCard *ecard,
                                      const int system_index) {
   return evaluateGeneralizedBornEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(),
                                        ag.getDoublePrecisionImplicitSolventKit(), ngb_tables,
-                                       cfr, ecard, system_index);
+                                       cf.data(), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
 double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                     const CoordinateFrame &cf, ScoreCard *ecard,
                                      const int system_index) {
   return evaluateGeneralizedBornEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(),
                                        ag->getDoublePrecisionImplicitSolventKit(), ngb_tables,
-                                       cfr, ecard, system_index);
+                                       cf.data(), ecard, system_index);
 }
 
 } // namespace energy

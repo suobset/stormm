@@ -41,6 +41,7 @@ using topology::AtomGraph;
 using topology::ValenceKit;
 using topology::NonbondedKit;
 using topology::UnitCellType;
+using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
 using trajectory::PhaseSpace;
@@ -141,10 +142,10 @@ double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameReade
 double evaluateBondTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, int system_index = 0);
 
-double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrame &cf,
                          ScoreCard *ecard, int system_index = 0);
 
-double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrame &cf,
                          ScoreCard *ecard, int system_index = 0);
 /// \}
 
@@ -212,11 +213,11 @@ double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameRead
 double evaluateAngleTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                           ScoreCard *ecard, int system_index = 0);
 
-double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                          ScoreCard *ecard, int system_index = 0);
+double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                          int system_index = 0);
 
-double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                          ScoreCard *ecard, int system_index = 0);
+double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                          int system_index = 0);
 /// \}
 
 /// \brief Evalaute the energy and forces due to a cosine-based or harmonic dihedral term.
@@ -289,11 +290,11 @@ double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrame
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                               ScoreCard *ecard, int system_index = 0);
 
-double2 evaluateDihedralTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                              ScoreCard *ecard, int system_index = 0);
+double2 evaluateDihedralTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                              int system_index = 0);
 
-double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                              ScoreCard *ecard, int system_index = 0);
+double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                              int system_index = 0);
 /// \}
   
 /// \brief Evaluate Urey-Bradley harmonic angle interactions with a simple routine.  This looks
@@ -352,11 +353,11 @@ double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFra
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                 ScoreCard *ecard, int system_index = 0);
 
-double evaluateUreyBradleyTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
-                                ScoreCard *ecard, int system_index = 0);
+double evaluateUreyBradleyTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                                int system_index = 0);
 
-double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
-                                ScoreCard *ecard, int system_index = 0);
+double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
+                                int system_index = 0);
 /// \}
   
 /// \brief Evaluate CHARMM harmonic improper dihedral terms with a simple routine.  This
@@ -415,10 +416,10 @@ double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const Coordinate
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                                    ScoreCard *ecard, int system_index = 0);
 
-double evaluateCharmmImproperTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+double evaluateCharmmImproperTerms(const AtomGraph &ag, const CoordinateFrame &cf,
                                    ScoreCard *ecard, int system_index = 0);
 
-double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrame &cf,
                                    ScoreCard *ecard, int system_index = 0);
 /// \}
 
@@ -509,10 +510,10 @@ double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameReade
 double evaluateCmapTerms(const ValenceKit<double> vk, const CoordinateFrameWriter &cfw,
                          ScoreCard *ecard, int system_index = 0);
 
-double evaluateCmapTerms(const AtomGraph &ag, const CoordinateFrameReader &cfr, ScoreCard *ecard,
+double evaluateCmapTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreCard *ecard,
                          int system_index = 0);
 
-double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrameReader &cfr, ScoreCard *ecard,
+double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
                          int system_index = 0);
 /// \}
 
@@ -622,10 +623,10 @@ double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKi
                                   const CoordinateFrameWriter &cfw, ScoreCard *ecard,
                                   int system_index = 0);
 
-double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrameReader &cfr,
+double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrame &cf,
                                   ScoreCard *ecard, int system_index = 0);
 
-double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrameReader &cfr,
+double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrame &cf,
                                   ScoreCard *ecard, int system_index = 0);
 /// \}
 

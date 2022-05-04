@@ -4,8 +4,10 @@
 
 #include "Constants/generalized_born.h"
 #include "DataTypes/common_types.h"
+#include "Math/rounding.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 #include "scorecard.h"
 #include "static_exclusionmask.h"
@@ -16,6 +18,7 @@ namespace omni {
 namespace energy {
 
 using data_types::isSignedIntegralScalarType;
+using math::roundUp;
 using topology::AtomGraph;
 using topology::ImplicitSolventKit;
 using topology::NonbondedKit;
@@ -23,6 +26,9 @@ using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
+using trajectory::CoordinateSeries;
+using trajectory::CoordinateSeriesReader;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
 using namespace generalized_born_defaults;
@@ -96,11 +102,15 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<double> nbk,
                                 int system_index = 0);
 
 double2 evaluateNonbondedEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
-                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
-                                int system_index = 0);
+                                const CoordinateFrame &cf, ScoreCard *ecard, int system_index = 0);
 
 double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
-                                const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                const CoordinateFrame &cf, ScoreCard *ecard, int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> &nbk,
+                                const StaticExclusionMaskReader &ser,
+                                const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
                                 int system_index = 0);
 /// \}
 
@@ -127,9 +137,6 @@ double2 evaluateNonbondedEnergy(const AtomGraph *ag, const StaticExclusionMask &
 /// \param xfrc          Cartesian X forces acting on all particles
 /// \param yfrc          Cartesian X forces acting on all particles
 /// \param zfrc          Cartesian X forces acting on all particles
-/// \param umat          Box space transformation matrix
-/// \param invu          Inverse transformation matrix, fractional coordinates back to real space
-/// \param unit_cell     The unit cell type, i.e. triclinic
 /// \param ecard         Energy components and other state variables (volume, temperature, etc.)
 ///                      (modified by this function)
 /// \param eval_force    Flag to have forces also evaluated
@@ -141,10 +148,9 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const ImplicitSolventKit<Tcalc> isk,
                                      const NeckGeneralizedBornTable &ngb_tables,
                                      const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                                     const double* umat, const double* invu,
-                                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                                     Tforce* zfrc, Tforce *effective_gb_radii, Tforce *psi,
-                                     Tforce *sumdeijda, ScoreCard *ecard, EvaluateForce eval_force,
+                                     Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                                     Tforce *effective_gb_radii, Tforce *psi, Tforce *sumdeijda,
+                                     ScoreCard *ecard, EvaluateForce eval_force,
                                      int system_index = 0, Tcalc inv_gpos_factor = 1.0,
                                      Tcalc force_factor = 1.0);
 
@@ -184,12 +190,20 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<double> nbk,
 
 double evaluateGeneralizedBornEnergy(const AtomGraph &ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                     const CoordinateFrame &cf, ScoreCard *ecard,
                                      int system_index = 0);
 
 double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionMask &se,
                                      const NeckGeneralizedBornTable &ngb_tables,
-                                     const CoordinateFrameReader &cfr, ScoreCard *ecard,
+                                     const CoordinateFrame &cf, ScoreCard *ecard,
+                                     int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
+                                     const StaticExclusionMaskReader ser,
+                                     const ImplicitSolventKit<Tcalc> isk,
+                                     const NeckGeneralizedBornTable &ngb_tables,
+                                     const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
                                      int system_index = 0);
 /// \}
 

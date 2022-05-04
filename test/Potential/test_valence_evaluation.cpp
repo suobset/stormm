@@ -173,38 +173,38 @@ int main(const int argc, const char* argv[]) {
 
   // Re-compute valence energies with a CoordinateFrame abstract (no force computations)
   ScoreCard secondary_sc(3);
-  const CoordinateFrameReader trpcage_cfr(trpcage_ps);
-  const CoordinateFrameReader dhfr_cfr(dhfr_ps);
-  const CoordinateFrameReader alad_cfr(alad_ps);
-  const double2 trpcage_dihe_energy_ii = evaluateDihedralTerms(trpcage_ag, trpcage_cfr,
+  const CoordinateFrame trpcage_cf(trpcage_ps);
+  const CoordinateFrame dhfr_cf(dhfr_ps);
+  const CoordinateFrame alad_cf(alad_ps);
+  const double2 trpcage_dihe_energy_ii = evaluateDihedralTerms(trpcage_ag, trpcage_cf,
                                                                &secondary_sc, trpcage_idx);
   const std::vector<double> trpcage_valence_energy_ii = {
-    evaluateBondTerms(trpcage_ag, trpcage_cfr, &secondary_sc, trpcage_idx),
-    evaluateAngleTerms(trpcage_ag, trpcage_cfr, &secondary_sc, trpcage_idx),
+    evaluateBondTerms(trpcage_ag, trpcage_cf, &secondary_sc, trpcage_idx),
+    evaluateAngleTerms(trpcage_ag, trpcage_cf, &secondary_sc, trpcage_idx),
     trpcage_dihe_energy_ii.x, trpcage_dihe_energy_ii.y,
-    evaluateUreyBradleyTerms(trpcage_ag, trpcage_cfr, &secondary_sc, trpcage_idx),
-    evaluateCharmmImproperTerms(trpcage_ag, trpcage_cfr, &secondary_sc, trpcage_idx),
-    evaluateCmapTerms(trpcage_ag, trpcage_cfr, &secondary_sc, trpcage_idx)
+    evaluateUreyBradleyTerms(trpcage_ag, trpcage_cf, &secondary_sc, trpcage_idx),
+    evaluateCharmmImproperTerms(trpcage_ag, trpcage_cf, &secondary_sc, trpcage_idx),
+    evaluateCmapTerms(trpcage_ag, trpcage_cf, &secondary_sc, trpcage_idx)
   };
-  const double2 dhfr_dihe_energy_ii = evaluateDihedralTerms(dhfr_ag, dhfr_cfr, &secondary_sc,
+  const double2 dhfr_dihe_energy_ii = evaluateDihedralTerms(dhfr_ag, dhfr_cf, &secondary_sc,
                                                             dhfr_idx);
   const std::vector<double> dhfr_valence_energy_ii = {
-    evaluateBondTerms(dhfr_ag, dhfr_cfr, &secondary_sc, dhfr_idx),
-    evaluateAngleTerms(dhfr_ag, dhfr_cfr, &secondary_sc, dhfr_idx),
+    evaluateBondTerms(dhfr_ag, dhfr_cf, &secondary_sc, dhfr_idx),
+    evaluateAngleTerms(dhfr_ag, dhfr_cf, &secondary_sc, dhfr_idx),
     dhfr_dihe_energy_ii.x, dhfr_dihe_energy_ii.y,
-    evaluateUreyBradleyTerms(dhfr_ag, dhfr_cfr, &secondary_sc, dhfr_idx),
-    evaluateCharmmImproperTerms(dhfr_ag, dhfr_cfr, &secondary_sc, dhfr_idx),
-    evaluateCmapTerms(dhfr_ag, dhfr_cfr, &secondary_sc, dhfr_idx)
+    evaluateUreyBradleyTerms(dhfr_ag, dhfr_cf, &secondary_sc, dhfr_idx),
+    evaluateCharmmImproperTerms(dhfr_ag, dhfr_cf, &secondary_sc, dhfr_idx),
+    evaluateCmapTerms(dhfr_ag, dhfr_cf, &secondary_sc, dhfr_idx)
   };
-  const double2 alad_dihe_energy_ii = evaluateDihedralTerms(alad_ag, alad_cfr, &secondary_sc,
+  const double2 alad_dihe_energy_ii = evaluateDihedralTerms(alad_ag, alad_cf, &secondary_sc,
                                                             alad_idx);
   const std::vector<double> alad_valence_energy_ii = {
-    evaluateBondTerms(alad_ag, alad_cfr, &secondary_sc, alad_idx),
-    evaluateAngleTerms(alad_ag, alad_cfr, &secondary_sc, alad_idx),
+    evaluateBondTerms(alad_ag, alad_cf, &secondary_sc, alad_idx),
+    evaluateAngleTerms(alad_ag, alad_cf, &secondary_sc, alad_idx),
     alad_dihe_energy_ii.x, alad_dihe_energy_ii.y,
-    evaluateUreyBradleyTerms(alad_ag, alad_cfr, &secondary_sc, alad_idx),
-    evaluateCharmmImproperTerms(alad_ag, alad_cfr, &secondary_sc, alad_idx),
-    evaluateCmapTerms(alad_ag, alad_cfr, &secondary_sc, alad_idx)
+    evaluateUreyBradleyTerms(alad_ag, alad_cf, &secondary_sc, alad_idx),
+    evaluateCharmmImproperTerms(alad_ag, alad_cf, &secondary_sc, alad_idx),
+    evaluateCmapTerms(alad_ag, alad_cf, &secondary_sc, alad_idx)
   };
   check(trpcage_valence_energy_ii, RelationalOperator::EQUAL, trpcage_valence_energy_answer,
         "Trp-cage valence energies do not meet expectations when computed with a CoordinateFrame "

@@ -1,4 +1,5 @@
 #include "../../src/Constants/behavior.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
@@ -10,6 +11,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
@@ -17,6 +19,7 @@ using omni::double2;
 using omni::int2;
 using omni::int3;
 using omni::constants::ExceptionResponse;
+using omni::data_types::llint;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
@@ -30,6 +33,7 @@ using omni::topology::AtomGraph;
 using omni::topology::NonbondedKit;
 using omni::trajectory::CoordinateFileKind;
 using omni::trajectory::PhaseSpace;
+using omni::trajectory::CoordinateSeries;
 using omni::trajectory::TrajectoryKind;
 using namespace omni::energy;
 using namespace omni::testing;
@@ -140,7 +144,13 @@ int main(const int argc, const char* argv[]) {
   section("Non-bonded force evaluation");
 
   // Section 5
-  section("Fixed-precision energy accumulator performance");
+  section("Fixed-precision energy accumulator checks");
+
+  // Section 6
+  section("Single-precision coordinate performance");
+
+  // Section 7
+  section("Fixed-precision coordinate performance");
 
   // Locate topologies and coordinate files
   const char osc = osSeparator();
@@ -284,7 +294,7 @@ int main(const int argc, const char* argv[]) {
            "the Trp-cage (isolated boundary conditions) system do not meet expectations.",
            oe.takeSnapshot(), 1.0e-6, 1.0e-12, PrintSituation::APPEND, snap_check);
   timer.assignTime(0);
-  const double2 trpi_14_e_ii = evaluateAttenuated14Terms(trpi_ag, CoordinateFrameReader(trpi_ps),
+  const double2 trpi_14_e_ii = evaluateAttenuated14Terms(trpi_ag, CoordinateFrame(trpi_ps),
                                                          &secondary_sc, trpi_idx);
   timer.assignTime(attn14_timings);
   check(trpi_14_e_ii.x, RelationalOperator::EQUAL, Approx(1458.0998129).margin(1.0e-6),
@@ -373,7 +383,7 @@ int main(const int argc, const char* argv[]) {
         "1:4 energy for solvated Trp-cage (AMBER ff99SB force field) was not computed correctly.",
         do_tests);
   timer.assignTime(0);
-  const double2 trpw_14_e_ii = evaluateAttenuated14Terms(trpw_ag, CoordinateFrameReader(trpw_ps),
+  const double2 trpw_14_e_ii = evaluateAttenuated14Terms(trpw_ag, CoordinateFrame(trpw_ps),
                                                          &all_systems_sc, trpw_idx);
   timer.assignTime(attn14_timings);
   check(trpw_14_e_ii.x, RelationalOperator::EQUAL, Approx(1458.0996855).margin(1.0e-6),
@@ -445,7 +455,7 @@ int main(const int argc, const char* argv[]) {
         do_tests);
   timer.assignTime(0);
   const double2 dhfr_nonb_e_ii = evaluateNonbondedEnergy(dhfr_ag, dhfr_semask,
-                                                         CoordinateFrameReader(dhfr_ps),
+                                                         CoordinateFrame(dhfr_ps),
                                                          &secondary_sc, dhfr_idx);
   timer.assignTime(nb_timings);
   check(dhfr_nonb_e_ii.x, RelationalOperator::EQUAL, Approx(-10036.4655324).margin(1.0e-6),
@@ -477,7 +487,7 @@ int main(const int argc, const char* argv[]) {
         "correctly.", do_tests);
   timer.assignTime(0);
   const double2 alad_nonb_e_ii = evaluateNonbondedEnergy(alad_ag, alad_semask,
-                                                         CoordinateFrameReader(alad_ps),
+                                                         CoordinateFrame(alad_ps),
                                                          &secondary_sc, alad_idx);
   timer.assignTime(nb_timings);
   check(alad_nonb_e_ii.x, RelationalOperator::EQUAL, Approx(-78.8463310).margin(1.0e-6),
@@ -550,6 +560,103 @@ int main(const int argc, const char* argv[]) {
         "targets to within tolerances.", do_tests);
   timer.assignTime(0);
 
+  // Read a Trp-cage trajectory and evaluate the results in double, single, and fixed-precision
+  // representations.
+  const std::string trpcage_traj = base_crd_name + osc + "trpcage.crd";
+  const bool traj_exists = (getDrivePathType(trpcage_traj) == DrivePathType::FILE);
+  const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  const CoordinateSeries<double> trpcage_csd(trpcage_traj, trpi_ag.getAtomCount());
+  const CoordinateSeries<float> trpcage_csf(trpcage_csd);
+  const CoordinateSeries<llint> trpcage_csi(trpcage_csd, 26);
+  timer.assignTime(0);
+  const int nframe = trpcage_csd.getFrameCount();
+  std::vector<double2> traj_nbe_dd(nframe), traj_nbe_fd(nframe), traj_nbe_id(nframe);
+  std::vector<double2> traj_nbe_df(nframe), traj_nbe_ff(nframe), traj_nbe_if(nframe);
+  ScoreCard traj_sc(20, 1, 32);
+  const NonbondedKit<double> trpi_nbk_d = trpi_ag.getDoublePrecisionNonbondedKit();
+  for (int i = 0; i < nframe; i++) {
+    traj_nbe_dd[i] = evaluateNonbondedEnergy<double, double>(trpi_nbk_d, trpi_semask.data(),
+                                                             trpcage_csd.data(), &traj_sc, i);
+    traj_nbe_fd[i] = evaluateNonbondedEnergy<float, double>(trpi_nbk_d, trpi_semask.data(),
+                                                            trpcage_csf.data(), &traj_sc, i);
+    traj_nbe_id[i] = evaluateNonbondedEnergy<llint, double>(trpi_nbk_d, trpi_semask.data(),
+                                                            trpcage_csi.data(), &traj_sc, i);
+  }
+  const NonbondedKit<float> trpi_nbk_f = trpi_ag.getSinglePrecisionNonbondedKit();
+  for (int i = 0; i < nframe; i++) {
+    traj_nbe_df[i] = evaluateNonbondedEnergy<double, float>(trpi_nbk_f, trpi_semask.data(),
+                                                            trpcage_csd.data(), &traj_sc, i);
+    traj_nbe_ff[i] = evaluateNonbondedEnergy<float, float>(trpi_nbk_f, trpi_semask.data(),
+                                                           trpcage_csf.data(), &traj_sc, i);
+    traj_nbe_if[i] = evaluateNonbondedEnergy<llint, float>(trpi_nbk_f, trpi_semask.data(),
+                                                          trpcage_csi.data(), &traj_sc, i);
+  }
+  double mue_elec_fd = 0.0;
+  double mue_elec_id = 0.0;
+  double mue_elec_df = 0.0;
+  double mue_elec_ff = 0.0;
+  double mue_elec_if = 0.0;
+  double mue_vdw_fd = 0.0;
+  double mue_vdw_id = 0.0;
+  double mue_vdw_df = 0.0;
+  double mue_vdw_ff = 0.0;
+  double mue_vdw_if = 0.0;
+  for (int i = 0; i < nframe; i++) {
+    mue_elec_fd += fabs(traj_nbe_fd[i].x - traj_nbe_dd[i].x);
+    mue_elec_id += fabs(traj_nbe_id[i].x - traj_nbe_dd[i].x);
+    mue_elec_df += fabs(traj_nbe_df[i].x - traj_nbe_dd[i].x);
+    mue_elec_ff += fabs(traj_nbe_ff[i].x - traj_nbe_dd[i].x);
+    mue_elec_if += fabs(traj_nbe_if[i].x - traj_nbe_dd[i].x);
+    mue_vdw_fd += fabs(traj_nbe_fd[i].y - traj_nbe_dd[i].y);
+    mue_vdw_id += fabs(traj_nbe_id[i].y - traj_nbe_dd[i].y);
+    mue_vdw_df += fabs(traj_nbe_df[i].y - traj_nbe_dd[i].y);
+    mue_vdw_ff += fabs(traj_nbe_ff[i].y - traj_nbe_dd[i].y);
+    mue_vdw_if += fabs(traj_nbe_if[i].y - traj_nbe_dd[i].y);
+  }
+  const double dnframe = nframe;
+  mue_elec_fd /= dnframe;
+  mue_elec_id /= dnframe;
+  mue_elec_df /= dnframe;
+  mue_elec_ff /= dnframe;
+  mue_elec_if /= dnframe;
+  mue_vdw_fd /= dnframe;
+  mue_vdw_id /= dnframe;
+  mue_vdw_df /= dnframe;
+  mue_vdw_ff /= dnframe;
+  mue_vdw_if /= dnframe;
+  section(6);
+  check(mue_elec_fd, RelationalOperator::LESS_THAN, 2.0e-5, "Mean unsigned error for "
+        "electrostatic energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in single precision and calculating in double precision.", do_traj_tests);
+  check(mue_vdw_fd, RelationalOperator::LESS_THAN, 5.0e-6, "Mean unsigned error for "
+        "van-der Waals energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in single precision and calculating in double precision.", do_traj_tests);
+  check(mue_elec_df, RelationalOperator::LESS_THAN, 1.0e-4, "Mean unsigned error for "
+        "electrostatic energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in double precision and calculating in single precision.", do_traj_tests);
+  check(mue_vdw_df, RelationalOperator::LESS_THAN, 1.0e-5, "Mean unsigned error for "
+        "van-der Waals energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in double precision and calculating in single precision.", do_traj_tests);
+  check(mue_elec_ff, RelationalOperator::LESS_THAN, 1.0e-4, "Mean unsigned error for "
+        "electrostatic energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in single precision and calculating in single precision.", do_traj_tests);
+  check(mue_vdw_ff, RelationalOperator::LESS_THAN, 1.0e-5, "Mean unsigned error for "
+        "van-der Waals energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in single precision and calculating in single precision.", do_traj_tests);
+  section(7);
+  check(mue_elec_id, RelationalOperator::LESS_THAN, 2.0e-6, "Mean unsigned error for "
+        "electrostatic energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in fixed precision and calculating in double precision.", do_traj_tests);
+  check(mue_vdw_id, RelationalOperator::LESS_THAN, 1.0e-6, "Mean unsigned error for "
+        "van-der Waals energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in fixed precision and calculating in double precision.", do_traj_tests);
+  check(mue_elec_if, RelationalOperator::LESS_THAN, 1.0e-4, "Mean unsigned error for "
+        "electrostatic energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in fixed precision and calculating in single precision.", do_traj_tests);
+  check(mue_vdw_if, RelationalOperator::LESS_THAN, 1.0e-5, "Mean unsigned error for "
+        "van-der Waals energies of Trp-cage frames is higher than expected when representing "
+        "coordinates in fixed precision and calculating in single precision.", do_traj_tests);
+  
   // Print results
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

@@ -83,14 +83,11 @@ int main(const int argc, const char* argv[]) {
   const llint etr_expected_max =  545794316914905LL;
   const bool exact_passes = (minValue(exact_test_range) == etr_expected_min &&
                              maxValue(exact_test_range) == etr_expected_max);
-  if (exact_passes == false) {
-    rtWarn("A series of long long integers needed for many tests was not constructed properly.  "
-           "Its contents should span a range [" + std::to_string(etr_expected_min) + ", " +
-           std::to_string(etr_expected_max) + "], but instead it spans " +
-           std::to_string(minValue(exact_test_range)) + " to " +
-           std::to_string(maxValue(exact_test_range)) + ".  Dependent tests will be skipped.",
-           "test_numerics");
-  }
+  check(exact_passes, "A series of long long integers needed for many tests was not constructed "
+        "properly.  Its contents should span a range [" + std::to_string(etr_expected_min) + ", " +
+        std::to_string(etr_expected_max) + "], but instead it spans " +
+        std::to_string(minValue(exact_test_range)) + " to " +
+        std::to_string(maxValue(exact_test_range)) + ".  Dependent tests will be skipped.");
   const TestPriority do_exact_tests = (exact_passes) ? TestPriority::CRITICAL :
                                                        TestPriority::ABORT;
   
@@ -113,16 +110,14 @@ int main(const int argc, const char* argv[]) {
   const llint ltr_expected_min = -1056755308863634LL;
   const bool large_passes = (minValue(large_test_range) == ltr_expected_min &&
                              maxValue(large_test_range) == ltr_expected_max);
-  if (large_passes == false) {
-    rtWarn("A series of long long integers needed for many tests was not constructed properly.  "
-           "Its contents should span a range [" + std::to_string(ltr_expected_min) + ", " +
-           std::to_string(ltr_expected_max) + "], but instead it spans " +
-           std::to_string(minValue(large_test_range)) + " to " +
-           std::to_string(maxValue(large_test_range)) + ".  Dependent tests will be skipped.",
-           "test_numerics");
-  }
+  check(large_passes, "A series of long long integers needed for many tests was not constructed "
+        "properly.  Its contents should span a range [" + std::to_string(ltr_expected_min) + ", " +
+        std::to_string(ltr_expected_max) + "], but instead it spans " +
+        std::to_string(minValue(large_test_range)) + " to " +
+        std::to_string(maxValue(large_test_range)) + ".  Dependent tests will be skipped.");
   const TestPriority do_large_tests = (exact_passes) ? TestPriority::CRITICAL :
                                                        TestPriority::ABORT;
+
 
   // Print results
   printTestSummary(oe.getVerbosity());
