@@ -500,16 +500,25 @@ int main(const int argc, const char* argv[]) {
                                                             trpi_isk_f, ngb_kit_f,
                                                             trpcage_csi.data(), &traj_sc, i, 22);
   }
-  
-
-  // CHECK
-  for (int i = 0; i < nframe; i++) {
-    printf("  %11.5lf %9.6lf %9.6lf %9.6lf %9.6lf %9.6lf\n", gbe_dd[i], gbe_fd[i] - gbe_dd[i],
-           gbe_id[i] - gbe_dd[i], gbe_df[i] - gbe_dd[i], gbe_ff[i] - gbe_dd[i],
-           gbe_if[i] - gbe_dd[i]);
-  }
-  // END CHECK
-  
+  check(meanUnsignedError(gbe_dd, gbe_fd), RelationalOperator::LESS_THAN, 8.0e-6, "Representing "
+        "coordinates in single-precision (calculations in double-precision) exacts a greater than "
+        "expected toll on the accuracy of (Mongan Neck II) Generalized Born calculations in the "
+        "Trp-cage system.", do_traj_tests);
+  check(meanUnsignedError(gbe_dd, gbe_id), RelationalOperator::LESS_THAN, 8.0e-7, "Representing "
+        "coordinates in fixed-precision (calculations in double-precision) exacts a greater than "
+        "expected toll on the accuracy of (Mongan Neck II) Generalized Born calculations in the "
+        "Trp-cage system.", do_traj_tests);
+  check(meanUnsignedError(gbe_dd, gbe_df), RelationalOperator::LESS_THAN, 6.5e-5, "Performing "
+        "calculations in single-precision exacts a greater than expected toll on the accuracy of "
+        "(Mongan Neck II) Generalized Born calculations in the Trp-cage system.", do_traj_tests);
+  check(meanUnsignedError(gbe_dd, gbe_ff), RelationalOperator::LESS_THAN, 7.5e-5, "Performing "
+        "calculations in single-precision (with coordinates also represented in single-precision) "
+        "exacts a greater than expected toll on the accuracy of (Mongan Neck II) Generalized Born "
+        "calculations in the Trp-cage system.", do_traj_tests);
+  check(meanUnsignedError(gbe_dd, gbe_ff), RelationalOperator::LESS_THAN, 8.5e-5, "Performing "
+        "calculations in single-precision (with coordinates represented in fixed-precision) "
+        "exacts a greater than expected toll on the accuracy of (Mongan Neck II) Generalized Born "
+        "calculations in the Trp-cage system.", do_traj_tests);
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {
