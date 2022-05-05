@@ -23,7 +23,7 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
   double vdw_energy = 0.0;
   llint ele_acc = 0LL;
   llint vdw_acc = 0LL;
-  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
 
   // Allocate arrays for tile coordinates and accumulated forces, akin to GPU protocols.
   std::vector<Tcalc> cachi_xcrd(tile_length), cachi_ycrd(tile_length), cachi_zcrd(tile_length);
@@ -323,7 +323,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   const ImplicitSolventRecipe<Tcalc> isr(isk, ngb_kit);
   double egb_energy = 0.0;
   llint egb_acc = 0LL;
-  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
 
   // Initialize psi
   for (int i = 0; i < nbk.natom; i++) {

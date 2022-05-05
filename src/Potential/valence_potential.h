@@ -6,6 +6,7 @@
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
+#include "Math/rounding.h"
 #include "Math/vector_ops.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Restraints/restraint_util.h"
@@ -14,6 +15,7 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/coordinateframe.h"
+#include "Trajectory/coordinate_series.h"
 #include "Trajectory/phasespace.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
@@ -25,6 +27,7 @@ using data_types::isSignedIntegralScalarType;
 using math::crossProduct;
 using math::matrixMultiply;
 using math::matrixVectorMultiply;
+using math::roundUp;
 using restraints::computeRestraintMixture;
 using restraints::RestraintApparatus;
 using restraints::RestraintApparatusDpReader;
@@ -40,10 +43,12 @@ using symbols::inverse_twopi_f;
 using topology::AtomGraph;
 using topology::ValenceKit;
 using topology::NonbondedKit;
+using topology::TorsionKind;
 using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
+using trajectory::CoordinateSeriesReader;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
 
@@ -98,7 +103,7 @@ Tcalc evalHarmonicStretch(int i_atom, int j_atom, Tcalc stiffness, Tcalc equilib
 /// Overloaded:
 ///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame or CoordinateSeries abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
@@ -107,6 +112,10 @@ Tcalc evalHarmonicStretch(int i_atom, int j_atom, Tcalc stiffness, Tcalc equilib
 /// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param csr           Coordinates of a series of snapshots, each containing all particles.  If
+///                      using such a series the energy tracking object should be allocated to
+///                      store results for all frames and the system index will be taken as the
+///                      frame number of interest.
 /// \param xcrd          Cartesian X coordinates of all particles
 /// \param ycrd          Cartesian Y coordinates of all particles
 /// \param zcrd          Cartesian Z coordinates of all particles
@@ -121,11 +130,13 @@ Tcalc evalHarmonicStretch(int i_atom, int j_atom, Tcalc stiffness, Tcalc equilib
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double evaluateBondTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
-                         const double* zcrd, const double* umat, const double* invu,
-                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double evaluateBondTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const Tcoord* ycrd,
+                         const Tcoord* zcrd, const double* umat, const double* invu,
+                         UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                          ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
-                         int system_index = 0);
+                         int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                         Tcalc force_factor = 1.0);
   
 double evaluateBondTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -147,6 +158,10 @@ double evaluateBondTerms(const AtomGraph &ag, const CoordinateFrame &cf,
 
 double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrame &cf,
                          ScoreCard *ecard, int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateBondTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                         ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 /// \brief Evaluate the energy and forces due to a harmonic bending interaction.  Parameters for
@@ -169,7 +184,7 @@ Tcalc evalHarmonicBend(int i_atom, int j_atom, int k_atom, Tcalc stiffness, Tcal
 /// Overloaded:
 ///   - Evaluate based on raw pointers to coordinates, box transformations, and forces
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
-///   - Evaluate energy only based on a CoordinateFrame abstract
+///   - Evaluate energy only based on a CoordinateFrame or CoordinateSeries abstract
 ///   - Pass a topology by pointer, by reference, or just the ValenceKit abstract by value
 ///
 /// \param ag            System topology
@@ -178,6 +193,10 @@ Tcalc evalHarmonicBend(int i_atom, int j_atom, int k_atom, Tcalc stiffness, Tcal
 /// \param psw           Coordinates, box size, and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param csr           Coordinates of a series of snapshots, each containing all particles.  If
+///                      using such a series the energy tracking object should be allocated to
+///                      store results for all frames and the system index will be taken as the
+///                      frame number of interest.
 /// \param xcrd          Cartesian X coordinates of all particles
 /// \param ycrd          Cartesian Y coordinates of all particles
 /// \param zcrd          Cartesian Z coordinates of all particles
@@ -192,11 +211,13 @@ Tcalc evalHarmonicBend(int i_atom, int j_atom, int k_atom, Tcalc stiffness, Tcal
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double evaluateAngleTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
-                          const double* zcrd, const double* umat, const double* invu,
-                          UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const Tcoord* ycrd,
+                          const Tcoord* zcrd, const double* umat, const double* invu,
+                          UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                           ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
-                          int system_index = 0);
+                          int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                          Tcalc force_factor = 1.0);
 
 double evaluateAngleTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -218,6 +239,10 @@ double evaluateAngleTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreC
 
 double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
                           int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                          ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 /// \brief Evalaute the energy and forces due to a cosine-based or harmonic dihedral term.
@@ -269,11 +294,13 @@ Tcalc evalDihedralTwist(int i_atom, int j_atom, int k_atom, int l_atom, Tcalc am
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double2 evaluateDihedralTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
-                              const double* zcrd, const double* umat, const double* invu,
-                              UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const Tcoord* ycrd,
+                              const Tcoord* zcrd, const double* umat, const double* invu,
+                              UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                               ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
-                              int system_index = 0);
+                              int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                              Tcalc force_factor = 1.0);
 
 double2 evaluateDihedralTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                               EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -295,6 +322,10 @@ double2 evaluateDihedralTerms(const AtomGraph &ag, const CoordinateFrame &cf, Sc
 
 double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
                               int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                              ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
   
 /// \brief Evaluate Urey-Bradley harmonic angle interactions with a simple routine.  This looks
@@ -328,12 +359,14 @@ double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrame &cf, Sc
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double evaluateUreyBradleyTerms(const ValenceKit<double> vk, const double* xcrd,
-                                const double* ycrd, const double* zcrd, const double* umat,
-                                const double* invu, const UnitCellType unit_cell, double* xfrc,
-                                double* yfrc, double* zfrc, ScoreCard *ecard,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd,
+                                const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                                const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
+                                Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                                 EvaluateForce eval_force = EvaluateForce::NO,
-                                int system_index = 0);
+                                int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                                Tcalc force_factor = 1.0);
 
 double evaluateUreyBradleyTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                 ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
@@ -358,6 +391,11 @@ double evaluateUreyBradleyTerms(const AtomGraph &ag, const CoordinateFrame &cf, 
 
 double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
                                 int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk,
+                                const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                int system_index = 0, int force_scale_bits = 23);
 /// \}
   
 /// \brief Evaluate CHARMM harmonic improper dihedral terms with a simple routine.  This
@@ -391,12 +429,14 @@ double evaluateUreyBradleyTerms(const AtomGraph *ag, const CoordinateFrame &cf, 
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double evaluateCharmmImproperTerms(const ValenceKit<double> vk, const double* xcrd,
-                                   const double* ycrd, const double* zcrd, const double* umat,
-                                   const double* invu, UnitCellType unit_cell, double* xfrc,
-                                   double* yfrc, double* zfrc, ScoreCard *ecard,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd,
+                                   const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                                   const double* invu, UnitCellType unit_cell, Tforce* xfrc,
+                                   Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                                    EvaluateForce eval_force = EvaluateForce::NO,
-                                   int system_index = 0);
+                                   int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                                   Tcalc force_factor = 1.0);
 
 double evaluateCharmmImproperTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw,
                                    ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
@@ -421,6 +461,11 @@ double evaluateCharmmImproperTerms(const AtomGraph &ag, const CoordinateFrame &c
 
 double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrame &cf,
                                    ScoreCard *ecard, int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk,
+                                   const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                   int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 /// \brief Evaluate a single CHARMM CMAP two-dimensional potential and force term.  This procedure
@@ -489,11 +534,13 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, int surf
 /// \param eval_force    Flag to have forces also evaluated
 /// \param system_index  Index of the system to which this energy contributes
 /// \{
-double evaluateCmapTerms(const ValenceKit<double> vk, const double* xcrd, const double* ycrd,
-                         const double* zcrd, const double* umat, const double* invu,
-                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const Tcoord* ycrd,
+                         const Tcoord* zcrd, const double* umat, const double* invu,
+                         UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                          ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
-                         int system_index = 0);
+                         int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                         Tcalc force_factor = 1.0);
 
 double evaluateCmapTerms(const ValenceKit<double> vk, PhaseSpaceWriter psw, ScoreCard *ecard,
                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0);
@@ -515,6 +562,10 @@ double evaluateCmapTerms(const AtomGraph &ag, const CoordinateFrame &cf, ScoreCa
 
 double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCard *ecard,
                          int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                         ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 /// \brief Evaluate a 1:4 pair interaction according to a pair of attenuation factors for
@@ -590,14 +641,16 @@ Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc
 /// \param eval_vdw_force   Flag to have van-der Waals (Lennard-Jones) forces evaluated
 /// \param system_index     Index of the system to which this energy contributes
 /// \{
-double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
-                                  const double* xcrd, const double* ycrd, const double* zcrd,
+template <typename Tcoord, typename Tforce, typename Tcalc>
+double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk, const NonbondedKit<Tcalc> nbk,
+                                  const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
                                   const double* umat, const double* invu,
-                                  UnitCellType unit_cell, double* xfrc, double* yfrc,
-                                  double* zfrc, ScoreCard *ecard,
+                                  UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                  Tforce* zfrc, ScoreCard *ecard,
                                   EvaluateForce eval_elec_force = EvaluateForce::NO,
                                   EvaluateForce eval_vdw_force = EvaluateForce::NO,
-                                  int system_index = 0);
+                                  int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                                  Tcalc force_factor = 1.0);
 
 double2 evaluateAttenuated14Terms(const ValenceKit<double> vk, const NonbondedKit<double> nbk,
                                   PhaseSpaceWriter psw, ScoreCard *ecard,
@@ -628,6 +681,11 @@ double2 evaluateAttenuated14Terms(const AtomGraph &ag, const CoordinateFrame &cf
 
 double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrame &cf,
                                   ScoreCard *ecard, int system_index = 0);
+
+template <typename Tcoord, typename Tcalc>
+double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
+                                  const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                  int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 /// \brief Evaluate a positional restraint.  Return the energy penalty.

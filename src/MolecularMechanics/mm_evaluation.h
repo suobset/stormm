@@ -3,8 +3,10 @@
 #define OMNI_MM_EVALUATION_H
 
 #include "Potential/energy_enumerators.h"
+#include "Potential/nonbonded_potential.h"
 #include "Potential/scorecard.h"
 #include "Potential/static_exclusionmask.h"
+#include "Potential/valence_potential.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -16,6 +18,13 @@ namespace omni {
 namespace mm {
 
 using energy::EvaluateForce;
+using energy::evaluateBondTerms;
+using energy::evaluateAngleTerms;
+using energy::evaluateDihedralTerms;
+using energy::evaluateUreyBradleyTerms;
+using energy::evaluateCharmmImproperTerms;
+using energy::evaluateCmapTerms;
+using energy::evaluateAttenuated14Terms;
 using energy::ScoreCard;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
@@ -58,10 +67,12 @@ using trajectory::PhaseSpaceWriter;
 /// \param eval_force    Directive to have forces evaluated or not
 /// \param system_index  Index of the system within the score card
 /// \{
-void evalValeMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc, ScoreCard *sc,
-                const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                EvaluateForce eval_force, int system_index = 0);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void evalValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, ScoreCard *sc,
+                const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                EvaluateForce eval_force, int system_index = 0, Tcalc inv_gpos_factor = 1.0,
+                Tcalc force_factor = 1.0);
 
 void evalValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                 const NonbondedKit<double> &nbk, EvaluateForce eval_force, int system_index = 0);
@@ -177,5 +188,7 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 
 } // namespace mm
 } // namespace omni
+
+#include "mm_evaluation.tpp"
 
 #endif

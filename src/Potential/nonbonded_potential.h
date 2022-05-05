@@ -46,10 +46,15 @@ using namespace generalized_born_defaults;
 /// \param ag            System topology
 /// \param nbk           Non-bonded parameters abstract taken from the original topology
 /// \param se            Exclusion mask providing bits for all atom pairs
+/// \param ser           Abstract of the exclusion mask providing bits for all atom pairs
 /// \param ps            Coordinates and force accumulators (modified by this function)
 /// \param psw           Coordinates and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param csr           Coordinates of many frames of a particular system.  If a series is
+///                      provided, the energy and state variable tracking object should be
+///                      allocated to store results for all frames and the system index will be
+///                      taken as the frame to evaluate.
 /// \param xcrd          Cartesian X coordinates of all particles
 /// \param ycrd          Cartesian Y coordinates of all particles
 /// \param zcrd          Cartesian Z coordinates of all particles
@@ -126,11 +131,17 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> &nbk,
 ///
 /// \param ag            System topology
 /// \param nbk           Non-bonded parameters abstract taken from the original topology
+/// \param se            Exclusion mask providing bits for all atom pairs
+/// \param ser           Abstract of the exclusion mask providing bits for all atom pairs
 /// \param ngb_tables    "Neck" Generalized Born tables from some pre-loaded cache of constants
 /// \param ps            Coordinates and force accumulators (modified by this function)
 /// \param psw           Coordinates and force accumulators (modified by this function)
 /// \param cfr           Coordinates of all particles, plus box dimensions (if needed)
 /// \param cfw           Coordinates of all particles, plus box dimensions (if needed)
+/// \param csr           Coordinates of many frames of a particular system.  If a series is
+///                      provided, the energy and state variable tracking object should be
+///                      allocated to store results for all frames and the system index will be
+///                      taken as the frame to evaluate.
 /// \param xcrd          Cartesian X coordinates of all particles
 /// \param ycrd          Cartesian Y coordinates of all particles
 /// \param zcrd          Cartesian Z coordinates of all particles
