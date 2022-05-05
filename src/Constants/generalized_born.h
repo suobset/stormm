@@ -34,16 +34,16 @@ constexpr double gb_taylor_hh_lf = 5.45454545454545454545;
 
 /// \brief Single-precision Generalized Born Taylor series expansion coefficients
 /// \{
-constexpr double gb_taylor_a_f  = gb_taylor_a_lf;
-constexpr double gb_taylor_b_f  = gb_taylor_b_lf;
-constexpr double gb_taylor_c_f  = gb_taylor_c_lf;
-constexpr double gb_taylor_d_f  = gb_taylor_d_lf;
-constexpr double gb_taylor_dd_f = gb_taylor_dd_lf;
-constexpr double gb_taylor_e_f  = gb_taylor_e_lf;
-constexpr double gb_taylor_f_f  = gb_taylor_f_lf;
-constexpr double gb_taylor_g_f  = gb_taylor_g_lf;
-constexpr double gb_taylor_h_f  = gb_taylor_h_lf;
-constexpr double gb_taylor_hh_f = gb_taylor_hh_lf;
+constexpr float gb_taylor_a_f  = gb_taylor_a_lf;
+constexpr float gb_taylor_b_f  = gb_taylor_b_lf;
+constexpr float gb_taylor_c_f  = gb_taylor_c_lf;
+constexpr float gb_taylor_d_f  = gb_taylor_d_lf;
+constexpr float gb_taylor_dd_f = gb_taylor_dd_lf;
+constexpr float gb_taylor_e_f  = gb_taylor_e_lf;
+constexpr float gb_taylor_f_f  = gb_taylor_f_lf;
+constexpr float gb_taylor_g_f  = gb_taylor_g_lf;
+constexpr float gb_taylor_h_f  = gb_taylor_h_lf;
+constexpr float gb_taylor_hh_f = gb_taylor_hh_lf;
 /// \}
 
 /// \brief Onufriev / Bashford / Case Generalized Born model I alpha, beta, and gamma values

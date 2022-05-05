@@ -484,7 +484,7 @@ int main(const int argc, const char* argv[]) {
                                                              trpcage_csf.data(), &traj_sc, i);
     gbe_id[i] = evaluateGeneralizedBornEnergy<llint, double>(trpi_nbk_d, trpi_se.data(),
                                                              trpi_isk_d, ngb_kit_d,
-                                                             trpcage_csi.data(), &traj_sc, i);
+                                                             trpcage_csi.data(), &traj_sc, i, 28);
   }
   const NonbondedKit<float> trpi_nbk_f = trpi_ag.getSinglePrecisionNonbondedKit();
   const ImplicitSolventKit<float> trpi_isk_f = trpi_ag.getSinglePrecisionImplicitSolventKit();
@@ -498,8 +498,9 @@ int main(const int argc, const char* argv[]) {
                                                             trpcage_csf.data(), &traj_sc, i);
     gbe_if[i] = evaluateGeneralizedBornEnergy<llint, float>(trpi_nbk_f, trpi_se.data(),
                                                             trpi_isk_f, ngb_kit_f,
-                                                            trpcage_csi.data(), &traj_sc, i);
+                                                            trpcage_csi.data(), &traj_sc, i, 22);
   }
+  
 
   // CHECK
   for (int i = 0; i < nframe; i++) {

@@ -338,16 +338,16 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   }
 
   // Shorthand for some constants defined in Constants/generalized_born.h
-  const Tcalc gta  = gb_taylor_a_lf;
-  const Tcalc gtb  = gb_taylor_b_lf;
-  const Tcalc gtc  = gb_taylor_c_lf;
-  const Tcalc gtd  = gb_taylor_d_lf;
-  const Tcalc gtdd = gb_taylor_dd_lf;
-  const Tcalc gte  = gb_taylor_e_lf;
-  const Tcalc gtf  = gb_taylor_f_lf;
-  const Tcalc gtg  = gb_taylor_g_lf;
-  const Tcalc gth  = gb_taylor_h_lf;
-  const Tcalc gthh = gb_taylor_hh_lf;
+  const Tcalc gta  = (tcalc_is_double) ? gb_taylor_a_lf  : gb_taylor_a_f;
+  const Tcalc gtb  = (tcalc_is_double) ? gb_taylor_b_lf  : gb_taylor_b_f;
+  const Tcalc gtc  = (tcalc_is_double) ? gb_taylor_c_lf  : gb_taylor_c_f;
+  const Tcalc gtd  = (tcalc_is_double) ? gb_taylor_d_lf  : gb_taylor_d_f;
+  const Tcalc gtdd = (tcalc_is_double) ? gb_taylor_dd_lf : gb_taylor_dd_f;
+  const Tcalc gte  = (tcalc_is_double) ? gb_taylor_e_lf  : gb_taylor_e_f;
+  const Tcalc gtf  = (tcalc_is_double) ? gb_taylor_f_lf  : gb_taylor_f_f;
+  const Tcalc gtg  = (tcalc_is_double) ? gb_taylor_g_lf  : gb_taylor_g_f;
+  const Tcalc gth  = (tcalc_is_double) ? gb_taylor_h_lf  : gb_taylor_h_f;
+  const Tcalc gthh = (tcalc_is_double) ? gb_taylor_hh_lf : gb_taylor_hh_f;
 
   // Perform nested loops over all supertiles, and all tiles within them, to compute the GB radii
   std::vector<Tcalc> cachi_xcrd(tile_length), cachi_ycrd(tile_length), cachi_zcrd(tile_length);
@@ -576,7 +576,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       }
     }
   }
-
+  
   // Make a second pass to finalize the effective GB radii
   for (int i = 0; i < nbk.natom; i++) {
     switch (isr.igb) {
@@ -629,7 +629,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       break;
     }
   }
-
+  
   // Compute inherent Generalized Born energies and initialize an array for solvent forces
   for (int i = 0; i < nbk.natom; i++) {
     const Tcalc atomi_q = nbk.charge[i];
@@ -654,7 +654,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       }
     }
   }
-
+  
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.  However,
   // the tiling continues to add a degree of complexity.
@@ -700,7 +700,9 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
             // Re-use the cachi_radii array for the effective, no longer the offset intrinsic,
             // Born radii.  Re-use the cachi_screen array for atomic partial charges.  Re-use
             // the cachi_psi array to accumulate sumdeijda.
-            cachi_radii[i]  = effective_gb_radii[atom_i];
+            cachi_radii[i]  = (tforce_is_sgnint) ?
+                              static_cast<Tcalc>(effective_gb_radii[atom_i]) / force_factor :
+                              effective_gb_radii[atom_i];
             cachi_screen[i] = nbk.charge[atom_i];
             cachi_psi[i] = 0.0;
           }
@@ -721,7 +723,9 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
             cachj_zfrc[j] = 0.0;
 
             // See above for the re-use of these local detail caches and accumulators.
-            cachj_radii[j]  = effective_gb_radii[atom_j];
+            cachj_radii[j]  = (tforce_is_sgnint) ?
+                              static_cast<Tcalc>(effective_gb_radii[atom_j]) / force_factor :
+                              effective_gb_radii[atom_j];
             cachj_screen[j] = nbk.charge[atom_j];
             cachj_psi[j] = 0.0;
           }
@@ -1146,10 +1150,16 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const ImplicitSolventKit<Tcalc> isk,
                                      const NeckGeneralizedBornKit<Tcalc> ngb_kit,
                                      const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
-                                     int system_index) {
+                                     const int system_index, const int force_scale_bits) {
   const size_t atom_os = static_cast<size_t>(system_index) *
                          roundUp<size_t>(csr.natom, warp_size_zu);
   const size_t xfrm_os = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
+
+  // Compute the force scaling factor based on the requested bit count.  While this routine will
+  // not compute forces per se, the scaling factor is still relevant to the accumulators for Born
+  // radii.
+  const Tcalc force_scale = (isSignedIntegralScalarType<Tcoord>()) ?
+                            pow(2.0, force_scale_bits) : 1.0;
   std::vector<Tcoord> effective_gb_radii(csr.natom);
   std::vector<Tcoord> psi(csr.natom);
   std::vector<Tcoord> sumdeijda(csr.natom);
@@ -1160,7 +1170,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                                       nullptr, nullptr, effective_gb_radii.data(),
                                                       psi.data(), sumdeijda.data(), ecard,
                                                       EvaluateForce::NO, system_index,
-                                                      csr.inv_gpos_scale, csr.gpos_scale);
+                                                      csr.inv_gpos_scale, force_scale);
 }
   
 } // namespace energy

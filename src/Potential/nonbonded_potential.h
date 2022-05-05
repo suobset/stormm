@@ -204,7 +204,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                      const ImplicitSolventKit<Tcalc> isk,
                                      const NeckGeneralizedBornKit<Tcalc> ngb_kit,
                                      const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
-                                     int system_index = 0);
+                                     int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 } // namespace energy

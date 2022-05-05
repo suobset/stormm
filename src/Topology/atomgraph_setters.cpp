@@ -686,11 +686,14 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
       return;
     }
   }
-
-  double* alpha_ptr = gb_alpha_parameters.data();
-  double* beta_ptr  = gb_beta_parameters.data();
-  double* gamma_ptr = gb_gamma_parameters.data();
-  double* screen_ptr = gb_screening_factors.data();
+  double* alpha_ptr   = gb_alpha_parameters.data();
+  double* beta_ptr    = gb_beta_parameters.data();
+  double* gamma_ptr   = gb_gamma_parameters.data();
+  double* screen_ptr  = gb_screening_factors.data();
+  float* sp_alpha_ptr  = sp_gb_alpha_parameters.data();
+  float* sp_beta_ptr   = sp_gb_beta_parameters.data();
+  float* sp_gamma_ptr  = sp_gb_gamma_parameters.data();
+  float* sp_screen_ptr = sp_gb_screening_factors.data();
   const int* znum_ptr = atomic_numbers.data();
 
   // Set the dielectric constant and salt concentration, if appropriate
@@ -1026,6 +1029,17 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
       }
     }
     break;
+  }
+
+  // Copy double-precision values to single-precision arrays
+  double* rad_ptr = atomic_pb_radii.data();
+  float* sp_rad_ptr = sp_atomic_pb_radii.data();
+  for (int i = 0; i < atom_count; i++) {
+    sp_alpha_ptr[i]  = alpha_ptr[i];
+    sp_beta_ptr[i]   = beta_ptr[i];
+    sp_gamma_ptr[i]  = gamma_ptr[i];
+    sp_screen_ptr[i] = screen_ptr[i];
+    sp_rad_ptr[i]    = rad_ptr[i];
   }
 
   // Note the radius set in the topology, if it has indeed changed
