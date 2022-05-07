@@ -14,8 +14,7 @@ namespace synthesis {
 using card::Hybrid;
 using constants::ExceptionResponse;
 using restraints::RestraintApparatus;
-using restraints::RestraintApparatusDpReader;
-using restraints::RestraintApparatusSpReader;
+using restraints::RestraintKit;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using topology::ImplicitSolventModel;

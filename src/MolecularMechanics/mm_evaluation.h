@@ -25,11 +25,12 @@ using energy::evaluateUreyBradleyTerms;
 using energy::evaluateCharmmImproperTerms;
 using energy::evaluateCmapTerms;
 using energy::evaluateAttenuated14Terms;
+using energy::evaluateRestraints;
 using energy::ScoreCard;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
 using restraints::RestraintApparatus;
-using restraints::RestraintApparatusDpReader;
+using restraints::RestraintKit;
 using topology::AtomGraph;
 using topology::NonbondedKit;
 using topology::UnitCellType;
@@ -104,12 +105,13 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForc
 void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
                     UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                     ScoreCard *sc, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                    const RestraintApparatusDpReader &rar, EvaluateForce eval_force,
+                    const RestraintKit<double, double2, double4> &rar, EvaluateForce eval_force,
                     int system_index = 0, int step = 0);
 
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
-                    const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
-                    EvaluateForce eval_force, int system_index = 0, int step = 0);
+                    const NonbondedKit<double> &nbk,
+                    const RestraintKit<double, double2, double4> &rar, EvaluateForce eval_force,
+                    int system_index = 0, int step = 0);
 
 void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                     const RestraintApparatus &ra, EvaluateForce eval_force, int system_index = 0,
@@ -169,13 +171,13 @@ void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, 
                         UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                         ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintApparatusDpReader &rar, EvaluateForce eval_force,
-                        int system_index = 0, int step = 0);
+                        const RestraintKit<double, double2, double4> &rar,
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintApparatusDpReader &rar, EvaluateForce eval_force,
-                        int system_index = 0, int step = 0);
+                        const RestraintKit<double, double2, double4> &rar,
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                         const StaticExclusionMask &se, const RestraintApparatus &ra,

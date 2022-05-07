@@ -751,7 +751,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     nb_exclusion_offsets.putHost(excl_offset, i);
     excl_offset += roundUp(ag_ptr->getTotalExclusions(), warp_size_int);
     if (ra_ptr != nullptr) {
-      const RestraintApparatusDpReader rar = ra_ptr->dpData();
+      const RestraintKit<double, double2, double4> rar = ra_ptr->getDoublePrecisionAbstract();
       posn_restraint_counts.putHost(rar.nposn, i);
       bond_restraint_counts.putHost(rar.nbond, i);
       angl_restraint_counts.putHost(rar.nangl, i);
@@ -1015,7 +1015,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     if (ra_ptr == nullptr) {
       continue;
     }
-    const RestraintApparatusDpReader rar = ra_ptr->dpData();
+    const RestraintKit<double, double2, double4> rar = ra_ptr->getDoublePrecisionAbstract();
     const int synth_atom_base = atom_offsets.readHost(sysid);
     const int synth_rposn_offset = posn_restraint_offsets.readHost(sysid);
     const int synth_rbond_offset = bond_restraint_offsets.readHost(sysid);
@@ -1914,7 +1914,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
     if (ira_ptr == nullptr) {
       continue;
     }
-    const RestraintApparatusDpReader irar_dp = ira_ptr->dpData();
+    const RestraintKit<double, double2, double4> irar_dp = ira_ptr->getDoublePrecisionAbstract();
     for (int j = 0; j < irar_dp.nposn; j++) {
 
       // Skip restraints that have been determined to have unique x / y / z targets.  This
@@ -1933,7 +1933,8 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
           if (kra_ptr == nullptr) {
             continue;
           }
-          const RestraintApparatusDpReader krar_dp = kra_ptr->dpData();
+          const RestraintKit<double,
+                             double2, double4> krar_dp = kra_ptr->getDoublePrecisionAbstract();
           const int mstart = (k == i) ? j : 0;
           for (int m = mstart; m < krar_dp.nposn; m++) {
             if (rposn_synthesis_xyz_index[network_rposn_table_offsets[k] + m] >= 0) {
@@ -2072,7 +2073,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
     if (ra_ptr == nullptr) {
       continue;
     }
-    const RestraintApparatusDpReader rar = ra_ptr->dpData();
+    const RestraintKit<double, double2, double4> rar = ra_ptr->getDoublePrecisionAbstract();
     const int ra_posn_table_offset = network_rposn_table_offsets[ra_index];
     const int ra_bond_table_offset = network_rbond_table_offsets[ra_index];
     const int ra_angl_table_offset = network_rangl_table_offsets[ra_index];

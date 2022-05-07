@@ -1207,16 +1207,16 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int step_number,
-                        const int init_step, const int finl_step, const Vec2<Tcalc> init_xy,
-                        const Vec2<Tcalc> finl_xy, const Tcalc init_z, const Tcalc finl_z,
-                        const Vec2<Tcalc> init_keq, const Vec2<Tcalc> finl_keq,
-                        const Vec4<Tcalc> init_r, const Vec4<Tcalc> finl_r, const Tcoord* xcrd,
-                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                        const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
-                        Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
-                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                        const int init_step, const int finl_step, const Tcalc2 init_xy,
+                        const Tcalc2 finl_xy, const Tcalc init_z, const Tcalc finl_z,
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
+                        const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
@@ -1235,11 +1235,13 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
     dz = zcrd[p_atom] - ((mixwt.x * init_z) + (mixwt.y * finl_z));
   }
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  const double dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
-                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-  const Vec3<double> rst_eval = restraintDelta(Vec2<double>(init_keq), Vec2<double>(finl_keq),
-                                               Vec4<double>(init_r), Vec4<double>(finl_r),
-                                               Vec2<double>(mixwt), dr);
+  const Tcalc dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                       sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq.x, init_keq.y),
+                                              Vec2<Tcalc>(finl_keq.x, finl_keq.y),
+                                              Vec4<Tcalc>(init_r.x, init_r.y, init_r.z, init_r.w),
+                                              Vec4<Tcalc>(finl_r.x, finl_r.y, finl_r.z, finl_r.w),
+                                              mixwt, dr);
 
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
@@ -1251,8 +1253,8 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
       // from the target point, which would imply a non-zero force when the particle is at
       // the target location.  The proper direction of that force is an arbitrary thing in
       // such a case, so subdivide it among all three dimensions.
-      const double fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / sqrt(3.0) :
-                                              2.0f * rst_eval.x * rst_eval.y / sqrtf(3.0f);
+      const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / sqrt(3.0) :
+                                             2.0f * rst_eval.x * rst_eval.y / sqrtf(3.0f);
       if (isSignedIntegralScalarType<Tforce>()) {
         const Tforce ifmag = llround(fmag * force_factor);
         xfrc[p_atom] -= ifmag;
@@ -1266,8 +1268,8 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
       }
     }
     else {
-      const double fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
-                                              2.0f * rst_eval.x * rst_eval.y / dr;
+      const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
+                                             2.0f * rst_eval.x * rst_eval.y / dr;
       if (isSignedIntegralScalarType<Tforce>()) {
         xfrc[p_atom] -= llround(fmag * dx * force_factor);
         yfrc[p_atom] -= llround(fmag * dy * force_factor);
@@ -1284,18 +1286,18 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_dependence,
                         const int step_number, const int init_step, const int finl_step,
-                        const Vec2<Tcalc> init_keq, const Vec2<Tcalc> finl_keq,
-                        const Vec4<Tcalc> init_r, const Vec4<Tcalc> finl_r, const Tcoord* xcrd,
-                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                        const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
-                        Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
-                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
+                        const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
-  const Vec2<Tcalc> mixwt = computeRestraintMixture<double>(step_number, init_step, finl_step);
+  const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
     dx = static_cast<Tcalc>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
@@ -1310,9 +1312,11 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_depe
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
   const Tcalc dr = (tcalc_is_double) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                        sqrtf((dx * dx) + (dy * dy) + (dz * dz));
-  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq), Vec2<Tcalc>(finl_keq),
-                                              Vec4<Tcalc>(init_r), Vec4<Tcalc>(finl_r),
-                                              Vec2<Tcalc>(mixwt), dr);
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq.x, init_keq.y),
+                                              Vec2<Tcalc>(finl_keq.x, finl_keq.y),
+                                              Vec4<Tcalc>(init_r.x, init_r.y, init_r.z, init_r.w),
+                                              Vec4<Tcalc>(finl_r.x, finl_r.y, finl_r.z, finl_r.w),
+                                              mixwt, dr);
   if (eval_force == EvaluateForce::YES) {
     const Tcalc fmag = (tcalc_is_double) ? 2.0  * rst_eval.x * rst_eval.y / dr :
                                            2.0f * rst_eval.x * rst_eval.y / dr;
@@ -1343,12 +1347,12 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_depe
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
                         const bool time_dependence, const int step_number, const int init_step,
-                        const int finl_step, const Vec2<Tcalc> init_keq,
-                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
-                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const int finl_step, const Tcalc2 init_keq,
+                        const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
@@ -1385,9 +1389,11 @@ Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
   costheta = (costheta < -value_one) ? -value_one : (costheta > value_one) ? value_one : costheta;
   const Tcalc theta = (tcalc_is_double) ? acos(costheta) : acosf(costheta);
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
-  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<double>(init_keq), Vec2<double>(finl_keq),
-                                              Vec4<double>(init_r), Vec4<double>(finl_r),
-                                              Vec2<double>(mixwt), theta);
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq.x, init_keq.y),
+                                              Vec2<Tcalc>(finl_keq.x, finl_keq.y),
+                                              Vec4<Tcalc>(init_r.x, init_r.y, init_r.z, init_r.w),
+                                              Vec4<Tcalc>(finl_r.x, finl_r.y, finl_r.z, finl_r.w),
+                                              mixwt, theta);
 
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
@@ -1434,12 +1440,12 @@ Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
                         const bool time_dependence, const int step_number, const int init_step,
-                        const int finl_step, const Vec2<Tcalc> init_keq,
-                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
-                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const int finl_step, const Tcalc2 init_keq,
+                        const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
                         const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
@@ -1496,7 +1502,7 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
     theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ?  acosf(costheta) :
                                                                   -acosf(costheta);
   }
-  const Vec2<Tcalc> mixwt = computeRestraintMixture<double>(step_number, init_step, finl_step);
+  const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
 
   // As part of the setup, the restraint has been arranged so that r1, r2, r3, and r4 are
   // monotonically increasing and span at most two pi radians.  The center of this arrangement
@@ -1512,9 +1518,11 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
     midpoint_delta = imageValue(theta - midpoint, twopi_f, ImagingMethod::MINIMUM_IMAGE);
   }
   theta += midpoint_delta - (theta - midpoint);
-  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq), Vec2<Tcalc>(finl_keq),
-                                              Vec4<Tcalc>(init_r), Vec4<Tcalc>(finl_r),
-                                              Vec2<Tcalc>(mixwt), theta);
+  const Vec3<Tcalc> rst_eval = restraintDelta(Vec2<Tcalc>(init_keq.x, init_keq.y),
+                                              Vec2<Tcalc>(finl_keq.x, finl_keq.y),
+                                              Vec4<Tcalc>(init_r.x, init_r.y, init_r.z, init_r.w),
+                                              Vec4<Tcalc>(finl_r.x, finl_r.y, finl_r.z, finl_r.w),
+                                              mixwt, theta);
   
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
@@ -1611,6 +1619,78 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
   }
   return rst_eval.z;
 }
-    
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const Tcoord* xcrd,
+                          const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                          const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
+                          Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
+                          const EvaluateForce eval_force, const int system_index,
+                          const int step_number) {
+  double rest_energy = 0.0;
+  llint rest_acc = 0LL;
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
+
+  // Accumulate results by looping over all restraint terms
+  for (int i = 0; i < rar.nposn; i++) {
+    const double contrib =
+      evalPosnRestraint(rar.rposn_atoms[i], rar.time_dependence, step_number,
+                        rar.rposn_init_step[i], rar.rposn_finl_step[i], rar.rposn_init_xy[i],
+                        rar.rposn_finl_xy[i], rar.rposn_init_z[i], rar.rposn_finl_z[i],
+                        rar.rposn_init_keq[i], rar.rposn_finl_keq[i], rar.rposn_init_r[i],
+                        rar.rposn_finl_r[i], xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                        zfrc, eval_force);
+    rest_energy += contrib;
+    rest_acc += llround(contrib * nrg_scale_factor);
+  }
+  for (int pos = 0; pos < rar.nbond; pos++) {
+    const double contrib =
+      evalBondRestraint<Tcoord, Tforce,
+                        Tcalc, Tcalc2, Tcalc4>(rar.rbond_i_atoms[pos], rar.rbond_j_atoms[pos],
+                                               rar.time_dependence, step_number,
+                                               rar.rbond_init_step[pos], rar.rbond_finl_step[pos],
+                                               rar.rbond_init_keq[pos], rar.rbond_finl_keq[pos],
+                                               rar.rbond_init_r[pos], rar.rbond_finl_r[pos], xcrd,
+                                               ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                                               zfrc, eval_force);
+    rest_energy += contrib;
+    rest_acc += llround(contrib * nrg_scale_factor);
+  }
+  for (int pos = 0; pos < rar.nangl; pos++) {
+    const double contrib =
+      evalAnglRestraint<Tcoord, Tforce,
+                        Tcalc, Tcalc2, Tcalc4>(rar.rangl_i_atoms[pos], rar.rangl_j_atoms[pos],
+                                               rar.rangl_k_atoms[pos], rar.time_dependence,
+                                               step_number, rar.rangl_init_step[pos],
+                                               rar.rangl_finl_step[pos], rar.rangl_init_keq[pos],
+                                               rar.rangl_finl_keq[pos], rar.rangl_init_r[pos],
+                                               rar.rangl_finl_r[pos], xcrd, ycrd, zcrd, umat, invu,
+                                               unit_cell, xfrc, yfrc, zfrc, eval_force);
+    rest_energy += contrib;
+    rest_acc += llround(contrib * nrg_scale_factor);
+  }
+  for (int pos = 0; pos < rar.ndihe; pos++) {
+    const double contrib =
+      evalDiheRestraint<Tcoord, Tforce,
+                        Tcalc, Tcalc2, Tcalc4>(rar.rdihe_i_atoms[pos], rar.rdihe_j_atoms[pos],
+                                               rar.rdihe_k_atoms[pos], rar.rdihe_l_atoms[pos],
+                                               rar.time_dependence, step_number,
+                                               rar.rdihe_init_step[pos], rar.rdihe_finl_step[pos],
+                                               rar.rdihe_init_keq[pos], rar.rdihe_finl_keq[pos],
+                                               rar.rdihe_init_r[pos], rar.rdihe_finl_r[pos], xcrd,
+                                               ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
+                                               zfrc, eval_force);
+    rest_energy += contrib;
+    rest_acc += llround(contrib * nrg_scale_factor);
+  }
+
+  // Contribute results
+  ecard->contribute(StateVariable::RESTRAINT, rest_acc, system_index);
+
+  // Return the double-precision energy sum, if of interest
+  return rest_energy;
+}
+
 } // namespace energy
 } // namespace omni

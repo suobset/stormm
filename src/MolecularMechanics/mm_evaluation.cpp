@@ -38,23 +38,27 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
                     const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                     ScoreCard *sc, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                    const RestraintApparatusDpReader &rar, const EvaluateForce eval_force,
-                    const int step, const int system_index) {
+                    const RestraintKit<double, double2, double4> &rar,
+                    const EvaluateForce eval_force, const int step, const int system_index) {
   evalValeMM<double, double, double>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
                                      vk, nbk, eval_force, system_index);
-  evaluateRestraints(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                     eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                               yfrc, zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
-                    const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
+                    const NonbondedKit<double> &nbk,
+                    const RestraintKit<double, double2, double4> &rar,
                     const EvaluateForce eval_force, const int step, const int system_index) {
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, vk, nbk,
                                      eval_force, system_index);
-  evaluateRestraints(rar, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                     psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(rar, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                               psw.zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -67,8 +71,11 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                                      ag.getDoublePrecisionValenceKit(),
                                      ag.getDoublePrecisionNonbondedKit(), eval_force,
                                      system_index);
-  evaluateRestraints(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                     psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
+                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
+                                               system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -81,8 +88,11 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                      psw.zfrc, sc, ag->getDoublePrecisionValenceKit(),
                                      ag->getDoublePrecisionNonbondedKit(), eval_force,
                                      system_index);
-  evaluateRestraints(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                     psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
+                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
+                                               system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -144,29 +154,32 @@ void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, 
                         const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
                         ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintApparatusDpReader &rar, const EvaluateForce eval_force,
-                        const int system_index, const int step) {
+                        const RestraintKit<double, double2, double4> &rar,
+                        const EvaluateForce eval_force, const int system_index, const int step) {
   evaluateNonbondedEnergy(nbk, ser, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
                           eval_force, eval_force, system_index);
   evalValeMM<double, double, double>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
                                      vk, nbk, eval_force, system_index);
-  evaluateRestraints(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                     eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                               yfrc, zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
 void evalNonbValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintApparatusDpReader &rar, const EvaluateForce eval_force,
-                        const int system_index, const int step) {
+                        const RestraintKit<double, double2, double4> &rar,
+                        const EvaluateForce eval_force, const int system_index, const int step) {
   evaluateNonbondedEnergy(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                           psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
                           system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, vk, nbk,
                                      eval_force, system_index);
-  evaluateRestraints(rar, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                     psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(rar, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                               psw.zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -182,8 +195,11 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc,
                                      ag.getDoublePrecisionValenceKit(), nbk, eval_force,
                                      system_index);
-  evaluateRestraints(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                     psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
+                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
+                                               system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -199,8 +215,11 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc,
                                      ag->getDoublePrecisionValenceKit(), nbk, eval_force,
                                      system_index);
-  evaluateRestraints(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                     psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, system_index, step);
+  evaluateRestraints<double, double,
+                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
+                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
+                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
+                                               system_index, step);
 }
 
 } // namespace mm

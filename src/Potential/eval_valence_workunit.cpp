@@ -60,7 +60,8 @@ void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid
   
 //-------------------------------------------------------------------------------------------------
 void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                        const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
+                        const NonbondedKit<double> nbk,
+                        const RestraintKit<double, double2, double4> rar,
                         const double* sh_charges, const int* sh_lj_idx, double* sh_xcrd,
                         double* sh_ycrd, double* sh_zcrd, double* sh_xfrc, double* sh_yfrc,
                         double* sh_zfrc, ScoreCard *ecard, const int sysid,
@@ -436,14 +437,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int xyz_param_idx = tinsr.y;
       const double contrib =
         evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number, rar.rposn_init_step[kr_param_idx],
-                          rar.rposn_finl_step[kr_param_idx],
-                          Vec2<double>(rar.rposn_init_xy[xyz_param_idx]),
-                          Vec2<double>(rar.rposn_finl_xy[xyz_param_idx]),
-                          rar.rposn_init_z[xyz_param_idx], rar.rposn_finl_z[xyz_param_idx],
-                          Vec2<double>(rar.rposn_init_keq[kr_param_idx]),
-                          Vec2<double>(rar.rposn_finl_keq[kr_param_idx]),
-                          Vec4<double>(rar.rposn_init_r[kr_param_idx]),
-                          Vec4<double>(rar.rposn_finl_r[kr_param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
+                          rar.rposn_finl_step[kr_param_idx], rar.rposn_init_xy[xyz_param_idx],
+                          rar.rposn_finl_xy[xyz_param_idx], rar.rposn_init_z[xyz_param_idx],
+                          rar.rposn_finl_z[xyz_param_idx], rar.rposn_init_keq[kr_param_idx],
+                          rar.rposn_finl_keq[kr_param_idx], rar.rposn_init_r[kr_param_idx],
+                          rar.rposn_finl_r[kr_param_idx], sh_xcrd, sh_ycrd, sh_zcrd,
                           nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
                           eval_force);
       if (log_term) {
@@ -473,14 +471,16 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int param_idx = tinsr.y;
       const double contrib =
-        evalBondRestraint(i_atom, j_atom, (tinsr.x >> 31), step_number,
-                          rar.rbond_init_step[param_idx], rar.rbond_finl_step[param_idx],
-                          Vec2<double>(rar.rbond_init_keq[param_idx]),
-                          Vec2<double>(rar.rbond_finl_keq[param_idx]),
-                          Vec4<double>(rar.rbond_init_r[param_idx]),
-                          Vec4<double>(rar.rbond_finl_r[param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
-                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                          eval_force);
+        evalBondRestraint<double,
+                          double,
+                          double,
+                          double2,
+                          double4>(i_atom, j_atom, (tinsr.x >> 31), step_number,
+                                   rar.rbond_init_step[param_idx], rar.rbond_finl_step[param_idx],
+                                   rar.rbond_init_keq[param_idx], rar.rbond_finl_keq[param_idx],
+                                   rar.rbond_init_r[param_idx], rar.rbond_finl_r[param_idx],
+                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -509,14 +509,16 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int param_idx = tinsr.y;
       const double contrib =
-        evalAnglRestraint(i_atom, j_atom, k_atom, (tinsr.x >> 31), step_number,
-                          rar.rangl_init_step[param_idx], rar.rangl_finl_step[param_idx],
-                          Vec2<double>(rar.rangl_init_keq[param_idx]),
-                          Vec2<double>(rar.rangl_finl_keq[param_idx]),
-                          Vec4<double>(rar.rangl_init_r[param_idx]),
-                          Vec4<double>(rar.rangl_finl_r[param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
-                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                          eval_force);
+        evalAnglRestraint<double,
+                          double,
+                          double,
+                          double2,
+                          double4>(i_atom, j_atom, k_atom, (tinsr.x >> 31), step_number,
+                                   rar.rangl_init_step[param_idx], rar.rangl_finl_step[param_idx],
+                                   rar.rangl_init_keq[param_idx], rar.rangl_finl_keq[param_idx],
+                                   rar.rangl_init_r[param_idx], rar.rangl_finl_r[param_idx],
+                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -546,14 +548,16 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int l_atom = (tinsr.y & 0x3ff);
       const int param_idx = (tinsr.y >> 10);
       const double contrib =
-        evalDiheRestraint(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31), step_number,
-                          rar.rdihe_init_step[param_idx], rar.rdihe_finl_step[param_idx],
-                          Vec2<double>(rar.rdihe_init_keq[param_idx]),
-                          Vec2<double>(rar.rdihe_finl_keq[param_idx]),
-                          Vec4<double>(rar.rdihe_init_r[param_idx]),
-                          Vec4<double>(rar.rdihe_finl_r[param_idx]), sh_xcrd, sh_ycrd, sh_zcrd,
-                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                          eval_force);
+        evalDiheRestraint<double,
+                          double,
+                          double,
+                          double2,
+                          double4>(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31), step_number,
+                                   rar.rdihe_init_step[param_idx], rar.rdihe_finl_step[param_idx],
+                                   rar.rdihe_init_keq[param_idx], rar.rdihe_finl_keq[param_idx],
+                                   rar.rdihe_init_r[param_idx], rar.rdihe_finl_r[param_idx],
+                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
       }
@@ -610,10 +614,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
 
 //-------------------------------------------------------------------------------------------------
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
-                          double* xcrd, double* ycrd, double* zcrd, const double* umat,
-                          const double* invu, const UnitCellType unit_cell, double* xfrc,
-                          double* yfrc, double* zfrc, ScoreCard *ecard, const int sysid,
+                          const NonbondedKit<double> nbk,
+                          const RestraintKit<double, double2, double4> rar, double* xcrd,
+                          double* ycrd, double* zcrd, const double* umat, const double* invu,
+                          const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          ScoreCard *ecard, const int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           const EvaluateForce eval_force, const VwuTask activity,
                           const VwuGoal purpose, const int step_number) {  
@@ -709,18 +714,20 @@ void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, const RestraintAp
                           const VwuGoal goal, const int step_number) {
   PhaseSpaceWriter psw = ps->data();
   evalValenceWorkUnits(ag->getDoublePrecisionValenceKit(), ag->getDoublePrecisionVirtualSiteKit(),
-                       ag->getDoublePrecisionNonbondedKit(), ra->dpData(), psw.xcrd, psw.ycrd,
-                       psw.zcrd, psw.umat, psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc,
-                       ecard, sysid, vwu_list, eval_force, activity, step_number);
+                       ag->getDoublePrecisionNonbondedKit(), ra->getDoublePrecisionAbstract(),
+                       psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                       psw.yfrc, psw.zfrc, ecard, sysid, vwu_list, eval_force, activity,
+                       step_number);
 }
 
 //-------------------------------------------------------------------------------------------------
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
-                          const double* xcrd, const double* ycrd, const double* zcrd,
-                          const double* umat, const double* invu, const UnitCellType unit_cell,
-                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard,
-                          const int sysid, const std::vector<ValenceWorkUnit> &vwu_list,
+                          const NonbondedKit<double> nbk,
+                          const RestraintKit<double, double2, double4> rar, const double* xcrd,
+                          const double* ycrd, const double* zcrd, const double* umat,
+                          const double* invu, const UnitCellType unit_cell, double* xfrc,
+                          double* yfrc, double* zfrc, ScoreCard *ecard, const int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list,
                           const EvaluateForce eval_force, const VwuTask activity,
                           const int step_number) {  
 
@@ -789,9 +796,10 @@ void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const Restr
                           const VwuTask activity, const int step_number) {
   PhaseSpaceReader psr = ps.data();
   evalValenceWorkUnits(ag.getDoublePrecisionValenceKit(), ag.getDoublePrecisionVirtualSiteKit(),
-                       ag.getDoublePrecisionNonbondedKit(), ra.dpData(), psr.xcrd, psr.ycrd,
-                       psr.zcrd, psr.umat, psr.invu, psr.unit_cell, nullptr, nullptr, nullptr,
-                       ecard, sysid, vwu_list, EvaluateForce::NO, activity, step_number);
+                       ag.getDoublePrecisionNonbondedKit(), ra.getDoublePrecisionAbstract(),
+                       psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.unit_cell, nullptr,
+                       nullptr, nullptr, ecard, sysid, vwu_list, EvaluateForce::NO, activity,
+                       step_number);
 }
 
 } // namespace energy

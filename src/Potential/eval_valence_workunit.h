@@ -15,7 +15,7 @@ namespace omni {
 namespace energy {
 
 using restraints::RestraintApparatus;
-using restraints::RestraintApparatusDpReader;
+using restraints::RestraintKit;
 using synthesis::ValenceWorkUnit;
 using synthesis::VwuTask;
 using synthesis::VwuGoal;
@@ -63,11 +63,11 @@ void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid
 ///                     particles, but not both at once
 /// \param step_number  MD or minimization step number (for calculating restraint activation)
 void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                        const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
-                        const double* sh_charges, const int* sh_lj_idx, double* sh_xcrd,
-                        double* sh_ycrd, double* sh_zcrd, double* sh_xfrc, double* sh_yfrc,
-                        double* sh_zfrc, ScoreCard *ecard, const int sysid,
-                        const ValenceWorkUnit &my_vwu, EvaluateForce eval_force,
+                        const NonbondedKit<double> nbk,
+                        const RestraintKit<double, double2, double4> rar, const double* sh_charges,
+                        const int* sh_lj_idx, double* sh_xcrd, double* sh_ycrd, double* sh_zcrd,
+                        double* sh_xfrc, double* sh_yfrc, double* sh_zfrc, ScoreCard *ecard,
+                        const int sysid, const ValenceWorkUnit &my_vwu, EvaluateForce eval_force,
                         VwuTask activity, VwuGoal purpose, int step_number);
 
 /// \brief Evaluate force and energy-related tasks in a list of valence work units given a system
@@ -92,10 +92,11 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
 /// \param zfrc  Global storage array of Cartesian Z forces on all particles
 /// \{
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
-                          double* xcrd, double* ycrd, double* zcrd, const double* umat,
-                          const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
-                          double* zfrc, ScoreCard *ecard, int sysid,
+                          const NonbondedKit<double> nbk,
+                          const RestraintKit<double, double2, double4> rar, double* xcrd,
+                          double* ycrd, double* zcrd, const double* umat, const double* invu,
+                          UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
+                          ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
                           VwuTask activity = VwuTask::ALL_TASKS,
@@ -109,12 +110,13 @@ void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, const RestraintAp
                           VwuGoal goal = VwuGoal::ACCUMULATE_FORCES, int step_number = 0);
 
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
-                          const NonbondedKit<double> nbk, const RestraintApparatusDpReader rar,
-                          const double* xcrd, const double* ycrd, const double* zcrd,
-                          const double* umat, const double* invu, UnitCellType unit_cell,
-                          double* xfrc, double* yfrc, double* zfrc, ScoreCard *ecard,
-                          const int sysid, const std::vector<ValenceWorkUnit> &vwu_list,
-                          EvaluateForce eval_force, VwuTask activity, int step_number);
+                          const NonbondedKit<double> nbk,
+                          const RestraintKit<double, double2, double4> rar, const double* xcrd,
+                          const double* ycrd, const double* zcrd, const double* umat,
+                          const double* invu, UnitCellType unit_cell, double* xfrc, double* yfrc,
+                          double* zfrc, ScoreCard *ecard, const int sysid,
+                          const std::vector<ValenceWorkUnit> &vwu_list, EvaluateForce eval_force,
+                          VwuTask activity, int step_number);
 
 void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const RestraintApparatus &ra,
                           ScoreCard *ecard, int sysid,

@@ -22,7 +22,7 @@ using energy::StaticExclusionMaskReader;
 using namelist::MinimizeControls;
 using numerics::default_energy_scale_bits;
 using restraints::RestraintApparatus;
-using restraints::RestraintApparatusDpReader;
+using restraints::RestraintKit;
 using topology::AtomGraph;
 using topology::NonbondedKit;
 using topology::UnitCellType;
@@ -119,9 +119,9 @@ ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, doubl
                    double* zfrc, double* xprv_move, double* yprv_move, double* zprv_move,
                    double* x_cg_temp, double* y_cg_temp, double* z_cg_temp,
                    const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                   const RestraintApparatusDpReader &rar, const VirtualSiteKit<double> &vsk,
-                   const StaticExclusionMaskReader &ser, const MinimizeControls &mincon,
-                   int nrg_scale_bits = default_energy_scale_bits);
+                   const RestraintKit<double, double2, double4> &rar,
+                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
+                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
                    const StaticExclusionMask &se, const MinimizeControls &mincon,
@@ -131,7 +131,8 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMas
                    const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 
 ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
-                   const NonbondedKit<double> &nbk, const RestraintApparatusDpReader &rar,
+                   const NonbondedKit<double> &nbk,
+                   const RestraintKit<double, double2, double4> &rar,
                    const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
                    const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
 /// \}

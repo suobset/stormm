@@ -30,7 +30,7 @@ using math::matrixVectorMultiply;
 using math::roundUp;
 using restraints::computeRestraintMixture;
 using restraints::RestraintApparatus;
-using restraints::RestraintApparatusDpReader;
+using restraints::RestraintKit;
 using restraints::restraintDelta;
 using structure::imageCoordinates;
 using structure::ImagingMethod;
@@ -715,57 +715,54 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
 /// \param yfrc             Cartesian Y forces acting on all particles
 /// \param zfrc             Cartesian Z forces acting on all particles
 /// \param eval_force       Flag to have forces due to the restraint evaluated
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalPosnRestraint(int p_atom, bool time_dependence, int step_number, int init_step,
-                        int finl_step, const Vec2<Tcalc> init_xy, const Vec2<Tcalc> finl_xy,
-                        Tcalc init_z, Tcalc finl_z, const Vec2<Tcalc> init_keq,
-                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
-                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
-                        const Tcoord* zcrd, const double* umat, const double* invu,
-                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+                        int finl_step, const Tcalc2 init_xy, const Tcalc2 finl_xy,
+                        Tcalc init_z, Tcalc finl_z, const Tcalc2 init_keq, const Tcalc2 finl_keq,
+                        const Tcalc4 init_r, const Tcalc4 finl_r, const Tcoord* xcrd,
+                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
                         Tcalc force_factor = 1.0);
 
 /// \brief Evaluate distance restraints.  See the descriptions in evalPosnRestraint (above) for
 ///        explanations of each input parameter.  The restraint energy is returned.
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalBondRestraint(int i_atom, int j_atom, bool time_dependence, int step_number,
-                        int init_step, int finl_step, const Vec2<Tcalc> init_keq,
-                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
-                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
-                        const Tcoord* zcrd, const double* umat, const double* invu,
-                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+                        int init_step, int finl_step, const Tcalc2 init_keq, const Tcalc2 finl_keq,
+                        const Tcalc4 init_r, const Tcalc4 finl_r, const Tcoord* xcrd,
+                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
                         Tcalc force_factor = 1.0);
 
 /// \brief Evaluate three-point angle restraints.  See the descriptions in evalPosnRestraint
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalAnglRestraint(int i_atom, int j_atom, int k_atom, bool time_dependence, int step_number,
-                        const int init_step, const int finl_step, const Vec2<Tcalc> init_keq,
-                        const Vec2<Tcalc> finl_keq, const Vec4<Tcalc> init_r,
-                        const Vec4<Tcalc> finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
-                        const Tcoord* zcrd, const double* umat, const double* invu,
-                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
-                        Tcalc force_factor = 1.0);
+                        const int init_step, const int finl_step, const Tcalc2 init_keq,
+                        const Tcalc2 finl_keq, const Tcalc4 init_r, const Tcalc4 finl_r,
+                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
+                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 /// \brief Evaluate four-point dihedral restraints.  See the descriptions in evalPosnRestraint
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
-template <typename Tcoord, typename Tforce, typename Tcalc>
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, bool time_dependence,
                         int step_number, const int init_step, const int finl_step,
-                        const Vec2<Tcalc> init_keq, const Vec2<Tcalc> finl_keq,
-                        const Vec4<Tcalc> init_r, const Vec4<Tcalc> finl_r, const Tcoord* xcrd,
-                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
                         Tcalc force_factor = 1.0);
 
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
@@ -791,16 +788,18 @@ Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, bool tim
 /// \param step_number   The step number at which the energy is being evaluated (may determine the
 ///                      restraint parameters by mixing their endpoint values)
 /// \{
-double evaluateRestraints(const RestraintApparatusDpReader rar, const double* xcrd,
-                          const double* ycrd, const double* zcrd, const double* umat,
-                          const double* invu, const UnitCellType unit_cell, double* xfrc,
-                          double* yfrc, double* zfrc, ScoreCard *ecard,
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const Tcoord* xcrd,
+                          const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                          const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
+                          Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
                           int step_number = 0);
 
-double evaluateRestraints(const RestraintApparatusDpReader rar, PhaseSpaceWriter psw,
-                          ScoreCard *ecard, EvaluateForce eval_force = EvaluateForce::NO,
-                          int system_index = 0, int step_number = 0);
+double evaluateRestraints(const RestraintKit<double, double2, double4> rar,
+                          PhaseSpaceWriter psw, ScoreCard *ecard,
+                          EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
+                          int step_number = 0);
 
 double evaluateRestraints(const RestraintApparatus &ra, PhaseSpace *ps, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
@@ -810,17 +809,24 @@ double evaluateRestraints(const RestraintApparatus *ra, PhaseSpace *ps, ScoreCar
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
                           int step_number = 0);
 
-double evaluateRestraints(const RestraintApparatusDpReader rar, const CoordinateFrameReader cfr,
-                          ScoreCard *ecard, int system_index = 0, int step_number = 0);
+double evaluateRestraints(const RestraintKit<double, double2, double4> rar,
+                          const CoordinateFrameReader cfr, ScoreCard *ecard, int system_index = 0,
+                          int step_number = 0);
 
-double evaluateRestraints(const RestraintApparatusDpReader rar, const CoordinateFrameWriter &cfw,
-                          ScoreCard *ecard, int system_index = 0, int step_number = 0);
+double evaluateRestraints(const RestraintKit<double, double2, double4> rar,
+                          const CoordinateFrameWriter &cfw, ScoreCard *ecard, int system_index = 0,
+                          int step_number = 0);
 
 double evaluateRestraints(const RestraintApparatus &ra, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, int system_index = 0, int step_number = 0);
 
 double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, int system_index = 0, int step_number = 0);
+
+template <typename Tcoord, typename Tcalc, typename Tcalc2, typename Tcalc4>
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4>,
+                          const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                          int system_index = 0, int force_scale_bits = 23);
 /// \}
   
 } // namespace energy

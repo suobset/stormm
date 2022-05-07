@@ -12,7 +12,7 @@ namespace omni {
 namespace synthesis {
 
 using restraints::RestraintApparatus;
-using restraints::RestraintApparatusDpReader;
+using restraints::RestraintKit;
 using topology::AtomGraph;
 using topology::ConstraintKit;
 using topology::ValenceKit;
@@ -548,7 +548,8 @@ private:
   /// \param cnk  Constraint group abstract from the original topology
   /// \param rar  Restraint apparatus abstract
   void fillAffectorArrays(const ValenceKit<double> &vk, const VirtualSiteKit<double> &vsk,
-                          const ConstraintKit<double> &cnk, const RestraintApparatusDpReader &rar);
+                          const ConstraintKit<double> &cnk,
+                          const RestraintKit<double, double2, double4> &rar);
 };
   
 /// \brief An object to collect the components of a valence work unit (which will also track frozen

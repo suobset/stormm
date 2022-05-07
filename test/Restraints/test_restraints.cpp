@@ -63,7 +63,7 @@ using namespace omni::testing;
 std::vector<double> finiteDifferenceForces(const RestraintApparatus &ra,
                                            CoordinateFrameWriter *cfw,
                                            const double fd_delta = 0.0000001) {
-  const RestraintApparatusDpReader rar = ra.dpData();
+  const RestraintKit<double, double2, double4> rar = ra.getDoublePrecisionAbstract();
   const CoordinateFrameReader cfr(*cfw);
   ScoreCard sc(1);
   std::vector<double> result(cfr.natom * 3, 0.0);

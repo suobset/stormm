@@ -10,100 +10,6 @@ using card::HybridKind;
 using math::roundUp;
 
 //-------------------------------------------------------------------------------------------------
-RestraintApparatusDpReader::
-RestraintApparatusDpReader(const int total_rst_in, const int nposn_in, const int nbond_in,
-                           const int nangl_in, const int ndihe_in, bool time_dependence_in,
-                           const int* rposn_atoms_in, const int* rbond_i_atoms_in,
-                           const int* rbond_j_atoms_in, const int* rangl_i_atoms_in,
-                           const int* rangl_j_atoms_in, const int* rangl_k_atoms_in,
-                           const int* rdihe_i_atoms_in, const int* rdihe_j_atoms_in,
-                           const int* rdihe_k_atoms_in, const int* rdihe_l_atoms_in,
-                           const int* rposn_init_step_in, const int* rposn_finl_step_in,
-                           const int* rbond_init_step_in, const int* rbond_finl_step_in,
-                           const int* rangl_init_step_in, const int* rangl_finl_step_in,
-                           const int* rdihe_init_step_in, const int* rdihe_finl_step_in,
-                           const double2* rposn_init_keq_in, const double2* rposn_finl_keq_in,
-                           const double2* rposn_init_xy_in, const double2* rposn_finl_xy_in,
-                           const double* rposn_init_z_in, const double* rposn_finl_z_in,
-                           const double2* rbond_init_keq_in, const double2* rbond_finl_keq_in,
-                           const double2* rangl_init_keq_in, const double2* rangl_finl_keq_in,
-                           const double2* rdihe_init_keq_in, const double2* rdihe_finl_keq_in,
-                           const double4* rposn_init_r_in, const double4* rposn_finl_r_in,
-                           const double4* rbond_init_r_in, const double4* rbond_finl_r_in,
-                           const double4* rangl_init_r_in, const double4* rangl_finl_r_in,
-                           const double4* rdihe_init_r_in, const double4* rdihe_finl_r_in,
-                           const AtomGraph *ag_pointer_in) :
-    total_rst{total_rst_in}, nposn{nposn_in}, nbond{nbond_in}, nangl{nangl_in}, ndihe{ndihe_in},
-    time_dependence{time_dependence_in}, rposn_atoms{rposn_atoms_in},
-    rbond_i_atoms{rbond_i_atoms_in}, rbond_j_atoms{rbond_j_atoms_in},
-    rangl_i_atoms{rangl_i_atoms_in}, rangl_j_atoms{rangl_j_atoms_in},
-    rangl_k_atoms{rangl_k_atoms_in}, rdihe_i_atoms{rdihe_i_atoms_in},
-    rdihe_j_atoms{rdihe_j_atoms_in}, rdihe_k_atoms{rdihe_k_atoms_in},
-    rdihe_l_atoms{rdihe_l_atoms_in}, rposn_init_step{rposn_init_step_in},
-    rposn_finl_step{rposn_finl_step_in}, rbond_init_step{rbond_init_step_in},
-    rbond_finl_step{rbond_finl_step_in}, rangl_init_step{rangl_init_step_in},
-    rangl_finl_step{rangl_finl_step_in}, rdihe_init_step{rdihe_init_step_in},
-    rdihe_finl_step{rdihe_finl_step_in}, rposn_init_keq{rposn_init_keq_in},
-    rposn_finl_keq{rposn_finl_keq_in}, rposn_init_xy{rposn_init_xy_in},
-    rposn_finl_xy{rposn_finl_xy_in}, rposn_init_z{rposn_init_z_in},
-    rposn_finl_z{rposn_finl_z_in}, rbond_init_keq{rbond_init_keq_in},
-    rbond_finl_keq{rbond_finl_keq_in}, rangl_init_keq{rangl_init_keq_in},
-    rangl_finl_keq{rangl_finl_keq_in}, rdihe_init_keq{rdihe_init_keq_in},
-    rdihe_finl_keq{rdihe_finl_keq_in}, rposn_init_r{rposn_init_r_in},
-    rposn_finl_r{rposn_finl_r_in}, rbond_init_r{rbond_init_r_in},
-    rbond_finl_r{rbond_finl_r_in}, rangl_init_r{rangl_init_r_in},
-    rangl_finl_r{rangl_finl_r_in}, rdihe_init_r{rdihe_init_r_in},
-    rdihe_finl_r{rdihe_finl_r_in}, ag_pointer{ag_pointer_in}
-{}
-
-//-------------------------------------------------------------------------------------------------
-RestraintApparatusSpReader::
-RestraintApparatusSpReader(const int total_rst_in, const int nposn_in, const int nbond_in,
-                           const int nangl_in, const int ndihe_in, bool time_dependence_in,
-                           const int* rposn_atoms_in, const int* rbond_i_atoms_in,
-                           const int* rbond_j_atoms_in, const int* rangl_i_atoms_in,
-                           const int* rangl_j_atoms_in, const int* rangl_k_atoms_in,
-                           const int* rdihe_i_atoms_in, const int* rdihe_j_atoms_in,
-                           const int* rdihe_k_atoms_in, const int* rdihe_l_atoms_in,
-                           const int* rposn_init_step_in, const int* rposn_finl_step_in,
-                           const int* rbond_init_step_in, const int* rbond_finl_step_in,
-                           const int* rangl_init_step_in, const int* rangl_finl_step_in,
-                           const int* rdihe_init_step_in, const int* rdihe_finl_step_in,
-                           const float2* rposn_init_keq_in, const float2* rposn_finl_keq_in,
-                           const float2* rposn_init_xy_in, const float2* rposn_finl_xy_in,
-                           const float* rposn_init_z_in, const float* rposn_finl_z_in,
-                           const float2* rbond_init_keq_in, const float2* rbond_finl_keq_in,
-                           const float2* rangl_init_keq_in, const float2* rangl_finl_keq_in,
-                           const float2* rdihe_init_keq_in, const float2* rdihe_finl_keq_in,
-                           const float4* rposn_init_r_in, const float4* rposn_finl_r_in,
-                           const float4* rbond_init_r_in, const float4* rbond_finl_r_in,
-                           const float4* rangl_init_r_in, const float4* rangl_finl_r_in,
-                           const float4* rdihe_init_r_in, const float4* rdihe_finl_r_in,
-                           const AtomGraph *ag_pointer_in) :
-    total_rst{total_rst_in}, nposn{nposn_in}, nbond{nbond_in}, nangl{nangl_in}, ndihe{ndihe_in},
-    time_dependence{time_dependence_in}, rposn_atoms{rposn_atoms_in},
-    rbond_i_atoms{rbond_i_atoms_in}, rbond_j_atoms{rbond_j_atoms_in},
-    rangl_i_atoms{rangl_i_atoms_in}, rangl_j_atoms{rangl_j_atoms_in},
-    rangl_k_atoms{rangl_k_atoms_in}, rdihe_i_atoms{rdihe_i_atoms_in},
-    rdihe_j_atoms{rdihe_j_atoms_in}, rdihe_k_atoms{rdihe_k_atoms_in},
-    rdihe_l_atoms{rdihe_l_atoms_in}, rposn_init_step{rposn_init_step_in},
-    rposn_finl_step{rposn_finl_step_in}, rbond_init_step{rbond_init_step_in},
-    rbond_finl_step{rbond_finl_step_in}, rangl_init_step{rangl_init_step_in},
-    rangl_finl_step{rangl_finl_step_in}, rdihe_init_step{rdihe_init_step_in},
-    rdihe_finl_step{rdihe_finl_step_in}, rposn_init_keq{rposn_init_keq_in},
-    rposn_finl_keq{rposn_finl_keq_in}, rposn_init_xy{rposn_init_xy_in},
-    rposn_finl_xy{rposn_finl_xy_in}, rposn_init_z{rposn_init_z_in},
-    rposn_finl_z{rposn_finl_z_in}, rbond_init_keq{rbond_init_keq_in},
-    rbond_finl_keq{rbond_finl_keq_in}, rangl_init_keq{rangl_init_keq_in},
-    rangl_finl_keq{rangl_finl_keq_in}, rdihe_init_keq{rdihe_init_keq_in},
-    rdihe_finl_keq{rdihe_finl_keq_in}, rposn_init_r{rposn_init_r_in},
-    rposn_finl_r{rposn_finl_r_in}, rbond_init_r{rbond_init_r_in},
-    rbond_finl_r{rbond_finl_r_in}, rangl_init_r{rangl_init_r_in},
-    rangl_finl_r{rangl_finl_r_in}, rdihe_init_r{rdihe_init_r_in},
-    rdihe_finl_r{rdihe_finl_r_in}, ag_pointer{ag_pointer_in}
-{}
-
-//-------------------------------------------------------------------------------------------------
 RestraintApparatus::RestraintApparatus(const AtomGraph *ag_in) :
     total_restraint_count{0}, position_count{0}, distance_count{0}, angle_count{0},
     dihedral_count{0}, time_based_restraints{false},
@@ -572,54 +478,59 @@ const AtomGraph* RestraintApparatus::getTopologyPointer() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-RestraintApparatusDpReader RestraintApparatus::dpData(const HybridTargetLevel tier) const {
-  return RestraintApparatusDpReader(total_restraint_count, position_count, distance_count,
-                                    angle_count, dihedral_count, time_based_restraints,
-                                    rposn_atoms.data(tier), rbond_i_atoms.data(tier),
-                                    rbond_j_atoms.data(tier), rangl_i_atoms.data(tier),
-                                    rangl_j_atoms.data(tier), rangl_k_atoms.data(tier),
-                                    rdihe_i_atoms.data(tier), rdihe_j_atoms.data(tier),
-                                    rdihe_k_atoms.data(tier), rdihe_l_atoms.data(tier),
-                                    rposn_init_step.data(tier), rposn_final_step.data(tier),
-                                    rbond_init_step.data(tier), rbond_final_step.data(tier),
-                                    rangl_init_step.data(tier), rangl_final_step.data(tier),
-                                    rdihe_init_step.data(tier), rdihe_final_step.data(tier),
-                                    rposn_init_keq.data(tier), rposn_final_keq.data(tier),
-                                    rposn_init_xy.data(tier), rposn_final_xy.data(tier),
-                                    rposn_init_z.data(tier), rposn_final_z.data(tier),
-                                    rbond_init_keq.data(tier), rbond_final_keq.data(tier),
-                                    rangl_init_keq.data(tier), rangl_final_keq.data(tier),
-                                    rdihe_init_keq.data(tier), rdihe_final_keq.data(tier),
-                                    rposn_init_r.data(tier), rposn_final_r.data(tier),
-                                    rbond_init_r.data(tier), rbond_final_r.data(tier),
-                                    rangl_init_r.data(tier), rangl_final_r.data(tier),
-                                    rdihe_init_r.data(tier), rdihe_final_r.data(tier), ag_pointer);
+RestraintKit<double, double2, double4>
+RestraintApparatus::getDoublePrecisionAbstract(const HybridTargetLevel tier) const {
+  return RestraintKit<double,
+                      double2, double4>(total_restraint_count, position_count, distance_count,
+                                        angle_count, dihedral_count, time_based_restraints,
+                                        rposn_atoms.data(tier), rbond_i_atoms.data(tier),
+                                        rbond_j_atoms.data(tier), rangl_i_atoms.data(tier),
+                                        rangl_j_atoms.data(tier), rangl_k_atoms.data(tier),
+                                        rdihe_i_atoms.data(tier), rdihe_j_atoms.data(tier),
+                                        rdihe_k_atoms.data(tier), rdihe_l_atoms.data(tier),
+                                        rposn_init_step.data(tier), rposn_final_step.data(tier),
+                                        rbond_init_step.data(tier), rbond_final_step.data(tier),
+                                        rangl_init_step.data(tier), rangl_final_step.data(tier),
+                                        rdihe_init_step.data(tier), rdihe_final_step.data(tier),
+                                        rposn_init_keq.data(tier), rposn_final_keq.data(tier),
+                                        rposn_init_xy.data(tier), rposn_final_xy.data(tier),
+                                        rposn_init_z.data(tier), rposn_final_z.data(tier),
+                                        rbond_init_keq.data(tier), rbond_final_keq.data(tier),
+                                        rangl_init_keq.data(tier), rangl_final_keq.data(tier),
+                                        rdihe_init_keq.data(tier), rdihe_final_keq.data(tier),
+                                        rposn_init_r.data(tier), rposn_final_r.data(tier),
+                                        rbond_init_r.data(tier), rbond_final_r.data(tier),
+                                        rangl_init_r.data(tier), rangl_final_r.data(tier),
+                                        rdihe_init_r.data(tier), rdihe_final_r.data(tier),
+                                        ag_pointer);
 }
 
 //-------------------------------------------------------------------------------------------------
-RestraintApparatusSpReader RestraintApparatus::spData(const HybridTargetLevel tier) const {
-  return RestraintApparatusSpReader(total_restraint_count, position_count, distance_count,
-                                    angle_count, dihedral_count, time_based_restraints,
-                                    rposn_atoms.data(tier), rbond_i_atoms.data(tier),
-                                    rbond_j_atoms.data(tier), rangl_i_atoms.data(tier),
-                                    rangl_j_atoms.data(tier), rangl_k_atoms.data(tier),
-                                    rdihe_i_atoms.data(tier), rdihe_j_atoms.data(tier),
-                                    rdihe_k_atoms.data(tier), rdihe_l_atoms.data(tier),
-                                    rposn_init_step.data(tier), rposn_final_step.data(tier),
-                                    rbond_init_step.data(tier), rbond_final_step.data(tier),
-                                    rangl_init_step.data(tier), rangl_final_step.data(tier),
-                                    rdihe_init_step.data(tier), rdihe_final_step.data(tier),
-                                    sp_rposn_init_keq.data(tier), sp_rposn_final_keq.data(tier),
-                                    sp_rposn_init_xy.data(tier), sp_rposn_final_xy.data(tier),
-                                    sp_rposn_init_z.data(tier), sp_rposn_final_z.data(tier),
-                                    sp_rbond_init_keq.data(tier), sp_rbond_final_keq.data(tier),
-                                    sp_rangl_init_keq.data(tier), sp_rangl_final_keq.data(tier),
-                                    sp_rdihe_init_keq.data(tier), sp_rdihe_final_keq.data(tier),
-                                    sp_rposn_init_r.data(tier), sp_rposn_final_r.data(tier),
-                                    sp_rbond_init_r.data(tier), sp_rbond_final_r.data(tier),
-                                    sp_rangl_init_r.data(tier), sp_rangl_final_r.data(tier),
-                                    sp_rdihe_init_r.data(tier), sp_rdihe_final_r.data(tier),
-                                    ag_pointer);
+RestraintKit<float, float2, float4>
+RestraintApparatus::getSinglePrecisionAbstract(const HybridTargetLevel tier) const {
+  return RestraintKit<float,
+                      float2,
+                      float4>(total_restraint_count, position_count, distance_count, angle_count,
+                              dihedral_count, time_based_restraints, rposn_atoms.data(tier),
+                              rbond_i_atoms.data(tier), rbond_j_atoms.data(tier),
+                              rangl_i_atoms.data(tier), rangl_j_atoms.data(tier),
+                              rangl_k_atoms.data(tier), rdihe_i_atoms.data(tier),
+                              rdihe_j_atoms.data(tier), rdihe_k_atoms.data(tier),
+                              rdihe_l_atoms.data(tier), rposn_init_step.data(tier),
+                              rposn_final_step.data(tier), rbond_init_step.data(tier),
+                              rbond_final_step.data(tier), rangl_init_step.data(tier),
+                              rangl_final_step.data(tier), rdihe_init_step.data(tier),
+                              rdihe_final_step.data(tier), sp_rposn_init_keq.data(tier),
+                              sp_rposn_final_keq.data(tier), sp_rposn_init_xy.data(tier),
+                              sp_rposn_final_xy.data(tier), sp_rposn_init_z.data(tier),
+                              sp_rposn_final_z.data(tier), sp_rbond_init_keq.data(tier),
+                              sp_rbond_final_keq.data(tier), sp_rangl_init_keq.data(tier),
+                              sp_rangl_final_keq.data(tier), sp_rdihe_init_keq.data(tier),
+                              sp_rdihe_final_keq.data(tier), sp_rposn_init_r.data(tier),
+                              sp_rposn_final_r.data(tier), sp_rbond_init_r.data(tier),
+                              sp_rbond_final_r.data(tier), sp_rangl_init_r.data(tier),
+                              sp_rangl_final_r.data(tier), sp_rdihe_init_r.data(tier),
+                              sp_rdihe_final_r.data(tier), ag_pointer);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -726,7 +637,7 @@ std::vector<BoundedRestraint> RestraintApparatus::getRestraintList() const {
 
   // Get the abstract despite the fact that this is a member function--the Hybrid arrays cloister
   // the data slightly and the internal names are longer to write.
-  RestraintApparatusDpReader current = dpData();
+  RestraintKit<double, double2, double4> current = getDoublePrecisionAbstract();
   std::vector<BoundedRestraint> result;
   result.reserve(total_restraint_count);
   for (size_t pos = 0; pos < position_count; pos++) {

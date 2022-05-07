@@ -11,7 +11,8 @@ namespace restraints {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
-
+using topology::AtomGraph;
+  
 /// \brief Enumerate the stages of a restraint's application
 enum class RestraintStage {
   INITIAL,  ///< The initial stage of restraint application, at which point the initial parameter
@@ -22,164 +23,84 @@ enum class RestraintStage {
   
 /// \brief Double-precision reader abstract for the RestraintApparatus class.  Restraints are very
 ///        detailed things, as reflected in the tedium of this object.
-struct RestraintApparatusDpReader {
+template <typename T, typename T2, typename T4>
+struct RestraintKit {
 
   /// \brief The constructor requires a tedious list of arguments.
-  RestraintApparatusDpReader(int total_rst_in, int nposn_in, int nbond_in, int nangl_in,
-                             int ndihe_in, bool time_dependence_in, const int* rposn_atoms_in,
-                             const int* rbond_i_atoms_in, const int* rbond_j_atoms_in,
-                             const int* rangl_i_atoms_in, const int* rangl_j_atoms_in,
-                             const int* rangl_k_atoms_in, const int* rdihe_i_atoms_in,
-                             const int* rdihe_j_atoms_in, const int* rdihe_k_atoms_in,
-                             const int* rdihe_l_atoms_in, const int* rposn_init_step_in,
-                             const int* rposn_finl_step_in, const int* rbond_init_step_in,
-                             const int* rbond_finl_step_in, const int* rangl_init_step_in,
-                             const int* rangl_finl_step_in, const int* rdihe_init_step_in,
-                             const int* rdihe_finl_step_in, const double2* rposn_init_keq_in,
-                             const double2* rposn_finl_keq_in, const double2* rposn_init_xy_in,
-                             const double2* rposn_finl_xy_in, const double*  rposn_init_z_in,
-                             const double*  rposn_finl_z_in, const double2* rbond_init_keq_in,
-                             const double2* rbond_finl_keq_in, const double2* rangl_init_keq_in,
-                             const double2* rangl_finl_keq_in, const double2* rdihe_init_keq_in,
-                             const double2* rdihe_finl_keq_in, const double4* rposn_init_r_in,
-                             const double4* rposn_finl_r_in, const double4* rbond_init_r_in,
-                             const double4* rbond_finl_r_in, const double4* rangl_init_r_in,
-                             const double4* rangl_finl_r_in, const double4* rdihe_init_r_in,
-                             const double4* rdihe_finl_r_in, const AtomGraph *ag_pointer_in);
+  explicit RestraintKit(int total_rst_in, int nposn_in, int nbond_in, int nangl_in,
+                        int ndihe_in, bool time_dependence_in, const int* rposn_atoms_in,
+                        const int* rbond_i_atoms_in, const int* rbond_j_atoms_in,
+                        const int* rangl_i_atoms_in, const int* rangl_j_atoms_in,
+                        const int* rangl_k_atoms_in, const int* rdihe_i_atoms_in,
+                        const int* rdihe_j_atoms_in, const int* rdihe_k_atoms_in,
+                        const int* rdihe_l_atoms_in, const int* rposn_init_step_in,
+                        const int* rposn_finl_step_in, const int* rbond_init_step_in,
+                        const int* rbond_finl_step_in, const int* rangl_init_step_in,
+                        const int* rangl_finl_step_in, const int* rdihe_init_step_in,
+                        const int* rdihe_finl_step_in, const T2* rposn_init_keq_in,
+                        const T2* rposn_finl_keq_in, const T2* rposn_init_xy_in,
+                        const T2* rposn_finl_xy_in, const T*  rposn_init_z_in,
+                        const T*  rposn_finl_z_in, const T2* rbond_init_keq_in,
+                        const T2* rbond_finl_keq_in, const T2* rangl_init_keq_in,
+                        const T2* rangl_finl_keq_in, const T2* rdihe_init_keq_in,
+                        const T2* rdihe_finl_keq_in, const T4* rposn_init_r_in,
+                        const T4* rposn_finl_r_in, const T4* rbond_init_r_in,
+                        const T4* rbond_finl_r_in, const T4* rangl_init_r_in,
+                        const T4* rangl_finl_r_in, const T4* rdihe_init_r_in,
+                        const T4* rdihe_finl_r_in, const AtomGraph *ag_pointer_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
   /// \{
-  RestraintApparatusDpReader(const RestraintApparatusDpReader &original) = default;
-  RestraintApparatusDpReader(RestraintApparatusDpReader &&other) = default;
+  RestraintKit(const RestraintKit &original) = default;
+  RestraintKit(RestraintKit &&other) = default;
   /// \}
 
-  const int total_rst;            ///< Total number of restraints in the apparatus
-  const int nposn;                ///< Number of positional restraints
-  const int nbond;                ///< Number of distance restraints
-  const int nangl;                ///< Number of three-point restraints
-  const int ndihe;                ///< Number of four-point dihedral restraints
-  const bool time_dependence;     ///< Whether there is a time dependent nature to the restraints
-  const int* rposn_atoms;         ///< Atoms which are under positional restraints
-  const int* rbond_i_atoms;       ///< Atoms which are under distance restraints (i)
-  const int* rbond_j_atoms;       ///< Atoms which are under distance restraints (ii)
-  const int* rangl_i_atoms;       ///< Atoms which are under three-point angle restraints (i)
-  const int* rangl_j_atoms;       ///< Atoms which are under three-point angle restraints (ii)
-  const int* rangl_k_atoms;       ///< Atoms which are under three-point angle restraints (iii)
-  const int* rdihe_i_atoms;       ///< Atoms which are under four-point dihedral restraints (i)
-  const int* rdihe_j_atoms;       ///< Atoms which are under four-point dihedral restraints (ii)
-  const int* rdihe_k_atoms;       ///< Atoms which are under four-point dihedral restraints (iii)
-  const int* rdihe_l_atoms;       ///< Atoms which are under four-point dihedral restraints (iv)
-  const int* rposn_init_step;     ///< Initial steps for applying positional restraints
-  const int* rposn_finl_step;     ///< Final steps for applying positional restraints
-  const int* rbond_init_step;     ///< Initial steps for applying distance restraints
-  const int* rbond_finl_step;     ///< Final steps for applying distance restraints
-  const int* rangl_init_step;     ///< Initial steps for applying three-point angle restraints
-  const int* rangl_finl_step;     ///< Final steps for applying three-point angle restraints
-  const int* rdihe_init_step;     ///< Initial steps for applying dihedral restraints
-  const int* rdihe_finl_step;     ///< Final steps for applying dihedral restraints
-  const double2* rposn_init_keq;  ///< Initial harmonic parameters for positional restraints
-  const double2* rposn_finl_keq;  ///< Final harmonic parameters for positional restraints
-  const double2* rposn_init_xy;   ///< Initial X and Y coordinates for positional restraint targets
-  const double2* rposn_finl_xy;   ///< Final X and Y coordinates for positional restraint targets
-  const double*  rposn_init_z;    ///< Initial Z coordinates for positional restraint targets
-  const double*  rposn_finl_z;    ///< Final Z coordinates for positional restraint targets
-  const double2* rbond_init_keq;  ///< Initial harmonic parameters for distance restraints
-  const double2* rbond_finl_keq;  ///< Final harmonic parameters for distance restraints
-  const double2* rangl_init_keq;  ///< Initial harmonic parameters for angle restraints
-  const double2* rangl_finl_keq;  ///< Final harmonic parameters for angle restraints
-  const double2* rdihe_init_keq;  ///< Initial harmonic parameters for dihedral restraints
-  const double2* rdihe_finl_keq;  ///< Final harmonic parameters for dihedral restraints
-  const double4* rposn_init_r;    ///< Initial displacement parameters for positional restraints
-  const double4* rposn_finl_r;    ///< Final displacement parameters for positional restraints
-  const double4* rbond_init_r;    ///< Initial displacement parameters for distance restraints
-  const double4* rbond_finl_r;    ///< Final displacement parameters for distance restraints
-  const double4* rangl_init_r;    ///< Initial displacement parameters for angle restraints
-  const double4* rangl_finl_r;    ///< Final displacement parameters for angle restraints
-  const double4* rdihe_init_r;    ///< Initial displacement parameters for dihedral restraints
-  const double4* rdihe_finl_r;    ///< Final displacement parameters for dihedral restraints
-  const AtomGraph *ag_pointer;    ///< Pointer to the topology to which this apparatus applies
-};
-
-/// \brief Single-precision reader abstract for the RestraintApparatus class.  Restraints are very
-///        detailed things, as reflected in the tedium of this object.
-struct RestraintApparatusSpReader {
-
-  /// \brief The constructor requires a tedious list of arguments.
-  RestraintApparatusSpReader(int total_rst_in, int nposn_in, int nbond_in, int nangl_in,
-                             int ndihe_in, bool time_dependence_in, const int* rposn_atoms_in,
-                             const int* rbond_i_atoms_in, const int* rbond_j_atoms_in,
-                             const int* rangl_i_atoms_in, const int* rangl_j_atoms_in,
-                             const int* rangl_k_atoms_in, const int* rdihe_i_atoms_in,
-                             const int* rdihe_j_atoms_in, const int* rdihe_k_atoms_in,
-                             const int* rdihe_l_atoms_in, const int* rposn_init_step_in,
-                             const int* rposn_finl_step_in, const int* rbond_init_step_in,
-                             const int* rbond_finl_step_in, const int* rangl_init_step_in,
-                             const int* rangl_finl_step_in, const int* rdihe_init_step_in,
-                             const int* rdihe_finl_step_in, const float2* rposn_init_keq_in,
-                             const float2* rposn_finl_keq_in, const float2* rposn_init_xy_in,
-                             const float2* rposn_finl_xy_in, const float*  rposn_init_z_in,
-                             const float*  rposn_finl_z_in, const float2* rbond_init_keq_in,
-                             const float2* rbond_finl_keq_in, const float2* rangl_init_keq_in,
-                             const float2* rangl_finl_keq_in, const float2* rdihe_init_keq_in,
-                             const float2* rdihe_finl_keq_in, const float4* rposn_init_r_in,
-                             const float4* rposn_finl_r_in, const float4* rbond_init_r_in,
-                             const float4* rbond_finl_r_in, const float4* rangl_init_r_in,
-                             const float4* rangl_finl_r_in, const float4* rdihe_init_r_in,
-                             const float4* rdihe_finl_r_in, const AtomGraph *ag_pointer_in);
-
-  /// \brief Take the default copy and move constructors.  The assignment operators will get
-  ///        implicitly deleted as this is just a collection of constants.
-  /// \{
-  RestraintApparatusSpReader(const RestraintApparatusSpReader &original) = default;
-  RestraintApparatusSpReader(RestraintApparatusSpReader &&other) = default;
-  /// \}
-
-  const int total_rst;           ///< Total number of restraints in the apparatus
-  const int nposn;               ///< Number of positional restraints
-  const int nbond;               ///< Number of distance restraints
-  const int nangl;               ///< Number of three-point restraints
-  const int ndihe;               ///< Number of four-point dihedral restraints
-  const bool time_dependence;    ///< Whether there is a time dependent nature to the restraints
-  const int* rposn_atoms;        ///< Atoms which are under positional restraints
-  const int* rbond_i_atoms;      ///< Atoms which are under distance restraints (i)
-  const int* rbond_j_atoms;      ///< Atoms which are under distance restraints (ii)
-  const int* rangl_i_atoms;      ///< Atoms which are under three-point angle restraints (i)
-  const int* rangl_j_atoms;      ///< Atoms which are under three-point angle restraints (ii)
-  const int* rangl_k_atoms;      ///< Atoms which are under three-point angle restraints (iii)
-  const int* rdihe_i_atoms;      ///< Atoms which are under four-point dihedral restraints (i)
-  const int* rdihe_j_atoms;      ///< Atoms which are under four-point dihedral restraints (ii)
-  const int* rdihe_k_atoms;      ///< Atoms which are under four-point dihedral restraints (iii)
-  const int* rdihe_l_atoms;      ///< Atoms which are under four-point dihedral restraints (iv)
-  const int* rposn_init_step;    ///< Initial steps for applying positional restraints
-  const int* rposn_finl_step;    ///< Final steps for applying positional restraints
-  const int* rbond_init_step;    ///< Initial steps for applying distance restraints
-  const int* rbond_finl_step;    ///< Final steps for applying distance restraints
-  const int* rangl_init_step;    ///< Initial steps for applying three-point angle restraints
-  const int* rangl_finl_step;    ///< Final steps for applying three-point angle restraints
-  const int* rdihe_init_step;    ///< Initial steps for applying dihedral restraints
-  const int* rdihe_finl_step;    ///< Final steps for applying dihedral restraints
-  const float2* rposn_init_keq;  ///< Initial harmonic parameters for positional restraints
-  const float2* rposn_finl_keq;  ///< Final harmonic parameters for positional restraints
-  const float2* rposn_init_xy;   ///< Initial X and Y coordinates for positional restraint targets
-  const float2* rposn_finl_xy;   ///< Final X and Y coordinates for positional restraint targets
-  const float*  rposn_init_z;    ///< Initial Z coordinates for positional restraint targets
-  const float*  rposn_finl_z;    ///< Final Z coordinates for positional restraint targets
-  const float2* rbond_init_keq;  ///< Initial harmonic parameters for distance restraints
-  const float2* rbond_finl_keq;  ///< Final harmonic parameters for distance restraints
-  const float2* rangl_init_keq;  ///< Initial harmonic parameters for angle restraints
-  const float2* rangl_finl_keq;  ///< Final harmonic parameters for angle restraints
-  const float2* rdihe_init_keq;  ///< Initial harmonic parameters for dihedral restraints
-  const float2* rdihe_finl_keq;  ///< Final harmonic parameters for dihedral restraints
-  const float4* rposn_init_r;    ///< Initial displacement parameters for positional restraints
-  const float4* rposn_finl_r;    ///< Final displacement parameters for positional restraints
-  const float4* rbond_init_r;    ///< Initial displacement parameters for distance restraints
-  const float4* rbond_finl_r;    ///< Final displacement parameters for distance restraints
-  const float4* rangl_init_r;    ///< Initial displacement parameters for angle restraints
-  const float4* rangl_finl_r;    ///< Final displacement parameters for angle restraints
-  const float4* rdihe_init_r;    ///< Initial displacement parameters for dihedral restraints
-  const float4* rdihe_finl_r;    ///< Final displacement parameters for dihedral restraints
-  const AtomGraph *ag_pointer;   ///< Pointer to the topology to which this apparatus applies
+  const int total_rst;          ///< Total number of restraints in the apparatus
+  const int nposn;              ///< Number of positional restraints
+  const int nbond;              ///< Number of distance restraints
+  const int nangl;              ///< Number of three-point restraints
+  const int ndihe;              ///< Number of four-point dihedral restraints
+  const bool time_dependence;   ///< Whether there is a time dependent nature to the restraints
+  const int* rposn_atoms;       ///< Atoms which are under positional restraints
+  const int* rbond_i_atoms;     ///< Atoms which are under distance restraints (i)
+  const int* rbond_j_atoms;     ///< Atoms which are under distance restraints (ii)
+  const int* rangl_i_atoms;     ///< Atoms which are under three-point angle restraints (i)
+  const int* rangl_j_atoms;     ///< Atoms which are under three-point angle restraints (ii)
+  const int* rangl_k_atoms;     ///< Atoms which are under three-point angle restraints (iii)
+  const int* rdihe_i_atoms;     ///< Atoms which are under four-point dihedral restraints (i)
+  const int* rdihe_j_atoms;     ///< Atoms which are under four-point dihedral restraints (ii)
+  const int* rdihe_k_atoms;     ///< Atoms which are under four-point dihedral restraints (iii)
+  const int* rdihe_l_atoms;     ///< Atoms which are under four-point dihedral restraints (iv)
+  const int* rposn_init_step;   ///< Initial steps for applying positional restraints
+  const int* rposn_finl_step;   ///< Final steps for applying positional restraints
+  const int* rbond_init_step;   ///< Initial steps for applying distance restraints
+  const int* rbond_finl_step;   ///< Final steps for applying distance restraints
+  const int* rangl_init_step;   ///< Initial steps for applying three-point angle restraints
+  const int* rangl_finl_step;   ///< Final steps for applying three-point angle restraints
+  const int* rdihe_init_step;   ///< Initial steps for applying dihedral restraints
+  const int* rdihe_finl_step;   ///< Final steps for applying dihedral restraints
+  const T2* rposn_init_keq;     ///< Initial harmonic parameters for positional restraints
+  const T2* rposn_finl_keq;     ///< Final harmonic parameters for positional restraints
+  const T2* rposn_init_xy;      ///< Initial X and Y coordinates for positional restraint targets
+  const T2* rposn_finl_xy;      ///< Final X and Y coordinates for positional restraint targets
+  const T*  rposn_init_z;       ///< Initial Z coordinates for positional restraint targets
+  const T*  rposn_finl_z;       ///< Final Z coordinates for positional restraint targets
+  const T2* rbond_init_keq;     ///< Initial harmonic parameters for distance restraints
+  const T2* rbond_finl_keq;     ///< Final harmonic parameters for distance restraints
+  const T2* rangl_init_keq;     ///< Initial harmonic parameters for angle restraints
+  const T2* rangl_finl_keq;     ///< Final harmonic parameters for angle restraints
+  const T2* rdihe_init_keq;     ///< Initial harmonic parameters for dihedral restraints
+  const T2* rdihe_finl_keq;     ///< Final harmonic parameters for dihedral restraints
+  const T4* rposn_init_r;       ///< Initial displacement parameters for positional restraints
+  const T4* rposn_finl_r;       ///< Final displacement parameters for positional restraints
+  const T4* rbond_init_r;       ///< Initial displacement parameters for distance restraints
+  const T4* rbond_finl_r;       ///< Final displacement parameters for distance restraints
+  const T4* rangl_init_r;       ///< Initial displacement parameters for angle restraints
+  const T4* rangl_finl_r;       ///< Final displacement parameters for angle restraints
+  const T4* rdihe_init_r;       ///< Initial displacement parameters for dihedral restraints
+  const T4* rdihe_finl_r;       ///< Final displacement parameters for dihedral restraints
+  const AtomGraph *ag_pointer;  ///< Pointer to the topology to which this apparatus applies
 };
 
 /// \brief A collection of all restraints pertaining to a specific topology for the purposes of
@@ -247,10 +168,16 @@ public:
   const AtomGraph* getTopologyPointer() const;
   
   /// \brief Get a double-precision abstract of this apparatus
-  RestraintApparatusDpReader dpData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  ///
+  /// \param tier  The level at which to obtain pointers
+  RestraintKit<double, double2, double4>
+  getDoublePrecisionAbstract(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get a single-precision abstract of this apparatus
-  RestraintApparatusSpReader spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  ///
+  /// \param tier  The level at which to obtain pointers
+  RestraintKit<float, float2, float4>
+  getSinglePrecisionAbstract(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get an integer pointer into one of the restraint initial or final application step
   ///        parameter arrays, specified by the order of the restraint.
@@ -475,5 +402,7 @@ private:
 
 } // namespace restraints
 } // namespace omni
+
+#include "restraint_apparatus.tpp"
 
 #endif

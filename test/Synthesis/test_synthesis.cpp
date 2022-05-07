@@ -40,7 +40,9 @@ using omni::constants::verytiny;
 using omni::data_types::int2;
 using omni::data_types::uint2;
 using omni::data_types::uint3;
+using omni::data_types::double2;
 using omni::data_types::double3;
+using omni::data_types::double4;
 using omni::data_types::ValueWithCounter;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
@@ -57,6 +59,7 @@ using omni::restraints::applyHydrogenBondPreventors;
 using omni::restraints::applyPositionalRestraints;
 using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
+using omni::restraints::RestraintKit;
 using omni::structure::distance;
 using omni::structure::angle;
 using omni::structure::dihedral_angle;
@@ -513,7 +516,7 @@ std::vector<std::vector<int>> getAtomForceContributors(const AtomGraph &ag,
                                                        const RestraintApparatus &ra) {
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
-  const RestraintApparatusDpReader rar = ra.dpData();
+  const RestraintKit<double, double2, double4> rar = ra.getDoublePrecisionAbstract();
 
   // Initialize the result.  Every atom list includes the atom itself.
   std::vector<std::vector<int>> result(vk.natom, std::vector<int>());
