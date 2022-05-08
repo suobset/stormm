@@ -26,6 +26,7 @@ using energy::evaluateCharmmImproperTerms;
 using energy::evaluateCmapTerms;
 using energy::evaluateAttenuated14Terms;
 using energy::evaluateRestraints;
+using energy::evaluateNonbondedEnergy;
 using energy::ScoreCard;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
@@ -102,10 +103,11 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag, EvaluateForc
 /// \param ra    Restraint apparatus from which an appropriate abstract can be derived
 /// \param step  The step number, which may affect restraint activation
 /// \{
-void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                    UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                    ScoreCard *sc, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                    const RestraintKit<double, double2, double4> &rar, EvaluateForce eval_force,
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                    UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                    ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                    const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
                     int system_index = 0, int step = 0);
 
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
@@ -134,11 +136,12 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 ///
 /// Descriptions of input variables follow from evalValeMM() and evalValeRestMM() above.
 /// \{
-void evalNonbValeMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                    UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                    ScoreCard *sc, const ValenceKit<double> &vk,
-                    const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                    EvaluateForce eval_force, int system_index = 0);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void evalNonbValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                    UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                    ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                    const StaticExclusionMaskReader &ser, EvaluateForce eval_force,
+                    int system_index = 0);
 
 void evalNonbValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
@@ -167,12 +170,13 @@ void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 /// \param ser  Abstract for a map of non-bonded exclusions for all pairs of atoms in the system
 /// \param se   Permanent map of non-bonded exclusions for all pairs of atoms in the system
 /// \{
-void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                        UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                        ScoreCard *sc, const ValenceKit<double> &vk,
-                        const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintKit<double, double2, double4> &rar,
-                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalNonbValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                        const StaticExclusionMaskReader &ser,
+                        const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
+                        int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,

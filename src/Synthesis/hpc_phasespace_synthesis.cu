@@ -84,7 +84,9 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
       if (warp_idx < atom_warps) {
         int read_pos = atom_read_start + (warp_idx * warp_size_int) + tgx;
         while (read_pos < atom_read_end) {
-          destination.xyz_qlj[read_pos] = source.xyz_qlj[read_pos];
+          destination.xcrd[read_pos] = source.xcrd[read_pos];
+          destination.ycrd[read_pos] = source.ycrd[read_pos];
+          destination.zcrd[read_pos] = source.zcrd[read_pos];
           read_pos += atom_warps * warp_size_int;
         }
       }

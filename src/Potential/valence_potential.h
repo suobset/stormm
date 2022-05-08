@@ -824,9 +824,9 @@ double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameRea
                           ScoreCard *ecard, int system_index = 0, int step_number = 0);
 
 template <typename Tcoord, typename Tcalc, typename Tcalc2, typename Tcalc4>
-double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4>,
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
                           const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
-                          int system_index = 0, int force_scale_bits = 23);
+                          int system_index = 0, int step_number = 0, int force_scale_bits = 23);
 /// \}
   
 } // namespace energy

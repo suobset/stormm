@@ -522,8 +522,7 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
 #  endif
   if (problem) {
     rtErr("Unable to get device-mapped pointers to host memory.  Types of memory used in each "
-          "array: " + std::string(xyz_qlj.getLabel().name) + " " + xyz_qlj.getLabel().format +
-          ", " + std::string(int_data.getLabel().name) + " " + int_data.getLabel().format +
+          "array: " + std::string(int_data.getLabel().name) + " " + int_data.getLabel().format +
           ", " + std::string(llint_data.getLabel().name) + " " + llint_data.getLabel().format +
           ", " + std::string(double_data.getLabel().name) + " " + double_data.getLabel().format +
           ", " + std::string(float_data.getLabel().name) + " " + float_data.getLabel().format +
@@ -589,7 +588,6 @@ void PhaseSpaceSynthesis::upload(const TrajectoryKind kind, const int system_low
 void PhaseSpaceSynthesis::download() {
   atom_starts.download();
   atom_counts.download();
-  xyz_qlj.download();
   llint_data.download();
   double_data.download();
   float_data.download();
@@ -671,7 +669,9 @@ void PhaseSpaceSynthesis::extractPhaseSpace(PhaseSpace *ps, const int index,
     break;
 #ifdef OMNI_USE_HPC
   case HybridTargetLevel::DEVICE:
-    xyz_qlj.download(atom_offset, psw.natom);
+    x_coordinates.download(atom_offset, psw.natom);
+    y_coordinates.download(atom_offset, psw.natom);
+    z_coordinates.download(atom_offset, psw.natom);
     box_space_transforms.download(mtrx_offset, 9);
     inverse_transforms.download(mtrx_offset, 9);
     box_dimensions.download(bdim_offset, 6);

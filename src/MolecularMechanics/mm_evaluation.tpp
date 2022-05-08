@@ -33,5 +33,51 @@ void evalValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* 
                                                    force_factor);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                    const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                    ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                    const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, const EvaluateForce eval_force,
+                    const int step, const int system_index) {
+  evalValeMM<Tcoord, Tforce, Tcalc>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
+                                    vk, nbk, eval_force, system_index);
+  evaluateRestraints<Tcoord, Tforce,
+                     Tcalc, Tcalc2, Tcalc4>(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                            yfrc, zfrc, sc, eval_force, system_index, step);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void evalNonbValeMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                    const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                    ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                    const StaticExclusionMaskReader &ser, const EvaluateForce eval_force,
+                    const int system_index) {
+  evaluateNonbondedEnergy<Tcoord, Tforce, Tcalc>(nbk, ser, xcrd, ycrd, zcrd, umat, invu, unit_cell,
+                                                 xfrc, yfrc, zfrc, sc, eval_force, eval_force,
+                                                 system_index);
+  evalValeMM<Tcoord, Tforce, Tcalc>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
+                                    vk, nbk, eval_force, system_index);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalNonbValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        ScoreCard *sc, const ValenceKit<Tcalc> &vk,
+                        const NonbondedKit<Tcalc> &nbk, const StaticExclusionMaskReader &ser,
+                        const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar,
+                        const EvaluateForce eval_force, const int system_index, const int step) {
+  evaluateNonbondedEnergy<Tcoord, Tforce, Tcalc>(nbk, ser, xcrd, ycrd, zcrd, umat, invu, unit_cell,
+                                                 xfrc, yfrc, zfrc, sc, eval_force, eval_force,
+                                                 system_index);
+  evalValeMM<Tcoord, Tforce, Tcalc>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
+                                    vk, nbk, eval_force, system_index);
+  evaluateRestraints<Tcoord, Tforce,
+                     Tcalc, Tcalc2, Tcalc4>(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
+                                            yfrc, zfrc, sc, eval_force, system_index, step);
+}
+
 } // namespace mm
 } // namespace omni

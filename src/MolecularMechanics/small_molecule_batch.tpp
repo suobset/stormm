@@ -73,10 +73,9 @@ template <typename T> void minimizeSmallMoleculeBatch<T>(PhaseSpaceSynthesis *ps
     const int atom_offset = descriptors[ValenceWorkUnitSpecs::ATOM_DIRECT_READ_START];
     const int atom_count = descriptors[ValenceWorkUnitSpecs::ATOM_COUNT];
     for (int i = 0; i < atom_count; i++) {
-      const longlong4 t_xyz = psynthw.xyz_qlj[atom_offset + i];
-      xcrd[i] = t_xyz.x;
-      ycrd[i] = t_xyz.y;
-      zcrd[i] = t_xyz.z;
+      xcrd[i] = psynthw.xcrd[atom_offset + i];
+      ycrd[i] = psynthw.ycrd[atom_offset + i];
+      zcrd[i] = psynthw.zcrd[atom_offset + i];
     }
 
     // These flags are held in __shared__ memory to conserve registers in an HPC scenario.

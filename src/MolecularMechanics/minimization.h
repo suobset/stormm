@@ -2,27 +2,39 @@
 #ifndef OMNI_MINIMIZATION_H
 #define OMNI_MINIMIZATION_H
 
+#include <cmath>
 #include "Constants/fixed_precision.h"
+#include "DataTypes/common_types.h"
+#include "Math/matrix_ops.h"
 #include "Namelists/nml_minimize.h"
+#include "Potential/energy_enumerators.h"
 #include "Potential/scorecard.h"
 #include "Potential/static_exclusionmask.h"
 #include "Restraints/restraint_apparatus.h"
+#include "Structure/virtual_site_handling.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
+#include "mm_evaluation.h"
 
 namespace omni {
 namespace mm {
 
+using data_types::isSignedIntegralScalarType;
+using energy::EvaluateForce;
 using energy::ScoreCard;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
+using math::invertSquareMatrix;
+using math::matrixVectorMultiply;
 using namelist::MinimizeControls;
 using numerics::default_energy_scale_bits;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
+using structure::placeVirtualSites;
+using structure::transmitVirtualSiteForces;
 using topology::AtomGraph;
 using topology::NonbondedKit;
 using topology::UnitCellType;
@@ -54,9 +66,11 @@ using trajectory::PhaseSpaceWriter;
 /// \param step       Current step number of the energy minimization
 /// \param sd_step    Step number at which steepest descent optimization ends and conjugate
 ///                   gradient moves begin
-void computeGradientMove(double* xfrc, double* yfrc, double* zfrc, double* xprv_move,
-                         double* yprv_move, double* zprv_move, double* x_cg_temp,
-                         double* y_cg_temp, double* z_cg_temp, int natom, int step, int sd_steps);
+template <typename Tforce, typename Tcalc>
+void computeGradientMove(Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, Tforce* xprv_move,
+                         Tforce* yprv_move, Tforce* zprv_move, Tcalc* x_cg_temp,
+                         Tcalc* y_cg_temp, Tcalc* z_cg_temp, int natom, int step, int sd_steps,
+                         Tcalc force_factor = 1.0);
 
 /// \brief Move particles based on a direction and a specified distance.  The unit vector spread
 ///        across xmove, ymove, and zmove provides the direction and dist the length to travel
@@ -74,10 +88,11 @@ void computeGradientMove(double* xfrc, double* yfrc, double* zfrc, double* xprv_
 /// \param vsk        Virtual site abstract from the original topology
 /// \param natom      Number of atoms (trusted length of xcrd, ycrd, ..., ymove, and zmove)
 /// \param dist       Distance along the gradient to travel (a multiplier for the unit vector)
-void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove,
-                   const double* ymove, const double* zmove, const double* umat,
-                   const double* invu, UnitCellType unit_cell, const VirtualSiteKit<double> &vsk,
-                   int natom, double dist);
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void moveParticles(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tforce* xmove,
+                   const Tforce* ymove, const Tforce* zmove, const double* umat,
+                   const double* invu, UnitCellType unit_cell, const VirtualSiteKit<Tcalc> &vsk,
+                   int natom, Tcalc dist, Tcalc gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 /// \brief Minimize a set of coordinates governed by a single topology and restraint apparatus.
 ///        This routine carries out line minimizations.
@@ -115,13 +130,15 @@ void moveParticles(double* xcrd, double* ycrd, double* zcrd, const double* xmove
 /// \param mincon          User input from a &minimize namelist
 /// \param nrg_scale_bits  Number of bits after the decimal with which to accumulate energy terms
 /// \{
-ScoreCard minimize(double* xcrd, double* ycrd, double* zcrd, double* xfrc, double* yfrc,
-                   double* zfrc, double* xprv_move, double* yprv_move, double* zprv_move,
-                   double* x_cg_temp, double* y_cg_temp, double* z_cg_temp,
-                   const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                   const RestraintKit<double, double2, double4> &rar,
-                   const VirtualSiteKit<double> &vsk, const StaticExclusionMaskReader &ser,
-                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits);
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforce* yfrc,
+                   Tforce* zfrc, Tforce* xprv_move, Tforce* yprv_move, Tforce* zprv_move,
+                   Tcalc* x_cg_temp, Tcalc* y_cg_temp, Tcalc* z_cg_temp,
+                   const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                   const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar,
+                   const VirtualSiteKit<Tcalc> &vsk, const StaticExclusionMaskReader &ser,
+                   const MinimizeControls &mincon, int nrg_scale_bits = default_energy_scale_bits,
+                   Tcalc gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus &ra,
                    const StaticExclusionMask &se, const MinimizeControls &mincon,
@@ -139,5 +156,7 @@ ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
   
 } // namespace mm
 } // namespace omni
+
+#include "minimization.tpp"
 
 #endif

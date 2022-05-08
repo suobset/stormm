@@ -217,6 +217,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Math/series_ops.tpp \
 		 $(SRCDIR)/Math/summation.tpp \
 		 $(SRCDIR)/Math/vector_ops.tpp \
+		 $(SRCDIR)/MolecularMechanics/minimization.tpp \
 		 $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \

@@ -35,19 +35,6 @@ void evalValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 }
 
 //-------------------------------------------------------------------------------------------------
-void evalValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                    const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                    ScoreCard *sc, const ValenceKit<double> &vk, const NonbondedKit<double> &nbk,
-                    const RestraintKit<double, double2, double4> &rar,
-                    const EvaluateForce eval_force, const int step, const int system_index) {
-  evalValeMM<double, double, double>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                                     vk, nbk, eval_force, system_index);
-  evaluateRestraints<double, double,
-                     double, double2, double4>(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
-                                               yfrc, zfrc, sc, eval_force, system_index, step);
-}
-
-//-------------------------------------------------------------------------------------------------
 void evalValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk,
                     const RestraintKit<double, double2, double4> &rar,
@@ -96,24 +83,13 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 }
 
 //-------------------------------------------------------------------------------------------------
-void evalNonbValeMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                    const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                    ScoreCard *sc, const ValenceKit<double> &vk,
-                    const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                    const EvaluateForce eval_force, const int system_index) {
-  evaluateNonbondedEnergy(nbk, ser, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                          eval_force, eval_force, system_index);
-  evalValeMM<double, double, double>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                                     vk, nbk, eval_force, system_index);
-}
-
-//-------------------------------------------------------------------------------------------------
 void evalNonbValeMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                     const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
                     const EvaluateForce eval_force, const int system_index) {
-  evaluateNonbondedEnergy(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                          psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
-                          system_index);
+  evaluateNonbondedEnergy<double, double, double>(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                                  psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                                  psw.zfrc, sc, eval_force, eval_force,
+                                                  system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, vk, nbk,
                                      eval_force, system_index);
@@ -125,9 +101,10 @@ void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                     const int system_index) {
   PhaseSpaceWriter psw = ps->data();
   const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
-  evaluateNonbondedEnergy(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                          psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
-                          system_index);
+  evaluateNonbondedEnergy<double, double, double>(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                                  psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                                                  psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
+                                                  system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc,
                                      ag.getDoublePrecisionValenceKit(), nbk, eval_force,
@@ -140,9 +117,10 @@ void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                     const int system_index) {
   PhaseSpaceWriter psw = ps->data();
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
-  evaluateNonbondedEnergy(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                          psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
-                          system_index);
+  evaluateNonbondedEnergy<double, double, double>(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                                  psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                                                  psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
+                                                  system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc,
                                      ag->getDoublePrecisionValenceKit(), nbk, eval_force,
@@ -150,29 +128,14 @@ void evalNonbValeMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 }
 
 //-------------------------------------------------------------------------------------------------
-void evalNonbValeRestMM(double* xcrd, double* ycrd, double* zcrd, double* umat, double* invu,
-                        const UnitCellType unit_cell, double* xfrc, double* yfrc, double* zfrc,
-                        ScoreCard *sc, const ValenceKit<double> &vk,
-                        const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
-                        const RestraintKit<double, double2, double4> &rar,
-                        const EvaluateForce eval_force, const int system_index, const int step) {
-  evaluateNonbondedEnergy(nbk, ser, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                          eval_force, eval_force, system_index);
-  evalValeMM<double, double, double>(xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, sc,
-                                     vk, nbk, eval_force, system_index);
-  evaluateRestraints<double, double,
-                     double, double2, double4>(rar, xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc,
-                                               yfrc, zfrc, sc, eval_force, system_index, step);
-}
-
-//-------------------------------------------------------------------------------------------------
 void evalNonbValeRestMM(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
                         const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
                         const RestraintKit<double, double2, double4> &rar,
                         const EvaluateForce eval_force, const int system_index, const int step) {
-  evaluateNonbondedEnergy(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                          psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
-                          system_index);
+  evaluateNonbondedEnergy<double, double, double>(nbk, ser, psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                                  psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                                  psw.zfrc, sc, eval_force, eval_force,
+                                                  system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, vk, nbk,
                                      eval_force, system_index);
@@ -188,9 +151,10 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                         const EvaluateForce eval_force, const int system_index, const int step) {
   PhaseSpaceWriter psw = ps->data();
   const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
-  evaluateNonbondedEnergy(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                          psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
-                          system_index);
+  evaluateNonbondedEnergy<double, double, double>(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                                  psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                                                  psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
+                                                  system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc,
                                      ag.getDoublePrecisionValenceKit(), nbk, eval_force,
@@ -208,9 +172,10 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                         const EvaluateForce eval_force, const int system_index, const int step) {
   PhaseSpaceWriter psw = ps->data();
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
-  evaluateNonbondedEnergy(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                          psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
-                          system_index);
+  evaluateNonbondedEnergy<double, double, double>(nbk, se.data(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                                  psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                                                  psw.yfrc, psw.zfrc, sc, eval_force, eval_force,
+                                                  system_index);
   evalValeMM<double, double, double>(psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu,
                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc, sc,
                                      ag->getDoublePrecisionValenceKit(), nbk, eval_force,

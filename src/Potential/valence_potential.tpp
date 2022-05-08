@@ -69,7 +69,7 @@ double evaluateBondTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const T
   // (see Constants/fixed_precision.h).
   double bond_energy = 0.0;
   llint bond_acc = 0LL;
-  const double nrg_scale_factor = ecard->getEnergyScalingFactor<double>();
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
 
   // Accumulate the results (energy in both precision models)
   for (int pos = 0; pos < vk.nbond; pos++) {
@@ -1690,6 +1690,24 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
 
   // Return the double-precision energy sum, if of interest
   return rest_energy;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc, typename Tcalc2, typename Tcalc4>
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
+                          const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                          const int system_index, const int step_number,
+                          const int force_scale_bits) {
+  const size_t atom_os = static_cast<size_t>(system_index) *
+                         roundUp<size_t>(csr.natom, warp_size_zu);
+  const size_t xfrm_os = static_cast<size_t>(system_index) * roundUp<size_t>(9, warp_size_zu);
+  const Tcalc force_scale = (isSignedIntegralScalarType<Tcoord>()) ?
+                            pow(2.0, force_scale_bits) : 1.0;
+  return evaluateRestraints<Tcoord, Tcoord,
+                            Tcalc, Tcalc2, Tcalc4>(rar, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat,
+                                                   csr.invu, csr.unit_cell, csr.xfrc, csr.yfrc,
+                                                   csr.zfrc, ecard, EvaluateForce::NO,
+                                                   system_index, step_number);
 }
 
 } // namespace energy
