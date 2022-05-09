@@ -56,11 +56,16 @@ template <typename T> struct CoordinateSeriesWriter {
 /// \brief Collect C-style pointers and critical constants for a read-only CoordinateSeries object.
 template <typename T> struct CoordinateSeriesReader {
 
-  /// \brief The constructor feeds all arguments straight to the inline initialization list.
+  /// \brief The basic constructor feeds all arguments straight to the inline initialization list.
+  ///        An alternative constructor takes a writeable abstract and converts it to a read-only
+  ///        abstract.
+  /// \{
   CoordinateSeriesReader(int natom_in, int nframe_in, UnitCellType unit_cell_in, int gpos_bits_in,
                          double gpos_scale_in, double inv_gpos_scale_in, const T* xcrd_in,
                          const T* ycrd_in, const T* zcrd_in, const double* umat_in,
                          const double* invu_in, const double* boxdim_in);
+  CoordinateSeriesReader(const CoordinateSeriesWriter<T> &csw);
+  /// \}
 
   /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
   /// \{

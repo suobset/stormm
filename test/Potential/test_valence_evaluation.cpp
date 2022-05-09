@@ -1,4 +1,6 @@
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
@@ -6,11 +8,15 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
+#include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::double2;
+using omni::llint;
 using omni::constants::ExceptionResponse;
+using omni::data_types::getOmniScalarTypeName;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
@@ -19,11 +25,226 @@ using omni::parse::NumberFormat;
 using omni::parse::polyNumericVector;
 using omni::topology::AtomGraph;
 using omni::trajectory::CoordinateFileKind;
+using omni::trajectory::CoordinateSeries;
 using omni::trajectory::PhaseSpace;
 using omni::trajectory::TrajectoryKind;
 using namespace omni::energy;
 using namespace omni::testing;
 
+//-------------------------------------------------------------------------------------------------
+// Evaluate forces for a particular combination of coordinate, force, and calculation precision.
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                         CoordinateSeries<Tforce> *force_accumulator, const std::string &sys_title,
+                         const std::vector<double> &bond_ref, const std::vector<double> &angl_ref,
+                         const std::vector<double> &dihe_ref, const std::vector<double> &ubrd_ref,
+                         const std::vector<double> &cimp_ref, const std::vector<double> &cmap_ref, 
+                         const double tol, const TestPriority do_tests) {
+  CoordinateSeriesWriter<Tforce> faw = force_accumulator->data();
+  const Tforce zero = 0.0;
+  for (int i = 0; i < faw.natom; i++) {
+    faw.xcrd[i] = zero;
+    faw.ycrd[i] = zero;
+    faw.zcrd[i] = zero;
+  }
+  ScoreCard alt_sc(1, 16, 32);
+  evaluateBondTerms<Tcoord, Tforce, Tcalc>(vk, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat, csr.invu,
+                                           csr.unit_cell, faw.xcrd, faw.ycrd, faw.zcrd, &alt_sc,
+                                           EvaluateForce::YES, 0, csr.inv_gpos_scale,
+                                           faw.gpos_scale);
+  const CoordinateFrame bond_frame = force_accumulator->exportFrame(0);
+  const std::vector<double> bond_frc = bond_frame.getInterlacedCoordinates();
+  const RelationalOperator rel_eq = RelationalOperator::EQUAL;
+  check(bond_frc, rel_eq, Approx(bond_ref).margin(tol), "Forces due to harmonic bond "
+        "stretching interactions in the " + sys_title + " system do not meet expectations when "
+        "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
+        getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+        " coordinates.", do_tests);
+  for (int i = 0; i < faw.natom; i++) {
+    faw.xcrd[i] = zero;
+    faw.ycrd[i] = zero;
+    faw.zcrd[i] = zero;
+  }
+  evaluateAngleTerms<Tcoord, Tforce, Tcalc>(vk, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat, csr.invu,
+                                            csr.unit_cell, faw.xcrd, faw.ycrd, faw.zcrd, &alt_sc,
+                                            EvaluateForce::YES, 0, csr.inv_gpos_scale,
+                                            faw.gpos_scale);
+  const CoordinateFrame angl_frame = force_accumulator->exportFrame(0);
+  const std::vector<double> angl_frc = angl_frame.getInterlacedCoordinates();
+  check(angl_frc, rel_eq, Approx(angl_ref).margin(0.5 * tol), "Forces due to harmonic angle "
+        "bending interactions in the " + sys_title + " system do not meet expectations when "
+        "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
+        getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+        " coordinates.", do_tests);
+  for (int i = 0; i < faw.natom; i++) {
+    faw.xcrd[i] = zero;
+    faw.ycrd[i] = zero;
+    faw.zcrd[i] = zero;
+  }
+  evaluateDihedralTerms<Tcoord, Tforce, Tcalc>(vk, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat,
+                                               csr.invu, csr.unit_cell, faw.xcrd, faw.ycrd,
+                                               faw.zcrd, &alt_sc, EvaluateForce::YES, 0,
+                                               csr.inv_gpos_scale, faw.gpos_scale);
+  const CoordinateFrame dihe_frame = force_accumulator->exportFrame(0);
+  const std::vector<double> dihe_frc = dihe_frame.getInterlacedCoordinates();
+  check(dihe_frc, rel_eq, Approx(dihe_ref).margin(tol), "Forces due to cosine-based "
+        "dihedral interactions in the " + sys_title + " system do not meet expectations when "
+        "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
+        getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+        " coordinates.", do_tests);
+  if (vk.nubrd > 0) {
+    for (int i = 0; i < faw.natom; i++) {
+      faw.xcrd[i] = zero;
+      faw.ycrd[i] = zero;
+      faw.zcrd[i] = zero;
+    }
+    evaluateUreyBradleyTerms<Tcoord, Tforce, Tcalc>(vk, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat,
+                                                    csr.invu, csr.unit_cell, faw.xcrd, faw.ycrd,
+                                                    faw.zcrd, &alt_sc, EvaluateForce::YES, 0,
+                                                    csr.inv_gpos_scale, faw.gpos_scale);
+    const CoordinateFrame ubrd_frame = force_accumulator->exportFrame(0);
+    const std::vector<double> ubrd_frc = ubrd_frame.getInterlacedCoordinates();
+    check(ubrd_frc, rel_eq, Approx(ubrd_ref).margin(0.5 * tol), "Forces due to Urey-Bradley angle "
+          "stretching interactions in the " + sys_title + " system do not meet expectations when "
+          "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
+          getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+          " coordinates.", do_tests);
+  }
+  if (vk.ncimp > 0) {
+    for (int i = 0; i < faw.natom; i++) {
+      faw.xcrd[i] = zero;
+      faw.ycrd[i] = zero;
+      faw.zcrd[i] = zero;
+    }
+    evaluateCharmmImproperTerms<Tcoord, Tforce, Tcalc>(vk, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat,
+                                                       csr.invu, csr.unit_cell, faw.xcrd, faw.ycrd,
+                                                       faw.zcrd, &alt_sc, EvaluateForce::YES, 0,
+                                                       csr.inv_gpos_scale, faw.gpos_scale);
+    const CoordinateFrame cimp_frame = force_accumulator->exportFrame(0);
+    const std::vector<double> cimp_frc = cimp_frame.getInterlacedCoordinates();
+    check(cimp_frc, rel_eq, Approx(cimp_ref).margin(tol), "Forces due to CHARMM harmonic improper "
+          "dihedral interactions in the " + sys_title + " system do not meet expectations when "
+          "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
+          getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+          " coordinates.", do_tests);
+  }
+  if (vk.ncmap > 0) {
+    for (int i = 0; i < faw.natom; i++) {
+      faw.xcrd[i] = zero;
+      faw.ycrd[i] = zero;
+      faw.zcrd[i] = zero;
+    }
+    evaluateCmapTerms<Tcoord, Tforce, Tcalc>(vk, csr.xcrd, csr.ycrd, csr.zcrd, csr.umat, csr.invu,
+                                             csr.unit_cell, faw.xcrd, faw.ycrd, faw.zcrd, &alt_sc,
+                                             EvaluateForce::YES, 0, csr.inv_gpos_scale,
+                                             faw.gpos_scale);
+    const CoordinateFrame cmap_frame = force_accumulator->exportFrame(0);
+    const std::vector<double> cmap_frc = cmap_frame.getInterlacedCoordinates();
+    check(cmap_frc, rel_eq, Approx(cmap_ref).margin(tol), "Forces due to CMAP 2D spline surface "
+          "interactions in the " + sys_title + " system do not meet expectations when recomputed "
+          "in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
+          getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+          " coordinates.", do_tests);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Evaluate the various valence energies and forces for a system.
+//-------------------------------------------------------------------------------------------------
+void evalAlternateCoords(const AtomGraph &ag, const CoordinateFrame &cf,
+                         const std::string &sys_title, const std::vector<double> &valence_energy,
+                         const std::vector<double> &bond_frc, const std::vector<double> &angl_frc,
+                         const std::vector<double> &dihe_frc, const std::vector<double> &ubrd_frc,
+                         const std::vector<double> &cimp_frc, const std::vector<double> &cmap_frc,
+                         const double ef_tol, const double ei_tol, const double frcf_tol,
+                         const double frci_tol, const TestPriority do_tests)
+{
+  const CoordinateSeries<double> csd(cf, 1);
+  const CoordinateSeries<float> csf(cf, 1);
+  const CoordinateSeries<llint> csi(cf, 1, 26);
+  const ValenceKit<double> vkd = ag.getDoublePrecisionValenceKit();  
+  const ValenceKit<float> vkf = ag.getSinglePrecisionValenceKit();  
+  ScoreCard alt_sc(1, 16, 32);
+  const double2 dihe_energy_fd =
+    evaluateDihedralTerms<float, double>(vkd, csf.data(), &alt_sc, 0);
+  const std::vector<double> valence_energy_fd = {
+    evaluateBondTerms<float, double>(vkd, csf.data(), &alt_sc, 0),
+    evaluateAngleTerms<float, double>(vkd, csf.data(), &alt_sc, 0),
+    dihe_energy_fd.x, dihe_energy_fd.y,
+    evaluateUreyBradleyTerms<float, double>(vkd, csf.data(), &alt_sc, 0),
+    evaluateCharmmImproperTerms<float, double>(vkd, csf.data(), &alt_sc, 0),
+    evaluateCmapTerms<float, double>(vkd, csf.data(), &alt_sc, 0)
+  };
+  const double2 dihe_energy_id =
+    evaluateDihedralTerms<llint, double>(vkd, csi.data(), &alt_sc, 0);
+  const std::vector<double> valence_energy_id = {
+    evaluateBondTerms<llint, double>(vkd, csi.data(), &alt_sc, 0),
+    evaluateAngleTerms<llint, double>(vkd, csi.data(), &alt_sc, 0),
+    dihe_energy_id.x, dihe_energy_id.y,
+    evaluateUreyBradleyTerms<llint, double>(vkd, csi.data(), &alt_sc, 0),
+    evaluateCharmmImproperTerms<llint, double>(vkd, csi.data(), &alt_sc, 0),
+    evaluateCmapTerms<llint, double>(vkd, csi.data(), &alt_sc, 0)
+  };
+  section(3);
+  const RelationalOperator rel_eq = RelationalOperator::EQUAL;
+  check(valence_energy_fd, rel_eq, Approx(valence_energy).margin(ef_tol), sys_title +
+        " valence energies do not meet expectations when calculated in double-precision using a "
+        "single-precision coordinate representation.", do_tests);
+  check(valence_energy_id, rel_eq, Approx(valence_energy).margin(ei_tol), sys_title +
+        " valence energies do not meet expectations when calculated in double-precision using a "
+        "fixed-precision coordinate representation.", do_tests);
+  CoordinateSeries<double> fv_d(csf);
+  CoordinateSeries<float> fv_f(csf);
+  CoordinateSeries<llint> fv_i(csf, 23);
+  const CoordinateSeriesReader<double> csdr = csd.data();
+  const CoordinateSeriesReader<float> csfr  = csf.data();
+  const CoordinateSeriesReader<llint> csir  = csi.data();
+  CoordinateSeriesWriter<double> fv_dw = fv_d.data();
+  CoordinateSeriesWriter<float> fv_fw  = fv_f.data();
+  CoordinateSeriesWriter<llint> fv_iw  = fv_i.data();
+  section(4);
+  evalAlternateForces(vkd, csdr, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, omni::constants::tiny, do_tests);
+  evalAlternateForces(vkd, csfr, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frcf_tol, do_tests);
+  evalAlternateForces(vkd, csir, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frci_tol, do_tests);
+  evalAlternateForces(vkd, csdr, &fv_f, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frcf_tol, do_tests);
+  evalAlternateForces(vkd, csfr, &fv_f, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frcf_tol, do_tests);
+  evalAlternateForces(vkd, csir, &fv_f, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frcf_tol, do_tests);
+  evalAlternateForces(vkd, csdr, &fv_i, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frcf_tol, do_tests);
+  evalAlternateForces(vkd, csfr, &fv_i, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frcf_tol, do_tests);
+  evalAlternateForces(vkd, csir, &fv_i, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, frci_tol, do_tests);
+  evalAlternateForces(vkf, csdr, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc,       frcf_tol, do_tests);
+  evalAlternateForces(vkf, csfr, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, 2.0 * frcf_tol, do_tests);
+  evalAlternateForces(vkf, csir, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc,       frcf_tol, do_tests);
+  evalAlternateForces(vkf, csdr, &fv_f, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, 2.0 * frcf_tol, do_tests);
+  evalAlternateForces(vkf, csfr, &fv_f, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, 3.0 * frcf_tol, do_tests);
+  evalAlternateForces(vkf, csir, &fv_f, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, 2.0 * frcf_tol, do_tests);
+  evalAlternateForces(vkf, csdr, &fv_i, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc,       frcf_tol, do_tests);
+  evalAlternateForces(vkf, csfr, &fv_i, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc, 2.0 * frcf_tol, do_tests);
+  evalAlternateForces(vkf, csir, &fv_i, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
+                      cimp_frc, cmap_frc,       frcf_tol, do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
@@ -34,6 +255,12 @@ int main(const int argc, const char* argv[]) {
 
   // Section 2
   section("Valence force evaluation");
+
+  // Section 3
+  section("Energy with alternate representations");
+
+  // Section 4
+  section("Forces with alternate representations");
 
   // Locate topologies and coordinate files
   const char osc = osSeparator();
@@ -70,6 +297,24 @@ int main(const int argc, const char* argv[]) {
     alad_ag.buildFromPrmtop(alad_top_name, ExceptionResponse::SILENT);
     alad_ps.buildFromFile(alad_crd_name, CoordinateFileKind::AMBER_INPCRD);
   }
+
+  // CHECK
+  PhaseSpaceWriter dhfr_psw = dhfr_ps.data();
+  ValenceKit<double> vk = dhfr_ag.getDoublePrecisionValenceKit();
+  ValenceKit<float> sp_vk = dhfr_ag.getSinglePrecisionValenceKit();
+  ScoreCard ddf_sc(1, 16, 32);
+  evaluateCharmmImproperTerms<double,
+                              double, double>(vk, dhfr_psw.xcrd, dhfr_psw.ycrd, dhfr_psw.zcrd,
+                                              dhfr_psw.umat, dhfr_psw.invu, dhfr_psw.unit_cell,
+                                              dhfr_psw.xfrc, dhfr_psw.yfrc, dhfr_psw.zfrc,
+                                              &ddf_sc, EvaluateForce::YES, 0);
+  evaluateCharmmImproperTerms<double,
+                              double, float>(sp_vk, dhfr_psw.xcrd, dhfr_psw.ycrd, dhfr_psw.zcrd,
+                                             dhfr_psw.umat, dhfr_psw.invu, dhfr_psw.unit_cell,
+                                             dhfr_psw.xfrc, dhfr_psw.yfrc, dhfr_psw.zfrc,
+                                             &ddf_sc, EvaluateForce::YES, 0);
+  // END CHECK
+  
   ScoreCard all_systems_sc(3);
   const int trpcage_idx = 0;
   const int dhfr_idx = 1;
@@ -164,11 +409,12 @@ int main(const int argc, const char* argv[]) {
     { alad_bond_e, alad_angl_e, alad_dihe_e.x, alad_dihe_e.y, alad_ubrd_e, alad_cimp_e,
       alad_cmap_e };
   section(1);
-  check(trpcage_valence_energy_result, RelationalOperator::EQUAL, trpcage_valence_energy_answer,
+  const RelationalOperator rel_eq = RelationalOperator::EQUAL;
+  check(trpcage_valence_energy_result, rel_eq, trpcage_valence_energy_answer,
         "Trp-cage valence energies do not meet expectations.", do_tests);
-  check(dhfr_valence_energy_result, RelationalOperator::EQUAL, dhfr_valence_energy_answer,
+  check(dhfr_valence_energy_result, rel_eq, dhfr_valence_energy_answer,
         "DHFR valence energies do not meet expectations.", do_tests);
-  check(alad_valence_energy_result, RelationalOperator::EQUAL, alad_valence_energy_answer,
+  check(alad_valence_energy_result, rel_eq, alad_valence_energy_answer,
         "Alanine dipeptide valence energies do not meet expectations.", do_tests);
 
   // Re-compute valence energies with a CoordinateFrame abstract (no force computations)
@@ -206,13 +452,13 @@ int main(const int argc, const char* argv[]) {
     evaluateCharmmImproperTerms(alad_ag, alad_cf, &secondary_sc, alad_idx),
     evaluateCmapTerms(alad_ag, alad_cf, &secondary_sc, alad_idx)
   };
-  check(trpcage_valence_energy_ii, RelationalOperator::EQUAL, trpcage_valence_energy_answer,
+  check(trpcage_valence_energy_ii, rel_eq, trpcage_valence_energy_answer,
         "Trp-cage valence energies do not meet expectations when computed with a CoordinateFrame "
         "abstract.", do_tests);
-  check(dhfr_valence_energy_ii, RelationalOperator::EQUAL, dhfr_valence_energy_answer,
+  check(dhfr_valence_energy_ii, rel_eq, dhfr_valence_energy_answer,
         "DHFR valence energies do not meet expectations when computed with a CoordinateFrame "
         "abstract.", do_tests);
-  check(alad_valence_energy_ii, RelationalOperator::EQUAL, alad_valence_energy_answer,
+  check(alad_valence_energy_ii, rel_eq, alad_valence_energy_answer,
         "Alanine dipeptide valence energies do not meet expectations when computed with a "
         "CoordinateFrame abstract.", do_tests);
   
@@ -281,6 +527,18 @@ int main(const int argc, const char* argv[]) {
            NumberFormat::SCIENTIFIC, "Forces due to ff19SB CMAP terms in the Ala dipeptide system "
            "do not meet expectations.", oe.takeSnapshot(), 1.0e-8, 1.0e-12, PrintSituation::APPEND,
            snap_check);
+
+  // Make alternate coordinate representations and recompute the energies
+  evalAlternateCoords(trpcage_ag, trpcage_cf, "Trp-cage", trpcage_valence_energy_ii,
+                      trpcage_bond_frc, trpcage_angl_frc, trpcage_dihe_frc, trpcage_bond_frc,
+                      trpcage_bond_frc, trpcage_bond_frc, 2.0e-4, 1.0e-5, 9.0e-4, 2.5e-5,
+                      do_tests);
+  evalAlternateCoords(dhfr_ag, dhfr_cf, "DHFR", dhfr_valence_energy_ii, dhfr_bond_frc,
+                      dhfr_angl_frc, dhfr_dihe_frc, dhfr_ubrd_frc, dhfr_cimp_frc, dhfr_cmap_frc,
+                      5.0e-4, 1.0e-5, 7.0e-3, 2.5e-5, do_tests);
+  evalAlternateCoords(alad_ag, alad_cf, "Alanine dipeptide", alad_valence_energy_ii, alad_bond_frc,
+                      alad_angl_frc, alad_dihe_frc, alad_bond_frc, alad_bond_frc, alad_cmap_frc,
+                      1.0e-4, 1.0e-5, 7.0e-4, 1.5e-5, do_tests);
 
   // Print results
   printTestSummary(oe.getVerbosity());

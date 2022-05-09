@@ -113,6 +113,14 @@ double evaluateBondTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double evaluateBondTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csw,
+                         ScoreCard *ecard, const int system_index, const int force_scale_bits) {
+  return evaluateBondTerms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard, system_index,
+                                          force_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Tcalc evalHarmonicBend(const int i_atom, const int j_atom, const int k_atom,
                        const Tcalc stiffness, const Tcalc equilibrium, const Tcoord* xcrd,
@@ -254,6 +262,14 @@ double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesRead
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csw,
+                          ScoreCard *ecard, const int system_index, const int force_scale_bits) {
+  return evaluateAngleTerms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard, system_index,
+                                           force_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
                         const Tcalc amplitude, const Tcalc phase_angle, const Tcalc frequency,
@@ -297,7 +313,7 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
   // Compute cross products and then the angle between the planes
   crossProduct(ab, bc, crabbc);
   crossProduct(bc, cd, crbccd);
-  Tcalc costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
+  Tcalc costheta = (crabbc[0] * crbccd[0]) + (crabbc[1] * crbccd[1]) + (crabbc[2] * crbccd[2]);
   if (tcalc_is_double) {
     costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
                      (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
@@ -313,8 +329,37 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
     theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ? acos(costheta) : -acos(costheta);
   }
   else {
-    theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ?  acosf(costheta) :
-                                                                  -acosf(costheta);
+    if (fabsf(costheta) >= near_to_one_f) {
+
+      // The floating-point representation of costheta is numerically ill-conditioned.  Compute
+      // the distance from atom I to the plane of atoms J, K, and L to get the angle by the
+      // arcsin of an extremely acute angle.
+      const Tcalc mg_crabbc = value_one / sqrtf(crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] +
+                                                crabbc[2]*crabbc[2]);
+      const Tcalc mg_crbccd = value_one / sqrtf(crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] +
+                                                crbccd[2]*crbccd[2]);
+      const Tcalc nx_abbc = crabbc[0] * mg_crabbc;
+      const Tcalc ny_abbc = crabbc[1] * mg_crabbc;
+      const Tcalc nz_abbc = crabbc[2] * mg_crabbc;
+      const Tcalc nx_bccd = crbccd[0] * mg_crbccd;
+      const Tcalc ny_bccd = crbccd[1] * mg_crbccd;
+      const Tcalc nz_bccd = crbccd[2] * mg_crbccd;
+      Tcalc rdx = nx_bccd - nx_abbc;
+      Tcalc rdy = ny_bccd - ny_abbc;
+      Tcalc rdz = nz_bccd - nz_abbc;
+      Tcalc rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+      if (fabsf(rs) > value_one) {
+        rdx = nx_bccd + nx_abbc;
+        rdy = ny_bccd + ny_abbc;
+        rdz = nz_bccd + nz_abbc;
+        rs = pi_f - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+      }
+      theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ? rs : -rs;
+    }
+    else {
+      theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ?  acosf(costheta) :
+                                                                    -acosf(costheta);
+    }
   }
   Tcalc sangle;
   switch (kind) {
@@ -505,6 +550,15 @@ double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const CoordinateSeries
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csw,
+                              ScoreCard *ecard, const int system_index,
+                              const int force_scale_bits) {
+  return evaluateDihedralTerms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard, system_index,
+                                              force_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd,
                                 const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
@@ -554,6 +608,15 @@ double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk,
                                                  &csr.invu[xfrm_os], csr.unit_cell, nullptr,
                                                  nullptr, nullptr, ecard, EvaluateForce::NO,
                                                  system_index, csr.inv_gpos_scale, force_scale);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk,
+                                const CoordinateSeriesWriter<Tcoord> csw, ScoreCard *ecard,
+                                const int system_index, const int force_scale_bits) {
+  return evaluateUreyBradleyTerms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard,
+                                                 system_index, force_scale_bits);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -608,7 +671,16 @@ double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk,
                                                     nullptr, nullptr, ecard, EvaluateForce::NO,
                                                     system_index, csr.inv_gpos_scale, force_scale);
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk,
+                                   const CoordinateSeriesWriter<Tcoord> csw, ScoreCard *ecard,
+                                   const int system_index, const int force_scale_bits) {
+  return evaluateCharmmImproperTerms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard,
+                                                    system_index, force_scale_bits);
+}
+
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const int surf_idx,
@@ -746,7 +818,7 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
     phi_progression[i] = phi_progression[i - 1] * phifrac;
     psi_progression[i] = psi_progression[i - 1] * psifrac;
   }
-  matrixVectorMultiply(acoef.data(), psi_progression, acoef_psi, 4, 4, 1.0, 1.0, 0.0);
+  matrixVectorMultiply<Tcalc>(acoef.data(), psi_progression, acoef_psi, 4, 4, 1.0, 1.0, 0.0);
   const Tcalc contrib = (phi_progression[0] * acoef_psi[0]) + (phi_progression[1] * acoef_psi[1]) +
                         (phi_progression[2] * acoef_psi[2]) + (phi_progression[3] * acoef_psi[3]);
 
@@ -1034,6 +1106,14 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csw,
+                         ScoreCard *ecard, const int system_index, const int force_scale_bits) {
+  return evaluateCmapTerms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard, system_index,
+                                          force_scale_bits);
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
                                      const Tcalc coulomb_constant, const Tcalc* charges,
@@ -1204,6 +1284,15 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                                   &csr.invu[xfrm_os], csr.unit_cell, nullptr,
                                                   nullptr, nullptr, ecard, EvaluateForce::NO,
                                                   system_index, csr.inv_gpos_scale, force_scale);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc>
+double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
+                                  const CoordinateSeriesWriter<Tcoord> csw, ScoreCard *ecard,
+                                  const int system_index, const int force_scale_bits) {
+  return evaluateAttenuated14Terms<Tcoord, Tcalc>(vk, CoordinateSeriesReader(csw), ecard,
+                                                  system_index, force_scale_bits);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1708,6 +1797,17 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
                                                    csr.invu, csr.unit_cell, csr.xfrc, csr.yfrc,
                                                    csr.zfrc, ecard, EvaluateForce::NO,
                                                    system_index, step_number);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tcalc, typename Tcalc2, typename Tcalc4>
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
+                          const CoordinateSeriesWriter<Tcoord> csw, ScoreCard *ecard,
+                          const int system_index, const int step_number,
+                          const int force_scale_bits) {
+  return evaluateRestraints<Tcoord, Tcalc, Tcalc2, Tcalc4>(rar, CoordinateSeriesReader(csw), ecard,
+                                                           system_index, step_number,
+                                                           force_scale_bits);
 }
 
 } // namespace energy

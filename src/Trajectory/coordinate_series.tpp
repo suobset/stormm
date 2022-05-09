@@ -36,6 +36,14 @@ CoordinateSeriesReader<T>::CoordinateSeriesReader(const int natom_in, const int 
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
+CoordinateSeriesReader<T>::CoordinateSeriesReader(const CoordinateSeriesWriter<T> &csw) :
+    natom{csw.natom}, nframe{csw.nframe}, unit_cell{csw.unit_cell}, gpos_bits{csw.gpos_bits},
+    gpos_scale{csw.gpos_scale}, inv_gpos_scale{csw.inv_gpos_scale}, xcrd{csw.xcrd}, ycrd{csw.ycrd},
+    zcrd{csw.zcrd}, umat{csw.umat}, invu{csw.invu}, boxdim{csw.boxdim}
+{}
+  
+//-------------------------------------------------------------------------------------------------
+template <typename T>
 CoordinateSeries<T>::CoordinateSeries(const int natom_in, const int nframe_in,
                                       const UnitCellType unit_cell_in,
                                       const int globalpos_scale_bits_in) :

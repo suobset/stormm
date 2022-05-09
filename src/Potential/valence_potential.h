@@ -49,6 +49,7 @@ using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::CoordinateFrameWriter;
 using trajectory::CoordinateSeriesReader;
+using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
 
@@ -60,6 +61,7 @@ using trajectory::PhaseSpaceWriter;
 /// \{
 constexpr double asymptotic_to_one_lf = 0.99999904632568359375;
 constexpr float  asymptotic_to_one_f  = (float)asymptotic_to_one_lf;
+constexpr float  near_to_one_f        = 0.99993896484375f;
 /// \}
 
 /// \brief A value which captures 1 / (1 - asymptotic_to_one), to put a cap on the value of such
@@ -162,6 +164,10 @@ double evaluateBondTerms(const AtomGraph *ag, const CoordinateFrame &cf,
 template <typename Tcoord, typename Tcalc>
 double evaluateBondTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
                          ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateBondTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csr,
+                         ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
 /// \brief Evaluate the energy and forces due to a harmonic bending interaction.  Parameters for
@@ -242,6 +248,10 @@ double evaluateAngleTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreC
 
 template <typename Tcoord, typename Tcalc>
 double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                          ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csr,
                           ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
@@ -326,6 +336,10 @@ double2 evaluateDihedralTerms(const AtomGraph *ag, const CoordinateFrame &cf, Sc
 template <typename Tcoord, typename Tcalc>
 double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
                               ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double2 evaluateDihedralTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csr,
+                              ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
   
 /// \brief Evaluate Urey-Bradley harmonic angle interactions with a simple routine.  This looks
@@ -396,6 +410,11 @@ template <typename Tcoord, typename Tcalc>
 double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk,
                                 const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
                                 int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateUreyBradleyTerms(const ValenceKit<Tcalc> vk,
+                                const CoordinateSeriesWriter<Tcoord> csr, ScoreCard *ecard,
+                                int system_index = 0, int force_scale_bits = 23);
 /// \}
   
 /// \brief Evaluate CHARMM harmonic improper dihedral terms with a simple routine.  This
@@ -465,6 +484,11 @@ double evaluateCharmmImproperTerms(const AtomGraph *ag, const CoordinateFrame &c
 template <typename Tcoord, typename Tcalc>
 double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk,
                                    const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                   int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateCharmmImproperTerms(const ValenceKit<Tcalc> vk,
+                                   const CoordinateSeriesWriter<Tcoord> csr, ScoreCard *ecard,
                                    int system_index = 0, int force_scale_bits = 23);
 /// \}
 
@@ -565,6 +589,10 @@ double evaluateCmapTerms(const AtomGraph *ag, const CoordinateFrame &cf, ScoreCa
 
 template <typename Tcoord, typename Tcalc>
 double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
+                         ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWriter<Tcoord> csr,
                          ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
@@ -685,6 +713,11 @@ double2 evaluateAttenuated14Terms(const AtomGraph *ag, const CoordinateFrame &cf
 template <typename Tcoord, typename Tcalc>
 double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
                                   const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                                  int system_index = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc>
+double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
+                                  const CoordinateSeriesWriter<Tcoord> csr, ScoreCard *ecard,
                                   int system_index = 0, int force_scale_bits = 23);
 /// \}
 
@@ -826,6 +859,11 @@ double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameRea
 template <typename Tcoord, typename Tcalc, typename Tcalc2, typename Tcalc4>
 double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
                           const CoordinateSeriesReader<Tcoord> csr, ScoreCard *ecard,
+                          int system_index = 0, int step_number = 0, int force_scale_bits = 23);
+
+template <typename Tcoord, typename Tcalc, typename Tcalc2, typename Tcalc4>
+double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
+                          const CoordinateSeriesWriter<Tcoord> csr, ScoreCard *ecard,
                           int system_index = 0, int step_number = 0, int force_scale_bits = 23);
 /// \}
   
