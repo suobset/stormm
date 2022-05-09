@@ -40,6 +40,11 @@ using symbols::twopi;
 using symbols::twopi_f;
 using symbols::inverse_twopi;
 using symbols::inverse_twopi_f;
+using symbols::asymptotic_to_one_f;
+using symbols::asymptotic_to_one_lf;
+using symbols::inverse_one_minus_asymptote_f;
+using symbols::inverse_one_minus_asymptote_lf;
+using symbols::near_to_one_f;
 using topology::AtomGraph;
 using topology::ValenceKit;
 using topology::NonbondedKit;
@@ -52,24 +57,6 @@ using trajectory::CoordinateSeriesReader;
 using trajectory::CoordinateSeriesWriter;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
-
-/// \brief A value which approaches one from below.  This is used in dihedral and similar
-///        computations to detect when a value is nearing 1.0 and might generate a singularity
-///        in some denominator.  It is nearly the closest value to 1.0 that can be represented in
-///        an IEEE-754 format 32-bit floating point number (the format can go a couple of bits'
-///        worth of precision closer, but this is 1 part in about a million).
-/// \{
-constexpr double asymptotic_to_one_lf = 0.99999904632568359375;
-constexpr float  asymptotic_to_one_f  = (float)asymptotic_to_one_lf;
-constexpr float  near_to_one_f        = 0.99993896484375f;
-/// \}
-
-/// \brief A value which captures 1 / (1 - asymptotic_to_one), to put a cap on the value of such
-///        fractions 1 / (1 - x) as x -> 1.
-/// \{
-constexpr double inverse_one_minus_asymptote_lf = 1048576.0;
-constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
-/// \}
 
 /// \brief Evaluate the energy and forces dur to a harmonic stretching term (both harmonic bonds
 ///        and Urey-Bradley terms can be evaluated with this function).
@@ -85,8 +72,8 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \param invu             Inverse transformation matrix, fractional coordinates to real space
 /// \param unit_cell        The unit cell type, i.e. triclinic
 /// \param xfrc             Cartesian X forces acting on all particles
-/// \param yfrc             Cartesian X forces acting on all particles
-/// \param zfrc             Cartesian X forces acting on all particles
+/// \param yfrc             Cartesian Y forces acting on all particles
+/// \param zfrc             Cartesian Z forces acting on all particles
 /// \param eval_force       Flag to have forces also evaluated
 /// \param inv_gpos_factor  Inverse positional scaling factor (for signed integer, fixed-precision
 ///                         coordinate representations)

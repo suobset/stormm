@@ -3,6 +3,7 @@
 #define OMNI_LOCAL_ARRANGEMENT_H
 
 #include <cmath>
+#include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
@@ -19,6 +20,8 @@ namespace structure {
 using card::Hybrid;
 using data_types::isSignedIntegralScalarType;
 using math::crossProduct;
+using symbols::pi_f;
+using symbols::near_to_one_f;
 using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
