@@ -1,5 +1,6 @@
 #include <vector>
 #include "../../src/Constants/scaling.h"
+#include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
@@ -14,6 +15,7 @@
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/coordinateframe.h"
+#include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
@@ -23,10 +25,15 @@ using omni::constants::tiny;
 using omni::data_types::char4;
 using omni::data_types::double2;
 using omni::data_types::double4;
+using omni::data_types::float2;
+using omni::data_types::float4;
+using omni::data_types::llint;
+using omni::data_types::getOmniScalarTypeName;
 using omni::diskutil::osSeparator;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::energy::ScoreCard;
+using omni::energy::StateVariable;
 using omni::energy::EvaluateForce;
 using omni::energy::evaluateRestraints;
 using omni::errors::rtWarn;
@@ -38,11 +45,7 @@ using omni::structure::distance;
 using omni::structure::angle;
 using omni::structure::dihedral_angle;
 using omni::topology::AtomGraph;
-using omni::trajectory::CoordinateFrameReader;
-using omni::trajectory::CoordinateFrameWriter;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::PhaseSpaceWriter;
-using omni::trajectory::TrajectoryKind;
+using namespace omni::trajectory;
 using namespace omni::restraints;
 using namespace omni::testing;
 
@@ -147,6 +150,131 @@ void digestRestraintList(const std::vector<BoundedRestraint> &rst_in, std::vecto
 }
 
 //-------------------------------------------------------------------------------------------------
+// Re-calculate the restraint forces on a system based on a particular precision model, then test
+// the result against a reference implementation.
+//
+// Arguments:
+//   
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+void testPrecModel(const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rak,
+                   const CoordinateSeries<Tcoord> &crd, CoordinateSeries<Tforce> *frc,
+                   const double e_target, const double e_tol,
+                   const std::vector<double> &frc_target, const double f_tol,
+                   const TestPriority do_tests) {
+  const CoordinateSeriesReader<Tcoord> crd_r = crd.data();
+  CoordinateSeriesWriter<Tforce> frc_w = frc->data();
+  const Tforce zero = 0.0;
+  for (int i = 0; i < frc_w.natom; i++) {
+    frc_w.xcrd[i] = zero;
+    frc_w.ycrd[i] = zero;
+    frc_w.zcrd[i] = zero;
+  }
+  ScoreCard sc(1, 16, 32);
+  evaluateRestraints<Tcoord, Tforce,
+                     Tcalc, Tcalc2, Tcalc4>(rak, crd_r.xcrd, crd_r.ycrd, crd_r.zcrd, crd_r.umat,
+                                            crd_r.invu, crd_r.unit_cell, frc_w.xcrd, frc_w.ycrd,
+                                            frc_w.zcrd, &sc, EvaluateForce::YES, 0, 0,
+                                            crd_r.inv_gpos_scale, frc_w.gpos_scale);
+  const double result_e = sc.reportInstantaneousStates(StateVariable::RESTRAINT, 0);
+  const CoordinateFrame result_frame = frc->exportFrame(0);
+  const std::vector<double> result_forces = result_frame.getInterlacedCoordinates();
+  const int restraint_order = (rak.nposn > 0) ? 1 : (rak.nbond > 0) ? 2 :
+                              (rak.nangl > 0) ? 3 : (rak.ndihe > 0) ? 4 : -1;
+  check(result_e, RelationalOperator::EQUAL, Approx(e_target).margin(e_tol), "Energy calculated "
+        "due to restraints of order " + std::to_string(restraint_order) + " fails to meet the "
+        "target value when calculated in " + getOmniScalarTypeName<Tcalc>() + " with coordinates "
+        "in " + getOmniScalarTypeName<Tcoord>() + " and forces in " +
+        getOmniScalarTypeName<Tforce>() + ".", do_tests);
+  check(result_forces, RelationalOperator::EQUAL, Approx(frc_target).margin(f_tol),
+        "Forces calculated due to restraints of order " + std::to_string(restraint_order) +
+        " fail to meet the target value when calculated in " + getOmniScalarTypeName<Tcalc>() +
+        " with coordinates in " + getOmniScalarTypeName<Tcoord>() + " and forces in " +
+        getOmniScalarTypeName<Tforce>() + ".", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Perform restraint calculations using various precision models for coordinates, forces, and the
+// calculation itself based on a given set of restraints.
+//
+// Arguments:
+//   rak:       Abstract for the restraint system in the precision model of interest (single or
+//              double precision)
+//   ps:        Coordinates of the system, also containing vectors to store forces on all particles
+//   ef_tol:    Tolerance for deviations from the <double, double, double> energy result when
+//              calculations are performed in single precision
+//   ei_tol:    Tolerance for deviations from the <double, double, double> energy result when
+//              coordinates or forces are stored in signed integer, fixed-precision format
+//   frcf_tol:  Tolerance for deviations from the <double, double, double> force result when
+//              calculations are performed in single precision
+//   frci_tol:  Tolerance for deviations from the <double, double, double> energy result when
+//              coordinates or forces are stored in signed integer, fixed-precision format
+//-------------------------------------------------------------------------------------------------
+void testPrecisionSetup(const RestraintApparatus &ra, const PhaseSpace &ps,
+                        const double ef_tol, const double ei_tol, const double frcf_tol,
+                        const double frci_tol, const TestPriority do_tests) {
+
+  // Check the various precision models
+  const CoordinateSeries<double> csd(ps, 1);
+  const CoordinateSeries<float> csf(ps, 1);
+  const CoordinateSeries<llint> csi(ps, 1, 26);
+  CoordinateSeries<double> frc_d(ps, 1);
+  CoordinateSeries<float> frc_f(ps, 1);
+  CoordinateSeries<llint> frc_i(ps, 1, 23);
+  const CoordinateSeriesReader<double> csdr = csd.data();
+  CoordinateSeriesWriter<double> frc_dw = frc_d.data();
+  ScoreCard ref_sc(1, 16, 32);
+  for (int i = 0; i < frc_dw.natom; i++) {
+    frc_dw.xcrd[i] = 0.0;
+    frc_dw.ycrd[i] = 0.0;
+    frc_dw.zcrd[i] = 0.0;
+  }
+  RestraintKit<double, double2, double4> rakd = ra.getDoublePrecisionAbstract();
+  RestraintKit<float, float2, float4> rakf = ra.getSinglePrecisionAbstract();
+  evaluateRestraints<double, double,
+                     double, double2, double4>(rakd, csdr.xcrd, csdr.ycrd, csdr.zcrd, csdr.umat,
+                                               csdr.invu, csdr.unit_cell, frc_dw.xcrd, frc_dw.ycrd,
+                                               frc_dw.zcrd, &ref_sc, EvaluateForce::YES);
+  const double ref_nrg = ref_sc.reportInstantaneousStates(StateVariable::RESTRAINT, 0);
+  const CoordinateFrame ref_frame = frc_d.exportFrame(0);
+  const std::vector<double> ref_forces = ref_frame.getInterlacedCoordinates();
+  testPrecModel<double, float, double, double2, double4>(rakd, csd, &frc_f, ref_nrg, ef_tol,
+                                                         ref_forces, frcf_tol, do_tests);
+  testPrecModel<double, float, float, float2, float4>(rakf, csd, &frc_f, ref_nrg, ef_tol,
+                                                      ref_forces, frcf_tol, do_tests);
+  testPrecModel<double, llint, double, double2, double4>(rakd, csd, &frc_i, ref_nrg, ei_tol,
+                                                         ref_forces, frci_tol, do_tests);
+  testPrecModel<double, llint, float, float2, float4>(rakf, csd, &frc_i, ref_nrg, ef_tol,
+                                                      ref_forces, frcf_tol, do_tests);
+  testPrecModel<float, double, double, double2, double4>(rakd, csf, &frc_d, ref_nrg, ef_tol,
+                                                         ref_forces, frcf_tol, do_tests);
+  testPrecModel<float, double, float, float2, float4>(rakf, csf, &frc_d, ref_nrg, ef_tol,
+                                                      ref_forces, frcf_tol, do_tests);
+  testPrecModel<float, float, double, double2, double4>(rakd, csf, &frc_f, ref_nrg, ef_tol,
+                                                        ref_forces, frcf_tol, do_tests);
+  testPrecModel<float, float, float, float2, float4>(rakf, csf, &frc_f, ref_nrg, ef_tol,
+                                                     ref_forces, frcf_tol, do_tests);
+  testPrecModel<float, llint, double, double2, double4>(rakd, csf, &frc_i, ref_nrg, ef_tol,
+                                                        ref_forces, frcf_tol, do_tests);
+  testPrecModel<float, llint, float, float2, float4>(rakf, csf, &frc_i, ref_nrg, ef_tol,
+                                                     ref_forces, frcf_tol, do_tests);
+  testPrecModel<llint, double, double, double2, double4>(rakd, csi, &frc_d, ref_nrg, ei_tol,
+                                                         ref_forces, frci_tol, do_tests);
+  testPrecModel<llint, double, float, float2, float4>(rakf, csi, &frc_d, ref_nrg, ef_tol,
+                                                      ref_forces, frcf_tol, do_tests);
+  testPrecModel<llint, float, double, double2, double4>(rakd, csi, &frc_f, ref_nrg, ei_tol,
+                                                        ref_forces, frcf_tol, do_tests);
+  testPrecModel<llint, float, float, float2, float4>(rakf, csi, &frc_f, ref_nrg, ef_tol,
+                                                     ref_forces, frcf_tol, do_tests);
+  testPrecModel<llint, llint, double, double2, double4>(rakd, csi, &frc_i, ref_nrg, ei_tol,
+                                                        ref_forces, frci_tol, do_tests);
+  testPrecModel<llint, llint, float, float2, float4>(rakf, csi, &frc_i, ref_nrg, ef_tol,
+                                                     ref_forces, frcf_tol, do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
@@ -160,6 +288,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 3
   section("Test restraint potential functions");
+
+  // Section 4
+  section("Test alternative precision models");
 
   // The restraint builders are automated tools for applying restraints to a structure based on
   // its features, to guide motion during dynamics or energy minimizations.
@@ -487,6 +618,14 @@ int main(const int argc, const char* argv[]) {
   check(analytic_frc, RelationalOperator::EQUAL, Approx(fd_frc).margin(2.0e-5), "Forces computed "
         "by analytic positional and holding restraints do not agree with finite-difference "
         "approximations.", do_tests);
+
+  // Try new precision models
+  section(4);
+  const RestraintKit<double,
+                     double2, double4> gk_posn_dbl = gk_posn_ra.getDoublePrecisionAbstract();
+  const RestraintKit<float,
+                     float2, float4> gk_posn_flt = gk_posn_ra.getSinglePrecisionAbstract();
+  testPrecisionSetup(gk_posn_ra, gk_ps, 1.0e-5, 1.0e-6, 1.0e-4, 1.0e-5, do_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

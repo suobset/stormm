@@ -814,7 +814,8 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
                           const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
                           Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                           EvaluateForce eval_force = EvaluateForce::NO, int system_index = 0,
-                          int step_number = 0);
+                          int step_number = 0, Tcalc inv_gpos_factor = 1.0,
+                          Tcalc force_factor = 1.0);
 
 double evaluateRestraints(const RestraintKit<double, double2, double4> rar,
                           PhaseSpaceWriter psw, ScoreCard *ecard,

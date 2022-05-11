@@ -33,6 +33,23 @@ using namespace omni::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Evaluate forces for a particular combination of coordinate, force, and calculation precision.
+//
+// Arguments:
+//   vk:                 Valence parameters for the system
+//   csr:                Original coordinates of the system
+//   force_accumulator:  Set of arrays in which to accumulate forces (this is a repurposing of the
+//                       CoordinateSeries object)
+//   sys_title:          Title of the system (for error reporting purposes)
+//   bond_ref:           Reference forces due to harmonic bond terms
+//   angl_ref:           Reference forces due to harmonic angles
+//   dihe_ref:           Reference forces due to cosine-based dihedrals
+//   ubrd_ref:           Reference forces due to Urey-Bradley harmonic angles
+//   cimp_ref:           Reference forces due to CHARMM improper dihedrals
+//   cmap_ref:           Reference CMAP forces
+//   tol:                Tolerance for judging success.  The amount will be scaled depending on the
+//                       particular test.
+//   do_tests:           Indicator that tests are even possible, passed down from a check in the
+//                       main program
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReader<Tcoord> csr,
@@ -151,6 +168,26 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
 
 //-------------------------------------------------------------------------------------------------
 // Evaluate the various valence energies and forces for a system.
+//
+// Arguments:
+//   ag:              System topology
+//   cf:              Original coordinates of the system in the highest-precision model
+//   sys_title:       System title (for error reporting purposes)
+//   valence_energy:  Vector of target valence energies computed with the highest-precision model
+//   bond_frc:        Reference forces due to harmonic bond terms
+//   angl_frc:        Reference forces due to harmonic angles
+//   dihe_frc:        Reference forces due to cosine-based dihedrals
+//   ubrd_frc:        Reference forces due to Urey-Bradley harmonic angles
+//   cimp_frc:        Reference forces due to CHARMM improper dihedrals
+//   cmap_frc:        Reference CMAP forces
+//   ef_tol:          Tolerance for energy calculations when single-precision floating point
+//                    operations are expected to be the primary source of error
+//   ei_tol:          Tolerance for energy calculations when fixed-precision coordinates are
+//                    expected to be the primary source of error
+//   frcf_tol:        Tolerance for force calculations when single-precision floating point
+//                    operations are expected to be the primary source of error
+//   frci_tol:        Tolerance for force calculations when fixed-precision coordinates or force
+//                    accumulators are expected to be the primary source of error
 //-------------------------------------------------------------------------------------------------
 void evalAlternateCoords(const AtomGraph &ag, const CoordinateFrame &cf,
                          const std::string &sys_title, const std::vector<double> &valence_energy,

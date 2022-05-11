@@ -1716,7 +1716,8 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
                           const double* invu, const UnitCellType unit_cell, Tforce* xfrc,
                           Tforce* yfrc, Tforce* zfrc, ScoreCard *ecard,
                           const EvaluateForce eval_force, const int system_index,
-                          const int step_number) {
+                          const int step_number, const Tcalc inv_gpos_factor,
+                          const Tcalc force_factor) {
   double rest_energy = 0.0;
   llint rest_acc = 0LL;
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
@@ -1729,7 +1730,7 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
                         rar.rposn_finl_xy[i], rar.rposn_init_z[i], rar.rposn_finl_z[i],
                         rar.rposn_init_keq[i], rar.rposn_finl_keq[i], rar.rposn_init_r[i],
                         rar.rposn_finl_r[i], xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                        zfrc, eval_force);
+                        zfrc, eval_force, inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
@@ -1742,7 +1743,7 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
                                                rar.rbond_init_keq[pos], rar.rbond_finl_keq[pos],
                                                rar.rbond_init_r[pos], rar.rbond_finl_r[pos], xcrd,
                                                ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                                               zfrc, eval_force);
+                                               zfrc, eval_force, inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
@@ -1755,7 +1756,8 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
                                                rar.rangl_finl_step[pos], rar.rangl_init_keq[pos],
                                                rar.rangl_finl_keq[pos], rar.rangl_init_r[pos],
                                                rar.rangl_finl_r[pos], xcrd, ycrd, zcrd, umat, invu,
-                                               unit_cell, xfrc, yfrc, zfrc, eval_force);
+                                               unit_cell, xfrc, yfrc, zfrc, eval_force,
+                                               inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
@@ -1769,7 +1771,7 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
                                                rar.rdihe_init_keq[pos], rar.rdihe_finl_keq[pos],
                                                rar.rdihe_init_r[pos], rar.rdihe_finl_r[pos], xcrd,
                                                ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                                               zfrc, eval_force);
+                                               zfrc, eval_force, inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
