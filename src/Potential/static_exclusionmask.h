@@ -50,7 +50,7 @@ struct StaticExclusionMaskReader {
   const int* tile_map_idx;           ///< Map indices for each tile's stretch of atoms within a
                                      ///<   supertile.  These are pre-inflated by 32, the length
                                      ///<   of an actual tile's mask.
-  const uint* mask_data;             ///< The exclusion actual mask data
+  const uint* mask_data;             ///< The actual exclusion mask data
 };
 
 /// \brief A simple pair list for an all-to-all calculation with exclusion masks.  The list stores

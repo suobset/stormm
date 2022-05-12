@@ -695,13 +695,14 @@ private:
   /// A list of atoms that the VWU shall import, with indices into the global array of atoms for
   /// all systems.  Each VWU may import up to 3/4 as many atoms as the kernel blocks have threads,
   /// and each VWU takes a stride of that many ints from this array.
-  Hybrid<int> atom_import_lists;
+  Hybrid<int> vwu_import_lists;
 
   /// A mask of the imported atoms that each VWU shall move (x member) and also update (y member)
   /// in terms of position and velocity.  Each bit is set to 1 if the atom must be moved or
   /// updated, 0 otherwise.  In terms of bitwise operations, for all elements of this array,
-  /// (x | y) = x.  This POINTER-kind object targets insr_uint2_data like other instructions sets.
-  Hybrid<uint2> atom_manipulation_mask;
+  /// the move mask completely subsumes the update mask, (x | y) = x.  This POINTER-kind object
+  /// targets insr_uint2_data like other instructions sets.
+  Hybrid<uint2> vwu_manipulation_mask;
 
   /// Instruction sets for the bond work units, up to 64 integers for the low and high limits of
   /// up to 32 types of interactions in a given work unit.  Each VWU takes a stride of 64 ints from

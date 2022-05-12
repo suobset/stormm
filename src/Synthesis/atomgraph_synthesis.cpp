@@ -258,8 +258,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     virtual_site_frame4_atoms{HybridKind::POINTER, "tpsyn_vs_frame4"},
     virtual_site_parameter_indices{HybridKind::POINTER, "tpsyn_vs_param_idx"},
     vsite_int_data{HybridKind::ARRAY, "tpsyn_vsite_ints"},
-    atom_import_lists{HybridKind::ARRAY, "tpsyn_atom_imports"},
-    atom_manipulation_mask{HybridKind::POINTER, "tpsyn_atom_manip"},
+    vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
+    vwu_manipulation_mask{HybridKind::POINTER, "tpsyn_vwu_manip"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     cbnd_instructions{HybridKind::POINTER, "tpsyn_cbnd_insr"},
     angl_instructions{HybridKind::POINTER, "tpsyn_angl_insr"},
@@ -304,6 +304,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 
   // Restraint data can now be incorporated.
   condenseRestraintNetworks();
+
+  // Create valence work units
+  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1108,16 +1111,20 @@ void AtomGraphSynthesis::condenseParameterTables() {
     topology_cmap_table_offsets[i] = cmap_offset;
     topology_chrg_table_offsets[i] = chrg_offset;
     topology_vste_table_offsets[i] = vste_offset;
-    bond_offset += vk.nbond;
-    angl_offset += vk.nangl;
-    dihe_offset += vk.ndihe;
-    ubrd_offset += vk.nubrd;
-    cimp_offset += vk.ncimp;
-    cmap_offset += vk.ncmap;
-    chrg_offset += nbk.natom;
-    vste_offset += vsk.nsite;
+    bond_offset += roundUp(vk.nbond_param, warp_size_int);
+    angl_offset += roundUp(vk.nangl_param, warp_size_int);
+    dihe_offset += roundUp(vk.ndihe_param, warp_size_int);
+    ubrd_offset += roundUp(vk.nubrd_param, warp_size_int);
+    cimp_offset += roundUp(vk.ncimp_param, warp_size_int);
+    cmap_offset += roundUp(vk.ncmap_surf, warp_size_int);
+    chrg_offset += roundUp(nbk.n_q_types, warp_size_int);
+    vste_offset += roundUp(vsk.nframe_set, warp_size_int);
   }
 
+  // CHECK
+  printf("There are %d bond mapping slots.\n", bond_offset);
+  // END CHECK
+  
   // Pre-compute some quantities relating to CMAPs that will help distinguish these gargantuan
   // "parameters" in the inner loops that follow.
   std::vector<double> cmap_parameter_sums(cmap_offset);
@@ -1492,13 +1499,13 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                  warp_size_zu);
 
   // Loop back over all systems and copy the known mapping of individual topologies to the
-  // synthesis as a whole
+  // synthesis as a whole.  Fill out the parameter maps.
   for (int i = 0; i < system_count; i++) {
-    const AtomGraph* iag_ptr = topologies[topology_indices.readHost(i)];
+    const int tp_index = topology_indices.readHost(i);
+    const AtomGraph* iag_ptr = topologies[tp_index];
     const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> i_vsk = iag_ptr->getDoublePrecisionVirtualSiteKit();
-    const int tp_index = topology_indices.readHost(i);
     const int ag_bond_table_offset = topology_bond_table_offsets[tp_index];
     const int ag_angl_table_offset = topology_angl_table_offsets[tp_index];
     const int ag_dihe_table_offset = topology_dihe_table_offsets[tp_index];
@@ -1507,47 +1514,77 @@ void AtomGraphSynthesis::condenseParameterTables() {
     const int ag_cmap_table_offset = topology_cmap_table_offsets[tp_index];
     const int ag_vste_table_offset = topology_vste_table_offsets[tp_index];
     const int ag_chrg_table_offset = topology_chrg_table_offsets[tp_index];
-    const int synth_bond_table_offset = bond_term_offsets.readHost(i);
-    const int synth_angl_table_offset = angl_term_offsets.readHost(i);
-    const int synth_dihe_table_offset = dihe_term_offsets.readHost(i);
-    const int synth_ubrd_table_offset = ubrd_term_offsets.readHost(i);
-    const int synth_cimp_table_offset = cimp_term_offsets.readHost(i);
-    const int synth_cmap_table_offset = cmap_term_offsets.readHost(i);
-    const int synth_vste_table_offset = virtual_site_offsets.readHost(i);
+    const int synth_bond_term_offset = bond_term_offsets.readHost(i);
+    const int synth_angl_term_offset = angl_term_offsets.readHost(i);
+    const int synth_dihe_term_offset = dihe_term_offsets.readHost(i);
+    const int synth_ubrd_term_offset = ubrd_term_offsets.readHost(i);
+    const int synth_cimp_term_offset = cimp_term_offsets.readHost(i);
+    const int synth_cmap_term_offset = cmap_term_offsets.readHost(i);
+    const int synth_vste_term_offset = virtual_site_offsets.readHost(i);
     const int synth_atom_offset = atom_offsets.readHost(i);
     for (int j = 0; j < i_vk.nbond; j++) {
-      bond_param_idx.putHost(bond_synthesis_index[ag_bond_table_offset + j],
-                             synth_bond_table_offset + j);
+      bond_param_idx.putHost(bond_synthesis_index[ag_bond_table_offset + i_vk.bond_param_idx[j]],
+                             synth_bond_term_offset + j);
     }
     for (int j = 0; j < i_vk.nangl; j++) {
-      angl_param_idx.putHost(angl_synthesis_index[ag_angl_table_offset + j],
-                             synth_angl_table_offset + j);
+      angl_param_idx.putHost(angl_synthesis_index[ag_angl_table_offset + i_vk.angl_param_idx[j]],
+                             synth_angl_term_offset + j);
     }
     for (int j = 0; j < i_vk.ndihe; j++) {
-      dihe_param_idx.putHost(dihe_synthesis_index[ag_dihe_table_offset + j],
-                             synth_dihe_table_offset + j);
+      dihe_param_idx.putHost(dihe_synthesis_index[ag_dihe_table_offset + i_vk.dihe_param_idx[j]],
+                             synth_dihe_term_offset + j);
     }
     for (int j = 0; j < i_vk.nubrd; j++) {
-      ubrd_param_idx.putHost(ubrd_synthesis_index[ag_ubrd_table_offset + j],
-                             synth_ubrd_table_offset + j);
+      ubrd_param_idx.putHost(ubrd_synthesis_index[ag_ubrd_table_offset + i_vk.ubrd_param_idx[j]],
+                             synth_ubrd_term_offset + j);
     }
     for (int j = 0; j < i_vk.ncimp; j++) {
-      cimp_param_idx.putHost(cimp_synthesis_index[ag_cimp_table_offset + j],
-                             synth_cimp_table_offset + j);
+      cimp_param_idx.putHost(cimp_synthesis_index[ag_cimp_table_offset + i_vk.cimp_param_idx[j]],
+                             synth_cimp_term_offset + j);
     }
     for (int j = 0; j < i_vk.ncmap; j++) {
-      cmap_param_idx.putHost(cmap_synthesis_index[ag_cmap_table_offset + j],
-                             synth_cmap_table_offset + j);
+      cmap_param_idx.putHost(cmap_synthesis_index[ag_cmap_table_offset + i_vk.cmap_surf_idx[j]],
+                             synth_cmap_term_offset + j);
     }
     for (int j = 0; j < i_nbk.natom; j++) {
-      charge_indices.putHost(chrg_synthesis_index[ag_chrg_table_offset + j],
+      charge_indices.putHost(chrg_synthesis_index[ag_chrg_table_offset + i_nbk.q_idx[j]],
                              synth_atom_offset + j);
     }
     for (int j = 0; j < i_vsk.nsite; j++) {
-      virtual_site_parameter_indices.putHost(vste_synthesis_index[ag_vste_table_offset + j],
-                                             synth_vste_table_offset + j);
+      virtual_site_parameter_indices.putHost(vste_synthesis_index[ag_vste_table_offset +
+                                                                  i_vsk.vs_param_idx[j]],
+                                             synth_vste_term_offset + j);
     }
   }
+
+  // CHECK
+#if 0
+  std::vector<bool> system_covered(topology_count, false);
+  for (int i = 0; i < system_count; i++) {
+    const int tp_index = topology_indices.readHost(i);
+    if (system_covered[tp_index]) {
+      continue;
+    }
+    system_covered[tp_index] = true;
+    const AtomGraph* iag_ptr = topologies[tp_index];
+    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
+    const VirtualSiteKit<double> i_vsk = iag_ptr->getDoublePrecisionVirtualSiteKit();
+    const int tmp_offset = topology_bond_table_offsets[tp_index];
+    printf("Topology %2d (%4d unique bond parameters):\n", tp_index, i_vk.nbond_param);
+    for (int j = 0; j < i_vk.nbond_param; j++) {
+      if (tmp_offset < 0 || tmp_offset >= bond_synthesis_index.size()) {
+        printf("tmp_offset = %d\n", tmp_offset);
+      }
+      if (tmp_offset + j < 0 || tmp_offset + j >= bond_synthesis_index.size()) {
+        printf("tmp_offset + j = %d\n", tmp_offset + j);
+      }
+      printf(" %4d", bond_synthesis_index[tmp_offset + j]);
+    }
+    printf("\n");
+  }
+#endif
+  // END CHECK
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -2279,7 +2316,7 @@ void AtomGraphSynthesis::upload() {
   virtual_site_parameters.upload();
   sp_virtual_site_parameters.upload();
   vsite_int_data.upload();
-  atom_import_lists.upload();
+  vwu_import_lists.upload();
   vwu_instruction_sets.upload();
   insr_uint_data.upload();
   insr_uint2_data.upload();
@@ -2315,7 +2352,7 @@ void AtomGraphSynthesis::download() {
   virtual_site_parameters.download();
   sp_virtual_site_parameters.download();
   vsite_int_data.download();
-  atom_import_lists.download();
+  vwu_import_lists.download();
   vwu_instruction_sets.download();
   insr_uint_data.download();
   insr_uint2_data.download();
