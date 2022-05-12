@@ -14,10 +14,12 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::llint;
+using omni::llint_type_index;
 using omni::double2;
 using omni::int2;
 using omni::int3;
 using omni::constants::ExceptionResponse;
+using omni::data_types::getOmniScalarTypeName;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
@@ -94,6 +96,55 @@ std::vector<double> forceByFiniteDifference(const AtomGraph &ag, const StaticExc
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+// Compute the non-bonded forces on a system using the precision model specified by a particular
+// parameter set, coordinate, and force representation.
+//
+// Arguments:
+//   nbk:         Non-bonded parameters in a particular precision
+//   semask:      Non-bonded exclusions list
+//   ps:          Coordinates of the system in double precision
+//   gb_ref_frc:  Reference Generalized Born forces on all particles
+//   tol:         Tolerance to apply to each force component on every particle when comparing to
+//                the reference
+//   do_tests:    Indicator of whether to pursue tests
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void testNBPrecisionModel(const NonbondedKit<Tcalc> nbk, const ImplicitSolventKit<Tcalc> isk,
+                          const NeckGeneralizedBornKit<Tcalc> ngb_kit,
+                          const StaticExclusionMask &semask, const PhaseSpace &ps,
+                          const std::vector<double> &gb_ref_frc, const double tol,
+                          const TestPriority do_tests) {
+  const size_t tcoord_ct = std::type_index(typeid(Tcoord)).hash_code();
+  const size_t tforce_ct = std::type_index(typeid(Tforce)).hash_code();
+  const CoordinateSeries<Tcoord> crd(ps, 1, 26 * (tcoord_ct == llint_type_index));
+  CoordinateSeries<Tforce> frc(ps, 1, 23 * (tforce_ct == llint_type_index));
+  CoordinateSeries<Tforce> xtra(ps, 1, 23 * (tforce_ct == llint_type_index));
+  CoordinateSeriesReader crdr = crd.data();
+  CoordinateSeriesWriter frcw = frc.data();
+  CoordinateSeriesWriter xtrw = xtra.data();
+  ScoreCard sc(1, 16, 32);
+  const Tforce zero = 0.0;
+  for (int i = 0; i < frcw.natom; i++) {
+    frcw.xcrd[i] = zero;
+    frcw.ycrd[i] = zero;
+    frcw.zcrd[i] = zero;
+  }
+  evaluateGeneralizedBornEnergy<Tcoord, Tforce, Tcalc>(nbk, semask.data(), isk, ngb_kit, crdr.xcrd,
+                                                       crdr.ycrd, crdr.zcrd, frcw.xcrd, frcw.ycrd,
+                                                       frcw.zcrd, xtrw.xcrd, xtrw.ycrd, xtrw.zcrd,
+                                                       &sc, EvaluateForce::YES, 0,
+                                                       crdr.inv_gpos_scale, frcw.gpos_scale);
+  const CoordinateFrame gb_frame = frc.exportFrame(0);
+  const std::vector<double> gb_result = gb_frame.getInterlacedCoordinates();
+  check(gb_result, RelationalOperator::EQUAL, Approx(gb_ref_frc).margin(tol),
+        "Generalized Born forces do not agree with the reference when computed in " +
+        getOmniScalarTypeName<Tcalc>() + " with " + getOmniScalarTypeName<Tcoord>() +
+        " coordinates and " + getOmniScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
@@ -500,6 +551,7 @@ int main(const int argc, const char* argv[]) {
                                                             trpi_isk_f, ngb_kit_f,
                                                             trpcage_csi.data(), &traj_sc, i, 22);
   }
+  section(5);
   check(meanUnsignedError(gbe_dd, gbe_fd), RelationalOperator::LESS_THAN, 8.0e-6, "Representing "
         "coordinates in single-precision (calculations in double-precision) exacts a greater than "
         "expected toll on the accuracy of (Mongan Neck II) Generalized Born calculations in the "
@@ -519,6 +571,42 @@ int main(const int argc, const char* argv[]) {
         "calculations in single-precision (with coordinates represented in fixed-precision) "
         "exacts a greater than expected toll on the accuracy of (Mongan Neck II) Generalized Born "
         "calculations in the Trp-cage system.", do_traj_tests);
+  trpi_ps.initializeForces();
+  ScoreCard trpi_sc(1, 1, 32);
+  evaluateGeneralizedBornEnergy(trpi_ag, trpi_se, ngb_tab, &trpi_ps, &trpi_sc, EvaluateForce::YES);
+  const std::vector<double> trpi_ref_gb_forces = trpi_ps.getInterlacedCoordinates(tkind);
+  testNBPrecisionModel<double, float, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                              trpi_ref_gb_forces, 7.0e-6, do_tests);
+  testNBPrecisionModel<double, float, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 3.0e-5, do_tests);
+  testNBPrecisionModel<double, llint, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                              trpi_ref_gb_forces, 1.0e-5, do_tests);
+  testNBPrecisionModel<double, llint, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 2.3e-5, do_tests);
+  testNBPrecisionModel<float, double, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                              trpi_ref_gb_forces, 2.0e-5, do_tests);
+  testNBPrecisionModel<float, double, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 2.4e-5, do_tests);
+  testNBPrecisionModel<float, float, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 1.7e-5, do_tests);
+  testNBPrecisionModel<float, float, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                            trpi_ref_gb_forces, 3.0e-5, do_tests);
+  testNBPrecisionModel<float, llint, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 2.0e-5, do_tests);
+  testNBPrecisionModel<float, llint, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                            trpi_ref_gb_forces, 2.2e-5, do_tests);
+  testNBPrecisionModel<llint, double, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                              trpi_ref_gb_forces, 6.0e-7, do_tests);
+  testNBPrecisionModel<llint, double, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 1.8e-5, do_tests);
+  testNBPrecisionModel<llint, float, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 1.0e-5, do_tests);
+  testNBPrecisionModel<llint, float, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                            trpi_ref_gb_forces, 3.2e-5, do_tests);
+  testNBPrecisionModel<llint, llint, double>(trpi_nbk_d, trpi_isk_d, ngb_kit_d, trpi_se, trpi_ps,
+                                             trpi_ref_gb_forces, 1.0e-5, do_tests);
+  testNBPrecisionModel<llint, llint, float>(trpi_nbk_f, trpi_isk_f, ngb_kit_f, trpi_se, trpi_ps,
+                                            trpi_ref_gb_forces, 1.8e-5, do_tests);
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {

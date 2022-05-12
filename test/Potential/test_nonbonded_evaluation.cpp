@@ -20,6 +20,8 @@ using omni::int2;
 using omni::int3;
 using omni::constants::ExceptionResponse;
 using omni::data_types::llint;
+using omni::data_types::llint_type_index;
+using omni::data_types::getOmniScalarTypeName;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
@@ -120,6 +122,69 @@ int3 checkMarkedExclusions(const StaticExclusionMask &se) {
   return n_errors;
 }
 
+//-------------------------------------------------------------------------------------------------
+// Compute the non-bonded forces on a system using the precision model specified by a particular
+// parameter set, coordinate, and force representation.
+//
+// Arguments:
+//   nbk:           Non-bonded parameters in a particular precision
+//   semask:        Non-bonded exclusions list
+//   ps:            Coordinates of the system in double precision
+//   elec_ref_frc:  Reference electrostatic forces on all particles
+//   vdw_ref_frc:   Reference van-der Waals forces on all particles
+//   tol:           Tolerance to apply to each force component on every particle when comparing to
+//                  the reference
+//   do_tests:      Indicator of whether to pursue tests
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+void testNBPrecisionModel(const NonbondedKit<Tcalc>nbk, const StaticExclusionMask &semask,
+                          const PhaseSpace &ps, const std::vector<double> &elec_ref_frc,
+                          const std::vector<double> &vdw_ref_frc, const double tol,
+                          const TestPriority do_tests) {
+  const size_t tcoord_ct = std::type_index(typeid(Tcoord)).hash_code();
+  const size_t tforce_ct = std::type_index(typeid(Tforce)).hash_code();
+  const CoordinateSeries<Tcoord> crd(ps, 1, 26 * (tcoord_ct == llint_type_index));
+  CoordinateSeries<Tforce> frc(ps, 1, 23 * (tforce_ct == llint_type_index));
+  CoordinateSeriesReader crdr = crd.data();
+  CoordinateSeriesWriter frcw = frc.data();
+  ScoreCard sc(1, 16, 32);
+  const Tforce zero = 0.0;
+  for (int i = 0; i < frcw.natom; i++) {
+    frcw.xcrd[i] = zero;
+    frcw.ycrd[i] = zero;
+    frcw.zcrd[i] = zero;
+  }
+  evaluateNonbondedEnergy<Tcoord, Tforce, Tcalc>(nbk, semask.data(), crdr.xcrd, crdr.ycrd,
+                                                 crdr.zcrd, crdr.umat, crdr.invu, crdr.unit_cell,
+                                                 frcw.xcrd, frcw.ycrd, frcw.zcrd, &sc,
+                                                 EvaluateForce::YES, EvaluateForce::NO, 0,
+                                                 crdr.inv_gpos_scale, frcw.gpos_scale);
+  const CoordinateFrame elec_frame = frc.exportFrame(0);
+  const std::vector<double> elec_result = elec_frame.getInterlacedCoordinates();
+  for (int i = 0; i < frcw.natom; i++) {
+    frcw.xcrd[i] = zero;
+    frcw.ycrd[i] = zero;
+    frcw.zcrd[i] = zero;
+  }
+  evaluateNonbondedEnergy<Tcoord, Tforce, Tcalc>(nbk, semask.data(), crdr.xcrd, crdr.ycrd,
+                                                 crdr.zcrd, crdr.umat, crdr.invu, crdr.unit_cell,
+                                                 frcw.xcrd, frcw.ycrd, frcw.zcrd, &sc,
+                                                 EvaluateForce::NO, EvaluateForce::YES, 0,
+                                                 crdr.inv_gpos_scale, frcw.gpos_scale);
+  const CoordinateFrame vdw_frame = frc.exportFrame(0);
+  const std::vector<double> vdw_result = vdw_frame.getInterlacedCoordinates();
+  check(elec_result, RelationalOperator::EQUAL, Approx(elec_ref_frc).margin(tol),
+        "Electrostatic forces do not agree with the reference when computed in " +
+        getOmniScalarTypeName<Tcalc>() + " with " + getOmniScalarTypeName<Tcoord>() +
+        " coordinates and " + getOmniScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+  check(vdw_result, RelationalOperator::EQUAL, Approx(vdw_ref_frc).margin(tol),
+        "van-der Waals forces do not agree with the reference when computed in " +
+        getOmniScalarTypeName<Tcalc>() + " with " + getOmniScalarTypeName<Tcoord>() +
+        " coordinates and " + getOmniScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
@@ -665,6 +730,39 @@ int main(const int argc, const char* argv[]) {
   check(mue_vdw_if, RelationalOperator::LESS_THAN, 1.0e-5, "Mean unsigned error for "
         "van-der Waals energies of Trp-cage frames is higher than expected when representing "
         "coordinates in fixed precision and calculating in single precision.", do_traj_tests);
+  section(6);
+  testNBPrecisionModel<double, float, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                              trpi_vdw_frc, 5.0e-6, do_tests);
+  testNBPrecisionModel<double, float, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<double, llint, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                              trpi_vdw_frc, 7.0e-7, do_tests);
+  testNBPrecisionModel<double, llint, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<float, double, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                              trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<float, double, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<float, float, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<float, float, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                            trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<float, llint, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<float, llint, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                            trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<llint, double, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                              trpi_vdw_frc, 1.8e-6, do_tests);
+  testNBPrecisionModel<llint, double, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<llint, float, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-6, do_tests);
+  testNBPrecisionModel<llint, float, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                            trpi_vdw_frc, 5.0e-5, do_tests);
+  testNBPrecisionModel<llint, llint, double>(trpi_nbk_d, trpi_semask, trpi_ps, trpi_elec_frc,
+                                             trpi_vdw_frc, 5.0e-6, do_tests);
+  testNBPrecisionModel<llint, llint, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
+                                            trpi_vdw_frc, 5.0e-5, do_tests);
   
   // Print results
   if (oe.getDisplayTimingsOrder()) {

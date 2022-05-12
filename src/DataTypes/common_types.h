@@ -49,7 +49,7 @@ template <typename T> bool isUnsignedIntegralScalarType();
 /// \brief Test whether some data type is a recongized floating point number.
 template <typename T> bool isFloatingPointScalarType();
 
-/// \brief Produce a platform-independent name by which to identify one of the scalara data types.
+/// \brief Produce a platform-independent name by which to identify one of the scalar data types.
 template <typename T> std::string getOmniScalarTypeName();
   
 } // namespace data_types
