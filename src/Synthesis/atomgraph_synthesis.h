@@ -19,12 +19,9 @@ using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
 using topology::ImplicitSolventModel;
 using topology::MassForm;
-using topology::NonbondedKit;
 using topology::SettleSetting;
 using topology::ShakeSetting;
 using topology::UnitCellType;
-using topology::ValenceKit;
-using topology::VirtualSiteKit;
   
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing

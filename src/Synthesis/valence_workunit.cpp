@@ -21,6 +21,7 @@ using math::roundUp;
 using parse::char4ToString;
 using topology::extractBoundedListEntries;
 using topology::markAffectorAtoms;
+using topology::NonbondedKit;
 using topology::TorsionKind;
 using topology::VirtualSiteKind;
 using topology::writeAtomList;
