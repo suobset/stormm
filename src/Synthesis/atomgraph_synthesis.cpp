@@ -25,7 +25,12 @@ using restraints::RestraintStage;
 using topology::accepted_coulomb_constant;
 using topology::CmapAccessories;
 using topology::ComputeCmapDerivatives;
+using topology::ConstraintKit;
+using topology::NonbondedKit;
+using topology::ValenceKit;
+using topology::VirtualSiteKit;
 using testing::Approx;
+using testing::ComparisonType;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
@@ -1090,6 +1095,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int cmap_offset = 0;
   int chrg_offset = 0;
   int vste_offset = 0;
+  int sett_offset = 0;
+  int cnst_offset = 0;
   std::vector<int> topology_bond_table_offsets(topology_count);
   std::vector<int> topology_angl_table_offsets(topology_count);
   std::vector<int> topology_dihe_table_offsets(topology_count);
@@ -1098,11 +1105,14 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> topology_cmap_table_offsets(topology_count);
   std::vector<int> topology_chrg_table_offsets(topology_count);
   std::vector<int> topology_vste_table_offsets(topology_count);
+  std::vector<int> topology_sett_table_offsets(topology_count);
+  std::vector<int> topology_cnst_table_offsets(topology_count);
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* ag_ptr = topologies[i];
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
+    const ConstraintKit<double> cnk  = ag_ptr->getDoublePrecisionConstraintKit();
     topology_bond_table_offsets[i] = bond_offset;
     topology_angl_table_offsets[i] = angl_offset;
     topology_dihe_table_offsets[i] = dihe_offset;
@@ -1111,6 +1121,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
     topology_cmap_table_offsets[i] = cmap_offset;
     topology_chrg_table_offsets[i] = chrg_offset;
     topology_vste_table_offsets[i] = vste_offset;
+    topology_sett_table_offsets[i] = sett_offset;
+    topology_cnst_table_offsets[i] = cnst_offset;
     bond_offset += roundUp(vk.nbond_param, warp_size_int);
     angl_offset += roundUp(vk.nangl_param, warp_size_int);
     dihe_offset += roundUp(vk.ndihe_param, warp_size_int);
@@ -1119,11 +1131,9 @@ void AtomGraphSynthesis::condenseParameterTables() {
     cmap_offset += roundUp(vk.ncmap_surf, warp_size_int);
     chrg_offset += roundUp(nbk.n_q_types, warp_size_int);
     vste_offset += roundUp(vsk.nframe_set, warp_size_int);
+    sett_offset += roundUp(cnk.nsett_param, warp_size_int);
+    cnst_offset += roundUp(cnk.ncnst_param, warp_size_int);
   }
-
-  // CHECK
-  printf("There are %d bond mapping slots.\n", bond_offset);
-  // END CHECK
   
   // Pre-compute some quantities relating to CMAPs that will help distinguish these gargantuan
   // "parameters" in the inner loops that follow.
@@ -1147,36 +1157,29 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> cmap_synthesis_index(cmap_offset, -1);
   std::vector<int> chrg_synthesis_index(chrg_offset, -1);
   std::vector<int> vste_synthesis_index(vste_offset, -1);
-  std::vector<double> filtered_bond_keq;
-  std::vector<double> filtered_bond_leq;
-  std::vector<float> sp_filtered_bond_keq;
-  std::vector<float> sp_filtered_bond_leq;
-  std::vector<double> filtered_angl_keq;
-  std::vector<double> filtered_angl_theta;
-  std::vector<float> sp_filtered_angl_keq;
-  std::vector<float> sp_filtered_angl_theta;
-  std::vector<double> filtered_dihe_amp;
-  std::vector<double> filtered_dihe_freq;
-  std::vector<double> filtered_dihe_phi;
-  std::vector<float> sp_filtered_dihe_amp;
-  std::vector<float> sp_filtered_dihe_freq;
-  std::vector<float> sp_filtered_dihe_phi;
-  std::vector<double> filtered_ubrd_keq;
-  std::vector<double> filtered_ubrd_leq;
-  std::vector<float> sp_filtered_ubrd_keq;
-  std::vector<float> sp_filtered_ubrd_leq;
-  std::vector<double> filtered_cimp_keq;
-  std::vector<double> filtered_cimp_phi;
-  std::vector<float> sp_filtered_cimp_keq;
-  std::vector<float> sp_filtered_cimp_phi;
+  std::vector<int> sett_synthesis_index(sett_offset, -1);
+  std::vector<int> cnst_synthesis_index(cnst_offset, -1);
+  std::vector<double> filtered_bond_keq, filtered_bond_leq;
+  std::vector<float> sp_filtered_bond_keq, sp_filtered_bond_leq;
+  std::vector<double> filtered_angl_keq, filtered_angl_theta;
+  std::vector<float> sp_filtered_angl_keq, sp_filtered_angl_theta;
+  std::vector<double> filtered_dihe_amp, filtered_dihe_freq, filtered_dihe_phi;
+  std::vector<float> sp_filtered_dihe_amp, sp_filtered_dihe_freq, sp_filtered_dihe_phi;
+  std::vector<double> filtered_ubrd_keq,filtered_ubrd_leq;
+  std::vector<float> sp_filtered_ubrd_keq, sp_filtered_ubrd_leq;
+  std::vector<double> filtered_cimp_keq, filtered_cimp_phi;
+  std::vector<float> sp_filtered_cimp_keq, sp_filtered_cimp_phi;
   std::vector<int> filtered_cmap_dim;
   std::vector<int> filtered_cmap_surf_bounds(1, 0);
   std::vector<double> filtered_cmap_surf;
   std::vector<float> sp_filtered_cmap_surf;
   std::vector<double> filtered_chrg;
   std::vector<float> sp_filtered_chrg;
-  std::vector<double4> filtered_vste_params;
-  std::vector<float4> sp_filtered_vste_params;
+  std::vector<double4> filtered_vste_params, filtered_sett_geom;
+  std::vector<float4> sp_filtered_vste_params, sp_filtered_sett_geom;
+  std::vector<double2> filtered_sett_mass, filtered_cnst_group_params;
+  std::vector<float2> sp_filtered_sett_mass, sp_filtered_cnst_group_params;
+  std::vector<int> filtered_cnst_group_bounds(1, 0);
   int n_unique_bond = 0;
   int n_unique_angl = 0;
   int n_unique_dihe = 0;
@@ -1185,15 +1188,19 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int n_unique_cmap = 0;
   int n_unique_chrg = 0;
   int n_unique_vste = 0;
+  int n_unique_sett = 0;
+  int n_unique_cnst = 0;
   for (int i = 0; i < topology_count; i++) {
     const AtomGraph* iag_ptr = topologies[i];
     const ChemicalDetailsKit i_cdk       = iag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> i_nbk     = iag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> i_vk        = iag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> i_vsk   = iag_ptr->getDoublePrecisionVirtualSiteKit();
+    const ConstraintKit<double> i_cnk    = iag_ptr->getDoublePrecisionConstraintKit();
     const NonbondedKit<float> i_nbk_sp   = iag_ptr->getSinglePrecisionNonbondedKit();
     const ValenceKit<float> i_vk_sp      = iag_ptr->getSinglePrecisionValenceKit();
     const VirtualSiteKit<float> i_vsk_sp = iag_ptr->getSinglePrecisionVirtualSiteKit();
+    const ConstraintKit<float> i_cnk_sp  = iag_ptr->getSinglePrecisionConstraintKit();
 
     // Seek out unique bond parameters
     for (int j = 0; j < i_vk.nbond_param; j++) {
@@ -1411,7 +1418,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_dim3(i_vsk.dim3[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
         const AtomGraph* kag_ptr = topologies[k];
-        const VirtualSiteKit<double> k_vsk    = kag_ptr->getDoublePrecisionVirtualSiteKit();
+        const VirtualSiteKit<double> k_vsk = kag_ptr->getDoublePrecisionVirtualSiteKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vsk.nframe_set; m++) {
           if (vste_synthesis_index[topology_vste_table_offsets[k] + m] < 0 &&
@@ -1428,6 +1435,86 @@ void AtomGraphSynthesis::condenseParameterTables() {
       sp_filtered_vste_params.push_back({ i_vsk_sp.dim1[j], i_vsk_sp.dim2[j],
                                           i_vsk_sp.dim3[j], static_cast<float>(ij_frame_type) });
       n_unique_vste++;
+    }
+
+    // Seek out unique SETTLE parameter sets
+    for (int j = 0; j < i_cnk.nsett_param; j++) {
+      if (sett_synthesis_index[topology_sett_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_mormt(i_cnk.settle_mormt[j], constants::verytiny);
+      const Approx ij_mhrmt(i_cnk.settle_mhrmt[j], constants::verytiny);
+      const Approx ij_ra(i_cnk.settle_ra[j], constants::verytiny);
+      const Approx ij_rb(i_cnk.settle_rb[j], constants::verytiny);
+      const Approx ij_rc(i_cnk.settle_rc[j], constants::verytiny);
+      const Approx ij_invra(i_cnk.settle_invra[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ConstraintKit<double> k_cnk = kag_ptr->getDoublePrecisionConstraintKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_cnk.nsett_param; m++) {
+          if (sett_synthesis_index[topology_sett_table_offsets[k] + m] < 0 &&
+              ij_mormt.test(k_cnk.settle_mormt[m]) && ij_mhrmt.test(k_cnk.settle_mhrmt[m]) &&
+              ij_ra.test(k_cnk.settle_ra[m]) && ij_rb.test(k_cnk.settle_rb[m]) &&
+              ij_rc.test(k_cnk.settle_rc[m]) && ij_invra.test(k_cnk.settle_invra[m])) {
+            sett_synthesis_index[topology_sett_table_offsets[k] + m] = n_unique_sett;
+          }
+        }
+      }
+
+      // Catalog this unique SETTLE group geometry
+      filtered_sett_mass.push_back({ i_cnk.settle_mormt[j], i_cnk.settle_mhrmt[j] });
+      filtered_sett_geom.push_back({ i_cnk.settle_ra[j], i_cnk.settle_rb[j], i_cnk.settle_rc[j],
+                                     i_cnk.settle_invra[j] });
+      sp_filtered_sett_mass.push_back({ i_cnk_sp.settle_mormt[j], i_cnk_sp.settle_mhrmt[j] });
+      sp_filtered_sett_geom.push_back({ i_cnk_sp.settle_ra[j], i_cnk_sp.settle_rb[j],
+                                        i_cnk_sp.settle_rc[j], i_cnk_sp.settle_invra[j] });
+      n_unique_sett++;
+    }
+
+    // Seek out unique bond length constraint parameter sets
+    for (int j = 0; j < i_cnk.ncnst_param; j++) {
+      if (cnst_synthesis_index[topology_cnst_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const int nelem = i_cnk.group_param_bounds[j + 1] - i_cnk.group_param_bounds[j];
+      std::vector<Approx> lengths, inv_masses;
+      for (int k = i_cnk.group_param_bounds[j]; k < i_cnk.group_param_bounds[j + 1]; k++) {
+        lengths.emplace_back(i_cnk.group_lengths[k], ComparisonType::ABSOLUTE,
+                             constants::verytiny);
+        inv_masses.emplace_back(i_cnk.group_inv_masses[k], ComparisonType::ABSOLUTE,
+                                constants::verytiny);
+      }
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph* kag_ptr = topologies[k];
+        const ConstraintKit<double> k_cnk = kag_ptr->getDoublePrecisionConstraintKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_cnk.ncnst_param; m++) {
+          if (k_cnk.group_param_bounds[m + 1] - k_cnk.group_param_bounds[m] != nelem) {
+            continue;
+          }
+          bool same = true;
+          for (int n = 0; n < nelem; n++) {
+            const double km_length = k_cnk.group_lengths[k_cnk.group_param_bounds[m] + n];
+            const double km_inv_mass = k_cnk.group_inv_masses[k_cnk.group_param_bounds[m] + n];
+            same = (same && lengths[n].test(km_length) && inv_masses[n].test(km_inv_mass));
+          }
+          if (same) {
+            cnst_synthesis_index[topology_cnst_table_offsets[k] + m] = n_unique_cnst;
+          }
+        }
+      }
+
+      // Catalog this unique hub-and-spoke constraint group
+      for (int k = 0; k < nelem; k++) {
+        filtered_cnst_group_params.push_back({ lengths[k].getValue(), inv_masses[k].getValue() });
+        float2 tmp_f2;
+        tmp_f2.x = lengths[k].getValue();
+        tmp_f2.y = inv_masses[k].getValue();
+        sp_filtered_cnst_group_params.push_back(tmp_f2);
+      }
+      filtered_cnst_group_bounds.push_back(static_cast<int>(filtered_cnst_group_params.size()));
+      n_unique_cnst++;
     }
   }
 
