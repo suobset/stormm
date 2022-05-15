@@ -327,6 +327,10 @@ private:
                                           ///<   restraints
   Hybrid<int> dihe_restraint_offsets;     ///< Starting indices for each system's four-point
                                           ///<   dihedral angle restraints
+  Hybrid<int> sett_group_offsets;         ///< Starting indices for SETTLE-constrained rigid waters
+                                          ///<   in each system
+  Hybrid<int> cnst_group_offsets;         ///< Starting indices for hub-and-spoke constraint groups
+                                          ///<   in each system
   Hybrid<int> nb_exclusion_offsets;       ///< Starting indices for unified nonbonded exclusion
                                           ///<   lists
   Hybrid<int> lennard_jones_abc_offsets;  ///< Starting indices for each system's relevant
@@ -347,13 +351,15 @@ private:
   // objects.
 
   // Atom and residue details
-  Hybrid<int> residue_limits;             ///< Atomic indices marking boundaries of individual
-                                          ///<   residues
+  Hybrid<int2> residue_limits;            ///< Atomic indices marking boundaries of individual
+                                          ///<   residues: lower limit in the x index and upper
+                                          ///<   limit in the y index
   Hybrid<int> atom_struc_numbers;         ///< Structure atom numbers, such as those taken from a
                                           ///<   PDB file
   Hybrid<int> residue_numbers;            ///< Residue numbers, such as those taken from a PDB file
-  Hybrid<int> molecule_limits;            ///< Atomic indices marking the boundaries of molecules
-                                          ///<   in the molecule_contents array
+  Hybrid<int2> molecule_limits;           ///< Atomic indices marking the boundaries of molecules
+                                          ///<   in the molecule_contents array: lower limit in the
+                                          ///<   x index and upper limit in the y index
   Hybrid<int> atomic_numbers;             ///< Atomic numbers for atoms in all systems
   Hybrid<int> mobile_atoms;               ///< Atom mobility masks for each system
   Hybrid<int> molecule_membership;        ///< Distinct molecules, indexed from 0 for each system,
@@ -371,9 +377,28 @@ private:
   Hybrid<char4> atom_types;               ///< Four letter names of all atom types, i.e. CT
   Hybrid<char4> residue_names;            ///< Four letter names of all residues, i.e. PDB names
   Hybrid<int> chem_int_data;              ///< Chemistry-related integer data
+  Hybrid<int2> chem_int2_data;            ///< Chemistry-related int2 data
   Hybrid<double> chem_double_data;        ///< Chemistry-related double-precision data
   Hybrid<float> chem_float_data;          ///< Chemistry-related single-precision data
   Hybrid<char4> chem_char4_data;          ///< Chemistry-related char4 data
+
+  // Valence parameter maps and bounds, showing how the parameters of each unique topology map to
+  // those of the consensus tables in the synthesis.
+  Hybrid<int> ubrd_param_map;          ///< Urey-Bradley parameter index maps
+  Hybrid<int2> ubrd_param_map_bounds;  ///< Bounds array for unique topologies in the Urey-Bradley
+                                       ///<   parameter maps (dimension topology_count + 1, an
+                                       ///<   exclusive prefix sum over the number of Urey-Bradley
+                                       ///<   parameters in each of the unique topologies)
+  Hybrid<int> cimp_param_map;          ///< CHARMM improper parameter index maps
+  Hybrid<int2> cimp_param_map_bounds;  ///< Bounds array for CHARMM improper parameter index maps
+  Hybrid<int> cmap_param_map;          ///< CMAP surface index maps
+  Hybrid<int2> cmap_param_map_bounds;  ///< Bounds array for CMAP surface index maps
+  Hybrid<int> bond_param_map;          ///< Harmonic bond index maps
+  Hybrid<int2> bond_param_map_bounds;  ///< Bounds array for harmonic bond index maps
+  Hybrid<int> angl_param_map;          ///< Harmonic angle index maps
+  Hybrid<int2> angl_param_map_bounds;  ///< Bounds array for harmonic angle index maps
+  Hybrid<int> dihe_param_map;          ///< Cosine-based dihedral index maps
+  Hybrid<int2> dihe_param_map_bounds;  ///< Bounds array for cosine-based dihedral index maps
   
   // CHARMM and basic force field valence term details.  Each of these objects points into one of
   // the data arrays at the bottom of the section.
@@ -420,6 +445,8 @@ private:
   Hybrid<float> valparam_float_data;    ///< Valence parameter single-pecision data
   Hybrid<int> valparam_int_data;        ///< Valence parameter integer data (for CMAP sizes and
                                         ///<   bounds)
+  Hybrid<int2> valparam_int2_data;      ///< Valence parameter int2 data (this is for the parameter
+                                        ///<   bounds arrays, i.e. bond_param_map_bounds)
   
   // Valence term indexing arrays, all of them indexing atoms in the synthesis list, updated from
   // the indexing in their original topologies and parameters in the condensed tables of the
@@ -452,7 +479,7 @@ private:
   Hybrid<int> dihe_param_idx;    ///< Cosine-based dihedral parameter indices
   Hybrid<int> valence_int_data;  ///< Array targeted by the preceding POINTER-kind hybrid objects
                                  ///<   in this section
-
+  
   // Non-bonded parameter indexing and van-der Waals tables
   Hybrid<int> charge_indices;                   ///< Atomic charge indices, 0 to
                                                 ///<   charge_type_count - 1, pointed to target
@@ -680,9 +707,53 @@ private:
   Hybrid<int> virtual_site_parameter_indices; ///< Parameter indices for each virtual site,
                                               ///<   indexing into the frame type and dimension
                                               ///<   arrays above.
+  Hybrid<int> virtual_site_param_map;         ///< Map of virtual site parameter sets from each
+                                              ///<   unique topology to the consensus table
+  Hybrid<int> virtual_site_param_map_bounds;  ///< Bounds array for each topology's virtual site
+                                              ///<   parameter set map
   Hybrid<int> vsite_int_data;                 ///< Virtual site integer data, storing virtual site
                                               ///<   and frame atom indices as well as virtual
                                               ///<   site parameter sets, but not frame types
+
+  // SETTLE constraint group parameter sets and atom indices
+  Hybrid<double4> settle_group_geometry;    ///< SETTLE group geometric parameters (ra, rb, rc,
+                                            ///<   and invra in the tuple's x, y, z, and w
+                                            ///<   members, respectively)
+  Hybrid<double2> settle_group_masses;      ///< SETTLE group inverse masses (mormt and mhrmt in
+                                            ///<   the tuple's x and y members, respectively)
+  Hybrid<float4> sp_settle_group_geometry;  ///< SETTLE group geometric parameters (ra, rb, rc,
+                                            ///<   and invra in the tuple's x, y, z, and w
+                                            ///<   members, respectively), single precision
+  Hybrid<float2> sp_settle_group_masses;    ///< SETTLE group inverse masses (mormt and mhrmt in
+                                            ///<   the tuple's x and y members, respectively),
+                                            ///<   single precision
+  Hybrid<int4> settle_group_indexing;       ///< Oxygen atom indices, first and second hydrogen
+                                            ///<   atom indices, and SETTLE parameter indices in
+                                            ///<   the tuple's x, y, z, and w members, respectively
+
+  // Constraint group parameter sets and atom indices
+  Hybrid<int> constraint_group_indices;       ///< Atom indices for all hub-and-spoke constraint
+                                              ///<   groups, beginning with each group's central
+                                              ///<   atom and then listing all peripheral atoms
+  Hybrid<int2> constraint_group_bounds;       ///< Bounds for every constraint group in the
+                                              ///<   constraint_group_indices array.  Due to the
+                                              ///<   presence of more than one system in the
+                                              ///<   synthesis, it is not possible to have the
+                                              ///<   bounds simply listed one after another and
+                                              ///<   also have padding between systems' group
+                                              ///<   indices.  But, these bounds are not used in
+                                              ///<   high-preformance contexts.
+  Hybrid<int> constraint_group_param_idx;     ///< Parameter indices for all hub-and-spoke
+                                              ///<   constraint groups, referencing the
+                                              ///<   constraint_param_bounds array
+  Hybrid<int> constraint_param_bounds;        ///< Bounds array for constraint_group_params and
+                                              ///<   sp_constraint_group_params
+  Hybrid<double2> constraint_group_params;    ///< Constraint parameters: length in the x member
+                                              ///<   and inverse mass in the y member, for each
+                                              ///<   constrained bond in the group
+  Hybrid<float2> sp_constraint_group_params;  ///< Single precision constraint parameters: length
+                                              ///<   length and inverse mass in the x and y
+                                              ///<   members of the tuple, respectively
   
   // Valence work units (VWUs): work units providing instruction sets for the GPU to operate on a
   // continuous, non-rearranged list of atoms and implement all valence terms.  Each VWU pertains
@@ -803,12 +874,12 @@ private:
   /// y member.
   Hybrid<uint2> sett_instructions;
 
-  /// Instructions for hub-and-spoke constraint groups.  These are more complex: there size of the
+  /// Instructions for hub-and-spoke constraint groups.  These are more complex: the size of the
   /// constraint group itself is uncertain, but for practical purposes the number of participating
   /// atoms will be limited to sixteen.  Each instruction pertains to one bond of the group,
   /// providing the atom index of the central (heavy) atom in bits 1-10 of the x member and the
-  /// atom index of the light atom (hydrogen) in bits 11-20 of the x member.  The number of
-  /// thread participating in evaluating this group is given in bits 21-24 and the number of
+  /// atom index of the light atom (hydrogen) in bits 11-20 of the x member.  The lane number of
+  /// the thread participating in evaluating this group is given in bits 21-24 and the number of
   /// constrained bonds is given in 25-28.  The parameter index indicating the target equilibrium
   /// length for this constraint group is given in the y member.  Masses of each atom involved will
   /// be read from global parameter tables and cached in L1 for this and subsequent atom updates.

@@ -94,6 +94,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     bond_restraint_offsets{HybridKind::POINTER, "tpsyn_rbond_offset"},
     angl_restraint_offsets{HybridKind::POINTER, "tpsyn_rangl_offset"},
     dihe_restraint_offsets{HybridKind::POINTER, "tpsyn_rdihe_offset"},
+    sett_group_offsets{HybridKind::POINTER, "tpsyn_sett_offset"},
+    cnst_group_offsets{HybridKind::POINTER, "tpsyn_cnst_offset"},
     nb_exclusion_offsets{HybridKind::POINTER, "tpsyn_nbexcl_offset"},
     lennard_jones_abc_offsets{HybridKind::POINTER, "tpsyn_ljtable_offset"},
     int_system_data{HybridKind::ARRAY, "tpsyn_int_data"},
@@ -115,9 +117,22 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     atom_types{HybridKind::POINTER, "tpsyn_atom_types"},
     residue_names{HybridKind::POINTER, "tpsyn_res_names"},
     chem_int_data{HybridKind::ARRAY, "tpsyn_chem_ints"},
+    chem_int2_data{HybridKind::ARRAY, "tpsyn_chem_int2s"},
     chem_double_data{HybridKind::ARRAY, "tpsyn_chem_doubles"},
     chem_float_data{HybridKind::ARRAY, "tpsyn_chem_floats"},
     chem_char4_data{HybridKind::ARRAY, "tpsyn_chem_char4s"},
+    ubrd_param_map{HybridKind::POINTER, "tpsyn_ubrd_map"},
+    ubrd_param_map_bounds{HybridKind::POINTER, "tpsyn_ubrd_map_bounds"},
+    cimp_param_map{HybridKind::POINTER, "tpsyn_cimp_map"},
+    cimp_param_map_bounds{HybridKind::POINTER, "tpsyn_cimp_map_bounds"},
+    cmap_param_map{HybridKind::POINTER, "tpsyn_cmap_map"},
+    cmap_param_map_bounds{HybridKind::POINTER, "tpsyn_cmap_map_bounds"},
+    bond_param_map{HybridKind::POINTER, "tpsyn_bond_map"},
+    bond_param_map_bounds{HybridKind::POINTER, "tpsyn_bond_map_bounds"},
+    angl_param_map{HybridKind::POINTER, "tpsyn_angl_map"},
+    angl_param_map_bounds{HybridKind::POINTER, "tpsyn_angl_map_bounds"},
+    dihe_param_map{HybridKind::POINTER, "tpsyn_dihe_map"},
+    dihe_param_map_bounds{HybridKind::POINTER, "tpsyn_dihe_map_bounds"},
     ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff"},
     ubrd_equilibria{HybridKind::POINTER, "tpsyn_ub_equil"},
     cimp_stiffnesses{HybridKind::POINTER, "tpsyn_cimp_stiff"},
@@ -150,6 +165,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     valparam_double_data{HybridKind::ARRAY, "tpsyn_vparm_dbl"},
     valparam_float_data{HybridKind::ARRAY, "tpsyn_vparm_flt"},
     valparam_int_data{HybridKind::ARRAY, "tpsyn_vparm_int"},
+    valparam_int2_data{HybridKind::ARRAY, "tpsyn_vparm_int2"},
     ubrd_i_atoms{HybridKind::POINTER, "tpsyn_ubrd_i"},
     ubrd_k_atoms{HybridKind::POINTER, "tpsyn_ubrd_k"},
     ubrd_param_idx{HybridKind::POINTER, "tpsyn_ubrd_idx"},
@@ -262,7 +278,20 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     virtual_site_frame3_atoms{HybridKind::POINTER, "tpsyn_vs_frame3"},
     virtual_site_frame4_atoms{HybridKind::POINTER, "tpsyn_vs_frame4"},
     virtual_site_parameter_indices{HybridKind::POINTER, "tpsyn_vs_param_idx"},
+    virtual_site_param_map{HybridKind::POINTER, "tpsyn_vs_param_map"},
+    virtual_site_param_map_bounds{HybridKind::POINTER, "tpsyn_vs_param_bnd"},
     vsite_int_data{HybridKind::ARRAY, "tpsyn_vsite_ints"},
+    settle_group_geometry{HybridKind::ARRAY, "tpsyn_settle_geom"},
+    settle_group_masses{HybridKind::ARRAY, "tpsyn_settle_mass"},
+    sp_settle_group_geometry{HybridKind::ARRAY, "tpsynf_settle_geom"},
+    sp_settle_group_masses{HybridKind::ARRAY, "tpsynf_settle_mass"},
+    settle_group_indexing{HybridKind::ARRAY, "tpsyn_settle_idx"},
+    constraint_group_indices{HybridKind::ARRAY, "tpsyn_cnst_atom_idx"},
+    constraint_group_bounds{HybridKind::ARRAY, "tpsyn_cnst_atom_bnd"},
+    constraint_group_param_idx{HybridKind::ARRAY, "tpsyn_cnst_parm_idx"},
+    constraint_param_bounds{HybridKind::ARRAY, "tpsyn_cnst_parm_bnd"},
+    constraint_group_params{HybridKind::ARRAY, "tpsyn_cnst_lm"},
+    sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
     vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
     vwu_manipulation_mask{HybridKind::POINTER, "tpsyn_vwu_manip"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
@@ -310,8 +339,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   // Restraint data can now be incorporated.
   condenseRestraintNetworks();
 
-  // Create valence work units
-  
+  // Create valence work units for all topologies, then load them into the synthesis
+  //loadValenceWorkUnits();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -584,7 +613,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate memory and set POINTER-kind arrays for the small packets of data
   const int padded_system_count = roundUp(system_count, warp_size_int);
-  int_system_data.resize(43 * padded_system_count);
+  int_system_data.resize(45 * padded_system_count);
   int pivot = 0;
   topology_indices.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
@@ -668,6 +697,10 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   pivot += padded_system_count;
   dihe_restraint_offsets.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
+  sett_group_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
+  cnst_group_offsets.setPointer(&int_system_data, pivot, system_count);
+  pivot += padded_system_count;
   nb_exclusion_offsets.setPointer(&int_system_data, pivot, system_count);
   pivot += padded_system_count;
   lennard_jones_abc_offsets.setPointer(&int_system_data, pivot, system_count);
@@ -692,16 +725,21 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   int dihe_offset = 0;
   int vste_offset = 0;
   int excl_offset = 0;
+  int sett_offset = 0;
+  int cnst_offset = 0;
+  int cnst_bounds_offset = 0;
+  int cnst_atom_offset = 0;
   int rposn_offset = 0;
   int rbond_offset = 0;
   int rangl_offset = 0;
   int rdihe_offset = 0;
   for (int i = 0; i < system_count; i++) {
     const AtomGraph* ag_ptr = topologies[topology_indices.readHost(i)];
-    const RestraintApparatus* ra_ptr     = restraint_networks[restraint_indices.readHost(i)];
-    const ChemicalDetailsKit cdk         = ag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> nbk       = ag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> vk          = ag_ptr->getDoublePrecisionValenceKit();
+    const RestraintApparatus* ra_ptr = restraint_networks[restraint_indices.readHost(i)];
+    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
+    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
+    const ConstraintKit<double> cnk  = ag_ptr->getDoublePrecisionConstraintKit();
     const int nvsite = ag_ptr->getVirtualSiteCount();
     atom_counts.putHost(cdk.natom, i);
     total_atoms += cdk.natom;
@@ -741,9 +779,9 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     virtual_site_offsets.putHost(vste_offset, i);
     vste_offset += roundUp(nvsite, warp_size_int);
     residue_offsets.putHost(resi_offset, i);
-    resi_offset += roundUp(cdk.nres + 1, warp_size_int);
+    resi_offset += roundUp(cdk.nres, warp_size_int);
     molecule_offsets.putHost(mole_offset, i);
-    mole_offset += roundUp(cdk.nmol + 1, warp_size_int);
+    mole_offset += roundUp(cdk.nmol, warp_size_int);
     ubrd_term_offsets.putHost(ubrd_offset, i);
     ubrd_offset += roundUp(vk.nubrd, warp_size_int);
     cimp_term_offsets.putHost(cimp_offset, i);
@@ -777,23 +815,35 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       rdihe_offset += roundUp(rar.ndihe, warp_size_int);
       dihe_restraint_offsets.putHost(rdihe_offset, i);
     }
+    sett_group_offsets.putHost(sett_offset, i);
+    sett_offset += roundUp(cnk.nsettle, warp_size_int);
+    cnst_group_offsets.putHost(cnst_offset, i);
+
+    // While all of the other offsets pertain to terms in each topology, the parameter sets
+    // themselves are not part of the picture yet as the consensus tables have yet to be
+    // determined.  However, all of the terms save for these constraint groups have a set size.
+    // Additional counters are needed to track the constraint group storage sizes.
+    cnst_offset += roundUp(cnk.ngroup, warp_size_int);
+    cnst_bounds_offset += roundUp(cnk.ngroup + 1, warp_size_int);
+    cnst_atom_offset += roundUp(cnk.group_bounds[cnk.ngroup], warp_size_int);
   }
 
   // Allocate detailed arrays for each descriptor, then collate all topologies.  This
   // fills the "atom and residue details" arrays listed in atomgraph_synthesis.h.
-  chem_int_data.resize(resi_offset + mole_offset + (8 * atom_offset));
+  chem_int_data.resize(8 * atom_offset);
+  chem_int2_data.resize(resi_offset + mole_offset);
   chem_double_data.resize(3 * atom_offset);
   chem_float_data.resize(3 * atom_offset);
   chem_char4_data.resize(resi_offset + (2 * atom_offset));
   pivot = 0;
-  residue_limits.setPointer(&chem_int_data, pivot, resi_offset);
+  residue_limits.setPointer(&chem_int2_data, pivot, resi_offset);
   pivot += resi_offset;
+  molecule_limits.setPointer(&chem_int2_data, pivot, mole_offset);
+  pivot = 0;
   atom_struc_numbers.setPointer(&chem_int_data, pivot, atom_offset);
   pivot += atom_offset;
   residue_numbers.setPointer(&chem_int_data, pivot, atom_offset);
   pivot += atom_offset;
-  molecule_limits.setPointer(&chem_int_data, pivot, mole_offset);
-  pivot += mole_offset;
   atomic_numbers.setPointer(&chem_int_data, pivot, atom_offset);
   pivot += atom_offset;
   mobile_atoms.setPointer(&chem_int_data, pivot, atom_offset);
@@ -825,10 +875,10 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   residue_names.setPointer(&chem_char4_data, pivot, resi_offset);
 
   // Fill the above atom and residue descriptor arrays
-  int* residue_limits_ptr      = residue_limits.data();
+  int2* residue_limits_ptr      = residue_limits.data();
+  int2* molecule_limits_ptr     = molecule_limits.data();
   int* atom_struc_numbers_ptr  = atom_struc_numbers.data();
   int* residue_numbers_ptr     = residue_numbers.data();
-  int* molecule_limits_ptr     = molecule_limits.data();
   int* atomic_numbers_ptr      = atomic_numbers.data();
   int* molecule_membership_ptr = molecule_membership.data();
   int* molecule_contents_ptr   = molecule_contents.data();
@@ -847,8 +897,13 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     const int synth_atom_base = atom_offsets.readHost(i);
     const int synth_residue_base = residue_offsets.readHost(i);
     const int synth_molecule_base = molecule_offsets.readHost(i);
-    for (int j = 0; j < cdk.nres + 1; j++) {
-      residue_limits_ptr[synth_residue_base + j] = cdk.res_limits[j] + synth_atom_base;
+    for (int j = 0; j < cdk.nres; j++) {
+      residue_limits_ptr[synth_residue_base + j].x = cdk.res_limits[j    ] + synth_atom_base;
+      residue_limits_ptr[synth_residue_base + j].y = cdk.res_limits[j + 1] + synth_atom_base;
+    }
+    for (int j = 0; j < cdk.nmol; j++) {
+      molecule_limits_ptr[synth_molecule_base + j].x = cdk.mol_limits[j    ] + synth_atom_base;
+      molecule_limits_ptr[synth_molecule_base + j].y = cdk.mol_limits[j + 1] + synth_atom_base;
     }
     for (int j = 0; j < cdk.natom; j++) {
       atom_struc_numbers_ptr[synth_atom_base + j] = cdk.atom_numbers[j];
@@ -868,9 +923,6 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       residue_names_ptr[synth_residue_base + j].y = cdk.res_names[j].y;
       residue_names_ptr[synth_residue_base + j].z = cdk.res_names[j].z;
       residue_names_ptr[synth_residue_base + j].w = cdk.res_names[j].w;
-    }
-    for (int j = 0; j < cdk.nmol + 1; j++) {
-      molecule_limits_ptr[synth_molecule_base + j] = cdk.mol_limits[j] + synth_atom_base;
     }
     const std::vector<bool> atom_mobility = ag_ptr->getAtomMobility();
     const std::vector<int> iatom_mobility(atom_mobility.begin(), atom_mobility.end());
@@ -1050,6 +1102,12 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   }
 
   // Fill in the virtual site indexing arrays
+  int vste_map_size = 0;
+  for (int i = 0; i < topology_count; i++) {
+    const AtomGraph* ag_ptr = topologies[i];
+    const int ni_vs = ag_ptr->getVirtualSiteParameterSetCount();
+    vste_map_size += roundUp(ni_vs, warp_size_int);
+  }
   vsite_int_data.resize(6 * vste_offset);
   pivot = 0;
   virtual_site_atoms.setPointer(&vsite_int_data, pivot, vste_offset);
@@ -1070,12 +1128,46 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     const int synth_atom_base = atom_offsets.readHost(sysid);
     const int synth_vste_offset = virtual_site_offsets.readHost(sysid);
     for (int pos = 0; pos < vsk.nsite; pos++) {
-      virtual_site_atoms.putHost(vsk.vs_atoms[pos], synth_vste_offset + pos);
-      virtual_site_frame1_atoms.putHost(vsk.frame1_idx[pos], synth_vste_offset + pos);
-      virtual_site_frame2_atoms.putHost(vsk.frame2_idx[pos], synth_vste_offset + pos);
-      virtual_site_frame3_atoms.putHost(vsk.frame3_idx[pos], synth_vste_offset + pos);
-      virtual_site_frame4_atoms.putHost(vsk.frame4_idx[pos], synth_vste_offset + pos);
+      const int svpos = synth_vste_offset + pos;
+      virtual_site_atoms.putHost(vsk.vs_atoms[pos] + synth_atom_base, svpos);
+      virtual_site_frame1_atoms.putHost(vsk.frame1_idx[pos] + synth_atom_base, svpos);
+      virtual_site_frame2_atoms.putHost(vsk.frame2_idx[pos] + synth_atom_base, svpos);
+      virtual_site_frame3_atoms.putHost(vsk.frame3_idx[pos] + synth_atom_base, svpos);
+      virtual_site_frame4_atoms.putHost(vsk.frame4_idx[pos] + synth_atom_base, svpos);
     }
+  }
+
+  // Fill in the constraint group indexing arrays
+  settle_group_indexing.resize(sett_offset);
+  constraint_group_bounds.resize(cnst_bounds_offset);
+  constraint_group_indices.resize(cnst_atom_offset);
+  constraint_group_param_idx.resize(cnst_offset);
+  int cnst_atom_count = 0;
+  for (int sysid = 0; sysid < system_count; sysid++) {
+    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(sysid)];
+    const ConstraintKit<double> cnk = ag_ptr->getDoublePrecisionConstraintKit();
+    const int synth_atom_base = atom_offsets.readHost(sysid);
+    const int synth_sett_offset = sett_group_offsets.readHost(sysid);
+    const int synth_cnst_offset = cnst_group_offsets.readHost(sysid);
+    for (int pos = 0; pos < cnk.nsettle; pos++) {
+
+      // The SETTLE parameter group type is not yet known--but it is best to package four integers
+      // for the oxygen, two hydrogens, and the parameter set into one tuple, so use a placeholder
+      // for the type index in the w member.
+      const int4 tmp_i4 = { synth_atom_base + cnk.settle_ox_atoms[pos],
+                            synth_atom_base + cnk.settle_h1_atoms[pos],
+                            synth_atom_base + cnk.settle_h2_atoms[pos], -1 };
+      settle_group_indexing.putHost(tmp_i4, synth_sett_offset + pos);
+    }
+    for (int pos = 0; pos < cnk.ngroup; pos++) {
+      for (int j = cnk.group_bounds[pos]; j < cnk.group_bounds[pos + 1]; j++) {
+        constraint_group_indices.putHost(synth_atom_base + cnk.group_list[j], cnst_atom_count + j);
+      }
+      const int grp_len = cnk.group_bounds[pos + 1] - cnk.group_bounds[pos];
+      const int2 tmp_i2 = { cnst_atom_count, cnst_atom_count + grp_len };
+      constraint_group_bounds.putHost(tmp_i2, synth_cnst_offset + pos);
+    }
+    cnst_atom_count += roundUp(cnk.group_bounds[cnk.ngroup], warp_size_int);
   }
 }
 
@@ -1097,6 +1189,12 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int vste_offset = 0;
   int sett_offset = 0;
   int cnst_offset = 0;
+  std::vector<int2> tmp_ubrd_param_map_bounds(topology_count);
+  std::vector<int2> tmp_cimp_param_map_bounds(topology_count);
+  std::vector<int2> tmp_cmap_param_map_bounds(topology_count);
+  std::vector<int2> tmp_bond_param_map_bounds(topology_count);
+  std::vector<int2> tmp_angl_param_map_bounds(topology_count);
+  std::vector<int2> tmp_dihe_param_map_bounds(topology_count);
   std::vector<int> topology_bond_table_offsets(topology_count);
   std::vector<int> topology_angl_table_offsets(topology_count);
   std::vector<int> topology_dihe_table_offsets(topology_count);
@@ -1123,6 +1221,18 @@ void AtomGraphSynthesis::condenseParameterTables() {
     topology_vste_table_offsets[i] = vste_offset;
     topology_sett_table_offsets[i] = sett_offset;
     topology_cnst_table_offsets[i] = cnst_offset;
+    tmp_bond_param_map_bounds[i].x = bond_offset;
+    tmp_angl_param_map_bounds[i].x = angl_offset;
+    tmp_dihe_param_map_bounds[i].x = dihe_offset;
+    tmp_ubrd_param_map_bounds[i].x = ubrd_offset;
+    tmp_cimp_param_map_bounds[i].x = cimp_offset;
+    tmp_cmap_param_map_bounds[i].x = cmap_offset;
+    tmp_bond_param_map_bounds[i].y = bond_offset + vk.nbond_param;
+    tmp_angl_param_map_bounds[i].y = angl_offset + vk.nangl_param;
+    tmp_dihe_param_map_bounds[i].y = dihe_offset + vk.ndihe_param;
+    tmp_ubrd_param_map_bounds[i].y = ubrd_offset + vk.nubrd_param;
+    tmp_cimp_param_map_bounds[i].y = cimp_offset + vk.ncimp_param;
+    tmp_cmap_param_map_bounds[i].y = cmap_offset + vk.ncmap_surf;
     bond_offset += roundUp(vk.nbond_param, warp_size_int);
     angl_offset += roundUp(vk.nangl_param, warp_size_int);
     dihe_offset += roundUp(vk.ndihe_param, warp_size_int);
@@ -1517,7 +1627,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       n_unique_cnst++;
     }
   }
-
+  
   // Post-process the condensed array of CMAP surfaces into patches
   const CmapAccessories cmap_digest = ComputeCmapDerivatives(n_unique_cmap, filtered_cmap_dim,
                                                              filtered_cmap_surf_bounds,
@@ -1544,7 +1654,9 @@ void AtomGraphSynthesis::condenseParameterTables() {
   valparam_double_data.resize(rn_space);
   valparam_float_data.resize(rn_space);
   valparam_int_data.resize(roundUp(total_cmap_surfaces, warp_size_int) +
-                           (2 * roundUp(total_cmap_surfaces + 1, warp_size_int)));
+                           (2 * roundUp(total_cmap_surfaces + 1, warp_size_int)) +
+                           ubrd_offset + cimp_offset + cmap_offset + bond_offset +
+                           angl_offset + dihe_offset);
   size_t ic = 0LLU;
   ic = bond_stiffnesses.putHost(&valparam_double_data, filtered_bond_keq, ic, warp_size_zu);
   ic = bond_equilibria.putHost(&valparam_double_data, filtered_bond_leq, ic, warp_size_zu);
@@ -1584,6 +1696,27 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                    warp_size_zu);
   ic = cmap_patch_bounds.putHost(&valparam_int_data, cmap_digest.patch_matrix_bounds, ic,
                                  warp_size_zu);
+  ic = ubrd_param_map.putHost(&valparam_int_data, ubrd_synthesis_index, ic, warp_size_zu);
+  ic = cimp_param_map.putHost(&valparam_int_data, cimp_synthesis_index, ic, warp_size_zu);
+  ic = cmap_param_map.putHost(&valparam_int_data, cmap_synthesis_index, ic, warp_size_zu);
+  ic = bond_param_map.putHost(&valparam_int_data, bond_synthesis_index, ic, warp_size_zu);
+  ic = angl_param_map.putHost(&valparam_int_data, angl_synthesis_index, ic, warp_size_zu);
+  ic = dihe_param_map.putHost(&valparam_int_data, dihe_synthesis_index, ic, warp_size_zu);
+  const int tc_offset = roundUp(topology_count, warp_size_int);
+  valparam_int2_data.resize(6 * tc_offset);
+  ic = 0LLU;
+  ic = ubrd_param_map_bounds.putHost(&valparam_int2_data, tmp_ubrd_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = cimp_param_map_bounds.putHost(&valparam_int2_data, tmp_cimp_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = cmap_param_map_bounds.putHost(&valparam_int2_data, tmp_cmap_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = bond_param_map_bounds.putHost(&valparam_int2_data, tmp_bond_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = angl_param_map_bounds.putHost(&valparam_int2_data, tmp_angl_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = dihe_param_map_bounds.putHost(&valparam_int2_data, tmp_dihe_param_map_bounds, ic,
+                                     warp_size_zu);
 
   // Loop back over all systems and copy the known mapping of individual topologies to the
   // synthesis as a whole.  Fill out the parameter maps.
@@ -2377,12 +2510,14 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
 void AtomGraphSynthesis::upload() {
   int_system_data.upload();
   chem_int_data.upload();
+  chem_int2_data.upload();
   chem_double_data.upload();
   chem_float_data.upload();
   chem_char4_data.upload();
   valparam_double_data.upload();
   valparam_float_data.upload();
   valparam_int_data.upload();
+  valparam_int2_data.upload();
   valence_int_data.upload();
   lennard_jones_ab_coeff.upload();
   lennard_jones_c_coeff.upload();
@@ -2403,6 +2538,17 @@ void AtomGraphSynthesis::upload() {
   virtual_site_parameters.upload();
   sp_virtual_site_parameters.upload();
   vsite_int_data.upload();
+  settle_group_geometry.upload();
+  settle_group_masses.upload();
+  sp_settle_group_geometry.upload();
+  sp_settle_group_masses.upload();
+  settle_group_indexing.upload();
+  constraint_group_indices.upload();
+  constraint_group_bounds.upload();
+  constraint_group_param_idx.upload();
+  constraint_param_bounds.upload();
+  constraint_group_params.upload();
+  sp_constraint_group_params.upload();
   vwu_import_lists.upload();
   vwu_instruction_sets.upload();
   insr_uint_data.upload();
@@ -2413,12 +2559,14 @@ void AtomGraphSynthesis::upload() {
 void AtomGraphSynthesis::download() {
   int_system_data.download();
   chem_int_data.download();
+  chem_int2_data.download();
   chem_double_data.download();
   chem_float_data.download();
   chem_char4_data.download();
   valparam_double_data.download();
   valparam_float_data.download();
   valparam_int_data.download();
+  valparam_int2_data.download();
   valence_int_data.download();
   lennard_jones_ab_coeff.download();
   lennard_jones_c_coeff.download();
@@ -2439,6 +2587,17 @@ void AtomGraphSynthesis::download() {
   virtual_site_parameters.download();
   sp_virtual_site_parameters.download();
   vsite_int_data.download();
+  settle_group_geometry.download();
+  settle_group_masses.download();
+  sp_settle_group_geometry.download();
+  sp_settle_group_masses.download();
+  settle_group_indexing.download();
+  constraint_group_indices.download();
+  constraint_group_bounds.download();
+  constraint_group_param_idx.download();
+  constraint_param_bounds.download();
+  constraint_group_params.download();
+  sp_constraint_group_params.download();
   vwu_import_lists.download();
   vwu_instruction_sets.download();
   insr_uint_data.download();
