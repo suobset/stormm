@@ -81,6 +81,16 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 7, 7 };
   AtomGraphSynthesis synth(all_tops, system_ids, ExceptionResponse::SILENT, &timer);
   
+  // CHECK
+#if 0
+  const std::string stmv_top_name("/home/david.cerutti/AmberBenchmark/PME/Topologies/STMV.prmtop");
+  AtomGraph stmv_ag(stmv_top_name);
+  const std::vector<AtomGraph*> all_tops = { &stmv_ag };
+  const std::vector<int> system_ids(8, 0);
+  AtomGraphSynthesis synth(all_tops, system_ids, ExceptionResponse::SILENT, &timer);  
+#endif
+  // END CHECK
+  
   // Check various descriptors
   section(1);
   check(synth.getAtomCount(), RelationalOperator::EQUAL, 46892, "The topology synthesis does not "
