@@ -15,7 +15,7 @@ namespace topology {
 
 using math::UniqueValueHandling;
 using math::reduceUniqueValues;
-  
+
 /// \brief Extract a series of numbers from a bounded list, based on an index.  Return the result
 ///        as a std::vector of integers.  If data from multiple bins is requested, offer an option
 ///        to sort and prune the data for unique values.
@@ -23,20 +23,34 @@ using math::reduceUniqueValues;
 /// Overloaded:
 ///   - Accept a single bin index
 ///   - Accept multiple bin indices
+///   - Accept a pre-allocated result vector with one or more bin indices
 ///
+/// \param result     The vector to pack the outcome into (should be pre-allocated, but will be
+///                   resized as necessary)
 /// \param va         The original list of entries with demarcations given in va_bounds
 /// \param va_bounds  Bounds array for va
 /// \param index      Index of the bin of interest (checked against the size of va_bounds)
 /// \param indices    Vector of indices for the bins of interest (each will be checked against the
 ///                   size of va_bounds)
+/// \param filter     Indication that the result should be reduced to unique values only (applies
+///                   to cases with multiple collection bin indices)
 /// \{
 template <typename T> std::vector<T> extractBoundedListEntries(const std::vector<T> &va,
                                                                const std::vector<int> &va_bounds,
                                                                int index);
 
+template <typename T>
+void extractBoundedListEntries(std::vector<T> *result, const std::vector<T> &va,
+                               const std::vector<int> &va_bounds, int index);
+
 template <typename T> std::vector<T>
 extractBoundedListEntries(const std::vector<T> &va, const std::vector<int> &va_bounds,
                           const std::vector<int> &indices,
+                          UniqueValueHandling filter = UniqueValueHandling::UNIQUE_VALUES_ONLY);
+
+template <typename T> void
+extractBoundedListEntries(std::vector<T> *result, const std::vector<T> &va,
+                          const std::vector<int> &va_bounds, const std::vector<int> &indices,
                           UniqueValueHandling filter = UniqueValueHandling::UNIQUE_VALUES_ONLY);
 /// \}
   

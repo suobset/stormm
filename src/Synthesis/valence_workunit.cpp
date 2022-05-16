@@ -7,10 +7,6 @@
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
-// CHECK
-#include "FileManagement/file_listing.h"
-// END CHECK
-
 namespace omni {
 namespace synthesis {
 

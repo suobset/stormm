@@ -22,6 +22,7 @@ int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
   TestEnvironment oe(argc, argv);
+  StopWatch timer;
 
   // Section 1
   section("Test AtomGraphSynthesis layout");
@@ -78,8 +79,8 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomGraph*> all_tops = { &tip3p_ag, &tip4p_ag, &trpcage_ag, &trpcage2_ag,
                                              &trpcage3_ag, &nbfix_ag, &ubiquitin_ag, &brbz_vs_ag };
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 7, 7 };
-  AtomGraphSynthesis synth(all_tops, system_ids, ExceptionResponse::SILENT);
-
+  AtomGraphSynthesis synth(all_tops, system_ids, ExceptionResponse::SILENT, &timer);
+  
   // Check various descriptors
   section(1);
   check(synth.getAtomCount(), RelationalOperator::EQUAL, 46892, "The topology synthesis does not "
@@ -100,6 +101,10 @@ int main(const int argc, const char* argv[]) {
         "synthesis contains incorrect numbers of some valence terms.", do_tests);
   
   // Summary evaluation
+  if (oe.getDisplayTimingsOrder()) {
+    timer.assignTime(0);
+    timer.printResults();
+  }
   printTestSummary(oe.getVerbosity());
 
   return 0;

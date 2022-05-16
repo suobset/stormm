@@ -7,6 +7,7 @@
 #include "DataTypes/omni_vector_types.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
+#include "UnitTesting/stopwatch.h"
 #include "valence_workunit.h"
 
 namespace omni {
@@ -23,6 +24,7 @@ using topology::MassForm;
 using topology::SettleSetting;
 using topology::ShakeSetting;
 using topology::UnitCellType;
+using testing::StopWatch;
   
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing
@@ -58,11 +60,13 @@ public:
                      const std::vector<RestraintApparatus*> &restraints_in,
                      const std::vector<int> &topology_indices_in,
                      const std::vector<int> &restraint_indices_in,
-                     ExceptionResponse policy_in = ExceptionResponse::WARN);
+                     ExceptionResponse policy_in = ExceptionResponse::WARN,
+                     StopWatch *timer_in = nullptr);
 
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<int> &topology_indices_in,
-                     ExceptionResponse policy_in = ExceptionResponse::WARN);
+                     ExceptionResponse policy_in = ExceptionResponse::WARN,
+                     StopWatch *timer_in = nullptr);
   /// \}
 
   /// \brief Get the number of unique topologies described by the synthesis
@@ -914,6 +918,9 @@ private:
 
   /// Collected array of all uint2 instructions
   Hybrid<uint2> insr_uint2_data;
+
+  /// Timings data, for reporting purposes
+  StopWatch* timer;
   
   /// \brief Check the central lists of topologies and system indices to ensure that the requested
   ///        synthesis is sane.  Condense the list of topologies by weeding out duplicates.
