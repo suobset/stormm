@@ -11,9 +11,10 @@ void extractBoundedListEntries(std::vector<T> *result, const std::vector<T> &va,
           std::to_string(va_bounds.size() - 1LLU) + " elements.", "extractBoundedListEntries");
   }
   const int llim = va_bounds[index];
-  result->resize(va_bounds[index + 1] - llim);
+  const int hlim = va_bounds[index + 1];
+  result->resize(hlim - llim);
   T* res_ptr = result->data();
-  for (int i = llim; i < va_bounds[index + 1]; i++) {
+  for (int i = llim; i < hlim; i++) {
     res_ptr[i - llim] = va[i];
   }
 }
@@ -27,8 +28,9 @@ template <typename T> std::vector<T> extractBoundedListEntries(const std::vector
           std::to_string(va_bounds.size() - 1LLU) + " elements.", "extractBoundedListEntries");
   }
   const int llim = va_bounds[index];
-  std::vector<T> result(va_bounds[index + 1] - llim);
-  for (int i = llim; i < va_bounds[index + 1]; i++) {
+  const int hlim = va_bounds[index + 1];
+  std::vector<T> result(hlim - llim);
+  for (int i = llim; i < hlim; i++) {
     result[i - llim] = va[i];
   }
   return result;

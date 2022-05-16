@@ -275,62 +275,51 @@ std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
   result.push_back(atom_idx);
 
   // Push atoms relevant to all valence force field terms onto the list
-  const std::vector<int> relevant_bonds = extractBoundedListEntries(bond_affector_list,
-                                                                    bond_affector_bounds,
-                                                                    atom_idx);
-  const int nbond = relevant_bonds.size();
+  std::vector<int> afl_extractions(32);
+  extractBoundedListEntries(&afl_extractions, bond_affector_list, bond_affector_bounds, atom_idx);
+  const int nbond = afl_extractions.size();
   for (int i = 0; i < nbond; i++) {
-    const int bond_term_index = relevant_bonds[i];
+    const int bond_term_index = afl_extractions[i];
     result.push_back(vk.bond_i_atoms[bond_term_index]);
     result.push_back(vk.bond_j_atoms[bond_term_index]);
   }
-  const std::vector<int> relevant_angls = extractBoundedListEntries(angl_affector_list,
-                                                                    angl_affector_bounds,
-                                                                    atom_idx);
-  const int nangl = relevant_angls.size();
+  extractBoundedListEntries(&afl_extractions, angl_affector_list, angl_affector_bounds, atom_idx);
+  const int nangl = afl_extractions.size();
   for (int i = 0; i < nangl; i++) {
-    const int angl_term_index = relevant_angls[i];
+    const int angl_term_index = afl_extractions[i];
     result.push_back(vk.angl_i_atoms[angl_term_index]);
     result.push_back(vk.angl_j_atoms[angl_term_index]);
     result.push_back(vk.angl_k_atoms[angl_term_index]);
   }
-  const std::vector<int> relevant_dihes = extractBoundedListEntries(dihe_affector_list,
-                                                                    dihe_affector_bounds,
-                                                                    atom_idx);
-  const int ndihe = relevant_dihes.size();
+  extractBoundedListEntries(&afl_extractions, dihe_affector_list, dihe_affector_bounds, atom_idx);
+  const int ndihe = afl_extractions.size();
   for (int i = 0; i < ndihe; i++) {
-    const int dihe_term_index = relevant_dihes[i];
+    const int dihe_term_index = afl_extractions[i];
     result.push_back(vk.dihe_i_atoms[dihe_term_index]);
     result.push_back(vk.dihe_j_atoms[dihe_term_index]);
     result.push_back(vk.dihe_k_atoms[dihe_term_index]);
     result.push_back(vk.dihe_l_atoms[dihe_term_index]);
   }
-  const std::vector<int> relevant_ubrds = extractBoundedListEntries(ubrd_affector_list,
-                                                                    ubrd_affector_bounds,
-                                                                    atom_idx);
-  const int nubrd = relevant_ubrds.size();
+  extractBoundedListEntries(&afl_extractions, ubrd_affector_list, ubrd_affector_bounds, atom_idx);
+  const int nubrd = afl_extractions.size();
   for (int i = 0; i < nubrd; i++) {
-    const int ubrd_term_index = relevant_ubrds[i];
+    const int ubrd_term_index = afl_extractions[i];
     result.push_back(vk.ubrd_i_atoms[ubrd_term_index]);
     result.push_back(vk.ubrd_k_atoms[ubrd_term_index]);
   }
-  const std::vector<int> relevant_cimps = extractBoundedListEntries(cimp_affector_list,
-                                                                    cimp_affector_bounds,
-                                                                    atom_idx);
-  const int ncimp = relevant_cimps.size();
+  extractBoundedListEntries(&afl_extractions, cimp_affector_list, cimp_affector_bounds, atom_idx);
+  const int ncimp = afl_extractions.size();
   for (int i = 0; i < ncimp; i++) {
-    const int cimp_term_index = relevant_cimps[i];
+    const int cimp_term_index = afl_extractions[i];
     result.push_back(vk.cimp_i_atoms[cimp_term_index]);
     result.push_back(vk.cimp_j_atoms[cimp_term_index]);
     result.push_back(vk.cimp_k_atoms[cimp_term_index]);
     result.push_back(vk.cimp_l_atoms[cimp_term_index]);
   }
-  const std::vector<int> relevant_cmaps = extractBoundedListEntries(cmap_affector_list,
-                                                                    cmap_affector_bounds,
-                                                                    atom_idx);
-  const int ncmap = relevant_cmaps.size();
+  extractBoundedListEntries(&afl_extractions, cmap_affector_list, cmap_affector_bounds, atom_idx);
+  const int ncmap = afl_extractions.size();
   for (int i = 0; i < ncmap; i++) {
-    const int cmap_term_index = relevant_cmaps[i];
+    const int cmap_term_index = afl_extractions[i];
     result.push_back(vk.cmap_i_atoms[cmap_term_index]);
     result.push_back(vk.cmap_j_atoms[cmap_term_index]);
     result.push_back(vk.cmap_k_atoms[cmap_term_index]);
@@ -342,50 +331,44 @@ std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
   // they can be linked.  Most virtual sites will have additional 1:4 attenuated interactions
   // that are not covered by dihedral interactions, as the virtual sites do not typically
   // participate in dihedral terms.  Push these onto the list.
-  const std::vector<int> relevant_infrs = extractBoundedListEntries(infr_affector_list,
-                                                                    infr_affector_bounds,
-                                                                    atom_idx);
-  const int ninfr = relevant_infrs.size();
+  extractBoundedListEntries(&afl_extractions, infr_affector_list, infr_affector_bounds, atom_idx);
+  const int ninfr = afl_extractions.size();
   for (int i = 0; i < ninfr; i++) {
-    const int infr_term_index = relevant_infrs[i];
+    const int infr_term_index = afl_extractions[i];
     result.push_back(vk.infr14_i_atoms[infr_term_index]);
     result.push_back(vk.infr14_l_atoms[infr_term_index]);
   }
 
   // Push atoms relevant to NMR restraints onto the list.
-  const std::vector<int> relevant_rposn = extractBoundedListEntries(rposn_affector_list,
-                                                                    rposn_affector_bounds,
-                                                                    atom_idx);
-  const int nrposn = relevant_rposn.size();
+  extractBoundedListEntries(&afl_extractions, rposn_affector_list, rposn_affector_bounds,
+                            atom_idx);
+  const int nrposn = afl_extractions.size();
   for (int i = 0; i < nrposn; i++) {
-    const int rposn_term_index = relevant_rposn[i];
+    const int rposn_term_index = afl_extractions[i];
     result.push_back(rar.rposn_atoms[rposn_term_index]);
   }
-  const std::vector<int> relevant_rbond = extractBoundedListEntries(rbond_affector_list,
-                                                                    rbond_affector_bounds,
-                                                                    atom_idx);
-  const int nrbond = relevant_rbond.size();
+  extractBoundedListEntries(&afl_extractions, rbond_affector_list, rbond_affector_bounds,
+                            atom_idx);
+  const int nrbond = afl_extractions.size();
   for (int i = 0; i < nrbond; i++) {
-    const int rbond_term_index = relevant_rbond[i];
+    const int rbond_term_index = afl_extractions[i];
     result.push_back(rar.rbond_i_atoms[rbond_term_index]);
     result.push_back(rar.rbond_j_atoms[rbond_term_index]);
   }
-  const std::vector<int> relevant_rangl = extractBoundedListEntries(rangl_affector_list,
-                                                                    rangl_affector_bounds,
-                                                                    atom_idx);
-  const int nrangl = relevant_rangl.size();
+  extractBoundedListEntries(&afl_extractions, rangl_affector_list, rangl_affector_bounds,
+                            atom_idx);
+  const int nrangl = afl_extractions.size();
   for (int i = 0; i < nrangl; i++) {
-    const int rangl_term_index = relevant_rangl[i];
+    const int rangl_term_index = afl_extractions[i];
     result.push_back(rar.rangl_i_atoms[rangl_term_index]);
     result.push_back(rar.rangl_j_atoms[rangl_term_index]);
     result.push_back(rar.rangl_k_atoms[rangl_term_index]);
   }
-  const std::vector<int> relevant_rdihe = extractBoundedListEntries(rdihe_affector_list,
-                                                                    rdihe_affector_bounds,
-                                                                    atom_idx);
-  const int nrdihe = relevant_rdihe.size();
+  extractBoundedListEntries(&afl_extractions, rdihe_affector_list, rdihe_affector_bounds,
+                            atom_idx);
+  const int nrdihe = afl_extractions.size();
   for (int i = 0; i < nrdihe; i++) {
-    const int rdihe_term_index = relevant_rdihe[i];
+    const int rdihe_term_index = afl_extractions[i];
     result.push_back(rar.rdihe_i_atoms[rdihe_term_index]);
     result.push_back(rar.rdihe_j_atoms[rdihe_term_index]);
     result.push_back(rar.rdihe_k_atoms[rdihe_term_index]);
@@ -396,12 +379,10 @@ std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
   // from attenuated 1:4 non-bonded interactions, possibly standard valence terms if the force
   // field is very abstract) to their frame atoms.  The virtual site, all of its frame atoms, and
   // any atoms making interactions with the virtual site must therefore be included.
-  const std::vector<int> relevant_vstes = extractBoundedListEntries(vste_affector_list,
-                                                                    vste_affector_bounds,
-                                                                    atom_idx);
-  const int nvsite = relevant_vstes.size();
+  extractBoundedListEntries(&afl_extractions, vste_affector_list, vste_affector_bounds, atom_idx);
+  const int nvsite = afl_extractions.size();
   for (int i = 0; i < nvsite; i++) {
-    const int vste_index = relevant_vstes[i];
+    const int vste_index = afl_extractions[i];
 
     // If the virtual site is atom_idx, then the primary and inferred 1:4 interactions have already
     // been counted in the work above.  This part of the step can be skipped, and since the atom

@@ -12,6 +12,9 @@ namespace constants {
 constexpr llint kilo = 1024;
 constexpr llint mega = kilo * kilo;
 constexpr llint giga = mega * kilo;
+constexpr size_t kilo_zu = 1024LLU;
+constexpr size_t mega_zu = kilo_zu * kilo_zu;
+constexpr size_t giga_zu = mega_zu * kilo_zu;
 /// \}
 
 /// \brief a value bigger than tiny but still small enough to often be negligible

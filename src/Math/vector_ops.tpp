@@ -1028,10 +1028,46 @@ template <typename T> std::vector<T> reduceUniqueValues(const std::vector<T> &va
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> void reduceUniqueValues(std::vector<T> *va) {
+
+  // Return immediately if there is no data
+  if (va->size() == 0) {
+    return;
+  }
+
+  // If the type is integral, test whether the data might be well clustered
+  T* va_ptr = va->data();
+  const size_t nval = va->size();
+  if (isSignedIntegralScalarType<T>() || isUnsignedIntegralScalarType<T>()) {
+    T va_min = va_ptr[0];
+    T va_max = va_ptr[0];
+    for (size_t i = 1LLU; i < nval; i++) {
+      va_min = std::min(va_min, va_ptr[i]);
+      va_max = std::max(va_max, va_ptr[i]);
+    }
+    const size_t max_unique = va_max - va_min + 1LLU;
+    if (max_unique < nval) {
+      std::vector<bool> presence(max_unique, false);
+      for (size_t i = 0LLU; i < nval; i++) {
+        presence[va_ptr[i] - va_min] = true;
+      }
+      size_t j = 0LLU;
+      T ti = 0;
+      for (size_t i = 0LLU; i < max_unique; i++) {
+        if (presence[i]) {
+          va_ptr[j] = va_min + ti;
+          j++;
+        }
+        ti++;
+      }
+      va->resize(j);
+      va->shrink_to_fit();      
+      return;
+    }
+  }
+
+  // Take the standard sorting approach
   std::sort(va->begin(), va->end(), [](T a, T b) { return a < b; });
   size_t nunique = 0LLU;
-  const size_t nval = va->size();
-  T* va_ptr = va->data();
   const size_t nvalm1 = nval - 1LLU;
   T last_unique;
   for (size_t i = 0LLU; i < nval; i++) {
