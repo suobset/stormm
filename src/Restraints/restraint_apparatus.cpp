@@ -1138,5 +1138,17 @@ void RestraintApparatus::assessTimeDependence() {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+std::vector<RestraintApparatus>
+createBlankRestraintApparatus(const std::vector<AtomGraph*> ags) {
+  std::vector<RestraintApparatus> result;
+  const size_t ntops = ags.size();
+  result.reserve(ntops);
+  for (size_t i = 0LLU; i < ntops; i++) {
+    result.emplace_back(ags[i]);
+  }
+  return result;
+}
+
 } // namespace restraints
 } // namespace omni

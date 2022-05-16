@@ -6,7 +6,7 @@
 #include <vector>
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
-#include "atomgraph_synthesis.h"
+#include "Topology/atomgraph_abstracts.h"
 
 namespace omni {
 namespace synthesis {

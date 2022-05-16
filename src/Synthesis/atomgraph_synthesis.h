@@ -7,6 +7,7 @@
 #include "DataTypes/omni_vector_types.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
+#include "valence_workunit.h"
 
 namespace omni {
 namespace synthesis {
@@ -396,6 +397,12 @@ private:
   Hybrid<int2> angl_param_map_bounds;  ///< Bounds array for harmonic angle index maps
   Hybrid<int> dihe_param_map;          ///< Cosine-based dihedral index maps
   Hybrid<int2> dihe_param_map_bounds;  ///< Bounds array for cosine-based dihedral index maps
+  Hybrid<int> vste_param_map;          ///< Virtual site frame specifications mapping 
+  Hybrid<int2> vste_param_map_bounds;  ///< Bounds array for vste_param_map
+  Hybrid<int> sett_param_map;          ///< SETTLE group geometry mapping
+  Hybrid<int2> sett_param_map_bounds;  ///< Buunds array for SETTLE group geometry mapping
+  Hybrid<int> cnst_param_map;          ///< Constraint group parameter set mapping
+  Hybrid<int2> cnst_param_map_bounds;  ///< Buunds array for constraint group parameter set mapping
   
   // CHARMM and basic force field valence term details.  Each of these objects points into one of
   // the data arrays at the bottom of the section.
@@ -1003,6 +1010,12 @@ private:
   ///        condensed (each network comes from a RestraintApparatus object, and is just another
   ///        name to avoid repeating the type name as the name of an actual variable).
   void condenseRestraintNetworks();
+
+  /// \brief Construct valence work units for all systems and load their instructions into the
+  ///        topology synthesis for availability on the GPU.
+  ///
+  /// \param max_atoms_per_vwu  The maximum number of atoms to assign to any one valence work unit
+  void loadValenceWorkUnits(int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
 };
 
 } // namespace synthesis

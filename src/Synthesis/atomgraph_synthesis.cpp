@@ -133,6 +133,12 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     angl_param_map_bounds{HybridKind::POINTER, "tpsyn_angl_map_bounds"},
     dihe_param_map{HybridKind::POINTER, "tpsyn_dihe_map"},
     dihe_param_map_bounds{HybridKind::POINTER, "tpsyn_dihe_map_bounds"},
+    vste_param_map{HybridKind::POINTER, "tpsyn_vsite_map"},
+    vste_param_map_bounds{HybridKind::POINTER, "tpsyn_vste_map_bounds"},
+    sett_param_map{HybridKind::POINTER, "tpsyn_settle_map"},
+    sett_param_map_bounds{HybridKind::POINTER, "tpsyn_sett_map_bounds"},
+    cnst_param_map{HybridKind::POINTER, "tpsyn_constraint_map"},
+    cnst_param_map_bounds{HybridKind::POINTER, "tpsyn_cnst_map_bounds"},
     ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff"},
     ubrd_equilibria{HybridKind::POINTER, "tpsyn_ub_equil"},
     cimp_stiffnesses{HybridKind::POINTER, "tpsyn_cimp_stiff"},
@@ -340,7 +346,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   condenseRestraintNetworks();
 
   // Create valence work units for all topologies, then load them into the synthesis
-  //loadValenceWorkUnits();
+  loadValenceWorkUnits();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -451,8 +457,8 @@ AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices
     if (restraint_indices_in[i] < 0 || restraint_networks[restraint_indices_in[i]] == nullptr) {
       continue;
     }
-    const AtomGraph* topref = topologies[topology_indices[i]];    
-    const AtomGraph* rstref = restraint_networks[restraint_indices_in[i]]->getTopologyPointer();
+    const AtomGraph *topref = topologies[topology_indices[i]];    
+    const AtomGraph *rstref = restraint_networks[restraint_indices_in[i]]->getTopologyPointer();
     if (rstref != topref) {
       rtErr("Mismatch in topologies referenced by the restraint apparatus for system " +
             std::to_string(i) + " and the system itself.  Atom counts of the topologies are " +
@@ -734,7 +740,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   int rangl_offset = 0;
   int rdihe_offset = 0;
   for (int i = 0; i < system_count; i++) {
-    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(i)];
+    const AtomGraph *ag_ptr = topologies[topology_indices.readHost(i)];
     const RestraintApparatus* ra_ptr = restraint_networks[restraint_indices.readHost(i)];
     const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
@@ -888,7 +894,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   char4* atom_types_ptr        = atom_types.data();
   char4* residue_names_ptr     = residue_names.data();
   for (int i = 0; i < system_count; i++) {
-    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(i)];
+    const AtomGraph *ag_ptr = topologies[topology_indices.readHost(i)];
     const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
     const NonbondedKit<float> nbk_sp = ag_ptr->getSinglePrecisionNonbondedKit();
@@ -994,7 +1000,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   pivot += dihe_offset;
   dihe_param_idx.setPointer(&valence_int_data, pivot, dihe_offset);
   for (int sysid = 0; sysid < system_count; sysid++) {
-    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(sysid)];
+    const AtomGraph *ag_ptr = topologies[topology_indices.readHost(sysid)];
     const ValenceKit<double> vk = ag_ptr->getDoublePrecisionValenceKit();
     const int synth_atom_base = atom_offsets.readHost(sysid);
     const int synth_ubrd_offset = ubrd_term_offsets.readHost(sysid);
@@ -1104,7 +1110,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   // Fill in the virtual site indexing arrays
   int vste_map_size = 0;
   for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* ag_ptr = topologies[i];
+    const AtomGraph *ag_ptr = topologies[i];
     const int ni_vs = ag_ptr->getVirtualSiteParameterSetCount();
     vste_map_size += roundUp(ni_vs, warp_size_int);
   }
@@ -1123,7 +1129,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   virtual_site_parameter_indices.setPointer(&vsite_int_data, pivot, vste_offset);
   pivot += vste_offset;
   for (int sysid = 0; sysid < system_count; sysid++) {
-    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(sysid)];
+    const AtomGraph *ag_ptr = topologies[topology_indices.readHost(sysid)];
     const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
     const int synth_atom_base = atom_offsets.readHost(sysid);
     const int synth_vste_offset = virtual_site_offsets.readHost(sysid);
@@ -1144,7 +1150,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   constraint_group_param_idx.resize(cnst_offset);
   int cnst_atom_count = 0;
   for (int sysid = 0; sysid < system_count; sysid++) {
-    const AtomGraph* ag_ptr = topologies[topology_indices.readHost(sysid)];
+    const AtomGraph *ag_ptr = topologies[topology_indices.readHost(sysid)];
     const ConstraintKit<double> cnk = ag_ptr->getDoublePrecisionConstraintKit();
     const int synth_atom_base = atom_offsets.readHost(sysid);
     const int synth_sett_offset = sett_group_offsets.readHost(sysid);
@@ -1195,6 +1201,9 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int2> tmp_bond_param_map_bounds(topology_count);
   std::vector<int2> tmp_angl_param_map_bounds(topology_count);
   std::vector<int2> tmp_dihe_param_map_bounds(topology_count);
+  std::vector<int2> tmp_vste_param_map_bounds(topology_count);
+  std::vector<int2> tmp_sett_param_map_bounds(topology_count);
+  std::vector<int2> tmp_cnst_param_map_bounds(topology_count);
   std::vector<int> topology_bond_table_offsets(topology_count);
   std::vector<int> topology_angl_table_offsets(topology_count);
   std::vector<int> topology_dihe_table_offsets(topology_count);
@@ -1206,7 +1215,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> topology_sett_table_offsets(topology_count);
   std::vector<int> topology_cnst_table_offsets(topology_count);
   for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* ag_ptr = topologies[i];
+    const AtomGraph *ag_ptr = topologies[i];
     const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> vsk = ag_ptr->getDoublePrecisionVirtualSiteKit();
@@ -1227,12 +1236,18 @@ void AtomGraphSynthesis::condenseParameterTables() {
     tmp_ubrd_param_map_bounds[i].x = ubrd_offset;
     tmp_cimp_param_map_bounds[i].x = cimp_offset;
     tmp_cmap_param_map_bounds[i].x = cmap_offset;
+    tmp_vste_param_map_bounds[i].x = vste_offset;
+    tmp_sett_param_map_bounds[i].x = sett_offset;
+    tmp_cnst_param_map_bounds[i].x = cnst_offset;
     tmp_bond_param_map_bounds[i].y = bond_offset + vk.nbond_param;
     tmp_angl_param_map_bounds[i].y = angl_offset + vk.nangl_param;
     tmp_dihe_param_map_bounds[i].y = dihe_offset + vk.ndihe_param;
     tmp_ubrd_param_map_bounds[i].y = ubrd_offset + vk.nubrd_param;
     tmp_cimp_param_map_bounds[i].y = cimp_offset + vk.ncimp_param;
     tmp_cmap_param_map_bounds[i].y = cmap_offset + vk.ncmap_surf;
+    tmp_vste_param_map_bounds[i].y = vste_offset + vsk.nframe_set;
+    tmp_sett_param_map_bounds[i].y = sett_offset + cnk.nsett_param;
+    tmp_cnst_param_map_bounds[i].y = cnst_offset + cnk.ncnst_param;
     bond_offset += roundUp(vk.nbond_param, warp_size_int);
     angl_offset += roundUp(vk.nangl_param, warp_size_int);
     dihe_offset += roundUp(vk.ndihe_param, warp_size_int);
@@ -1249,7 +1264,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   // "parameters" in the inner loops that follow.
   std::vector<double> cmap_parameter_sums(cmap_offset);
   for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* iag_ptr = topologies[i];
+    const AtomGraph *iag_ptr = topologies[i];
     const ValenceKit<double> i_vk = iag_ptr->getDoublePrecisionValenceKit();
     for (int j = 0; j < i_vk.ncmap_surf; j++) {
       cmap_parameter_sums[topology_cmap_table_offsets[i] + j] =
@@ -1301,7 +1316,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int n_unique_sett = 0;
   int n_unique_cnst = 0;
   for (int i = 0; i < topology_count; i++) {
-    const AtomGraph* iag_ptr = topologies[i];
+    const AtomGraph *iag_ptr = topologies[i];
     const ChemicalDetailsKit i_cdk       = iag_ptr->getChemicalDetailsKit();
     const NonbondedKit<double> i_nbk     = iag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> i_vk        = iag_ptr->getDoublePrecisionValenceKit();
@@ -1320,7 +1335,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_bond_keq(i_vk.bond_keq[j], constants::verytiny);
       const Approx ij_bond_leq(i_vk.bond_leq[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
         const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
@@ -1348,7 +1363,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_angl_keq(i_vk.angl_keq[j], constants::verytiny);
       const Approx ij_angl_theta(i_vk.angl_theta[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
         const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
@@ -1377,7 +1392,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_dihe_freq(i_vk.dihe_freq[j], constants::verytiny);
       const Approx ij_dihe_phi(i_vk.dihe_phi[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
         const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
@@ -1408,7 +1423,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_ubrd_keq(i_vk.ubrd_keq[j], constants::verytiny);
       const Approx ij_ubrd_leq(i_vk.ubrd_leq[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
         const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
@@ -1436,7 +1451,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_cimp_keq(i_vk.cimp_keq[j], constants::verytiny);
       const Approx ij_cimp_phi(i_vk.cimp_phi[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
         const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
@@ -1469,7 +1484,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const int ij_cmap_dim = i_vk.cmap_dim[j];
       const double* ij_surf_ptr = &i_vk.cmap_surf[i_vk.cmap_surf_bounds[j]];
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ValenceKit<double> k_vk = kag_ptr->getDoublePrecisionValenceKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.ncmap_surf; m++) {
@@ -1500,7 +1515,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       }
       const Approx ij_chrg(i_nbk.q_parameter[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const NonbondedKit<double> k_nbk   = kag_ptr->getDoublePrecisionNonbondedKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_nbk.n_q_types; m++) {
@@ -1527,7 +1542,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_dim2(i_vsk.dim2[j], constants::verytiny);
       const Approx ij_dim3(i_vsk.dim3[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const VirtualSiteKit<double> k_vsk = kag_ptr->getDoublePrecisionVirtualSiteKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vsk.nframe_set; m++) {
@@ -1559,7 +1574,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       const Approx ij_rc(i_cnk.settle_rc[j], constants::verytiny);
       const Approx ij_invra(i_cnk.settle_invra[j], constants::verytiny);
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ConstraintKit<double> k_cnk = kag_ptr->getDoublePrecisionConstraintKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_cnk.nsett_param; m++) {
@@ -1596,7 +1611,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                 constants::verytiny);
       }
       for (int k = i; k < topology_count; k++) {
-        const AtomGraph* kag_ptr = topologies[k];
+        const AtomGraph *kag_ptr = topologies[k];
         const ConstraintKit<double> k_cnk = kag_ptr->getDoublePrecisionConstraintKit();
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_cnk.ncnst_param; m++) {
@@ -1654,9 +1669,9 @@ void AtomGraphSynthesis::condenseParameterTables() {
   valparam_double_data.resize(rn_space);
   valparam_float_data.resize(rn_space);
   valparam_int_data.resize(roundUp(total_cmap_surfaces, warp_size_int) +
-                           (2 * roundUp(total_cmap_surfaces + 1, warp_size_int)) +
-                           ubrd_offset + cimp_offset + cmap_offset + bond_offset +
-                           angl_offset + dihe_offset);
+                           (2 * roundUp(total_cmap_surfaces + 1, warp_size_int)) + ubrd_offset +
+                           cimp_offset + cmap_offset + bond_offset + angl_offset + dihe_offset +
+                           vste_offset + sett_offset + cnst_offset);
   size_t ic = 0LLU;
   ic = bond_stiffnesses.putHost(&valparam_double_data, filtered_bond_keq, ic, warp_size_zu);
   ic = bond_equilibria.putHost(&valparam_double_data, filtered_bond_leq, ic, warp_size_zu);
@@ -1702,8 +1717,11 @@ void AtomGraphSynthesis::condenseParameterTables() {
   ic = bond_param_map.putHost(&valparam_int_data, bond_synthesis_index, ic, warp_size_zu);
   ic = angl_param_map.putHost(&valparam_int_data, angl_synthesis_index, ic, warp_size_zu);
   ic = dihe_param_map.putHost(&valparam_int_data, dihe_synthesis_index, ic, warp_size_zu);
+  ic = vste_param_map.putHost(&valparam_int_data, vste_synthesis_index, ic, warp_size_zu);
+  ic = sett_param_map.putHost(&valparam_int_data, sett_synthesis_index, ic, warp_size_zu);
+  ic = cnst_param_map.putHost(&valparam_int_data, cnst_synthesis_index, ic, warp_size_zu);
   const int tc_offset = roundUp(topology_count, warp_size_int);
-  valparam_int2_data.resize(6 * tc_offset);
+  valparam_int2_data.resize(9 * tc_offset);
   ic = 0LLU;
   ic = ubrd_param_map_bounds.putHost(&valparam_int2_data, tmp_ubrd_param_map_bounds, ic,
                                      warp_size_zu);
@@ -1717,12 +1735,18 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                      warp_size_zu);
   ic = dihe_param_map_bounds.putHost(&valparam_int2_data, tmp_dihe_param_map_bounds, ic,
                                      warp_size_zu);
+  ic = vste_param_map_bounds.putHost(&valparam_int2_data, tmp_vste_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = sett_param_map_bounds.putHost(&valparam_int2_data, tmp_sett_param_map_bounds, ic,
+                                     warp_size_zu);
+  ic = cnst_param_map_bounds.putHost(&valparam_int2_data, tmp_cnst_param_map_bounds, ic,
+                                     warp_size_zu);
 
   // Loop back over all systems and copy the known mapping of individual topologies to the
   // synthesis as a whole.  Fill out the parameter maps.
   for (int i = 0; i < system_count; i++) {
     const int tp_index = topology_indices.readHost(i);
-    const AtomGraph* iag_ptr = topologies[tp_index];
+    const AtomGraph *iag_ptr = topologies[tp_index];
     const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> i_vsk = iag_ptr->getDoublePrecisionVirtualSiteKit();
@@ -1786,7 +1810,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       continue;
     }
     system_covered[tp_index] = true;
-    const AtomGraph* iag_ptr = topologies[tp_index];
+    const AtomGraph *iag_ptr = topologies[tp_index];
     const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
     const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
     const VirtualSiteKit<double> i_vsk = iag_ptr->getDoublePrecisionVirtualSiteKit();
@@ -2326,7 +2350,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   // terms of the synthesis tables.
   for (int sysid = 0; sysid < system_count; sysid++) {
     const int ra_index = restraint_indices.readHost(sysid);
-    const RestraintApparatus* ra_ptr = restraint_networks[ra_index];
+    const RestraintApparatus *ra_ptr = restraint_networks[ra_index];
     if (ra_ptr == nullptr) {
       continue;
     }
@@ -2358,6 +2382,30 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
                               synth_dihe_table_offset + j);
     }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
+
+  // Loop over all systems and create lists of valence work units
+  std::vector<std::vector<ValenceWorkUnit>> all_vwu;
+  all_vwu.reserve(system_count);
+  for (int i = 0; i < system_count; i++) {
+    const AtomGraph *ag = topologies[topology_indices.readHost(i)];
+
+    // Check the restraint network--if the restraint network is blank then construct a 
+    // blank network.
+    const int rn = restraint_indices.readHost(i);
+    const RestraintApparatus ra_blank = RestraintApparatus(ag);
+    const RestraintApparatus *ra = (restraint_networks[rn] == nullptr) ? &ra_blank :
+                                                                         restraint_networks[rn];
+    all_vwu.push_back(buildValenceWorkUnits(ag, ra, max_atoms_per_vwu));
+  }
+  
+  // Allocate instruction arrays in the topological synthesis
+
+  // Populate the instruction arrays with appropriate mapping and imported atom offsets
+  
 }
 
 //-------------------------------------------------------------------------------------------------

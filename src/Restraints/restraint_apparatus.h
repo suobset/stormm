@@ -400,6 +400,13 @@ private:
   /// \}
 };
 
+/// \brief Create a series of blank restraint apparatuses based on a series of topology pointers.
+///        The results are available for expansion, adding actual BoundedRestraint objects, later.
+///
+/// \param ags  The topologies for which to create empty restraint apparatuses
+std::vector<RestraintApparatus>
+createBlankRestraintApparatus(const std::vector<AtomGraph*> ags);
+  
 } // namespace restraints
 } // namespace omni
 

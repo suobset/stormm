@@ -7,6 +7,10 @@
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
+// CHECK
+#include "FileManagement/file_listing.h"
+// END CHECK
+
 namespace omni {
 namespace synthesis {
 
@@ -21,6 +25,7 @@ using math::roundUp;
 using parse::char4ToString;
 using topology::extractBoundedListEntries;
 using topology::markAffectorAtoms;
+using topology::ChemicalDetailsKit;
 using topology::NonbondedKit;
 using topology::TorsionKind;
 using topology::VirtualSiteKind;
@@ -268,7 +273,7 @@ std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
           "somehow, a virtual site in the topology is including itself as one of its frame atoms "
           "or some similar paradox.  Calls include atoms " + atom_list + ".", "findForcePartners");
   }
-  
+
   // Push the atom itself onto the list first.  Even if there are no interactions, having the
   // atom is, by definition, critical to evaluating its movement.
   result.push_back(atom_idx);
@@ -776,7 +781,7 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
     vste_affector_bounds[vsk.vs_atoms[pos]] += 1;
     vste_affector_bounds[vsk.frame1_idx[pos]] += 1;
     vste_affector_bounds[vsk.frame2_idx[pos]] += 1;
-    switch (static_cast<VirtualSiteKind>(vsk.vs_types[pos])) {
+    switch (static_cast<VirtualSiteKind>(vsk.vs_types[vsk.vs_param_idx[pos]])) {
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::FIXED_2:
     case VirtualSiteKind::NONE:
@@ -803,7 +808,7 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
   }
   prefixSumInPlace<int>(&vste_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
   prefixSumInPlace<int>(&cnst_affector_bounds, PrefixSumType::EXCLUSIVE, "ValenceDelegator");
-
+  
   // Finish up the virtual site mapping
   for (int pos = 0; pos < vsk.nsite; pos++) {
     const int virtual_atom = vsk.vs_atoms[pos];
@@ -912,7 +917,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
           std::to_string(maximum_valence_work_unit_atoms) + ".  A value of " +
           std::to_string(atom_limit) + err_msg, "ValenceWorkUnit");
   }
-
+  
   // Reserve space for atoms
   atom_import_list.reserve(atom_limit);
 
@@ -950,6 +955,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
       // of its dependencies and add them to the import list, if there is room.  Mark the atom
       // as one for the work unit to update.
       const std::vector<int> up_deps = vdel_pointer->getUpdateDependencies(candidate_additions[i]);
+      
       const int ndeps = up_deps.size();
       std::vector<bool> incl_up_deps(ndeps, false);
       int n_new_atoms = 0;
@@ -973,7 +979,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
       }
     }
     candidate_additions.resize(0);
-    
+        
     // Loop over the growth points and determine new candidate atoms.  During construction,
     // valence work units do not overlap.  Atoms included in some previous work unit do not
     // become new candidates.
