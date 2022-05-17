@@ -186,6 +186,8 @@ private:
   int total_ubrd_params;          ///< Total number of unique Urey-Bradley angle parameter sets
   int total_cimp_params;          ///< Total number of unique CHARMM improper parameter sets
   int total_cmap_surfaces;        ///< Total number of unique CMAP surfaces
+  int total_attn14_params;        ///< Total number of unique 1:4 attenuated interaction pairs
+                                  ///<   (electrostatic and van-der Waals)
   int total_vste_params;          ///< Total number of unique virtual site frames, across all
                                   ///<   systems
   int total_position_restraints;  ///< Total number of positional restraints
@@ -386,27 +388,31 @@ private:
 
   // Valence parameter maps and bounds, showing how the parameters of each unique topology map to
   // those of the consensus tables in the synthesis.
-  Hybrid<int> ubrd_param_map;          ///< Urey-Bradley parameter index maps
-  Hybrid<int2> ubrd_param_map_bounds;  ///< Bounds array for unique topologies in the Urey-Bradley
-                                       ///<   parameter maps (dimension topology_count + 1, an
-                                       ///<   exclusive prefix sum over the number of Urey-Bradley
-                                       ///<   parameters in each of the unique topologies)
-  Hybrid<int> cimp_param_map;          ///< CHARMM improper parameter index maps
-  Hybrid<int2> cimp_param_map_bounds;  ///< Bounds array for CHARMM improper parameter index maps
-  Hybrid<int> cmap_param_map;          ///< CMAP surface index maps
-  Hybrid<int2> cmap_param_map_bounds;  ///< Bounds array for CMAP surface index maps
-  Hybrid<int> bond_param_map;          ///< Harmonic bond index maps
-  Hybrid<int2> bond_param_map_bounds;  ///< Bounds array for harmonic bond index maps
-  Hybrid<int> angl_param_map;          ///< Harmonic angle index maps
-  Hybrid<int2> angl_param_map_bounds;  ///< Bounds array for harmonic angle index maps
-  Hybrid<int> dihe_param_map;          ///< Cosine-based dihedral index maps
-  Hybrid<int2> dihe_param_map_bounds;  ///< Bounds array for cosine-based dihedral index maps
-  Hybrid<int> vste_param_map;          ///< Virtual site frame specifications mapping 
-  Hybrid<int2> vste_param_map_bounds;  ///< Bounds array for vste_param_map
-  Hybrid<int> sett_param_map;          ///< SETTLE group geometry mapping
-  Hybrid<int2> sett_param_map_bounds;  ///< Buunds array for SETTLE group geometry mapping
-  Hybrid<int> cnst_param_map;          ///< Constraint group parameter set mapping
-  Hybrid<int2> cnst_param_map_bounds;  ///< Buunds array for constraint group parameter set mapping
+  Hybrid<int> ubrd_param_map;            ///< Urey-Bradley parameter index maps
+  Hybrid<int2> ubrd_param_map_bounds;    ///< Bounds array for unique topologies in the
+                                         ///<   Urey-Bradley parameter maps (dimension
+                                         ///<   topology_count, a series of low and high limits
+                                         ///<   for each unique topology's Urey-Bradley parameter
+                                         ///<   index correspondence)
+  Hybrid<int> cimp_param_map;            ///< CHARMM improper parameter index maps
+  Hybrid<int2> cimp_param_map_bounds;    ///< Bounds array for CHARMM improper parameter index maps
+  Hybrid<int> cmap_param_map;            ///< CMAP surface index maps
+  Hybrid<int2> cmap_param_map_bounds;    ///< Bounds array for CMAP surface index maps
+  Hybrid<int> bond_param_map;            ///< Harmonic bond index maps
+  Hybrid<int2> bond_param_map_bounds;    ///< Bounds array for harmonic bond index maps
+  Hybrid<int> angl_param_map;            ///< Harmonic angle index maps
+  Hybrid<int2> angl_param_map_bounds;    ///< Bounds array for harmonic angle index maps
+  Hybrid<int> dihe_param_map;            ///< Cosine-based dihedral index maps
+  Hybrid<int2> dihe_param_map_bounds;    ///< Bounds array for cosine-based dihedral index maps
+  Hybrid<int> attn14_param_map;          ///< Cosine-based dihedral index maps
+  Hybrid<int2> attn14_param_map_bounds;  ///< Bounds array for cosine-based dihedral index maps  
+  Hybrid<int> vste_param_map;            ///< Virtual site frame specifications mapping 
+  Hybrid<int2> vste_param_map_bounds;    ///< Bounds array for vste_param_map
+  Hybrid<int> sett_param_map;            ///< SETTLE group geometry mapping
+  Hybrid<int2> sett_param_map_bounds;    ///< Buunds array for SETTLE group geometry mapping
+  Hybrid<int> cnst_param_map;            ///< Constraint group parameter set mapping
+  Hybrid<int2> cnst_param_map_bounds;    ///< Buunds array for constraint group parameter set
+                                         ///<   mapping
   
   // CHARMM and basic force field valence term details.  Each of these objects points into one of
   // the data arrays at the bottom of the section.
@@ -434,7 +440,7 @@ private:
                                         ///<   CMAP aggregated patch representation in single
                                         ///<   precision (see description in Topology/atomgraph.h).
 
-  // Basic force field valence term details
+  // Basic force field valence term details, consensus tables form all topologies
   Hybrid<double> bond_stiffnesses;      ///< Stiffness of each bond stretch, kcal/mol-A^2
   Hybrid<double> bond_equilibria;       ///< Equilibrium lengths of all bonds, A
   Hybrid<double> angl_stiffnesses;      ///< Stiffness of each angle bend, kcal/mol-rad^2
@@ -442,6 +448,10 @@ private:
   Hybrid<double> dihe_amplitudes;       ///< Amplitudes of each dihedral cosine term, kcal/mol
   Hybrid<double> dihe_periodicities;    ///< Periodicity of each dihedral / torsion cosine term
   Hybrid<double> dihe_phase_angles;     ///< Phase angle of each dihedral / torsion cosine term
+  Hybrid<double> attn14_elec_factors;   ///< Attenuated 1:4 non-bonded interaction electrostatic
+                                        ///<   scaling factors
+  Hybrid<double> attn14_vdw_factors;    ///< Attenuated 1:4 non-bonded interaction van-der Waals
+                                        ///<   scaling factors
   Hybrid<float> sp_bond_stiffnesses;    ///< Stiffness of each bond stretch (single precision)
   Hybrid<float> sp_bond_equilibria;     ///< Equilibrium lengths of all bonds (single precision)
   Hybrid<float> sp_angl_stiffnesses;    ///< Angle bending stiffnesses (single precision)
