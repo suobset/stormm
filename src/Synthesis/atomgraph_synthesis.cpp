@@ -4,6 +4,7 @@
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
+#include "UnitTesting/stopwatch.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "Topology/atomgraph_refinement.h"
@@ -32,13 +33,14 @@ using topology::ValenceKit;
 using topology::VirtualSiteKit;
 using testing::Approx;
 using testing::ComparisonType;
+using testing::StopWatch;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                                        const std::vector<RestraintApparatus*> &restraints_in,
                                        const std::vector<int> &topology_indices_in,
                                        const std::vector<int> &restraint_indices_in,
-                                       const ExceptionResponse policy_in) :
+                                       const ExceptionResponse policy_in, StopWatch *timer_in) :
     policy{policy_in},
     topology_count{static_cast<int>(topologies_in.size())},
     restraint_network_count{static_cast<int>(restraints_in.size())},
@@ -324,15 +326,24 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     accumulate_rangl_energy{HybridKind::POINTER, "tpsyn_rangl_edir"},
     accumulate_rdihe_energy{HybridKind::POINTER, "tpsyn_rdihe_edir"},
     insr_uint_data{HybridKind::ARRAY, "tpsyn_insr_data1"},
-    insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data2"}
+    insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data2"},
+    timer{timer_in}
 {
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
   const std::vector<int> restraint_index_rebase = checkRestraintList(restraint_indices_in,
                                                                      topology_index_rebase);
   checkCommonSettings();
+  int term_array_timings, param_cond_timings, vwu_creation_timings;
+  if (timer != nullptr) {
+    term_array_timings   = timer->addCategory("[AtomGraphSynthesis] Build term arrays");
+    param_cond_timings   = timer->addCategory("[AtomGraphSynthesis] Condense parameters");
+    vwu_creation_timings = timer->addCategory("[AtomGraphSynthesis] VWU creation");
+    timer->assignTime(0);
+  }
   buildAtomAndTermArrays(topology_indices_in, topology_index_rebase, restraint_indices_in,
                          restraint_index_rebase);
+  if (timer != nullptr) timer->assignTime(term_array_timings);
 
   // Condense valence and charge parameters into compact tables of unique values
   condenseParameterTables();
@@ -345,18 +356,20 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 
   // Restraint data can now be incorporated.
   condenseRestraintNetworks();
+  if (timer != nullptr) timer->assignTime(param_cond_timings);
 
   // Create valence work units for all topologies, then load them into the synthesis
   loadValenceWorkUnits();
+  if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                                        const std::vector<int> &topology_indices_in,
-                                       const ExceptionResponse policy_in) :
+                                       const ExceptionResponse policy_in, StopWatch *timer_in) :
     AtomGraphSynthesis(topologies_in, std::vector<RestraintApparatus*>(1, nullptr),
                        topology_indices_in, std::vector<int>(topology_indices_in.size(), 0),
-                       policy_in)
+                       policy_in, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
