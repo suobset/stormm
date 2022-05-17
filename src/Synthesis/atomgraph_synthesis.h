@@ -767,6 +767,12 @@ private:
   // the cached atoms.  Forces are accumulated on all atoms in __shared__ memory and then
   // contributed back to the global arrays.
 
+  /// Instruction sets for the bond work units, storing integers for the low (_L nomenclature) and
+  /// high (_H nomeclature) limits of all the types of interactions in a given work unit.  Each
+  /// VWU takes a stride of integers from this array.  The length of this stride is not a matter
+  /// of the warp size.
+  Hybrid<int2> vwu_instruction_sets;
+
   /// A list of atoms that the VWU shall import, with indices into the global array of atoms for
   /// all systems.  Each VWU may import up to 3/4 as many atoms as the kernel blocks have threads,
   /// and each VWU takes a stride of that many ints from this array.
@@ -777,12 +783,7 @@ private:
   /// updated, 0 otherwise.  In terms of bitwise operations, for all elements of this array,
   /// the move mask completely subsumes the update mask, (x | y) = x.  This POINTER-kind object
   /// targets insr_uint2_data like other instructions sets.
-  Hybrid<uint2> vwu_manipulation_mask;
-
-  /// Instruction sets for the bond work units, up to 64 integers for the low and high limits of
-  /// up to 32 types of interactions in a given work unit.  Each VWU takes a stride of 64 ints from
-  /// this array.  The length of this stride is not a matter of the warp size.
-  Hybrid<int> vwu_instruction_sets;
+  Hybrid<uint2> vwu_manipulation_masks;
 
   /// Instructions for bond stretching and Urey-Bradley interactions.  Each uint2 tuple contains
   /// two atom indices in the x member (bits 1-10 and 11-20) and the parameter index of the bond /
@@ -1011,6 +1012,19 @@ private:
   ///        name to avoid repeating the type name as the name of an actual variable).
   void condenseRestraintNetworks();
 
+  /// \brief Utility function for setting the limit arrays in the abstract of each ValenceWorkUnit.
+  ///        This will set the x member of the appropriate tuple (identified by slot, read as a
+  ///        literal integer, plus the appropriate stride times the valence work unit index) to
+  ///        the current item count, the y member to the item count plus the quantity, and then
+  ///        return the item count plus quantity padded with the warp size.
+  ///
+  /// \param item_counter   The current enumber of items across all previous work units
+  /// \param vwu_counter    The index of the work unit
+  /// \param slot           Type of instruction, the place in the work unit's abstract to set
+  /// \param item_quantity  The number of items in the current work unit
+  int setVwuAbstractLimits(int item_counter, int vwu_counter, VwuAbstractMap slot,
+                           int item_quantity);
+  
   /// \brief Construct valence work units for all systems and load their instructions into the
   ///        topology synthesis for availability on the GPU.
   ///

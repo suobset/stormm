@@ -180,6 +180,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
+		   $(SRCDIR)/Synthesis/synthesis_enumerators.h \
 		   $(SRCDIR)/Synthesis/systemcache.h \
 		   $(SRCDIR)/Synthesis/valence_workunit.h \
 		   $(SRCDIR)/Topology/amber_prmtop_util.h \

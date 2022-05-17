@@ -8,6 +8,7 @@
 #include "Topology/atomgraph_enumerators.h"
 #include "Topology/atomgraph_refinement.h"
 #include "atomgraph_synthesis.h"
+#include "synthesis_enumerators.h"
 
 namespace omni {
 namespace synthesis {
@@ -298,9 +299,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     constraint_param_bounds{HybridKind::ARRAY, "tpsyn_cnst_parm_bnd"},
     constraint_group_params{HybridKind::ARRAY, "tpsyn_cnst_lm"},
     sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
-    vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
-    vwu_manipulation_mask{HybridKind::POINTER, "tpsyn_vwu_manip"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
+    vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
+    vwu_manipulation_masks{HybridKind::POINTER, "tpsyn_vwu_manip"},
     cbnd_instructions{HybridKind::POINTER, "tpsyn_cbnd_insr"},
     angl_instructions{HybridKind::POINTER, "tpsyn_angl_insr"},
     cdhe_instructions{HybridKind::POINTER, "tpsyn_cdhe_insr"},
@@ -2385,11 +2386,23 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::setVwuAbstractLimits(const int item_counter, const int vwu_counter,
+                                             const VwuAbstractMap slot, const int item_quantity) {
+  int2* vwu_insr_ptr = vwu_instruction_sets.data();
+  const int vv_offset = vwu_counter * vwu_abstract_length + static_cast<int>(slot);
+  vwu_insr_ptr[vv_offset].x = item_counter;
+  vwu_insr_ptr[vv_offset].y = item_counter + item_quantity;
+  return roundUp(item_counter + item_quantity, warp_size_int);
+}
+
+//-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
 
   // Loop over all systems and create lists of valence work units
   std::vector<std::vector<ValenceWorkUnit>> all_vwu;
   all_vwu.reserve(system_count);
+  std::vector<int> total_task_counts(static_cast<size_t>(VwuTask::ALL_TASKS), 0);
+  int total_vwu = 0;
   for (int i = 0; i < system_count; i++) {
     const AtomGraph *ag = topologies[topology_indices.readHost(i)];
 
@@ -2400,9 +2413,163 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
     const RestraintApparatus *ra = (restraint_networks[rn] == nullptr) ? &ra_blank :
                                                                          restraint_networks[rn];
     all_vwu.push_back(buildValenceWorkUnits(ag, ra, max_atoms_per_vwu));
+    total_vwu += all_vwu[i].size();    
+  }
+
+  // Allocate the valence work unit instruction set array, an abstract of each ValenceWorkUnit
+  // in a stream of integers.
+  vwu_instruction_sets.resize(total_vwu * vwu_abstract_length);
+  int2* vwu_insr_ptr = vwu_instruction_sets.data();
+  int atom_import_count = 0;
+  int manipulation_mask_count = 0;
+  int cbnd_count = 0;
+  int angl_count = 0;
+  int cdhe_count = 0;
+  int cmap_count = 0;
+  int infr14_count = 0;
+  int rposn_count = 0;
+  int rbond_count = 0;
+  int rangl_count = 0;
+  int rdihe_count = 0;
+  int vsite_count = 0;
+  int settle_count = 0;
+  int cgroup_count = 0;
+  int cbnd_nrg_count = 0;
+  int angl_nrg_count = 0;
+  int cdhe_nrg_count = 0;
+  int cmap_nrg_count = 0;
+  int infr14_nrg_count = 0;
+  int rposn_nrg_count = 0;
+  int rbond_nrg_count = 0;
+  int rangl_nrg_count = 0;
+  int rdihe_nrg_count = 0;
+  int vwu_count = 0;
+  for (int i = 0; i < system_count; i++) {
+    const size_t nvwu = all_vwu[i].size(); 
+    for (size_t j = 0LLU; j < nvwu; j++) {
+      const std::vector<int> task_counts = all_vwu[i][j].getTaskCounts();
+      
+      // Record the appropriate limits for the present system
+      const int ntatom = all_vwu[i][j].getImportedAtomCount();
+      const int manip_bits= (ntatom + uint_bit_count_int - 1) / uint_bit_count_int;
+      atom_import_count = setVwuAbstractLimits(atom_import_count, vwu_count,
+                                               VwuAbstractMap::IMPORT, ntatom);
+      manipulation_mask_count = setVwuAbstractLimits(manipulation_mask_count, vwu_count,
+                                                     VwuAbstractMap::MOVE, manip_bits);
+      const int ntcbnd  = task_counts[static_cast<size_t>(VwuTask::CBND)];
+      const int ntangl  = task_counts[static_cast<size_t>(VwuTask::ANGL)];
+      const int ntcdhe  = task_counts[static_cast<size_t>(VwuTask::CDHE)];
+      const int ntcmap  = task_counts[static_cast<size_t>(VwuTask::CMAP)];
+      const int ntinfr  = task_counts[static_cast<size_t>(VwuTask::INFR14)];
+      const int ntrposn = task_counts[static_cast<size_t>(VwuTask::RPOSN)];
+      const int ntrbond = task_counts[static_cast<size_t>(VwuTask::RBOND)];
+      const int ntrangl = task_counts[static_cast<size_t>(VwuTask::RANGL)];
+      const int ntrdihe = task_counts[static_cast<size_t>(VwuTask::RDIHE)];
+      const int ntvste  = task_counts[static_cast<size_t>(VwuTask::VSITE)];
+      const int ntsett  = task_counts[static_cast<size_t>(VwuTask::SETTLE)];
+      const int ntcnst  = task_counts[static_cast<size_t>(VwuTask::CGROUP)];
+      cbnd_count   = setVwuAbstractLimits(cbnd_count, vwu_count, VwuAbstractMap::CBND, ntcbnd);
+      angl_count   = setVwuAbstractLimits(angl_count, vwu_count, VwuAbstractMap::ANGL, ntangl);
+      cdhe_count   = setVwuAbstractLimits(cdhe_count, vwu_count, VwuAbstractMap::CDHE, ntcdhe);
+      cmap_count   = setVwuAbstractLimits(cmap_count, vwu_count, VwuAbstractMap::CMAP, ntcmap);
+      infr14_count = setVwuAbstractLimits(infr14_count, vwu_count, VwuAbstractMap::INFR14, ntinfr);
+      rposn_count  = setVwuAbstractLimits(rposn_count, vwu_count, VwuAbstractMap::RPOSN, ntrposn);
+      rbond_count  = setVwuAbstractLimits(rbond_count, vwu_count, VwuAbstractMap::RBOND, ntrbond);
+      rangl_count  = setVwuAbstractLimits(rangl_count, vwu_count, VwuAbstractMap::RANGL, ntrangl);
+      rdihe_count  = setVwuAbstractLimits(rdihe_count, vwu_count, VwuAbstractMap::RDIHE, ntrdihe);
+      vsite_count  = setVwuAbstractLimits(vsite_count, vwu_count, VwuAbstractMap::VSITE, ntvste);
+      settle_count = setVwuAbstractLimits(settle_count, vwu_count, VwuAbstractMap::SETTLE, ntsett);
+      cgroup_count = setVwuAbstractLimits(cgroup_count, vwu_count, VwuAbstractMap::CGROUP, ntcnst);
+      const int cbnd_bits   = (ntcbnd + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int angl_bits   = (ntangl + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cdhe_bits   = (ntcdhe + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cmap_bits   = (ntcmap + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int infr14_bits = (ntinfr + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rposn_bits  = (ntrposn + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rbond_bits  = (ntrbond + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rangl_bits  = (ntrangl + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rdihe_bits  = (ntrdihe + uint_bit_count_int - 1) / uint_bit_count_int;
+      cbnd_nrg_count   = setVwuAbstractLimits(cbnd_nrg_count, vwu_count, VwuAbstractMap::CBND_NRG,
+                                              cbnd_bits);
+      angl_nrg_count   = setVwuAbstractLimits(angl_nrg_count, vwu_count, VwuAbstractMap::ANGL_NRG,
+                                              angl_bits);
+      cdhe_nrg_count   = setVwuAbstractLimits(cdhe_nrg_count, vwu_count, VwuAbstractMap::CDHE_NRG,
+                                              cdhe_bits);
+      cmap_nrg_count   = setVwuAbstractLimits(cmap_nrg_count, vwu_count, VwuAbstractMap::CMAP_NRG,
+                                              cmap_bits);
+      infr14_nrg_count = setVwuAbstractLimits(cmap_nrg_count, vwu_count,
+                                              VwuAbstractMap::INFR14_NRG, infr14_bits);
+      rposn_nrg_count  = setVwuAbstractLimits(rposn_nrg_count, vwu_count,
+                                              VwuAbstractMap::RPOSN_NRG, rposn_bits);
+      rbond_nrg_count  = setVwuAbstractLimits(rbond_nrg_count, vwu_count,
+                                              VwuAbstractMap::RBOND_NRG, rbond_bits);
+      rangl_nrg_count  = setVwuAbstractLimits(rangl_nrg_count, vwu_count,
+                                              VwuAbstractMap::RANGL_NRG, rangl_bits);
+      rdihe_nrg_count  = setVwuAbstractLimits(rdihe_nrg_count, vwu_count,
+                                              VwuAbstractMap::RDIHE_NRG, rdihe_bits);
+      const size_t klim = static_cast<size_t>(VwuTask::ALL_TASKS);
+      for (size_t k = 0LLU; k < klim; k++) {
+        total_task_counts[k] += roundUp(task_counts[k], warp_size_int);        
+      }
+      vwu_count++;
+    }
   }
   
   // Allocate instruction arrays in the topological synthesis
+  vwu_import_lists.resize(atom_import_count);
+  insr_uint_data.resize(cdhe_count + infr14_count + cbnd_nrg_count + angl_nrg_count +
+                        cdhe_nrg_count + cmap_nrg_count + infr14_nrg_count + rposn_nrg_count +
+                        rbond_nrg_count + rangl_nrg_count + rdihe_nrg_count);
+  insr_uint2_data.resize(manipulation_mask_count + cbnd_count + angl_count + cdhe_count +
+                         cmap_count + rposn_count + rbond_count + rangl_count + rdihe_count +
+                         vsite_count + settle_count + cgroup_count);
+  size_t pivot = 0LLU;
+  cdhe_overtones.setPointer(&insr_uint_data, pivot, cdhe_count);
+  pivot += cdhe_count;
+  infr14_instructions.setPointer(&insr_uint_data, pivot, infr14_count);
+  pivot += infr14_count;
+  accumulate_cbnd_energy.setPointer(&insr_uint_data, pivot, cbnd_nrg_count);
+  pivot += cbnd_nrg_count;
+  accumulate_angl_energy.setPointer(&insr_uint_data, pivot, angl_nrg_count);
+  pivot += angl_nrg_count;
+  accumulate_cdhe_energy.setPointer(&insr_uint_data, pivot, cdhe_nrg_count);
+  pivot += cdhe_nrg_count;
+  accumulate_cmap_energy.setPointer(&insr_uint_data, pivot, cmap_nrg_count);
+  pivot += cmap_nrg_count;
+  accumulate_infr14_energy.setPointer(&insr_uint_data, pivot, infr14_nrg_count);
+  pivot += infr14_nrg_count;
+  accumulate_rposn_energy.setPointer(&insr_uint_data, pivot, rposn_nrg_count);
+  pivot += rposn_nrg_count;
+  accumulate_rbond_energy.setPointer(&insr_uint_data, pivot, rbond_nrg_count);
+  pivot += rbond_nrg_count;
+  accumulate_rangl_energy.setPointer(&insr_uint_data, pivot, rangl_nrg_count);
+  pivot += rangl_nrg_count;
+  accumulate_rdihe_energy.setPointer(&insr_uint_data, pivot, rdihe_nrg_count);  
+  pivot = 0LLU;
+  vwu_manipulation_masks.setPointer(&insr_uint2_data, pivot, manipulation_mask_count);
+  pivot += manipulation_mask_count;
+  cbnd_instructions.setPointer(&insr_uint2_data, pivot, cbnd_count);
+  pivot += cbnd_count;
+  angl_instructions.setPointer(&insr_uint2_data, pivot, angl_count);
+  pivot += angl_count;
+  cdhe_instructions.setPointer(&insr_uint2_data, pivot, cdhe_count);
+  pivot += cdhe_count;
+  cmap_instructions.setPointer(&insr_uint2_data, pivot, cmap_count);
+  pivot += cmap_count;
+  rposn_instructions.setPointer(&insr_uint2_data, pivot, rposn_count);
+  pivot += rposn_count;
+  rbond_instructions.setPointer(&insr_uint2_data, pivot, rbond_count);
+  pivot += rbond_count;
+  rangl_instructions.setPointer(&insr_uint2_data, pivot, rangl_count);
+  pivot += rangl_count;
+  rdihe_instructions.setPointer(&insr_uint2_data, pivot, rdihe_count);
+  pivot += rdihe_count;
+  vste_instructions.setPointer(&insr_uint2_data, pivot, vsite_count);
+  pivot += vsite_count;
+  sett_instructions.setPointer(&insr_uint2_data, pivot, settle_count);
+  pivot += settle_count;
+  cnst_instructions.setPointer(&insr_uint2_data, pivot, cgroup_count);
+  pivot += cgroup_count;
 
   // Populate the instruction arrays with appropriate mapping and imported atom offsets
   

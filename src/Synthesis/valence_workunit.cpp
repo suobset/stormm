@@ -2383,7 +2383,7 @@ void ValenceWorkUnit::logActivities() {
 
   // Store instruction sets based on the original topology only.  If the instructions need to be
   // realigned to the parameter tables in an AtomGraphSynthesis, that can be done with external
-  // calls to the same functions, supply the necessary parameter translation tables.
+  // calls to the same functions, supplying the necessary parameter translation tables.
   storeCompositeBondInstructions();
   storeAngleInstructions();
   storeCompositeDihedralInstructions();
