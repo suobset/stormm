@@ -1507,7 +1507,9 @@ ValenceWorkUnit::storeConstraintGroupInstructions(const std::vector<int> &parame
   int ridx = 0;
   for (int pos = 0; pos < cnst_group_count; pos++) {
     const int ct_idx = cnk.group_param_idx[cnst_group_list[pos]];
-    const int param_llim = (use_map) ? parameter_map[ct_idx] : ct_idx;
+    const int actual_param_idx = (use_map) ? parameter_map[ct_idx] : ct_idx;
+    const int param_llim = (use_map) ? group_param_bounds[actual_param_idx] :
+                                       cnk.group_param_bounds[actual_param_idx];
     const int total_bonds = cnst_group_bounds[pos + 1] - cnst_group_bounds[pos] - 1;
     for (int i = cnst_group_bounds[pos] + 1; i < cnst_group_bounds[pos + 1]; i++) {
       cnst_instructions[ridx].x = ((cnst_group_atoms[i] << 10) |
@@ -2360,7 +2362,7 @@ void ValenceWorkUnit::logActivities() {
 
   // Store instruction sets based on the original topology only.  If the instructions need to be
   // realigned to the parameter tables in an AtomGraphSynthesis, that can be done with external
-  // calls to the same functions, supply the necessary parameter translation tables.
+  // calls to the same functions, supplying the necessary parameter translation tables.
   storeCompositeBondInstructions();
   storeAngleInstructions();
   storeCompositeDihedralInstructions();

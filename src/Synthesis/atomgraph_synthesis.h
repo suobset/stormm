@@ -186,6 +186,8 @@ private:
   int total_ubrd_params;          ///< Total number of unique Urey-Bradley angle parameter sets
   int total_cimp_params;          ///< Total number of unique CHARMM improper parameter sets
   int total_cmap_surfaces;        ///< Total number of unique CMAP surfaces
+  int total_attn14_params;        ///< Total number of unique 1:4 attenuated interaction pairs
+                                  ///<   (electrostatic and van-der Waals)
   int total_vste_params;          ///< Total number of unique virtual site frames, across all
                                   ///<   systems
   int total_position_restraints;  ///< Total number of positional restraints
@@ -386,27 +388,31 @@ private:
 
   // Valence parameter maps and bounds, showing how the parameters of each unique topology map to
   // those of the consensus tables in the synthesis.
-  Hybrid<int> ubrd_param_map;          ///< Urey-Bradley parameter index maps
-  Hybrid<int2> ubrd_param_map_bounds;  ///< Bounds array for unique topologies in the Urey-Bradley
-                                       ///<   parameter maps (dimension topology_count + 1, an
-                                       ///<   exclusive prefix sum over the number of Urey-Bradley
-                                       ///<   parameters in each of the unique topologies)
-  Hybrid<int> cimp_param_map;          ///< CHARMM improper parameter index maps
-  Hybrid<int2> cimp_param_map_bounds;  ///< Bounds array for CHARMM improper parameter index maps
-  Hybrid<int> cmap_param_map;          ///< CMAP surface index maps
-  Hybrid<int2> cmap_param_map_bounds;  ///< Bounds array for CMAP surface index maps
-  Hybrid<int> bond_param_map;          ///< Harmonic bond index maps
-  Hybrid<int2> bond_param_map_bounds;  ///< Bounds array for harmonic bond index maps
-  Hybrid<int> angl_param_map;          ///< Harmonic angle index maps
-  Hybrid<int2> angl_param_map_bounds;  ///< Bounds array for harmonic angle index maps
-  Hybrid<int> dihe_param_map;          ///< Cosine-based dihedral index maps
-  Hybrid<int2> dihe_param_map_bounds;  ///< Bounds array for cosine-based dihedral index maps
-  Hybrid<int> vste_param_map;          ///< Virtual site frame specifications mapping 
-  Hybrid<int2> vste_param_map_bounds;  ///< Bounds array for vste_param_map
-  Hybrid<int> sett_param_map;          ///< SETTLE group geometry mapping
-  Hybrid<int2> sett_param_map_bounds;  ///< Buunds array for SETTLE group geometry mapping
-  Hybrid<int> cnst_param_map;          ///< Constraint group parameter set mapping
-  Hybrid<int2> cnst_param_map_bounds;  ///< Buunds array for constraint group parameter set mapping
+  Hybrid<int> ubrd_param_map;            ///< Urey-Bradley parameter index maps
+  Hybrid<int2> ubrd_param_map_bounds;    ///< Bounds array for unique topologies in the
+                                         ///<   Urey-Bradley parameter maps (dimension
+                                         ///<   topology_count, a series of low and high limits
+                                         ///<   for each unique topology's Urey-Bradley parameter
+                                         ///<   index correspondence)
+  Hybrid<int> cimp_param_map;            ///< CHARMM improper parameter index maps
+  Hybrid<int2> cimp_param_map_bounds;    ///< Bounds array for CHARMM improper parameter index maps
+  Hybrid<int> cmap_param_map;            ///< CMAP surface index maps
+  Hybrid<int2> cmap_param_map_bounds;    ///< Bounds array for CMAP surface index maps
+  Hybrid<int> bond_param_map;            ///< Harmonic bond index maps
+  Hybrid<int2> bond_param_map_bounds;    ///< Bounds array for harmonic bond index maps
+  Hybrid<int> angl_param_map;            ///< Harmonic angle index maps
+  Hybrid<int2> angl_param_map_bounds;    ///< Bounds array for harmonic angle index maps
+  Hybrid<int> dihe_param_map;            ///< Cosine-based dihedral index maps
+  Hybrid<int2> dihe_param_map_bounds;    ///< Bounds array for cosine-based dihedral index maps
+  Hybrid<int> attn14_param_map;          ///< Cosine-based dihedral index maps
+  Hybrid<int2> attn14_param_map_bounds;  ///< Bounds array for cosine-based dihedral index maps  
+  Hybrid<int> vste_param_map;            ///< Virtual site frame specifications mapping 
+  Hybrid<int2> vste_param_map_bounds;    ///< Bounds array for vste_param_map
+  Hybrid<int> sett_param_map;            ///< SETTLE group geometry mapping
+  Hybrid<int2> sett_param_map_bounds;    ///< Buunds array for SETTLE group geometry mapping
+  Hybrid<int> cnst_param_map;            ///< Constraint group parameter set mapping
+  Hybrid<int2> cnst_param_map_bounds;    ///< Buunds array for constraint group parameter set
+                                         ///<   mapping
   
   // CHARMM and basic force field valence term details.  Each of these objects points into one of
   // the data arrays at the bottom of the section.
@@ -434,7 +440,7 @@ private:
                                         ///<   CMAP aggregated patch representation in single
                                         ///<   precision (see description in Topology/atomgraph.h).
 
-  // Basic force field valence term details
+  // Basic force field valence term details, consensus tables form all topologies
   Hybrid<double> bond_stiffnesses;      ///< Stiffness of each bond stretch, kcal/mol-A^2
   Hybrid<double> bond_equilibria;       ///< Equilibrium lengths of all bonds, A
   Hybrid<double> angl_stiffnesses;      ///< Stiffness of each angle bend, kcal/mol-rad^2
@@ -442,6 +448,10 @@ private:
   Hybrid<double> dihe_amplitudes;       ///< Amplitudes of each dihedral cosine term, kcal/mol
   Hybrid<double> dihe_periodicities;    ///< Periodicity of each dihedral / torsion cosine term
   Hybrid<double> dihe_phase_angles;     ///< Phase angle of each dihedral / torsion cosine term
+  Hybrid<double> attn14_elec_factors;   ///< Attenuated 1:4 non-bonded interaction electrostatic
+                                        ///<   scaling factors
+  Hybrid<double> attn14_vdw_factors;    ///< Attenuated 1:4 non-bonded interaction van-der Waals
+                                        ///<   scaling factors
   Hybrid<float> sp_bond_stiffnesses;    ///< Stiffness of each bond stretch (single precision)
   Hybrid<float> sp_bond_equilibria;     ///< Equilibrium lengths of all bonds (single precision)
   Hybrid<float> sp_angl_stiffnesses;    ///< Angle bending stiffnesses (single precision)
@@ -631,9 +641,6 @@ private:
                                      ///<   restraints
   Hybrid<float4> sp_rdihe_final_r;   ///< Final displacments for time-dependent dihedral restraints
                                      ///<   (ignored for time-independent restraints)
-  Hybrid<int2> nmr_int2_data;        ///< Integer information pertianing to (NMR) restraints, i.e.
-                                     ///<   the step counts at which restraints come on and reach
-                                     ///<   their final, mature values.
   Hybrid<double> nmr_double_data;    ///< Double-precision information pertianing to (NMR)
                                      ///<   restraints of the kinds delinated above.  The Hybrid
                                      ///<   objects above are POINTER-kind, targeting arrays like
@@ -663,27 +670,37 @@ private:
   // parameter arrays of the synthesis.  The Hybrid objects in this section are POINTER-kind
   // objects targeting the nmr_int_data array, much like the parameters in the preceding section
   // target nmr_[type]_data.
-  Hybrid<int> rposn_atoms;          ///< Atom indices involved in positional restraints
-  Hybrid<int> rposn_kr_param_idx;   ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   positional restraint
-  Hybrid<int> rposn_xyz_param_idx;  ///< Restraint parameters for the target positions in each
-                                    ///<   positional restraint
-  Hybrid<int> rbond_i_atoms;        ///< Atom I indices involved in distance restraints
-  Hybrid<int> rbond_j_atoms;        ///< Atom J indices involved in distance restraints
-  Hybrid<int> rbond_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   distance restraint
-  Hybrid<int> rangl_i_atoms;        ///< Atom I indices involved in angle restraints
-  Hybrid<int> rangl_j_atoms;        ///< Atom J indices involved in angle restraints
-  Hybrid<int> rangl_k_atoms;        ///< Atom K indices involved in angle restraints
-  Hybrid<int> rangl_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   three-point angle restraint
-  Hybrid<int> rdihe_i_atoms;        ///< Atom I indices involved in dihedral restraints
-  Hybrid<int> rdihe_j_atoms;        ///< Atom J indices involved in dihedral restraints
-  Hybrid<int> rdihe_k_atoms;        ///< Atom K indices involved in dihedral restraints
-  Hybrid<int> rdihe_l_atoms;        ///< Atom L indices involved in dihedral restraints
-  Hybrid<int> rdihe_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   four-point dihedral angle restraint
-  Hybrid<int> nmr_int_data;         ///< Array targeted by POINTER-kind objects in this section
+  Hybrid<int> rposn_atoms;              ///< Atom indices involved in positional restraints
+  Hybrid<int> rposn_kr_param_idx;       ///< Restraint parameters for k(2,3) and r(1,2,3,4) in
+                                        ///<   each positional restraint
+  Hybrid<int> rposn_xyz_param_idx;      ///< Restraint parameters for the target positions in each
+                                        ///<   positional restraint
+  Hybrid<int> rbond_i_atoms;            ///< Atom I indices involved in distance restraints
+  Hybrid<int> rbond_j_atoms;            ///< Atom J indices involved in distance restraints
+  Hybrid<int> rbond_param_idx;          ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                        ///<   distance restraint
+  Hybrid<int> rangl_i_atoms;            ///< Atom I indices involved in angle restraints
+  Hybrid<int> rangl_j_atoms;            ///< Atom J indices involved in angle restraints
+  Hybrid<int> rangl_k_atoms;            ///< Atom K indices involved in angle restraints
+  Hybrid<int> rangl_param_idx;          ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                        ///<   three-point angle restraint
+  Hybrid<int> rdihe_i_atoms;            ///< Atom I indices involved in dihedral restraints
+  Hybrid<int> rdihe_j_atoms;            ///< Atom J indices involved in dihedral restraints
+  Hybrid<int> rdihe_k_atoms;            ///< Atom K indices involved in dihedral restraints
+  Hybrid<int> rdihe_l_atoms;            ///< Atom L indices involved in dihedral restraints
+  Hybrid<int> rdihe_param_idx;          ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                        ///<   four-point dihedral angle restraint
+  Hybrid<int> rposn_kr_param_map;       ///< Positional restraint K-R parameter maps
+  Hybrid<int> rposn_xyz_param_map;      ///< Positional restraint X-Y-Z parameter maps
+  Hybrid<int2> rposn_param_map_bounds;  ///< Positional restraint parameter map bounds
+  Hybrid<int> rbond_param_map;          ///< Distance restraint parameter maps
+  Hybrid<int2> rbond_param_map_bounds;  ///< Distance restraint parameter map bounds
+  Hybrid<int> rangl_param_map;          ///< Three-point angle restraint parameter maps
+  Hybrid<int2> rangl_param_map_bounds;  ///< Three-point angle restraint parameter map bounds
+  Hybrid<int> rdihe_param_map;          ///< Four-point dihedral restraint parameter maps
+  Hybrid<int2> rdihe_param_map_bounds;  ///< Four-point dihedral restraint parameter map bounds
+  Hybrid<int> nmr_int_data;             ///< Array targeted by POINTER-kind objects in this section
+  Hybrid<int2> nmr_int2_data;           ///< Array targeted by POINTER-kind objects in this section
 
   // Virtual site details: virtual sites are considered parameters, which like valence terms apply
   // to a small group of atoms and index into a table of parameters including the frame type and
@@ -771,6 +788,12 @@ private:
   // the cached atoms.  Forces are accumulated on all atoms in __shared__ memory and then
   // contributed back to the global arrays.
 
+  /// Instruction sets for the bond work units, storing integers for the low (_L nomenclature) and
+  /// high (_H nomeclature) limits of all the types of interactions in a given work unit.  Each
+  /// VWU takes a stride of integers from this array.  The length of this stride is not a matter
+  /// of the warp size.
+  Hybrid<int2> vwu_instruction_sets;
+
   /// A list of atoms that the VWU shall import, with indices into the global array of atoms for
   /// all systems.  Each VWU may import up to 3/4 as many atoms as the kernel blocks have threads,
   /// and each VWU takes a stride of that many ints from this array.
@@ -781,12 +804,7 @@ private:
   /// updated, 0 otherwise.  In terms of bitwise operations, for all elements of this array,
   /// the move mask completely subsumes the update mask, (x | y) = x.  This POINTER-kind object
   /// targets insr_uint2_data like other instructions sets.
-  Hybrid<uint2> vwu_manipulation_mask;
-
-  /// Instruction sets for the bond work units, up to 64 integers for the low and high limits of
-  /// up to 32 types of interactions in a given work unit.  Each VWU takes a stride of 64 ints from
-  /// this array.  The length of this stride is not a matter of the warp size.
-  Hybrid<int> vwu_instruction_sets;
+  Hybrid<uint2> vwu_manipulation_masks;
 
   /// Instructions for bond stretching and Urey-Bradley interactions.  Each uint2 tuple contains
   /// two atom indices in the x member (bits 1-10 and 11-20) and the parameter index of the bond /
@@ -1018,6 +1036,19 @@ private:
   ///        name to avoid repeating the type name as the name of an actual variable).
   void condenseRestraintNetworks();
 
+  /// \brief Utility function for setting the limit arrays in the abstract of each ValenceWorkUnit.
+  ///        This will set the x member of the appropriate tuple (identified by slot, read as a
+  ///        literal integer, plus the appropriate stride times the valence work unit index) to
+  ///        the current item count, the y member to the item count plus the quantity, and then
+  ///        return the item count plus quantity padded with the warp size.
+  ///
+  /// \param item_counter   The current enumber of items across all previous work units
+  /// \param vwu_counter    The index of the work unit
+  /// \param slot           Type of instruction, the place in the work unit's abstract to set
+  /// \param item_quantity  The number of items in the current work unit
+  int setVwuAbstractLimits(int item_counter, int vwu_counter, VwuAbstractMap slot,
+                           int item_quantity);
+  
   /// \brief Construct valence work units for all systems and load their instructions into the
   ///        topology synthesis for availability on the GPU.
   ///

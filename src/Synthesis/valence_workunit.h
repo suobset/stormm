@@ -7,6 +7,7 @@
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
+#include "synthesis_enumerators.h"
 
 namespace omni {
 namespace synthesis {
@@ -35,48 +36,6 @@ constexpr int max_atom_search_stacks = 8;
 /// \brief The maximum size of any constraint group.  This limit is imposed to ensure that one
 ///        warp can handle each constraint group, and the Intel GPU warp size is 16.
 constexpr int max_constraint_group_size = 16;
-  
-/// \brief Enumerate the different tasks that this work unit can perform.
-enum class VwuTask {
-  BOND = 0,  ///< Harmonic bond interactions
-  ANGL,      ///< Harmonic angle interactions
-  DIHE,      ///< Cosine-based dihedral interactions
-  UBRD,      ///< Urey-Bradley harmonic stretching angle terms
-  CBND,      ///< Composite bond term count, including harmonic bonds and Urey-Bradley angle
-             ///<   stretching terms
-  CIMP,      ///< CHARMM improper dihedrals
-  CDHE,      ///< Composite dihedral term count (includes multiple dihedrals that share the same
-             ///<   atoms as well as CHARMM impropers in one list)
-  CMAP,      ///< CMAP spline-based surface potentials
-  INFR14,    ///< Inferred 1:4 attenuated non-bonded interactions
-  RPOSN,     ///< Positional restraints
-  RBOND,     ///< Distance-based restraints
-  RANGL,     ///< Three-point angle restraints
-  RDIHE,     ///< Four-point dihedral restraints
-  SETTLE,    ///< SETTLE analytic (fast, rigid water) constraints
-  CGROUP,    ///< Constraint groups (hub-and-spoke, Hydrogen-on-heavy atom constraint clusters)
-  VSITE,     ///< Virtual sites
-  ALL_TASKS  ///< Total number of distinct tasks that the ValenceWorkUnit can perform (for array
-             ///<   sizing purposes
-};
-
-/// \brief There are two modes in which an evaluation of ValenceWorkUnit instructions can proceed.
-enum class VwuGoal {
-  ACCUMULATE_FORCES,  ///< The objective is a global ccumulation of forces.  This case, the bit
-                      ///<   strings that dictact whether a ValenceWorkUnit logs the energy due to
-                      ///<   a particular interaction will dictate whether the ValenceWorkUnit
-                      ///<   evaluates a term at all.  The local force accumulations will be
-                      ///<   added back to a global array.  Particles cannot be moved under this
-                      ///<   mode.
-  MOVE_PARTICLES      ///< The objective to is to move particles.  In this mode, global energy
-                      ///<   accumulators will still be valid as the work units continue to follow
-                      ///<   their bit strings dictating which interactions they are responsible
-                      ///<   for logging, but forces accumulated locally may contain redundant
-                      ///<   effects needed to carry out a local atom move and therefore cannot be
-                      ///<   pooled at the end of the calculation.  Atoms will move and their
-                      ///<   global positions will be updated according to separate bit strings
-                      ///<   dictating which work units are responsible for each update.
-};
   
 /// \brief Object to track how different valence terms in a topology are delegated.  Valence work
 ///        units may evaluate a valence term without being responsible for moving both atoms, or

@@ -9,6 +9,7 @@
 #include "Topology/atomgraph_enumerators.h"
 #include "Topology/atomgraph_refinement.h"
 #include "atomgraph_synthesis.h"
+#include "synthesis_enumerators.h"
 
 namespace omni {
 namespace synthesis {
@@ -48,12 +49,12 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     total_dihe_terms{0}, total_ubrd_terms{0}, total_cimp_terms{0}, total_cmap_terms{0},
     total_atom_types{0}, total_charge_types{0}, total_bond_params{0}, total_angl_params{0},
     total_dihe_params{0}, total_ubrd_params{0}, total_cimp_params{0}, total_cmap_surfaces{0},
-    total_position_restraints{0}, total_distance_restraints{0}, total_angle_restraints{0},
-    total_dihedral_restraints{0}, periodic_box_class{UnitCellType::NONE},
-    gb_style{ImplicitSolventModel::NONE}, dielectric_constant{1.0}, salt_concentration{0.0},
-    coulomb_constant{accepted_coulomb_constant}, use_bond_constraints{ShakeSetting::OFF},
-    use_settle{SettleSetting::OFF}, water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
-    topologies{topologies_in},
+    total_attn14_params{0}, total_vste_params{0}, total_position_restraints{0},
+    total_distance_restraints{0}, total_angle_restraints{0}, total_dihedral_restraints{0},
+    periodic_box_class{UnitCellType::NONE}, gb_style{ImplicitSolventModel::NONE},
+    dielectric_constant{1.0}, salt_concentration{0.0}, coulomb_constant{accepted_coulomb_constant},
+    use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
+    water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{}, topologies{topologies_in},
     restraint_networks{restraints_in},
     topology_indices{HybridKind::POINTER, "tpsyn_top_indices"},
     restraint_indices{HybridKind::POINTER, "tpsyn_rst_indices"},
@@ -124,30 +125,32 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     chem_float_data{HybridKind::ARRAY, "tpsyn_chem_floats"},
     chem_char4_data{HybridKind::ARRAY, "tpsyn_chem_char4s"},
     ubrd_param_map{HybridKind::POINTER, "tpsyn_ubrd_map"},
-    ubrd_param_map_bounds{HybridKind::POINTER, "tpsyn_ubrd_map_bounds"},
+    ubrd_param_map_bounds{HybridKind::POINTER, "tpsyn_ubrd_map_bnd"},
     cimp_param_map{HybridKind::POINTER, "tpsyn_cimp_map"},
-    cimp_param_map_bounds{HybridKind::POINTER, "tpsyn_cimp_map_bounds"},
+    cimp_param_map_bounds{HybridKind::POINTER, "tpsyn_cimp_map_bnd"},
     cmap_param_map{HybridKind::POINTER, "tpsyn_cmap_map"},
-    cmap_param_map_bounds{HybridKind::POINTER, "tpsyn_cmap_map_bounds"},
+    cmap_param_map_bounds{HybridKind::POINTER, "tpsyn_cmap_map_bnd"},
     bond_param_map{HybridKind::POINTER, "tpsyn_bond_map"},
-    bond_param_map_bounds{HybridKind::POINTER, "tpsyn_bond_map_bounds"},
+    bond_param_map_bounds{HybridKind::POINTER, "tpsyn_bond_map_bnd"},
     angl_param_map{HybridKind::POINTER, "tpsyn_angl_map"},
-    angl_param_map_bounds{HybridKind::POINTER, "tpsyn_angl_map_bounds"},
+    angl_param_map_bounds{HybridKind::POINTER, "tpsyn_angl_map_bnd"},
     dihe_param_map{HybridKind::POINTER, "tpsyn_dihe_map"},
-    dihe_param_map_bounds{HybridKind::POINTER, "tpsyn_dihe_map_bounds"},
+    dihe_param_map_bounds{HybridKind::POINTER, "tpsyn_dihe_map_bnd"},
+    attn14_param_map{HybridKind::POINTER, "tpsyn_attn_map"},
+    attn14_param_map_bounds{HybridKind::POINTER, "tpsyn_attn_map_bnd"},
     vste_param_map{HybridKind::POINTER, "tpsyn_vsite_map"},
-    vste_param_map_bounds{HybridKind::POINTER, "tpsyn_vste_map_bounds"},
+    vste_param_map_bounds{HybridKind::POINTER, "tpsyn_vste_map_bnd"},
     sett_param_map{HybridKind::POINTER, "tpsyn_settle_map"},
-    sett_param_map_bounds{HybridKind::POINTER, "tpsyn_sett_map_bounds"},
+    sett_param_map_bounds{HybridKind::POINTER, "tpsyn_sett_map_bnd"},
     cnst_param_map{HybridKind::POINTER, "tpsyn_constraint_map"},
-    cnst_param_map_bounds{HybridKind::POINTER, "tpsyn_cnst_map_bounds"},
+    cnst_param_map_bounds{HybridKind::POINTER, "tpsyn_cnst_map_bnd"},
     ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff"},
     ubrd_equilibria{HybridKind::POINTER, "tpsyn_ub_equil"},
     cimp_stiffnesses{HybridKind::POINTER, "tpsyn_cimp_stiff"},
     cimp_phase_angles{HybridKind::POINTER, "tpsyn_cimp_equil"},
     cmap_surface_dimensions{HybridKind::POINTER, "tpsyn_cmap_dims"},
-    cmap_surface_bounds{HybridKind::POINTER, "tpsyn_cmap_bounds"},
-    cmap_patch_bounds{HybridKind::POINTER, "tpsyn_cmpatch_bounds"},
+    cmap_surface_bounds{HybridKind::POINTER, "tpsyn_cmap_bnd"},
+    cmap_patch_bounds{HybridKind::POINTER, "tpsyn_cmpatch_bnd"},
     cmap_surfaces{HybridKind::POINTER, "tpsyn_cmap_surf"},
     cmap_patches{HybridKind::POINTER, "tpsyn_cmap_patch"},
     sp_ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff_sp"},
@@ -163,6 +166,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     dihe_amplitudes{HybridKind::POINTER, "tpsyn_dihek"},
     dihe_periodicities{HybridKind::POINTER, "tpsyn_dihen"},
     dihe_phase_angles{HybridKind::POINTER, "tpsyn_dihepsi"},
+    attn14_elec_factors{HybridKind::POINTER, "tpsyn_elec14_scale"},
+    attn14_vdw_factors{HybridKind::POINTER, "tpsyn_vdw14_scale"},
     sp_bond_stiffnesses{HybridKind::POINTER, "tpsyn_bondk_sp"},
     sp_bond_equilibria{HybridKind::POINTER, "tpsyn_bondl0_sp"},
     sp_angl_stiffnesses{HybridKind::POINTER, "tpsyn_anglk_sp"},
@@ -255,7 +260,6 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_rdihe_final_k{HybridKind::POINTER, "tpsynf_rdihe_finl_k"},
     sp_rdihe_init_r{HybridKind::POINTER, "tpsynf_rdihe_init_k"},
     sp_rdihe_final_r{HybridKind::POINTER, "tpsynf_rdihe_finl_k"},
-    nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
     nmr_double_data{HybridKind::ARRAY, "tpsyn_nmr_dbl_data"},
     nmr_double2_data{HybridKind::ARRAY, "tpsyn_nmr_dbl2_data"},
     nmr_double4_data{HybridKind::ARRAY, "tpsyn_nmr_dbl4_data"},
@@ -277,7 +281,17 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rdihe_k_atoms{HybridKind::POINTER, "tpsyn_rdihe_kat"},
     rdihe_l_atoms{HybridKind::POINTER, "tpsyn_rdihe_lat"},
     rdihe_param_idx{HybridKind::POINTER, "tpsyn_rdihe_param"},
+    rposn_kr_param_map{HybridKind::POINTER, "tpsyn_rposn_kr_map"},
+    rposn_xyz_param_map{HybridKind::POINTER, "tpsyn_rposn_xyz_map"},
+    rposn_param_map_bounds{HybridKind::POINTER, "tpsyn_rposn_map_bnd"},
+    rbond_param_map{HybridKind::POINTER, "tpsyn_rbond_map"},
+    rbond_param_map_bounds{HybridKind::POINTER, "tpsyn_rbond_map_bnd"},
+    rangl_param_map{HybridKind::POINTER, "tpsyn_rangl_map"},
+    rangl_param_map_bounds{HybridKind::POINTER, "tpsyn_rangl_map_bnd"},
+    rdihe_param_map{HybridKind::POINTER, "tpsyn_rdihe_map"},
+    rdihe_param_map_bounds{HybridKind::POINTER, "tpsyn_rdihe_map_bnd"},
     nmr_int_data{HybridKind::ARRAY, "tpsyn_nmr_ints"},
+    nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
     virtual_site_parameters{HybridKind::ARRAY, "tpsyn_vs_params"},
     sp_virtual_site_parameters{HybridKind::ARRAY, "tpsynf_vs_params"},
     virtual_site_atoms{HybridKind::POINTER, "tpsyn_vs_atoms"},
@@ -300,14 +314,15 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     constraint_param_bounds{HybridKind::ARRAY, "tpsyn_cnst_parm_bnd"},
     constraint_group_params{HybridKind::ARRAY, "tpsyn_cnst_lm"},
     sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
-    vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
-    vwu_manipulation_mask{HybridKind::POINTER, "tpsyn_vwu_manip"},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
+    vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
+    vwu_manipulation_masks{HybridKind::POINTER, "tpsyn_vwu_manip"},
     cbnd_instructions{HybridKind::POINTER, "tpsyn_cbnd_insr"},
     angl_instructions{HybridKind::POINTER, "tpsyn_angl_insr"},
     cdhe_instructions{HybridKind::POINTER, "tpsyn_cdhe_insr"},
     cdhe_overtones{HybridKind::POINTER, "tpsyn_ovrt_insr"},
     cmap_instructions{HybridKind::POINTER, "tpsyn_cmap_insr"},
+    infr14_instructions{HybridKind::POINTER, "tpsyn_infr14_insr"},
     rposn_instructions{HybridKind::POINTER, "tpsyn_nmr1_insr"},
     rbond_instructions{HybridKind::POINTER, "tpsyn_nmr2_insr"},
     rangl_instructions{HybridKind::POINTER, "tpsyn_nmr3_insr"},
@@ -1057,8 +1072,8 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   }
 
   // Fill in the restraint term indexing arrays
-  nmr_int_data.resize((3 * rposn_offset) + (3 * rbond_offset) + (4 * rangl_offset) +
-                      (5 * rdihe_offset));
+  nmr_int_data.resize((5 * rposn_offset) + (4 * rbond_offset) + (5 * rangl_offset) +
+                      (6 * rdihe_offset));
   pivot = 0;
   rposn_atoms.setPointer(&nmr_int_data, pivot, rposn_offset);
   pivot += rposn_offset;
@@ -1204,6 +1219,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int ubrd_offset = 0;
   int cimp_offset = 0;
   int cmap_offset = 0;
+  int attn_offset = 0;
   int chrg_offset = 0;
   int vste_offset = 0;
   int sett_offset = 0;
@@ -1214,6 +1230,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int2> tmp_bond_param_map_bounds(topology_count);
   std::vector<int2> tmp_angl_param_map_bounds(topology_count);
   std::vector<int2> tmp_dihe_param_map_bounds(topology_count);
+  std::vector<int2> tmp_attn_param_map_bounds(topology_count);
   std::vector<int2> tmp_vste_param_map_bounds(topology_count);
   std::vector<int2> tmp_sett_param_map_bounds(topology_count);
   std::vector<int2> tmp_cnst_param_map_bounds(topology_count);
@@ -1223,6 +1240,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> topology_ubrd_table_offsets(topology_count);
   std::vector<int> topology_cimp_table_offsets(topology_count);
   std::vector<int> topology_cmap_table_offsets(topology_count);
+  std::vector<int> topology_attn_table_offsets(topology_count);
   std::vector<int> topology_chrg_table_offsets(topology_count);
   std::vector<int> topology_vste_table_offsets(topology_count);
   std::vector<int> topology_sett_table_offsets(topology_count);
@@ -1239,6 +1257,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     topology_ubrd_table_offsets[i] = ubrd_offset;
     topology_cimp_table_offsets[i] = cimp_offset;
     topology_cmap_table_offsets[i] = cmap_offset;
+    topology_attn_table_offsets[i] = attn_offset;
     topology_chrg_table_offsets[i] = chrg_offset;
     topology_vste_table_offsets[i] = vste_offset;
     topology_sett_table_offsets[i] = sett_offset;
@@ -1249,6 +1268,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     tmp_ubrd_param_map_bounds[i].x = ubrd_offset;
     tmp_cimp_param_map_bounds[i].x = cimp_offset;
     tmp_cmap_param_map_bounds[i].x = cmap_offset;
+    tmp_attn_param_map_bounds[i].x = attn_offset;
     tmp_vste_param_map_bounds[i].x = vste_offset;
     tmp_sett_param_map_bounds[i].x = sett_offset;
     tmp_cnst_param_map_bounds[i].x = cnst_offset;
@@ -1258,6 +1278,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     tmp_ubrd_param_map_bounds[i].y = ubrd_offset + vk.nubrd_param;
     tmp_cimp_param_map_bounds[i].y = cimp_offset + vk.ncimp_param;
     tmp_cmap_param_map_bounds[i].y = cmap_offset + vk.ncmap_surf;
+    tmp_attn_param_map_bounds[i].y = attn_offset + vk.nattn14_param;
     tmp_vste_param_map_bounds[i].y = vste_offset + vsk.nframe_set;
     tmp_sett_param_map_bounds[i].y = sett_offset + cnk.nsett_param;
     tmp_cnst_param_map_bounds[i].y = cnst_offset + cnk.ncnst_param;
@@ -1267,6 +1288,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
     ubrd_offset += roundUp(vk.nubrd_param, warp_size_int);
     cimp_offset += roundUp(vk.ncimp_param, warp_size_int);
     cmap_offset += roundUp(vk.ncmap_surf, warp_size_int);
+    attn_offset += roundUp(vk.nattn14_param, warp_size_int);
     chrg_offset += roundUp(nbk.n_q_types, warp_size_int);
     vste_offset += roundUp(vsk.nframe_set, warp_size_int);
     sett_offset += roundUp(cnk.nsett_param, warp_size_int);
@@ -1293,6 +1315,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> ubrd_synthesis_index(ubrd_offset, -1);
   std::vector<int> cimp_synthesis_index(cimp_offset, -1);
   std::vector<int> cmap_synthesis_index(cmap_offset, -1);
+  std::vector<int> attn_synthesis_index(attn_offset, -1);
   std::vector<int> chrg_synthesis_index(chrg_offset, -1);
   std::vector<int> vste_synthesis_index(vste_offset, -1);
   std::vector<int> sett_synthesis_index(sett_offset, -1);
@@ -1311,6 +1334,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
   std::vector<int> filtered_cmap_surf_bounds(1, 0);
   std::vector<double> filtered_cmap_surf;
   std::vector<float> sp_filtered_cmap_surf;
+  std::vector<double> filtered_attn14_elec, filtered_attn14_vdw;
+  std::vector<float> sp_filtered_attn14_elec, sp_filtered_attn14_vdw;
   std::vector<double> filtered_chrg;
   std::vector<float> sp_filtered_chrg;
   std::vector<double4> filtered_vste_params, filtered_sett_geom;
@@ -1324,6 +1349,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   int n_unique_ubrd = 0;
   int n_unique_cimp = 0;
   int n_unique_cmap = 0;
+  int n_unique_attn = 0;
   int n_unique_chrg = 0;
   int n_unique_vste = 0;
   int n_unique_sett = 0;
@@ -1521,6 +1547,34 @@ void AtomGraphSynthesis::condenseParameterTables() {
       n_unique_cmap++;
     }
 
+    // Seek out unique attenuated 1:4 scaling factor pairs
+    for (int j = 0; j < i_vk.nattn14_param; j++) {
+      if (attn_synthesis_index[topology_attn_table_offsets[i] + j] >= 0) {
+        continue;
+      }
+      const Approx ij_attn_qq(i_vk.attn14_elec[j], constants::verytiny);
+      const Approx ij_attn_lj(i_vk.attn14_vdw[j], constants::verytiny);
+      for (int k = i; k < topology_count; k++) {
+        const AtomGraph *kag_ptr = topologies[k];
+        const ValenceKit<double> k_vk   = kag_ptr->getDoublePrecisionValenceKit();
+        const ValenceKit<float> k_vk_sp = kag_ptr->getSinglePrecisionValenceKit();
+        const int mstart = (k == i) ? j : 0;
+        for (int m = mstart; m < k_vk.nattn14_param; m++) {
+          if (attn_synthesis_index[topology_attn_table_offsets[k] + m] < 0 &&
+              ij_attn_qq.test(k_vk.attn14_elec[m]) && ij_attn_lj.test(k_vk.attn14_vdw[m])) {
+            attn_synthesis_index[topology_attn_table_offsets[k] + m] = n_unique_attn;            
+          }
+        }
+      }
+
+      // Catalog this unique attenuation scaling factor pair
+      filtered_attn14_elec.push_back(i_vk.attn14_elec[j]);
+      filtered_attn14_vdw.push_back(i_vk.attn14_vdw[j]);
+      sp_filtered_attn14_elec.push_back(i_vk_sp.attn14_elec[j]);
+      sp_filtered_attn14_vdw.push_back(i_vk_sp.attn14_vdw[j]);
+      n_unique_attn++;
+    }
+
     // Seek out unique charges
     for (int j = 0; j < i_nbk.n_q_types; j++) {
       if (chrg_synthesis_index[topology_chrg_table_offsets[i] + j] >= 0) {
@@ -1669,6 +1723,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   total_ubrd_params   = n_unique_ubrd;
   total_cimp_params   = n_unique_cimp;
   total_cmap_surfaces = n_unique_cmap;
+  total_attn14_params = n_unique_attn;
   total_charge_types  = n_unique_chrg;
   total_vste_params   = n_unique_vste;
   const int rn_space = (2 * roundUp(total_bond_params, warp_size_int)) +
@@ -1676,6 +1731,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
                        (3 * roundUp(total_dihe_params, warp_size_int)) +
                        (2 * roundUp(total_ubrd_params, warp_size_int)) +
                        (2 * roundUp(total_cimp_params, warp_size_int)) +
+                       (2 * roundUp(total_attn14_params, warp_size_int)) +
                        roundUp(static_cast<int>(filtered_cmap_surf.size()), warp_size_int) +
                        roundUp(static_cast<int>(cmap_digest.patch_matrix_form.size()),
                                warp_size_int);
@@ -1684,7 +1740,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
   valparam_int_data.resize(roundUp(total_cmap_surfaces, warp_size_int) +
                            (2 * roundUp(total_cmap_surfaces + 1, warp_size_int)) + ubrd_offset +
                            cimp_offset + cmap_offset + bond_offset + angl_offset + dihe_offset +
-                           vste_offset + sett_offset + cnst_offset);
+                           attn_offset + vste_offset + sett_offset + cnst_offset);
   size_t ic = 0LLU;
   ic = bond_stiffnesses.putHost(&valparam_double_data, filtered_bond_keq, ic, warp_size_zu);
   ic = bond_equilibria.putHost(&valparam_double_data, filtered_bond_leq, ic, warp_size_zu);
@@ -1697,6 +1753,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
   ic = ubrd_equilibria.putHost(&valparam_double_data, filtered_ubrd_leq, ic, warp_size_zu);
   ic = cimp_stiffnesses.putHost(&valparam_double_data, filtered_cimp_keq, ic, warp_size_zu);
   ic = cimp_phase_angles.putHost(&valparam_double_data, filtered_cimp_phi, ic, warp_size_zu);
+  ic = attn14_elec_factors.putHost(&valparam_double_data, filtered_attn14_elec, ic, warp_size_zu);
+  ic = attn14_vdw_factors.putHost(&valparam_double_data, filtered_attn14_vdw, ic, warp_size_zu);
   ic = cmap_surfaces.putHost(&valparam_double_data, filtered_cmap_surf, ic, warp_size_zu);
   ic = cmap_patches.putHost(&valparam_double_data, cmap_digest.patch_matrix_form, ic,
                             warp_size_zu);
@@ -1730,11 +1788,12 @@ void AtomGraphSynthesis::condenseParameterTables() {
   ic = bond_param_map.putHost(&valparam_int_data, bond_synthesis_index, ic, warp_size_zu);
   ic = angl_param_map.putHost(&valparam_int_data, angl_synthesis_index, ic, warp_size_zu);
   ic = dihe_param_map.putHost(&valparam_int_data, dihe_synthesis_index, ic, warp_size_zu);
+  ic = attn14_param_map.putHost(&valparam_int_data, attn_synthesis_index, ic, warp_size_zu);
   ic = vste_param_map.putHost(&valparam_int_data, vste_synthesis_index, ic, warp_size_zu);
   ic = sett_param_map.putHost(&valparam_int_data, sett_synthesis_index, ic, warp_size_zu);
   ic = cnst_param_map.putHost(&valparam_int_data, cnst_synthesis_index, ic, warp_size_zu);
   const int tc_offset = roundUp(topology_count, warp_size_int);
-  valparam_int2_data.resize(9 * tc_offset);
+  valparam_int2_data.resize(10 * tc_offset);
   ic = 0LLU;
   ic = ubrd_param_map_bounds.putHost(&valparam_int2_data, tmp_ubrd_param_map_bounds, ic,
                                      warp_size_zu);
@@ -1748,13 +1807,17 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                      warp_size_zu);
   ic = dihe_param_map_bounds.putHost(&valparam_int2_data, tmp_dihe_param_map_bounds, ic,
                                      warp_size_zu);
+  ic = attn14_param_map_bounds.putHost(&valparam_int2_data, tmp_attn_param_map_bounds, ic,
+                                       warp_size_zu);
   ic = vste_param_map_bounds.putHost(&valparam_int2_data, tmp_vste_param_map_bounds, ic,
                                      warp_size_zu);
   ic = sett_param_map_bounds.putHost(&valparam_int2_data, tmp_sett_param_map_bounds, ic,
                                      warp_size_zu);
   ic = cnst_param_map_bounds.putHost(&valparam_int2_data, tmp_cnst_param_map_bounds, ic,
                                      warp_size_zu);
-
+  constraint_param_bounds.resize(filtered_cnst_group_bounds.size());
+  constraint_param_bounds.putHost(filtered_cnst_group_bounds);
+  
   // Loop back over all systems and copy the known mapping of individual topologies to the
   // synthesis as a whole.  Fill out the parameter maps.
   for (int i = 0; i < system_count; i++) {
@@ -1813,35 +1876,6 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                              synth_vste_term_offset + j);
     }
   }
-
-  // CHECK
-#if 0
-  std::vector<bool> system_covered(topology_count, false);
-  for (int i = 0; i < system_count; i++) {
-    const int tp_index = topology_indices.readHost(i);
-    if (system_covered[tp_index]) {
-      continue;
-    }
-    system_covered[tp_index] = true;
-    const AtomGraph *iag_ptr = topologies[tp_index];
-    const NonbondedKit<double> i_nbk   = iag_ptr->getDoublePrecisionNonbondedKit();
-    const ValenceKit<double> i_vk      = iag_ptr->getDoublePrecisionValenceKit();
-    const VirtualSiteKit<double> i_vsk = iag_ptr->getDoublePrecisionVirtualSiteKit();
-    const int tmp_offset = topology_bond_table_offsets[tp_index];
-    printf("Topology %2d (%4d unique bond parameters):\n", tp_index, i_vk.nbond_param);
-    for (int j = 0; j < i_vk.nbond_param; j++) {
-      if (tmp_offset < 0 || tmp_offset >= bond_synthesis_index.size()) {
-        printf("tmp_offset = %d\n", tmp_offset);
-      }
-      if (tmp_offset + j < 0 || tmp_offset + j >= bond_synthesis_index.size()) {
-        printf("tmp_offset + j = %d\n", tmp_offset + j);
-      }
-      printf(" %4d", bond_synthesis_index[tmp_offset + j]);
-    }
-    printf("\n");
-  }
-#endif
-  // END CHECK
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -2125,34 +2159,52 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   // various sets of terms.  One difference in this implementation is that the restraint apparatus
   // pointer for any particular network may be the null pointer, indicating that there is no
   // restraint system in place for that case (or perhaps any cases).
-  int posn_offset = 0;
-  int bond_offset = 0;
-  int angl_offset = 0;
-  int dihe_offset = 0;
+  int rposn_offset = 0;
+  int rbond_offset = 0;
+  int rangl_offset = 0;
+  int rdihe_offset = 0;
+  std::vector<int2> network_rposn_param_map_bounds(restraint_network_count);
+  std::vector<int2> network_rbond_param_map_bounds(restraint_network_count);
+  std::vector<int2> network_rangl_param_map_bounds(restraint_network_count);
+  std::vector<int2> network_rdihe_param_map_bounds(restraint_network_count);
   std::vector<int> network_rposn_table_offsets(restraint_network_count, 0);
   std::vector<int> network_rbond_table_offsets(restraint_network_count, 0);
   std::vector<int> network_rangl_table_offsets(restraint_network_count, 0);
   std::vector<int> network_rdihe_table_offsets(restraint_network_count, 0);
   for (int i = 0; i < restraint_network_count; i++) {
     const RestraintApparatus* ra_ptr = restraint_networks[i];
-    network_rposn_table_offsets[i] = posn_offset;
-    network_rbond_table_offsets[i] = bond_offset;
-    network_rangl_table_offsets[i] = angl_offset;
-    network_rdihe_table_offsets[i] = dihe_offset;
+    network_rposn_table_offsets[i] = rposn_offset;
+    network_rbond_table_offsets[i] = rbond_offset;
+    network_rangl_table_offsets[i] = rangl_offset;
+    network_rdihe_table_offsets[i] = rdihe_offset;
+    network_rposn_param_map_bounds[i].x = rposn_offset;
+    network_rbond_param_map_bounds[i].x = rbond_offset;
+    network_rangl_param_map_bounds[i].x = rangl_offset;
+    network_rdihe_param_map_bounds[i].x = rdihe_offset;
     if (ra_ptr != nullptr) {
-      posn_offset += ra_ptr->getPositionalRestraintCount();
-      bond_offset += ra_ptr->getDistanceRestraintCount();
-      angl_offset += ra_ptr->getAngleRestraintCount();
-      dihe_offset += ra_ptr->getDihedralRestraintCount();
+      network_rposn_param_map_bounds[i].y = rposn_offset + ra_ptr->getPositionalRestraintCount();
+      network_rbond_param_map_bounds[i].y = rbond_offset + ra_ptr->getDistanceRestraintCount();
+      network_rangl_param_map_bounds[i].y = rangl_offset + ra_ptr->getAngleRestraintCount();
+      network_rdihe_param_map_bounds[i].y = rdihe_offset + ra_ptr->getDihedralRestraintCount();
+      rposn_offset += roundUp(ra_ptr->getPositionalRestraintCount(), warp_size_int);
+      rbond_offset += roundUp(ra_ptr->getDistanceRestraintCount(), warp_size_int);
+      rangl_offset += roundUp(ra_ptr->getAngleRestraintCount(), warp_size_int);
+      rdihe_offset += roundUp(ra_ptr->getDihedralRestraintCount(), warp_size_int);
+    }
+    else {
+      network_rposn_param_map_bounds[i].y = rposn_offset;
+      network_rbond_param_map_bounds[i].y = rbond_offset;
+      network_rangl_param_map_bounds[i].y = rangl_offset;
+      network_rdihe_param_map_bounds[i].y = rdihe_offset;
     }
   }
 
   // Create lists of unique parameters for the various types of restraints.
-  std::vector<int> rposn_synthesis_kr_index(posn_offset, -1);  
-  std::vector<int> rposn_synthesis_xyz_index(posn_offset, -1);  
-  std::vector<int> rbond_synthesis_index(bond_offset, -1);
-  std::vector<int> rangl_synthesis_index(angl_offset, -1);
-  std::vector<int> rdihe_synthesis_index(dihe_offset, -1);
+  std::vector<int> rposn_synthesis_kr_index(rposn_offset, -1);  
+  std::vector<int> rposn_synthesis_xyz_index(rposn_offset, -1);  
+  std::vector<int> rbond_synthesis_index(rbond_offset, -1);
+  std::vector<int> rangl_synthesis_index(rangl_offset, -1);
+  std::vector<int> rdihe_synthesis_index(rdihe_offset, -1);
   std::vector<int2> filtered_rposn_step_bounds, filtered_rbond_step_bounds;
   std::vector<int2> filtered_rangl_step_bounds, filtered_rdihe_step_bounds;
   std::vector<double2> filtered_rposn_init_keq, filtered_rposn_finl_keq;
@@ -2211,7 +2263,9 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
     const RestraintKit<double, double2, double4> irar_dp = ira_ptr->getDoublePrecisionAbstract();
     for (int j = 0; j < irar_dp.nposn; j++) {
 
-      // Skip restraints that have been determined to have unique x / y / z targets.  This
+      // Skip restraints that have been determined to have unique x / y / z targets.  This is
+      // better done by checking whether the x / y / z target has not yet been matched to some
+      // previous target, as the k / r combination can also be unique.
       if (rposn_synthesis_xyz_index[network_rposn_table_offsets[i] + j] < 0) {
         const int ij_init_step = irar_dp.rposn_init_step[j];
         const int ij_finl_step = irar_dp.rposn_finl_step[j];
@@ -2269,10 +2323,11 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   }
 
   // Resize the Hybrid arrays, set pointers, and fill Hybrid objects in the AtomGraphSynthesis
+  const int rnc_offset = roundUp(restraint_network_count, warp_size_int);
   const size_t i2c = roundUp(n_unique_posn_kr, warp_size_int) +
                      roundUp(n_unique_bond, warp_size_int) +
                      roundUp(n_unique_angl, warp_size_int) +
-                     roundUp(n_unique_dihe, warp_size_int);
+                     roundUp(n_unique_dihe, warp_size_int) + (4 * rnc_offset);
   nmr_int2_data.resize(i2c);
   nmr_double_data.resize(2 * roundUp(n_unique_posn_xyz, warp_size_int));
   nmr_double2_data.resize(2 * (i2c + n_unique_posn_xyz));
@@ -2285,6 +2340,14 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = rbond_step_bounds.putHost(&nmr_int2_data, filtered_rbond_step_bounds, ic, warp_size_zu);
   ic = rangl_step_bounds.putHost(&nmr_int2_data, filtered_rangl_step_bounds, ic, warp_size_zu);
   ic = rdihe_step_bounds.putHost(&nmr_int2_data, filtered_rdihe_step_bounds, ic, warp_size_zu);
+  ic = rposn_param_map_bounds.putHost(&nmr_int2_data, network_rposn_param_map_bounds, ic,
+                                      warp_size_zu);
+  ic = rbond_param_map_bounds.putHost(&nmr_int2_data, network_rbond_param_map_bounds, ic,
+                                      warp_size_zu);
+  ic = rangl_param_map_bounds.putHost(&nmr_int2_data, network_rangl_param_map_bounds, ic,
+                                      warp_size_zu);
+  ic = rdihe_param_map_bounds.putHost(&nmr_int2_data, network_rdihe_param_map_bounds, ic,
+                                      warp_size_zu);
   ic = 0LLU;
   ic = rposn_init_z.putHost(&nmr_double_data, filtered_rposn_init_z, ic, warp_size_zu);
   ic = rposn_final_z.putHost(&nmr_double_data, filtered_rposn_finl_z, ic, warp_size_zu);
@@ -2309,6 +2372,15 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = rdihe_init_r.putHost(&nmr_double4_data, filtered_rdihe_init_r, ic, warp_size_zu);
   ic = rdihe_final_r.putHost(&nmr_double4_data, filtered_rdihe_finl_r, ic, warp_size_zu);
 
+  // The nmr_int_data array has already been resized in condenseParameterTables(), with extra
+  // space allocated to hold the parameter maps.  Set those pointers now.
+  ic = (3 * rposn_offset) + (3 * rbond_offset) + (4 * rangl_offset) + (5 * rdihe_offset);
+  ic = rposn_kr_param_map.putHost(&nmr_int_data, rposn_synthesis_kr_index, ic, warp_size_zu);
+  ic = rposn_xyz_param_map.putHost(&nmr_int_data, rposn_synthesis_xyz_index, ic, warp_size_zu);
+  ic = rbond_param_map.putHost(&nmr_int_data, rbond_synthesis_index, ic, warp_size_zu);
+  ic = rangl_param_map.putHost(&nmr_int_data, rangl_synthesis_index, ic, warp_size_zu);
+  ic = rdihe_param_map.putHost(&nmr_int_data, rdihe_synthesis_index, ic, warp_size_zu);
+  
   // Create temporary arrays for floating-point data.  This is done more in line with what happens
   // in an AtomGraph, with each POINTER-kind Hybrid object targeting a handful of larger arrays.
   // The likelihood that most simulations will have few to no restraints makes it advantageous to
@@ -2398,11 +2470,23 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::setVwuAbstractLimits(const int item_counter, const int vwu_counter,
+                                             const VwuAbstractMap slot, const int item_quantity) {
+  int2* vwu_insr_ptr = vwu_instruction_sets.data();
+  const int vv_offset = vwu_counter * vwu_abstract_length + static_cast<int>(slot);
+  vwu_insr_ptr[vv_offset].x = item_counter;
+  vwu_insr_ptr[vv_offset].y = item_counter + item_quantity;
+  return roundUp(item_counter + item_quantity, warp_size_int);
+}
+
+//-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
 
   // Loop over all systems and create lists of valence work units
   std::vector<std::vector<ValenceWorkUnit>> all_vwu;
   all_vwu.reserve(system_count);
+  std::vector<int> total_task_counts(static_cast<size_t>(VwuTask::ALL_TASKS), 0);
+  int total_vwu = 0;
   for (int i = 0; i < system_count; i++) {
     const AtomGraph *ag = topologies[topology_indices.readHost(i)];
 
@@ -2413,12 +2497,254 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
     const RestraintApparatus *ra = (restraint_networks[rn] == nullptr) ? &ra_blank :
                                                                          restraint_networks[rn];
     all_vwu.push_back(buildValenceWorkUnits(ag, ra, max_atoms_per_vwu));
+    total_vwu += all_vwu[i].size();    
+  }
+
+  // Allocate the valence work unit instruction set array, an abstract of each ValenceWorkUnit
+  // in a stream of integers.
+  vwu_instruction_sets.resize(total_vwu * vwu_abstract_length);
+  int2* vwu_insr_ptr = vwu_instruction_sets.data();
+  int atom_import_count = 0;
+  int manipulation_mask_count = 0;
+  int cbnd_count = 0;
+  int angl_count = 0;
+  int cdhe_count = 0;
+  int cmap_count = 0;
+  int infr14_count = 0;
+  int rposn_count = 0;
+  int rbond_count = 0;
+  int rangl_count = 0;
+  int rdihe_count = 0;
+  int vsite_count = 0;
+  int settle_count = 0;
+  int cgroup_count = 0;
+  int cbnd_nrg_count = 0;
+  int angl_nrg_count = 0;
+  int cdhe_nrg_count = 0;
+  int cmap_nrg_count = 0;
+  int infr14_nrg_count = 0;
+  int rposn_nrg_count = 0;
+  int rbond_nrg_count = 0;
+  int rangl_nrg_count = 0;
+  int rdihe_nrg_count = 0;
+  int vwu_count = 0;
+  for (int i = 0; i < system_count; i++) {
+    const size_t nvwu = all_vwu[i].size(); 
+    for (size_t j = 0LLU; j < nvwu; j++) {
+      const std::vector<int> task_counts = all_vwu[i][j].getTaskCounts();
+      
+      // Record the appropriate limits for the present system
+      const int ntatom = all_vwu[i][j].getImportedAtomCount();
+      const int manip_bits = (ntatom + uint_bit_count_int - 1) / uint_bit_count_int;
+      atom_import_count = setVwuAbstractLimits(atom_import_count, vwu_count,
+                                               VwuAbstractMap::IMPORT, ntatom);
+      manipulation_mask_count = setVwuAbstractLimits(manipulation_mask_count, vwu_count,
+                                                     VwuAbstractMap::MOVE, manip_bits);
+      const int ntcbnd  = task_counts[static_cast<size_t>(VwuTask::CBND)];
+      const int ntangl  = task_counts[static_cast<size_t>(VwuTask::ANGL)];
+      const int ntcdhe  = task_counts[static_cast<size_t>(VwuTask::CDHE)];
+      const int ntcmap  = task_counts[static_cast<size_t>(VwuTask::CMAP)];
+      const int ntinfr  = task_counts[static_cast<size_t>(VwuTask::INFR14)];
+      const int ntrposn = task_counts[static_cast<size_t>(VwuTask::RPOSN)];
+      const int ntrbond = task_counts[static_cast<size_t>(VwuTask::RBOND)];
+      const int ntrangl = task_counts[static_cast<size_t>(VwuTask::RANGL)];
+      const int ntrdihe = task_counts[static_cast<size_t>(VwuTask::RDIHE)];
+      const int ntvste  = task_counts[static_cast<size_t>(VwuTask::VSITE)];
+      const int ntsett  = task_counts[static_cast<size_t>(VwuTask::SETTLE)];
+      const int ntcnst  = task_counts[static_cast<size_t>(VwuTask::CGROUP)];
+      cbnd_count   = setVwuAbstractLimits(cbnd_count, vwu_count, VwuAbstractMap::CBND, ntcbnd);
+      angl_count   = setVwuAbstractLimits(angl_count, vwu_count, VwuAbstractMap::ANGL, ntangl);
+      cdhe_count   = setVwuAbstractLimits(cdhe_count, vwu_count, VwuAbstractMap::CDHE, ntcdhe);
+      cmap_count   = setVwuAbstractLimits(cmap_count, vwu_count, VwuAbstractMap::CMAP, ntcmap);
+      infr14_count = setVwuAbstractLimits(infr14_count, vwu_count, VwuAbstractMap::INFR14, ntinfr);
+      rposn_count  = setVwuAbstractLimits(rposn_count, vwu_count, VwuAbstractMap::RPOSN, ntrposn);
+      rbond_count  = setVwuAbstractLimits(rbond_count, vwu_count, VwuAbstractMap::RBOND, ntrbond);
+      rangl_count  = setVwuAbstractLimits(rangl_count, vwu_count, VwuAbstractMap::RANGL, ntrangl);
+      rdihe_count  = setVwuAbstractLimits(rdihe_count, vwu_count, VwuAbstractMap::RDIHE, ntrdihe);
+      vsite_count  = setVwuAbstractLimits(vsite_count, vwu_count, VwuAbstractMap::VSITE, ntvste);
+      settle_count = setVwuAbstractLimits(settle_count, vwu_count, VwuAbstractMap::SETTLE, ntsett);
+      cgroup_count = setVwuAbstractLimits(cgroup_count, vwu_count, VwuAbstractMap::CGROUP, ntcnst);
+      const int cbnd_bits   = (ntcbnd + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int angl_bits   = (ntangl + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cdhe_bits   = (ntcdhe + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cmap_bits   = (ntcmap + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int infr14_bits = (ntinfr + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rposn_bits  = (ntrposn + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rbond_bits  = (ntrbond + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rangl_bits  = (ntrangl + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rdihe_bits  = (ntrdihe + uint_bit_count_int - 1) / uint_bit_count_int;
+      cbnd_nrg_count   = setVwuAbstractLimits(cbnd_nrg_count, vwu_count, VwuAbstractMap::CBND_NRG,
+                                              cbnd_bits);
+      angl_nrg_count   = setVwuAbstractLimits(angl_nrg_count, vwu_count, VwuAbstractMap::ANGL_NRG,
+                                              angl_bits);
+      cdhe_nrg_count   = setVwuAbstractLimits(cdhe_nrg_count, vwu_count, VwuAbstractMap::CDHE_NRG,
+                                              cdhe_bits);
+      cmap_nrg_count   = setVwuAbstractLimits(cmap_nrg_count, vwu_count, VwuAbstractMap::CMAP_NRG,
+                                              cmap_bits);
+      infr14_nrg_count = setVwuAbstractLimits(cmap_nrg_count, vwu_count,
+                                              VwuAbstractMap::INFR14_NRG, infr14_bits);
+      rposn_nrg_count  = setVwuAbstractLimits(rposn_nrg_count, vwu_count,
+                                              VwuAbstractMap::RPOSN_NRG, rposn_bits);
+      rbond_nrg_count  = setVwuAbstractLimits(rbond_nrg_count, vwu_count,
+                                              VwuAbstractMap::RBOND_NRG, rbond_bits);
+      rangl_nrg_count  = setVwuAbstractLimits(rangl_nrg_count, vwu_count,
+                                              VwuAbstractMap::RANGL_NRG, rangl_bits);
+      rdihe_nrg_count  = setVwuAbstractLimits(rdihe_nrg_count, vwu_count,
+                                              VwuAbstractMap::RDIHE_NRG, rdihe_bits);
+      const size_t klim = static_cast<size_t>(VwuTask::ALL_TASKS);
+      for (size_t k = 0LLU; k < klim; k++) {
+        total_task_counts[k] += roundUp(task_counts[k], warp_size_int);        
+      }
+      vwu_count++;
+    }
   }
   
   // Allocate instruction arrays in the topological synthesis
+  vwu_import_lists.resize(atom_import_count);
+  insr_uint_data.resize(cdhe_count + infr14_count + cbnd_nrg_count + angl_nrg_count +
+                        cdhe_nrg_count + cmap_nrg_count + infr14_nrg_count + rposn_nrg_count +
+                        rbond_nrg_count + rangl_nrg_count + rdihe_nrg_count);
+  insr_uint2_data.resize(manipulation_mask_count + cbnd_count + angl_count + cdhe_count +
+                         cmap_count + rposn_count + rbond_count + rangl_count + rdihe_count +
+                         vsite_count + settle_count + cgroup_count);
+  size_t pivot = 0LLU;
+  cdhe_overtones.setPointer(&insr_uint_data, pivot, cdhe_count);
+  pivot += cdhe_count;
+  infr14_instructions.setPointer(&insr_uint_data, pivot, infr14_count);
+  pivot += infr14_count;
+  accumulate_cbnd_energy.setPointer(&insr_uint_data, pivot, cbnd_nrg_count);
+  pivot += cbnd_nrg_count;
+  accumulate_angl_energy.setPointer(&insr_uint_data, pivot, angl_nrg_count);
+  pivot += angl_nrg_count;
+  accumulate_cdhe_energy.setPointer(&insr_uint_data, pivot, cdhe_nrg_count);
+  pivot += cdhe_nrg_count;
+  accumulate_cmap_energy.setPointer(&insr_uint_data, pivot, cmap_nrg_count);
+  pivot += cmap_nrg_count;
+  accumulate_infr14_energy.setPointer(&insr_uint_data, pivot, infr14_nrg_count);
+  pivot += infr14_nrg_count;
+  accumulate_rposn_energy.setPointer(&insr_uint_data, pivot, rposn_nrg_count);
+  pivot += rposn_nrg_count;
+  accumulate_rbond_energy.setPointer(&insr_uint_data, pivot, rbond_nrg_count);
+  pivot += rbond_nrg_count;
+  accumulate_rangl_energy.setPointer(&insr_uint_data, pivot, rangl_nrg_count);
+  pivot += rangl_nrg_count;
+  accumulate_rdihe_energy.setPointer(&insr_uint_data, pivot, rdihe_nrg_count);  
+  pivot = 0LLU;
+  vwu_manipulation_masks.setPointer(&insr_uint2_data, pivot, manipulation_mask_count);
+  pivot += manipulation_mask_count;
+  cbnd_instructions.setPointer(&insr_uint2_data, pivot, cbnd_count);
+  pivot += cbnd_count;
+  angl_instructions.setPointer(&insr_uint2_data, pivot, angl_count);
+  pivot += angl_count;
+  cdhe_instructions.setPointer(&insr_uint2_data, pivot, cdhe_count);
+  pivot += cdhe_count;
+  cmap_instructions.setPointer(&insr_uint2_data, pivot, cmap_count);
+  pivot += cmap_count;
+  rposn_instructions.setPointer(&insr_uint2_data, pivot, rposn_count);
+  pivot += rposn_count;
+  rbond_instructions.setPointer(&insr_uint2_data, pivot, rbond_count);
+  pivot += rbond_count;
+  rangl_instructions.setPointer(&insr_uint2_data, pivot, rangl_count);
+  pivot += rangl_count;
+  rdihe_instructions.setPointer(&insr_uint2_data, pivot, rdihe_count);
+  pivot += rdihe_count;
+  vste_instructions.setPointer(&insr_uint2_data, pivot, vsite_count);
+  pivot += vsite_count;
+  sett_instructions.setPointer(&insr_uint2_data, pivot, settle_count);
+  pivot += settle_count;
+  cnst_instructions.setPointer(&insr_uint2_data, pivot, cgroup_count);
+  pivot += cgroup_count;
 
   // Populate the instruction arrays with appropriate mapping and imported atom offsets
-  
+  int atom_import_idx = 0;
+  int manipulation_mask_idx = 0;
+  int cbnd_idx = 0;
+  int angl_idx = 0;
+  int cdhe_idx = 0;
+  int cmap_idx = 0;
+  int infr14_idx = 0;
+  int rposn_idx = 0;
+  int rbond_idx = 0;
+  int rangl_idx = 0;
+  int rdihe_idx = 0;
+  int vsite_idx = 0;
+  int settle_idx = 0;
+  int cgroup_idx = 0;
+  int cbnd_nrg_idx = 0;
+  int angl_nrg_idx = 0;
+  int cdhe_nrg_idx = 0;
+  int cmap_nrg_idx = 0;
+  int infr14_nrg_idx = 0;
+  int rposn_nrg_idx = 0;
+  int rbond_nrg_idx = 0;
+  int rangl_nrg_idx = 0;
+  int rdihe_nrg_idx = 0;
+  int vwu_idx = 0;
+  const std::vector<int> synth_cnst_param_bounds = constraint_param_bounds.readHost();
+  for (int i = 0; i < system_count; i++) {
+    const size_t nvwu = all_vwu[i].size();
+    const int tp_idx = topology_indices.readHost(i);
+    const int rn_idx = restraint_indices.readHost(i);
+    const int2 bond_limits  = bond_param_map_bounds.readHost(tp_idx);
+    const int2 angl_limits  = angl_param_map_bounds.readHost(tp_idx);
+    const int2 dihe_limits  = dihe_param_map_bounds.readHost(tp_idx);
+    const int2 ubrd_limits  = ubrd_param_map_bounds.readHost(tp_idx);
+    const int2 cimp_limits  = cimp_param_map_bounds.readHost(tp_idx);
+    const int2 cmap_limits  = cmap_param_map_bounds.readHost(tp_idx);
+    const int2 attn_limits  = attn14_param_map_bounds.readHost(tp_idx);
+    const int2 rposn_limits = rposn_param_map_bounds.readHost(rn_idx);
+    const int2 rbond_limits = rbond_param_map_bounds.readHost(rn_idx);
+    const int2 rangl_limits = rangl_param_map_bounds.readHost(rn_idx);
+    const int2 rdihe_limits = rdihe_param_map_bounds.readHost(rn_idx);
+    const int2 vste_limits  = vste_param_map_bounds.readHost(tp_idx);
+    const int2 sett_limits  = sett_param_map_bounds.readHost(tp_idx);
+    const int2 cnst_limits  = cnst_param_map_bounds.readHost(tp_idx);
+    const std::vector<int> sysi_bond_map = bond_param_map.readHost(bond_limits.x,
+                                                                   bond_limits.y - bond_limits.x);
+    const std::vector<int> sysi_angl_map = angl_param_map.readHost(angl_limits.x,
+                                                                   angl_limits.y - angl_limits.x);
+    const std::vector<int> sysi_dihe_map = dihe_param_map.readHost(dihe_limits.x,
+                                                                   dihe_limits.y - dihe_limits.x);
+    const std::vector<int> sysi_ubrd_map = ubrd_param_map.readHost(ubrd_limits.x,
+                                                                   ubrd_limits.y - ubrd_limits.x);
+    const std::vector<int> sysi_cimp_map = cimp_param_map.readHost(cimp_limits.x,
+                                                                   cimp_limits.y - cimp_limits.x);
+    const std::vector<int> sysi_cmap_map = cmap_param_map.readHost(cmap_limits.x,
+                                                                   cmap_limits.y - cmap_limits.x);
+    const std::vector<int> sysi_attn_map =
+      attn14_param_map.readHost(attn_limits.x, attn_limits.y - attn_limits.x);
+    const std::vector<int> sysi_rposn_kr_map =
+      rposn_kr_param_map.readHost(rposn_limits.x, rposn_limits.y - rposn_limits.x);
+    const std::vector<int> sysi_rposn_xyz_map =
+      rposn_xyz_param_map.readHost(rposn_limits.x, rposn_limits.y - rposn_limits.x);
+    const std::vector<int> sysi_rbond_map =
+      rbond_param_map.readHost(rbond_limits.x, rbond_limits.y - rbond_limits.x);
+    const std::vector<int> sysi_rangl_map =
+      rangl_param_map.readHost(rangl_limits.x, rangl_limits.y - rangl_limits.x);
+    const std::vector<int> sysi_rdihe_map =
+      rdihe_param_map.readHost(rdihe_limits.x, rdihe_limits.y - rdihe_limits.x);
+    const std::vector<int> sysi_vste_map = vste_param_map.readHost(vste_limits.x,
+                                                                   vste_limits.y - vste_limits.x);
+    const std::vector<int> sysi_sett_map = sett_param_map.readHost(sett_limits.x,
+                                                                   sett_limits.y - sett_limits.x);
+    const std::vector<int> sysi_cnst_map = cnst_param_map.readHost(cnst_limits.x,
+                                                                   cnst_limits.y - cnst_limits.x);
+    for (size_t j = 0LLU; j < nvwu; j++) {
+      all_vwu[i][j].storeCompositeBondInstructions(sysi_bond_map, sysi_ubrd_map);
+      all_vwu[i][j].storeAngleInstructions(sysi_angl_map);
+      all_vwu[i][j].storeCompositeDihedralInstructions(sysi_dihe_map, sysi_attn_map,
+                                                       sysi_cimp_map);
+      all_vwu[i][j].storeCmapInstructions(sysi_cmap_map);
+      all_vwu[i][j].storeInferred14Instructions(sysi_attn_map);
+      all_vwu[i][j].storePositionalRestraintInstructions(sysi_rposn_kr_map, sysi_rposn_xyz_map);
+      all_vwu[i][j].storeDistanceRestraintInstructions(sysi_rbond_map);
+      all_vwu[i][j].storeAngleRestraintInstructions(sysi_rangl_map);
+      all_vwu[i][j].storeDihedralRestraintInstructions(sysi_rdihe_map);
+      all_vwu[i][j].storeVirtualSiteInstructions(sysi_vste_map);
+      all_vwu[i][j].storeSettleGroupInstructions(sysi_sett_map);
+      all_vwu[i][j].storeConstraintGroupInstructions(sysi_cnst_map, synth_cnst_param_bounds);
+    }
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2596,6 +2922,7 @@ void AtomGraphSynthesis::upload() {
   nmr_float2_data.upload();
   nmr_float4_data.upload();
   nmr_int_data.upload();
+  nmr_int2_data.upload();
   virtual_site_parameters.upload();
   sp_virtual_site_parameters.upload();
   vsite_int_data.upload();
@@ -2645,6 +2972,7 @@ void AtomGraphSynthesis::download() {
   nmr_float2_data.download();
   nmr_float4_data.download();
   nmr_int_data.download();
+  nmr_int2_data.download();
   virtual_site_parameters.download();
   sp_virtual_site_parameters.download();
   vsite_int_data.download();
