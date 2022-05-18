@@ -1815,7 +1815,9 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                      warp_size_zu);
   ic = cnst_param_map_bounds.putHost(&valparam_int2_data, tmp_cnst_param_map_bounds, ic,
                                      warp_size_zu);
-
+  constraint_param_bounds.resize(filtered_cnst_group_bounds.size());
+  constraint_param_bounds.putHost(filtered_cnst_group_bounds);
+  
   // Loop back over all systems and copy the known mapping of individual topologies to the
   // synthesis as a whole.  Fill out the parameter maps.
   for (int i = 0; i < system_count; i++) {
@@ -2533,7 +2535,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       
       // Record the appropriate limits for the present system
       const int ntatom = all_vwu[i][j].getImportedAtomCount();
-      const int manip_bits= (ntatom + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int manip_bits = (ntatom + uint_bit_count_int - 1) / uint_bit_count_int;
       atom_import_count = setVwuAbstractLimits(atom_import_count, vwu_count,
                                                VwuAbstractMap::IMPORT, ntatom);
       manipulation_mask_count = setVwuAbstractLimits(manipulation_mask_count, vwu_count,
@@ -2654,6 +2656,31 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
   pivot += cgroup_count;
 
   // Populate the instruction arrays with appropriate mapping and imported atom offsets
+  int atom_import_idx = 0;
+  int manipulation_mask_idx = 0;
+  int cbnd_idx = 0;
+  int angl_idx = 0;
+  int cdhe_idx = 0;
+  int cmap_idx = 0;
+  int infr14_idx = 0;
+  int rposn_idx = 0;
+  int rbond_idx = 0;
+  int rangl_idx = 0;
+  int rdihe_idx = 0;
+  int vsite_idx = 0;
+  int settle_idx = 0;
+  int cgroup_idx = 0;
+  int cbnd_nrg_idx = 0;
+  int angl_nrg_idx = 0;
+  int cdhe_nrg_idx = 0;
+  int cmap_nrg_idx = 0;
+  int infr14_nrg_idx = 0;
+  int rposn_nrg_idx = 0;
+  int rbond_nrg_idx = 0;
+  int rangl_nrg_idx = 0;
+  int rdihe_nrg_idx = 0;
+  int vwu_idx = 0;
+  const std::vector<int> synth_cnst_param_bounds = constraint_param_bounds.readHost();
   for (int i = 0; i < system_count; i++) {
     const size_t nvwu = all_vwu[i].size();
     const int tp_idx = topology_indices.readHost(i);
@@ -2703,7 +2730,19 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
     const std::vector<int> sysi_cnst_map = cnst_param_map.readHost(cnst_limits.x,
                                                                    cnst_limits.y - cnst_limits.x);
     for (size_t j = 0LLU; j < nvwu; j++) {
-
+      all_vwu[i][j].storeCompositeBondInstructions(sysi_bond_map, sysi_ubrd_map);
+      all_vwu[i][j].storeAngleInstructions(sysi_angl_map);
+      all_vwu[i][j].storeCompositeDihedralInstructions(sysi_dihe_map, sysi_attn_map,
+                                                       sysi_cimp_map);
+      all_vwu[i][j].storeCmapInstructions(sysi_cmap_map);
+      all_vwu[i][j].storeInferred14Instructions(sysi_attn_map);
+      all_vwu[i][j].storePositionalRestraintInstructions(sysi_rposn_kr_map, sysi_rposn_xyz_map);
+      all_vwu[i][j].storeDistanceRestraintInstructions(sysi_rbond_map);
+      all_vwu[i][j].storeAngleRestraintInstructions(sysi_rangl_map);
+      all_vwu[i][j].storeDihedralRestraintInstructions(sysi_rdihe_map);
+      all_vwu[i][j].storeVirtualSiteInstructions(sysi_vste_map);
+      all_vwu[i][j].storeSettleGroupInstructions(sysi_sett_map);
+      all_vwu[i][j].storeConstraintGroupInstructions(sysi_cnst_map, synth_cnst_param_bounds);
     }
   }
 }
@@ -2883,6 +2922,7 @@ void AtomGraphSynthesis::upload() {
   nmr_float2_data.upload();
   nmr_float4_data.upload();
   nmr_int_data.upload();
+  nmr_int2_data.upload();
   virtual_site_parameters.upload();
   sp_virtual_site_parameters.upload();
   vsite_int_data.upload();
@@ -2932,6 +2972,7 @@ void AtomGraphSynthesis::download() {
   nmr_float2_data.download();
   nmr_float4_data.download();
   nmr_int_data.download();
+  nmr_int2_data.download();
   virtual_site_parameters.download();
   sp_virtual_site_parameters.download();
   vsite_int_data.download();
