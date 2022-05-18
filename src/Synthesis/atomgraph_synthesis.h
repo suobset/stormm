@@ -641,9 +641,6 @@ private:
                                      ///<   restraints
   Hybrid<float4> sp_rdihe_final_r;   ///< Final displacments for time-dependent dihedral restraints
                                      ///<   (ignored for time-independent restraints)
-  Hybrid<int2> nmr_int2_data;        ///< Integer information pertianing to (NMR) restraints, i.e.
-                                     ///<   the step counts at which restraints come on and reach
-                                     ///<   their final, mature values.
   Hybrid<double> nmr_double_data;    ///< Double-precision information pertianing to (NMR)
                                      ///<   restraints of the kinds delinated above.  The Hybrid
                                      ///<   objects above are POINTER-kind, targeting arrays like
@@ -673,27 +670,37 @@ private:
   // parameter arrays of the synthesis.  The Hybrid objects in this section are POINTER-kind
   // objects targeting the nmr_int_data array, much like the parameters in the preceding section
   // target nmr_[type]_data.
-  Hybrid<int> rposn_atoms;          ///< Atom indices involved in positional restraints
-  Hybrid<int> rposn_kr_param_idx;   ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   positional restraint
-  Hybrid<int> rposn_xyz_param_idx;  ///< Restraint parameters for the target positions in each
-                                    ///<   positional restraint
-  Hybrid<int> rbond_i_atoms;        ///< Atom I indices involved in distance restraints
-  Hybrid<int> rbond_j_atoms;        ///< Atom J indices involved in distance restraints
-  Hybrid<int> rbond_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   distance restraint
-  Hybrid<int> rangl_i_atoms;        ///< Atom I indices involved in angle restraints
-  Hybrid<int> rangl_j_atoms;        ///< Atom J indices involved in angle restraints
-  Hybrid<int> rangl_k_atoms;        ///< Atom K indices involved in angle restraints
-  Hybrid<int> rangl_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   three-point angle restraint
-  Hybrid<int> rdihe_i_atoms;        ///< Atom I indices involved in dihedral restraints
-  Hybrid<int> rdihe_j_atoms;        ///< Atom J indices involved in dihedral restraints
-  Hybrid<int> rdihe_k_atoms;        ///< Atom K indices involved in dihedral restraints
-  Hybrid<int> rdihe_l_atoms;        ///< Atom L indices involved in dihedral restraints
-  Hybrid<int> rdihe_param_idx;      ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
-                                    ///<   four-point dihedral angle restraint
-  Hybrid<int> nmr_int_data;         ///< Array targeted by POINTER-kind objects in this section
+  Hybrid<int> rposn_atoms;              ///< Atom indices involved in positional restraints
+  Hybrid<int> rposn_kr_param_idx;       ///< Restraint parameters for k(2,3) and r(1,2,3,4) in
+                                        ///<   each positional restraint
+  Hybrid<int> rposn_xyz_param_idx;      ///< Restraint parameters for the target positions in each
+                                        ///<   positional restraint
+  Hybrid<int> rbond_i_atoms;            ///< Atom I indices involved in distance restraints
+  Hybrid<int> rbond_j_atoms;            ///< Atom J indices involved in distance restraints
+  Hybrid<int> rbond_param_idx;          ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                        ///<   distance restraint
+  Hybrid<int> rangl_i_atoms;            ///< Atom I indices involved in angle restraints
+  Hybrid<int> rangl_j_atoms;            ///< Atom J indices involved in angle restraints
+  Hybrid<int> rangl_k_atoms;            ///< Atom K indices involved in angle restraints
+  Hybrid<int> rangl_param_idx;          ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                        ///<   three-point angle restraint
+  Hybrid<int> rdihe_i_atoms;            ///< Atom I indices involved in dihedral restraints
+  Hybrid<int> rdihe_j_atoms;            ///< Atom J indices involved in dihedral restraints
+  Hybrid<int> rdihe_k_atoms;            ///< Atom K indices involved in dihedral restraints
+  Hybrid<int> rdihe_l_atoms;            ///< Atom L indices involved in dihedral restraints
+  Hybrid<int> rdihe_param_idx;          ///< Restraint parameters for k(2,3) and r(1,2,3,4) in each
+                                        ///<   four-point dihedral angle restraint
+  Hybrid<int> rposn_kr_param_map;       ///< Positional restraint K-R parameter maps
+  Hybrid<int> rposn_xyz_param_map;      ///< Positional restraint X-Y-Z parameter maps
+  Hybrid<int2> rposn_param_map_bounds;  ///< Positional restraint parameter map bounds
+  Hybrid<int> rbond_param_map;          ///< Distance restraint parameter maps
+  Hybrid<int2> rbond_param_map_bounds;  ///< Distance restraint parameter map bounds
+  Hybrid<int> rangl_param_map;          ///< Three-point angle restraint parameter maps
+  Hybrid<int2> rangl_param_map_bounds;  ///< Three-point angle restraint parameter map bounds
+  Hybrid<int> rdihe_param_map;          ///< Four-point dihedral restraint parameter maps
+  Hybrid<int2> rdihe_param_map_bounds;  ///< Four-point dihedral restraint parameter map bounds
+  Hybrid<int> nmr_int_data;             ///< Array targeted by POINTER-kind objects in this section
+  Hybrid<int2> nmr_int2_data;           ///< Array targeted by POINTER-kind objects in this section
 
   // Virtual site details: virtual sites are considered parameters, which like valence terms apply
   // to a small group of atoms and index into a table of parameters including the frame type and

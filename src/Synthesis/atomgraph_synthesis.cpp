@@ -260,7 +260,6 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_rdihe_final_k{HybridKind::POINTER, "tpsynf_rdihe_finl_k"},
     sp_rdihe_init_r{HybridKind::POINTER, "tpsynf_rdihe_init_k"},
     sp_rdihe_final_r{HybridKind::POINTER, "tpsynf_rdihe_finl_k"},
-    nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
     nmr_double_data{HybridKind::ARRAY, "tpsyn_nmr_dbl_data"},
     nmr_double2_data{HybridKind::ARRAY, "tpsyn_nmr_dbl2_data"},
     nmr_double4_data{HybridKind::ARRAY, "tpsyn_nmr_dbl4_data"},
@@ -282,7 +281,17 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rdihe_k_atoms{HybridKind::POINTER, "tpsyn_rdihe_kat"},
     rdihe_l_atoms{HybridKind::POINTER, "tpsyn_rdihe_lat"},
     rdihe_param_idx{HybridKind::POINTER, "tpsyn_rdihe_param"},
+    rposn_kr_param_map{HybridKind::POINTER, "tpsyn_rposn_kr_map"},
+    rposn_xyz_param_map{HybridKind::POINTER, "tpsyn_rposn_xyz_map"},
+    rposn_param_map_bounds{HybridKind::POINTER, "tpsyn_rposn_map_bnd"},
+    rbond_param_map{HybridKind::POINTER, "tpsyn_rbond_map"},
+    rbond_param_map_bounds{HybridKind::POINTER, "tpsyn_rbond_map_bnd"},
+    rangl_param_map{HybridKind::POINTER, "tpsyn_rangl_map"},
+    rangl_param_map_bounds{HybridKind::POINTER, "tpsyn_rangl_map_bnd"},
+    rdihe_param_map{HybridKind::POINTER, "tpsyn_rdihe_map"},
+    rdihe_param_map_bounds{HybridKind::POINTER, "tpsyn_rdihe_map_bnd"},
     nmr_int_data{HybridKind::ARRAY, "tpsyn_nmr_ints"},
+    nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
     virtual_site_parameters{HybridKind::ARRAY, "tpsyn_vs_params"},
     sp_virtual_site_parameters{HybridKind::ARRAY, "tpsynf_vs_params"},
     virtual_site_atoms{HybridKind::POINTER, "tpsyn_vs_atoms"},
@@ -1063,8 +1072,8 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   }
 
   // Fill in the restraint term indexing arrays
-  nmr_int_data.resize((3 * rposn_offset) + (3 * rbond_offset) + (4 * rangl_offset) +
-                      (5 * rdihe_offset));
+  nmr_int_data.resize((5 * rposn_offset) + (4 * rbond_offset) + (5 * rangl_offset) +
+                      (6 * rdihe_offset));
   pivot = 0;
   rposn_atoms.setPointer(&nmr_int_data, pivot, rposn_offset);
   pivot += rposn_offset;
@@ -2148,34 +2157,52 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   // various sets of terms.  One difference in this implementation is that the restraint apparatus
   // pointer for any particular network may be the null pointer, indicating that there is no
   // restraint system in place for that case (or perhaps any cases).
-  int posn_offset = 0;
-  int bond_offset = 0;
-  int angl_offset = 0;
-  int dihe_offset = 0;
+  int rposn_offset = 0;
+  int rbond_offset = 0;
+  int rangl_offset = 0;
+  int rdihe_offset = 0;
+  std::vector<int2> network_rposn_param_map_bounds(restraint_network_count);
+  std::vector<int2> network_rbond_param_map_bounds(restraint_network_count);
+  std::vector<int2> network_rangl_param_map_bounds(restraint_network_count);
+  std::vector<int2> network_rdihe_param_map_bounds(restraint_network_count);
   std::vector<int> network_rposn_table_offsets(restraint_network_count, 0);
   std::vector<int> network_rbond_table_offsets(restraint_network_count, 0);
   std::vector<int> network_rangl_table_offsets(restraint_network_count, 0);
   std::vector<int> network_rdihe_table_offsets(restraint_network_count, 0);
   for (int i = 0; i < restraint_network_count; i++) {
     const RestraintApparatus* ra_ptr = restraint_networks[i];
-    network_rposn_table_offsets[i] = posn_offset;
-    network_rbond_table_offsets[i] = bond_offset;
-    network_rangl_table_offsets[i] = angl_offset;
-    network_rdihe_table_offsets[i] = dihe_offset;
+    network_rposn_table_offsets[i] = rposn_offset;
+    network_rbond_table_offsets[i] = rbond_offset;
+    network_rangl_table_offsets[i] = rangl_offset;
+    network_rdihe_table_offsets[i] = rdihe_offset;
+    network_rposn_param_map_bounds[i].x = rposn_offset;
+    network_rbond_param_map_bounds[i].x = rbond_offset;
+    network_rangl_param_map_bounds[i].x = rangl_offset;
+    network_rdihe_param_map_bounds[i].x = rdihe_offset;
     if (ra_ptr != nullptr) {
-      posn_offset += ra_ptr->getPositionalRestraintCount();
-      bond_offset += ra_ptr->getDistanceRestraintCount();
-      angl_offset += ra_ptr->getAngleRestraintCount();
-      dihe_offset += ra_ptr->getDihedralRestraintCount();
+      network_rposn_param_map_bounds[i].y = rposn_offset + ra_ptr->getPositionalRestraintCount();
+      network_rbond_param_map_bounds[i].y = rbond_offset + ra_ptr->getDistanceRestraintCount();
+      network_rangl_param_map_bounds[i].y = rangl_offset + ra_ptr->getAngleRestraintCount();
+      network_rdihe_param_map_bounds[i].y = rdihe_offset + ra_ptr->getDihedralRestraintCount();
+      rposn_offset += roundUp(ra_ptr->getPositionalRestraintCount(), warp_size_int);
+      rbond_offset += roundUp(ra_ptr->getDistanceRestraintCount(), warp_size_int);
+      rangl_offset += roundUp(ra_ptr->getAngleRestraintCount(), warp_size_int);
+      rdihe_offset += roundUp(ra_ptr->getDihedralRestraintCount(), warp_size_int);
+    }
+    else {
+      network_rposn_param_map_bounds[i].y = rposn_offset;
+      network_rbond_param_map_bounds[i].y = rbond_offset;
+      network_rangl_param_map_bounds[i].y = rangl_offset;
+      network_rdihe_param_map_bounds[i].y = rdihe_offset;
     }
   }
 
   // Create lists of unique parameters for the various types of restraints.
-  std::vector<int> rposn_synthesis_kr_index(posn_offset, -1);  
-  std::vector<int> rposn_synthesis_xyz_index(posn_offset, -1);  
-  std::vector<int> rbond_synthesis_index(bond_offset, -1);
-  std::vector<int> rangl_synthesis_index(angl_offset, -1);
-  std::vector<int> rdihe_synthesis_index(dihe_offset, -1);
+  std::vector<int> rposn_synthesis_kr_index(rposn_offset, -1);  
+  std::vector<int> rposn_synthesis_xyz_index(rposn_offset, -1);  
+  std::vector<int> rbond_synthesis_index(rbond_offset, -1);
+  std::vector<int> rangl_synthesis_index(rangl_offset, -1);
+  std::vector<int> rdihe_synthesis_index(rdihe_offset, -1);
   std::vector<int2> filtered_rposn_step_bounds, filtered_rbond_step_bounds;
   std::vector<int2> filtered_rangl_step_bounds, filtered_rdihe_step_bounds;
   std::vector<double2> filtered_rposn_init_keq, filtered_rposn_finl_keq;
@@ -2234,7 +2261,9 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
     const RestraintKit<double, double2, double4> irar_dp = ira_ptr->getDoublePrecisionAbstract();
     for (int j = 0; j < irar_dp.nposn; j++) {
 
-      // Skip restraints that have been determined to have unique x / y / z targets.  This
+      // Skip restraints that have been determined to have unique x / y / z targets.  This is
+      // better done by checking whether the x / y / z target has not yet been matched to some
+      // previous target, as the k / r combination can also be unique.
       if (rposn_synthesis_xyz_index[network_rposn_table_offsets[i] + j] < 0) {
         const int ij_init_step = irar_dp.rposn_init_step[j];
         const int ij_finl_step = irar_dp.rposn_finl_step[j];
@@ -2292,10 +2321,11 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   }
 
   // Resize the Hybrid arrays, set pointers, and fill Hybrid objects in the AtomGraphSynthesis
+  const int rnc_offset = roundUp(restraint_network_count, warp_size_int);
   const size_t i2c = roundUp(n_unique_posn_kr, warp_size_int) +
                      roundUp(n_unique_bond, warp_size_int) +
                      roundUp(n_unique_angl, warp_size_int) +
-                     roundUp(n_unique_dihe, warp_size_int);
+                     roundUp(n_unique_dihe, warp_size_int) + (4 * rnc_offset);
   nmr_int2_data.resize(i2c);
   nmr_double_data.resize(2 * roundUp(n_unique_posn_xyz, warp_size_int));
   nmr_double2_data.resize(2 * (i2c + n_unique_posn_xyz));
@@ -2308,6 +2338,14 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = rbond_step_bounds.putHost(&nmr_int2_data, filtered_rbond_step_bounds, ic, warp_size_zu);
   ic = rangl_step_bounds.putHost(&nmr_int2_data, filtered_rangl_step_bounds, ic, warp_size_zu);
   ic = rdihe_step_bounds.putHost(&nmr_int2_data, filtered_rdihe_step_bounds, ic, warp_size_zu);
+  ic = rposn_param_map_bounds.putHost(&nmr_int2_data, network_rposn_param_map_bounds, ic,
+                                      warp_size_zu);
+  ic = rbond_param_map_bounds.putHost(&nmr_int2_data, network_rbond_param_map_bounds, ic,
+                                      warp_size_zu);
+  ic = rangl_param_map_bounds.putHost(&nmr_int2_data, network_rangl_param_map_bounds, ic,
+                                      warp_size_zu);
+  ic = rdihe_param_map_bounds.putHost(&nmr_int2_data, network_rdihe_param_map_bounds, ic,
+                                      warp_size_zu);
   ic = 0LLU;
   ic = rposn_init_z.putHost(&nmr_double_data, filtered_rposn_init_z, ic, warp_size_zu);
   ic = rposn_final_z.putHost(&nmr_double_data, filtered_rposn_finl_z, ic, warp_size_zu);
@@ -2332,6 +2370,15 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
   ic = rdihe_init_r.putHost(&nmr_double4_data, filtered_rdihe_init_r, ic, warp_size_zu);
   ic = rdihe_final_r.putHost(&nmr_double4_data, filtered_rdihe_finl_r, ic, warp_size_zu);
 
+  // The nmr_int_data array has already been resized in condenseParameterTables(), with extra
+  // space allocated to hold the parameter maps.  Set those pointers now.
+  ic = (3 * rposn_offset) + (3 * rbond_offset) + (4 * rangl_offset) + (5 * rdihe_offset);
+  ic = rposn_kr_param_map.putHost(&nmr_int_data, rposn_synthesis_kr_index, ic, warp_size_zu);
+  ic = rposn_xyz_param_map.putHost(&nmr_int_data, rposn_synthesis_xyz_index, ic, warp_size_zu);
+  ic = rbond_param_map.putHost(&nmr_int_data, rbond_synthesis_index, ic, warp_size_zu);
+  ic = rangl_param_map.putHost(&nmr_int_data, rangl_synthesis_index, ic, warp_size_zu);
+  ic = rdihe_param_map.putHost(&nmr_int_data, rdihe_synthesis_index, ic, warp_size_zu);
+  
   // Create temporary arrays for floating-point data.  This is done more in line with what happens
   // in an AtomGraph, with each POINTER-kind Hybrid object targeting a handful of larger arrays.
   // The likelihood that most simulations will have few to no restraints makes it advantageous to
@@ -2610,13 +2657,21 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
   for (int i = 0; i < system_count; i++) {
     const size_t nvwu = all_vwu[i].size();
     const int tp_idx = topology_indices.readHost(i);
-    const int2 bond_limits = bond_param_map_bounds.readHost(tp_idx);
-    const int2 angl_limits = angl_param_map_bounds.readHost(tp_idx);
-    const int2 dihe_limits = dihe_param_map_bounds.readHost(tp_idx);
-    const int2 ubrd_limits = ubrd_param_map_bounds.readHost(tp_idx);
-    const int2 cimp_limits = cimp_param_map_bounds.readHost(tp_idx);
-    const int2 cmap_limits = cmap_param_map_bounds.readHost(tp_idx);
-    const int2 attn_limits = attn14_param_map_bounds.readHost(tp_idx);
+    const int rn_idx = restraint_indices.readHost(i);
+    const int2 bond_limits  = bond_param_map_bounds.readHost(tp_idx);
+    const int2 angl_limits  = angl_param_map_bounds.readHost(tp_idx);
+    const int2 dihe_limits  = dihe_param_map_bounds.readHost(tp_idx);
+    const int2 ubrd_limits  = ubrd_param_map_bounds.readHost(tp_idx);
+    const int2 cimp_limits  = cimp_param_map_bounds.readHost(tp_idx);
+    const int2 cmap_limits  = cmap_param_map_bounds.readHost(tp_idx);
+    const int2 attn_limits  = attn14_param_map_bounds.readHost(tp_idx);
+    const int2 rposn_limits = rposn_param_map_bounds.readHost(rn_idx);
+    const int2 rbond_limits = rbond_param_map_bounds.readHost(rn_idx);
+    const int2 rangl_limits = rangl_param_map_bounds.readHost(rn_idx);
+    const int2 rdihe_limits = rdihe_param_map_bounds.readHost(rn_idx);
+    const int2 vste_limits  = vste_param_map_bounds.readHost(tp_idx);
+    const int2 sett_limits  = sett_param_map_bounds.readHost(tp_idx);
+    const int2 cnst_limits  = cnst_param_map_bounds.readHost(tp_idx);
     const std::vector<int> sysi_bond_map = bond_param_map.readHost(bond_limits.x,
                                                                    bond_limits.y - bond_limits.x);
     const std::vector<int> sysi_angl_map = angl_param_map.readHost(angl_limits.x,
@@ -2631,8 +2686,24 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
                                                                    cmap_limits.y - cmap_limits.x);
     const std::vector<int> sysi_attn_map =
       attn14_param_map.readHost(attn_limits.x, attn_limits.y - attn_limits.x);
+    const std::vector<int> sysi_rposn_kr_map =
+      rposn_kr_param_map.readHost(rposn_limits.x, rposn_limits.y - rposn_limits.x);
+    const std::vector<int> sysi_rposn_xyz_map =
+      rposn_xyz_param_map.readHost(rposn_limits.x, rposn_limits.y - rposn_limits.x);
+    const std::vector<int> sysi_rbond_map =
+      rbond_param_map.readHost(rbond_limits.x, rbond_limits.y - rbond_limits.x);
+    const std::vector<int> sysi_rangl_map =
+      rangl_param_map.readHost(rangl_limits.x, rangl_limits.y - rangl_limits.x);
+    const std::vector<int> sysi_rdihe_map =
+      rdihe_param_map.readHost(rdihe_limits.x, rdihe_limits.y - rdihe_limits.x);
+    const std::vector<int> sysi_vste_map = vste_param_map.readHost(vste_limits.x,
+                                                                   vste_limits.y - vste_limits.x);
+    const std::vector<int> sysi_sett_map = sett_param_map.readHost(sett_limits.x,
+                                                                   sett_limits.y - sett_limits.x);
+    const std::vector<int> sysi_cnst_map = cnst_param_map.readHost(cnst_limits.x,
+                                                                   cnst_limits.y - cnst_limits.x);
     for (size_t j = 0LLU; j < nvwu; j++) {
-      
+
     }
   }
 }
