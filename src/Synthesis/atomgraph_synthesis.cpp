@@ -2730,6 +2730,8 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
     const std::vector<int> sysi_cnst_map = cnst_param_map.readHost(cnst_limits.x,
                                                                    cnst_limits.y - cnst_limits.x);
     for (size_t j = 0LLU; j < nvwu; j++) {
+
+      // Reconfigure the work units to store instructions appropriate for the AtomGraphSynthesis
       all_vwu[i][j].storeCompositeBondInstructions(sysi_bond_map, sysi_ubrd_map);
       all_vwu[i][j].storeAngleInstructions(sysi_angl_map);
       all_vwu[i][j].storeCompositeDihedralInstructions(sysi_dihe_map, sysi_attn_map,
@@ -2743,6 +2745,8 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       all_vwu[i][j].storeVirtualSiteInstructions(sysi_vste_map);
       all_vwu[i][j].storeSettleGroupInstructions(sysi_sett_map);
       all_vwu[i][j].storeConstraintGroupInstructions(sysi_cnst_map, synth_cnst_param_bounds);
+
+      
     }
   }
 }
