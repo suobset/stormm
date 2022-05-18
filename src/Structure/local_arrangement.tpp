@@ -500,7 +500,7 @@ Tcalc dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const Tcoor
     return (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ? acos(costheta) : -acos(costheta);
   }
   else {
-    if (fabsf(costheta) >= near_to_one_f) {
+    if (std::abs(costheta) >= near_to_one_f) {
             const Tcalc mg_crabbc = value_one / sqrtf(crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] +
                                                 crabbc[2]*crabbc[2]);
       const Tcalc mg_crbccd = value_one / sqrtf(crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] +
@@ -515,7 +515,7 @@ Tcalc dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const Tcoor
       Tcalc rdy = ny_bccd - ny_abbc;
       Tcalc rdz = nz_bccd - nz_abbc;
       Tcalc rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-      if (fabsf(rs) > value_one) {
+      if (std::abs(rs) > value_one) {
         rdx = nx_bccd + nx_abbc;
         rdy = ny_bccd + ny_abbc;
         rdz = nz_bccd + nz_abbc;
