@@ -41,9 +41,8 @@ enum class VwuAbstractMap {
   IMPORT = 0,  ///< Atom import indexing limits (these are the bounds of a list of atom
                ///<   indices to import, not the low end of a consecutive series of topological
                ///<   atoms to import)
-  MOVE,        ///< Limits for the imported atom movement mask (this will be about 1/32nd the size
+  MANIPULATE,  ///< Limits for the imported atom movement mask (this will be about 1/32nd the size
                ///<   of the import list)
-  UPDATE,      ///< Limits for the atom update mask
   CBND,        ///< Composite bond instruction index limits
   ANGL,        ///< Harmonic angle instruction limits
   CDHE,        ///< Composite dihedral instruction limits

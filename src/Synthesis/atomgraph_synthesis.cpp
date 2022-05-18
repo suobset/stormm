@@ -2535,11 +2535,11 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       
       // Record the appropriate limits for the present system
       const int ntatom = all_vwu[i][j].getImportedAtomCount();
-      const int manip_bits = (ntatom + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int manip_uints = (ntatom + uint_bit_count_int - 1) / uint_bit_count_int;
       atom_import_count = setVwuAbstractLimits(atom_import_count, vwu_count,
                                                VwuAbstractMap::IMPORT, ntatom);
       manipulation_mask_count = setVwuAbstractLimits(manipulation_mask_count, vwu_count,
-                                                     VwuAbstractMap::MOVE, manip_bits);
+                                                     VwuAbstractMap::MANIPULATE, manip_uints);
       const int ntcbnd  = task_counts[static_cast<size_t>(VwuTask::CBND)];
       const int ntangl  = task_counts[static_cast<size_t>(VwuTask::ANGL)];
       const int ntcdhe  = task_counts[static_cast<size_t>(VwuTask::CDHE)];
@@ -2564,33 +2564,33 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       vsite_count  = setVwuAbstractLimits(vsite_count, vwu_count, VwuAbstractMap::VSITE, ntvste);
       settle_count = setVwuAbstractLimits(settle_count, vwu_count, VwuAbstractMap::SETTLE, ntsett);
       cgroup_count = setVwuAbstractLimits(cgroup_count, vwu_count, VwuAbstractMap::CGROUP, ntcnst);
-      const int cbnd_bits   = (ntcbnd + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int angl_bits   = (ntangl + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int cdhe_bits   = (ntcdhe + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int cmap_bits   = (ntcmap + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int infr14_bits = (ntinfr + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int rposn_bits  = (ntrposn + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int rbond_bits  = (ntrbond + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int rangl_bits  = (ntrangl + uint_bit_count_int - 1) / uint_bit_count_int;
-      const int rdihe_bits  = (ntrdihe + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cbnd_uints   = (ntcbnd + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int angl_uints   = (ntangl + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cdhe_uints   = (ntcdhe + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int cmap_uints   = (ntcmap + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int infr14_uints = (ntinfr + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rposn_uints  = (ntrposn + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rbond_uints  = (ntrbond + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rangl_uints  = (ntrangl + uint_bit_count_int - 1) / uint_bit_count_int;
+      const int rdihe_uints  = (ntrdihe + uint_bit_count_int - 1) / uint_bit_count_int;
       cbnd_nrg_count   = setVwuAbstractLimits(cbnd_nrg_count, vwu_count, VwuAbstractMap::CBND_NRG,
-                                              cbnd_bits);
+                                              cbnd_uints);
       angl_nrg_count   = setVwuAbstractLimits(angl_nrg_count, vwu_count, VwuAbstractMap::ANGL_NRG,
-                                              angl_bits);
+                                              angl_uints);
       cdhe_nrg_count   = setVwuAbstractLimits(cdhe_nrg_count, vwu_count, VwuAbstractMap::CDHE_NRG,
-                                              cdhe_bits);
+                                              cdhe_uints);
       cmap_nrg_count   = setVwuAbstractLimits(cmap_nrg_count, vwu_count, VwuAbstractMap::CMAP_NRG,
-                                              cmap_bits);
-      infr14_nrg_count = setVwuAbstractLimits(cmap_nrg_count, vwu_count,
-                                              VwuAbstractMap::INFR14_NRG, infr14_bits);
+                                              cmap_uints);
+      infr14_nrg_count = setVwuAbstractLimits(infr14_nrg_count, vwu_count,
+                                              VwuAbstractMap::INFR14_NRG, infr14_uints);
       rposn_nrg_count  = setVwuAbstractLimits(rposn_nrg_count, vwu_count,
-                                              VwuAbstractMap::RPOSN_NRG, rposn_bits);
+                                              VwuAbstractMap::RPOSN_NRG, rposn_uints);
       rbond_nrg_count  = setVwuAbstractLimits(rbond_nrg_count, vwu_count,
-                                              VwuAbstractMap::RBOND_NRG, rbond_bits);
+                                              VwuAbstractMap::RBOND_NRG, rbond_uints);
       rangl_nrg_count  = setVwuAbstractLimits(rangl_nrg_count, vwu_count,
-                                              VwuAbstractMap::RANGL_NRG, rangl_bits);
+                                              VwuAbstractMap::RANGL_NRG, rangl_uints);
       rdihe_nrg_count  = setVwuAbstractLimits(rdihe_nrg_count, vwu_count,
-                                              VwuAbstractMap::RDIHE_NRG, rdihe_bits);
+                                              VwuAbstractMap::RDIHE_NRG, rdihe_uints);
       const size_t klim = static_cast<size_t>(VwuTask::ALL_TASKS);
       for (size_t k = 0LLU; k < klim; k++) {
         total_task_counts[k] += roundUp(task_counts[k], warp_size_int);        
@@ -2685,53 +2685,53 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
     const size_t nvwu = all_vwu[i].size();
     const int tp_idx = topology_indices.readHost(i);
     const int rn_idx = restraint_indices.readHost(i);
-    const int2 bond_limits  = bond_param_map_bounds.readHost(tp_idx);
-    const int2 angl_limits  = angl_param_map_bounds.readHost(tp_idx);
-    const int2 dihe_limits  = dihe_param_map_bounds.readHost(tp_idx);
-    const int2 ubrd_limits  = ubrd_param_map_bounds.readHost(tp_idx);
-    const int2 cimp_limits  = cimp_param_map_bounds.readHost(tp_idx);
-    const int2 cmap_limits  = cmap_param_map_bounds.readHost(tp_idx);
-    const int2 attn_limits  = attn14_param_map_bounds.readHost(tp_idx);
-    const int2 rposn_limits = rposn_param_map_bounds.readHost(rn_idx);
-    const int2 rbond_limits = rbond_param_map_bounds.readHost(rn_idx);
-    const int2 rangl_limits = rangl_param_map_bounds.readHost(rn_idx);
-    const int2 rdihe_limits = rdihe_param_map_bounds.readHost(rn_idx);
-    const int2 vste_limits  = vste_param_map_bounds.readHost(tp_idx);
-    const int2 sett_limits  = sett_param_map_bounds.readHost(tp_idx);
-    const int2 cnst_limits  = cnst_param_map_bounds.readHost(tp_idx);
-    const std::vector<int> sysi_bond_map = bond_param_map.readHost(bond_limits.x,
-                                                                   bond_limits.y - bond_limits.x);
-    const std::vector<int> sysi_angl_map = angl_param_map.readHost(angl_limits.x,
-                                                                   angl_limits.y - angl_limits.x);
-    const std::vector<int> sysi_dihe_map = dihe_param_map.readHost(dihe_limits.x,
-                                                                   dihe_limits.y - dihe_limits.x);
-    const std::vector<int> sysi_ubrd_map = ubrd_param_map.readHost(ubrd_limits.x,
-                                                                   ubrd_limits.y - ubrd_limits.x);
-    const std::vector<int> sysi_cimp_map = cimp_param_map.readHost(cimp_limits.x,
-                                                                   cimp_limits.y - cimp_limits.x);
-    const std::vector<int> sysi_cmap_map = cmap_param_map.readHost(cmap_limits.x,
-                                                                   cmap_limits.y - cmap_limits.x);
+    const int2 bond_maplim  = bond_param_map_bounds.readHost(tp_idx);
+    const int2 angl_maplim  = angl_param_map_bounds.readHost(tp_idx);
+    const int2 dihe_maplim  = dihe_param_map_bounds.readHost(tp_idx);
+    const int2 ubrd_maplim  = ubrd_param_map_bounds.readHost(tp_idx);
+    const int2 cimp_maplim  = cimp_param_map_bounds.readHost(tp_idx);
+    const int2 cmap_maplim  = cmap_param_map_bounds.readHost(tp_idx);
+    const int2 attn_maplim  = attn14_param_map_bounds.readHost(tp_idx);
+    const int2 rposn_maplim = rposn_param_map_bounds.readHost(rn_idx);
+    const int2 rbond_maplim = rbond_param_map_bounds.readHost(rn_idx);
+    const int2 rangl_maplim = rangl_param_map_bounds.readHost(rn_idx);
+    const int2 rdihe_maplim = rdihe_param_map_bounds.readHost(rn_idx);
+    const int2 vste_maplim  = vste_param_map_bounds.readHost(tp_idx);
+    const int2 sett_maplim  = sett_param_map_bounds.readHost(tp_idx);
+    const int2 cnst_maplim  = cnst_param_map_bounds.readHost(tp_idx);
+    const std::vector<int> sysi_bond_map = bond_param_map.readHost(bond_maplim.x,
+                                                                   bond_maplim.y - bond_maplim.x);
+    const std::vector<int> sysi_angl_map = angl_param_map.readHost(angl_maplim.x,
+                                                                   angl_maplim.y - angl_maplim.x);
+    const std::vector<int> sysi_dihe_map = dihe_param_map.readHost(dihe_maplim.x,
+                                                                   dihe_maplim.y - dihe_maplim.x);
+    const std::vector<int> sysi_ubrd_map = ubrd_param_map.readHost(ubrd_maplim.x,
+                                                                   ubrd_maplim.y - ubrd_maplim.x);
+    const std::vector<int> sysi_cimp_map = cimp_param_map.readHost(cimp_maplim.x,
+                                                                   cimp_maplim.y - cimp_maplim.x);
+    const std::vector<int> sysi_cmap_map = cmap_param_map.readHost(cmap_maplim.x,
+                                                                   cmap_maplim.y - cmap_maplim.x);
     const std::vector<int> sysi_attn_map =
-      attn14_param_map.readHost(attn_limits.x, attn_limits.y - attn_limits.x);
+      attn14_param_map.readHost(attn_maplim.x, attn_maplim.y - attn_maplim.x);
     const std::vector<int> sysi_rposn_kr_map =
-      rposn_kr_param_map.readHost(rposn_limits.x, rposn_limits.y - rposn_limits.x);
+      rposn_kr_param_map.readHost(rposn_maplim.x, rposn_maplim.y - rposn_maplim.x);
     const std::vector<int> sysi_rposn_xyz_map =
-      rposn_xyz_param_map.readHost(rposn_limits.x, rposn_limits.y - rposn_limits.x);
+      rposn_xyz_param_map.readHost(rposn_maplim.x, rposn_maplim.y - rposn_maplim.x);
     const std::vector<int> sysi_rbond_map =
-      rbond_param_map.readHost(rbond_limits.x, rbond_limits.y - rbond_limits.x);
+      rbond_param_map.readHost(rbond_maplim.x, rbond_maplim.y - rbond_maplim.x);
     const std::vector<int> sysi_rangl_map =
-      rangl_param_map.readHost(rangl_limits.x, rangl_limits.y - rangl_limits.x);
+      rangl_param_map.readHost(rangl_maplim.x, rangl_maplim.y - rangl_maplim.x);
     const std::vector<int> sysi_rdihe_map =
-      rdihe_param_map.readHost(rdihe_limits.x, rdihe_limits.y - rdihe_limits.x);
-    const std::vector<int> sysi_vste_map = vste_param_map.readHost(vste_limits.x,
-                                                                   vste_limits.y - vste_limits.x);
-    const std::vector<int> sysi_sett_map = sett_param_map.readHost(sett_limits.x,
-                                                                   sett_limits.y - sett_limits.x);
-    const std::vector<int> sysi_cnst_map = cnst_param_map.readHost(cnst_limits.x,
-                                                                   cnst_limits.y - cnst_limits.x);
+      rdihe_param_map.readHost(rdihe_maplim.x, rdihe_maplim.y - rdihe_maplim.x);
+    const std::vector<int> sysi_vste_map = vste_param_map.readHost(vste_maplim.x,
+                                                                   vste_maplim.y - vste_maplim.x);
+    const std::vector<int> sysi_sett_map = sett_param_map.readHost(sett_maplim.x,
+                                                                   sett_maplim.y - sett_maplim.x);
+    const std::vector<int> sysi_cnst_map = cnst_param_map.readHost(cnst_maplim.x,
+                                                                   cnst_maplim.y - cnst_maplim.x);
     for (size_t j = 0LLU; j < nvwu; j++) {
 
-      // Reconfigure the work units to store instructions appropriate for the AtomGraphSynthesis
+      // Reconfigure the work units to store instructions appropriate for the AtomGraphSynthesis.
       all_vwu[i][j].storeCompositeBondInstructions(sysi_bond_map, sysi_ubrd_map);
       all_vwu[i][j].storeAngleInstructions(sysi_angl_map);
       all_vwu[i][j].storeCompositeDihedralInstructions(sysi_dihe_map, sysi_attn_map,
@@ -2746,7 +2746,100 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       all_vwu[i][j].storeSettleGroupInstructions(sysi_sett_map);
       all_vwu[i][j].storeConstraintGroupInstructions(sysi_cnst_map, synth_cnst_param_bounds);
 
+      // Get limits for all data components of the valence work unit
+      const int2* vwu_abs_ptr      = &vwu_instruction_sets.data()[vwu_idx * vwu_abstract_length];
+      const int2 import_limits     = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::IMPORT)];
+      const int2 manipulate_limits = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::MANIPULATE)];
+      const int2 cbnd_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CBND)];
+      const int2 angl_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::ANGL)];
+      const int2 cdhe_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CDHE)];
+      const int2 cmap_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CMAP)];
+      const int2 infr14_limits     = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::INFR14)];
+      const int2 rposn_limits      = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RPOSN)];
+      const int2 rbond_limits      = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RBOND)];
+      const int2 rangl_limits      = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RANGL)];
+      const int2 rdihe_limits      = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RDIHE)];
+      const int2 vste_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::VSITE)];
+      const int2 sett_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::SETTLE)];
+      const int2 csnt_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CGROUP)];
+      const int2 cbnd_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CBND_NRG)];
+      const int2 angl_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::ANGL_NRG)];
+      const int2 cdhe_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CDHE_NRG)];
+      const int2 cmap_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CMAP_NRG)];
+      const int2 infr14_nrg_limits = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::INFR14_NRG)];
+      const int2 rposn_nrg_limits  = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RPOSN_NRG)];
+      const int2 rbond_nrg_limits  = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RBOND_NRG)];
+      const int2 rangl_nrg_limits  = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RANGL_NRG)];
+      const int2 rdihe_nrg_limits  = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RDIHE_NRG)];
+
+      // Upload the atom import array
+      const int atom_start = atom_offsets.readHost(i);
+      int* int_ptr = vwu_import_lists.data();
+      for (int k = import_limits.x; k < import_limits.y; k++) {
+        int_ptr[k] = all_vwu[i][j].getImportedAtomIndex(k - import_limits.x, atom_start);
+      }
+
+      // Upload the manipulation and various energy accumulation bitmasks
+      const std::vector<uint2> manip_mask = all_vwu[i][j].getAtomManipulationMasks();
+      uint2* uint2_ptr = vwu_manipulation_masks.data();
+      for (int k = manipulate_limits.x; k < manipulate_limits.y; k++) {
+        uint2_ptr[k] = manip_mask[k - manipulate_limits.x];
+      }
+      const std::vector<uint> cbnd_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::CBND);
+      uint* uint_ptr = accumulate_cbnd_energy.data();
+
+      // CHECK
+      if (cbnd_nrg_mask.size() != static_cast<size_t>(cbnd_nrg_limits.y - cbnd_nrg_limits.x)) {
+        printf("mask size = %4zu and limits imply %4d - %4d = %4d\n", cbnd_nrg_mask.size(),
+               cbnd_nrg_limits.y, cbnd_nrg_limits.x, cbnd_nrg_limits.y - cbnd_nrg_limits.x);
+      }
+      // END CHECK
       
+      for (int k = cbnd_nrg_limits.x; k < cbnd_nrg_limits.y; k++) {
+        uint_ptr[k] = cbnd_nrg_mask[k - cbnd_nrg_limits.x];
+      }
+      const std::vector<uint> angl_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::ANGL);
+      uint_ptr = accumulate_angl_energy.data();
+      for (int k = angl_nrg_limits.x; k < angl_nrg_limits.y; k++) {
+        uint_ptr[k] = angl_nrg_mask[k - angl_nrg_limits.x];
+      }
+      const std::vector<uint> cdhe_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::CDHE);
+      uint_ptr = accumulate_cdhe_energy.data();
+      for (int k = cdhe_nrg_limits.x; k < cdhe_nrg_limits.y; k++) {
+        uint_ptr[k] = cdhe_nrg_mask[k - cdhe_nrg_limits.x];
+      }
+      const std::vector<uint> cmap_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::CMAP);
+      uint_ptr = accumulate_cmap_energy.data();
+      for (int k = cmap_nrg_limits.x; k < cmap_nrg_limits.y; k++) {
+        uint_ptr[k] = cmap_nrg_mask[k - cmap_nrg_limits.x];
+      }
+      const std::vector<uint> infr14_nrg_mask =
+        all_vwu[i][j].getAccumulationFlags(VwuTask::INFR14);
+      uint_ptr = accumulate_infr14_energy.data();
+      for (int k = infr14_nrg_limits.x; k < infr14_nrg_limits.y; k++) {
+        uint_ptr[k] = infr14_nrg_mask[k - infr14_nrg_limits.x];
+      }
+      const std::vector<uint> rposn_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RPOSN);
+      uint_ptr = accumulate_rposn_energy.data();
+      for (int k = rposn_nrg_limits.x; k < rposn_nrg_limits.y; k++) {
+        uint_ptr[k] = rposn_nrg_mask[k - rposn_nrg_limits.x];
+      }
+      const std::vector<uint> rbond_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RBOND);
+      uint_ptr = accumulate_rbond_energy.data();
+      for (int k = rbond_nrg_limits.x; k < rbond_nrg_limits.y; k++) {
+        uint_ptr[k] = rbond_nrg_mask[k - rbond_nrg_limits.x];
+      }
+      const std::vector<uint> rangl_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RANGL);
+      uint_ptr = accumulate_rangl_energy.data();
+      for (int k = rangl_nrg_limits.x; k < rangl_nrg_limits.y; k++) {
+        uint_ptr[k] = rangl_nrg_mask[k - rangl_nrg_limits.x];
+      }
+      const std::vector<uint> rdihe_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RDIHE);
+      uint_ptr = accumulate_rdihe_energy.data();
+      for (int k = rdihe_nrg_limits.x; k < rdihe_nrg_limits.y; k++) {
+        uint_ptr[k] = rdihe_nrg_mask[k - rdihe_nrg_limits.x];
+      }
+      vwu_idx++;
     }
   }
 }
