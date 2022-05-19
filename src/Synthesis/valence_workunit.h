@@ -697,40 +697,40 @@ public:
                                         const std::vector<int> &group_param_bounds = {});
 
   /// \brief Get the stored vector of composite bond instructions.
-  std::vector<uint2> getCompositeBondInstructions() const;
+  const std::vector<uint2>& getCompositeBondInstructions() const;
 
   /// \brief Get the stored vector of angle instructions.
-  std::vector<uint2> getAngleInstructions() const;
+  const std::vector<uint2>& getAngleInstructions() const;
 
   /// \brief Get the stored vector of composite dihedral instructions.
-  std::vector<uint3> getCompositeDihedralInstructions() const;
+  const std::vector<uint3>& getCompositeDihedralInstructions() const;
 
   /// \brief Get the stored vector of CMAP instructions.
-  std::vector<uint2> getCmapInstructions() const;
+  const std::vector<uint2>& getCmapInstructions() const;
 
   /// \brief Get the stored vector of CMAP instructions.
-  std::vector<uint> getInferred14Instructions() const;
+  const std::vector<uint>& getInferred14Instructions() const;
 
   /// \brief Get the stored vector of positional restraint instructions.
-  std::vector<uint2> getPositionalRestraintInstructions() const;
+  const std::vector<uint2>& getPositionalRestraintInstructions() const;
 
   /// \brief Get the stored vector of distance restraint instructions.
-  std::vector<uint2> getDistanceRestraintInstructions() const;
+  const std::vector<uint2>& getDistanceRestraintInstructions() const;
 
   /// \brief Get the stored vector of three-point angle restraint instructions.
-  std::vector<uint2> getAngleRestraintInstructions() const;
+  const std::vector<uint2>& getAngleRestraintInstructions() const;
 
   /// \brief Get the stored vector of four-point dihedral restraint instructions.
-  std::vector<uint2> getDihedralRestraintInstructions() const;
+  const std::vector<uint2>& getDihedralRestraintInstructions() const;
 
   /// \brief Get the stored vector of virtual site placement instructions.
-  std::vector<uint2> getVirtualSiteInstructions() const;  
+  const std::vector<uint2>& getVirtualSiteInstructions() const;  
   
   /// \brief Get the stored vector of SETTLE constraint group instructions.
-  std::vector<uint2> getSettleGroupInstructions() const;  
+  const std::vector<uint2>& getSettleGroupInstructions() const;  
   
   /// \brief Get the stored vector of hub-and-spoke constraint group instructions.
-  std::vector<uint2> getConstraintGroupInstructions() const;  
+  const std::vector<uint2>& getConstraintGroupInstructions() const;  
 
   /// \brief Get a specific composite bond instruction.
   ///

@@ -1538,62 +1538,62 @@ ValenceWorkUnit::storeConstraintGroupInstructions(const std::vector<int> &parame
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getCompositeBondInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getCompositeBondInstructions() const {
   return cbnd_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getAngleInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getAngleInstructions() const {
   return angl_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint3> ValenceWorkUnit::getCompositeDihedralInstructions() const {
+const std::vector<uint3>& ValenceWorkUnit::getCompositeDihedralInstructions() const {
   return cdhe_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getCmapInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getCmapInstructions() const {
   return cmap_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint> ValenceWorkUnit::getInferred14Instructions() const {
+const std::vector<uint>& ValenceWorkUnit::getInferred14Instructions() const {
   return infr14_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getPositionalRestraintInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getPositionalRestraintInstructions() const {
   return rposn_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getDistanceRestraintInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getDistanceRestraintInstructions() const {
   return rbond_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getAngleRestraintInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getAngleRestraintInstructions() const {
   return rangl_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getDihedralRestraintInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getDihedralRestraintInstructions() const {
   return rdihe_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getVirtualSiteInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getVirtualSiteInstructions() const {
   return vste_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getSettleGroupInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getSettleGroupInstructions() const {
   return sett_instructions;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<uint2> ValenceWorkUnit::getConstraintGroupInstructions() const {
+const std::vector<uint2>& ValenceWorkUnit::getConstraintGroupInstructions() const {
   return cnst_instructions;
 }
 

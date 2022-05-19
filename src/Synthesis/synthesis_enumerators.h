@@ -64,6 +64,9 @@ enum class VwuAbstractMap {
   RBOND_NRG,   ///< Limits of the distance restraint energy accumulation bit mask
   RANGL_NRG,   ///< Limits of the three-point angle restraint energy accumulation bit mask
   RDIHE_NRG,   ///< Limits of the four-point dihedral restraint energy accumulation bit mask
+  SYSTEM_ID,   ///< System to which the valence work unit pertains, referencing the list of
+               ///<   systems within the AtomGraphSynthesis.  Only the x member of this element
+               ///<   has meaning.
 };
 
 /// \brief There are two modes in which an evaluation of ValenceWorkUnit instructions can proceed.

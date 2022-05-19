@@ -41,6 +41,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
                                        const std::vector<int> &topology_indices_in,
                                        const std::vector<int> &restraint_indices_in,
                                        const ExceptionResponse policy_in, StopWatch *timer_in) :
+
+    // Counts spanning all topologies
     policy{policy_in},
     topology_count{static_cast<int>(topologies_in.size())},
     restraint_network_count{static_cast<int>(restraints_in.size())},
@@ -51,10 +53,16 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     total_dihe_params{0}, total_ubrd_params{0}, total_cimp_params{0}, total_cmap_surfaces{0},
     total_attn14_params{0}, total_vste_params{0}, total_position_restraints{0},
     total_distance_restraints{0}, total_angle_restraints{0}, total_dihedral_restraints{0},
+
+    // Descriptors spanning all systems
     periodic_box_class{UnitCellType::NONE}, gb_style{ImplicitSolventModel::NONE},
     dielectric_constant{1.0}, salt_concentration{0.0}, coulomb_constant{accepted_coulomb_constant},
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
-    water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{}, topologies{topologies_in},
+    water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
+
+    // Individual topologies and restraint networks (RestraintApparatus objects), each of them
+    // describing one or more of the individual systems within the synthesis
+    topologies{topologies_in},
     restraint_networks{restraints_in},
     topology_indices{HybridKind::POINTER, "tpsyn_top_indices"},
     restraint_indices{HybridKind::POINTER, "tpsyn_rst_indices"},
@@ -65,6 +73,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     last_solute_residues{HybridKind::POINTER, "tpsyn_last_sol_res"},
     last_solute_atoms{HybridKind::POINTER, "tpsyn_last_sol_atm"},
     first_solvent_molecules{HybridKind::POINTER, "tpsyn_1st_solv_mol"},
+
+    // Counts of energy terms and particle-related quantities
     ubrd_term_counts{HybridKind::POINTER, "tpsyn_ubrd_counts"},
     cimp_term_counts{HybridKind::POINTER, "tpsyn_cimp_counts"},
     cmap_term_counts{HybridKind::POINTER, "tpsyn_cmap_counts"},
@@ -82,6 +92,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     bond_constraint_counts{HybridKind::POINTER, "tpsyn_bcnst_counts"},
     degrees_of_freedom{HybridKind::POINTER, "tpsyn_deg_freedom"},
     nonrigid_particle_counts{HybridKind::POINTER, "tpsyn_n_nonrigid"},
+
+    // Offsets for each system's term lists
     atom_offsets{HybridKind::POINTER, "tpsyn_atom_offsets"},
     atom_bit_offsets{HybridKind::POINTER, "tpsyn_abit_offsets"},
     residue_offsets{HybridKind::POINTER, "tpsyn_res_offsets"},
@@ -102,6 +114,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nb_exclusion_offsets{HybridKind::POINTER, "tpsyn_nbexcl_offset"},
     lennard_jones_abc_offsets{HybridKind::POINTER, "tpsyn_ljtable_offset"},
     int_system_data{HybridKind::ARRAY, "tpsyn_int_data"},
+
+    // Atom and residue details
     residue_limits{HybridKind::POINTER, "tpsyn_res_lims"},
     atom_struc_numbers{HybridKind::POINTER, "tpsyn_atom_struc_nums"},
     residue_numbers{HybridKind::POINTER, "tpsyn_res_numbers"},
@@ -124,6 +138,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     chem_double_data{HybridKind::ARRAY, "tpsyn_chem_doubles"},
     chem_float_data{HybridKind::ARRAY, "tpsyn_chem_floats"},
     chem_char4_data{HybridKind::ARRAY, "tpsyn_chem_char4s"},
+
+    // Force field parameter maps from individual systems to the consensus tables
     ubrd_param_map{HybridKind::POINTER, "tpsyn_ubrd_map"},
     ubrd_param_map_bounds{HybridKind::POINTER, "tpsyn_ubrd_map_bnd"},
     cimp_param_map{HybridKind::POINTER, "tpsyn_cimp_map"},
@@ -144,6 +160,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sett_param_map_bounds{HybridKind::POINTER, "tpsyn_sett_map_bnd"},
     cnst_param_map{HybridKind::POINTER, "tpsyn_constraint_map"},
     cnst_param_map_bounds{HybridKind::POINTER, "tpsyn_cnst_map_bnd"},
+
+    // Force field consensus table condensed parameters
     ubrd_stiffnesses{HybridKind::POINTER, "tpsyn_ub_stiff"},
     ubrd_equilibria{HybridKind::POINTER, "tpsyn_ub_equil"},
     cimp_stiffnesses{HybridKind::POINTER, "tpsyn_cimp_stiff"},
@@ -175,10 +193,16 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_dihe_amplitudes{HybridKind::POINTER, "tpsyn_dihek_sp"},
     sp_dihe_periodicities{HybridKind::POINTER, "tpsyn_dihen_sp"},
     sp_dihe_phase_angles{HybridKind::POINTER, "tpsyn_dihepsi_sp"},
+    sp_attn14_elec_factors{HybridKind::POINTER, "tpsynf_elec14_scale"},
+    sp_attn14_vdw_factors{HybridKind::POINTER, "tpsynf_vdw14_scale"},
     valparam_double_data{HybridKind::ARRAY, "tpsyn_vparm_dbl"},
     valparam_float_data{HybridKind::ARRAY, "tpsyn_vparm_flt"},
     valparam_int_data{HybridKind::ARRAY, "tpsyn_vparm_int"},
     valparam_int2_data{HybridKind::ARRAY, "tpsyn_vparm_int2"},
+
+    // Atoms participating in each valence term, plus the parameter indices of each term.  Atom
+    // indices refer to concatenated lists of all systems.  Parameter indices refer to the
+    // consensus tables in this object.
     ubrd_i_atoms{HybridKind::POINTER, "tpsyn_ubrd_i"},
     ubrd_k_atoms{HybridKind::POINTER, "tpsyn_ubrd_k"},
     ubrd_param_idx{HybridKind::POINTER, "tpsyn_ubrd_idx"},
@@ -206,6 +230,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     dihe_l_atoms{HybridKind::POINTER, "tpsyn_dihe_l"},
     dihe_param_idx{HybridKind::POINTER, "tpsyn_dihe_idx"},
     valence_int_data{HybridKind::ARRAY, "tpsyn_val_ints"},
+
+    // Non-bonded parameters for all systems
     charge_indices{HybridKind::POINTER, "tpsyn_q_idx"},
     lennard_jones_indices{HybridKind::POINTER, "tpsyn_lj_idx"},
     lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab"},
@@ -216,6 +242,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c_sp"},
     sp_lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab_sp"},
     sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
+
+    // Restraint parameters for all systems
     rposn_step_bounds{HybridKind::POINTER, "tpsyn_rposn_steps"},
     rbond_step_bounds{HybridKind::POINTER, "tpsyn_rbond_steps"},
     rangl_step_bounds{HybridKind::POINTER, "tpsyn_rangl_steps"},
@@ -266,6 +294,10 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nmr_float_data{HybridKind::ARRAY, "tpsyn_nmr_flt_data"},
     nmr_float2_data{HybridKind::ARRAY, "tpsyn_nmr_flt2_data"},
     nmr_float4_data{HybridKind::ARRAY, "tpsyn_nmr_flt4_data"},
+
+    // Restraint term atom indices and parameter indices.  Like standard force field terms, the
+    // atom indices refer to the concatenated list of all systems and the parameter indices refer
+    // to the consensus tables.
     rposn_atoms{HybridKind::POINTER, "tpsyn_rposn_at"},
     rposn_kr_param_idx{HybridKind::POINTER, "tpsyn_rposn_kr_idx"},
     rposn_xyz_param_idx{HybridKind::POINTER, "tpsyn_rposn_xyz_idx"},
@@ -292,6 +324,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     rdihe_param_map_bounds{HybridKind::POINTER, "tpsyn_rdihe_map_bnd"},
     nmr_int_data{HybridKind::ARRAY, "tpsyn_nmr_ints"},
     nmr_int2_data{HybridKind::ARRAY, "tpsyn_nmr_int2_data"},
+
+    // Virtual site parameter arrays, term atom indices, and parameter indices
     virtual_site_parameters{HybridKind::ARRAY, "tpsyn_vs_params"},
     sp_virtual_site_parameters{HybridKind::ARRAY, "tpsynf_vs_params"},
     virtual_site_atoms{HybridKind::POINTER, "tpsyn_vs_atoms"},
@@ -303,17 +337,26 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     virtual_site_param_map{HybridKind::POINTER, "tpsyn_vs_param_map"},
     virtual_site_param_map_bounds{HybridKind::POINTER, "tpsyn_vs_param_bnd"},
     vsite_int_data{HybridKind::ARRAY, "tpsyn_vsite_ints"},
+
+    // SETTLE (analytic rigid water constraints) parameter arrays, plus fused atom and parameter
+    // indices.
     settle_group_geometry{HybridKind::ARRAY, "tpsyn_settle_geom"},
     settle_group_masses{HybridKind::ARRAY, "tpsyn_settle_mass"},
     sp_settle_group_geometry{HybridKind::ARRAY, "tpsynf_settle_geom"},
     sp_settle_group_masses{HybridKind::ARRAY, "tpsynf_settle_mass"},
     settle_group_indexing{HybridKind::ARRAY, "tpsyn_settle_idx"},
+
+    // Constraint group parameter indices and bounds (referencing consensus tables from the
+    // synthesis) plus length / inverse mass parameters (also fused)
     constraint_group_indices{HybridKind::ARRAY, "tpsyn_cnst_atom_idx"},
     constraint_group_bounds{HybridKind::ARRAY, "tpsyn_cnst_atom_bnd"},
     constraint_group_param_idx{HybridKind::ARRAY, "tpsyn_cnst_parm_idx"},
     constraint_param_bounds{HybridKind::ARRAY, "tpsyn_cnst_parm_bnd"},
     constraint_group_params{HybridKind::ARRAY, "tpsyn_cnst_lm"},
     sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
+
+    // Valence work unit instruction sets and energy accumulation masks
+    total_valence_work_units{0},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
     vwu_manipulation_masks{HybridKind::POINTER, "tpsyn_vwu_manip"},
@@ -341,6 +384,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     accumulate_rdihe_energy{HybridKind::POINTER, "tpsyn_rdihe_edir"},
     insr_uint_data{HybridKind::ARRAY, "tpsyn_insr_data1"},
     insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data2"},
+
+    // Pointer to the timer used to track time needed for assembling this object.  The timer can
+    // also be used to track access and other usage of the object.
     timer{timer_in}
 {
   // Setup and memory layout
@@ -1771,6 +1817,10 @@ void AtomGraphSynthesis::condenseParameterTables() {
   ic = sp_ubrd_equilibria.putHost(&valparam_float_data, sp_filtered_ubrd_leq, ic, warp_size_zu);
   ic = sp_cimp_stiffnesses.putHost(&valparam_float_data, sp_filtered_cimp_keq, ic, warp_size_zu);
   ic = sp_cimp_phase_angles.putHost(&valparam_float_data, sp_filtered_cimp_phi, ic, warp_size_zu);
+  ic = sp_attn14_elec_factors.putHost(&valparam_float_data, sp_filtered_attn14_elec, ic,
+                                      warp_size_zu);
+  ic = sp_attn14_vdw_factors.putHost(&valparam_float_data, sp_filtered_attn14_vdw, ic,
+                                     warp_size_zu);
   ic = sp_cmap_surfaces.putHost(&valparam_float_data, sp_filtered_cmap_surf, ic, warp_size_zu);
   ic = sp_cmap_patches.putHost(&valparam_float_data,
                                std::vector<float>(cmap_digest.patch_matrix_form.begin(),
@@ -2502,6 +2552,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
 
   // Allocate the valence work unit instruction set array, an abstract of each ValenceWorkUnit
   // in a stream of integers.
+  total_valence_work_units = total_vwu;
   vwu_instruction_sets.resize(total_vwu * vwu_abstract_length);
   int2* vwu_insr_ptr = vwu_instruction_sets.data();
   int atom_import_count = 0;
@@ -2595,6 +2646,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       for (size_t k = 0LLU; k < klim; k++) {
         total_task_counts[k] += roundUp(task_counts[k], warp_size_int);        
       }
+      setVwuAbstractLimits(i, vwu_count, VwuAbstractMap::SYSTEM_ID, 0);
       vwu_count++;
     }
   }
@@ -2761,7 +2813,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       const int2 rdihe_limits      = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::RDIHE)];
       const int2 vste_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::VSITE)];
       const int2 sett_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::SETTLE)];
-      const int2 csnt_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CGROUP)];
+      const int2 cnst_limits       = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CGROUP)];
       const int2 cbnd_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CBND_NRG)];
       const int2 angl_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::ANGL_NRG)];
       const int2 cdhe_nrg_limits   = vwu_abs_ptr[static_cast<int>(VwuAbstractMap::CDHE_NRG)];
@@ -2780,65 +2832,57 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
       }
 
       // Upload the manipulation and various energy accumulation bitmasks
-      const std::vector<uint2> manip_mask = all_vwu[i][j].getAtomManipulationMasks();
-      uint2* uint2_ptr = vwu_manipulation_masks.data();
-      for (int k = manipulate_limits.x; k < manipulate_limits.y; k++) {
-        uint2_ptr[k] = manip_mask[k - manipulate_limits.x];
-      }
-      const std::vector<uint> cbnd_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::CBND);
-      uint* uint_ptr = accumulate_cbnd_energy.data();
+      vwu_manipulation_masks.putHost(all_vwu[i][j].getAtomManipulationMasks(), manipulate_limits.x,
+                                     manipulate_limits.y - manipulate_limits.x);
+      accumulate_cbnd_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::CBND),
+                                     cbnd_nrg_limits.x, cbnd_nrg_limits.y - cbnd_nrg_limits.x);
+      accumulate_angl_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::ANGL),
+                                     angl_nrg_limits.x, angl_nrg_limits.y - angl_nrg_limits.x);
+      accumulate_cdhe_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::CDHE),
+                                     cdhe_nrg_limits.x, cdhe_nrg_limits.y - cdhe_nrg_limits.x);
+      accumulate_cmap_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::CMAP),
+                                     cmap_nrg_limits.x, cmap_nrg_limits.y - cmap_nrg_limits.x);
+      accumulate_infr14_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::INFR14),
+                                       infr14_nrg_limits.x,
+                                       infr14_nrg_limits.y - infr14_nrg_limits.x);
+      accumulate_rposn_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::RPOSN),
+                                      rposn_nrg_limits.x, rposn_nrg_limits.y - rposn_nrg_limits.x);
+      accumulate_rbond_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::RBOND),
+                                      rbond_nrg_limits.x, rbond_nrg_limits.y - rbond_nrg_limits.x);
+      accumulate_rangl_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::RANGL),
+                                      rangl_nrg_limits.x, rangl_nrg_limits.y - rangl_nrg_limits.x);
+      accumulate_rdihe_energy.putHost(all_vwu[i][j].getAccumulationFlags(VwuTask::RDIHE),
+                                      rdihe_nrg_limits.x, rdihe_nrg_limits.y - rdihe_nrg_limits.x);
 
-      // CHECK
-      if (cbnd_nrg_mask.size() != static_cast<size_t>(cbnd_nrg_limits.y - cbnd_nrg_limits.x)) {
-        printf("mask size = %4zu and limits imply %4d - %4d = %4d\n", cbnd_nrg_mask.size(),
-               cbnd_nrg_limits.y, cbnd_nrg_limits.x, cbnd_nrg_limits.y - cbnd_nrg_limits.x);
+      // Upload the term instructions
+      cbnd_instructions.putHost(all_vwu[i][j].getCompositeBondInstructions(), cbnd_limits.x,
+                                cbnd_limits.y - cbnd_limits.x);
+      angl_instructions.putHost(all_vwu[i][j].getAngleInstructions(), angl_limits.x,
+                                angl_limits.y - angl_limits.x);
+      const std::vector<uint3> cdhe_insr = all_vwu[i][j].getCompositeDihedralInstructions();
+      uint2* uint2_ptr = cdhe_instructions.data();
+      uint* uint_ptr = cdhe_overtones.data();
+      for (int k = cdhe_limits.x; k < cdhe_limits.y; k++) {
+        uint2_ptr[k].x = cdhe_insr[k - cdhe_limits.x].x;
+        uint2_ptr[k].y = cdhe_insr[k - cdhe_limits.x].y;
+        uint_ptr[k]    = cdhe_insr[k - cdhe_limits.x].z;
       }
-      // END CHECK
-      
-      for (int k = cbnd_nrg_limits.x; k < cbnd_nrg_limits.y; k++) {
-        uint_ptr[k] = cbnd_nrg_mask[k - cbnd_nrg_limits.x];
-      }
-      const std::vector<uint> angl_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::ANGL);
-      uint_ptr = accumulate_angl_energy.data();
-      for (int k = angl_nrg_limits.x; k < angl_nrg_limits.y; k++) {
-        uint_ptr[k] = angl_nrg_mask[k - angl_nrg_limits.x];
-      }
-      const std::vector<uint> cdhe_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::CDHE);
-      uint_ptr = accumulate_cdhe_energy.data();
-      for (int k = cdhe_nrg_limits.x; k < cdhe_nrg_limits.y; k++) {
-        uint_ptr[k] = cdhe_nrg_mask[k - cdhe_nrg_limits.x];
-      }
-      const std::vector<uint> cmap_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::CMAP);
-      uint_ptr = accumulate_cmap_energy.data();
-      for (int k = cmap_nrg_limits.x; k < cmap_nrg_limits.y; k++) {
-        uint_ptr[k] = cmap_nrg_mask[k - cmap_nrg_limits.x];
-      }
-      const std::vector<uint> infr14_nrg_mask =
-        all_vwu[i][j].getAccumulationFlags(VwuTask::INFR14);
-      uint_ptr = accumulate_infr14_energy.data();
-      for (int k = infr14_nrg_limits.x; k < infr14_nrg_limits.y; k++) {
-        uint_ptr[k] = infr14_nrg_mask[k - infr14_nrg_limits.x];
-      }
-      const std::vector<uint> rposn_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RPOSN);
-      uint_ptr = accumulate_rposn_energy.data();
-      for (int k = rposn_nrg_limits.x; k < rposn_nrg_limits.y; k++) {
-        uint_ptr[k] = rposn_nrg_mask[k - rposn_nrg_limits.x];
-      }
-      const std::vector<uint> rbond_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RBOND);
-      uint_ptr = accumulate_rbond_energy.data();
-      for (int k = rbond_nrg_limits.x; k < rbond_nrg_limits.y; k++) {
-        uint_ptr[k] = rbond_nrg_mask[k - rbond_nrg_limits.x];
-      }
-      const std::vector<uint> rangl_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RANGL);
-      uint_ptr = accumulate_rangl_energy.data();
-      for (int k = rangl_nrg_limits.x; k < rangl_nrg_limits.y; k++) {
-        uint_ptr[k] = rangl_nrg_mask[k - rangl_nrg_limits.x];
-      }
-      const std::vector<uint> rdihe_nrg_mask = all_vwu[i][j].getAccumulationFlags(VwuTask::RDIHE);
-      uint_ptr = accumulate_rdihe_energy.data();
-      for (int k = rdihe_nrg_limits.x; k < rdihe_nrg_limits.y; k++) {
-        uint_ptr[k] = rdihe_nrg_mask[k - rdihe_nrg_limits.x];
-      }
+      cmap_instructions.putHost(all_vwu[i][j].getCmapInstructions(), cmap_limits.x,
+                                cmap_limits.y - cmap_limits.x);
+      infr14_instructions.putHost(all_vwu[i][j].getInferred14Instructions(), infr14_limits.x,
+                                  infr14_limits.y - infr14_limits.x);
+      rposn_instructions.putHost(all_vwu[i][j].getPositionalRestraintInstructions(),
+                                 rposn_limits.x, rposn_limits.y - rposn_limits.x);
+      rbond_instructions.putHost(all_vwu[i][j].getDistanceRestraintInstructions(), rbond_limits.x,
+                                 rbond_limits.y - rbond_limits.x);
+      rangl_instructions.putHost(all_vwu[i][j].getAngleRestraintInstructions(), rangl_limits.x,
+                                 rangl_limits.y - rangl_limits.x);
+      rdihe_instructions.putHost(all_vwu[i][j].getDihedralRestraintInstructions(), rdihe_limits.x,
+                                 rdihe_limits.y - rdihe_limits.x);
+      vste_instructions.putHost(all_vwu[i][j].getVirtualSiteInstructions(), vste_limits.x,
+                                vste_limits.y - vste_limits.x);
+      cnst_instructions.putHost(all_vwu[i][j].getConstraintGroupInstructions(), cnst_limits.x,
+                                cnst_limits.y - cnst_limits.x);
       vwu_idx++;
     }
   }
@@ -2987,6 +3031,48 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
           std::to_string(system_count) + " systems.", "AtomGraphSynthesis", "getPBRadiiSet");
   }
   return pb_radii_sets[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+SyValenceKit<double>
+AtomGraphSynthesis::getDoublePrecisionValenceKit(const HybridTargetLevel tier) const {
+  return SyValenceKit<double>(total_valence_work_units, bond_stiffnesses.data(tier),
+                              bond_equilibria.data(tier), angl_stiffnesses.data(tier),
+                              angl_equilibria.data(tier), dihe_amplitudes.data(tier),
+                              dihe_periodicities.data(tier), dihe_phase_angles.data(tier),
+                              attn14_elec_factors.data(tier), attn14_vdw_factors.data(tier),
+                              ubrd_stiffnesses.data(tier), ubrd_equilibria.data(tier),
+                              cimp_stiffnesses.data(tier), cimp_phase_angles.data(tier),
+                              cmap_surface_dimensions.data(tier), cmap_patches.data(tier),
+                              cmap_patch_bounds.data(tier), vwu_instruction_sets.data(tier),
+                              vwu_import_lists.data(tier), vwu_manipulation_masks.data(tier),
+                              cbnd_instructions.data(tier), angl_instructions.data(tier),
+                              cdhe_instructions.data(tier), cdhe_overtones.data(tier),
+                              cmap_instructions.data(tier), infr14_instructions.data(tier),
+                              accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
+                              accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
+                              accumulate_infr14_energy.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+SyValenceKit<float>
+AtomGraphSynthesis::getSinglePrecisionValenceKit(const HybridTargetLevel tier) const {
+  return SyValenceKit<float>(total_valence_work_units, sp_bond_stiffnesses.data(tier),
+                             sp_bond_equilibria.data(tier), sp_angl_stiffnesses.data(tier),
+                             sp_angl_equilibria.data(tier), sp_dihe_amplitudes.data(tier),
+                             sp_dihe_periodicities.data(tier), sp_dihe_phase_angles.data(tier),
+                             sp_attn14_elec_factors.data(tier), sp_attn14_vdw_factors.data(tier),
+                             sp_ubrd_stiffnesses.data(tier), sp_ubrd_equilibria.data(tier),
+                             sp_cimp_stiffnesses.data(tier), sp_cimp_phase_angles.data(tier),
+                             cmap_surface_dimensions.data(tier), sp_cmap_patches.data(tier),
+                             cmap_patch_bounds.data(tier), vwu_instruction_sets.data(tier),
+                             vwu_import_lists.data(tier), vwu_manipulation_masks.data(tier),
+                             cbnd_instructions.data(tier), angl_instructions.data(tier),
+                             cdhe_instructions.data(tier), cdhe_overtones.data(tier),
+                             cmap_instructions.data(tier), infr14_instructions.data(tier),
+                             accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
+                             accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
+                             accumulate_infr14_energy.data(tier));
 }
 
 #ifdef OMNI_USE_HPC

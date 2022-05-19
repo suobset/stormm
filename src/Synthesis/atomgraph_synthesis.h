@@ -8,12 +8,14 @@
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "UnitTesting/stopwatch.h"
+#include "synthesis_abstracts.h"
 #include "valence_workunit.h"
 
 namespace omni {
 namespace synthesis {
 
 using card::Hybrid;
+using card::HybridTargetLevel;
 using constants::ExceptionResponse;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
@@ -151,6 +153,20 @@ public:
   std::vector<std::string> getPBRadiiSet(int low_limit, int high_limit) const;
   std::string getPBRadiiSet(int index) const;
   /// \}
+
+  /// \brief Get a minimal kit with double-precision parameter detail for computing valence
+  ///        interactions for all systems based on the work units stored in this object.
+  ///
+  /// \param tier  Level at which to obtain pointers for the abstract
+  SyValenceKit<double>
+  getDoublePrecisionValenceKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get a minimal kit with single-precision parameter detail for computing valence
+  ///        interactions for all systems based on the work units stored in this object.
+  ///
+  /// \param tier  Level at which to obtain pointers for the abstract
+  SyValenceKit<float>
+  getSinglePrecisionValenceKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 #ifdef OMNI_USE_HPC
   /// \brief Upload the object
@@ -441,30 +457,35 @@ private:
                                         ///<   precision (see description in Topology/atomgraph.h).
 
   // Basic force field valence term details, consensus tables form all topologies
-  Hybrid<double> bond_stiffnesses;      ///< Stiffness of each bond stretch, kcal/mol-A^2
-  Hybrid<double> bond_equilibria;       ///< Equilibrium lengths of all bonds, A
-  Hybrid<double> angl_stiffnesses;      ///< Stiffness of each angle bend, kcal/mol-rad^2
-  Hybrid<double> angl_equilibria;       ///< Equilibrium angle for all bending terms, radians
-  Hybrid<double> dihe_amplitudes;       ///< Amplitudes of each dihedral cosine term, kcal/mol
-  Hybrid<double> dihe_periodicities;    ///< Periodicity of each dihedral / torsion cosine term
-  Hybrid<double> dihe_phase_angles;     ///< Phase angle of each dihedral / torsion cosine term
-  Hybrid<double> attn14_elec_factors;   ///< Attenuated 1:4 non-bonded interaction electrostatic
-                                        ///<   scaling factors
-  Hybrid<double> attn14_vdw_factors;    ///< Attenuated 1:4 non-bonded interaction van-der Waals
-                                        ///<   scaling factors
-  Hybrid<float> sp_bond_stiffnesses;    ///< Stiffness of each bond stretch (single precision)
-  Hybrid<float> sp_bond_equilibria;     ///< Equilibrium lengths of all bonds (single precision)
-  Hybrid<float> sp_angl_stiffnesses;    ///< Angle bending stiffnesses (single precision)
-  Hybrid<float> sp_angl_equilibria;     ///< Angle bending equilibria (single precision)
-  Hybrid<float> sp_dihe_amplitudes;     ///< Amplitudes of torsion cosine terms (single precision)
-  Hybrid<float> sp_dihe_periodicities;  ///< Periodicities of torsion terms (single precision)
-  Hybrid<float> sp_dihe_phase_angles;   ///< Phase angles of torsion terms (single precision)
-  Hybrid<double> valparam_double_data;  ///< Valence parameter double-pecision data
-  Hybrid<float> valparam_float_data;    ///< Valence parameter single-pecision data
-  Hybrid<int> valparam_int_data;        ///< Valence parameter integer data (for CMAP sizes and
-                                        ///<   bounds)
-  Hybrid<int2> valparam_int2_data;      ///< Valence parameter int2 data (this is for the parameter
-                                        ///<   bounds arrays, i.e. bond_param_map_bounds)
+  Hybrid<double> bond_stiffnesses;       ///< Stiffness of each bond stretch, kcal/mol-A^2
+  Hybrid<double> bond_equilibria;        ///< Equilibrium lengths of all bonds, A
+  Hybrid<double> angl_stiffnesses;       ///< Stiffness of each angle bend, kcal/mol-rad^2
+  Hybrid<double> angl_equilibria;        ///< Equilibrium angle for all bending terms, radians
+  Hybrid<double> dihe_amplitudes;        ///< Amplitudes of each dihedral cosine term, kcal/mol
+  Hybrid<double> dihe_periodicities;     ///< Periodicity of each dihedral / torsion cosine term
+  Hybrid<double> dihe_phase_angles;      ///< Phase angle of each dihedral / torsion cosine term
+  Hybrid<double> attn14_elec_factors;    ///< Attenuated 1:4 non-bonded interaction electrostatic
+                                         ///<   scaling factors
+  Hybrid<double> attn14_vdw_factors;     ///< Attenuated 1:4 non-bonded interaction van-der Waals
+                                         ///<   scaling factors
+  Hybrid<float> sp_bond_stiffnesses;     ///< Stiffness of each bond stretch (single precision)
+  Hybrid<float> sp_bond_equilibria;      ///< Equilibrium lengths of all bonds (single precision)
+  Hybrid<float> sp_angl_stiffnesses;     ///< Angle bending stiffnesses (single precision)
+  Hybrid<float> sp_angl_equilibria;      ///< Angle bending equilibria (single precision)
+  Hybrid<float> sp_dihe_amplitudes;      ///< Amplitudes of torsion cosine terms (single precision)
+  Hybrid<float> sp_dihe_periodicities;   ///< Periodicities of torsion terms (single precision)
+  Hybrid<float> sp_dihe_phase_angles;    ///< Phase angles of torsion terms (single precision)
+  Hybrid<float> sp_attn14_elec_factors;  ///< Attenuated 1:4 non-bonded interaction electrostatic
+                                         ///<   scaling factors
+  Hybrid<float> sp_attn14_vdw_factors;   ///< Attenuated 1:4 non-bonded interaction van-der Waals
+                                         ///<   scaling factors
+  Hybrid<double> valparam_double_data;   ///< Valence parameter double-pecision data
+  Hybrid<float> valparam_float_data;     ///< Valence parameter single-pecision data
+  Hybrid<int> valparam_int_data;         ///< Valence parameter integer data (for CMAP sizes and
+                                         ///<   bounds)
+  Hybrid<int2> valparam_int2_data;       ///< Valence parameter int2 data (this is for the
+                                         ///<   parameter bounds arrays, i.e.
+                                         ///<   bond_param_map_bounds)
   
   // Valence term indexing arrays, all of them indexing atoms in the synthesis list, updated from
   // the indexing in their original topologies and parameters in the condensed tables of the
@@ -692,7 +713,10 @@ private:
                                         ///<   four-point dihedral angle restraint
   Hybrid<int> rposn_kr_param_map;       ///< Positional restraint K-R parameter maps
   Hybrid<int> rposn_xyz_param_map;      ///< Positional restraint X-Y-Z parameter maps
-  Hybrid<int2> rposn_param_map_bounds;  ///< Positional restraint parameter map bounds
+  Hybrid<int2> rposn_param_map_bounds;  ///< Positional restraint parameter map bounds (this
+                                        ///<   applies to both the K-R and X-Y-Z parameter maps as
+                                        ///<   the individual topologies make every restraint a
+                                        ///<   unique parameter set)
   Hybrid<int> rbond_param_map;          ///< Distance restraint parameter maps
   Hybrid<int2> rbond_param_map_bounds;  ///< Distance restraint parameter map bounds
   Hybrid<int> rangl_param_map;          ///< Three-point angle restraint parameter maps
@@ -787,6 +811,7 @@ private:
   // atoms, then computes a series of bond, angle, dihedral, and other force field terms based on
   // the cached atoms.  Forces are accumulated on all atoms in __shared__ memory and then
   // contributed back to the global arrays.
+  int total_valence_work_units;  ///< Total count of valence work units spanning all systems
 
   /// Instruction sets for the bond work units, storing integers for the low (_L nomenclature) and
   /// high (_H nomeclature) limits of all the types of interactions in a given work unit.  Each

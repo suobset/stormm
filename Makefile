@@ -180,6 +180,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
+		   $(SRCDIR)/Synthesis/synthesis_abstracts.h \
 		   $(SRCDIR)/Synthesis/synthesis_enumerators.h \
 		   $(SRCDIR)/Synthesis/systemcache.h \
 		   $(SRCDIR)/Synthesis/valence_workunit.h \
@@ -233,6 +234,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Structure/local_arrangement.tpp \
 		 $(SRCDIR)/Structure/rmsd.tpp \
 		 $(SRCDIR)/Structure/virtual_site_handling.tpp \
+		 $(SRCDIR)/Synthesis/synthesis_abstracts.tpp \
 		 $(SRCDIR)/Topology/atomgraph.tpp \
 		 $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
 		 $(SRCDIR)/Topology/topology_util.tpp \
