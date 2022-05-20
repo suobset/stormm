@@ -35,6 +35,28 @@ using trajectory::PhaseSpace;
 /// \param sysid     Index of the system of interest, the one to initialize
 void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid);
 
+/// \brief Commit the energy results from evaluating one ValenceWorkUnit object or equivalent.
+///         This function is abstracted to also work in the context of a synthesis evaluation.
+///
+/// \param bond_acc  Accumulated harmonic bond energy (this and all subsequent energies are given
+///                  in a fixed-precision representation)
+/// \param angl_acc  Accumulated harmonic angle energy
+/// \param dihe_acc  Accumulated cosine-based dihedral energy
+/// \param impr_acc  Accumulated cosine-based improper dihedral energy
+/// \param ubrd_acc  Accumulated Urey-Bradley stretching energy
+/// \param cimp_acc  Accumulated harmonic improper dihedral energy
+/// \param cmap_acc  Accumulated CMAP energy
+/// \param qq14_acc  Accumulated electrostatic attenuated 1:4 interaction energy
+/// \param lj14_acc  Accumulated van-der Waals attenuated 1:4 interaction energy
+/// \param rest_acc  Accumulated restraint energy
+/// \param sysid     System index to assign the energies into
+/// \param activity  Activity that took place in order to accumulate one or more energy quantities
+/// \param ecard     Energy tracking object
+void commitVwuEnergies(llint bond_acc, llint angl_acc, llint dihe_acc, llint impr_acc,
+                       llint ubrd_acc, llint cimp_acc, llint cmap_acc, llint qq14_acc,
+                       llint lj14_acc, llint rest_acc, int sysid, VwuTask activity,
+                       ScoreCard *ecard);
+  
 /// \brief Carry out the local evaluations need for each valence work unit using locally cached
 ///        data.  This routine makes no assumptions about const-ness of the coordinates to permit
 ///        maximum flexibility.

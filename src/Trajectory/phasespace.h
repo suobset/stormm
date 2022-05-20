@@ -151,7 +151,8 @@ public:
   /// \param file_kind     The type of coordinate-containing input file
   /// \param frame_number  The frame number to read (if the file is a trajectory, not a single
   ///                      point from the system's phase space)
-  void buildFromFile(const std::string &file_name_in, const CoordinateFileKind file_kind,
+  void buildFromFile(const std::string &file_name_in,
+                     const CoordinateFileKind file_kind = CoordinateFileKind::UNKNOWN,
                      int frame_number = 0);
 
   /// \brief Get the name of the file associated with this object.

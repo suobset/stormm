@@ -212,7 +212,7 @@ public:
   ///   - Take arrays of PhaseSpace objects and AtomGraph pointers
   ///   - Take a SystemCache object and unpack it
   ///
-  /// \param ps            Input coordinates, velocities, and forces object
+  /// \param ps_list       Array of input coordinates, velocities, and forces objects
   /// \param time_step_in  The initial time step (will be converted to integer representation as
   ///                      described above, default 1.0fs which converts to llint(8))
   /// \param heat_bath_in  A thermostat to govern integration of the equations of motion

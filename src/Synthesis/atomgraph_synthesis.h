@@ -74,6 +74,11 @@ public:
   /// \brief Get the number of unique topologies described by the synthesis
   int getTopologyCount() const;
 
+  /// \brief Get a const topology pointer for a specific system contained within the synthesis.
+  ///
+  /// \param system_index  Index of the system of interest
+  AtomGraph* getTopologyPointer(int system_index) const;
+  
   /// \brief Get the number of systems that this synthesis describes
   int getSystemCount() const;
 

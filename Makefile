@@ -157,6 +157,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Potential/energy_abstracts.h \
 	           $(SRCDIR)/Potential/energy_enumerators.h \
 	           $(SRCDIR)/Potential/eval_valence_workunit.h \
+	           $(SRCDIR)/Potential/eval_synthesis.h \
 	           $(SRCDIR)/Potential/forward_exclusionmask.h \
 	           $(SRCDIR)/Potential/nonbonded_potential.h \
 	           $(SRCDIR)/Potential/scorecard.h \
@@ -224,6 +225,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \
+		 $(SRCDIR)/Potential/eval_synthesis.tpp \
 		 $(SRCDIR)/Potential/nonbonded_potential.tpp \
 		 $(SRCDIR)/Potential/scorecard.tpp \
 		 $(SRCDIR)/Potential/valence_potential.tpp \
@@ -367,12 +369,12 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 	          $(TESTDIR)/bin/test_amber_prmtop \
 	          $(TESTDIR)/bin/test_topology_mods \
 	          $(TESTDIR)/bin/test_amber_coordinates \
-	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_chemical_features \
 	          $(TESTDIR)/bin/test_atommask \
 	          $(TESTDIR)/bin/test_local_arrangement \
 	          $(TESTDIR)/bin/test_isomerization \
 		  $(TESTDIR)/bin/test_synthesis \
+	          $(TESTDIR)/bin/test_atomgraph_synthesis \
 	          $(TESTDIR)/bin/test_valence_evaluation \
 	          $(TESTDIR)/bin/test_nonbonded_evaluation \
 	          $(TESTDIR)/bin/test_generalized_born \
@@ -494,13 +496,6 @@ $(TESTDIR)/bin/test_topology_mods : $(LIBDIR)/libomni.so $(TESTDIR)/Topology/tes
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_topology_mods \
 	  $(TESTDIR)/Topology/test_topology_mods.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
-# Target: prmtop collating object test program
-$(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libomni.so \
-					  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp
-	@echo "[OMNI]  Building test_atomgraph_synthesis..."
-	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_atomgraph_synthesis \
-	  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
-
 # Target: trajectory and restart reading program
 $(TESTDIR)/bin/test_amber_coordinates : $(LIBDIR)/libomni.so \
 					$(TESTDIR)/Trajectory/test_amber_coordinates.cpp
@@ -547,6 +542,13 @@ $(TESTDIR)/bin/test_synthesis : $(LIBDIR)/libomni.so \
 	@echo "[OMNI]  Building test_synthesis..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_synthesis \
 	  $(TESTDIR)/Synthesis/test_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+
+# Target: prmtop collating object test program
+$(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libomni.so \
+					  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp
+	@echo "[OMNI]  Building test_atomgraph_synthesis..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_atomgraph_synthesis \
+	  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: valence term evaluation by the most basic CPU routines
 $(TESTDIR)/bin/test_valence_evaluation : $(LIBDIR)/libomni.so \

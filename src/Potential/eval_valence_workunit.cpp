@@ -57,7 +57,60 @@ void evalVwuInitEnergy(ScoreCard *ecard, const VwuTask activity, const int sysid
     break;
   }  
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+void commitVwuEnergies(const llint bond_acc, const llint angl_acc, const llint dihe_acc,
+                       const llint impr_acc, const llint ubrd_acc, const llint cimp_acc,
+                       const llint cmap_acc, const llint qq14_acc, const llint lj14_acc,
+                       const llint rest_acc, const int sysid, const VwuTask activity,
+                       ScoreCard *ecard) {
+  switch (activity) {
+  case VwuTask::BOND:
+    ecard->add(StateVariable::BOND, bond_acc, sysid);
+    break;
+  case VwuTask::ANGL:
+    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
+    break;
+  case VwuTask::DIHE:
+    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
+    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
+    break;
+  case VwuTask::UBRD:
+    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
+    break;
+  case VwuTask::CIMP:
+    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
+    break;
+  case VwuTask::CMAP:
+    ecard->add(StateVariable::CMAP, cmap_acc, sysid);
+    break;
+  case VwuTask::INFR14:
+    ecard->add(StateVariable::ELECTROSTATIC_ONE_FOUR, qq14_acc, sysid);
+    ecard->add(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
+    break;
+  case VwuTask::RPOSN:
+  case VwuTask::RBOND:
+  case VwuTask::RANGL:
+  case VwuTask::RDIHE:
+    ecard->add(StateVariable::RESTRAINT, rest_acc, sysid);
+    break;
+  case VwuTask::SETTLE:
+  case VwuTask::CGROUP:
+  case VwuTask::VSITE:
+  case VwuTask::CDHE:
+  case VwuTask::CBND:
+    break;
+  case VwuTask::ALL_TASKS:
+    ecard->add(StateVariable::BOND, bond_acc, sysid);
+    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
+    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
+    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
+    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
+    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
+    break;
+  }
+}
+
 //-------------------------------------------------------------------------------------------------
 void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
                         const NonbondedKit<double> nbk,
@@ -121,10 +174,10 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                                     sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         if (is_urey_bradley) {
-          ubrd_acc += static_cast<llint>(llround(du * nrg_scale_factor));
+          ubrd_acc += llround(du * nrg_scale_factor);
         }
         else {
-          bond_acc += static_cast<llint>(llround(du * nrg_scale_factor));
+          bond_acc += llround(du * nrg_scale_factor);
         }
       }
     }
@@ -159,7 +212,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                                  UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
                                                  eval_force);
       if (log_term) {
-        angl_acc += static_cast<llint>(llround(du * nrg_scale_factor));
+        angl_acc += llround(du * nrg_scale_factor);
       }
     }
   }
@@ -199,8 +252,8 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                      nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc,
                                      sh_zfrc, eval_force, eval_force);
           if (log_term) {
-            qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
-            lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
+            qq14_acc += llround(uc.x * nrg_scale_factor);
+            lj14_acc += llround(uc.y * nrg_scale_factor);
           }
         }
         if (activity == VwuTask::INFR14) {
@@ -249,7 +302,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
         sangle = theta - vk.cimp_phi[param_idx];
         double contrib = stiffness * sangle * sangle;
         if (log_term) {
-          cimp_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));          
+          cimp_acc += llround(contrib * nrg_scale_factor);
         }
       }
       else {
@@ -270,10 +323,10 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
         }
         if (log_term) {
           if (kind == TorsionKind::PROPER) {
-            dihe_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));          
+            dihe_acc += llround(contrib * nrg_scale_factor);
           }
           else {
-            impr_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+            impr_acc += llround(contrib * nrg_scale_factor);
           }
         }
       }
@@ -365,7 +418,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                       nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
                                       sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
-        cmap_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+        cmap_acc += llround(contrib * nrg_scale_factor);
       }
     }
   }
@@ -408,8 +461,8 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                  nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
                                  eval_force, eval_force);
       if (log_term) {
-        qq14_acc += static_cast<llint>(llround(uc.x * nrg_scale_factor));
-        lj14_acc += static_cast<llint>(llround(uc.y * nrg_scale_factor));
+        qq14_acc += llround(uc.x * nrg_scale_factor);
+        lj14_acc += llround(uc.y * nrg_scale_factor);
       }
     }
   }
@@ -445,7 +498,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                           nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
                           eval_force);
       if (log_term) {
-        rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+        rest_acc += llround(contrib * nrg_scale_factor);
       }
     }
   }
@@ -482,7 +535,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                    sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
                                    sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
-        rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+        rest_acc += llround(contrib * nrg_scale_factor);
       }
     }
   }
@@ -520,7 +573,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                    sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
                                    sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
-        rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+        rest_acc += llround(contrib * nrg_scale_factor);
       }
     }
   }
@@ -559,57 +612,14 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                                    sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
                                    sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
-        rest_acc += static_cast<llint>(llround(contrib * nrg_scale_factor));
+        rest_acc += llround(contrib * nrg_scale_factor);
       }
     }
   }  
 
   // Contribute results as the instantaneous states
-  switch (activity) {
-  case VwuTask::BOND:
-    ecard->add(StateVariable::BOND, bond_acc, sysid);
-    break;
-  case VwuTask::ANGL:
-    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
-    break;
-  case VwuTask::DIHE:
-    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
-    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
-    break;
-  case VwuTask::UBRD:
-    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
-    break;
-  case VwuTask::CIMP:
-    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
-    break;
-  case VwuTask::CMAP:
-    ecard->add(StateVariable::CMAP, cmap_acc, sysid);
-    break;
-  case VwuTask::INFR14:
-    ecard->add(StateVariable::ELECTROSTATIC_ONE_FOUR, qq14_acc, sysid);
-    ecard->add(StateVariable::VDW_ONE_FOUR, lj14_acc, sysid);
-    break;
-  case VwuTask::RPOSN:
-  case VwuTask::RBOND:
-  case VwuTask::RANGL:
-  case VwuTask::RDIHE:
-    ecard->add(StateVariable::RESTRAINT, rest_acc, sysid);
-    break;
-  case VwuTask::SETTLE:
-  case VwuTask::CGROUP:
-  case VwuTask::VSITE:
-  case VwuTask::CDHE:
-  case VwuTask::CBND:
-    break;
-  case VwuTask::ALL_TASKS:
-    ecard->add(StateVariable::BOND, bond_acc, sysid);
-    ecard->add(StateVariable::ANGLE, angl_acc, sysid);
-    ecard->add(StateVariable::PROPER_DIHEDRAL, dihe_acc, sysid);
-    ecard->add(StateVariable::IMPROPER_DIHEDRAL, impr_acc, sysid);
-    ecard->add(StateVariable::UREY_BRADLEY, ubrd_acc, sysid);
-    ecard->add(StateVariable::CHARMM_IMPROPER, cimp_acc, sysid);
-    break;
-  }
+  commitVwuEnergies(bond_acc, angl_acc, dihe_acc, impr_acc, ubrd_acc, cimp_acc, cmap_acc,
+                    qq14_acc, lj14_acc, rest_acc, sysid, activity, ecard);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -611,14 +611,16 @@ void AtomGraphSynthesis::checkCommonSettings() {
   bool diel_problem = false;
   bool salt_problem = false;
   bool coul_problem = false;
+  bool box_problem = false;
   for (int i = 1; i < topology_count; i++) {
-    ism_problem =  (ism_problem  || (topologies[i]->getImplicitSolventModel() != gb_style));
+    ism_problem  = (ism_problem  || (topologies[i]->getImplicitSolventModel() != gb_style));
     diel_problem = (diel_problem ||
                     appr_dielcon.test(topologies[i]->getDielectricConstant()) == false);
     salt_problem = (salt_problem ||
                     appr_saltcon.test(topologies[i]->getSaltConcentration()) == false);
     coul_problem = (coul_problem ||
                     appr_coulomb.test(topologies[i]->getCoulombConstant()) == false);
+    box_problem  = (box_problem  || (topologies[i]->getUnitCellType() != periodic_box_class));
   }
   if (ism_problem) {
     switch (policy) {
@@ -682,6 +684,12 @@ void AtomGraphSynthesis::checkCommonSettings() {
     case ExceptionResponse::SILENT:
       break;
     }
+  }
+  if (box_problem) {
+    rtErr("All topologies must have consistent periodic or isolated boundary conditions.  "
+          "The first topology is \"" + getUnitCellTypeName(periodic_box_class) + "\" but "
+          "subsequent topologies are different.  No rememdy is available.", "AtomGraphSynthesis",
+          "checkCommonSettings");
   }
 }
 
@@ -2891,6 +2899,16 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
 //-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getTopologyCount() const {
   return topology_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+AtomGraph* AtomGraphSynthesis::getTopologyPointer(const int system_index) const {
+  if (system_index < 0 || system_index >= system_count) {
+    rtErr("A synthesis with " + std::to_string(system_count) + " systems cannot produce a "
+          "topology relating to system index " + std::to_string(system_index) + ".",
+          "AtomGraphSynthesis", "getTopologyPointer");
+  }
+  return topologies[topology_indices.readHost(system_index)];
 }
 
 //-------------------------------------------------------------------------------------------------
