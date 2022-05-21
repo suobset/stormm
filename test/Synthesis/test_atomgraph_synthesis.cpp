@@ -1,5 +1,6 @@
 #include <vector>
 #include "../../src/Constants/behavior.h"
+#include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Potential/energy_enumerators.h"
@@ -7,23 +8,28 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/synthesis_abstracts.h"
 #include "../../src/Synthesis/synthesis_enumerators.h"
+#include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
-using omni::random::Ran2Generator;
+using omni::data_types::double2;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
 using omni::energy::evalSyValenceEnergy;
 using omni::energy::EvaluateForce;
 using omni::energy::ScoreCard;
+using omni::energy::StateVariable;
 using omni::errors::rtWarn;
+using omni::random::Ran2Generator;
+using omni::restraints::RestraintApparatus;
 using namespace omni::synthesis;
 using namespace omni::topology;
 using namespace omni::trajectory;
@@ -166,13 +172,43 @@ int main(const int argc, const char* argv[]) {
   ScoreCard sc(ps_list.size(), 1, 32);
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::BOND,
                               VwuGoal::ACCUMULATE_FORCES, 0);
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::ANGL,
+                              VwuGoal::ACCUMULATE_FORCES, 0);
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::INFR14,
+                              VwuGoal::ACCUMULATE_FORCES, 0);
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::DIHE,
+                              VwuGoal::ACCUMULATE_FORCES, 0);
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::UBRD,
+                              VwuGoal::ACCUMULATE_FORCES, 0);
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::CIMP,
+                              VwuGoal::ACCUMULATE_FORCES, 0);
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::CMAP,
+                              VwuGoal::ACCUMULATE_FORCES, 0);
 
   // CHECK
+#if 0
   for (int i = 0; i < poly_ag.getSystemCount(); i++) {
     ScoreCard tmp_sc(1, 1, 32);
-    printf("System  %4d : %9.4lf / %9.4lf\n", i, sc.reportTotalEnergy(i),
-           evaluateBondTerms(ag_list[i], &ps_list[i], &tmp_sc));
+    const double2 e14 = evaluateAttenuated14Terms(ag_list[i], &ps_list[i], &tmp_sc);
+    const double2 edh = evaluateDihedralTerms(ag_list[i], &ps_list[i], &tmp_sc);
+    printf("System  %4d : %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf\n", i,
+           sc.reportInstantaneousStates(StateVariable::BOND, i),
+           sc.reportInstantaneousStates(StateVariable::ANGLE, i),
+           sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i),
+           sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i),
+           sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, i),
+           sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, i),
+           sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, i),
+           sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, i),
+           sc.reportInstantaneousStates(StateVariable::CMAP, i));
+    printf("             : %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf\n",
+           evaluateBondTerms(ag_list[i], &ps_list[i], &tmp_sc),
+           evaluateAngleTerms(ag_list[i], &ps_list[i], &tmp_sc), e14.x, e14.y, edh.x, edh.y,
+           evaluateUreyBradleyTerms(ag_list[i], &ps_list[i], &tmp_sc),
+           evaluateCharmmImproperTerms(ag_list[i], &ps_list[i], &tmp_sc),
+           evaluateCmapTerms(ag_list[i], &ps_list[i], &tmp_sc));
   }
+#endif
   // END CHECK
   
   // Summary evaluation

@@ -408,7 +408,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int l_atom = (tinsr.y & 0x3ff);
       const int m_atom = ((tinsr.y >> 10) & 0x3ff);
       const int surf_idx = (tinsr.y >> 20);
-
+      
       // Assume that, by this point, the imported atoms in the ValenceWorkUnit have been
       // arranged into an image that can be trusted for all interactions.  Avoid further
       // re-imaging of displacements inside the CMAP calculation.

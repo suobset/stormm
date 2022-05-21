@@ -2470,10 +2470,10 @@ CmapAccessories ComputeCmapDerivatives(const int cmap_surf_count,
     const int patch_offset = result.patch_matrix_bounds[i];
     for (int j = 0; j < current_stencil_size; j++) {
       for (int k = 0; k < current_stencil_size; k++) {
-        const int jk_offset = offset + (k * current_stencil_size) + j;
-        const int jpk_offset = offset + (k * current_stencil_size) +
-                               ((j < current_stencil_size - 1) * (j + 1));
-        const int jkp_offset = offset + j +
+        const int jk_offset   = offset + (k * current_stencil_size) + j;
+        const int jpk_offset  = offset + (k * current_stencil_size) +
+                                ((j < current_stencil_size - 1) * (j + 1));
+        const int jkp_offset  = offset + j +
                                 ((k < current_stencil_size - 1) * (k + 1) * current_stencil_size);
         const int jpkp_offset = offset + ((j < current_stencil_size - 1) * (j + 1)) +
                                 ((k < current_stencil_size - 1) * (k + 1) * current_stencil_size);

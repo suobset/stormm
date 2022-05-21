@@ -974,6 +974,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   int* atomic_numbers_ptr      = atomic_numbers.data();
   int* molecule_membership_ptr = molecule_membership.data();
   int* molecule_contents_ptr   = molecule_contents.data();
+  int* lj_idx_ptr              = lennard_jones_indices.data();
   double* atomic_charges_ptr   = atomic_charges.data();
   float* sp_atomic_charges_ptr = sp_atomic_charges.data();
   char4* atom_names_ptr        = atom_names.data();
@@ -1005,6 +1006,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       molecule_contents_ptr[synth_atom_base + j] = cdk.mol_contents[j] + synth_atom_base;
       atomic_charges_ptr[synth_atom_base + j] = nbk.charge[j];
       sp_atomic_charges_ptr[synth_atom_base + j] = nbk_sp.charge[j];
+      lj_idx_ptr[synth_atom_base + j] = nbk.lj_idx[j];
       atom_names_ptr[synth_atom_base + j].x = cdk.atom_names[j].x;
       atom_names_ptr[synth_atom_base + j].y = cdk.atom_names[j].y;
       atom_names_ptr[synth_atom_base + j].z = cdk.atom_names[j].z;
@@ -1586,7 +1588,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
         const int mstart = (k == i) ? j : 0;
         for (int m = mstart; m < k_vk.ncmap_surf; m++) {
           if (cmap_synthesis_index[topology_cmap_table_offsets[k] + m] < 0 &&
-              ij_cmap_dim != k_vk.cmap_dim[m] &&
+              ij_cmap_dim == k_vk.cmap_dim[m] &&
               ij_cmap_sum.test(cmap_parameter_sums[topology_cmap_table_offsets[k] + m]) &&
               maxAbsoluteDifference(ij_surf_ptr, &k_vk.cmap_surf[k_vk.cmap_surf_bounds[m]],
                                     ij_cmap_dim * ij_cmap_dim) < constants::verytiny) {
@@ -1597,8 +1599,8 @@ void AtomGraphSynthesis::condenseParameterTables() {
 
       // Catalog this unique CMAP and increment the counter
       for (int k = 0; k < ij_cmap_dim * ij_cmap_dim; k++) {
-        filtered_cmap_surf.push_back(i_vk.cmap_surf[k]);
-        sp_filtered_cmap_surf.push_back(i_vk_sp.cmap_surf[k]);
+        filtered_cmap_surf.push_back(i_vk.cmap_surf[i_vk.cmap_surf_bounds[j] + k]);
+        sp_filtered_cmap_surf.push_back(i_vk_sp.cmap_surf[i_vk_sp.cmap_surf_bounds[j] + k]);
       }
       filtered_cmap_dim.push_back(ij_cmap_dim);
       filtered_cmap_surf_bounds.push_back(filtered_cmap_surf.size());

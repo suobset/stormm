@@ -86,12 +86,12 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
       bool log_term = true;
       switch (purpose) {
       case VwuGoal::ACCUMULATE_FORCES:
-        if (readBitFromMask(&syvk.angl_acc[angl_limits.x], pos - angl_limits.x) == 0) {
+        if (readBitFromMask(&syvk.angl_acc[angl_nrg_limits.x], pos - angl_limits.x) == 0) {
           continue;
         }
         break;
       case VwuGoal::MOVE_PARTICLES:
-        log_term = readBitFromMask(&syvk.angl_acc[angl_limits.x], pos - angl_limits.x);
+        log_term = readBitFromMask(&syvk.angl_acc[angl_nrg_limits.x], pos - angl_limits.x);
         break;
       }
       const uint2 tinsr = syvk.angl_insr[pos];
@@ -115,20 +115,25 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
   // Evaluate cosine-based dihedrals and CHARMM improper dihedrals
   if (activity == VwuTask::DIHE || activity == VwuTask::CIMP || activity == VwuTask::INFR14 ||
       activity == VwuTask::ALL_TASKS) {
+    const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+    const bool tcalc_is_double = (tcalc_ct == double_type_index);
+    const Tcalc value_one = 1.0;
     const int2 cdhe_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
                                                 static_cast<int>(VwuAbstractMap::CDHE)];
     const int2 cdhe_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
                                                     static_cast<int>(VwuAbstractMap::CDHE_NRG)];
+    const int ljabc_offset = syvk.ljabc_offsets[sysid];
+    const int nljt = syvk.n_lj_types[sysid];
     for (int pos = cdhe_limits.x; pos < cdhe_limits.y; pos++) {
       bool log_term = true;
       switch (purpose) {
       case VwuGoal::ACCUMULATE_FORCES:
-        if (readBitFromMask(&syvk.cdhe_acc[cdhe_limits.x], pos - cdhe_limits.x) == 0) {
+        if (readBitFromMask(&syvk.cdhe_acc[cdhe_nrg_limits.x], pos - cdhe_limits.x) == 0) {
           continue;
         }
         break;
       case VwuGoal::MOVE_PARTICLES:
-        log_term = readBitFromMask(&syvk.cdhe_acc[cdhe_limits.x], pos - cdhe_limits.x);
+        log_term = readBitFromMask(&syvk.cdhe_acc[cdhe_nrg_limits.x], pos - cdhe_limits.x);
         break;
       }
       const uint2 tinsr = syvk.cdhe_insr[pos];
@@ -140,10 +145,10 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
           const Vec2<double> uc =
             evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, syvk.coulomb, sh_charges, sh_lj_idx,
                                      syvk.attn14_elec, syvk.attn14_vdw, syvk.lja_14_coeff,
-                                     syvk.ljb_14_coeff, syvk.ljabc_offsets[sysid],
-                                     syvk.n_lj_types[sysid], sh_xcrd, sh_ycrd, sh_zcrd, nullptr,
-                                     nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                                     eval_force, eval_force, inv_gpos_scale, force_scale);
+                                     syvk.ljb_14_coeff, ljabc_offset, nljt, sh_xcrd, sh_ycrd,
+                                     sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
+                                     sh_yfrc, sh_zfrc, eval_force, eval_force, inv_gpos_scale,
+                                     force_scale);
           if (log_term) {
             qq14_acc += llround(uc.x * nrg_scale_factor);
             lj14_acc += llround(uc.y * nrg_scale_factor);
@@ -155,9 +160,140 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
       }
       const bool is_charmm_improper = ((tinsr.x >> 30) & 0x1);
 
+      // Skip CHARMM improper interactions if only standard dihedrals are of interest, and
+      // skip standard dihedrals if only CHARMM impropers are of interest.
+      if ((activity == VwuTask::DIHE && is_charmm_improper) ||
+          (activity == VwuTask::CIMP && (! is_charmm_improper))) {
+        continue;
+      }
+      const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+      const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+      const int param_idx = ((tinsr.y >> 16) & 0xffff);
+      const bool second_term = ((tinsr.y >> 15) & 0x1);
+      const TorsionKind kind = (tinsr.x >> 31) ? TorsionKind::IMPROPER : TorsionKind::PROPER;
+      DihedralStyle dihe_style;
+      Tcalc ampl, phi, freq;
+      if (is_charmm_improper) {
+        dihe_style = DihedralStyle::HARMONIC;
+        ampl = syvk.cimp_keq[param_idx];
+        phi  = syvk.cimp_phi[param_idx];
+        freq = value_one;
+      }
+      else {
+        dihe_style = DihedralStyle::COSINE;
+        ampl = syvk.dihe_amp[param_idx];
+        phi  = syvk.dihe_phi[param_idx];
+        freq = syvk.dihe_freq[param_idx];
+      }
+      double du =
+        evalDihedralTwist<llint, llint, Tcalc>(i_atom, j_atom, k_atom, l_atom, ampl, phi, freq,
+                                               dihe_style, sh_xcrd, sh_ycrd, sh_zcrd, nullptr,
+                                               nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc,
+                                               sh_zfrc, eval_force, inv_gpos_scale, force_scale);
+      if (second_term) {
+
+        // Any second term will, by construction, be a cosine-based dihedral.  Computing it in
+        // this way foregoes the efficiency that could be gained by combining both terms into a
+        // single twist applied to the same four atoms.  GPU kernels will exploit the opportunity.
+        const uint xinsr = syvk.cdhe_ovrt_insr[pos];
+        const int param_ii_idx = (xinsr & 0xfffff);
+        const Tcalc ampl_ii = syvk.dihe_amp[param_ii_idx];
+        const Tcalc phi_ii  = syvk.dihe_phi[param_ii_idx];
+        const Tcalc freq_ii = syvk.dihe_freq[param_ii_idx];
+        du += evalDihedralTwist<llint, llint, Tcalc>(i_atom, j_atom, k_atom, l_atom, ampl_ii,
+                                                     phi_ii, freq_ii, dihe_style, sh_xcrd, sh_ycrd,
+                                                     sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                                     sh_xfrc, sh_yfrc, sh_zfrc, eval_force,
+                                                     inv_gpos_scale, force_scale);
+      }
+      if (log_term) {
+        if (kind == TorsionKind::PROPER) {
+          dihe_acc += llround(du * nrg_scale_factor);
+        }
+        else {
+          impr_acc += llround(du * nrg_scale_factor);
+        }
+      }
+    }
+  }
+
+  // Evaluate CMAP interactions
+  if (activity == VwuTask::CMAP || activity == VwuTask::ALL_TASKS) {
+    const int2 cmap_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                static_cast<int>(VwuAbstractMap::CMAP)];
+    const int2 cmap_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                    static_cast<int>(VwuAbstractMap::CMAP_NRG)];
+    for (int pos = cmap_limits.x; pos < cmap_limits.y; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(&syvk.cmap_acc[cmap_nrg_limits.x], pos - cmap_limits.x) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(&syvk.cmap_acc[cmap_nrg_limits.x], pos - cmap_limits.x);
+        break;
+      }
+      const uint2 tinsr = syvk.cmap_insr[pos];
+      const int i_atom = (tinsr.x & 0x3ff);
+      const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+      const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+      const int l_atom = (tinsr.y & 0x3ff);
+      const int m_atom = ((tinsr.y >> 10) & 0x3ff);
+      const int surf_idx = (tinsr.y >> 20);
+      const double du =
+        evalCmap<llint, llint, Tcalc>(syvk.cmap_patches, syvk.cmap_patch_bounds, surf_idx,
+                                      syvk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom,
+                                      m_atom, sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr,
+                                      UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+      if (log_term) {
+        cmap_acc += llround(du * nrg_scale_factor);
+      }
     }
   }
   
+  // Evaluate any remaining 1:4 interactions
+  if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
+    const int2 infr14_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                  static_cast<int>(VwuAbstractMap::INFR14)];
+    const int2 infr14_nrg_limits =
+      syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                         static_cast<int>(VwuAbstractMap::INFR14_NRG)];
+    const int ljabc_offset = syvk.ljabc_offsets[sysid];
+    const int nljt = syvk.n_lj_types[sysid];    
+    for (int pos = infr14_limits.x; pos < infr14_limits.y; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE_FORCES:
+        if (readBitFromMask(&syvk.infr14_acc[infr14_nrg_limits.x], pos - infr14_limits.x) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(&syvk.infr14_acc[infr14_nrg_limits.x], pos - infr14_limits.x);
+        break;
+      }
+      const uint tinsr = syvk.infr14_insr[pos];
+      const int i_atom = (tinsr & 0x3ff);
+      const int l_atom = ((tinsr >> 10) & 0x3ff);
+      const int attn_idx = (tinsr >> 20);
+      if (attn_idx == 0) {
+        continue;
+      }
+      const Vec2<double> uc =
+        evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, syvk.coulomb, sh_charges,
+                                 sh_lj_idx, syvk.attn14_elec, syvk.attn14_vdw, syvk.lja_14_coeff,
+                                 syvk.ljb_14_coeff, ljabc_offset, nljt, sh_xcrd, sh_ycrd, sh_zcrd,
+                                 nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                                 eval_force, eval_force);
+      if (log_term) {
+        qq14_acc += llround(uc.x * nrg_scale_factor);
+        lj14_acc += llround(uc.y * nrg_scale_factor);
+      }
+    }
+  }
+
   // Contribute results as the instantaneous states
   commitVwuEnergies(bond_acc, angl_acc, dihe_acc, impr_acc, ubrd_acc, cimp_acc, cmap_acc,
                     qq14_acc, lj14_acc, rest_acc, sysid, activity, ecard);
