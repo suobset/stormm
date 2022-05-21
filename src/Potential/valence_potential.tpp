@@ -1120,9 +1120,9 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
                                      const Tcalc coulomb_constant, const Tcalc* charges,
                                      const int* lj_param_idx, const Tcalc* attn14_elec_factors,
                                      const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
-                                     const Tcalc* ljb_14_coeff, const int n_lj_types,
-                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                                     const double* umat, const double* invu,
+                                     const Tcalc* ljb_14_coeff, const int ljtab_offset,
+                                     const int n_lj_types, const Tcoord* xcrd, const Tcoord* ycrd,
+                                     const Tcoord* zcrd, const double* umat, const double* invu,
                                      const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
                                      Tforce* zfrc, const EvaluateForce eval_elec_force,
                                      const EvaluateForce eval_vdw_force,
@@ -1131,7 +1131,7 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc value_one = 1.0;
   const int ilj_t = lj_param_idx[i_atom];
-  const int jlj_t = lj_param_idx[l_atom];
+  const int jlj_t = lj_param_idx[l_atom] + ljtab_offset;
   Tcalc dx, dy, dz;
   if (isSignedIntegralScalarType<Tcoord>()) {
     dx = static_cast<Tcalc>(xcrd[l_atom] - xcrd[i_atom]) * inv_gpos_factor;
@@ -1190,6 +1190,26 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
     }
   } 
   return Vec2<Tcalc>(ele_contrib, vdw_contrib);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const int attn_idx,
+                                     const Tcalc coulomb_constant, const Tcalc* charges,
+                                     const int* lj_param_idx, const Tcalc* attn14_elec_factors,
+                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                     const Tcalc* ljb_14_coeff, const int n_lj_types,
+                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                                     const double* umat, const double* invu,
+                                     const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                     Tforce* zfrc, const EvaluateForce eval_elec_force,
+                                     const EvaluateForce eval_vdw_force,
+                                     const Tcalc inv_gpos_factor, const Tcalc force_factor) {
+  return evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, coulomb_constant, charges,
+                                  lj_param_idx, attn14_elec_factors, attn14_vdw_factors,
+                                  lja_14_coeff, ljb_14_coeff, 0, n_lj_types, xcrd, ycrd, zcrd,
+                                  umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_elec_force,
+                                  eval_vdw_force, inv_gpos_factor, force_factor);
 }
 
 //-------------------------------------------------------------------------------------------------

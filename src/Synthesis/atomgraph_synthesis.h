@@ -532,22 +532,32 @@ private:
   Hybrid<int> lennard_jones_indices;            ///< Lennard-Jones indices, 0 to
                                                 ///<   atom_type_count - 1, pointed to target
                                                 ///<   chem_int_data
-  Hybrid<double2> lennard_jones_ab_coeff;       ///< Lennard-Jones A and B coefficients, a series
+  Hybrid<double> lennard_jones_a_coeff;         ///< Lennard-Jones A coefficients, a series
+                                                ///<   of tables covering all systems
+  Hybrid<double> lennard_jones_b_coeff;         ///< Lennard-Jones B coefficients, a series
                                                 ///<   of tables covering all systems
   Hybrid<double> lennard_jones_c_coeff;         ///< Lennard-Jones C coefficients, a series of
                                                 ///<   tables covering all systems
-  Hybrid<double2> lennard_jones_14_ab_coeff;    ///< Lennard-Jones A and B coefficients, a series
+  Hybrid<double> lennard_jones_14_a_coeff;      ///< Lennard-Jones A coefficients, a series
+                                                ///<   of tables covering all systems
+  Hybrid<double> lennard_jones_14_b_coeff;      ///< Lennard-Jones B coefficients, a series
                                                 ///<   of tables covering all systems
   Hybrid<double> lennard_jones_14_c_coeff;      ///< Lennard-Jones C coefficients, a series of
                                                 ///<   tables covering all systems
-  Hybrid<float2> sp_lennard_jones_ab_coeff;     ///< Lennard-Jones A and B coefficients, a series
-                                                ///<   of tables covering all systems (single
+  Hybrid<float> sp_lennard_jones_a_coeff;       ///< Lennard-Jones A coefficients, a series of
+                                                ///<   tables covering all systems (single
+                                                ///<   precision)
+  Hybrid<float> sp_lennard_jones_b_coeff;       ///< Lennard-Jones B coefficients, a series of
+                                                ///<   tables covering all systems (single
                                                 ///<   precision)
   Hybrid<float> sp_lennard_jones_c_coeff;       ///< Lennard-Jones C coefficients, a series of
                                                 ///<   tables covering all systems (single
                                                 ///<   precision)
-  Hybrid<float2> sp_lennard_jones_14_ab_coeff;  ///< Lennard-Jones A and B coefficients, a series
-                                                ///<   of tables covering all systems (single
+  Hybrid<float> sp_lennard_jones_14_a_coeff;    ///< Lennard-Jones A coefficients, a series of
+                                                ///<   tables covering all systems (single
+                                                ///<   precision)
+  Hybrid<float> sp_lennard_jones_14_b_coeff;    ///< Lennard-Jones B coefficients, a series of
+                                                ///<   tables covering all systems (single
                                                 ///<   precision)
   Hybrid<float> sp_lennard_jones_14_c_coeff;    ///< Lennard-Jones C coefficients, a series of
                                                 ///<  tables covering all systems (single

@@ -50,9 +50,10 @@ using synthesis::VwuTask;
 /// \param purpose
 /// \param step_number
 template <typename Tcalc>
-void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, llint* sh_xcrd, llint* sh_ycrd,
-                            llint* sh_zcrd, llint* sh_xvel, llint* sh_yvel, llint* sh_zvel,
-                            llint* sh_xfrc, llint* sh_yfrc, llint* sh_zfrc, double inv_gpos_scale,
+void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_charges,
+                            const int* sh_lj_idx, llint* sh_xcrd, llint* sh_ycrd, llint* sh_zcrd,
+                            llint* sh_xvel, llint* sh_yvel, llint* sh_zvel, llint* sh_xfrc,
+                            llint* sh_yfrc, llint* sh_zfrc, double inv_gpos_scale,
                             double force_scale, ScoreCard *ecard, int vwu_idx,
                             EvaluateForce eval_force, VwuTask activity, VwuGoal purpose,
                             int step_number);

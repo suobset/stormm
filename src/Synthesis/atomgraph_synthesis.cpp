@@ -234,13 +234,17 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     // Non-bonded parameters for all systems
     charge_indices{HybridKind::POINTER, "tpsyn_q_idx"},
     lennard_jones_indices{HybridKind::POINTER, "tpsyn_lj_idx"},
-    lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab"},
+    lennard_jones_a_coeff{HybridKind::ARRAY, "tpsyn_lj_a"},
+    lennard_jones_b_coeff{HybridKind::ARRAY, "tpsyn_lj_b"},
     lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c"},
-    lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab"},
+    lennard_jones_14_a_coeff{HybridKind::ARRAY, "tpsyn_lj_14_a"},
+    lennard_jones_14_b_coeff{HybridKind::ARRAY, "tpsyn_lj_14_b"},
     lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c"},
-    sp_lennard_jones_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_ab_sp"},
+    sp_lennard_jones_a_coeff{HybridKind::ARRAY, "tpsyn_lj_a_sp"},
+    sp_lennard_jones_b_coeff{HybridKind::ARRAY, "tpsyn_lj_b_sp"},
     sp_lennard_jones_c_coeff{HybridKind::ARRAY, "tpsyn_lj_c_sp"},
-    sp_lennard_jones_14_ab_coeff{HybridKind::ARRAY, "tpsyn_lj_14_ab_sp"},
+    sp_lennard_jones_14_a_coeff{HybridKind::ARRAY, "tpsyn_lj_14_a_sp"},
+    sp_lennard_jones_14_b_coeff{HybridKind::ARRAY, "tpsyn_lj_14_b_sp"},
     sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
 
     // Restraint parameters for all systems
@@ -2005,21 +2009,29 @@ void AtomGraphSynthesis::extendLJMatrices() {
   }
 
   // Allocate and fill the Lennard-Jones tables
-  lennard_jones_ab_coeff.resize(alloc_size);
+  lennard_jones_a_coeff.resize(alloc_size);
+  lennard_jones_b_coeff.resize(alloc_size);
   lennard_jones_c_coeff.resize(alloc_size);
-  lennard_jones_14_ab_coeff.resize(alloc_size);
+  lennard_jones_14_a_coeff.resize(alloc_size);
+  lennard_jones_14_b_coeff.resize(alloc_size);
   lennard_jones_14_c_coeff.resize(alloc_size);
-  sp_lennard_jones_ab_coeff.resize(alloc_size);
+  sp_lennard_jones_a_coeff.resize(alloc_size);
+  sp_lennard_jones_b_coeff.resize(alloc_size);
   sp_lennard_jones_c_coeff.resize(alloc_size);
-  sp_lennard_jones_14_ab_coeff.resize(alloc_size);
+  sp_lennard_jones_14_a_coeff.resize(alloc_size);
+  sp_lennard_jones_14_b_coeff.resize(alloc_size);
   sp_lennard_jones_14_c_coeff.resize(alloc_size);
-  double2* ab_ptr = lennard_jones_ab_coeff.data();
+  double* a_ptr = lennard_jones_a_coeff.data();
+  double* b_ptr = lennard_jones_b_coeff.data();
   double* c_ptr = lennard_jones_c_coeff.data();
-  double2* ab_14_ptr = lennard_jones_14_ab_coeff.data();
+  double* a_14_ptr = lennard_jones_14_a_coeff.data();
+  double* b_14_ptr = lennard_jones_14_b_coeff.data();
   double* c_14_ptr = lennard_jones_14_c_coeff.data();
-  float2* sp_ab_ptr = sp_lennard_jones_ab_coeff.data();
+  float* sp_a_ptr = sp_lennard_jones_a_coeff.data();
+  float* sp_b_ptr = sp_lennard_jones_b_coeff.data();
   float* sp_c_ptr = sp_lennard_jones_c_coeff.data();
-  float2* sp_ab_14_ptr = sp_lennard_jones_14_ab_coeff.data();
+  float* sp_a_14_ptr = sp_lennard_jones_14_a_coeff.data();
+  float* sp_b_14_ptr = sp_lennard_jones_14_b_coeff.data();
   float* sp_c_14_ptr = sp_lennard_jones_14_c_coeff.data();
   seek_idx = 0;
   for (int i = 0; i < topology_count; i++) {
@@ -2027,17 +2039,17 @@ void AtomGraphSynthesis::extendLJMatrices() {
       const int offset = tmp_table_offsets[i];
       for (int j = 0; j < nbkvec[i].n_lj_types * nbkvec[i].n_lj_types; j++) {
         const int joffset = offset + j;
-        ab_ptr[joffset].x = nbkvec[i].lja_coeff[j];
-        ab_ptr[joffset].y = nbkvec[i].ljb_coeff[j];
+        a_ptr[joffset] = nbkvec[i].lja_coeff[j];
+        b_ptr[joffset] = nbkvec[i].ljb_coeff[j];
         c_ptr[joffset] = nbkvec[i].ljc_coeff[j];
-        ab_14_ptr[joffset].x = nbkvec[i].lja_14_coeff[j];
-        ab_14_ptr[joffset].y = nbkvec[i].ljb_14_coeff[j];
+        a_14_ptr[joffset] = nbkvec[i].lja_14_coeff[j];
+        b_14_ptr[joffset] = nbkvec[i].ljb_14_coeff[j];
         c_14_ptr[joffset] = nbkvec[i].ljc_14_coeff[j];
-        sp_ab_ptr[joffset].x = nbkvec[i].lja_coeff[j];
-        sp_ab_ptr[joffset].y = nbkvec[i].ljb_coeff[j];
+        sp_a_ptr[joffset] = nbkvec[i].lja_coeff[j];
+        sp_b_ptr[joffset] = nbkvec[i].ljb_coeff[j];
         sp_c_ptr[joffset] = nbkvec[i].ljc_coeff[j];
-        sp_ab_14_ptr[joffset].x = nbkvec[i].lja_14_coeff[j];
-        sp_ab_14_ptr[joffset].y = nbkvec[i].ljb_14_coeff[j];
+        sp_a_14_ptr[joffset] = nbkvec[i].lja_14_coeff[j];
+        sp_b_14_ptr[joffset] = nbkvec[i].ljb_14_coeff[j];
         sp_c_14_ptr[joffset] = nbkvec[i].ljc_14_coeff[j];
       }
       seek_idx++;
@@ -2049,7 +2061,7 @@ void AtomGraphSynthesis::extendLJMatrices() {
   for (int i = 0; i < system_count; i++) {
     tmp_lj_system_offsets[i] = tmp_table_offsets[topology_indices.readHost(i)];
   }
-  lennard_jones_abc_offsets.putHost(tmp_table_offsets);
+  lennard_jones_abc_offsets.putHost(tmp_lj_system_offsets);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3054,42 +3066,54 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
 //-------------------------------------------------------------------------------------------------
 SyValenceKit<double>
 AtomGraphSynthesis::getDoublePrecisionValenceKit(const HybridTargetLevel tier) const {
-  return SyValenceKit<double>(total_valence_work_units, bond_stiffnesses.data(tier),
-                              bond_equilibria.data(tier), angl_stiffnesses.data(tier),
-                              angl_equilibria.data(tier), dihe_amplitudes.data(tier),
-                              dihe_periodicities.data(tier), dihe_phase_angles.data(tier),
-                              attn14_elec_factors.data(tier), attn14_vdw_factors.data(tier),
-                              ubrd_stiffnesses.data(tier), ubrd_equilibria.data(tier),
-                              cimp_stiffnesses.data(tier), cimp_phase_angles.data(tier),
-                              cmap_surface_dimensions.data(tier), cmap_patches.data(tier),
-                              cmap_patch_bounds.data(tier), vwu_instruction_sets.data(tier),
-                              vwu_import_lists.data(tier), vwu_manipulation_masks.data(tier),
-                              cbnd_instructions.data(tier), angl_instructions.data(tier),
-                              cdhe_instructions.data(tier), cdhe_overtones.data(tier),
-                              cmap_instructions.data(tier), infr14_instructions.data(tier),
-                              accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
-                              accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
+  return SyValenceKit<double>(total_valence_work_units, coulomb_constant,
+                              bond_stiffnesses.data(tier), bond_equilibria.data(tier),
+                              angl_stiffnesses.data(tier), angl_equilibria.data(tier),
+                              dihe_amplitudes.data(tier), dihe_periodicities.data(tier),
+                              dihe_phase_angles.data(tier), attn14_elec_factors.data(tier),
+                              attn14_vdw_factors.data(tier), atomic_charges.data(tier),
+                              lennard_jones_14_a_coeff.data(tier),
+                              lennard_jones_14_b_coeff.data(tier),
+                              lennard_jones_14_c_coeff.data(tier),
+                              lennard_jones_indices.data(tier), atom_type_counts.data(tier),
+                              lennard_jones_abc_offsets.data(tier), ubrd_stiffnesses.data(tier),
+                              ubrd_equilibria.data(tier), cimp_stiffnesses.data(tier),
+                              cimp_phase_angles.data(tier), cmap_surface_dimensions.data(tier),
+                              cmap_patches.data(tier), cmap_patch_bounds.data(tier),
+                              vwu_instruction_sets.data(tier), vwu_import_lists.data(tier),
+                              vwu_manipulation_masks.data(tier), cbnd_instructions.data(tier),
+                              angl_instructions.data(tier), cdhe_instructions.data(tier),
+                              cdhe_overtones.data(tier), cmap_instructions.data(tier),
+                              infr14_instructions.data(tier), accumulate_cbnd_energy.data(tier),
+                              accumulate_angl_energy.data(tier), accumulate_cdhe_energy.data(tier),
+                              accumulate_cmap_energy.data(tier),
                               accumulate_infr14_energy.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 SyValenceKit<float>
 AtomGraphSynthesis::getSinglePrecisionValenceKit(const HybridTargetLevel tier) const {
-  return SyValenceKit<float>(total_valence_work_units, sp_bond_stiffnesses.data(tier),
-                             sp_bond_equilibria.data(tier), sp_angl_stiffnesses.data(tier),
-                             sp_angl_equilibria.data(tier), sp_dihe_amplitudes.data(tier),
-                             sp_dihe_periodicities.data(tier), sp_dihe_phase_angles.data(tier),
-                             sp_attn14_elec_factors.data(tier), sp_attn14_vdw_factors.data(tier),
-                             sp_ubrd_stiffnesses.data(tier), sp_ubrd_equilibria.data(tier),
-                             sp_cimp_stiffnesses.data(tier), sp_cimp_phase_angles.data(tier),
-                             cmap_surface_dimensions.data(tier), sp_cmap_patches.data(tier),
-                             cmap_patch_bounds.data(tier), vwu_instruction_sets.data(tier),
-                             vwu_import_lists.data(tier), vwu_manipulation_masks.data(tier),
-                             cbnd_instructions.data(tier), angl_instructions.data(tier),
-                             cdhe_instructions.data(tier), cdhe_overtones.data(tier),
-                             cmap_instructions.data(tier), infr14_instructions.data(tier),
-                             accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
-                             accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
+  return SyValenceKit<float>(total_valence_work_units, coulomb_constant,
+                             sp_bond_stiffnesses.data(tier), sp_bond_equilibria.data(tier),
+                             sp_angl_stiffnesses.data(tier), sp_angl_equilibria.data(tier),
+                             sp_dihe_amplitudes.data(tier), sp_dihe_periodicities.data(tier),
+                             sp_dihe_phase_angles.data(tier), sp_attn14_elec_factors.data(tier),
+                             sp_attn14_vdw_factors.data(tier), sp_atomic_charges.data(tier),
+                             sp_lennard_jones_14_a_coeff.data(tier),
+                             sp_lennard_jones_14_b_coeff.data(tier),
+                             sp_lennard_jones_14_c_coeff.data(tier),
+                             lennard_jones_indices.data(tier), atom_type_counts.data(tier),
+                             lennard_jones_abc_offsets.data(tier), sp_ubrd_stiffnesses.data(tier),
+                             sp_ubrd_equilibria.data(tier), sp_cimp_stiffnesses.data(tier),
+                             sp_cimp_phase_angles.data(tier), cmap_surface_dimensions.data(tier),
+                             sp_cmap_patches.data(tier), cmap_patch_bounds.data(tier),
+                             vwu_instruction_sets.data(tier), vwu_import_lists.data(tier),
+                             vwu_manipulation_masks.data(tier), cbnd_instructions.data(tier),
+                             angl_instructions.data(tier), cdhe_instructions.data(tier),
+                             cdhe_overtones.data(tier), cmap_instructions.data(tier),
+                             infr14_instructions.data(tier), accumulate_cbnd_energy.data(tier),
+                             accumulate_angl_energy.data(tier), accumulate_cdhe_energy.data(tier),
+                             accumulate_cmap_energy.data(tier),
                              accumulate_infr14_energy.data(tier));
 }
 
@@ -3107,13 +3131,17 @@ void AtomGraphSynthesis::upload() {
   valparam_int_data.upload();
   valparam_int2_data.upload();
   valence_int_data.upload();
-  lennard_jones_ab_coeff.upload();
+  lennard_jones_a_coeff.upload();
+  lennard_jones_b_coeff.upload();
   lennard_jones_c_coeff.upload();
-  lennard_jones_14_ab_coeff.upload();
+  lennard_jones_14_a_coeff.upload();
+  lennard_jones_14_b_coeff.upload();
   lennard_jones_14_c_coeff.upload();
-  sp_lennard_jones_ab_coeff.upload();
+  sp_lennard_jones_a_coeff.upload();
+  sp_lennard_jones_b_coeff.upload();
   sp_lennard_jones_c_coeff.upload();
-  sp_lennard_jones_14_ab_coeff.upload();
+  sp_lennard_jones_14_a_coeff.upload();
+  sp_lennard_jones_14_b_coeff.upload();
   sp_lennard_jones_14_c_coeff.upload();
   nmr_int2_data.upload();
   nmr_double_data.upload();
@@ -3157,13 +3185,17 @@ void AtomGraphSynthesis::download() {
   valparam_int_data.download();
   valparam_int2_data.download();
   valence_int_data.download();
-  lennard_jones_ab_coeff.download();
+  lennard_jones_a_coeff.download();
+  lennard_jones_b_coeff.download();
   lennard_jones_c_coeff.download();
-  lennard_jones_14_ab_coeff.download();
+  lennard_jones_14_a_coeff.download();
+  lennard_jones_14_b_coeff.download();
   lennard_jones_14_c_coeff.download();
-  sp_lennard_jones_ab_coeff.download();
+  sp_lennard_jones_a_coeff.download();
+  sp_lennard_jones_b_coeff.download();
   sp_lennard_jones_c_coeff.download();
-  sp_lennard_jones_14_ab_coeff.download();
+  sp_lennard_jones_14_a_coeff.download();
+  sp_lennard_jones_14_b_coeff.download();
   sp_lennard_jones_14_c_coeff.download();
   nmr_int2_data.download();
   nmr_double_data.download();

@@ -167,7 +167,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int param_idx = tinsr.y;
       const double keq = (is_urey_bradley) ? vk.ubrd_keq[param_idx] : vk.bond_keq[param_idx];
       const double leq = (is_urey_bradley) ? vk.ubrd_leq[param_idx] :
-                                             fabs(vk.bond_leq[param_idx]);
+                                             std::abs(vk.bond_leq[param_idx]);
       const double du =
         evalHarmonicStretch<double, double, double>(i_atom, j_atom, keq, leq, sh_xcrd, sh_ycrd,
                                                     sh_zcrd, nullptr, nullptr, UnitCellType::NONE,

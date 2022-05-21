@@ -13,10 +13,13 @@ namespace synthesis {
 template <typename T> struct SyValenceKit {
 
   /// \brief The constructor takes a straight list of arguments for each member variable.
-  explicit SyValenceKit(int nvwu_in, const T* bond_keq_in, const T* bond_leq_in,
-                        const T* angl_keq_in, const T* angl_theta_in, const T* dihe_amp_in,
-                        const T* dihe_freq_in, const T* dihe_phi_in, const T* attn14_elec_in,
-                        const T* attn14_vdw_in, const T* ubrd_keq_in, const T* ubrd_leq_in,
+  explicit SyValenceKit(int nvwu_in, const T coulomb_in, const T* bond_keq_in,
+                        const T* bond_leq_in, const T* angl_keq_in, const T* angl_theta_in,
+                        const T* dihe_amp_in, const T* dihe_freq_in, const T* dihe_phi_in,
+                        const T* attn14_elec_in, const T* attn14_vdw_in, const T* charges_in,
+                        const T* lja_14_coeff_in, const T* ljb_14_coeff_in,
+                        const T* ljc_14_coeff_in, const int* lj_idx_in, const int* n_lj_types_in,
+                        const int* ljabc_offsets_in, const T* ubrd_keq_in, const T* ubrd_leq_in,
                         const T* cimp_keq_in, const T* cimp_phi_in, const int* cmap_dim_in,
                         const T* cmap_patches_in, const int* cmap_patch_bounds_in,
                         const int2* vwu_abstracts_in, const int* vwu_imports_in,
@@ -29,6 +32,7 @@ template <typename T> struct SyValenceKit {
 
   // Member variables (all public)
   const int nvwu;                ///< The number of valence work units
+  const T coulomb;               ///< Coulomb's constant in kcal-A2/mol-e2
   const T* bond_keq;             ///< Consensus table of harmonic bond stiffness constants
   const T* bond_leq;             ///< Consensus table of harmonic bond equilibrium lengths
   const T* angl_keq;             ///< Consensus table of harmonic angle stiffness constants
@@ -38,6 +42,14 @@ template <typename T> struct SyValenceKit {
   const T* dihe_phi;             ///< Consensus table of cosine-based dihedral phase angles
   const T* attn14_elec;          ///< Consensus table of 1:4 electrostatic scaling factors
   const T* attn14_vdw;           ///< Consensus table of 1:4 van-der Waals scaling factors
+  const T* charges;              ///< Charges on all atoms
+  const T* lja_14_coeff;         ///< Lennard-Jones 1:4 interaction A coefficients
+  const T* ljb_14_coeff;         ///< Lennard-Jones 1:4 interaction B coefficients
+  const T* ljc_14_coeff;         ///< Lennard-Jones 1:4 interaction C coefficients
+  const int* lj_idx;             ///< Lennard-Jones type indices for all atoms
+  const int* n_lj_types;         ///< Lennard-Jones type counts for all systems
+  const int* ljabc_offsets;      ///< Offsets for Lennard-Jones A, B, and C coefficient tables for
+                                 ///<   all systems
   const T* ubrd_keq;             ///< Consensus table of Urey-Bradley stiffnesses
   const T* ubrd_leq;             ///< Consensus table of Urey-Bradley I:K separation distances
   const T* cimp_keq;             ///< Consensus table of CHARMM improper dihedral stiffness

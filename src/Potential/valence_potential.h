@@ -587,6 +587,9 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrite
 ///        electrostatic and van-der Waals interactions.  Both dihedral-bound and inferred
 ///        1:4 pairs can be evaluated with this one routine.
 ///
+/// Overloaded:
+///   - Use a Lennard-Jones parameter table offset, or do not
+///
 /// \param i_atom               The first atom in the pair
 /// \param l_atom               The second atom in the pair
 /// \param attn_idx             The attenuation index into arrays of electrostatic and van-der
@@ -597,6 +600,7 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrite
 /// \param attn14_vdw_factors   Unique van-der Waals 1:4 scaling factors
 /// \param lja_14_coeff         Lennard-Jones A coefficients, in U = (A / r^12) - (B / r^6)
 /// \param ljb_14_coeff         Lennard-Jones B coefficients, in U = (A / r^12) - (B / r^6)
+/// \param ljtab_offset         Offset for the system's Lennard-Jones coefficient tables
 /// \param n_lj_types           Number of unique Lennard-Jones types, the rank of the A and B
 ///                             coefficient matrices above
 /// \param xcrd                 Cartesian X coordinates of all particles
@@ -610,6 +614,20 @@ double evaluateCmapTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrite
 /// \param unit_cell            The unit cell type, i.e. triclinic
 /// \param eval_elec_force      Flag to have electrostatic forces evaluated
 /// \param eval_vdw_force       Flag to have van-der Waals (Lennard-Jones) forces evaluated
+/// \{
+template <typename Tcoord, typename Tforce, typename Tcalc>
+Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
+                                     const Tcalc* charges, const int* lj_param_idx,
+                                     const Tcalc* attn14_elec_factors,
+                                     const Tcalc* attn14_vdw_factors, const Tcalc* lja_14_coeff,
+                                     const Tcalc* ljb_14_coeff, int ljtab_offset, int n_lj_types,
+                                     const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                                     const double* umat, const double* invu,
+                                     UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                                     Tforce* zfrc, EvaluateForce eval_elec_force,
+                                     EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
+                                     Tcalc force_factor = 1.0);
+
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc coulomb_constant,
                                      const Tcalc* charges, const int* lj_param_idx,
@@ -621,6 +639,7 @@ Vec2<Tcalc> evaluateAttenuated14Pair(int i_atom, int l_atom, int attn_idx, Tcalc
                                      Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_elec_force,
                                      EvaluateForce eval_vdw_force, Tcalc inv_gpos_factor = 1.0,
                                      Tcalc force_factor = 1.0);
+/// \}
   
 /// \brief Evaluate 1:4 non-bonded pair interactions.  This requires a suprising amount of
 ///        bookkeeping to make it performant, but the result is straightforward and this reference
