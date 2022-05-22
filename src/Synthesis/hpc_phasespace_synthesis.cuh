@@ -31,6 +31,14 @@ __global__ void __launch_bounds__(large_block_size, 1)
 kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, int low_index,
                 int high_index, const TrajectoryKind material);
 
+/// \brief Initialize forces for one or all systems of a PhaseSpaceSynthesis on the GPU.
+///
+/// \param psyw   Writeable abstract for the PhaseSpaceSynthesis, containing system limits and
+///               pointers to all coordinates and forces
+/// \param index  Index of the system to initialize; if negative, all systems will be initialized.
+__global__ void __launch_bounds__(large_block_size, 1)
+kPsyInitializeForces(PsSynthesisWriter psyw, const int index);
+  
 } // namespace synthesis
 } // namespace omni
 

@@ -206,5 +206,30 @@ extern void systemTransfer(PsSynthesisWriter *destination, PsSynthesisWriter *so
                                                                       low_index, high_index, kind);
 }
 
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(large_block_size, 1)
+kPsyInitializeForces(PsSynthesisWriter psyw, const int index) {
+  int minpos, maxpos;
+  if (index < 0) {
+    minpos = 0;
+    maxpos = psyw.atom_starts[psyw.system_count - 1] + psyw.atom_counts[psyw.system_count - 1];
+  }
+  else {
+    minpos = psyw.atom_starts[index];
+    maxpos = minpos + psyw.atom_counts[index];
+  }
+  for (int pos = threadIdx.x + (blockDim.x * blockIdx.x);
+       pos < maxpos; pos += gridDim.x * blockDim.x) {
+    psyw.xfrc[pos] = 0LL;
+    psyw.yfrc[pos] = 0LL;
+    psyw.zfrc[pos] = 0LL;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void psyInitializeForces(PsSynthesisWriter *psyw, const int index, const GpuDetails &gpu) {
+  kPsyInitializeForces<<<gpu.getSMPCount(), gpu.getMaxThreadsPerBlock()>>>(*psyw, index);
+}
+
 } // namespace synthesis
 } // namespace omni

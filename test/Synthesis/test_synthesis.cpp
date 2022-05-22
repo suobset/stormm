@@ -724,7 +724,7 @@ int main(const int argc, const char* argv[]) {
 
   // Try extracting a system from it
   PhaseSpace tip3p_ps_copy(tip3p_ps.getAtomCount(), tip3p_ps.getUnitCellType());
-  psynth.extractPhaseSpace(&tip3p_ps_copy, 3);
+  psynth.extractSystem(&tip3p_ps_copy, 3);
   PhaseSpaceWriter tip3p_orig_writer = tip3p_ps.data();
   PhaseSpaceWriter tip3p_muta_writer = psv[3].data();
   PhaseSpaceWriter tip3p_copy_writer = tip3p_ps_copy.data();
@@ -803,7 +803,7 @@ int main(const int argc, const char* argv[]) {
         "counts found in the PhaseSpaceSynthesis object's writer do not meet expectations.");
   check(psynth_w2.time_step, RelationalOperator::EQUAL, 2.5, "The time step was not correctly "
         "copied into a PhaseSpaceSynthesis writeable abstract.");
-  psynth2.extractPhaseSpace(&tip3p_ps_copy, 3);
+  psynth2.extractSystem(&tip3p_ps_copy, 3);
   for (int i = 0; i < tip3p_orig_writer.natom; i++) {
     y_orig[i] = tip3p_orig_writer.ycrd[i];
     y_muta[i] = tip3p_muta_writer.ycrd[i];

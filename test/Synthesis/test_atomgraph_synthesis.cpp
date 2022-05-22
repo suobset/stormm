@@ -170,20 +170,74 @@ int main(const int argc, const char* argv[]) {
   }
   PhaseSpaceSynthesis poly_ps(ps_list, ag_list);
   ScoreCard sc(ps_list.size(), 1, 32);
+  poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::BOND,
                               VwuGoal::ACCUMULATE_FORCES, 0);
+  std::vector<double> bond_nrg, bond_nrg_answer;
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    bond_nrg.push_back(sc.reportInstantaneousStates(StateVariable::BOND, i));
+    ps_list[i].initializeForces();
+    ScoreCard tmp_sc(1, 1, 32);    
+    bond_nrg_answer.push_back(evaluateBondTerms(ag_list[i], &ps_list[i], &tmp_sc));
+  }
+  check(bond_nrg, RelationalOperator::EQUAL, Approx(bond_nrg_answer).margin(5.0e-7),
+        "Bond energies computed using the synthesis methods are inconsistent with those computed "
+        "using a simpler approach.", do_tests);
+  poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::ANGL,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::INFR14,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+  std::vector<double> angl_nrg, angl_nrg_answer;
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    angl_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ANGLE, i));
+    ps_list[i].initializeForces();
+    ScoreCard tmp_sc(1, 1, 32);    
+    angl_nrg_answer.push_back(evaluateAngleTerms(ag_list[i], &ps_list[i], &tmp_sc));
+  }
+  check(angl_nrg, RelationalOperator::EQUAL, Approx(angl_nrg_answer).margin(3.1e-7),
+        "Harmonic angle energies computed using the synthesis methods are inconsistent with those "
+        "computed using a simpler approach.", do_tests);
+  poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::DIHE,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::UBRD,
+  std::vector<double> dihe_nrg, impr_nrg, dihe_nrg_answer, impr_nrg_answer;
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    dihe_nrg.push_back(sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, i));
+    impr_nrg.push_back(sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, i));
+    ps_list[i].initializeForces();
+    ScoreCard tmp_sc(1, 1, 32);
+    const double2 du = evaluateDihedralTerms(ag_list[i], &ps_list[i], &tmp_sc);
+    dihe_nrg_answer.push_back(du.x);
+    impr_nrg_answer.push_back(du.y);
+  }
+  check(dihe_nrg, RelationalOperator::EQUAL, Approx(dihe_nrg_answer).margin(1.0e-7),
+        "Cosine-based dihedral energies computed using the synthesis methods are inconsistent "
+        "with those computed using a simpler approach.", do_tests);
+  check(impr_nrg, RelationalOperator::EQUAL, Approx(impr_nrg_answer).margin(2.5e-9),
+        "Cosine-based improper dihedral energies computed using the synthesis methods are "
+        "inconsistent with those computed using a simpler approach.", do_tests);
+  poly_ps.initializeForces();
+  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::INFR14,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::CIMP,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+  std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer;
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    qq14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i));
+    lj14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i));
+    ps_list[i].initializeForces();
+    ScoreCard tmp_sc(1, 1, 32);
+    const double2 du = evaluateAttenuated14Terms(ag_list[i], &ps_list[i], &tmp_sc);
+    qq14_nrg_answer.push_back(du.x);
+    lj14_nrg_answer.push_back(du.y);
+  }
+  check(qq14_nrg, RelationalOperator::EQUAL, Approx(qq14_nrg_answer).margin(1.5e-7),
+        "Attenuated 1:4 electrostatic energies computed using the synthesis methods are "
+        "inconsistent with those computed using a simpler approach.", do_tests);
+  check(lj14_nrg, RelationalOperator::EQUAL, Approx(lj14_nrg_answer).margin(2.5e-7),
+        "Attenuated 1:4 van-der Waals energies computed using the synthesis methods are "
+        "inconsistent with those computed using a simpler approach.", do_tests);
+  poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::CMAP,
                               VwuGoal::ACCUMULATE_FORCES, 0);
+  poly_ps.initializeForces();
 
   // CHECK
 #if 0

@@ -431,6 +431,11 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
 }
 
 //-------------------------------------------------------------------------------------------------
+int PhaseSpaceSynthesis::getSystemCount() const {
+  return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
 int PhaseSpaceSynthesis::getGlobalPositionBits() const {
   return globalpos_scale_bits;
 }
@@ -653,68 +658,102 @@ void PhaseSpaceSynthesis::berendsenThermocoupling() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::extractPhaseSpace(PhaseSpace *ps, const int index,
-                                            const HybridTargetLevel tier) {
+void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
+                                        const HybridTargetLevel tier) const {
   PhaseSpaceWriter psw = ps->data();
   if (atom_counts.readHost(index) != psw.natom) {
     rtErr("A PhaseSpace object sized for " + std::to_string(psw.natom) + " atoms is not prepared "
           "to accept a system of " + std::to_string(atom_counts.readHost(index)) + " atoms from "
           "this synthesis.", "PhaseSpaceSynthesis", "extractPhaseSpace");
   }
-  const int atom_offset = atom_starts.readHost(index);
-  const int mtrx_offset = index * roundUp(9, warp_size_int);
-  const int bdim_offset = index * roundUp(6, warp_size_int);
-  switch (tier) {
-  case HybridTargetLevel::HOST:
-    break;
 #ifdef OMNI_USE_HPC
-  case HybridTargetLevel::DEVICE:
-    x_coordinates.download(atom_offset, psw.natom);
-    y_coordinates.download(atom_offset, psw.natom);
-    z_coordinates.download(atom_offset, psw.natom);
-    box_space_transforms.download(mtrx_offset, 9);
-    inverse_transforms.download(mtrx_offset, 9);
-    box_dimensions.download(bdim_offset, 6);
-    break;
+  std::vector<llint> xcrd_buff, ycrd_buff, zcrd_buff, xvel_buff, yvel_buff, zvel_buff;
+  std::vector<llint> xfrc_buff, yfrc_buff, zfrc_buff, box_buff, inv_buff, dim_buff;
 #endif
-  }
-  const llint* xcrd_ptr = x_coordinates.data();
-  const llint* ycrd_ptr = y_coordinates.data();
-  const llint* zcrd_ptr = z_coordinates.data();
-  const llint* xvel_ptr = x_velocities.data();
-  const llint* yvel_ptr = y_velocities.data();
-  const llint* zvel_ptr = z_velocities.data();
-  const llint* xfrc_ptr = x_velocities.data();
-  const llint* yfrc_ptr = y_velocities.data();
-  const llint* zfrc_ptr = z_velocities.data();
-  const double* box_ptr = box_space_transforms.data();
-  const double* inv_ptr = inverse_transforms.data();
-  const double* dim_ptr = box_dimensions.data();
+  int atom_offset = atom_starts.readHost(index);
+  int mtrx_offset = index * roundUp(9, warp_size_int);
+  int bdim_offset = index * roundUp(6, warp_size_int);
   const double crd_deflation = inverse_globalpos_scale;
   const double vel_deflation = inverse_velocity_scale;
   const double frc_deflation = inverse_force_scale;
-  for (int i = 0; i < psw.natom; i++) {
-    psw.xcrd[i] = static_cast<double>(xcrd_ptr[atom_offset + i]) * crd_deflation;
-    psw.ycrd[i] = static_cast<double>(ycrd_ptr[atom_offset + i]) * crd_deflation;
-    psw.zcrd[i] = static_cast<double>(zcrd_ptr[atom_offset + i]) * crd_deflation;
-    psw.xvel[i] = static_cast<double>(xvel_ptr[atom_offset + i]) * vel_deflation;
-    psw.yvel[i] = static_cast<double>(yvel_ptr[atom_offset + i]) * vel_deflation;
-    psw.zvel[i] = static_cast<double>(zvel_ptr[atom_offset + i]) * vel_deflation;
-    psw.xfrc[i] = static_cast<double>(xfrc_ptr[atom_offset + i]) * frc_deflation;
-    psw.yfrc[i] = static_cast<double>(yfrc_ptr[atom_offset + i]) * frc_deflation;
-    psw.zfrc[i] = static_cast<double>(zfrc_ptr[atom_offset + i]) * frc_deflation;
-  }
-  for (int i = 0; i < 9; i++) {
-    psw.umat[i] = box_ptr[mtrx_offset + i];
-    psw.invu[i] = inv_ptr[mtrx_offset + i];
-    psw.boxdim[i] = dim_ptr[bdim_offset + i];        
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* xcrd_ptr = x_coordinates.data();
+      const llint* ycrd_ptr = y_coordinates.data();
+      const llint* zcrd_ptr = z_coordinates.data();
+      const llint* xvel_ptr = x_velocities.data();
+      const llint* yvel_ptr = y_velocities.data();
+      const llint* zvel_ptr = z_velocities.data();
+      const llint* xfrc_ptr = x_forces.data();
+      const llint* yfrc_ptr = y_forces.data();
+      const llint* zfrc_ptr = z_forces.data();
+      const double* box_ptr = box_space_transforms.data();
+      const double* inv_ptr = inverse_transforms.data();
+      const double* dim_ptr = box_dimensions.data();
+      for (int i = 0; i < psw.natom; i++) {
+        psw.xcrd[i] = static_cast<double>(xcrd_ptr[atom_offset + i]) * crd_deflation;
+        psw.ycrd[i] = static_cast<double>(ycrd_ptr[atom_offset + i]) * crd_deflation;
+        psw.zcrd[i] = static_cast<double>(zcrd_ptr[atom_offset + i]) * crd_deflation;
+        psw.xvel[i] = static_cast<double>(xvel_ptr[atom_offset + i]) * vel_deflation;
+        psw.yvel[i] = static_cast<double>(yvel_ptr[atom_offset + i]) * vel_deflation;
+        psw.zvel[i] = static_cast<double>(zvel_ptr[atom_offset + i]) * vel_deflation;
+        psw.xfrc[i] = static_cast<double>(xfrc_ptr[atom_offset + i]) * frc_deflation;
+        psw.yfrc[i] = static_cast<double>(yfrc_ptr[atom_offset + i]) * frc_deflation;
+        psw.zfrc[i] = static_cast<double>(zfrc_ptr[atom_offset + i]) * frc_deflation;
+      }
+      for (int i = 0; i < 9; i++) {
+        psw.umat[i] = box_ptr[mtrx_offset + i];
+        psw.invu[i] = inv_ptr[mtrx_offset + i];
+      }
+      for (int i = 0; i < 6; i++) {
+        psw.boxdim[i] = dim_ptr[bdim_offset + i];        
+      }
+    }
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const std::vector<llint> xcrd_buff = x_coordinates.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> ycrd_buff = y_coordinates.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> zcrd_buff = z_coordinates.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> xvel_buff = x_velocities.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> yvel_buff = y_velocities.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> zvel_buff = z_velocities.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> xfrc_buff = x_forces.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> yfrc_buff = y_forces.readDevice(atom_offset, psw.natom);
+      const std::vector<llint> zfrc_buff = z_forces.readDevice(atom_offset, psw.natom);
+      const std::vector<double> box_buff = box_space_transforms.readDevice(mtrx_offset, 9);
+      const std::vector<double> inv_buff = inverse_transforms.readDevice(mtrx_offset, 9);
+      const std::vector<double> dim_buff = box_dimensions.readDevice(bdim_offset, 9);
+      for (int i = 0; i < psw.natom; i++) {
+        psw.xcrd[i] = static_cast<double>(xcrd_buff[i]) * crd_deflation;
+        psw.ycrd[i] = static_cast<double>(ycrd_buff[i]) * crd_deflation;
+        psw.zcrd[i] = static_cast<double>(zcrd_buff[i]) * crd_deflation;
+        psw.xvel[i] = static_cast<double>(xvel_buff[i]) * vel_deflation;
+        psw.yvel[i] = static_cast<double>(yvel_buff[i]) * vel_deflation;
+        psw.zvel[i] = static_cast<double>(zvel_buff[i]) * vel_deflation;
+        psw.xfrc[i] = static_cast<double>(xfrc_buff[i]) * frc_deflation;
+        psw.yfrc[i] = static_cast<double>(yfrc_buff[i]) * frc_deflation;
+        psw.zfrc[i] = static_cast<double>(zfrc_buff[i]) * frc_deflation;
+      }
+      for (int i = 0; i < 9; i++) {
+        psw.umat[i] = box_buff[i];
+        psw.invu[i] = inv_buff[i];
+      }
+      for (int i = 0; i < 6; i++) {
+        psw.boxdim[i] = dim_buff[i];
+      }
+    }
+    break;
+#endif
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
                                              const TrajectoryKind trajkind,
-                                             const HybridTargetLevel tier) {
+                                             const HybridTargetLevel tier) const {
   PhaseSpaceWriter psw = ps->data();
   if (atom_counts.readHost(index) != psw.natom) {
     rtErr("A PhaseSpace object sized for " + std::to_string(psw.natom) + " atoms is not prepared "
@@ -728,88 +767,206 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
   // Download the relevant data, if necessary.
   switch (tier) {
   case HybridTargetLevel::HOST:
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      {
+        const llint* xcrd_ptr = x_coordinates.data();
+        const llint* ycrd_ptr = y_coordinates.data();
+        const llint* zcrd_ptr = z_coordinates.data();
+        const double* box_ptr = box_space_transforms.data();
+        const double* inv_ptr = inverse_transforms.data();
+        const double* dim_ptr = box_dimensions.data();
+        const double crd_deflation = inverse_globalpos_scale;
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xcrd[i] = static_cast<double>(xcrd_ptr[atom_offset + i]) * crd_deflation;
+          psw.ycrd[i] = static_cast<double>(ycrd_ptr[atom_offset + i]) * crd_deflation;
+          psw.zcrd[i] = static_cast<double>(zcrd_ptr[atom_offset + i]) * crd_deflation;
+        }
+        for (int i = 0; i < 9; i++) {
+          psw.umat[i] = box_ptr[mtrx_offset + i];
+          psw.invu[i] = inv_ptr[mtrx_offset + i];
+        }
+        for (int i = 0; i < 6; i++) {
+          psw.boxdim[i] = dim_ptr[bdim_offset + i];        
+        }
+      }
+      break;
+    case TrajectoryKind::VELOCITIES:
+      {
+        const llint* xvel_ptr = x_velocities.data();
+        const llint* yvel_ptr = y_velocities.data();
+        const llint* zvel_ptr = z_velocities.data();
+        const double vel_deflation = inverse_velocity_scale;
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xvel[i] = static_cast<double>(xvel_ptr[atom_offset + i]) * vel_deflation;
+          psw.yvel[i] = static_cast<double>(yvel_ptr[atom_offset + i]) * vel_deflation;
+          psw.zvel[i] = static_cast<double>(zvel_ptr[atom_offset + i]) * vel_deflation;
+        }
+      }
+      break;
+    case TrajectoryKind::FORCES:
+      {
+        const llint* xfrc_ptr = x_forces.data();
+        const llint* yfrc_ptr = y_forces.data();
+        const llint* zfrc_ptr = z_forces.data();
+        const double frc_deflation = inverse_force_scale;
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xfrc[i] = static_cast<double>(xfrc_ptr[atom_offset + i]) * frc_deflation;
+          psw.yfrc[i] = static_cast<double>(yfrc_ptr[atom_offset + i]) * frc_deflation;
+          psw.zfrc[i] = static_cast<double>(zfrc_ptr[atom_offset + i]) * frc_deflation;
+        }
+      }
+      break;
+    }
     break;
 #ifdef OMNI_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
       {
-        x_coordinates.download(atom_offset, psw.natom);
-        y_coordinates.download(atom_offset, psw.natom);
-        z_coordinates.download(atom_offset, psw.natom);
-        box_space_transforms.download(mtrx_offset, 9);
-        inverse_transforms.download(mtrx_offset, 9);
-        box_dimensions.download(bdim_offset, 6);
+        const std::vector<llint> xcrd_buff = x_coordinates.readDevice(atom_offset, psw.natom);
+        const std::vector<llint> ycrd_buff = y_coordinates.readDevice(atom_offset, psw.natom);
+        const std::vector<llint> zcrd_buff = z_coordinates.readDevice(atom_offset, psw.natom);
+        const std::vector<double> box_buff = box_space_transforms.readDevice(mtrx_offset, 9);
+        const std::vector<double> inv_buff = inverse_transforms.readDevice(mtrx_offset, 9);
+        const std::vector<double> dim_buff = box_dimensions.readDevice(bdim_offset, 6);
+        const double crd_deflation = inverse_globalpos_scale;
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xcrd[i] = static_cast<double>(xcrd_buff[i]) * crd_deflation;
+          psw.ycrd[i] = static_cast<double>(ycrd_buff[i]) * crd_deflation;
+          psw.zcrd[i] = static_cast<double>(zcrd_buff[i]) * crd_deflation;
+        }
+        for (int i = 0; i < 9; i++) {
+          psw.umat[i] = box_buff[i];
+          psw.invu[i] = inv_buff[i];
+        }
+        for (int i = 0; i < 6; i++) {
+          psw.boxdim[i] = dim_buff[i];
+        }
       }
       break;
     case TrajectoryKind::VELOCITIES:
       {
-        x_velocities.download(atom_offset, psw.natom);
-        y_velocities.download(atom_offset, psw.natom);
-        z_velocities.download(atom_offset, psw.natom);
+        const std::vector<llint> xvel_buff = x_velocities.readDevice(atom_offset, psw.natom);
+        const std::vector<llint> yvel_buff = y_velocities.readDevice(atom_offset, psw.natom);
+        const std::vector<llint> zvel_buff = z_velocities.readDevice(atom_offset, psw.natom);
+        const double vel_deflation = inverse_velocity_scale;
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xvel[i] = static_cast<double>(xvel_buff[i]) * vel_deflation;
+          psw.yvel[i] = static_cast<double>(yvel_buff[i]) * vel_deflation;
+          psw.zvel[i] = static_cast<double>(zvel_buff[i]) * vel_deflation;
+        }
       }
       break;
     case TrajectoryKind::FORCES:
       {
-        x_forces.download(atom_offset, psw.natom);
-        y_forces.download(atom_offset, psw.natom);
-        z_forces.download(atom_offset, psw.natom);
+        const std::vector<llint> xfrc_buff = x_forces.readDevice(atom_offset, psw.natom);
+        const std::vector<llint> yfrc_buff = y_forces.readDevice(atom_offset, psw.natom);
+        const std::vector<llint> zfrc_buff = z_forces.readDevice(atom_offset, psw.natom);
+        const double frc_deflation = inverse_force_scale;
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xfrc[i] = static_cast<double>(xfrc_buff[i]) * frc_deflation;
+          psw.yfrc[i] = static_cast<double>(yfrc_buff[i]) * frc_deflation;
+          psw.zfrc[i] = static_cast<double>(zfrc_buff[i]) * frc_deflation;
+        }
       }
       break;
     }
     break;
 #endif
   }
-  switch (trajkind) {
-  case TrajectoryKind::POSITIONS:
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpace PhaseSpaceSynthesis::exportSystem(const int index, const HybridTargetLevel tier) const {
+  if (index < 0 || index >= system_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
+          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "exportSystem");
+  }
+  PhaseSpace result(atom_counts.readHost(index));
+  extractSystem(&result, index, tier);
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
+CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
+                                                       const TrajectoryKind trajkind,
+                                                       const HybridTargetLevel tier) const {
+  if (index < 0 || index >= system_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
+          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "exportSystem");
+  }
+  CoordinateFrame result(atom_counts.readHost(index));
+  const int astart = atom_starts.readHost(index);
+  CoordinateFrameWriter rsw = result.data();
+  std::vector<llint> xbuffer, ybuffer, zbuffer;
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    xbuffer = x_coordinates.readHost(astart, rsw.natom);
+    ybuffer = y_coordinates.readHost(astart, rsw.natom);
+    zbuffer = z_coordinates.readHost(astart, rsw.natom);
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    xbuffer = x_coordinates.readDevice(astart, rsw.natom);
+    ybuffer = y_coordinates.readDevice(astart, rsw.natom);
+    zbuffer = z_coordinates.readDevice(astart, rsw.natom);
+#endif
+  }
+  const double frc_deflation = inverse_force_scale;
+  for (int i = 0; i < rsw.natom; i++) {
+    rsw.xcrd[i] = static_cast<double>(xbuffer[i]) * frc_deflation;
+    rsw.ycrd[i] = static_cast<double>(ybuffer[i]) * frc_deflation;
+    rsw.zcrd[i] = static_cast<double>(zbuffer[i]) * frc_deflation;
+  }
+  return result;
+}
+  
+//-------------------------------------------------------------------------------------------------
+#ifdef OMNI_USE_HPC
+void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu, const int index,
+                                           const HybridTargetLevel tier)
+#else
+void PhaseSpaceSynthesis::initializeForces(const int index, const HybridTargetLevel tier)
+#endif
+{
+  if (index >= system_count) {
+    rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
+          std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "initializeForces");
+  }
+  switch (tier) {
+  case HybridTargetLevel::HOST:
     {
-      const llint* xcrd_ptr = x_coordinates.data();
-      const llint* ycrd_ptr = y_coordinates.data();
-      const llint* zcrd_ptr = z_coordinates.data();
-      const double* box_ptr = box_space_transforms.data();
-      const double* inv_ptr = inverse_transforms.data();
-      const double* dim_ptr = box_dimensions.data();
-      const double crd_deflation = inverse_globalpos_scale;
-      for (int i = 0; i < psw.natom; i++) {
-        psw.xcrd[i] = static_cast<double>(xcrd_ptr[atom_offset + i]) * crd_deflation;
-        psw.ycrd[i] = static_cast<double>(ycrd_ptr[atom_offset + i]) * crd_deflation;
-        psw.zcrd[i] = static_cast<double>(zcrd_ptr[atom_offset + i]) * crd_deflation;
+      llint* xptr = x_forces.data();
+      llint* yptr = y_forces.data();
+      llint* zptr = z_forces.data();
+      if (index < 0) {
+        for (int i = 0; i < system_count; i++) {
+          const int jmin = atom_starts.readHost(i);
+          const int jmax = jmin + atom_counts.readHost(i);
+          for (int j = jmin; j < jmax; j++) {
+            xptr[j] = 0LL;
+            yptr[j] = 0LL;
+            zptr[j] = 0LL;
+          }
+        }
       }
-      for (int i = 0; i < 9; i++) {
-        psw.umat[i] = box_ptr[mtrx_offset + i];
-        psw.invu[i] = inv_ptr[mtrx_offset + i];
-      }
-      for (int i = 0; i < 6; i++) {
-        psw.boxdim[i] = dim_ptr[bdim_offset + i];        
+      else {
+        const int imin = atom_starts.readHost(index);
+        const int imax = imin + atom_counts.readHost(index);
+        for (int i = imin; i < imax; i++) {
+          xptr[i] = 0LL;
+          yptr[i] = 0LL;
+          zptr[i] = 0LL;
+        }
       }
     }
-    break;
-  case TrajectoryKind::VELOCITIES:
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
     {
-      const llint* xvel_ptr = x_velocities.data();
-      const llint* yvel_ptr = y_velocities.data();
-      const llint* zvel_ptr = z_velocities.data();
-      const double vel_deflation = inverse_velocity_scale;
-      for (int i = 0; i < psw.natom; i++) {
-        psw.xvel[i] = static_cast<double>(xvel_ptr[atom_offset + i]) * vel_deflation;
-        psw.yvel[i] = static_cast<double>(yvel_ptr[atom_offset + i]) * vel_deflation;
-        psw.zvel[i] = static_cast<double>(zvel_ptr[atom_offset + i]) * vel_deflation;
-      }
+      PsSynthesisWriter dptr = data();
+      psyInitializeForces(&dptr, index, gpu);
     }
-    break;
-  case TrajectoryKind::FORCES:
-    {
-      const llint* xfrc_ptr = x_forces.data();
-      const llint* yfrc_ptr = y_forces.data();
-      const llint* zfrc_ptr = z_forces.data();
-      const double frc_deflation = inverse_force_scale;
-      for (int i = 0; i < psw.natom; i++) {
-        psw.xfrc[i] = static_cast<double>(xfrc_ptr[atom_offset + i]) * frc_deflation;
-        psw.yfrc[i] = static_cast<double>(yfrc_ptr[atom_offset + i]) * frc_deflation;
-        psw.zfrc[i] = static_cast<double>(zfrc_ptr[atom_offset + i]) * frc_deflation;
-      }
-    }
-    break;
+#endif
   }
 }
 

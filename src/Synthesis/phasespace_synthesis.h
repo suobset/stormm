@@ -255,6 +255,9 @@ public:
   PhaseSpaceSynthesis& operator=(PhaseSpaceSynthesis &&other) = delete;
   /// \}
 
+  /// \brief Get the number of systems in the object.
+  int getSystemCount() const;
+
   /// \brief Get the global position scaling bit count
   int getGlobalPositionBits() const;
 
@@ -353,21 +356,49 @@ public:
   ///               data from the synthesis (which may have evolved since it was first loaded)
   /// \param tier  The level (host or device) at which to get the data
   /// \param index  Index of the system of interest within the synthesis
-  void extractPhaseSpace(PhaseSpace *ps, int index,
-                         HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void extractSystem(PhaseSpace *ps, int index,
+                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Extract a specific type of coordinate from the synthesis into a pre-allocated space.
   ///
   /// \param ps        Pointer to an allocated PhaseSpace object (i.e. the original) ready to
   ///                  accept data from the synthesis (which may have evolved since it was first
   ///                  loaded)
-  /// \param trajkind  Type of trajectory to copy
+  /// \param trajkind  Type of coordinates to copy
   /// \param tier      The level (host or device) at which to get the data
   /// \param index     Index of the system of interest within the synthesis
   void extractCoordinates(PhaseSpace *ps, int index,
                           TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
-                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Export a system's coordinates, velocities, and forces to a PhaseSpace object.
+  ///
+  /// \param index     Index of the system of interest within the synthesis
+  /// \param tier      The level (host or device) at which to get the data
+  PhaseSpace exportSystem(int index, HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Export a system's coordinates, velocities, or forces to a compact CoordinateFrame
+  ///        object.
+  ///
+  /// \param index     Index of the system of interest within the synthesis
+  /// \param trajkind  Type of coordinates to copy
+  /// \param tier      The level (host or device) at which to get the data
+  CoordinateFrame exportCoordinates(int index, TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
+                                    HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Initialize the forces within a PhaseSpaceSynthesis object.  This is the analog of the
+  ///        eponymous function in the PhaseSpace object.
+  ///
+  /// \param index  Index of the system of interest within the synthesis--if negative, all systems
+  ///               will have their forces initialized
+  /// \param tier   The level (host or device) at which to initialize forces
+#ifdef OMNI_USE_HPC
+  void initializeForces(const GpuDetails &gpu, int index = -1,
+                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+#else
+  void initializeForces(int index = -1, HybridTargetLevel tier = HybridTargetLevel::HOST);
+#endif
+  
   /// \brief Print a list of structures to a trajectory file.  Download will be performed when
   ///        calling this function, over the subset of relevant frames and data.
   ///
