@@ -1,5 +1,6 @@
 #include <vector>
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -19,6 +20,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::ExceptionResponse;
+using omni::constants::verytiny;
 using omni::data_types::double2;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
@@ -35,6 +37,23 @@ using namespace omni::topology;
 using namespace omni::trajectory;
 using namespace omni::testing;
 
+//-------------------------------------------------------------------------------------------------
+// Compare the forces from a single system and one member of a multi-system representation.
+// Return the maximum absolute difference in Cartesian force components on any atom.
+//
+// Arguments:
+//   ps:     A single system's coordinates, velocities, and forces
+//   psy:    The multi-system object
+//   sysid:  System ID within the multi-system object
+//-------------------------------------------------------------------------------------------------
+double getForceDeviation(const PhaseSpace &ps, const PhaseSpaceSynthesis &psy, int sysid) {
+  const CoordinateFrame sys_frc = psy.exportCoordinates(sysid, TrajectoryKind::FORCES);
+  const std::vector<double> frc_a = ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+  const std::vector<double> frc_b = sys_frc.getInterlacedCoordinates();
+  return maxAbsoluteDifference(frc_a, frc_b);
+}
+
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Obtain environment variables or command-line input, if available
@@ -117,6 +136,7 @@ int main(const int argc, const char* argv[]) {
   SyValenceKit<double> syvk = poly_ag.getDoublePrecisionValenceKit();
 
   // Get the coordinates for all structures
+  section(2);
   PhaseSpace tip3p_ps, tip4p_ps, trpcage_ps, trpcage2_ps, trpcage3_ps, nbfix_ps, ubiquitin_ps;
   const std::string base_crd_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
@@ -173,42 +193,58 @@ int main(const int argc, const char* argv[]) {
   poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::BOND,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  std::vector<double> bond_nrg, bond_nrg_answer;
-  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+  const int nsys = poly_ps.getSystemCount();
+  Approx error_limits(std::vector<double>(nsys, 0.0), ComparisonType::ABSOLUTE, verytiny);
+  std::vector<double> bond_nrg, bond_nrg_answer, bond_frc_deviations;
+  ScoreCard tmp_sc(1, 1, 32);    
+  for (int i = 0; i < nsys; i++) {
     bond_nrg.push_back(sc.reportInstantaneousStates(StateVariable::BOND, i));
     ps_list[i].initializeForces();
-    ScoreCard tmp_sc(1, 1, 32);    
-    bond_nrg_answer.push_back(evaluateBondTerms(ag_list[i], &ps_list[i], &tmp_sc));
+    bond_nrg_answer.push_back(evaluateBondTerms(ag_list[i], &ps_list[i], &tmp_sc,
+                                                EvaluateForce::YES));
+    bond_frc_deviations.push_back(getForceDeviation(ps_list[i], poly_ps, i));
   }
-  check(bond_nrg, RelationalOperator::EQUAL, Approx(bond_nrg_answer).margin(5.0e-7),
-        "Bond energies computed using the synthesis methods are inconsistent with those computed "
-        "using a simpler approach.", do_tests);
+  error_limits.setValues(std::vector<double>(nsys, 1.0e-5));
+  check(bond_nrg, RelationalOperator::EQUAL, Approx(bond_nrg_answer).margin(5.5e-7), "Bond "
+        "energies computed using the synthesis methods are inconsistent with those computed using "
+        "a simpler approach.", do_tests);
+  check(bond_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to bond "
+        "interactions are inconsistent with those computed using a simpler approach.", do_tests);
   poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::ANGL,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  std::vector<double> angl_nrg, angl_nrg_answer;
-  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+  std::vector<double> angl_nrg, angl_nrg_answer, angl_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
     angl_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ANGLE, i));
     ps_list[i].initializeForces();
-    ScoreCard tmp_sc(1, 1, 32);    
-    angl_nrg_answer.push_back(evaluateAngleTerms(ag_list[i], &ps_list[i], &tmp_sc));
+    angl_nrg_answer.push_back(evaluateAngleTerms(ag_list[i], &ps_list[i], &tmp_sc,
+                                                 EvaluateForce::YES));
+    angl_frc_deviations.push_back(getForceDeviation(ps_list[i], poly_ps, i));
   }
+  error_limits.setValues(std::vector<double>(nsys, 5.0e-6));
+  check(angl_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to harmonic "
+        "angle interactions are inconsistent with those computed using a simpler approach.",
+        do_tests);
   check(angl_nrg, RelationalOperator::EQUAL, Approx(angl_nrg_answer).margin(3.1e-7),
         "Harmonic angle energies computed using the synthesis methods are inconsistent with those "
         "computed using a simpler approach.", do_tests);
   poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::DIHE,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  std::vector<double> dihe_nrg, impr_nrg, dihe_nrg_answer, impr_nrg_answer;
-  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+  std::vector<double> dihe_nrg, impr_nrg, dihe_nrg_answer, impr_nrg_answer, dihe_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
     dihe_nrg.push_back(sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, i));
     impr_nrg.push_back(sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, i));
     ps_list[i].initializeForces();
-    ScoreCard tmp_sc(1, 1, 32);
-    const double2 du = evaluateDihedralTerms(ag_list[i], &ps_list[i], &tmp_sc);
+    const double2 du = evaluateDihedralTerms(ag_list[i], &ps_list[i], &tmp_sc, EvaluateForce::YES);
     dihe_nrg_answer.push_back(du.x);
     impr_nrg_answer.push_back(du.y);
+    dihe_frc_deviations.push_back(getForceDeviation(ps_list[i], poly_ps, i));
   }
+  error_limits.setValues(std::vector<double>(nsys, 1.5e-6));
+  check(dihe_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to "
+        "cosine-based dihedral interactions are inconsistent with those computed using a simpler "
+        "approach.", do_tests);
   check(dihe_nrg, RelationalOperator::EQUAL, Approx(dihe_nrg_answer).margin(1.0e-7),
         "Cosine-based dihedral energies computed using the synthesis methods are inconsistent "
         "with those computed using a simpler approach.", do_tests);
@@ -218,16 +254,21 @@ int main(const int argc, const char* argv[]) {
   poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::INFR14,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer;
-  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+  std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer, attn14_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
     qq14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i));
     lj14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i));
     ps_list[i].initializeForces();
-    ScoreCard tmp_sc(1, 1, 32);
-    const double2 du = evaluateAttenuated14Terms(ag_list[i], &ps_list[i], &tmp_sc);
+    const double2 du = evaluateAttenuated14Terms(ag_list[i], &ps_list[i], &tmp_sc,
+                                                 EvaluateForce::YES, EvaluateForce::YES);
     qq14_nrg_answer.push_back(du.x);
     lj14_nrg_answer.push_back(du.y);
+    attn14_frc_deviations.push_back(getForceDeviation(ps_list[i], poly_ps, i));
   }
+  error_limits.setValues(std::vector<double>(nsys, 4.5e-6));
+  check(attn14_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to "
+        "attenuated 1:4 interactions are inconsistent with those computed using a simpler "
+        "approach.", do_tests);
   check(qq14_nrg, RelationalOperator::EQUAL, Approx(qq14_nrg_answer).margin(1.5e-7),
         "Attenuated 1:4 electrostatic energies computed using the synthesis methods are "
         "inconsistent with those computed using a simpler approach.", do_tests);
@@ -237,33 +278,22 @@ int main(const int argc, const char* argv[]) {
   poly_ps.initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps.data(), &sc, EvaluateForce::YES, VwuTask::CMAP,
                               VwuGoal::ACCUMULATE_FORCES, 0);
-  poly_ps.initializeForces();
-
-  // CHECK
-#if 0
-  for (int i = 0; i < poly_ag.getSystemCount(); i++) {
-    ScoreCard tmp_sc(1, 1, 32);
-    const double2 e14 = evaluateAttenuated14Terms(ag_list[i], &ps_list[i], &tmp_sc);
-    const double2 edh = evaluateDihedralTerms(ag_list[i], &ps_list[i], &tmp_sc);
-    printf("System  %4d : %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf\n", i,
-           sc.reportInstantaneousStates(StateVariable::BOND, i),
-           sc.reportInstantaneousStates(StateVariable::ANGLE, i),
-           sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i),
-           sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i),
-           sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, i),
-           sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, i),
-           sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, i),
-           sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, i),
-           sc.reportInstantaneousStates(StateVariable::CMAP, i));
-    printf("             : %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf %9.4lf\n",
-           evaluateBondTerms(ag_list[i], &ps_list[i], &tmp_sc),
-           evaluateAngleTerms(ag_list[i], &ps_list[i], &tmp_sc), e14.x, e14.y, edh.x, edh.y,
-           evaluateUreyBradleyTerms(ag_list[i], &ps_list[i], &tmp_sc),
-           evaluateCharmmImproperTerms(ag_list[i], &ps_list[i], &tmp_sc),
-           evaluateCmapTerms(ag_list[i], &ps_list[i], &tmp_sc));
+  std::vector<double> cmap_nrg, cmap_nrg_answer, cmap_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
+    cmap_nrg.push_back(sc.reportInstantaneousStates(StateVariable::CMAP, i));
+    ps_list[i].initializeForces();
+    cmap_nrg_answer.push_back(evaluateCmapTerms(ag_list[i], &ps_list[i], &tmp_sc,
+                                                EvaluateForce::YES));
+    cmap_frc_deviations.push_back(getForceDeviation(ps_list[i], poly_ps, i));
   }
-#endif
-  // END CHECK
+  error_limits.setValues(std::vector<double>(nsys, 1.0e-6));
+  check(cmap_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to CMAP "
+        "energy surface contributions are inconsistent with those computed using a simpler "
+        "approach.", do_tests);
+  check(cmap_nrg, RelationalOperator::EQUAL, Approx(cmap_nrg_answer).margin(3.1e-7),
+        "CMAP energies computed using the synthesis methods are inconsistent with those "
+        "computed using a simpler approach.", do_tests);
+  poly_ps.initializeForces();
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

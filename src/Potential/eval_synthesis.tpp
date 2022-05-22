@@ -246,7 +246,8 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
         evalCmap<llint, llint, Tcalc>(syvk.cmap_patches, syvk.cmap_patch_bounds, surf_idx,
                                       syvk.cmap_dim[surf_idx], i_atom, j_atom, k_atom, l_atom,
                                       m_atom, sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr,
-                                      UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+                                      UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc, eval_force,
+                                      inv_gpos_scale, force_scale);
       if (log_term) {
         cmap_acc += llround(du * nrg_scale_factor);
       }
@@ -340,6 +341,34 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk, PsSynthesisWriter psyw,
                            sh_zvel.data(), sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
                            psyw.inv_gpos_scale, psyw.frc_scale, ecard, i, eval_force, activity,
                            purpose, step_number);
+    switch (purpose) {
+    case VwuGoal::ACCUMULATE_FORCES:
+      for (int j = atom_limits.x; j < atom_limits.y; j++) {
+        const int atom_idx = syvk.vwu_imports[j];
+        const size_t j_sh = j - atom_limits.x;
+        psyw.xfrc[atom_idx] += sh_xfrc[j_sh];
+        psyw.yfrc[atom_idx] += sh_yfrc[j_sh];
+        psyw.zfrc[atom_idx] += sh_zfrc[j_sh];
+      }
+      break;
+    case VwuGoal::MOVE_PARTICLES:
+      {
+        const int2 manip_limits = syvk.vwu_abstracts[(i * vwu_abstract_length) +
+                                                     static_cast<int>(VwuAbstractMap::MANIPULATE)];
+        for (int j = atom_limits.x; j < atom_limits.y; j++) {
+          const int atom_idx = syvk.vwu_imports[j];
+          const int j_sh = j - atom_limits.x;
+          const int manip_idx = manip_limits.x + (j_sh / uint_bit_count_int);
+          const uint2 manip_mask = syvk.vwu_manip[manip_idx];
+          const int manip_bit = j_sh - ((j_sh / uint_bit_count_int) * uint_bit_count_int);
+          if ((manip_mask.y >> manip_bit) & 0x1) {
+            psyw.xcrd[atom_idx] = sh_xcrd[j_sh];
+            psyw.ycrd[atom_idx] = sh_ycrd[j_sh];
+            psyw.zcrd[atom_idx] = sh_zcrd[j_sh];
+          }
+        }
+      }
+    }
   }
 }
 

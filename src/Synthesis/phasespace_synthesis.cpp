@@ -902,14 +902,44 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
   std::vector<llint> xbuffer, ybuffer, zbuffer;
   switch (tier) {
   case HybridTargetLevel::HOST:
-    xbuffer = x_coordinates.readHost(astart, rsw.natom);
-    ybuffer = y_coordinates.readHost(astart, rsw.natom);
-    zbuffer = z_coordinates.readHost(astart, rsw.natom);
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      xbuffer = x_coordinates.readHost(astart, rsw.natom);
+      ybuffer = y_coordinates.readHost(astart, rsw.natom);
+      zbuffer = z_coordinates.readHost(astart, rsw.natom);
+      break;
+    case TrajectoryKind::VELOCITIES:
+      xbuffer = x_velocities.readHost(astart, rsw.natom);
+      ybuffer = y_velocities.readHost(astart, rsw.natom);
+      zbuffer = z_velocities.readHost(astart, rsw.natom);
+      break;
+    case TrajectoryKind::FORCES:
+      xbuffer = x_forces.readHost(astart, rsw.natom);
+      ybuffer = y_forces.readHost(astart, rsw.natom);
+      zbuffer = z_forces.readHost(astart, rsw.natom);
+      break;
+    }
+    break;
 #ifdef OMNI_USE_HPC
   case HybridTargetLevel::DEVICE:
-    xbuffer = x_coordinates.readDevice(astart, rsw.natom);
-    ybuffer = y_coordinates.readDevice(astart, rsw.natom);
-    zbuffer = z_coordinates.readDevice(astart, rsw.natom);
+    switch (trajkind) {
+    case TrajectoryKind::POSITIONS:
+      xbuffer = x_coordinates.readDevice(astart, rsw.natom);
+      ybuffer = y_coordinates.readDevice(astart, rsw.natom);
+      zbuffer = z_coordinates.readDevice(astart, rsw.natom);
+      break;
+    case TrajectoryKind::VELOCITIES:
+      xbuffer = x_velocities.readDevice(astart, rsw.natom);
+      ybuffer = y_velocities.readDevice(astart, rsw.natom);
+      zbuffer = z_velocities.readDevice(astart, rsw.natom);
+      break;
+    case TrajectoryKind::FORCES:
+      xbuffer = x_forces.readDevice(astart, rsw.natom);
+      ybuffer = y_forces.readDevice(astart, rsw.natom);
+      zbuffer = z_forces.readDevice(astart, rsw.natom);
+      break;
+    }
+    break;
 #endif
   }
   const double frc_deflation = inverse_force_scale;

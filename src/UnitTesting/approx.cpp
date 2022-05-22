@@ -57,6 +57,42 @@ double Approx::getTol() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+void Approx::setValue(const double value_in) {
+  values.resize(1);
+  values[0] = value_in;
+  values.shrink_to_fit();
+}
+
+//-------------------------------------------------------------------------------------------------
+void Approx::setValues(const std::vector<double> &values_in) {
+  values = values_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Approx::setValue(const double value_in, const size_t index) {
+  if (index >= values.size()) {
+    rtErr("Index " + std::to_string(index) + " is invalid for an approximate comparison with " +
+          std::to_string(values.size()) + " entries.", "Approx", "setValue");
+  }
+  values[index] = value_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Approx::setMargin(const double dtol_in) {
+  dtol = dtol_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Approx::setTolerance(const double dtol_in) {
+  dtol = dtol_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Approx::setTol(const double dtol_in) {
+  dtol = dtol_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 Approx Approx::margin(const double dtol_in) {
   return Approx(values, style, dtol_in);
 }

@@ -69,23 +69,50 @@ public:
   double getTol() const;
   /// \}
 
-  /// \brief Set the tolerance (method i).  This is written in such a way as to mimic the Catch2
-  ///        unit testing framework in some circumstances.
+  /// \brief Set the values that form the basis of the approximate comparison.
   ///
-  /// \param dtol_in  The tolerance to use
-  Approx margin(const double dtol_in);
+  /// Overloaded:
+  ///   - Set the approximation to use a single value
+  ///   - Set the target value of a particular index
+  ///   - Set the approximation to use multiple values 
+  ///
+  /// \param value_in   The single value to set (this will change the length of the comparison
+  ///                   vector to one)
+  /// \param values_in  The vector of values to set
+  /// \param index      Index of the value to change (this will be checked against the length of
+  ///                   comparison values in the existing object)
+  /// \{
+  void setValue(double value_in);
+  void setValues(const std::vector<double> &values_in);
+  void setValue(double value_in, size_t index);
+  /// \}
 
-  /// \brief This (method ii) is written to allow developers a second intuitive name by which to
-  ///        specify the tolerance.
+  /// \brief Set the tolerance of the existing object.  This will not emit a new object.
+  ///
+  /// Overloaded:
+  ///   - Three different names that individual developers may find most intuitive
   ///
   /// \param dtol_in  The tolerance to use
-  Approx tolerance(const double dtol_in);
+  /// \{
+  void setMargin(double dtol_in);
+  void setTolerance(double dtol_in);
+  void setTol(double dtol_in);
+  /// \}
 
-  /// \brief This (method iii) is written to allow developers a third intuitive name by which to
-  ///        specify the tolerance.
+  /// \brief Set the tolerance.   This is written in such a way as to mimic the Catch2 unit
+  ///        testing framework in some circumstances.  It will not change the original object's
+  ///        tolerance, rather it will emit an object with the same comparison values and the
+  ///        desired tolerance.
+  ///
+  /// Overloaded:
+  ///   - Three different names that individual developers may find most intuitive
   ///
   /// \param dtol_in  The tolerance to use
-  Approx tol(const double dtol_in);
+  /// \{
+  Approx margin(double dtol_in);
+  Approx tolerance(double dtol_in);
+  Approx tol(double dtol_in);
+  /// \}
 
   /// \brief Test whether a real-valued scalar is the same as the value held for comparison.
   ///
