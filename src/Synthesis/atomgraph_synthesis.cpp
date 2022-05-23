@@ -624,7 +624,13 @@ void AtomGraphSynthesis::checkCommonSettings() {
                     appr_saltcon.test(topologies[i]->getSaltConcentration()) == false);
     coul_problem = (coul_problem ||
                     appr_coulomb.test(topologies[i]->getCoulombConstant()) == false);
-    box_problem  = (box_problem  || (topologies[i]->getUnitCellType() != periodic_box_class));
+    box_problem  = (box_problem  ||
+                    (periodic_box_class == UnitCellType::NONE &&
+                     (topologies[i]->getUnitCellType() == UnitCellType::ORTHORHOMBIC ||
+                      topologies[i]->getUnitCellType() == UnitCellType::TRICLINIC)) ||
+                    ((periodic_box_class == UnitCellType::ORTHORHOMBIC ||
+                      periodic_box_class == UnitCellType::TRICLINIC) &&
+                     topologies[i]->getUnitCellType() == UnitCellType::NONE));
   }
   if (ism_problem) {
     switch (policy) {
@@ -692,7 +698,7 @@ void AtomGraphSynthesis::checkCommonSettings() {
   if (box_problem) {
     rtErr("All topologies must have consistent periodic or isolated boundary conditions.  "
           "The first topology is \"" + getUnitCellTypeName(periodic_box_class) + "\" but "
-          "subsequent topologies are different.  No rememdy is available.", "AtomGraphSynthesis",
+          "subsequent topologies are different.  No remedy is available.", "AtomGraphSynthesis",
           "checkCommonSettings");
   }
 }
