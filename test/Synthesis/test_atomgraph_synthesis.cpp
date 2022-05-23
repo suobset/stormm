@@ -370,6 +370,9 @@ int main(const int argc, const char* argv[]) {
   AtomGraphSynthesis poly_agn(agn_list, { 0, 1, 2 }, ExceptionResponse::SILENT, &timer);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
   checkSynthesis(poly_agn, &poly_psn, do_tests);
+
+  // Create some restraints and apply them, then check the synthesis implementation
+  
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

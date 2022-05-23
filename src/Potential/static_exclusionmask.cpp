@@ -107,7 +107,8 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
       std::vector<int> this_supertile_map(tiles_per_supertile, 0);
 
       // Within this supertile, count the number of unique tiles and log them in the master
-      // store of exclusion masks.  By default, every tile's map points to  
+      // store of exclusion masks.  By default, every tile's map points to the blank exclusion
+      // mask, tile 0.
       const int ni_tiles = (isptl_end - isptl_start + tile_length - 1) / tile_length;
       const int nj_tiles = (jsptl_end - jsptl_start + tile_length - 1) / tile_length;
       for (int ti = 0; ti < ni_tiles; ti++) {
@@ -155,7 +156,7 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
               }
             }
 
-            // Check 1:2 exclusions
+            // Check 1:4 exclusions
             for (int j = nbk.nb14_bounds[i]; j < nbk.nb14_bounds[i + 1]; j++) {
               const int jatom = nbk.nb14x[j];
               if (jatom >= jtl_start && jatom < jtl_end) {

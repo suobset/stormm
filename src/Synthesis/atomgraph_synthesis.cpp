@@ -923,7 +923,9 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     // Additional counters are needed to track the constraint group storage sizes.
     cnst_offset += roundUp(cnk.ngroup, warp_size_int);
     cnst_bounds_offset += roundUp(cnk.ngroup + 1, warp_size_int);
-    cnst_atom_offset += roundUp(cnk.group_bounds[cnk.ngroup], warp_size_int);
+    if (cnk.ngroup > 0) {
+      cnst_atom_offset += roundUp(cnk.group_bounds[cnk.ngroup], warp_size_int);
+    }
   }
 
   // Allocate detailed arrays for each descriptor, then collate all topologies.  This
