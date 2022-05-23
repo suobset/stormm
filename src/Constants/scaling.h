@@ -9,7 +9,7 @@ namespace constants {
 
 /// \brief Teh convenient, round number is 1024, not 1000.
 /// \{
-constexpr llint kilo = 1024;
+constexpr llint kilo = 1024LL;
 constexpr llint mega = kilo * kilo;
 constexpr llint giga = mega * kilo;
 constexpr size_t kilo_zu = 1024LLU;
