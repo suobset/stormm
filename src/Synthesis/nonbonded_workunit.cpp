@@ -12,47 +12,27 @@ NonbondedWorkUnit::NonbondedWorkUnit(const AtomGraph *ag_in, const StaticExclusi
 {}
 
 //-------------------------------------------------------------------------------------------------
-int getAllSystemsWorkUnitCount(const std::vector<int> &atom_counts, const int nbwu_tile) {
-
-  // There are pre-determined tile counts for the non-bonded work units, each with their own
-  // width and height in terms of the tile layout.
-  int absc_tile_dim, ordi_tile_dim;
-  switch (nbwu_tile) {
-  case 8:
-    absc_tile_dim = 4;
-    ordi_tile_dim = 2;
-  case 16:
-    absc_tile_dim = 4;
-    ordi_tile_dim = 4;
-  case 32:
-    absc_tile_dim = 4;
-    ordi_tile_dim = 8;
-  case 64:
-    absc_tile_dim = 8;
-    ordi_tile_dim = 8;
-  default:
-    rtErr("Only 8, 16, 32, or 64 tiles may be the target size of any one NonbondedWorkUnit.",
-          "getAllSystemsWorkUnitCount");
-  }
-  
+size_t estimateNonbondedWorkUnitCount(const std::vector<int> &atom_counts, const int nbwu_tile) {
   const size_t nsys = atom_counts.size();
-  int result = 0;
-  for (size_t i = 0LLU; i < nsys; i++) {
-    const int ntile_side  = atom_counts[i] / tile_length;
-    const int nabsc_whole = tile_length / absc_tile_dim;
-    const int nordi_whole = tile_length / ordi_tile_dim;
-    const int nabsc_rem   = tile_length - (nabsc_whole * absc_tile_dim);
-
-    // If there is a partial tile along the side, find out how many work units the trim can
-    // decompose into.  The abscissa and ordinate atom arrays must add to at most 256, which
-    // means sixteen tile lengths in both directions, combined.  Each work unit along the trim
-    // must have no more than the number of tiles in any other work unit.
-    int absc_idx = nabsc_whole * absc_tile_dim;
-    int ordi_idx = 0;
-    while (ordi_idx < ntile_side) {
-
-    }
+  size_t result = 0LLU;
+  const int big_nbwu = tile_lengths_per_supertile * tile_lengths_per_supertile;
+  for (size_t i = 0; i < atom_counts; i++) {
+    const size_t ntile_side = (nbwu_tile == big_nbwu) ? atom_counts[i] / supertile_length :
+                                                        atom_counts[i] / tile_length;
+    result += ntile_side * (ntile_side + 1LLU) / 2LLU;
   }
+  if (nbwu_tile != 8 && nbwu_tile != 16 && nbwu_tile != 32 && nbwu_tile != 64) {
+    const size_t nbwu_tile_zu = static_cast<size_t>(nbwu_tile);
+    return (result + nbwu_tile_zu - 1LLU) / nbwu_tile_zu;
+  }
+  else if (nbwu_tile == big_nbwu) {
+    return result;
+  }
+  else {
+    rtErr("Only 8, 16, 32, 64, or " + std::to_string(big_nbwu) + " tiles may be the target size "
+          "of any one NonbondedWorkUnit.", "estimateNonbondedWorkUnitCount");
+  }
+  __builtin_unreachable();
 }
  
 //-------------------------------------------------------------------------------------------------
@@ -76,7 +56,29 @@ buildNonbondedWorkUnits(const std::vector<AtomGraph*> &ag_list,
   }
 
   // Try work units of eight tiles
-  size_t tile_pair = 
+  const int huge_nbwu_size = tile_lengths_per_supertile * tile_lengths_per_supertile;
+  const size_t tiny_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, 8);
+  const size_t small_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, 16);
+  const size_t medium_wu_count = estimateNonbondedWorkUnitCount(atom_counts, 32);
+  const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, 64);
+  const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_size);
+
+  if (tiny_wu_count < mega) {
+    
+  }
+  else if (small_wu_count < mega) {
+    
+  }
+  else if (medium_wu_count < mega) {
+
+  }
+  else if (large_wu_count < mega) {
+
+  }
+  else {
+
+    // Use the huge tiles (this will imply the large block size)
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
