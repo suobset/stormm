@@ -21,12 +21,51 @@ private:
 class NonbondedWorkUnit {
 public:
 
-  /// \brief The constructor assumes a 16x16 tile and accepts a target number of tiles for each
-  ///        work unit to perform.  There will be a few "magic" numbers: eight tiles, the minimum
-  ///        for occupying 256 threads on NVIDIA or AMD GPUs, sixteen tiles, the most that can be
-  ///        accomplished with 64 x 64 imported atoms, sixty-four, for a much larger tile that
-  ///        approaches the maximum __shared__ memory usage for imported atoms and Generalized Born
-  ///        force computations.
+  /// \brief The constructor accepts an exclusion mask and a list of nonbonded interaction tiles
+  ///        to compute.  Non-bonded interaction tiles go according to "abscissa atoms" and
+  ///        "ordinate atoms," although both abscissa and ordinate indices refer to the same list
+  ///        of imported atoms.  There are three cases to consider:
+  ///
+  ///        Static exclusion mask, tiny up to large work units:
+  ///        This will be the majority of the cases with implicit-solvent systems.  In practice,
+  ///        the non-bonded work unit becomes a list of 19 integers representing the upper limit
+  ///        of atoms in the particular system and up to 16 starting locations of tile atoms to
+  ///        import (and convert to floating point representations) from within what may be a
+  ///        concatenated list of atoms for many systems.  The number of atoms after each starting
+  ///        point is a matter of the tile_length constant, and to some degree this couples it to
+  ///        the block size used for smaller non-bonded work units.  There are then low and high
+  ///        limits on the tile computations to perform, indexing into a master list of uint2
+  ///        tuples, each listing the abscissa atom start and ordinate atom starts in bits 1-16 and
+  ///        17-32 of the x member (referring to an index of local atom imports) and the tile
+  ///        exclusion mask index (referring to an index of a separate master list out in main
+  ///        memory) in the y member.  These cases will run with a 256-thread block size.
+  ///
+  ///        Static exclusion mask, huge work units:
+  ///        This will handle cases of implicit-solvent systems with sizes so large that millions
+  ///        of smaller work units would be required to cover everything.  In practice, the
+  ///        non-bonded work unit is reduced to a list of 4 integers, now representing the upper
+  ///        limit of atoms in the system and the lower limits of the abscissa and ordinate atoms
+  ///        to import in a supertile for which the work unit is to compute all interactions.
+  ///        There is no meaningful list of all interactions in this case, as it might be
+  ///        prohibitive even to store such a thing.  Instead, the work unit will proceed over all
+  ///        tiles in the supertile after computing whether it lies along the diagonal.  This will
+  ///        require a larger block size (512 threads minimum, up to 768 depending on the
+  ///        architecture).
+  ///
+  ///        Forward exclusion mask:
+  ///        This will handle cases of neighborlist-based non-bonded work units.  The work unit
+  ///        assumes a honeycomb-packed image of all atoms in or about the primary unit cell (some
+  ///        honeycomb pencils will straddle the unit cell boundary but their positions will be
+  ///        known as part of the decomposition).  The work unit will consist of thirty integers:
+  ///        seven starting locations of atom imports, seven bit-packed integers detailing the
+  ///        lengths of each stretch of atoms (first 20 bits) and the obligatory y- and z- imaging
+  ///        moves to make with such atoms (last 12 bits), seven integers detailing segments of
+  ///        each stretch of imported atoms to replicate in +x (and where in the list of imported
+  ///        atoms to put them), and finally seven integers detailing segments of each stretch of
+  ///        imported atoms to replicate in -x (and where to put the replicas).  The final two
+  ///        integers state the starting and ending indices of a list of tile instructions to
+  ///        process.  The tile instructions for the neighbor list-based non-bonded work units are
+  ///        much more complex than those for non-bonded work based on a static exclusion mask.
   ///
   /// \param 
   NonbondedWorkUnit(int tile_count_in);

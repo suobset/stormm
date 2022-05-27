@@ -6,10 +6,25 @@ namespace synthesis {
 using energy::tile_length;
   
 //-------------------------------------------------------------------------------------------------
-NonbondedWorkUnit::NonbondedWorkUnit(const AtomGraph *ag_in, const StaticExclusionMask *se_in) {
-    abscissa_atom_count{0}, ordinate_atom_count{0}, tile_count{0}, tile_instructions{},
-    ag_pointer{ag_in}, se_pointer{se_in}
-{}
+NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask *se_in,
+                                     const std::vector<int2> &tile_list) {
+    abscissa_atom_count{0},
+    ordinate_atom_count{0},
+    atom_limit{se_in->atom_count},
+    tile_count{static_cast<int>(tile_list.size())},
+    tile_instructions{}
+{
+  const int n_supert = se_in->supertile_stride_count;
+  for (int i = 0; i < tile_count; i++) {
+    const int sti = tile_list[i].x / supertile_length;
+    const int stj = tile_list[i].y / supertile_length;
+    const int stij_map_index = se_in->supertile_map_idx[(stj * n_supert) + sti];
+    const int ti = (tile_list[i].x - (sti * supertile_length)) / tile_length;
+    const int tj = (tile_list[i].y - (stj * supertile_length)) / tile_length;
+    const int tij_map_index = se_in->tile_map_idx[stij_map_index +
+                                                  (tj * tile_lengths_per_supertile) + ti];
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 size_t estimateNonbondedWorkUnitCount(const std::vector<int> &atom_counts, const int nbwu_tile) {
@@ -33,6 +48,26 @@ size_t estimateNonbondedWorkUnitCount(const std::vector<int> &atom_counts, const
           "of any one NonbondedWorkUnit.", "estimateNonbondedWorkUnitCount");
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<NonbondedWorkUnit>
+enumerateNonbondedWorkUnits(const std::vector<AtomGraph*> &ag_list,
+                            const std::vector<StaticExclusionMask*> se_list,
+                            const std::vector<int> &topology_indices,) {
+  std::vector<NonbondedWorkUnit> result;
+  result.reserve(nbwu_count);
+  const int nsys = topology_indices.size();
+  for (int i = 0; i < nsys; i++) {
+    const int natom = ag_list[i]->getAtomCount();
+    if (natom <= tile_length) {
+      result.emplace_back(
+    }
+    const int final_tile_start = (natom / tile_length) * tile_length;
+    int absc_counter = std::max(final_tile_start - tile_length, 0);
+    int ordi_counter = 0;
+    
+  }
 }
  
 //-------------------------------------------------------------------------------------------------
@@ -62,7 +97,6 @@ buildNonbondedWorkUnits(const std::vector<AtomGraph*> &ag_list,
   const size_t medium_wu_count = estimateNonbondedWorkUnitCount(atom_counts, 32);
   const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, 64);
   const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_size);
-
   if (tiny_wu_count < mega) {
     
   }
