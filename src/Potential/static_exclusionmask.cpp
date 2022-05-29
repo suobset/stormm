@@ -7,12 +7,12 @@ namespace energy {
 using topology::NonbondedKit;
 
 //-------------------------------------------------------------------------------------------------
-StaticExclusionMaskReader::StaticExclusionMaskReader(const int atom_count_in,
+StaticExclusionMaskReader::StaticExclusionMaskReader(const int natom_in,
                                                      const int supertile_stride_count_in,
                                                      const int* supertile_map_idx_in,
                                                      const int* tile_map_idx_in,
                                                      const uint* mask_data_in) :
-    atom_count{atom_count_in}, supertile_stride_count{supertile_stride_count_in},
+    natom{natom_in}, supertile_stride_count{supertile_stride_count_in},
     supertile_map_idx{supertile_map_idx_in}, tile_map_idx{tile_map_idx_in}, mask_data{mask_data_in}
 {}
 

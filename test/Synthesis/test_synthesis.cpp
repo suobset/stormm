@@ -17,6 +17,7 @@
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/scorecard.h"
+#include "../../src/Potential/static_exclusionmask.h"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Potential/eval_valence_workunit.h"
 #include "../../src/Random/random.h"
@@ -24,8 +25,9 @@
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Structure/local_arrangement.h"
-#include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/static_mask_synthesis.h"
+#include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
@@ -129,7 +131,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
   const bool files_exist = (getDrivePathType(top_name) == DrivePathType::FILE &&
                             getDrivePathType(crd_name) == DrivePathType::FILE);
   if (files_exist == false) {
-    rtWarn("The topology and input coordinates for the DHFR system appear to be missing.  Check "
+    rtWarn("The topology and input coordinates for a critical system appear to be missing.  Check "
            "the ${OMNI_SOURCE} variable (currently " + oe.getOmniSourcePath() + ") to make sure "
            "that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
   }
@@ -617,6 +619,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 3
   section("Valence work unit construction");
+
+  // Section 4
+  section("Static exclusion mask compilation");
   
   section(1);
   const char osc = osSeparator();
@@ -868,7 +873,47 @@ int main(const int argc, const char* argv[]) {
   const std::string ubiq_crd_name = base_crd_name + osc + "ubiquitin.inpcrd";
   const std::string ubiq_top_name = base_top_name + osc + "ubiquitin.top";
   runValenceWorkUnitTests(ubiq_top_name, ubiq_crd_name, oe, &my_prng);
-  
+
+  // Read additional implicit solvent models, then
+  const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
+  const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
+  const std::string lig1_crd_name = base_crd_name + osc + "stereo_L1.inpcrd";
+  const std::string lig1_top_name = base_top_name + osc + "stereo_L1.top";
+  const std::string lig2_crd_name = base_crd_name + osc + "stereo_L1_vs.inpcrd";
+  const std::string lig2_top_name = base_top_name + osc + "stereo_L1_vs.top";
+  const bool do_sem_tests = (getDrivePathType(trpi_crd_name) == DrivePathType::FILE &&
+                             getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
+                             getDrivePathType(dhfr_crd_name) == DrivePathType::FILE &&
+                             getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
+                             getDrivePathType(lig1_crd_name) == DrivePathType::FILE &&
+                             getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
+                             getDrivePathType(lig2_crd_name) == DrivePathType::FILE &&
+                             getDrivePathType(lig2_top_name) == DrivePathType::FILE);
+  AtomGraph trpi_ag, lig1_ag, lig2_ag, dhfr_ag;
+  PhaseSpace trpi_ps, lig1_ps, lig2_ps, dhfr_ps;
+  if (do_sem_tests) {
+    trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT);
+    dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT);
+    lig1_ag.buildFromPrmtop(lig1_top_name, ExceptionResponse::SILENT);
+    lig2_ag.buildFromPrmtop(lig2_top_name, ExceptionResponse::SILENT);
+    trpi_ps.buildFromFile(trpi_crd_name);
+    dhfr_ps.buildFromFile(dhfr_crd_name);
+    lig1_ps.buildFromFile(lig1_crd_name);
+    lig2_ps.buildFromFile(lig2_crd_name);
+  }
+  else {
+    rtWarn("Files for additional systems in isolated boundary conditions were not found.  Check "
+           "the ${OMNI_SOURCE} environment variable.  Subsequent tests involving these files "
+           "will be skipped.", "test_synthesis");
+  }
+  StaticExclusionMask dhfr_se(&dhfr_ag);
+  StaticExclusionMask trpi_se(&trpi_ag);
+  StaticExclusionMask lig1_se(&lig1_ag);
+  StaticExclusionMask lig2_se(&lig2_ag);
+  const std::vector<StaticExclusionMask*> semask_list = { &dhfr_se, &trpi_se, &lig1_se, &lig2_se };
+  const std::vector<int> system_indices = { 0, 1, 2, 3, 0, 1, 1, 3, 3, 2, 1 };
+  const StaticExclusionMaskSynthesis poly_se(semask_list, system_indices);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

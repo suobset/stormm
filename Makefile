@@ -72,6 +72,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
+		 $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/systemcache.cpp \
 		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
 	         $(SRCDIR)/Topology/amber_prmtop_util.cpp \
@@ -181,6 +182,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
+		   $(SRCDIR)/Synthesis/static_mask_synthesis.h \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.h \
 		   $(SRCDIR)/Synthesis/synthesis_enumerators.h \
 		   $(SRCDIR)/Synthesis/systemcache.h \
@@ -308,6 +310,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Structure/virtual_site_handling.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
+		$(SRCDIR)/Synthesis/static_mask_synthesis.o \
 		$(SRCDIR)/Synthesis/systemcache.o \
 		$(SRCDIR)/Synthesis/valence_workunit.o \
 		$(SRCDIR)/Topology/amber_prmtop_util.o \

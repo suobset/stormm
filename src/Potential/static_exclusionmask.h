@@ -38,11 +38,11 @@ constexpr int tiles_per_supertile = tile_lengths_per_supertile * tile_lengths_pe
 struct StaticExclusionMaskReader {
 
   /// Constructor works as any other abstract, taking a list of relevant constants and pointers
-  StaticExclusionMaskReader(int atom_count_in, int supertile_stride_count_in,
+  StaticExclusionMaskReader(int natom_in, int supertile_stride_count_in,
                             const int* supertile_map_idx_in, const int* tile_map_idx_in,
                             const uint* mask_data_in);
 
-  const int atom_count;              ///< Number of atoms in the system
+  const int natom;                   ///< Number of atoms in the system
   const int supertile_stride_count;  ///< Number of supertiles in the system
   const int* supertile_map_idx;      ///< Map indices for each supertile's stretch of tile masks.
                                      ///<   The indices in this array are pre-inflated by 256 (the
@@ -158,7 +158,7 @@ private:
                                 ///<   occur before other aspects of the code hit practical
                                 ///<   limitations on the system memory.
 
-  /// A collection of the mask groups, arranged in a concatenated fashion
+  // A collection of the mask groups, arranged in a concatenated fashion
   Hybrid<uint> all_masks;             ///< The actual mask data.  Each tile's exclusion map is
                                       ///<   a stretch of 32 unsigned integers in this array (16
                                       ///<   for the tile's sending atoms and 16 for the tile's

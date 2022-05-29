@@ -38,8 +38,8 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
     for (int stj = 0; stj <= sti; stj++) {
 
       // Tile dimensions and locations
-      const int stni_atoms = std::min(ser.atom_count - (supertile_length * sti), supertile_length);
-      const int stnj_atoms = std::min(ser.atom_count - (supertile_length * stj), supertile_length);
+      const int stni_atoms = std::min(ser.natom - (supertile_length * sti), supertile_length);
+      const int stnj_atoms = std::min(ser.natom - (supertile_length * stj), supertile_length);
       const int ni_tiles = (stni_atoms + tile_length - 1) / tile_length;
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
@@ -362,8 +362,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     for (int stj = 0; stj <= sti; stj++) {
 
       // Tile dimensions and locations
-      const int stni_atoms = std::min(ser.atom_count - (supertile_length * sti), supertile_length);
-      const int stnj_atoms = std::min(ser.atom_count - (supertile_length * stj), supertile_length);
+      const int stni_atoms = std::min(ser.natom - (supertile_length * sti), supertile_length);
+      const int stnj_atoms = std::min(ser.natom - (supertile_length * stj), supertile_length);
       const int ni_tiles = (stni_atoms + tile_length - 1) / tile_length;
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
@@ -662,8 +662,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     for (int stj = 0; stj <= sti; stj++) {
 
       // Tile dimensions and locations
-      const int stni_atoms = std::min(ser.atom_count - (supertile_length * sti), supertile_length);
-      const int stnj_atoms = std::min(ser.atom_count - (supertile_length * stj), supertile_length);
+      const int stni_atoms = std::min(ser.natom - (supertile_length * sti), supertile_length);
+      const int stnj_atoms = std::min(ser.natom - (supertile_length * stj), supertile_length);
       const int ni_tiles = (stni_atoms + tile_length - 1) / tile_length;
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
@@ -871,8 +871,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     for (int stj = 0; stj <= sti; stj++) {
 
       // Tile dimensions and locations
-      const int stni_atoms = std::min(ser.atom_count - (supertile_length * sti), supertile_length);
-      const int stnj_atoms = std::min(ser.atom_count - (supertile_length * stj), supertile_length);
+      const int stni_atoms = std::min(ser.natom - (supertile_length * sti), supertile_length);
+      const int stnj_atoms = std::min(ser.natom - (supertile_length * stj), supertile_length);
       const int ni_tiles = (stni_atoms + tile_length - 1) / tile_length;
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 

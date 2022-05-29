@@ -1,3 +1,4 @@
+// -*-c++-*-
 #ifndef OMNI_NONBONDED_WORKUNIT_H
 #define OMNI_NONBONDED_WORKUNIT_H
 
@@ -67,8 +68,15 @@ public:
   ///        process.  The tile instructions for the neighbor list-based non-bonded work units are
   ///        much more complex than those for non-bonded work based on a static exclusion mask.
   ///
-  /// \param 
-  NonbondedWorkUnit(int tile_count_in);
+  /// \param se_in        Static exclusion mask for a system in isolated boundary conditions
+  /// \param tile_list    Paired with a static exclusion mask and non-huge tiles, the specific list
+  ///                     of lower left corners for tiles to include in this work unit.  Among
+  ///                     them, the tiles must not call for importing more than 256 atoms.
+  /// \param tile_corner  The lower limits of the supertile to process.  Paired with a static
+  ///                     exclusion mask in extreme circumstances of very large implicit solvent
+  ///                     systems.  This will call for importing 512 atoms (2 x supertile_length)
+  ///                     in the most general case and will require larger thread blocks.
+  NonbondedWorkUnit(const StaticExclusionMask *se_in, const std::vector<int2> &tile_list);
 
 private:
   int abscissa_atom_count;
