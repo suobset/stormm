@@ -7,7 +7,18 @@ using card::HybridKind;
 using energy::StaticExclusionMaskReader;
 using energy::tile_length;
 using energy::tiles_per_supertile;
-  
+
+//-------------------------------------------------------------------------------------------------
+SeMaskSynthesisReader::SeMaskSynthesisReader(const int* atom_counts_in, const int nsupertile_in,
+                                             const int ntile_in, const int* supertile_map_idx_in,
+                                             const int* supertile_map_bounds_in,
+                                             const int* tile_map_idx_in,
+                                             const uint* mask_data_in) :
+    atom_counts{atom_counts_in}, nsupertile{nsupertile_in}, ntile{ntile_in},
+    supertile_map_idx{supertile_map_idx_in}, supertile_map_bounds{supertile_map_bounds_in},
+    tile_map_idx{tile_map_idx_in}, mask_data{mask_data_in}
+{}
+
 //-------------------------------------------------------------------------------------------------
 StaticExclusionMaskSynthesis::
 StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask*> &base_masks,
@@ -159,6 +170,13 @@ void StaticExclusionMaskSynthesis::build(const std::vector<StaticExclusionMask*>
     tbase += (base_masks[topid]->getUniqueSuperTileCount() - 1) * tiles_per_supertile;
   }
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+SeMaskSynthesisReader StaticExclusionMaskSynthesis::data(const HybridTargetLevel tier) const {
+  return SeMaskSynthesisReader(atom_counts.data(tier), unique_supertile_count, unique_tile_count,
+                               supertile_map_indices.data(tier), supertile_map_bounds.data(tier),
+                               tile_map_indices.data(tier), all_masks.data(tier));
+}
+
 } // namespace synthesis
 } // namespace omni

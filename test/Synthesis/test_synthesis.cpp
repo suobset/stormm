@@ -881,17 +881,17 @@ int main(const int argc, const char* argv[]) {
   const std::string lig1_top_name = base_top_name + osc + "stereo_L1.top";
   const std::string lig2_crd_name = base_crd_name + osc + "stereo_L1_vs.inpcrd";
   const std::string lig2_top_name = base_top_name + osc + "stereo_L1_vs.top";
-  const bool do_sem_tests = (getDrivePathType(trpi_crd_name) == DrivePathType::FILE &&
-                             getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
-                             getDrivePathType(dhfr_crd_name) == DrivePathType::FILE &&
-                             getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
-                             getDrivePathType(lig1_crd_name) == DrivePathType::FILE &&
-                             getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
-                             getDrivePathType(lig2_crd_name) == DrivePathType::FILE &&
-                             getDrivePathType(lig2_top_name) == DrivePathType::FILE);
+  const bool semk_exist = (getDrivePathType(trpi_crd_name) == DrivePathType::FILE &&
+                           getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
+                           getDrivePathType(dhfr_crd_name) == DrivePathType::FILE &&
+                           getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
+                           getDrivePathType(lig1_crd_name) == DrivePathType::FILE &&
+                           getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
+                           getDrivePathType(lig2_crd_name) == DrivePathType::FILE &&
+                           getDrivePathType(lig2_top_name) == DrivePathType::FILE);
   AtomGraph trpi_ag, lig1_ag, lig2_ag, dhfr_ag;
   PhaseSpace trpi_ps, lig1_ps, lig2_ps, dhfr_ps;
-  if (do_sem_tests) {
+  if (semk_exist) {
     trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT);
     dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT);
     lig1_ag.buildFromPrmtop(lig1_top_name, ExceptionResponse::SILENT);
@@ -906,6 +906,7 @@ int main(const int argc, const char* argv[]) {
            "the ${OMNI_SOURCE} environment variable.  Subsequent tests involving these files "
            "will be skipped.", "test_synthesis");
   }
+  const TestPriority do_semk_tests = (semk_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   StaticExclusionMask dhfr_se(&dhfr_ag);
   StaticExclusionMask trpi_se(&trpi_ag);
   StaticExclusionMask lig1_se(&lig1_ag);
@@ -913,7 +914,57 @@ int main(const int argc, const char* argv[]) {
   const std::vector<StaticExclusionMask*> semask_list = { &dhfr_se, &trpi_se, &lig1_se, &lig2_se };
   const std::vector<int> system_indices = { 0, 1, 2, 3, 0, 1, 1, 3, 3, 2, 1 };
   const StaticExclusionMaskSynthesis poly_se(semask_list, system_indices);
+  const SeMaskSynthesisReader poly_ser = poly_se.data();
+  section(4);
+  std::vector<int> poly_ser_natom(system_indices.size()), ag_natom(system_indices.size());
+  std::vector<int> mask_mismatches(system_indices.size(), 0);
+  for (size_t sysid = 0; sysid < system_indices.size(); sysid++) {
+    const StaticExclusionMaskReader ser = semask_list[system_indices[sysid]]->data();
+    const int natom = poly_ser.atom_counts[sysid];
+    poly_ser_natom[sysid] = natom;
+    ag_natom[sysid] = semask_list[system_indices[sysid]]->getTopologyPointer()->getAtomCount();
+    const int nst = (poly_ser.atom_counts[sysid] + supertile_length - 1) / supertile_length;
+    const int synth_st_offset = poly_ser.supertile_map_bounds[sysid];
 
+    // Loop over all pairs (double-counting interactions) so as to test the exclusion masks from
+    // both directions.
+    for (int i = 0; i < natom; i++) {
+      const int sti  = i / supertile_length;
+      const int ti   = (i - (sti * supertile_length)) / tile_length;
+      const int posi = i - (sti * supertile_length) - (ti * tile_length);
+      for (int j = 0; j < natom; j++) {
+        const int stj  = j / supertile_length;
+        const int tj   = (j - (stj * supertile_length)) / tile_length;
+        const int posj = j - (stj * supertile_length) - (tj * tile_length);
+
+        // Get the single-system tile mask
+        const int onesys_stij_map_idx = ser.supertile_map_idx[(stj * ser.supertile_stride_count) +
+                                                              sti];
+        const int onesys_tij_map_idx = ser.tile_map_idx[onesys_stij_map_idx +
+                                                        (tj * tile_lengths_per_supertile) + ti];
+        const uint onesys_mask_i = ser.mask_data[onesys_tij_map_idx + posi];
+
+        // Get the synthesis tile mask
+        const int synth_stij_map_idx = poly_ser.supertile_map_idx[(stj * nst) + sti +
+                                                                  synth_st_offset];
+        const int synth_tij_map_idx = poly_ser.tile_map_idx[synth_stij_map_idx + ti +
+                                                            (tj * tile_lengths_per_supertile)];
+        const uint synth_mask_i = poly_ser.mask_data[synth_tij_map_idx + posi];
+
+        // Compare the two exclusion masks
+        if (((onesys_mask_i >> posj) & 0x1) != ((synth_mask_i >> posj) & 0x1)) {
+          mask_mismatches[sysid] += 1;
+        }
+      }
+    }
+  }
+  check(poly_ser_natom, RelationalOperator::EQUAL, ag_natom, "The systems' numbers of atoms "
+        "stored in the compilation of static exclusion masks do not match the numbers of atoms "
+        "referenced from the original topologies.", do_semk_tests);
+  check(mask_mismatches, RelationalOperator::EQUAL, std::vector<int>(system_indices.size(), 0),
+        "Exclusions referenced from the compilation of systems do not match those obtained from "
+        "the individual systems' static exclusion masks.", do_semk_tests);
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

@@ -120,31 +120,6 @@ int main(const int argc, const char* argv[]) {
     sc_orig.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
   const std::vector<double> impr_e0 =
     sc_orig.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
-
-  // CHECK
-#if 0
-  printf("Energies = [\n");
-  for (size_t i = 0; i < system_count; i++) {
-    printf("  %9.4lf %9.4lf %9.4lf %9.4lf\n", bond_e0[i], angl_e0[i], dihe_e0[i], impr_e0[i]);
-  }
-  for (size_t i = 0; i < system_count; i++) {
-    const ChemicalDetailsKit cdk = ag_list[i].getChemicalDetailsKit();
-    const ValenceKit<double> vk = ag_list[i].getDoublePrecisionValenceKit();
-    printf("%s :\n", getBaseName(ag_list[i].getFileName()).c_str());
-    for (int pos = 0; pos < vk.nbond; pos++) {
-      const int atomi = vk.bond_i_atoms[pos];
-      const int atomj = vk.bond_j_atoms[pos];
-      printf("  %4.4s %4.4s   %4d %4d   %4.4s %4.4s\n",
-             char4ToString(cdk.atom_names[atomi]).c_str(),
-             char4ToString(cdk.atom_names[atomj]).c_str(), atomi + 1, atomj + 1,
-             char4ToString(cdk.atom_types[atomi]).c_str(),
-             char4ToString(cdk.atom_types[atomj]).c_str());
-    }
-  }
-  printf("];\n");
-#endif
-  // END CHECK
-  
   ForceFieldElement ca_ha_bond(ParameterKind::BOND, stringToChar4("ca"), stringToChar4("ha"));
   ForceFieldElement bl_bm_bond(ParameterKind::BOND, stringToChar4("bl"), stringToChar4("bm"));
   ca_ha_bond.setStiffness(100.0);
@@ -171,16 +146,6 @@ int main(const int argc, const char* argv[]) {
     sc_mods.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL);
   const std::vector<double> impr_em =
     sc_mods.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL);
-  
-  // CHECK
-#if 0
-  printf("Energies = [\n");
-  for (size_t i = 0; i < system_count; i++) {
-    printf("  %9.4lf %9.4lf %9.4lf %9.4lf\n", bond_em[i], angl_em[i], dihe_em[i], impr_em[i]);
-  }
-  printf("];\n");
-#endif
-  // END CHECK
 
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

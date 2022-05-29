@@ -10,8 +10,30 @@ namespace omni {
 namespace synthesis {
 
 using card::Hybrid;
+using card::HybridTargetLevel;
 using energy::StaticExclusionMask;
 using topology::AtomGraph;
+
+/// \brief The read-only abstract for a static exclusion mask compilation.  This provides access
+///        in a similar format to the static exclusion mask reader for a single system.
+struct SeMaskSynthesisReader {
+
+  /// \brief The constructor takes the object's constants and data pointers on either the CPU or
+  ///        HPC resources.
+  SeMaskSynthesisReader(const int* atom_counts_in, const int nsupertile_in, const int ntile_in,
+                        const int* supertile_map_idx_in, const int* supertile_map_bounds_in,
+                        const int* tile_map_idx_in, const uint* mask_data_in);
+
+  const int* atom_counts;           ///< Counts of atoms in all systems
+  const int nsupertile;             ///< Number of unique supertiles stored by the mask
+  const int ntile;                  ///< Number of unique tiles stored by the mask
+  const int* supertile_map_idx;     ///< Supertile maps for all systems, stored in a bounded list
+                                    ///<   delineated by supertile_map_bounds
+  const int* supertile_map_bounds;  ///< Bounds array for the supertile index maps of each system
+                                    ///<   stored in supertile_map_idx
+  const int* tile_map_idx;          ///< Tile maps for all unique supertiles
+  const uint* mask_data;            ///< Mask data for all unique tiles
+};
   
 class StaticExclusionMaskSynthesis {
 public:
@@ -41,9 +63,17 @@ public:
   StaticExclusionMaskSynthesis(const std::vector<AtomGraph*> &base_toplogies,
                                const std::vector<int> &topology_indices);
   /// \}
-
+  
+  /// \brief Get the abstract for this static exclusion mask synthesis.
+  SeMaskSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
 private:
-  Hybrid<int> atom_counts;            ///< Atom counts for all systems
+  Hybrid<int> atom_counts;            ///< Atom counts for all systems.  Supertile strides are not
+                                      ///<   stored, as this object will be used primarily to
+                                      ///<   direct the creation of instructions for non-bonded
+                                      ///<   work units.  The atom count is a more meaningful
+                                      ///<   quantity, from which the number of supertile strides
+                                      ///<   can be readily derived.
   int unique_supertile_count;         ///< The number of unique supertiles, essentially a sum of
                                       ///<   unique supertiles in all unique masks but omitting the
                                       ///<   zero supertile for all but the first mask.

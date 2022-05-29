@@ -334,24 +334,6 @@ int main(const int argc, const char* argv[]) {
     alad_ag.buildFromPrmtop(alad_top_name, ExceptionResponse::SILENT);
     alad_ps.buildFromFile(alad_crd_name, CoordinateFileKind::AMBER_INPCRD);
   }
-
-  // CHECK
-  PhaseSpaceWriter dhfr_psw = dhfr_ps.data();
-  ValenceKit<double> vk = dhfr_ag.getDoublePrecisionValenceKit();
-  ValenceKit<float> sp_vk = dhfr_ag.getSinglePrecisionValenceKit();
-  ScoreCard ddf_sc(1, 16, 32);
-  evaluateCharmmImproperTerms<double,
-                              double, double>(vk, dhfr_psw.xcrd, dhfr_psw.ycrd, dhfr_psw.zcrd,
-                                              dhfr_psw.umat, dhfr_psw.invu, dhfr_psw.unit_cell,
-                                              dhfr_psw.xfrc, dhfr_psw.yfrc, dhfr_psw.zfrc,
-                                              &ddf_sc, EvaluateForce::YES, 0);
-  evaluateCharmmImproperTerms<double,
-                              double, float>(sp_vk, dhfr_psw.xcrd, dhfr_psw.ycrd, dhfr_psw.zcrd,
-                                             dhfr_psw.umat, dhfr_psw.invu, dhfr_psw.unit_cell,
-                                             dhfr_psw.xfrc, dhfr_psw.yfrc, dhfr_psw.zfrc,
-                                             &ddf_sc, EvaluateForce::YES, 0);
-  // END CHECK
-  
   ScoreCard all_systems_sc(3);
   const int trpcage_idx = 0;
   const int dhfr_idx = 1;

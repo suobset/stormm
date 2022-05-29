@@ -273,41 +273,6 @@ int main(const int argc, const char* argv[]) {
   const StaticExclusionMask trpw_semask(&trpw_ag);
   timer.assignTime(sem_timings);
 
-  // CHECK
-#if 0
-  printf("Alad Excl mask (%3d unique supertiles, %6d unique tiles:\n",
-         alad_semask.getUniqueSuperTileCount(), alad_semask.getUniqueTileCount());
-  StaticExclusionMaskReader alad_ser = alad_semask.data();
-  const int alad_nst = alad_ser.supertile_stride_count;
-  for (int i = 0; i < alad_nst; i++) {
-    for (int j = 0; j < alad_nst; j++) {
-      printf(" %5d", alad_ser.supertile_map_idx[(alad_nst * j) + i]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-  printf("DHFR Excl mask (%3d unique supertiles, %6d unique tiles:\n",
-         dhfr_semask.getUniqueSuperTileCount(), dhfr_semask.getUniqueTileCount());
-  StaticExclusionMaskReader dhfr_ser = dhfr_semask.data();
-  const int dhfr_nst = dhfr_ser.supertile_stride_count;
-  for (int i = 0; i < dhfr_nst; i++) {
-    for (int j = 0; j < dhfr_nst; j++) {
-      printf(" %5d", dhfr_ser.supertile_map_idx[(dhfr_nst * j) + i]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-  printf("And here is ST 0:\n");
-  for (int i = 0; i < 16; i++) {
-    for (int j = 0; j < 16; j++) {
-      printf("  %4d", dhfr_ser.tile_map_idx[dhfr_ser.supertile_map_idx[0] + (16 * j) + i]);
-    }
-    printf("\n");
-  }
-  printf("\n");
-#endif
-  // END CHECK
-
   // Check exclusions for three systems against the original topologies
   section(1);
   const std::vector<const StaticExclusionMask*> my_masks = { &trpi_semask, &alad_semask,
