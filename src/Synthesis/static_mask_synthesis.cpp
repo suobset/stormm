@@ -1,3 +1,4 @@
+#include "Math/rounding.h"
 #include "static_mask_synthesis.h"
 
 namespace omni {
@@ -7,30 +8,38 @@ using card::HybridKind;
 using energy::StaticExclusionMaskReader;
 using energy::tile_length;
 using energy::tiles_per_supertile;
-
+using math::roundUp;
+  
 //-------------------------------------------------------------------------------------------------
 SeMaskSynthesisReader::SeMaskSynthesisReader(const int nsys_in, const int* atom_counts_in,
-                                             const int nsupertile_in, const int ntile_in,
-                                             const int* supertile_map_idx_in,
+                                             const int* atom_offsets_in, const int nsupertile_in,
+                                             const int ntile_in, const int* supertile_map_idx_in,
                                              const int* supertile_map_bounds_in,
                                              const int* tile_map_idx_in,
                                              const uint* mask_data_in) :
-    nsys{nsys_in}, atom_counts{atom_counts_in}, nsupertile{nsupertile_in}, ntile{ntile_in},
-    supertile_map_idx{supertile_map_idx_in}, supertile_map_bounds{supertile_map_bounds_in},
-    tile_map_idx{tile_map_idx_in}, mask_data{mask_data_in}
+    nsys{nsys_in}, atom_counts{atom_counts_in}, atom_offsets{atom_offsets_in},
+    nsupertile{nsupertile_in}, ntile{ntile_in}, supertile_map_idx{supertile_map_idx_in},
+    supertile_map_bounds{supertile_map_bounds_in}, tile_map_idx{tile_map_idx_in},
+    mask_data{mask_data_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
-StaticExclusionMaskSynthesis::
-StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask*> &base_masks,
-                             const std::vector<int> &topology_indices) :
+StaticExclusionMaskSynthesis::StaticExclusionMaskSynthesis() :
     atom_counts{},
+    atom_offsets{},
     unique_supertile_count{0},
     unique_tile_count{0},
     supertile_map_indices{HybridKind::ARRAY, "sesyn_supertile_idx"},
     supertile_map_bounds{HybridKind::ARRAY, "sesyn_supertile_bnd"},
     tile_map_indices{HybridKind::ARRAY, "sesyn_tile_idx"},
     all_masks{HybridKind::ARRAY, "sesyn_mask_data"}
+{}
+  
+//-------------------------------------------------------------------------------------------------
+StaticExclusionMaskSynthesis::
+StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask*> &base_masks,
+                             const std::vector<int> &topology_indices) :
+    StaticExclusionMaskSynthesis()
 {
   build(base_masks, topology_indices);
 }
@@ -39,13 +48,7 @@ StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask*> &base_masks
 StaticExclusionMaskSynthesis::
 StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask> &base_masks,
                              const std::vector<int> &topology_indices) :
-    atom_counts{},
-    unique_supertile_count{0},
-    unique_tile_count{0},
-    supertile_map_indices{HybridKind::ARRAY, "sesyn_supertile_idx"},
-    supertile_map_bounds{HybridKind::ARRAY, "sesyn_supertile_bnd"},
-    tile_map_indices{HybridKind::ARRAY, "sesyn_tile_idx"},
-    all_masks{HybridKind::ARRAY, "sesyn_mask_data"}
+    StaticExclusionMaskSynthesis()
 {
   const size_t ntop = base_masks.size();
   std::vector<StaticExclusionMask*> base_mask_ptrs(ntop);
@@ -59,13 +62,7 @@ StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask> &base_masks,
 StaticExclusionMaskSynthesis::
 StaticExclusionMaskSynthesis(const std::vector<AtomGraph*> &base_topologies,
                              const std::vector<int> &topology_indices) :
-    atom_counts{},
-    unique_supertile_count{0},
-    unique_tile_count{0},
-    supertile_map_indices{HybridKind::ARRAY, "sesyn_supertile_idx"},
-    supertile_map_bounds{HybridKind::ARRAY, "sesyn_supertile_bnd"},
-    tile_map_indices{HybridKind::ARRAY, "sesyn_tile_idx"},
-    all_masks{HybridKind::ARRAY, "sesyn_mask_data"}
+    StaticExclusionMaskSynthesis()
 {
   const size_t ntop = base_topologies.size();
   std::vector<StaticExclusionMask> base_masks;
@@ -101,14 +98,19 @@ void StaticExclusionMaskSynthesis::build(const std::vector<StaticExclusionMask*>
   // Lay out bounds arrays and basic descriptors spanning all systems
   const int nsys = topology_indices.size();
   atom_counts.resize(nsys);
+  atom_offsets.resize(nsys);
   supertile_map_bounds.resize(nsys + 1);
   int supertile_acc = 0;
   supertile_map_bounds.putHost(supertile_acc, 0);
+  int curr_offset = 0;
   for (int sysid = 0; sysid < nsys; sysid++) {
-    atom_counts.putHost(base_masks[topology_indices[sysid]]->getAtomCount(), sysid);
+    const int sys_natom = base_masks[topology_indices[sysid]]->getAtomCount();
+    atom_counts.putHost(sys_natom, sysid);
+    atom_offsets.putHost(curr_offset, sysid);
     const int stcount = base_masks[topology_indices[sysid]]->getSuperTileStrideCount();
     supertile_acc += stcount * stcount;
     supertile_map_bounds.putHost(supertile_acc, sysid + 1);
+    curr_offset += roundUp(sys_natom, warp_size_int);
   }
   supertile_map_indices.resize(supertile_acc);
 
@@ -181,14 +183,41 @@ int StaticExclusionMaskSynthesis::getSystemCount() const {
 int StaticExclusionMaskSynthesis::getAtomCount(const int index) const {
   return atom_counts.readHost(index);
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+int StaticExclusionMaskSynthesis::getAtomOffset(const int index) const {
+  return atom_offsets.readHost(index);
+}
+
 //-------------------------------------------------------------------------------------------------
 SeMaskSynthesisReader StaticExclusionMaskSynthesis::data(const HybridTargetLevel tier) const {
-  return SeMaskSynthesisReader(system_count, atom_counts.data(tier), unique_supertile_count,
-                               unique_tile_count, supertile_map_indices.data(tier),
-                               supertile_map_bounds.data(tier), tile_map_indices.data(tier),
-                               all_masks.data(tier));
+  return SeMaskSynthesisReader(system_count, atom_counts.data(tier), atom_offsets.data(tier),
+                               unique_supertile_count, unique_tile_count,
+                               supertile_map_indices.data(tier), supertile_map_bounds.data(tier),
+                               tile_map_indices.data(tier), all_masks.data(tier));
 }
+
+#ifdef OMNI_USE_HPC
+//-------------------------------------------------------------------------------------------------
+void StaticExclusionMaskSynthesis::upload() {
+  atom_counts.upload();
+  atom_offsets.upload();
+  supertile_map_indices.upload();
+  supertile_map_bounds.upload();
+  tile_map_indices.upload();
+  all_masks.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void StaticExclusionMaskSynthesis::download() {
+  atom_counts.download();
+  atom_offsets.download();
+  supertile_map_indices.download();
+  supertile_map_bounds.download();
+  tile_map_indices.download();
+  all_masks.download();
+}
+#endif
 
 } // namespace synthesis
 } // namespace omni

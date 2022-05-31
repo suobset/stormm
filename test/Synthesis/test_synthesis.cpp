@@ -971,23 +971,33 @@ int main(const int argc, const char* argv[]) {
   check(mask_mismatches, RelationalOperator::EQUAL, std::vector<int>(system_indices.size(), 0),
         "Exclusions referenced from the compilation of systems do not match those obtained from "
         "the individual systems' static exclusion masks.", do_semk_tests);
-
-  // CHECK
-#if 0
-  std::vector<NonbondedWorkUnit> nbv = buildNonbondedWorkUnits(dhfr_se);
-  int nbt_count = 0;
-  for (int i = 0; i < nbv.size(); i++) {
-    nbt_count += nbv[i].getTileCount();
-    printf("NBW[%4d] = [\n", i);
-    for (int j = 0; j < nbv[i].getTileCount(); j++) {
-      const int4 lims = nbv[i].getTileLimits(j);
-      printf("    %4d %4d %4d %4d\n", lims.x, lims.y, lims.z, lims.w);
-    }
-    printf("];\n");
+  const std::vector<NonbondedWorkUnit> dhfr_nbv = buildNonbondedWorkUnits(dhfr_se);
+  const std::vector<NonbondedWorkUnit> trpi_nbv = buildNonbondedWorkUnits(trpi_se);
+  const std::vector<NonbondedWorkUnit> lig1_nbv = buildNonbondedWorkUnits(lig1_se);
+  const std::vector<NonbondedWorkUnit> lig2_nbv = buildNonbondedWorkUnits(lig2_se);
+  std::vector<int> nbt_counts(4, 0);
+  for (int i = 0; i < dhfr_nbv.size(); i++) {
+    nbt_counts[0] += dhfr_nbv[i].getTileCount();
   }
-  printf("There are %5d non-bonded tiles\n", nbt_count);
-#endif
-  // END CHECK
+  for (int i = 0; i < trpi_nbv.size(); i++) {
+    nbt_counts[1] += trpi_nbv[i].getTileCount();
+  }
+  for (int i = 0; i < lig1_nbv.size(); i++) {
+    nbt_counts[2] += lig1_nbv[i].getTileCount();
+  }
+  for (int i = 0; i < lig2_nbv.size(); i++) {
+    nbt_counts[3] += lig2_nbv[i].getTileCount();
+  }
+  const std::vector<int> nbt_counts_answer = { 12246, 190, 15, 21 };
+  const std::vector<size_t> nbwu_counts = { dhfr_nbv.size(), trpi_nbv.size(), lig1_nbv.size(),
+                                            lig2_nbv.size() };
+  const std::vector<size_t> nbwu_counts_answer = { 1531LLU, 24LLU, 2LLU, 3LLU };
+  check(nbwu_counts, RelationalOperator::EQUAL, nbwu_counts_answer, "The number of non-bonded "
+        "work units obtained for four systems in isolated boundary conditions do not meet "
+        "expectations.", do_semk_tests);
+  check(nbt_counts, RelationalOperator::EQUAL, nbt_counts_answer, "The number of non-bonded tiles "
+        "obtained for four systems in isolated boundary conditions do not meet expectations.",
+        do_semk_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

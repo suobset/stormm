@@ -20,12 +20,15 @@ struct SeMaskSynthesisReader {
 
   /// \brief The constructor takes the object's constants and data pointers on either the CPU or
   ///        HPC resources.
-  SeMaskSynthesisReader(int nsys_in, const int* atom_counts_in, int nsupertile_in, int ntile_in,
-                        const int* supertile_map_idx_in, const int* supertile_map_bounds_in,
-                        const int* tile_map_idx_in, const uint* mask_data_in);
+  SeMaskSynthesisReader(int nsys_in, const int* atom_counts_in, const int* atom_offsets_in,
+                        int nsupertile_in, int ntile_in, const int* supertile_map_idx_in,
+                        const int* supertile_map_bounds_in, const int* tile_map_idx_in,
+                        const uint* mask_data_in);
 
   const int nsys;                   ///< The number of systems covered by this object
   const int* atom_counts;           ///< Counts of atoms in all systems
+  const int* atom_offsets;          ///< Offsets for the atoms of any given system within a
+                                    ///<   corresponding coordinate or topology synthesis
   const int nsupertile;             ///< Number of unique supertiles stored by the mask
   const int ntile;                  ///< Number of unique tiles stored by the mask
   const int* supertile_map_idx;     ///< Supertile maps for all systems, stored in a bounded list
@@ -44,6 +47,7 @@ public:
   ///        which masks to apply in a given order for the synthesis of systems.
   ///
   /// Overloaded:
+  ///   - Create an empty object
   ///   - Accept a list of static exclusion mask object pointers
   ///   - Accept a list of static exclusion mask objects
   ///   - Accept a list of topology pointers, from which exclusion masks will be constructed
@@ -55,6 +59,8 @@ public:
   /// \param topology_indices  List of indices into base_masks indicating how to compile the
   ///                          synthesis of systems
   /// \{
+  StaticExclusionMaskSynthesis();
+  
   StaticExclusionMaskSynthesis(const std::vector<StaticExclusionMask*> &base_masks,
                                const std::vector<int> &topology_indices);
 
@@ -73,6 +79,11 @@ public:
   /// \param index  The system index for which to query the atom count
   int getAtomCount(int index = 0) const;
 
+  /// \brief Get the starting position of atoms in one of the systems described by the mask.
+  ///
+  /// \param index  The system index for which to query the atom offset
+  int getAtomOffset(int index = 0) const;
+
   /// \brief Get the abstract for this static exclusion mask synthesis.
   SeMaskSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
@@ -84,6 +95,10 @@ private:
                                       ///<   work units.  The atom count is a more meaningful
                                       ///<   quantity, from which the number of supertile strides
                                       ///<   can be readily derived.
+  Hybrid<int> atom_offsets;           ///< Atomic offsets for all systems.  These will be
+                                      ///<   calculated with the same warp size padding as their
+                                      ///<   cognates in the PhaseSpaceSynthesis and
+                                      ///<   AtomGraphSynthesis.
   int unique_supertile_count;         ///< The number of unique supertiles, essentially a sum of
                                       ///<   unique supertiles in all unique masks but omitting the
                                       ///<   zero supertile for all but the first mask.

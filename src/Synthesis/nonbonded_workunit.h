@@ -89,13 +89,13 @@ public:
   ///        process.  The tile instructions for the neighbor list-based non-bonded work units are
   ///        much more complex than those for non-bonded work based on a static exclusion mask.
   ///
-  /// \param se_in           Static exclusion mask for a system in isolated boundary conditions
+  /// \param se              Static exclusion mask, or synthesis thereof, for one or more systems
+  ///                        in isolated boundary conditions
   /// \param tile_list       Paired with a static exclusion mask and non-huge tiles, the specific
-  ///                        list of lower left corners for tiles to include for this work unit in
-  ///                        the x- and y-members, plus the system index number in the z member
-  ///                        (if more than one system is present in a synthesis).  Among them, the
-  ///                        tiles must not call for importing more than small_block_max_atoms
-  ////                       atoms.
+  ///                        list of tiles to include for this work unit in the x- and y-members,
+  ///                        plus the system index number in the z member (if more than one system
+  ///                        is present in a synthesis).  Among them, the tiles must not call for
+  ///                        importing more than small_block_max_atoms atoms.
   /// \param abscissa_start  The abscissa axis start of the supertile to process.  Paired with a
   ///                        static exclusion mask in extreme circumstances of very large implicit
   ///                        solvent systems.  This will call for importing 512 atoms
@@ -107,6 +107,9 @@ public:
   
   NonbondedWorkUnit(const StaticExclusionMask &se, const int abscissa_start,
                     const int ordinate_start);
+
+  NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
+                    const std::vector<int3> &tile_list);
   /// \}
 
   /// \brief Get the tile count of this work units.

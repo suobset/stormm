@@ -151,6 +151,107 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
 }
 
 //-------------------------------------------------------------------------------------------------
+NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
+                                     const std::vector<int3> &tile_list) :
+  tile_count{static_cast<int>(tile_list.size())},
+  score{0},
+  imports{std::vector<int>(small_block_max_imports)},
+  import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
+  tile_instructions{std::vector<uint2>(tile_count)}
+{
+  // As before, loop over tiles to determine the array of imported atoms.  Work from the static
+  // exclusion mask compilation rather than a solitary system's exclusions.  The imports will be
+  // determined not just for tile numbers but also for system indices--the fourth tile edge's
+  // worth of atoms in the first system is not the fourth tile edge's worth of atoms in the third
+  // system.  Long long ints and standard sorting to the rescue.
+  SeMaskSynthesisReader ser = se.data();
+  std::vector<llint> tmp_imports(2 * tile_count);
+  for (int i = 0; i < tile_count; i++) {
+
+    // Get the atom count, and thus the supertile count, for the particular tile's system
+    const int natom = ser.atom_counts[tile_list[i].z];
+    const int n_supert = (natom + supertile_length - 1) / supertile_length;
+    if (tile_list[i].x < 0 || tile_list[i].y < 0 || tile_list[i].x * tile_length >= natom ||
+        tile_list[i].y * tile_length >= natom) {
+      rtErr("A tile with lower left corner (" + std::to_string(tile_list[i].x * tile_length) +
+            ", " + std::to_string(tile_list[i].y * tile_length) + ") cannot be part of a system "
+            "(index " + std::to_string(tile_list[i].z) + ") with " + std::to_string(natom) +
+            " atoms.", "NonbondedWorkUnit");
+    }
+    const int sti = tile_list[i].x / tile_lengths_per_supertile;
+    const int stj = tile_list[i].y / tile_lengths_per_supertile;
+    const int stm_bound = ser.supertile_map_bounds[tile_list[i].z];
+    const int stij_map_index = ser.supertile_map_idx[stm_bound + (stj * n_supert) + sti];
+    const int ti = tile_list[i].x - (sti * tile_lengths_per_supertile);
+    const int tj = tile_list[i].y - (stj * tile_lengths_per_supertile);
+    const int tij_map_index = ser.tile_map_idx[stij_map_index +
+                                               (tj * tile_lengths_per_supertile) + ti];
+    tile_instructions[i].y = tij_map_index;
+    tmp_imports[(2 * i)    ] = (tile_list[i].x |
+                                (static_cast<llint>(tile_list[i].z) << int_bit_count_int));
+    tmp_imports[(2 * i) + 1] = (tile_list[i].y |
+                                (static_cast<llint>(tile_list[i].z) << int_bit_count_int));
+  }
+
+  // As in the simple constructor involving just one system, we reduce the import list to its
+  // unique values, then inflate the imports to read as atom (rather than tile) indices.  This
+  // time, however, we add the system lower bound as well.  The imports array will then have
+  // absolute atom indices to obtain from the coordinate arrays pertaining to the compilation of
+  // systems, but it is still of interest what system they come from, as this will reveal the
+  // maximum numbers of atoms in each system and thus the extent of the import (whether it goes
+  // all the way to tile_length, or stops at the upper limit of system atoms).
+  reduceUniqueValues(&tmp_imports);
+  const int n_imports = tmp_imports.size();
+  std::vector<int> import_system_indices(n_imports, -1);
+  for (int i = 0; i < n_imports; i++) {
+    import_system_indices[i] = static_cast<int>(tmp_imports[i] >> int_bit_count_int);
+    imports[i] = (static_cast<int>(tmp_imports[i] & 0x00000000ffffffffLL) * tile_length) +
+                 ser.atom_offsets[import_system_indices[i]];
+  }
+  for (int i = n_imports; i < small_block_max_imports; i++) {
+    imports[i] = -1;
+  }
+  score = n_imports + (tile_count * 8);
+
+  // Assemble work unit instructions
+  for (int i = 0; i < n_imports; i++) {
+    const int system_idx = import_system_indices[i];
+    const int tile_idx = (imports[i] - ser.atom_offsets[system_idx]) / tile_length;
+    const uint absc_mask = 16 * i;
+    const uint ordi_mask = (absc_mask << 16);
+    for (int j = 0; j < tile_count; j++) {
+      if (tile_list[j].x == tile_idx && tile_list[j].z == system_idx) {
+        tile_instructions[j].x |= absc_mask;
+      }
+      if (tile_list[j].y == tile_idx && tile_list[j].z == system_idx) {
+        tile_instructions[j].x |= ordi_mask;
+      }
+    }
+  }
+
+  // Fill out the size keys for each import, a series of bit-packed integer with one import batch
+  // size (up to tile_length atoms, i.e. 16) per eight bits.
+  if (constants::int_bit_count_int < 32) {
+    rtErr("Descriptors for non-bonded work units require that signed integers be of size >= 32 "
+          "bits.", "NonbondedWorkUnit");
+  }
+  for (int i = 0; i < n_imports; i++) {
+    const int key_idx = i / 4;
+    const int key_pos = i - (key_idx * 4);
+    const int system_idx = import_system_indices[i];
+    const int atom_limit = ser.atom_offsets[system_idx] + ser.atom_counts[system_idx];
+    int import_batch_size;
+    if (imports[i] >= 0) {
+      import_batch_size = std::min(atom_limit - imports[i], tile_length);
+    }
+    else {
+      import_batch_size = 0;
+    }
+    import_size_keys[key_idx] |= (import_batch_size << (8 * key_pos));
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
 int NonbondedWorkUnit::getTileCount() const {
   return tile_count;
 }
@@ -234,21 +335,19 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
   const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, large_nbwu_tiles);
   const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_tiles);
   if (tiny_wu_count < 16 * kilo) {
-
-    // Implement tiny work units
+    return enumerateNonbondedWorkUnits(poly_se, tiny_nbwu_tiles, tiny_wu_count, atom_counts);
   }
   else if (small_wu_count < 32 * kilo) {
-    
+    return enumerateNonbondedWorkUnits(poly_se, small_nbwu_tiles, small_wu_count, atom_counts);    
   }
   else if (medium_wu_count < 64 * kilo) {
-
+    return enumerateNonbondedWorkUnits(poly_se, medium_nbwu_tiles, medium_wu_count, atom_counts);
   }
   else if (large_wu_count < 128 * kilo) {
-
+    return enumerateNonbondedWorkUnits(poly_se, large_nbwu_tiles, large_wu_count, atom_counts);
   }
   else {
-
-    // Use the huge tiles (this will imply the large block size)
+    return enumerateNonbondedWorkUnits(poly_se, huge_nbwu_tiles, huge_wu_count, atom_counts);
   }
 }
 
