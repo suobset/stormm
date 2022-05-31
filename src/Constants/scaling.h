@@ -53,12 +53,16 @@ constexpr long long int warp_bits_mask_llu = warp_size_llu - 1LLU;
 
 /// \brief Sizes of important data types
 /// \{
+constexpr int int_byte_count_int = sizeof(int);
+constexpr int int_bit_count_int = int_byte_count_int * 8;
 constexpr int uint_byte_count_int = sizeof(unsigned int);
 constexpr int uint_bit_count_int = uint_byte_count_int * 8;
 constexpr int ullint_byte_count_int = sizeof(unsigned long long int);
 constexpr int ullint_bit_count_int = ullint_byte_count_int * 8;
 constexpr int ushort_byte_count_int = sizeof(unsigned short int);
 constexpr int ushort_bit_count_int = ushort_byte_count_int * 8;
+constexpr size_t int_byte_count_zu = sizeof(int);
+constexpr size_t int_bit_count_zu = int_byte_count_int * 8;
 constexpr size_t uint_byte_count_zu = sizeof(unsigned int);
 constexpr size_t uint_bit_count_zu = uint_byte_count_zu * 8LLU;
 constexpr size_t ullint_byte_count_zu = sizeof(unsigned long long int);
@@ -82,12 +86,16 @@ using constants::warp_bits_mask_int;
 using constants::warp_bits_mask_lu;
 using constants::warp_bits_mask_lld;
 using constants::warp_bits_mask_llu;
+using constants::int_byte_count_int;
+using constants::int_bit_count_int;
 using constants::uint_byte_count_int;
 using constants::uint_bit_count_int;
 using constants::ullint_byte_count_int;
 using constants::ullint_bit_count_int;
 using constants::ushort_byte_count_int;
 using constants::ushort_bit_count_int;
+using constants::int_byte_count_zu;
+using constants::int_bit_count_zu;
 using constants::uint_byte_count_zu;
 using constants::uint_bit_count_zu;
 using constants::ullint_byte_count_zu;

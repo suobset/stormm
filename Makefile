@@ -72,6 +72,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
+		 $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
 		 $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/systemcache.cpp \
 		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
@@ -182,6 +183,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Structure/virtual_site_handling.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
+		   $(SRCDIR)/Synthesis/nonbonded_workunit.h \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.h \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.h \
 		   $(SRCDIR)/Synthesis/synthesis_enumerators.h \
@@ -238,6 +240,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Structure/local_arrangement.tpp \
 		 $(SRCDIR)/Structure/rmsd.tpp \
 		 $(SRCDIR)/Structure/virtual_site_handling.tpp \
+		 $(SRCDIR)/Synthesis/nonbonded_workunit.tpp \
 		 $(SRCDIR)/Synthesis/synthesis_abstracts.tpp \
 		 $(SRCDIR)/Topology/atomgraph.tpp \
 		 $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
@@ -310,6 +313,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Structure/virtual_site_handling.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
+		$(SRCDIR)/Synthesis/nonbonded_workunit.o \
 		$(SRCDIR)/Synthesis/static_mask_synthesis.o \
 		$(SRCDIR)/Synthesis/systemcache.o \
 		$(SRCDIR)/Synthesis/valence_workunit.o \

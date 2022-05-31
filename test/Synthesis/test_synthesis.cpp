@@ -72,6 +72,13 @@ using namespace omni::testing;
 using namespace omni::topology;
 using namespace omni::trajectory;
 
+// CHECK
+#include "../../src/Synthesis/nonbonded_workunit.h"
+using omni::synthesis::NonbondedWorkUnit;
+using omni::synthesis::buildNonbondedWorkUnits;
+using omni::data_types::int4;
+// END CHECK
+
 //-------------------------------------------------------------------------------------------------
 // Check the coverage of a simple task form a ValenceWorkUnit.
 //
@@ -964,6 +971,23 @@ int main(const int argc, const char* argv[]) {
   check(mask_mismatches, RelationalOperator::EQUAL, std::vector<int>(system_indices.size(), 0),
         "Exclusions referenced from the compilation of systems do not match those obtained from "
         "the individual systems' static exclusion masks.", do_semk_tests);
+
+  // CHECK
+#if 0
+  std::vector<NonbondedWorkUnit> nbv = buildNonbondedWorkUnits(dhfr_se);
+  int nbt_count = 0;
+  for (int i = 0; i < nbv.size(); i++) {
+    nbt_count += nbv[i].getTileCount();
+    printf("NBW[%4d] = [\n", i);
+    for (int j = 0; j < nbv[i].getTileCount(); j++) {
+      const int4 lims = nbv[i].getTileLimits(j);
+      printf("    %4d %4d %4d %4d\n", lims.x, lims.y, lims.z, lims.w);
+    }
+    printf("];\n");
+  }
+  printf("There are %5d non-bonded tiles\n", nbt_count);
+#endif
+  // END CHECK
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -20,10 +20,11 @@ struct SeMaskSynthesisReader {
 
   /// \brief The constructor takes the object's constants and data pointers on either the CPU or
   ///        HPC resources.
-  SeMaskSynthesisReader(const int* atom_counts_in, const int nsupertile_in, const int ntile_in,
+  SeMaskSynthesisReader(int nsys_in, const int* atom_counts_in, int nsupertile_in, int ntile_in,
                         const int* supertile_map_idx_in, const int* supertile_map_bounds_in,
                         const int* tile_map_idx_in, const uint* mask_data_in);
 
+  const int nsys;                   ///< The number of systems covered by this object
   const int* atom_counts;           ///< Counts of atoms in all systems
   const int nsupertile;             ///< Number of unique supertiles stored by the mask
   const int ntile;                  ///< Number of unique tiles stored by the mask
@@ -63,11 +64,20 @@ public:
   StaticExclusionMaskSynthesis(const std::vector<AtomGraph*> &base_toplogies,
                                const std::vector<int> &topology_indices);
   /// \}
+
+  /// \brief Get the number of systems covered by this object
+  int getSystemCount() const;
   
+  /// \brief Get the number of atoms in one of the systems described by the mask.
+  ///
+  /// \param index  The system index for which to query the atom count
+  int getAtomCount(int index = 0) const;
+
   /// \brief Get the abstract for this static exclusion mask synthesis.
   SeMaskSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
 private:
+  int system_count;                   ///< The number of systems covered by this object
   Hybrid<int> atom_counts;            ///< Atom counts for all systems.  Supertile strides are not
                                       ///<   stored, as this object will be used primarily to
                                       ///<   direct the creation of instructions for non-bonded

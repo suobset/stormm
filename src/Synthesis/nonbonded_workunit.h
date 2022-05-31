@@ -4,16 +4,34 @@
 
 #include "Topology/atomgraph.h"
 #include "Potential/static_exclusionmask.h"
+#include "static_mask_synthesis.h"
 
 namespace omni {
 namespace synthesis {
 
-/// \brief Management for the non-bonded delegation of one or more topologies.
-class NonbondedDelegator {
-public:
+using energy::StaticExclusionMask;
+using energy::tile_length;
+using energy::tile_lengths_per_supertile;
+  
+/// \brief The maximum number of imported atoms in a "small" nonbonded block (256 threads)
+constexpr int small_block_max_atoms = 320;
 
-private:
-};
+/// \brief The maximum number of tile sides' worth of atoms that can be imported
+constexpr int small_block_max_imports = small_block_max_atoms / tile_length;
+
+/// \brief The number of tiles that a small block will be designed to process simultaneously
+constexpr int small_block_tile_width = 8;
+
+/// \brief Tile counts for various sizes of non-bonded work units that use the small block size
+/// \{
+constexpr int tiny_nbwu_tiles   =     small_block_tile_width;
+constexpr int small_nbwu_tiles  = 2 * small_block_tile_width;
+constexpr int medium_nbwu_tiles = 4 * small_block_tile_width;
+constexpr int large_nbwu_tiles  = 8 * small_block_tile_width;
+/// \}
+
+/// \brief Tile count for non-bonded work units using the large block size
+constexpr int huge_nbwu_tiles   = tile_lengths_per_supertile * tile_lengths_per_supertile;
   
 /// \brief Collect a series of tiles for non-bonded computations as well as the required atom
 ///        imports to carry them out.  This will accomplish the task of planning the non-bonded
@@ -29,17 +47,20 @@ public:
   ///
   ///        Static exclusion mask, tiny up to large work units:
   ///        This will be the majority of the cases with implicit-solvent systems.  In practice,
-  ///        the non-bonded work unit becomes a list of 19 integers representing the upper limit
-  ///        of atoms in the particular system and up to 16 starting locations of tile atoms to
+  ///        the non-bonded work unit becomes a list of 28 integers representing the upper limit
+  ///        of atoms in the particular system and up to 20 starting locations of tile atoms to
   ///        import (and convert to floating point representations) from within what may be a
-  ///        concatenated list of atoms for many systems.  The number of atoms after each starting
-  ///        point is a matter of the tile_length constant, and to some degree this couples it to
-  ///        the block size used for smaller non-bonded work units.  There are then low and high
-  ///        limits on the tile computations to perform, indexing into a master list of uint2
-  ///        tuples, each listing the abscissa atom start and ordinate atom starts in bits 1-16 and
-  ///        17-32 of the x member (referring to an index of local atom imports) and the tile
-  ///        exclusion mask index (referring to an index of a separate master list out in main
-  ///        memory) in the y member.  These cases will run with a 256-thread block size.
+  ///        concatenated list of atoms for many systems.  Five integers following these import
+  ///        starting positions indicate the numbers of atoms to import in each tile (usually the
+  ///        tile length, but fewer if the tile is incomplete at the end of the system's list of
+  ///        atoms).  The number of atoms after each starting point is a matter of the tile_length
+  ///        constant, and to some degree this couples it to the block size used for smaller
+  ///        non-bonded work units.  There are then low and high limits on the tile computations to
+  ///        perform, indexing into a master list of uint2 tuples, each listing the abscissa atom
+  ///        start and ordinate atom starts in bits 1-16 and 17-32 of the x member (referring to
+  ///        an index of local atom imports) and the tile exclusion mask index (referring to an
+  ///        index of a separate master list out in main memory) in the y member.  These cases
+  ///        will run with a 256-thread block size.
   ///
   ///        Static exclusion mask, huge work units:
   ///        This will handle cases of implicit-solvent systems with sizes so large that millions
@@ -68,24 +89,68 @@ public:
   ///        process.  The tile instructions for the neighbor list-based non-bonded work units are
   ///        much more complex than those for non-bonded work based on a static exclusion mask.
   ///
-  /// \param se_in        Static exclusion mask for a system in isolated boundary conditions
-  /// \param tile_list    Paired with a static exclusion mask and non-huge tiles, the specific list
-  ///                     of lower left corners for tiles to include in this work unit.  Among
-  ///                     them, the tiles must not call for importing more than 256 atoms.
-  /// \param tile_corner  The lower limits of the supertile to process.  Paired with a static
-  ///                     exclusion mask in extreme circumstances of very large implicit solvent
-  ///                     systems.  This will call for importing 512 atoms (2 x supertile_length)
-  ///                     in the most general case and will require larger thread blocks.
-  NonbondedWorkUnit(const StaticExclusionMask *se_in, const std::vector<int2> &tile_list);
+  /// \param se_in           Static exclusion mask for a system in isolated boundary conditions
+  /// \param tile_list       Paired with a static exclusion mask and non-huge tiles, the specific
+  ///                        list of lower left corners for tiles to include for this work unit in
+  ///                        the x- and y-members, plus the system index number in the z member
+  ///                        (if more than one system is present in a synthesis).  Among them, the
+  ///                        tiles must not call for importing more than small_block_max_atoms
+  ////                       atoms.
+  /// \param abscissa_start  The abscissa axis start of the supertile to process.  Paired with a
+  ///                        static exclusion mask in extreme circumstances of very large implicit
+  ///                        solvent systems.  This will call for importing 512 atoms
+  ///                        (2 x supertile_length) in the most general case and will require
+  ///                        larger thread blocks.
+  /// \param ordinate_start  The ordinate axis start of the supertile to process.
+  /// \{
+  NonbondedWorkUnit(const StaticExclusionMask &se, const std::vector<int3> &tile_list);
+  
+  NonbondedWorkUnit(const StaticExclusionMask &se, const int abscissa_start,
+                    const int ordinate_start);
+  /// \}
 
+  /// \brief Get the tile count of this work units.
+  int getTileCount() const;
+
+  /// \brief Get the abscissa and ordinate atom limits for a tile from within this work unit.
+  ///        The abscissa limits are returned in the x and y members, the ordinate limits in the
+  ///        z and w members.
+  ///
+  /// \param index  Index of the tile from within the work unit
+  int4 getTileLimits(int index) const;
+  
 private:
-  int abscissa_atom_count;
-  int ordinate_atom_count;
-  int tile_count;
-  std::vector<uint2> tile_instructions;
-  const AtomGraph *ag_pointer;
-  const StaticExclusionMask *se_pointer;
+  int tile_count;                        ///< Number of tiles to be processed by this work unit
+  int score;                             ///< The estimated effort score of this work unit
+  std::vector<int> imports;              ///< List of starting positions for atoms that must be
+                                         ///<   cached in order to process all tiles in this work
+                                         ///<   unit
+  std::vector<int> import_size_keys;     ///< Bit-packed integers with the number of atoms to
+                                         ///<   import after each starting position
+  std::vector<uint2> tile_instructions;  ///< Instructions for  processing each tile based on an
+                                         ///<   appropriate exclusion mask
 };
+
+/// \brief Add one tile to the growing list that will eventually define a work unit, if it is
+///        possible to do so.  This encapsualtes some work at a rather high cost in terms of
+///        pointers for multiple returned values.  Return true if the tile addition was successful
+///        or false if not.
+///
+/// \param tile_list           The growing list of tiles, pre-allocated to be able to hold any
+///                            additions that this function might make.  Appended and returned.
+/// \param import_coverage     Array of 0's and 1's (an int, rather than boolean, array for
+///                            versatility in passing to and from this function and for direct
+///                            summation with other integers).  Edited and returned.
+/// \param import_count        The total number of imported tiles' worth of atoms.  Updated and
+///                            returned.
+/// \param current_tile_count  The current number of tiles, updarted and returned.
+/// \param ti                  Tile index of the abscissa atoms (starting atom index divided by
+///                            tile_length)
+/// \param tj                  Tile index of the ordinate atoms (starting atom index divided by
+///                            tile_length)
+/// \param sysid               System index from which the tiles are derived
+bool addTileToWorkUnitList(int3* tile_list, int* import_coverage, int *import_count,
+                           int *current_tile_count, const int ti, const int tj, const int sysid);
 
 /// \brief Create a list of work units of a consistent size so as to optimize the load balancing
 ///        on a given resource (GPU, on or more CPUs, etc.).
@@ -110,17 +175,14 @@ private:
 /// \param gpu                  GPU specifications (HPC compilation only)
 /// \{
 std::vector<NonbondedWorkUnit>
-buildNonbondedWorkUnits(const <AtomGraph*> &ag_in, const StaticExclusionMask *se_in,
-                        const std::vector<int> &topology_indices_in = { 0 },
-                        int target_nbwu_count = static_cast<int>(mega));
+buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
 
-std::vector<NonbondedWorkUnit>
-buildNonbondedWorkUnits(const AtomGraph *ag_in, const StaticExclusionMask *se_in,
-                        const std::vector<int> &topology_indices_in = { 0 },
-                        int target_nbwu_count = static_cast<int>(mega));
+std::vector<NonbondedWorkUnit> buildNonbondedWorkUnits(const StaticExclusionMask &se);
 /// \}
 
 } // namespace synthesis
 } // namespace omni
+
+#include "nonbonded_workunit.tpp"
 
 #endif

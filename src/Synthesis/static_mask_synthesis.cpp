@@ -9,12 +9,13 @@ using energy::tile_length;
 using energy::tiles_per_supertile;
 
 //-------------------------------------------------------------------------------------------------
-SeMaskSynthesisReader::SeMaskSynthesisReader(const int* atom_counts_in, const int nsupertile_in,
-                                             const int ntile_in, const int* supertile_map_idx_in,
+SeMaskSynthesisReader::SeMaskSynthesisReader(const int nsys_in, const int* atom_counts_in,
+                                             const int nsupertile_in, const int ntile_in,
+                                             const int* supertile_map_idx_in,
                                              const int* supertile_map_bounds_in,
                                              const int* tile_map_idx_in,
                                              const uint* mask_data_in) :
-    atom_counts{atom_counts_in}, nsupertile{nsupertile_in}, ntile{ntile_in},
+    nsys{nsys_in}, atom_counts{atom_counts_in}, nsupertile{nsupertile_in}, ntile{ntile_in},
     supertile_map_idx{supertile_map_idx_in}, supertile_map_bounds{supertile_map_bounds_in},
     tile_map_idx{tile_map_idx_in}, mask_data{mask_data_in}
 {}
@@ -172,10 +173,21 @@ void StaticExclusionMaskSynthesis::build(const std::vector<StaticExclusionMask*>
 }
 
 //-------------------------------------------------------------------------------------------------
+int StaticExclusionMaskSynthesis::getSystemCount() const {
+  return system_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int StaticExclusionMaskSynthesis::getAtomCount(const int index) const {
+  return atom_counts.readHost(index);
+}
+  
+//-------------------------------------------------------------------------------------------------
 SeMaskSynthesisReader StaticExclusionMaskSynthesis::data(const HybridTargetLevel tier) const {
-  return SeMaskSynthesisReader(atom_counts.data(tier), unique_supertile_count, unique_tile_count,
-                               supertile_map_indices.data(tier), supertile_map_bounds.data(tier),
-                               tile_map_indices.data(tier), all_masks.data(tier));
+  return SeMaskSynthesisReader(system_count, atom_counts.data(tier), unique_supertile_count,
+                               unique_tile_count, supertile_map_indices.data(tier),
+                               supertile_map_bounds.data(tier), tile_map_indices.data(tier),
+                               all_masks.data(tier));
 }
 
 } // namespace synthesis
