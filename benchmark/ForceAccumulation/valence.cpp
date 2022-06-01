@@ -292,16 +292,4 @@ int main(int argc, char* argv[]) {
                                                    EvaluateForce::YES, trpcage_idx);
   const std::vector<double> trpcage_angl_frc = trpcage_ps.getInterlacedCoordinates(tkind);
   trpcage_ps.initializeForces();
-
-  // Compute the forces in single precision.  Accumulate in fixed precision.
-  ValenceKit<float> vk = trpcage_ag.getSinglePrecisionValenceKit();
-  std::vector<llint> xfrc_bond(trpcage_ag.getAtomCount(), 0LLU);
-  std::vector<llint> yfrc_bond(trpcage_ag.getAtomCount(), 0LLU);
-  std::vector<llint> zfrc_bond(trpcage_ag.getAtomCount(), 0LLU);
-  std::vector<llint> xfrc_angl(trpcage_ag.getAtomCount(), 0LLU);
-  std::vector<llint> yfrc_angl(trpcage_ag.getAtomCount(), 0LLU);
-  std::vector<llint> zfrc_angl(trpcage_ag.getAtomCount(), 0LLU);
-  for (int i = 0; i < vk.nbond; i++) {
-
-  }
 }

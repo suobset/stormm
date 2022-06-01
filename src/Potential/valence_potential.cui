@@ -1,0 +1,274 @@
+A// -*-c++-*-
+#include "Constants/hpc_bounds.h"
+#include "DataTypes/common_types.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Synthesis/synthesis_abstracts.h"
+#include "Synthesis/valence_workunit.h"
+
+namespace omni {
+namespace energy {
+
+using synthesis::maximum_valence_work_unit_atoms;
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(large_block_size, 1)
+KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
+#ifdef COMPUTE_ENERGY
+            ScoreCardWriter sc,
+#endif
+            CacheResource<TCALC> gmem_r) {
+
+  // Coordinates and properties of particles are copied into special, L1-cached arrays of GMEM used
+  // exclusively by this block.  In this manner, only forces are held in __shared__ where they can
+  // be accumulated with more efficient atomics.
+  __shared__ int sh_xfrc[maximum_valence_work_unit_atoms];
+  __shared__ int sh_yfrc[maximum_valence_work_unit_atoms];
+  __shared__ int sh_zfrc[maximum_valence_work_unit_atoms];
+  __shared__ int2 vwu_map[vwu_abstract_length];
+  __shared__ int vwu_task_count[vwu_abstract_length];
+  __shared__ int vwu_padded_task_count[vwu_abstract_length];
+  
+  // Each block takes its first valence work unit based on its block index.
+  int vwu_idx = blockIdx.x;
+  while (vwu_idx < poly_vk.nvwu) {
+
+    // The instruction set map is read and stored in __shared__ for convenience, and to ensure
+    // that it never leaves cache.  The instructions themselves are "streamed," which for purposes
+    // of this documentation means read from global, used once, and not cached.
+    if (threadIdx.x < vwu_abstract_length) {
+      vwu_map[threadIdx.x] = poly_vk.vwu_abstracts[(vwu_idx * vwu_abstract_length) + threadIdx.x];
+      vwu_task_count[threadIdx.x] = vwu_map[threadIdx.x].y - vwu_map[threadIdx.x].x;
+      vwu_padded_task_count[threadIdx.x] = roundUp(vwu_task_count[threadIdx.x]);
+    }
+    __syncthreads();
+
+    // Import atomic coordinates, properties, and (if appropriate) velocities.  This employs all
+    // threads of the block, breaking up each set of information at the warp level.
+    const int import_llim = vwu_map[VwuAbstactMap::IMPORT].x;
+    const int import_hlim = vwu_map[VwuAbstactMap::IMPORT].y;
+    const int import_stride = roundUp(import_hlim - import_llim, warp_size_int);
+    const int import_count  = roundUp(import_hlim - import_llim, warp_size_int);
+    int pos = threadIdx.x;
+    while (pos < import_stride) {
+      if (pos < import_count) {
+        const size_t read_idx  = poly_vk.vwu_imports[import_llim + pos];
+        const size_t write_idx = EXCL_GMEM_OFFSET + pos;
+        gmem_r.xcrd[write_idx] = poly_ps.xcrd[read_idx];
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 2 * import_stride) {
+      const int rel_pos = pos - import_stride;
+      if (rel_pos < import_count) {
+        const size_t read_idx  = poly_vk.vwu_imports[import_llim + rel_pos];
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.ycrd[write_idx] = poly_ps.ycrd[read_idx];
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 3 * import_stride) {
+      const int rel_pos = pos - (2 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t read_idx  = poly_vk.vwu_imports[import_llim + rel_pos];
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.zcrd[write_idx] = poly_ps.zcrd[read_idx];
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 4 * import_stride) {
+      const int rel_pos = pos - (3 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t read_idx     = poly_vk.vwu_imports[import_llim + rel_pos;
+        const size_t write_idx    = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.charges[write_idx] = poly_vk.charges[read_idx];
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 5 * import_stride) {
+      const int rel_pos = pos - (4 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t read_idx     = poly_vk.vwu_imports[import_llim + rel_pos];
+        const size_t write_idx    = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.lj_idx[write_idx]  = poly_vk.charges[read_idx];
+      }
+      pos += blockDim.x;
+    }
+#ifdef UPDATE_POSITIONS
+    while (pos < 6 * import_stride) {
+      const int rel_pos = pos - (5 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t read_idx  = poly_vk.vwu_imports[import_llim + rel_pos;
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.xvel[write_idx] = poly_vk.xvel[read_idx];
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 7 * import_stride) {
+      const int rel_pos = pos - (6 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t read_idx  = poly_vk.vwu_imports[import_llim + rel_pos];
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.yvel[write_idx] = poly_vk.yvel[read_idx];
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 8 * import_stride) {
+      const int rel_pos = pos - (7 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t read_idx  = poly_vk.vwu_imports[import_llim + rel_pos];
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.zvel[write_idx] = poly_vk.zvel[read_idx];
+      }
+      pos += blockDim.x;
+    }
+#endif
+    __syncthreads();
+
+    // Perform each force-related task in the valence work unit
+    pos = threadIdx.x;
+    int vterm_offset = 0;
+    int vterm_limit  = vwu_padded_task_count[VwuAbstractMap::CBND];
+#ifdef COMPUTE_ENERGY
+    llint bond_acc = 0LL;
+#endif
+    while (pos < vterm_limit) {
+      if (pos < vwu_task_count[VwuAbstractMap::CBND]) {
+        const uint2 tinsr =  poly_vk.cbnd_insr[pos - vterm_offset];
+        const bool is_urey_bradley = ((tinsr.x >> 20) & 0x1);
+        const int i_atom = (tinsr.x & 0x3ff);
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int param_idx = tinsr.y;
+        const Tcalc keq = (is_urey_bradley) ? poly_vk.ubrd_keq[param_idx] :
+                                              poly_vk.bond_keq[param_idx];
+        const Tcalc leq = (is_urey_bradley) ? poly_vk.ubrd_leq[param_idx] :
+                                              std::abs(poly_vk.bond_leq[param_idx]);
+        const Tcalc dx = static_cast<TCALC>(xcrd[j_atom] - xcrd[i_atom]) * inv_gpos_factor;
+        const Tcalc dy = static_cast<TCALC>(ycrd[j_atom] - ycrd[i_atom]) * inv_gpos_factor;
+        const Tcalc dz = static_cast<TCALC>(zcrd[j_atom] - zcrd[i_atom]) * inv_gpos_factor;
+        const Tcalc dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
+        const Tcalc dl = dr - leq;
+#ifdef COMPUTE_ENERGY
+        const int acc_elem = (pos - vterm_offset) / uint_bit_count_int;
+        const int acc_bit  = pos - vterm_offset - (acc_elem * uint_bit_count_int);
+        if ((poly_vk.cbnd_acc[acc_elem] >> acc_bit) & 0x1) {
+
+          // The single-precision variant of the scaling factor is exact, like the double-precision
+          // variant.  If TCALC is double, it will get promoted in an inexpensive operation.
+          bond_acc += llround(keq * dl * dl * sc.nrg_scale_f);
+        }
+#endif
+#ifdef COMPUTE_FORCE
+#  ifndef UPDATE_ATOMS
+        // If atom updating is not the goal, then it is necessary to test whether the energy of
+        // this interaction should be accumulated in order to know whether this block should also
+        // be responsible for accumulating the force.  This repeats the evaluation from above, but
+        // only on the first stage of a line minimization evaluation will both energies and forces
+        // be evaluated.  
+#    ifndef COMPUTE_ENERGY
+        const int acc_elem = (pos - vterm_offset) / uint_bit_count_int;
+        const int acc_bit  = pos - vterm_offset - (acc_elem * uint_bit_count_int);
+#    endif
+        if ((poly_vk.cbnd_acc[acc_elem] >> acc_bit) & 0x1) {
+#  endif
+        const Tcalc fmag = (TCALC)2.0 * keq * dl / dr;
+        const Tcalc fmag_dx = fmag * dx * poly_ps.frc_scale;
+        const Tcalc fmag_dy = fmag * dy * poly_ps.frc_scale;
+        const Tcalc fmag_dz = fmag * dz * poly_ps.frc_scale;
+        if (fmag_dx >= poly_ps.max_iforce_contribution) {
+          fmag_dx -= 
+        }
+        const llint ifmag_dx = llround(fmag_dx);
+        const llint ifmag_dy = llround(fmag_dy);
+        const llint ifmag_dz = llround(fmag_dz);
+        xfrc[i_atom] += ifmag_dx;
+        yfrc[i_atom] += ifmag_dy;
+        zfrc[i_atom] += ifmag_dz;
+        xfrc[j_atom] -= ifmag_dx;
+        yfrc[j_atom] -= ifmag_dy;
+        zfrc[j_atom] -= ifmag_dz;
+#  ifndef UPDATE_ATOMS
+        }
+#  endif
+#endif
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::ANGL];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::CBND]) {
+        const uint2 tinsr =  poly_vk.angl_insr;
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::CDHE];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::CDHE]) {
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::CMAP];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::CMAP]) {
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::INFR14];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::INFR14]) {
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RPOSN];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RPOSN]) {
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RBOND];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RBOND]) {
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RANGL];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RANGL]) {
+        
+      }
+      pos += blockDim.x;
+    }
+    vterm_offset = vterm_limit;
+    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RDIHE];
+    while (pos < term_limit) {
+      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RDIHE]) {
+        
+      }
+      pos += blockDim.x;
+    }
+
+    // Proceed to the next valence work unit
+    vwu_idx++;
+  }
+
+ 
+  gmem_x[EXCL_GMEM_OFFSET + 
+
+}
+
+} // namespace energy
+} // namespace omni
+
+#endif
