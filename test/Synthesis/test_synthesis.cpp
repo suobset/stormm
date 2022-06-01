@@ -976,16 +976,16 @@ int main(const int argc, const char* argv[]) {
   const std::vector<NonbondedWorkUnit> lig1_nbv = buildNonbondedWorkUnits(lig1_se);
   const std::vector<NonbondedWorkUnit> lig2_nbv = buildNonbondedWorkUnits(lig2_se);
   std::vector<int> nbt_counts(4, 0);
-  for (int i = 0; i < dhfr_nbv.size(); i++) {
+  for (size_t i = 0; i < dhfr_nbv.size(); i++) {
     nbt_counts[0] += dhfr_nbv[i].getTileCount();
   }
-  for (int i = 0; i < trpi_nbv.size(); i++) {
+  for (size_t i = 0; i < trpi_nbv.size(); i++) {
     nbt_counts[1] += trpi_nbv[i].getTileCount();
   }
-  for (int i = 0; i < lig1_nbv.size(); i++) {
+  for (size_t i = 0; i < lig1_nbv.size(); i++) {
     nbt_counts[2] += lig1_nbv[i].getTileCount();
   }
-  for (int i = 0; i < lig2_nbv.size(); i++) {
+  for (size_t i = 0; i < lig2_nbv.size(); i++) {
     nbt_counts[3] += lig2_nbv[i].getTileCount();
   }
   const std::vector<int> nbt_counts_answer = { 12246, 190, 15, 21 };
@@ -998,6 +998,13 @@ int main(const int argc, const char* argv[]) {
   check(nbt_counts, RelationalOperator::EQUAL, nbt_counts_answer, "The number of non-bonded tiles "
         "obtained for four systems in isolated boundary conditions do not meet expectations.",
         do_semk_tests);
+  const std::vector<NonbondedWorkUnit> poly_nbv = buildNonbondedWorkUnits(poly_se);
+  int poly_nbt_count = 0;
+  for (size_t i = 0; i < poly_nbv.size(); i++) {
+    poly_nbt_count += poly_nbv[i].getTileCount();
+  }
+  check(poly_nbt_count, RelationalOperator::EQUAL, 25345, "The number of non-bonded tiles "
+        "obtained for the compiled set of systems does not meet expectations.", do_semk_tests);
   
   // Summary evaluation
   printTestSummary(oe.getVerbosity());

@@ -318,7 +318,7 @@ bool addTileToWorkUnitList(int3* tile_list, int* import_coverage, int *import_co
 //-------------------------------------------------------------------------------------------------
 std::vector<NonbondedWorkUnit>
 buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
-
+  
   // Determine the optimal overall size for work units.  Given that this process is guided by
   // static (as opposed to forward) exclusion masks, this is a matter of how many atoms are
   // present in all topologies and the number of tiles it would take to cover them all.
@@ -327,7 +327,7 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
   for (int i = 0; i < nsys; i++) {
     atom_counts[i] = poly_se.getAtomCount(i);
   }
-
+  
   // Try work units of eight tiles
   const size_t tiny_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, tiny_nbwu_tiles);
   const size_t small_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, small_nbwu_tiles);

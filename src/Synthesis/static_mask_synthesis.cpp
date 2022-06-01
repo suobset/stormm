@@ -25,8 +25,8 @@ SeMaskSynthesisReader::SeMaskSynthesisReader(const int nsys_in, const int* atom_
 
 //-------------------------------------------------------------------------------------------------
 StaticExclusionMaskSynthesis::StaticExclusionMaskSynthesis() :
-    atom_counts{},
-    atom_offsets{},
+    atom_counts{HybridKind::ARRAY, "sesyn_atom_counts"},
+    atom_offsets{HybridKind::ARRAY, "sesyn_atom_offsets"},
     unique_supertile_count{0},
     unique_tile_count{0},
     supertile_map_indices{HybridKind::ARRAY, "sesyn_supertile_idx"},
@@ -97,6 +97,7 @@ void StaticExclusionMaskSynthesis::build(const std::vector<StaticExclusionMask*>
   
   // Lay out bounds arrays and basic descriptors spanning all systems
   const int nsys = topology_indices.size();
+  system_count = nsys;
   atom_counts.resize(nsys);
   atom_offsets.resize(nsys);
   supertile_map_bounds.resize(nsys + 1);
