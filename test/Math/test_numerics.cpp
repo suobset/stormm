@@ -24,6 +24,91 @@ using namespace omni::math;
 using namespace omni::numerics;
 using namespace omni::testing;
 
+//-------------------------------------------------------------------------------------------------
+// Test the splitaccumulation method over a segment of the number line.
+//
+// Arguments:
+//   llim:        Low limit for sampling
+//   hlim:        High limit for sampling
+//   incr:        Incrementation value
+//   scale_bits:  The number of bits after the decimal
+//-------------------------------------------------------------------------------------------------
+void testSplitAccumulation(const double llim, const double hlim, const double incr,
+                           const int scale_bits) {
+  const double scale_factor = pow(2.0, scale_bits);
+  const float scale_factorf = scale_factor;
+  const float max_increment = pow(2.0, 31 - scale_bits);
+  const long long int imax_incr = (1LL << 31);
+  int n_basic_fail = 0;
+  for (double r = llim; r < hlim; r += incr) {
+    const long long int dp_result = r * scale_factor;
+    const float orig_fr = r;
+    float fr = r;
+    const long long int fp_result = fr * scale_factorf;
+    int overflow = 0;
+    if (fabsf(fr) >= max_increment) {
+      overflow = fr / max_increment;
+      fr -= overflow * max_increment;
+    }
+    const int workbin = fr * scale_factorf;
+    overflow += (workbin < 0 && fr > 0.0f) - (workbin > 0 && fr < 0.0f);
+    const long long int lloverflow = overflow;
+    const long long int llworkbin  = workbin;
+    const long long int fp_reconst = (lloverflow * imax_incr) + llworkbin;
+    if (fp_reconst != fp_result) {
+      printf("For r = %12.8lf -> fr = %12.8lf :: fpresult = %14lld, [ %4d %10d ] -> %14lld\n", r,
+             fr, fp_result, overflow, workbin, fp_reconst);
+      printf("  orig_fr = %16.8e -> less overflow = %16.8e (%11d)\n", orig_fr,
+             orig_fr - (overflow * max_increment),
+             static_cast<int>((orig_fr - (overflow * max_increment)) * scale_factorf));
+      n_basic_fail++;
+    }
+  }
+  const double ellim = llim * 0.125;
+  const double ehlim = hlim * 0.125;
+  const double eincr = incr * 0.125;
+  int n_inc_fail = 0;
+  for (double r = ellim; r < ehlim; r += eincr) {
+    long long int dp_result = 0LL;
+    long long int fp_result = 0LL;
+    int overflow = 0;
+    int workbin = 0;
+    for (int i = 0; i < 9; i++) {
+      float fr = r;
+      dp_result += static_cast<int>(r * scale_factor);
+      fp_result += static_cast<int>(fr * scale_factorf);
+      if (fabsf(fr) >= max_increment) {
+        const int ovalue = fr / max_increment;
+        fr -= ovalue * max_increment;
+        overflow += ovalue;
+      }
+      const int workbin_old = workbin;
+      workbin += static_cast<int>(fr * scale_factorf);
+      overflow += 2 * ((workbin < workbin_old && fr > 0.0f) -
+                       (workbin > workbin_old && fr < 0.0f));
+    }
+    const long long int lloverflow = overflow;
+    const long long int llworkbin  = workbin;
+    const long long int fp_reconst = (lloverflow * imax_incr) + llworkbin;
+    if (fp_reconst != fp_result) {
+      printf("For r = %12.8lf :: fpresult = %14lld, [ %4d %10d ] -> %14lld\n", r, fp_result,
+             overflow, workbin, fp_reconst);
+      n_inc_fail++;
+    }
+  }
+  check(n_basic_fail == 0, "A total of " + std::to_string(n_basic_fail) + " failures were "
+        "recorded converting the range " + realToString(llim, 7, 3) + " : " +
+        realToString(hlim, 7, 3) + " to split integer fixed-precision values when sampled with "
+        "a " + realToString(incr, 9, 2) + " increment.");
+  check(n_inc_fail == 0, "A total of " + std::to_string(n_inc_fail) + " failures were recorded "
+        "converting the range " + realToString(ellim, 7, 3) + " : " + realToString(ehlim, 7, 3) +
+        " to split integer fixed-precision values by incrementing 9x when sampled with a " +
+        realToString(incr, 9, 2) + " increment.");
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
@@ -33,10 +118,7 @@ int main(const int argc, const char* argv[]) {
   section("Long long int <=> float2 conversion");
 
   // Section 2
-  section("Double <=> float2 conversion");
-
-  // Section 3
-  section("Compariosn of precision formats for unit cell operations");
+  section("Real to int2, 63-bit conversion");
 
   // Make a series of prime numbers
   std::vector<llint> primes(1, 2);
@@ -79,6 +161,7 @@ int main(const int argc, const char* argv[]) {
   }
 
   // Check the condition of the number series
+  section(1);
   const llint etr_expected_min = -545794316914904LL;  
   const llint etr_expected_max =  545794316914905LL;
   const bool exact_passes = (minValue(exact_test_range) == etr_expected_min &&
@@ -118,6 +201,16 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_large_tests = (exact_passes) ? TestPriority::CRITICAL :
                                                        TestPriority::ABORT;
 
+
+  // Test direct conversion
+  section(2);
+  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 26);
+  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 26);
+  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 26);
+  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 26);
+  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 26);
+  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 26);
+  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 26);
 
   // Print results
   printTestSummary(oe.getVerbosity());
