@@ -1,4 +1,4 @@
-A// -*-c++-*-
+// -*-c++-*-
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -9,7 +9,7 @@ namespace omni {
 namespace energy {
 
 using synthesis::maximum_valence_work_unit_atoms;
-
+  
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
@@ -21,9 +21,16 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
   // Coordinates and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.  In this manner, only forces are held in __shared__ where they can
   // be accumulated with more efficient atomics.
+#ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_xfrc[maximum_valence_work_unit_atoms];
   __shared__ int sh_yfrc[maximum_valence_work_unit_atoms];
   __shared__ int sh_zfrc[maximum_valence_work_unit_atoms];
+  __shared__ int sh_overflow_active[large_block_size / warp_size_int];
+#else
+  __shared__ llint sh_xfrc[maximum_valence_work_unit_atoms];
+  __shared__ llint sh_yfrc[maximum_valence_work_unit_atoms];
+  __shared__ llint sh_zfrc[maximum_valence_work_unit_atoms];
+#endif
   __shared__ int2 vwu_map[vwu_abstract_length];
   __shared__ int vwu_task_count[vwu_abstract_length];
   __shared__ int vwu_padded_task_count[vwu_abstract_length];
@@ -34,12 +41,19 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
 
     // The instruction set map is read and stored in __shared__ for convenience, and to ensure
     // that it never leaves cache.  The instructions themselves are "streamed," which for purposes
-    // of this documentation means read from global, used once, and not cached.
+    // of this documentation means read from global, used once, and not cached.  Each block must be
+    // at least vwu_abstract_length + warp_size_int in size.  Currently that is 96 on NVIDIA GOUs
+    // and 128 on commodity AMD GPUs.
     if (threadIdx.x < vwu_abstract_length) {
       vwu_map[threadIdx.x] = poly_vk.vwu_abstracts[(vwu_idx * vwu_abstract_length) + threadIdx.x];
       vwu_task_count[threadIdx.x] = vwu_map[threadIdx.x].y - vwu_map[threadIdx.x].x;
       vwu_padded_task_count[threadIdx.x] = roundUp(vwu_task_count[threadIdx.x]);
     }
+#ifdef SPLIT_FORCE_ACCUMULATION
+    else if (threadIdx.x < vwu_abstract_length + warp_size_int) {
+      sh_overflow_active[theradIdx.x - vwu_abstract_length] = 0;
+    }
+#endif
     __syncthreads();
 
     // Import atomic coordinates, properties, and (if appropriate) velocities.  This employs all
@@ -94,6 +108,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
       pos += blockDim.x;
     }
 #ifdef UPDATE_POSITIONS
+    // Import velocities into the local, block-exclusive L1-resident arrays
     while (pos < 6 * import_stride) {
       const int rel_pos = pos - (5 * import_stride);
       if (rel_pos < import_count) {
@@ -118,6 +133,37 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
         const size_t read_idx  = poly_vk.vwu_imports[import_llim + rel_pos];
         const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
         gmem_r.zvel[write_idx] = poly_vk.zvel[read_idx];
+      }
+      pos += blockDim.x;
+    }
+#endif
+#ifdef COMPUTE_FORCE
+    // Initialize the force accumulators, including the GMEM-based, non-shared force accumulators
+    // that will have their atomic operations occur in L2.
+    while (pos < 9 * import_stride) {
+      const int rel_pos = pos - (8 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.xfrc_overflow[write_idx] = 0;
+        sh_xfrc[rel_pos] = 0;
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 10 * import_stride) {
+      const int rel_pos = pos - (9 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.yfrc_overflow[write_idx] = 0;
+        sh_yfrc[rel_pos] = 0;
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 11 * import_stride) {
+      const int rel_pos = pos - (10 * import_stride);
+      if (rel_pos < import_count) {
+        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
+        gmem_r.zfrc_overflow[write_idx] = 0;
+        sh_zfrc[rel_pos] = 0;
       }
       pos += blockDim.x;
     }
@@ -174,19 +220,29 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
         const Tcalc fmag_dx = fmag * dx * poly_ps.frc_scale;
         const Tcalc fmag_dy = fmag * dy * poly_ps.frc_scale;
         const Tcalc fmag_dz = fmag * dz * poly_ps.frc_scale;
-        if (fmag_dx >= poly_ps.max_iforce_contribution) {
-          fmag_dx -= 
-        }
-        const llint ifmag_dx = llround(fmag_dx);
-        const llint ifmag_dy = llround(fmag_dy);
-        const llint ifmag_dz = llround(fmag_dz);
-        xfrc[i_atom] += ifmag_dx;
-        yfrc[i_atom] += ifmag_dy;
-        zfrc[i_atom] += ifmag_dz;
-        xfrc[j_atom] -= ifmag_dx;
-        yfrc[j_atom] -= ifmag_dy;
-        zfrc[j_atom] -= ifmag_dz;
+#ifdef SPLIT_FORCE_ACCUMULATION
+        splitForceContribution( fmag_dx, poly_ps.max_iforce_contribuion, i_atom, sh_xfrc,
+                               sh_overflow, gmem_r.xfrc_overflow);
+        splitForceContribution( fmag_dy, poly_ps.max_iforce_contribuion, i_atom, sh_yfrc,
+                               sh_overflow, gmem_r.yfrc_overflow);
+        splitForceContribution( fmag_dz, poly_ps.max_iforce_contribuion, i_atom, sh_zfrc,
+                               sh_overflow, gmem_r.zfrc_overflow);
+        splitForceContribution(-fmag_dx, poly_ps.max_iforce_contribuion, j_atom, sh_xfrc,
+                               sh_overflow, gmem_r.xfrc_overflow);
+        splitForceContribution(-fmag_dy, poly_ps.max_iforce_contribuion, j_atom, sh_yfrc,
+                               sh_overflow, gmem_r.yfrc_overflow);
+        splitForceContribution(-fmag_dz, poly_ps.max_iforce_contribuion, j_atom, sh_zfrc,
+                               sh_overflow, gmem_r.zfrc_overflow);
+#else
+        atomicAdd(&sh_xfrc[i_atom],  fmag_dx);
+        atomicAdd(&sh_yfrc[i_atom],  fmag_dy);
+        atomicAdd(&sh_zfrc[i_atom],  fmag_dz);
+        atomicAdd(&sh_xfrc[j_atom], -fmag_dx);
+        atomicAdd(&sh_yfrc[j_atom], -fmag_dy);
+        atomicAdd(&sh_zfrc[j_atom], -fmag_dz);
+#endif
 #  ifndef UPDATE_ATOMS
+        // See above for the reason these force accumulations sit within a conditional scope
         }
 #  endif
 #endif
@@ -262,7 +318,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
     // Proceed to the next valence work unit
     vwu_idx++;
   }
-
  
   gmem_x[EXCL_GMEM_OFFSET + 
 
