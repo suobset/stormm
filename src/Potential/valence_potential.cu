@@ -1,5 +1,6 @@
-A// -*-c++-*-
+// -*-c++-*-
 #include "Constants/hpc_bounds.h"
+#include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Synthesis/synthesis_abstracts.h"
@@ -8,15 +9,17 @@ A// -*-c++-*-
 namespace omni {
 namespace energy {
 
+using numerics::max_int_accumulation_f;
+using numerics::max_int_accumulation_ll;
 using synthesis::maximum_valence_work_unit_atoms;
 
 //-------------------------------------------------------------------------------------------------
-__device__ __forceinline__ void splitForceContribution(const float fval, const float max_incr,
-                                                       const int pos, int* sh_primary,
-                                                       int* sh_overflow_active, int* overflow) {
+__device__ __forceinline__ void splitForceContribution(const float fval, const int pos,
+                                                       int* sh_primary, int* sh_overflow_active,
+                                                       int* overflow) {
   int ival;
   if (fabsf(fval) >= max_incr) {
-    const int spillover = flocal / max_incr;
+    const int spillover = fval / max_incr;
     ival = fval - (spillover * max_incr);
     atomicAdd(&overflow[pos], spillover);
 
@@ -27,10 +30,10 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const f
     ival = fval;
   }
   const int prim_old = atomicAdd(&primary[pos], ival);
-  const int rollover = 2 * ((ival > 0 && prim_old + ival < prim_old) +
-                            (ival < 0 && prim_old + ival > prim_old));
-  if (rollover) {
-    atomicAdd(&overflow[pos], rollover);
+  if ((ival > 0 && prim_old + ival < prim_old) || (ival < 0 && prim_old + ival > prim_old)) {
+    atomicAdd(&overflow[pos],
+              (1 - (2 * (ival < 0))) * 2 * ((ival > 0 && prim_old + ival < prim_old) +
+                                            (ival < 0 && prim_old + ival > prim_old)));
     sh_overflow_active[pos / warp_size_int] = 1;
   }
 }

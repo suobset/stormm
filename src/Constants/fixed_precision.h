@@ -2,13 +2,17 @@
 #ifndef OMNI_FIXED_PRECISION_H
 #define OMNI_FIXED_PRECISION_H
 
+#include <cmath>
 #include <string>
 #include "Constants/behavior.h"
+#include "Constants/scaling.h"
+#include "DataTypes/common_types.h"
 
 namespace omni {
 namespace numerics {
 
 using constants::ExceptionResponse;
+using constants::int_bit_count_int;
   
 /// \brief Enumerate different available precision models
 enum class PrecisionLevel {
@@ -104,6 +108,12 @@ constexpr float  default_inverse_charge_mesh_scale_f = (float)default_inverse_ch
 constexpr int    min_charge_mesh_scale_bits = 24;
 constexpr int    max_charge_mesh_scale_bits = 48;
 /// \}
+
+/// \brief The maximum contribution for signed integer accumulation
+/// \{
+constexpr llint max_int_accumulation_ll = (1LL << (int_bit_count_int - 1));
+constexpr double max_int_accumulation   = max_int_accumulation_ll;
+constexpr float max_int_accumulation_f  = max_int_accumulation;
 
 /// \brief Translate a string into a known precision level enumeration.
 ///

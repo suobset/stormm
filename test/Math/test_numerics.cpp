@@ -25,7 +25,34 @@ using namespace omni::numerics;
 using namespace omni::testing;
 
 //-------------------------------------------------------------------------------------------------
-// Test the splitaccumulation method over a segment of the number line.
+// Convert a floating point number into a fixed-precision representation with two integers.
+//
+// Arguments:
+//   fval:      The value to convert to fixed-precision
+//   primary:   The primary accumulator (the low 32 bits)
+//   overflow:  The secondary accumulator (the high 31 bits)
+//-------------------------------------------------------------------------------------------------
+void splitForceContribution(const float fval, int *primary, int *overflow) {
+  int ival;
+  if (fabsf(fval) >= max_int_accumulation) {
+    const int spillover = fval / max_int_accumulation_f;
+    ival = fval - (spillover * max_int_accumulation_f);
+    *overflow += spillover;
+  }
+  else {
+    ival = fval;
+  }
+  const int prim_old = *primary;
+  *primary += ival;
+  if ((ival > 0 && prim_old + ival < prim_old) || (ival < 0 && prim_old + ival > prim_old)) {
+    *overflow += (1 - (2 * (ival < 0))) * 2 * ((ival > 0 && prim_old + ival < prim_old) +
+                                               (ival < 0 && prim_old + ival > prim_old));
+  }
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// Test the split accumulation method over a segment of the number line.
 //
 // Arguments:
 //   llim:        Low limit for sampling
@@ -37,30 +64,20 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
                            const int scale_bits) {
   const double scale_factor = pow(2.0, scale_bits);
   const float scale_factorf = scale_factor;
-  const float max_increment = pow(2.0, 31 - scale_bits);
-  const long long int imax_incr = (1LL << 31);
   int n_basic_fail = 0;
   for (double r = llim; r < hlim; r += incr) {
-    const long long int dp_result = r * scale_factor;
-    const float orig_fr = r;
+    const double scaled_r = r * scale_factor;
+    const llint dp_result = scaled_r;
     float fr = r;
-    const long long int fp_result = fr * scale_factorf;
+    const float scaled_fr = fr * scale_factor;
+    const llint fp_result = scaled_fr;
     int overflow = 0;
-    if (fabsf(fr) >= max_increment) {
-      overflow = fr / max_increment;
-      fr -= overflow * max_increment;
-    }
-    const int workbin = fr * scale_factorf;
-    overflow += (workbin < 0 && fr > 0.0f) - (workbin > 0 && fr < 0.0f);
-    const long long int lloverflow = overflow;
-    const long long int llworkbin  = workbin;
-    const long long int fp_reconst = (lloverflow * imax_incr) + llworkbin;
+    int workbin = 0;
+    splitForceContribution(scaled_fr, &workbin, &overflow);
+    const llint lloverflow = overflow;
+    const llint llworkbin  = workbin;
+    const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
     if (fp_reconst != fp_result) {
-      printf("For r = %12.8lf -> fr = %12.8lf :: fpresult = %14lld, [ %4d %10d ] -> %14lld\n", r,
-             fr, fp_result, overflow, workbin, fp_reconst);
-      printf("  orig_fr = %16.8e -> less overflow = %16.8e (%11d)\n", orig_fr,
-             orig_fr - (overflow * max_increment),
-             static_cast<int>((orig_fr - (overflow * max_increment)) * scale_factorf));
       n_basic_fail++;
     }
   }
@@ -69,39 +86,31 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
   const double eincr = incr * 0.125;
   int n_inc_fail = 0;
   for (double r = ellim; r < ehlim; r += eincr) {
-    long long int dp_result = 0LL;
-    long long int fp_result = 0LL;
+    llint dp_result = 0LL;
+    llint fp_result = 0LL;
     int overflow = 0;
     int workbin = 0;
     for (int i = 0; i < 9; i++) {
       float fr = r;
-      dp_result += static_cast<int>(r * scale_factor);
-      fp_result += static_cast<int>(fr * scale_factorf);
-      if (fabsf(fr) >= max_increment) {
-        const int ovalue = fr / max_increment;
-        fr -= ovalue * max_increment;
-        overflow += ovalue;
-      }
-      const int workbin_old = workbin;
-      workbin += static_cast<int>(fr * scale_factorf);
-      overflow += 2 * ((workbin < workbin_old && fr > 0.0f) -
-                       (workbin > workbin_old && fr < 0.0f));
+      double scaled_r = r * scale_factor;
+      float scaled_fr = fr * scale_factorf;
+      splitForceContribution(scaled_fr, &workbin, &overflow);
+      dp_result += static_cast<llint>(scaled_r);
+      fp_result += static_cast<llint>(scaled_fr);
     }
-    const long long int lloverflow = overflow;
-    const long long int llworkbin  = workbin;
-    const long long int fp_reconst = (lloverflow * imax_incr) + llworkbin;
+    const llint lloverflow = overflow;
+    const llint llworkbin  = workbin;
+    const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
     if (fp_reconst != fp_result) {
-      printf("For r = %12.8lf :: fpresult = %14lld, [ %4d %10d ] -> %14lld\n", r, fp_result,
-             overflow, workbin, fp_reconst);
       n_inc_fail++;
     }
   }
   check(n_basic_fail == 0, "A total of " + std::to_string(n_basic_fail) + " failures were "
-        "recorded converting the range " + realToString(llim, 7, 3) + " : " +
-        realToString(hlim, 7, 3) + " to split integer fixed-precision values when sampled with "
+        "recorded converting the range " + realToString(llim, 8, 4) + " : " +
+        realToString(hlim, 8, 4) + " to split integer fixed-precision values when sampled with "
         "a " + realToString(incr, 9, 2) + " increment.");
   check(n_inc_fail == 0, "A total of " + std::to_string(n_inc_fail) + " failures were recorded "
-        "converting the range " + realToString(ellim, 7, 3) + " : " + realToString(ehlim, 7, 3) +
+        "converting the range " + realToString(ellim, 8, 4) + " : " + realToString(ehlim, 8, 4) +
         " to split integer fixed-precision values by incrementing 9x when sampled with a " +
         realToString(incr, 9, 2) + " increment.");
 }
