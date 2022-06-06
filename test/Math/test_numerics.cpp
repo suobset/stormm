@@ -50,7 +50,6 @@ void splitForceContribution(const float fval, int *primary, int *overflow) {
   }
 }
 
-
 //-------------------------------------------------------------------------------------------------
 // Test the split accumulation method over a segment of the number line.
 //

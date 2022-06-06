@@ -273,7 +273,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int param_idx = ((tinsr.y >> 16) & 0xffff);
       const bool second_term = ((tinsr.y >> 15) & 0x1);
       const TorsionKind kind = (tinsr.x >> 31) ? TorsionKind::IMPROPER : TorsionKind::PROPER;
-        
+
       // Compute displacements
       double ab[3], bc[3], cd[3], crabbc[3], crbccd[3], scr[3];
       ab[0] = sh_xcrd[j_atom] - sh_xcrd[i_atom];
@@ -289,10 +289,10 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       // Compute cross products and then the angle between the planes
       crossProduct(ab, bc, crabbc);
       crossProduct(bc, cd, crbccd);
+      crossProduct(crabbc, crbccd, scr);
       double costheta = crabbc[0]*crbccd[0] + crabbc[1]*crbccd[1] + crabbc[2]*crbccd[2];
       costheta /= sqrt((crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] + crabbc[2]*crabbc[2]) *
                        (crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] + crbccd[2]*crbccd[2]));
-      crossProduct(crabbc, crbccd, scr);
       costheta = (costheta < -1.0) ? -1.0 : (costheta > 1.0) ? 1.0 : costheta;
       const double theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ?  acos(costheta) :
                                                                                 -acos(costheta);
