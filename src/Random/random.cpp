@@ -153,6 +153,11 @@ ullint2 Xoroshiro128pGenerator::revealState() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+void Xoroshiro128pGenerator::setState(const ullint2 state_in) {
+  state = state_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 ullint2 Xoroshiro128pGenerator::seed128(const int igseed) {
 
   // It is within the C and C++ standards to set an unsigned integer equal to a signed integer,

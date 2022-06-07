@@ -1,15 +1,5 @@
 // -*-c++-*-
-#include "Constants/hpc_bounds.h"
-#include "DataTypes/common_types.h"
-#include "Topology/atomgraph_abstracts.h"
-#include "Synthesis/synthesis_abstracts.h"
-#include "Synthesis/valence_workunit.h"
 
-namespace omni {
-namespace energy {
-
-using synthesis::maximum_valence_work_unit_atoms;
-  
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
@@ -620,16 +610,37 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
       }
       pos += blockDim.x;
     }
+#ifdef UPDATE_ATOMS
+    // Update atomic positions
 
-    // Proceed to the next valence work unit
-    vwu_idx++;
-  }
- 
-  gmem_x[EXCL_GMEM_OFFSET + 
-
-}
-
-} // namespace energy
-} // namespace omni
-
+#else // UPDATE_ATOMS
+#  ifdef COMPUTE_ENERGY
+    // Contribute energies to global accumulators
+#  endif
+#  ifdef COMPUTE_FORCES
+    // Contribute forces to global accumulators
+#  endif
 #endif
+    // Proceed to the next valence work unit, incrementing one of a series of global counters
+    // based on the current step number stored in the PhaseSpaceSynthesis object.  The CPU will
+    // update the step counter just prior to launching this kernel so that the correct step number
+    // comes in via the constants cache during the kernel launch.  The step number will determine
+    // which block progress counter is used.  At appropriate times (based on the modulo of the
+    // step number), the kernel will reset some of its block progress counters.
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      const size_t prog_counter_idx = (poly_ps.step & twice_warp_bits_mask_int);
+      vwu_idx = atomicAdd(&poly_ps.valence_progress_counters[prog_counter_idx], 1);
+    }
+    if (threadIdx.x >= warp_size_int && threadIdx.x < twice_warp_size_int) {
+      const int step_modulus = polyps.step & twice_warp_bits_mask_int;
+      if (step_modulus == 0) {
+        poly_ps.vwu_progress[threadIdx.x] = blockDim.x;
+      }
+      if (step_modulus == warp_size_int) {
+        poly_ps.vwu_progress[threadIdx.x - warp_size_int] = blockDim.x;
+      }
+    }
+    __syncthreads();
+  }
+}

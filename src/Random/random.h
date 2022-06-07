@@ -2,12 +2,19 @@
 #ifndef OMNI_RANDOM_H
 #define OMNI_RANDOM_H
 
+#include "Accelerator/hybrid.h"
+#include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Math/rounding.h"
 
 namespace omni {
 namespace random {
 
+using card::Hybrid;
+using card::HybridTargetLevel;
+using constants::giga_zu;
+  
 /// \brief Constants for the "ran2" pseudo-random number generator
 /// \{
 constexpr int im1 = 2147483563;
@@ -114,6 +121,9 @@ public:
 
   /// \brief Reveal the current state of the generator.
   ullint2 revealState() const;
+
+  /// \brief Set the current state of the generator.
+  void setState();
   
 private:
   ullint2 state;  ///< 128-bit state vector for the generator
@@ -133,6 +143,34 @@ private:
   void fastForward(const ullint2 stride);
 };
 
+/// \brief An series of "Xorshiro128+" generators, with state vectors for all of them and the
+///        means for seeding the series based on long jumps from a single state vector.
+template <typename T> class Xoroshiro128pSeries {
+public:
+
+  /// \brief The constructor can work off of a simple random initialization seed integer or a
+  ///        specific state vector for the first generator in the series.
+  ///
+  /// \{
+  Xoroshiro128pSeries(size_t generators_in = 1LLU, size_t depth_in = 2LLU, int igseed_in = 827493,
+                      int niter = 25, size_t bank_limit = 4LLU * giga);
+
+  Xoroshiro128pSeries(const ullint2 state_in, int generators_in = 0);
+  /// \}
+  
+private:
+  size_t generators;       ///< The quantity of (pseudo-) random number generators in the series
+  size_t depth;            ///< The depth of each generator's random numbers in the memory bank
+  int igseed;              ///< Integer used to seed this generator series, for records-keeping
+                           ///<   purposes
+  Hybrid<ullint2> states;  ///< Thestate vectors for all random number generators in the series
+  Hybrid<T> bank;          ///< Bank of random numbers pre-computed and saved for later use.  The
+                           ///<   numbers are stored only in the specifictype format of the series,
+                           ///<   float or double, to save space and avoid ambiguities as to when
+                           ///<   the numbers should be refreshed if multiple levels of precision
+                           ///<   in the random numbers are required.
+};
+  
 /// \brief The "Xoshiro256++" random number generator.  While not cryptographically useful, it is
 ///        a rock-solid random number generator for both floating-point and 64-bit integer results.
 class Xoshiro256ppGenerator {
@@ -192,5 +230,7 @@ private:
   
 } // namespace random
 } // namespace omni
+
+#include "random.tpp"
 
 #endif
