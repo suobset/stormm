@@ -12,6 +12,7 @@ namespace omni {
 namespace random {
 
 using card::Hybrid;
+using card::HybridKind;
 using card::HybridTargetLevel;
 using constants::giga_zu;
   
@@ -32,6 +33,12 @@ constexpr int ndiv = 1 + im1_minus_one / ntab;
 constexpr double double_increment = 2.2205e-16;
 constexpr double ran2_max = 1.0 - double_increment;
 /// \}
+
+/// \brief Enumerate the types of random numbers that can be generated.
+enum class RandomNumberKind {
+  UNIFORM,   ///< Uniform random number distribution
+  GAUSSIAN   ///< Normal distribution of random numbers
+};
   
 /// \brief Stores the state of a Ran2 pseudo-random number generator.  Member functions produce
 ///        random numbers along various distributions, as required.  While it is not as performant
@@ -123,7 +130,7 @@ public:
   ullint2 revealState() const;
 
   /// \brief Set the current state of the generator.
-  void setState();
+  void setState(const ullint2 state_in);
   
 private:
   ullint2 state;  ///< 128-bit state vector for the generator
@@ -152,8 +159,10 @@ public:
   ///        specific state vector for the first generator in the series.
   ///
   /// \{
-  Xoroshiro128pSeries(size_t generators_in = 1LLU, size_t depth_in = 2LLU, int igseed_in = 827493,
-                      int niter = 25, size_t bank_limit = 4LLU * giga);
+  Xoroshiro128pSeries(size_t generators_in = 1LLU, size_t depth_in = 2LLU,
+                      RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
+                      int igseed_in = 827493, int niter = 25,
+                      size_t bank_limit = 4LLU * constants::giga_zu);
 
   Xoroshiro128pSeries(const ullint2 state_in, int generators_in = 0);
   /// \}

@@ -5,7 +5,7 @@ namespace random {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 Xoroshiro128pSeries<T>::Xoroshiro128pSeries(const size_t generators_in, const size_t depth_in,
-                                            const RandomNumberType rng_type, const int igseed_in,
+                                            const RandomNumberKind init_kind, const int igseed_in,
                                             const int niter, const size_t bank_limit) :
   generators{generators_in}, depth{depth_in}, igseed{igseed_in},
   states{generators, "xrs128_states"},
@@ -13,7 +13,6 @@ Xoroshiro128pSeries<T>::Xoroshiro128pSeries(const size_t generators_in, const si
 {
   // Check that the depth is a multiple of two if the storage type is float.
   const size_t tcalc_ct = std::type_index(typeid(T)).hash_code();
-
   
   // Check the bank's dimensions before allocating it, as it is a product of two numbers
   if (generators * depth == 0LLU) {
@@ -42,7 +41,7 @@ Xoroshiro128pSeries<T>::Xoroshiro128pSeries(const size_t generators_in, const si
   for (size_t i = 0LLU; i < generators; i++) {
     xrs.setState(states.readHost(i));
     for (size_t j = 0LLU; j < depth; j++) {
-      xrs.uniformRandomNumber()
+      xrs.uniformRandomNumber();
     }
   }
 }
