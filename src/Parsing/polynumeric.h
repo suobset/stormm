@@ -27,6 +27,7 @@ enum class NumberFormat {
 /// \brief Union for storing numbers or other 4-8 byte pieces of information
 union PolyNumeric {
   double d;
+  float2 f2;
   int i;
   unsigned int ui;
   long long int lli;

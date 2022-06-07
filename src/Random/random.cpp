@@ -126,12 +126,24 @@ double Xoroshiro128pGenerator::uniformRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+float Xoroshiro128pGenerator::spUniformRandomNumber() {
+  const ullint rndbits = next();
+  PolyNumeric work;
+  work.ulli = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
+  return work.f2.x - 1.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
 double Xoroshiro128pGenerator::gaussianRandomNumber() {
+  const double x1 = sqrt(-2.0 * log(uniformRandomNumber()));
+  const double x2 = sin(symbols::twopi * uniformRandomNumber());
+  return x1 * x2;
+}
 
-  using symbols::twopi;
-
-  const double x1 = std::sqrt(-2.0 * std::log(uniformRandomNumber()));
-  const double x2 = std::sin(twopi * uniformRandomNumber());
+//-------------------------------------------------------------------------------------------------
+float Xoroshiro128pGenerator::spGaussianRandomNumber() {
+  const float x1 = sqrtf(-2.0f * logf(spUniformRandomNumber()));
+  const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
 }
 
@@ -150,6 +162,11 @@ void Xoroshiro128pGenerator::longJump() {
 //-------------------------------------------------------------------------------------------------
 ullint2 Xoroshiro128pGenerator::revealState() const {
   return state;
+}
+
+//-------------------------------------------------------------------------------------------------
+ullint Xoroshiro128pGenerator::revealBitString() const {
+  return state.x + state.y;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -252,12 +269,24 @@ double Xoshiro256ppGenerator::uniformRandomNumber() {
 }
 
 //-------------------------------------------------------------------------------------------------
+float Xoshiro256ppGenerator::spUniformRandomNumber() {
+  const ullint rndbits = next();
+  PolyNumeric work;
+  work.ulli = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
+  return work.f2.x - 1.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
 double Xoshiro256ppGenerator::gaussianRandomNumber() {
+  const double x1 = sqrt(-2.0 * log(uniformRandomNumber()));
+  const double x2 = sin(symbols::twopi * uniformRandomNumber());
+  return x1 * x2;
+}
 
-  using symbols::twopi;
-
-  const double x1 = std::sqrt(-2.0 * std::log(uniformRandomNumber()));
-  const double x2 = std::sin(twopi * uniformRandomNumber());
+//-------------------------------------------------------------------------------------------------
+float Xoshiro256ppGenerator::spGaussianRandomNumber() {
+  const float x1 = sqrtf(-2.0f * logf(spUniformRandomNumber()));
+  const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
 }
 

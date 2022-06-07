@@ -15,9 +15,10 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
+using omni::double3;
 using omni::ulint;
 using omni::ullint;
-using omni::double3;
+using omni::ullint2;
 using omni::constants::tiny;
 using omni::card::Hybrid;
 using omni::card::HybridTargetLevel;
@@ -29,6 +30,7 @@ using omni::parse::TextFile;
 using omni::parse::polyNumericVector;
 using omni::random::Ran2Generator;
 using omni::random::Xoroshiro128pGenerator;
+using omni::random::Xoroshiro128pSeries;
 using omni::random::Xoshiro256ppGenerator;
 using omni::symbols::pi;
 using namespace omni::math;
@@ -507,6 +509,58 @@ int main(const int argc, const char* argv[]) {
   const std::vector<double> corr_x2 = {  0.7, -0.8, -4.9,  9.2,  5.3,  4.0, -5.9, 7.9 };
   check(pearson(corr_x1, corr_x2), RelationalOperator::EQUAL, Approx(0.9651506029).margin(tiny),
         "The correlation coefficient computed for two vectors is incorrect.");
+
+  // Check single-precision random number generation
+  section(2);
+  Xoroshiro128pGenerator test_128;
+  Xoroshiro128pGenerator test_128f;
+  Xoshiro256ppGenerator test_256;
+  Xoshiro256ppGenerator test_256f;
+  const size_t npts = 64;
+  std::vector<double> t128_uni(npts), t128f_uni(npts), t128_gss(npts), t128f_gss(npts);
+  std::vector<double> t256_uni(npts), t256f_uni(npts), t256_gss(npts), t256f_gss(npts);
+  for (size_t i = 0; i < npts; i++) {
+    t128_uni[i]  = test_128.uniformRandomNumber();
+    t128f_uni[i] = test_128f.spUniformRandomNumber();
+    t128_gss[i]  = test_128.gaussianRandomNumber();
+    t128f_gss[i] = test_128f.spGaussianRandomNumber();
+    t256_uni[i]  = test_256.uniformRandomNumber();
+    t256f_uni[i] = test_256f.spUniformRandomNumber();
+    t256_gss[i]  = test_256.gaussianRandomNumber();
+    t256f_gss[i] = test_256f.spGaussianRandomNumber();
+  }
+  check(t128f_uni, RelationalOperator::EQUAL, Approx(t128_uni).margin(3.0e-7), "Random numbers "
+        "pulled from a uniform distribution with the Xoroshiro128+ generator do not have the same "
+        "values when produced in single- versus double-precision.");
+  check(t128f_gss, RelationalOperator::EQUAL, Approx(t128_gss).margin(6.0e-6), "Random numbers "
+        "pulled from a normal distribution with the Xoroshiro128+ generator do not have the same "
+        "values when produced in single- versus double-precision.");
+  check(t256f_uni, RelationalOperator::EQUAL, Approx(t256_uni).margin(3.0e-7), "Random numbers "
+        "pulled from a uniform distribution with the Xoshiro256++ generator do not have the same "
+        "values when produced in single- versus double-precision.");
+  check(t256f_gss, RelationalOperator::EQUAL, Approx(t256_gss).margin(6.0e-6), "Random numbers "
+        "pulled from a normal distribution with the Xoshiro256++ generator do not have the same "
+        "values when produced in single- versus double-precision.");
+
+  // Check the behavior of the Xoroshiro128+ series object
+  Xoroshiro128pGenerator leader_xrs128p(9183084, 75);
+  const ullint2 init_state = leader_xrs128p.revealState();
+  Xoroshiro128pGenerator test_xrs128p(105892, 95);
+  test_xrs128p.setState(init_state);
+  std::vector<double> orig_uni_output(npts), rstr_uni_output(npts);
+  for (int i = 0; i < npts; i++) {
+    orig_uni_output[i] = leader_xrs128p.uniformRandomNumber();
+    rstr_uni_output[i] = test_xrs128p.uniformRandomNumber();
+  }
+  check(rstr_uni_output, RelationalOperator::EQUAL, orig_uni_output, "Resetting the state of a "
+        "Xoroshiro128+ generator failed to restart the sequence as expected.");
+  Xoroshiro128pSeries<double> my_128p_series(init_state, 1024, 8);
+  int mseries_state = 0;
+  const int stride_length = my_128p_series.getRefreshStride();
+  const int bank_depth = my_128p_series.getDepth();
+  for (int i = 0; i < bank_depth; i++) {
+    my_128p_series.gaussianRandomNumbers(i * stride_length, (i + 1) * stride_length);
+  }
   
   // Print results
   printTestSummary(oe.getVerbosity());

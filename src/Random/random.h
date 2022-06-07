@@ -15,6 +15,7 @@ using card::Hybrid;
 using card::HybridKind;
 using card::HybridTargetLevel;
 using constants::giga_zu;
+using data_types::isFloatingPointScalarType;
   
 /// \brief Constants for the "ran2" pseudo-random number generator
 /// \{
@@ -39,6 +40,8 @@ enum class RandomNumberKind {
   UNIFORM,   ///< Uniform random number distribution
   GAUSSIAN   ///< Normal distribution of random numbers
 };
+
+/// \brief 
   
 /// \brief Stores the state of a Ran2 pseudo-random number generator.  Member functions produce
 ///        random numbers along various distributions, as required.  While it is not as performant
@@ -115,10 +118,16 @@ public:
   ///        results across platforms.
   double uniformRandomNumber();
 
+  /// \brief Return a single-precision random number obtained from a uniform distribution.
+  float spUniformRandomNumber();
+
   /// \brief Return a normally distributed random number.  This works off of the uniform random
   ///        number generator and will thus advance the state vector of the RandomNumberGenerator
   ///        that produces the result.
   double gaussianRandomNumber();
+
+  /// \brief Return a single-precision random number obtained from a normal distribution.
+  float spGaussianRandomNumber();
 
   /// \brief Jump forward 2^64 iterations in the sequence.
   void jump();
@@ -128,6 +137,9 @@ public:
 
   /// \brief Reveal the current state of the generator.
   ullint2 revealState() const;
+
+  /// \brief Reveal the random bit string.
+  ullint revealBitString() const;
 
   /// \brief Set the current state of the generator.
   void setState(const ullint2 state_in);
@@ -158,20 +170,55 @@ public:
   /// \brief The constructor can work off of a simple random initialization seed integer or a
   ///        specific state vector for the first generator in the series.
   ///
+  /// \param generators_in   The count of generators in the series
+  /// \param depth_in        Quantity of random numbers from each generator to store in the bank
+  /// \param init_kind       Style in which to initialize the random numbers in the bank,
+  ///                        i.e. from a uniform or a normal distribution
+  /// \param igseed_in       The seed for the first generator in the series
+  /// \param niter           The number of iterations to use in initializing each generator
+  /// \param bank_limit      The maximum length of the random number cache
+  /// \param state_in        The state to apply to generator zero, thus determining the initial
+  ///                        states of all other generators
   /// \{
+  Xoroshiro128pSeries(const ullint2 state_in, size_t generators_in = 1LLU, size_t depth_in = 2LLU,
+                      RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
+                      size_t bank_limit = constants::giga_zu);
+
   Xoroshiro128pSeries(size_t generators_in = 1LLU, size_t depth_in = 2LLU,
                       RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
                       int igseed_in = 827493, int niter = 25,
-                      size_t bank_limit = 4LLU * constants::giga_zu);
-
-  Xoroshiro128pSeries(const ullint2 state_in, int generators_in = 0);
+                      size_t bank_limit = constants::giga_zu);
   /// \}
+
+  /// \brief Get the number of (forward-jumped) generators.
+  size_t getGeneratorCount() const;
+
+  /// \brief Get the depth of the bank for each generator.
+  size_t getDepth() const;
   
+  /// \brief Get the number of generators for which to refesh all banked values at one time.
+  size_t getRefreshStride() const;
+  
+  /// \brief Populate a portion of this object's bank with random numbers from each of the
+  ///        respective generators.
+  ///
+  /// \param first_gen  Index of the first generator to draw random numbers from
+  /// \param last_gen   Index of the generator before which to stop drawing new random numbers
+  void uniformRandomNumbers(size_t first_gen, size_t last_gen);
+
+  /// \brief Populate a portion of this object's bank with normally distributed random numbers
+  ///        from each of the respective generators.
+  ///
+  /// \param first_gen  Index of the first generator to draw random numbers from
+  /// \param last_gen   Index of the generator before which to stop drawing new random numbers
+  void gaussianRandomNumbers(size_t first_gen, size_t last_gen);
+
 private:
   size_t generators;       ///< The quantity of (pseudo-) random number generators in the series
   size_t depth;            ///< The depth of each generator's random numbers in the memory bank
-  int igseed;              ///< Integer used to seed this generator series, for records-keeping
-                           ///<   purposes
+  size_t refresh_stride;   ///< The number of segments in which the generators series can be
+                           ///<   refreshed, calling a subset of the generators to recalculate the
+                           ///<  full of depth of banked random values for that generator / lane.
   Hybrid<ullint2> states;  ///< Thestate vectors for all random number generators in the series
   Hybrid<T> bank;          ///< Bank of random numbers pre-computed and saved for later use.  The
                            ///<   numbers are stored only in the specifictype format of the series,
@@ -202,10 +249,16 @@ public:
   ///        results across platforms.
   double uniformRandomNumber();
 
+  /// \brief Return a single-precision random number obtained from a uniform distribution.
+  float spUniformRandomNumber();
+
   /// \brief Return a normally distributed random number.  This works off of the uniform random
   ///        number generator and will thus advance the state vector of the RandomNumberGenerator
   ///        that produces the result.
   double gaussianRandomNumber();
+
+  /// \brief Return a single-precision random number obtained from a normal distribution.
+  float spGaussianRandomNumber();
 
   /// \brief Jump forward 2^64 iterations in the sequence.
   void jump();
@@ -218,6 +271,9 @@ public:
 
   /// \brief Reveal the random bit string.
   ullint revealBitString() const;
+
+  /// \brief Set the current state of the generator.
+  void setState(const ullint2 state_in);
   
 private:
   ullint4 state;  ///< 128-bit state vector for the generator
