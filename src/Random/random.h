@@ -41,8 +41,13 @@ enum class RandomNumberKind {
   GAUSSIAN   ///< Normal distribution of random numbers
 };
 
-/// \brief 
-  
+/// \brief List the random number generator types that can power a RandomNumberMill object.
+enum class RandomAlgorithm {
+  XOROSHIRO_128P,  ///< Xoroshiro128+ generator (see below, fails BigCrush and not advised for
+                   ///<   powering mills with > 1024 generator streams)
+  XOSHIRO_256PP    ///< Xoshiro256++ generator (see below--high quality generator)
+};
+
 /// \brief Stores the state of a Ran2 pseudo-random number generator.  Member functions produce
 ///        random numbers along various distributions, as required.  While it is not as performant
 ///        to have a member function, these random number generators are intended for convenience
@@ -110,8 +115,10 @@ public:
   /// \param igseed    The pseudo-randome number seed
   /// \param niter     Number of iterations to run through while equilibrating the generator
   /// \param state_in  State to accept
+  /// \{
   Xoroshiro128pGenerator(int igseed = 827493, int niter = 25);
   Xoroshiro128pGenerator(const ullint2 state_in);
+  /// \}
   
   /// \brief Return a single random number distributed over a uniform distribution.  This is an
   ///        internal generator based on an integer vector state which will provide reproducible
@@ -162,77 +169,6 @@ private:
   void fastForward(const ullint2 stride);
 };
 
-/// \brief An series of "Xorshiro128+" generators, with state vectors for all of them and the
-///        means for seeding the series based on long jumps from a single state vector.
-template <typename T> class Xoroshiro128pSeries {
-public:
-
-  /// \brief The constructor can work off of a simple random initialization seed integer or a
-  ///        specific state vector for the first generator in the series.
-  ///
-  /// \param generators_in   The count of generators in the series
-  /// \param depth_in        Quantity of random numbers from each generator to store in the bank
-  /// \param init_kind       Style in which to initialize the random numbers in the bank,
-  ///                        i.e. from a uniform or a normal distribution
-  /// \param igseed_in       The seed for the first generator in the series
-  /// \param niter           The number of iterations to use in initializing each generator
-  /// \param bank_limit      The maximum length of the random number cache
-  /// \param state_in        The state to apply to generator zero, thus determining the initial
-  ///                        states of all other generators
-  /// \{
-  Xoroshiro128pSeries(const ullint2 state_in, size_t generators_in = 1LLU, size_t depth_in = 2LLU,
-                      RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
-                      size_t bank_limit = constants::giga_zu);
-
-  Xoroshiro128pSeries(size_t generators_in = 1LLU, size_t depth_in = 2LLU,
-                      RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
-                      int igseed_in = 827493, int niter = 25,
-                      size_t bank_limit = constants::giga_zu);
-  /// \}
-
-  /// \brief Get the number of (forward-jumped) generators.
-  size_t getGeneratorCount() const;
-
-  /// \brief Get the depth of the bank for each generator.
-  size_t getDepth() const;
-  
-  /// \brief Get the number of generators for which to refesh all banked values at one time.
-  size_t getRefreshStride() const;
-
-  /// \brief Get a random number out of the bank.
-  ///
-  /// \param generator_index  The generator series from which to obtain the value
-  /// \param layer_index      Layer from which to obtain the value
-  T getBankValue(size_t generator_index, size_t layer_index) const;
-  
-  /// \brief Populate a portion of this object's bank with random numbers from each of the
-  ///        respective generators.
-  ///
-  /// \param first_gen  Index of the first generator to draw random numbers from
-  /// \param last_gen   Index of the generator before which to stop drawing new random numbers
-  void uniformRandomNumbers(size_t first_gen, size_t last_gen);
-
-  /// \brief Populate a portion of this object's bank with normally distributed random numbers
-  ///        from each of the respective generators.
-  ///
-  /// \param first_gen  Index of the first generator to draw random numbers from
-  /// \param last_gen   Index of the generator before which to stop drawing new random numbers
-  void gaussianRandomNumbers(size_t first_gen, size_t last_gen);
-
-private:
-  size_t generators;       ///< The quantity of (pseudo-) random number generators in the series
-  size_t depth;            ///< The depth of each generator's random numbers in the memory bank
-  size_t refresh_stride;   ///< The number of segments in which the generators series can be
-                           ///<   refreshed, calling a subset of the generators to recalculate the
-                           ///<  full of depth of banked random values for that generator / lane.
-  Hybrid<ullint2> states;  ///< Thestate vectors for all random number generators in the series
-  Hybrid<T> bank;          ///< Bank of random numbers pre-computed and saved for later use.  The
-                           ///<   numbers are stored only in the specifictype format of the series,
-                           ///<   float or double, to save space and avoid ambiguities as to when
-                           ///<   the numbers should be refreshed if multiple levels of precision
-                           ///<   in the random numbers are required.
-};
-  
 /// \brief The "Xoshiro256++" random number generator.  While not cryptographically useful, it is
 ///        a rock-solid random number generator for both floating-point and 64-bit integer results.
 class Xoshiro256ppGenerator {
@@ -279,7 +215,7 @@ public:
   ullint revealBitString() const;
 
   /// \brief Set the current state of the generator.
-  void setState(const ullint2 state_in);
+  void setState(const ullint4 state_in);
   
 private:
   ullint4 state;  ///< 128-bit state vector for the generator
@@ -298,7 +234,99 @@ private:
   ///                xrs256pp_longjump_(i,ii,iii,iv).
   void fastForward(const ullint4 stride);
 };
+
+/// \brief An series of "Xorshiro128+" generators, with state vectors for all of them and the
+///        means for seeding the series based on long jumps from a single state vector.
+template <typename T> class RandomNumberMill {
+public:
+
+  /// \brief The constructor can work off of a simple random initialization seed integer or a
+  ///        specific state vector for the first generator in the series.
+  ///
+  /// \param generators_in   The count of generators in the series
+  /// \param depth_in        Quantity of random numbers from each generator to store in the bank
+  /// \param init_kind       Style in which to initialize the random numbers in the bank,
+  ///                        i.e. from a uniform or a normal distribution
+  /// \param igseed_in       The seed for the first generator in the series
+  /// \param niter           The number of iterations to use in initializing each generator
+  /// \param bank_limit      The maximum length of the random number cache
+  /// \param state_in        The state to apply to generator zero, thus determining the initial
+  ///                        states of all other generators
+  /// \{
+  RandomNumberMill(const ullint2 state_in, size_t generators_in = 1LLU, size_t depth_in = 2LLU,
+                   RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
+                   size_t bank_limit = constants::giga_zu);
+
+  RandomNumberMill(const ullint4 state_in, size_t generators_in = 1LLU, size_t depth_in = 2LLU,
+                   RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
+                   size_t bank_limit = constants::giga_zu);
+
+  RandomNumberMill(size_t generators_in = 1LLU, size_t depth_in = 2LLU,
+                   RandomAlgorithm style_in = RandomAlgorithm::XOSHIRO_256PP,
+                   RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
+                   int igseed_in = 827493, int niter = 25, size_t bank_limit = constants::giga_zu);
+  /// \}
+
+  /// \brief Get the number of (forward-jumped) generators.
+  size_t getGeneratorCount() const;
+
+  /// \brief Get the depth of the bank for each generator.
+  size_t getDepth() const;
   
+  /// \brief Get the number of generators for which to refesh all banked values at one time.
+  size_t getRefreshStride() const;
+
+  /// \brief Get a random number out of the bank.
+  ///
+  /// \param generator_index  The generator series from which to obtain the value
+  /// \param layer_index      Layer from which to obtain the value
+  T getBankValue(size_t generator_index, size_t layer_index) const;
+  
+  /// \brief Populate a portion of this object's bank with random numbers from each of the
+  ///        respective generators.
+  ///
+  /// \param first_gen  Index of the first generator to draw random numbers from
+  /// \param last_gen   Index of the generator before which to stop drawing new random numbers
+  void uniformRandomNumbers(size_t first_gen, size_t last_gen);
+
+  /// \brief Populate a portion of this object's bank with normally distributed random numbers
+  ///        from each of the respective generators.
+  ///
+  /// \param first_gen  Index of the first generator to draw random numbers from
+  /// \param last_gen   Index of the generator before which to stop drawing new random numbers
+  void gaussianRandomNumbers(size_t first_gen, size_t last_gen);
+
+private:
+  RandomAlgorithm style;     ///< The kind of random number generator that this mill uses
+  size_t generators;         ///< The quantity of (pseudo-) random number generators in the series
+  size_t depth;              ///< The depth of each generator's random numbers in the memory bank
+  size_t refresh_stride;     ///< The number of segments in which the generators series can be
+                             ///<   refreshed, calling a subset of the generators to recalculate
+                             ///<   the banked random values for that generator / lane.
+  Hybrid<ullint2> state_xy;  ///< State vectors for all random number generators in the series,
+                             ///<   sufficient for a Xoroshiro128+ generator or any other requiring
+                             ///<   a 128-bit state
+  Hybrid<ullint2> state_zw;  ///< State vectors for all random number generators in the series,
+                             ///<   extended for Xoshiro256++ and any other generator requiring a
+                             ///<   256-bit state vector
+  Hybrid<T> bank;            ///< Bank of random numbers pre-computed and saved for later use.  The
+                             ///<   numbers are stored only in the specifictype format of the
+                             ///<   series, float or double, to save space and avoid ambiguities
+                             ///<   as to when the numbers should be refreshed if multiple levels
+                             ///<   of precision in the random numbers are required.
+
+  /// \brief Check the inputs for validity and safety, to avoid excessive allocations.
+  ///
+  /// \param bank_limit  The maximum length of the random number cache
+  void checkDimensions(size_t bank_limit);
+
+  /// \brief Prime the bank with its first complement of random numbers.
+  ///
+  /// \param init_kind  Style in which to initialize the random numbers in the bank, i.e. from a
+  ///                   uniform or a normal distribution
+  void initializeBank(RandomNumberKind init_kind);
+};
+
 } // namespace random
 } // namespace omni
 

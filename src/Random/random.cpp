@@ -316,6 +316,11 @@ ullint Xoshiro256ppGenerator::revealBitString() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+void Xoshiro256ppGenerator::setState(const ullint4 state_in) {
+  state = state_in;
+}
+
+//-------------------------------------------------------------------------------------------------
 ullint4 Xoshiro256ppGenerator::seed256(const int igseed) {
 
   // It is within the C and C++ standards to set an unsigned integer equal to a signed integer,

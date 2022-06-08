@@ -30,7 +30,7 @@ using omni::parse::TextFile;
 using omni::parse::polyNumericVector;
 using omni::random::Ran2Generator;
 using omni::random::Xoroshiro128pGenerator;
-using omni::random::Xoroshiro128pSeries;
+using omni::random::RandomNumberMill;
 using omni::random::Xoshiro256ppGenerator;
 using omni::symbols::pi;
 using namespace omni::math;
@@ -601,7 +601,7 @@ int main(const int argc, const char* argv[]) {
         "Xoroshiro128+ generator failed to restart the sequence as expected.");
   const int ngen = 1024;
   const int bank_depth = 8;
-  Xoroshiro128pSeries<double> my_128p_series(init_state, ngen, bank_depth);
+  RandomNumberMill<double> my_128p_series(init_state, ngen, bank_depth);
   CHECK_THROWS(my_128p_series.getBankValue(ngen + 3, 7), "Invalid random number bank access was "
                "permitted in a Xoroshiro128+ generator series object.");
   int mseries_state = 0;
