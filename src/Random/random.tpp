@@ -83,7 +83,7 @@ template <typename T>
 Xoroshiro128pSeries<T>::Xoroshiro128pSeries(const size_t generators_in, const size_t depth_in,
                                             const RandomNumberKind init_kind, const int igseed_in,
                                             const int niter, const size_t bank_limit) :
-  Xoroshiro128pSeries(Xoroshiro128pGenerator(igseed_in, niter).revealState, generators_in,
+  Xoroshiro128pSeries(Xoroshiro128pGenerator(igseed_in, niter).revealState(), generators_in,
                       depth_in, init_kind, bank_limit)
 {}
 
@@ -100,6 +100,18 @@ template <typename T> size_t Xoroshiro128pSeries<T>::getDepth() const {
 //-------------------------------------------------------------------------------------------------
 template <typename T> size_t Xoroshiro128pSeries<T>::getRefreshStride() const {
   return refresh_stride;
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T> T Xoroshiro128pSeries<T>::getBankValue(const size_t generator_index,
+                                                             const size_t layer_index) const {
+  if (generator_index >= generators || layer_index >= depth) {
+    rtErr("Value index (" + std::to_string(generator_index) + ", " + std::to_string(layer_index) +
+          ") is not valid in a series with " + std::to_string(generators) + " pseudo-random "
+          "number generators and " + std::to_string(depth) + " bank depth.", "Xoroshiro128pSeries",
+          "getBankValue");
+  }
+  return bank.readHost((layer_index * generators) + generator_index);
 }
 
 //-------------------------------------------------------------------------------------------------

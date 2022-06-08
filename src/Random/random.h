@@ -198,6 +198,12 @@ public:
   
   /// \brief Get the number of generators for which to refesh all banked values at one time.
   size_t getRefreshStride() const;
+
+  /// \brief Get a random number out of the bank.
+  ///
+  /// \param generator_index  The generator series from which to obtain the value
+  /// \param layer_index      Layer from which to obtain the value
+  T getBankValue(size_t generator_index, size_t layer_index) const;
   
   /// \brief Populate a portion of this object's bank with random numbers from each of the
   ///        respective generators.

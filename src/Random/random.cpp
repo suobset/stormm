@@ -289,7 +289,7 @@ float Xoshiro256ppGenerator::spGaussianRandomNumber() {
   const float x2 = sinf(symbols::twopi_f * spUniformRandomNumber());
   return x1 * x2;
 }
-
+ 
 //-------------------------------------------------------------------------------------------------
 void Xoshiro256ppGenerator::jump() {
   const ullint4 stride = { xrs256pp_jump_i,   xrs256pp_jump_ii,

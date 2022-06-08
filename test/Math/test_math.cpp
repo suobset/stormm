@@ -36,6 +36,51 @@ using omni::symbols::pi;
 using namespace omni::math;
 using namespace omni::testing;
 
+//-------------------------------------------------------------------------------------------------
+// Produce a series of random numbers from a generator based on an initial state and some
+// directions about how to cycle the generator after each sample.
+//-------------------------------------------------------------------------------------------------
+template <typename Tgen, typename Tstate>
+std::vector<double> generateExpectedSeries(Tgen *xrs, const Tstate init_state, const int gen_idx,
+                                           const int ngen, const int depth, const int maxcyc) {
+
+  // Initialize the pseudo-random number generator
+  xrs->setState(init_state);
+  for (int i = 0; i < gen_idx; i++) {
+    xrs->longJump();
+  }
+  
+  // Create a buffer to represent the series that should be held within the generator series
+  std::vector<double> buffer(depth);
+  for (int i = 0; i < depth; i++) {
+    buffer[i] = xrs->gaussianRandomNumber();
+  }
+
+  // Allocate the result
+  std::vector<double> result(maxcyc * depth);
+  
+  // Compute the refresh schedule
+  const int rstride = (ngen + depth - 1) / depth;
+  const int rsched  = gen_idx / rstride;
+  for (int i = 0; i < maxcyc * depth; i++) {
+
+    // Pull a value from the table
+    const int table_idx = i - ((i / depth) * depth);
+    result[i] = buffer[table_idx];
+    
+    // Refresh the table as appropriate
+    if (table_idx == rsched) {
+      for (int j = 0; j < depth; j++) {
+        buffer[j] = xrs->gaussianRandomNumber();
+      }
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+// main
+//-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
@@ -554,13 +599,53 @@ int main(const int argc, const char* argv[]) {
   }
   check(rstr_uni_output, RelationalOperator::EQUAL, orig_uni_output, "Resetting the state of a "
         "Xoroshiro128+ generator failed to restart the sequence as expected.");
-  Xoroshiro128pSeries<double> my_128p_series(init_state, 1024, 8);
+  const int ngen = 1024;
+  const int bank_depth = 8;
+  Xoroshiro128pSeries<double> my_128p_series(init_state, ngen, bank_depth);
+  CHECK_THROWS(my_128p_series.getBankValue(ngen + 3, 7), "Invalid random number bank access was "
+               "permitted in a Xoroshiro128+ generator series object.");
   int mseries_state = 0;
   const int stride_length = my_128p_series.getRefreshStride();
-  const int bank_depth = my_128p_series.getDepth();
-  for (int i = 0; i < bank_depth; i++) {
-    my_128p_series.gaussianRandomNumbers(i * stride_length, (i + 1) * stride_length);
+  check(stride_length, RelationalOperator::EQUAL, ngen / bank_depth, "The length of a refresh "
+        "stride in the Xoroshiro128+ generator series should be such that running through a "
+        "number of refresh cycles equal to the depth of the object's banks should cover all "
+        "generators.");
+  const int sample_a = 0;
+  const int sample_b = ngen - 53;
+  const int sample_c = (ngen / 2) - 37;
+  const int sample_d = ngen / 4;
+  const int maxcyc = 4;
+  std::vector<double> a_path(bank_depth * maxcyc), b_path(bank_depth * maxcyc);
+  std::vector<double> c_path(bank_depth * maxcyc), d_path(bank_depth * maxcyc);
+  for (int cyc = 0; cyc < maxcyc; cyc++) {
+    for (int i = 0; i < bank_depth; i++) {
+      a_path[(cyc * bank_depth) + i] = my_128p_series.getBankValue(sample_a, i);
+      b_path[(cyc * bank_depth) + i] = my_128p_series.getBankValue(sample_b, i);
+      c_path[(cyc * bank_depth) + i] = my_128p_series.getBankValue(sample_c, i);
+      d_path[(cyc * bank_depth) + i] = my_128p_series.getBankValue(sample_d, i);
+      my_128p_series.gaussianRandomNumbers(i * stride_length, (i + 1) * stride_length);
+    }
   }
+  const std::vector<double> a_expect = generateExpectedSeries(&test_xrs128p, init_state, sample_a,
+                                                              ngen, bank_depth, maxcyc);
+  const std::vector<double> b_expect = generateExpectedSeries(&test_xrs128p, init_state, sample_b,
+                                                              ngen, bank_depth, maxcyc);
+  const std::vector<double> c_expect = generateExpectedSeries(&test_xrs128p, init_state, sample_c,
+                                                              ngen, bank_depth, maxcyc);
+  const std::vector<double> d_expect = generateExpectedSeries(&test_xrs128p, init_state, sample_d,
+                                                              ngen, bank_depth, maxcyc);
+  check(a_path, RelationalOperator::EQUAL, a_expect, "A random number sequence obtained from "
+        "generator " + std::to_string(sample_a) + " of a Xoroshiro128+ generator series did not "
+        "meet expectations.");
+  check(b_path, RelationalOperator::EQUAL, b_expect, "A random number sequence obtained from "
+        "generator " + std::to_string(sample_b) + " of a Xoroshiro128+ generator series did not "
+        "meet expectations.");
+  check(c_path, RelationalOperator::EQUAL, c_expect, "A random number sequence obtained from "
+        "generator " + std::to_string(sample_c) + " of a Xoroshiro128+ generator series did not "
+        "meet expectations.");
+  check(d_path, RelationalOperator::EQUAL, d_expect, "A random number sequence obtained from "
+        "generator " + std::to_string(sample_d) + " of a Xoroshiro128+ generator series did not "
+        "meet expectations.");
   
   // Print results
   printTestSummary(oe.getVerbosity());
