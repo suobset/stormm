@@ -1,0 +1,7 @@
+// -*-c++-*-
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ int devcRoundUp(const int jagged, const int increment) {
+  return ((jagged + increment - 1) / increment) * increment;
+}
+

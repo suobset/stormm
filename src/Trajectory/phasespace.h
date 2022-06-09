@@ -140,7 +140,7 @@ public:
   /// \param original  The PhaseSpace object from which to preserve content
   PhaseSpace(PhaseSpace &&original);
 
-  /// \brief Take the default move assignment operator
+  /// \brief The move assignment operator looks much like the copy assignment operator.
   ///  
   /// \param other     Another way to say original, in a different semantic context
   PhaseSpace& operator=(PhaseSpace &&other);

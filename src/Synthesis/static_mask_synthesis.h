@@ -86,7 +86,15 @@ public:
 
   /// \brief Get the abstract for this static exclusion mask synthesis.
   SeMaskSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  
+
+#ifdef OMNI_USE_HPC
+  /// \brief Upload the exclusion mask synthesis to the GPU device.
+  void upload();
+
+  /// \brief Download the exclusion mask synthesis from the GPU device.
+  void download();
+#endif
+
 private:
   int system_count;                   ///< The number of systems covered by this object
   Hybrid<int> atom_counts;            ///< Atom counts for all systems.  Supertile strides are not

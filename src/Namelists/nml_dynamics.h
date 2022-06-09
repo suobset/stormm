@@ -12,6 +12,10 @@ namespace namelist {
 /// \brief Default values for molecular dynamics
 /// \{
 constexpr int default_dynamics_nstlim = 100;
+constexpr double default_dynamics_time_step = 1.0;
+constexpr double default_rattle_tolerance = 1.0e-6;
+constexpr double minimum_dynamics_time_step = 0.015625;
+constexpr double minimum_rattle_tolerance = 1.0e-9;
 /// \}
 
 /// \brief Object to encapsulate molecular dynamics control information.  Like other namelist
@@ -38,11 +42,27 @@ public:
   /// \brief Get the total number of dynamics steps
   int getStepCount() const;
 
+  /// \brief Get the simulation time step
+  double getTimeStep() const;
+
+  /// \brief Get the RATTLE tolerance
+  double getRattleTolerance() const;
+
   /// \brief Set the total number of dynamics steps
   ///
   /// \param nstlim_in  The number of steps to take
   void setStepCount(int nstlim_in);
 
+  /// \brief Set the simulation time step
+  ///
+  /// \param time_step_in  The requested time step
+  void setTimeStep(double time_step_in);
+
+  /// \brief Set the simulation RATTLE tolerance
+  ///
+  /// \param tol_in  The requested tolerance
+  void setRattleTolerance(double rattle_tolerance_in);
+  
 private:
   ExceptionResponse policy;     ///< Set the behavior when bad inputs are encountered.  DIE =
                                 ///<   abort program, WARN = warn the user, and likely reset to
@@ -51,9 +71,17 @@ private:
                                 ///<   if one is available.
   int nstlim;                   ///< Total number of dynamics steps to perform (equivalent to
                                 ///<   maxcyc in sander)
+  double time_step;             ///< Time step to take after each force evaluation
+  double rattle_tolerance;      ///< The tolerance to apply to bond constraint calculations
 
   /// \brief Validate the total number of steps
   void validateStepCount() const;
+
+  /// \brief Validate the time step
+  void validateTimeStep() const;
+
+  /// \brief Validate the RATTLE tolerance
+  void validateRattleTolerance() const;
 };
   
 /// \brief Produce a namelist for specifying molecular dynamics directives, similar to those found

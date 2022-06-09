@@ -1,12 +1,16 @@
 // -*-c++-*-
 
+#ifndef EXCL_GMEM_OFFSET
+#define EXCL_GMEM_OFFSET  (blockIdx.x * maximum_valence_work_unit_atoms)
+#endif
+
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
-KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
+KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, ControlKit ctrl, PsSynthesisWriter poly_ps,
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter sc,
 #endif
-            CacheResource<TCALC> gmem_r) {
+            CacheResourceKit<TCALC> gmem_r) {
 
   // Coordinates and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.  In this manner, only forces are held in __shared__ where they can
@@ -19,9 +23,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
   __shared__ int yoverflow_active[large_block_size / warp_size_int];
   __shared__ int zoverflow_active[large_block_size / warp_size_int];
 #else
-  __shared__ llint sh_xfrc[maximum_valence_work_unit_atoms];
-  __shared__ llint sh_yfrc[maximum_valence_work_unit_atoms];
-  __shared__ llint sh_zfrc[maximum_valence_work_unit_atoms];
+#  ifdef COMPUTE_FORCE
+  __shared__ long long int sh_xfrc[maximum_valence_work_unit_atoms];
+  __shared__ long long int sh_yfrc[maximum_valence_work_unit_atoms];
+  __shared__ long long int sh_zfrc[maximum_valence_work_unit_atoms];
+#  endif
 #endif
   __shared__ int2 vwu_map[vwu_abstract_length];
   __shared__ int vwu_task_count[vwu_abstract_length];
@@ -39,27 +45,27 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
     if (threadIdx.x < vwu_abstract_length) {
       vwu_map[threadIdx.x] = poly_vk.vwu_abstracts[(vwu_idx * vwu_abstract_length) + threadIdx.x];
       vwu_task_count[threadIdx.x] = vwu_map[threadIdx.x].y - vwu_map[threadIdx.x].x;
-      vwu_padded_task_count[threadIdx.x] = roundUp(vwu_task_count[threadIdx.x]);
+      vwu_padded_task_count[threadIdx.x] = devcRoundUp(vwu_task_count[threadIdx.x], warp_size_int);
     }
 #ifdef SPLIT_FORCE_ACCUMULATION
     else if (threadIdx.x < vwu_abstract_length + warp_size_int) {
-      sh_x_overflow_active[theradIdx.x - vwu_abstract_length] = 0;
+      xoverflow_active[threadIdx.x - vwu_abstract_length] = 0;
     }
     else if (threadIdx.x < vwu_abstract_length + (2 * warp_size_int)) {
-      sh_y_overflow_active[theradIdx.x - vwu_abstract_length - warp_size_int] = 0;
+      yoverflow_active[threadIdx.x - vwu_abstract_length - warp_size_int] = 0;
     }
     else if (threadIdx.x < vwu_abstract_length + (3 * warp_size_int)) {
-      sh_z_overflow_active[theradIdx.x - vwu_abstract_length - (2 * warp_size_int)] = 0;
+      zoverflow_active[threadIdx.x - vwu_abstract_length - (2 * warp_size_int)] = 0;
     }
 #endif
     __syncthreads();
 
     // Import atomic coordinates, properties, and (if appropriate) velocities.  This employs all
     // threads of the block, breaking up each set of information at the warp level.
-    const int import_llim = vwu_map[VwuAbstactMap::IMPORT].x;
-    const int import_hlim = vwu_map[VwuAbstactMap::IMPORT].y;
-    const int import_stride = roundUp(import_hlim - import_llim, warp_size_int);
-    const int import_count  = roundUp(import_hlim - import_llim, warp_size_int);
+    const int import_llim = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].x;
+    const int import_hlim = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].y;
+    const int import_stride = devcRoundUp(import_hlim - import_llim, warp_size_int);
+    const int import_count  = devcRoundUp(import_hlim - import_llim, warp_size_int);
     int pos = threadIdx.x;
     while (pos < import_stride) {
       if (pos < import_count) {
@@ -90,7 +96,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
     while (pos < 4 * import_stride) {
       const int rel_pos = pos - (3 * import_stride);
       if (rel_pos < import_count) {
-        const size_t read_idx     = poly_vk.vwu_imports[import_llim + rel_pos;
+        const size_t read_idx     = poly_vk.vwu_imports[import_llim + rel_pos];
         const size_t write_idx    = EXCL_GMEM_OFFSET + rel_pos;
         gmem_r.charges[write_idx] = poly_vk.charges[read_idx];
       }
@@ -171,24 +177,30 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
     // Perform each force-related task in the valence work unit
     pos = threadIdx.x;
     int vterm_offset = 0;
-    int vterm_limit  = vwu_padded_task_count[VwuAbstractMap::CBND];
+    int vterm_limit  = vwu_padded_task_count[(size_t)(VwuAbstractMap::CBND)];
 #ifdef COMPUTE_ENERGY
     llint bond_acc = 0LL;
 #endif
     while (pos < vterm_limit) {
-      if (pos < vwu_task_count[VwuAbstractMap::CBND]) {
+      if (pos < vwu_task_count[(size_t)(VwuAbstractMap::CBND)]) {
         const uint2 tinsr =  poly_vk.cbnd_insr[pos - vterm_offset];
         const bool is_urey_bradley = ((tinsr.x >> 20) & 0x1);
-        const int i_atom = (tinsr.x & 0x3ff);
-        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int i_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
         const int param_idx = tinsr.y;
         const TCALC keq = (is_urey_bradley) ? poly_vk.ubrd_keq[param_idx] :
                                               poly_vk.bond_keq[param_idx];
         const TCALC leq = (is_urey_bradley) ? poly_vk.ubrd_leq[param_idx] :
-                                              std::abs(poly_vk.bond_leq[param_idx]);
-        const TCALC dx = (TCALC)(xcrd[j_atom] - xcrd[i_atom]) * poly_ps.inv_gpos_scale_f;
-        const TCALC dy = (TCALC)(ycrd[j_atom] - ycrd[i_atom]) * poly_ps.inv_gpos_scale_f;
-        const TCALC dz = (TCALC)(zcrd[j_atom] - zcrd[i_atom]) * poly_ps.inv_gpos_scale_f;
+                                              ABS_FUNC(poly_vk.bond_leq[param_idx]);
+        const llint ixloc = gmem_r.xcrd[i_atom];
+        const llint jxloc = gmem_r.xcrd[j_atom];
+        const TCALC dx = (TCALC)(jxloc - ixloc) * poly_ps.inv_gpos_scale_f;
+        const llint iyloc = gmem_r.ycrd[i_atom];
+        const llint jyloc = gmem_r.ycrd[j_atom];
+        const TCALC dy = (TCALC)(jyloc - iyloc) * poly_ps.inv_gpos_scale_f;
+        const llint izloc = gmem_r.zcrd[i_atom];
+        const llint jzloc = gmem_r.zcrd[j_atom];
+        const TCALC dz = (TCALC)(jzloc - izloc) * poly_ps.inv_gpos_scale_f;
         const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
         const TCALC dl = dr - leq;
 #ifdef COMPUTE_ENERGY
@@ -226,12 +238,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
         splitForceContribution(-fmag_dy, j_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow);
         splitForceContribution(-fmag_dz, j_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
-        atomicAdd(&sh_xfrc[i_atom],  LLCONV_FUNC(fmag_dx));
-        atomicAdd(&sh_yfrc[i_atom],  LLCONV_FUNC(fmag_dy));
-        atomicAdd(&sh_zfrc[i_atom],  LLCONV_FUNC(fmag_dz));
-        atomicAdd(&sh_xfrc[j_atom], LLCONV_FUNC(-fmag_dx));
-        atomicAdd(&sh_yfrc[j_atom], LLCONV_FUNC(-fmag_dy));
-        atomicAdd(&sh_zfrc[j_atom], LLCONV_FUNC(-fmag_dz));
+        const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
+        const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
+        const llint ifmag_dz = LLCONV_FUNC(fmag_dz);
+        atomicAdd((ullint*)&sh_xfrc[i_atom],  llitoulli(ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[i_atom],  llitoulli(ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[i_atom],  llitoulli(ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(-ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(-ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], llitoulli(-ifmag_dz));
 #  endif
 #  ifndef UPDATE_ATOMS
         // See above for the reason these force accumulations sit within a conditional scope
@@ -242,38 +257,47 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::ANGL];
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::ANGL)];
 #ifdef COMPUTE_ENERGY
     llint angl_acc = 0LL;
 #endif
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::ANGL]) {
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::ANGL)]) {
         const uint2 tinsr =  poly_vk.angl_insr[pos - vterm_offset];
-        const int i_atom = (tinsr.x & 0x3ff);
-        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
-        const int j_atom = ((tinsr.x >> 20) & 0x3ff);
+        const int i_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int k_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
         const int param_idx = tinsr.y;
         const TCALC keq      = poly_vk.angl_keq[param_idx];
         const TCALC theta_eq = poly_vk.angl_theta[param_idx];
-        const TCALC ba_x = (TCALC)(xcrd[i_atom] - xcrd[j_atom]) * inv_gpos_scale_f;
-        const TCALC ba_y = (TCALC)(ycrd[i_atom] - ycrd[j_atom]) * inv_gpos_scale_f;
-        const TCALC ba_z = (TCALC)(zcrd[i_atom] - zcrd[j_atom]) * inv_gpos_scale_f;
-        const TCALC bc_x = (TCALC)(xcrd[k_atom] - xcrd[j_atom]) * inv_gpos_scale_f;
-        const TCALC bc_y = (TCALC)(ycrd[k_atom] - ycrd[j_atom]) * inv_gpos_scale_f;
-        const TCALC bc_z = (TCALC)(zcrd[k_atom] - zcrd[j_atom]) * inv_gpos_scale_f;
+        const llint ixloc = gmem_r.xcrd[i_atom];
+        const llint jxloc = gmem_r.xcrd[j_atom];
+        const llint kxloc = gmem_r.xcrd[k_atom];
+        const TCALC ba_x = (TCALC)(ixloc - jxloc) * poly_ps.inv_gpos_scale_f;
+        const TCALC bc_x = (TCALC)(kxloc - jxloc) * poly_ps.inv_gpos_scale_f;
+        const llint iyloc = gmem_r.ycrd[i_atom];
+        const llint jyloc = gmem_r.ycrd[j_atom];
+        const llint kyloc = gmem_r.ycrd[k_atom];
+        const TCALC ba_y = (TCALC)(iyloc - jyloc) * poly_ps.inv_gpos_scale_f;
+        const TCALC bc_y = (TCALC)(kyloc - jyloc) * poly_ps.inv_gpos_scale_f;
+        const llint izloc = gmem_r.zcrd[i_atom];
+        const llint jzloc = gmem_r.zcrd[j_atom];
+        const llint kzloc = gmem_r.zcrd[k_atom];
+        const TCALC ba_z = (TCALC)(izloc - jzloc) * poly_ps.inv_gpos_scale_f;
+        const TCALC bc_z = (TCALC)(kzloc - jzloc) * poly_ps.inv_gpos_scale_f;
         const TCALC mgba = (ba_x * ba_x) + (ba_y * ba_y) + (ba_z * ba_z);
         const TCALC mgbc = (bc_x * bc_x) + (bc_y * bc_y) + (bc_z * bc_z);
-        const TCALC invbabc = (TCALC)1.0 / SQRT_FUNC(mgba * mgbc)
+        const TCALC invbabc = (TCALC)1.0 / SQRT_FUNC(mgba * mgbc);
         TCALC costheta = ((ba_x * bc_x) + (ba_y * bc_y) + (ba_z * bc_z)) * invbabc;
         costheta = (costheta < (TCALC)(-1.0)) ?
                    (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
-        const Tcalc theta = ACOS_FUNC(costheta);
-        const Tcalc dtheta = theta - equilibrium;
+        const TCALC theta = ACOS_FUNC(costheta);
+        const TCALC dtheta = theta - theta_eq;
 #ifdef COMPUTE_ENERGY
         const int acc_elem = (pos - vterm_offset) / uint_bit_count_int;
         const int acc_bit  = pos - vterm_offset - (acc_elem * uint_bit_count_int);
         if ((poly_vk.angl_acc[acc_elem] >> acc_bit) & 0x1) {
-          angl_acc += LLCONV_FUNC(keq * dtheta * dltheta * sc.nrg_scale_f);
+          angl_acc += LLCONV_FUNC(keq * dtheta * dtheta * sc.nrg_scale_f);
         }
 #endif
 #ifdef COMPUTE_FORCE
@@ -320,15 +344,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
         const llint icdf_x = LLCONV_FUNC((ba_x * mbabc) - (costheta * bc_x * sqbc));
         const llint icdf_y = LLCONV_FUNC((ba_y * mbabc) - (costheta * bc_y * sqbc));
         const llint icdf_z = LLCONV_FUNC((ba_z * mbabc) - (costheta * bc_z * sqbc));
-        atomicAdd(&sh_xfrc[i_atom], -iadf_x);
-        atomicAdd(&sh_yfrc[i_atom], -iadf_y);
-        atomicAdd(&sh_zfrc[i_atom], -iadf_z);
-        atomicAdd(&sh_xfrc[j_atom], iadf_x + icdf_x);
-        atomicAdd(&sh_yfrc[j_atom], iadf_y + icdf_y);
-        atomicAdd(&sh_zfrc[j_atom], iadf_z + icdf_z);
-        atomicAdd(&sh_xfrc[k_atom], -icdf_x);
-        atomicAdd(&sh_yfrc[k_atom], -icdf_y);
-        atomicAdd(&sh_zfrc[k_atom], -icdf_z);
+        atomicAdd((ullint*)&sh_xfrc[i_atom], llitoulli(-iadf_x));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(-iadf_y));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], llitoulli(-iadf_z));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(iadf_x + icdf_x));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(iadf_y + icdf_y));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], llitoulli(iadf_z + icdf_z));
+        atomicAdd((ullint*)&sh_xfrc[k_atom], llitoulli(-icdf_x));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-icdf_y));
+        atomicAdd((ullint*)&sh_zfrc[k_atom], llitoulli(-icdf_z));
 #  endif
 #  ifndef UPDATE_ATOMS
         }
@@ -338,36 +362,47 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::CDHE];
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::CDHE)];
 #ifdef COMPUTE_ENERGY
     llint dihe_acc = 0LL;
+    llint impr_acc = 0LL;
     llint cimp_acc = 0LL;
-    llint qq14_acc = 0LL;
-    llint lj14_acc = 0LL;
 #endif
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::CDHE]) {
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::CDHE)]) {
         const uint2 tinsr =  poly_vk.cdhe_insr[pos - vterm_offset];
-        const int i_atom = (tinsr.x & 0x3ff);
-        const int j_atom = ((tinsr.x >> 10) & 0x3ff);
-        const int k_atom = ((tinsr.x >> 20) & 0x3ff);
-        const int l_atom = (tinsr.y & 0x3ff);
+        const int i_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int j_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int k_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int l_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
         const int param_idx = ((tinsr.y >> 16) & 0xffff);
-        const TCALC3 ab = { (TCALC)(sh_xcrd[j_atom] - sh_xcrd[i_atom]),
-                            (TCALC)(sh_ycrd[j_atom] - sh_ycrd[i_atom]),
-                            (TCALC)(sh_zcrd[j_atom] - sh_zcrd[i_atom]) };
-        const TCALC3 bc = { (TCALC)(sh_xcrd[k_atom] - sh_xcrd[j_atom]),
-                            (TCALC)(sh_ycrd[k_atom] - sh_ycrd[j_atom]),
-                            (TCALC)(sh_zcrd[k_atom] - sh_zcrd[j_atom]) };
-        const TCALC3 cd = { (TCALC)(sh_xcrd[l_atom] - sh_xcrd[k_atom]),
-                            (TCALC)(sh_ycrd[l_atom] - sh_ycrd[k_atom]),
-                            (TCALC)(sh_zcrd[l_atom] - sh_zcrd[k_atom]) };
+        const llint ixloc = gmem_r.xcrd[i_atom];
+        const llint iyloc = gmem_r.ycrd[i_atom];
+        const llint izloc = gmem_r.zcrd[i_atom];
+        const llint jxloc = gmem_r.xcrd[j_atom];
+        const llint jyloc = gmem_r.ycrd[j_atom];
+        const llint jzloc = gmem_r.zcrd[j_atom];
+        const TCALC3 ab = { (TCALC)(jxloc - ixloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(jyloc - iyloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(jzloc - izloc) * poly_ps.inv_gpos_scale_f };
+        const llint kxloc = gmem_r.xcrd[k_atom];
+        const llint kyloc = gmem_r.ycrd[k_atom];
+        const llint kzloc = gmem_r.zcrd[k_atom];
+        const TCALC3 bc = { (TCALC)(kxloc - jxloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(kyloc - jyloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(kzloc - jzloc) * poly_ps.inv_gpos_scale_f };
+        const llint lxloc = gmem_r.xcrd[l_atom];
+        const llint lyloc = gmem_r.ycrd[l_atom];
+        const llint lzloc = gmem_r.zcrd[l_atom];
+        const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(lyloc - kyloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(lzloc - kzloc) * poly_ps.inv_gpos_scale_f };
         TCALC crabbc_x = (ab.y * bc.z) - (ab.z * bc.y);
         TCALC crabbc_y = (ab.z * bc.x) - (ab.x * bc.z);
-        TCALC crabbc_x = (ab.x * bc.y) - (ab.y * bc.x);
+        TCALC crabbc_z = (ab.x * bc.y) - (ab.y * bc.x);
         TCALC crbccd_x = (bc.y * cd.z) - (bc.z * cd.y);
         TCALC crbccd_y = (bc.z * cd.x) - (bc.x * cd.z);
-        TCALC crbccd_x = (bc.x * cd.y) - (bc.y * cd.x);
+        TCALC crbccd_z = (bc.x * cd.y) - (bc.y * cd.x);
         const TCALC scr_x = (crabbc_y * crbccd_z) - (crabbc_z * crbccd_y);
         const TCALC scr_y = (crabbc_z * crbccd_x) - (crabbc_x * crbccd_z);
         const TCALC scr_z = (crabbc_x * crbccd_y) - (crabbc_y * crbccd_x);
@@ -378,7 +413,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
                                (crbccd_z * crbccd_z)));
 #ifdef CHECK_COSARG
         TCALC theta;
-        if (fabs(costheta) >= near_to_one_f) {
+        if (ABS_FUNC(costheta) >= near_to_one_f) {
 
           // The floating-point representation of costheta is numerically ill-conditioned.
           // Compute the distance from atom I to the plane of atoms J, K, and L to get the angle
@@ -399,11 +434,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
           TCALC rdy = ny_bccd - ny_abbc;
           TCALC rdz = nz_bccd - nz_abbc;
           TCALC rs = SQRT_FUNC((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-          if (std::abs(rs) > value_one) {
+          if (ABS_FUNC(rs) > (TCALC)(1.0)) {
             rdx = nx_bccd + nx_abbc;
             rdy = ny_bccd + ny_abbc;
             rdz = nz_bccd + nz_abbc;
-            rs = pi_f - SQT_FUNC((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+            rs = pi_f - SQRT_FUNC((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
           }
           theta = ((scr_x * bc.x) + (scr_y * bc.y) + (scr_z * bc.z) > (TCALC)(0.0)) ? rs : -rs;
         }
@@ -414,16 +449,23 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
 #else
         costheta = (costheta < (TCALC)(-1.0)) ?
                    (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
-        const TCALC theta = ((scr_x * bc.x) + (scr_y * bc.y) + (scr_ Z * bc_z) > (TCALC)(0.0)) ?
+        const TCALC theta = ((scr_x * bc.x) + (scr_y * bc.y) + (scr_z * bc.z) > (TCALC)(0.0)) ?
                             acos(costheta) : -acos(costheta);
 #endif
-        TCALC sangle, sangle_ii, stiffness, stiffness_ii;
+        TCALC sangle, sangle_ii, stiffness;
+#ifdef COMPUTE_FORCE
+        TCALC stiffness_ii;
+#endif
         if ((tinsr.x >> 30) & 0x1) {
           stiffness = poly_vk.cimp_keq[param_idx];
           sangle = theta - poly_vk.cimp_phi[param_idx];
 #ifdef COMPUTE_ENERGY
           TCALC contrib = stiffness * sangle * sangle;
-          cimp_acc += LLCONV_FUNC(contrib * nrg_scale_factor);
+          const int acc_elem = (pos - vterm_offset) / uint_bit_count_int;
+          const int acc_bit  = pos - vterm_offset - (acc_elem * uint_bit_count_int);
+          if ((poly_vk.cdhe_acc[acc_elem] >> acc_bit) & 0x1) {
+            cimp_acc += LLCONV_FUNC(contrib * sc.nrg_scale_f);
+          }
 #endif
         }
         else {
@@ -437,11 +479,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
 #endif
           // Superimpose a second dihedral onto the same four atoms
           if ((tinsr.y >> 15) & 0x1) {
-            const int param_ii_idx = (tinsr.z & 0xfffff);
+            const uint tinsr_z = poly_vk.cdhe_ovrt_insr[pos - vterm_offset];
+            const int param_ii_idx = (tinsr_z & 0xfffff);
             const TCALC ampl_ii = poly_vk.dihe_amp[param_ii_idx];
             const TCALC freq_ii = poly_vk.dihe_freq[param_ii_idx];
             const TCALC phi_ii  = poly_vk.dihe_phi[param_ii_idx];
+#ifdef COMPUTE_FORCE        
             stiffness_ii = ampl_ii * freq_ii;
+#endif
             sangle_ii = (freq_ii * theta) - phi_ii;
 #ifdef COMPUTE_ENERGY
             contrib += ampl_ii * ((TCALC)(1.0) + cos(sangle_ii));
@@ -451,20 +496,18 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
           const TorsionKind kind = (tinsr.x >> 31) ? TorsionKind::IMPROPER :
                                                      TorsionKind::PROPER;
           if (kind == TorsionKind::PROPER) {
-            dihe_acc += LLCONV_FUNC(contrib * nrg_scale_factor);
+            dihe_acc += LLCONV_FUNC(contrib * sc.nrg_scale_f);
           }
           else {
-            impr_acc += LLCONV_FUNC(contrib * nrg_scale_factor);
+            impr_acc += LLCONV_FUNC(contrib * sc.nrg_scale_f);
           }
 #endif
         }
 #ifdef COMPUTE_FORCE        
 #  ifdef UPDATE_ATOMS
-#    ifndef COMPUTE_ENERGY
-        const int acc_elem = (pos - vterm_offset) / uint_bit_count_int;
-        const int acc_bit  = pos - vterm_offset - (acc_elem * uint_bit_count_int);
-#    endif
-        if ((poly_vk.cdhe_acc[acc_elem] >> acc_bit) & 0x1) {
+        const int acc_elem_ii = (pos - vterm_offset) / uint_bit_count_int;
+        const int acc_bit_ii  = pos - vterm_offset - (acc_elem_ii * uint_bit_count_int);
+        if ((poly_vk.cdhe_acc[acc_elem_ii] >> acc_bit_ii) & 0x1) {
 #  endif
         TCALC fr;
         if ((tinsr.x >> 30) & 0x1) {
@@ -536,24 +579,24 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
         const llint ifrc_ix = LLCONV_FUNC(crabbc_x * fa);
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc_x) - (fb2 * crbccd_x));
         const llint ifrc_lx = LLCONV_FUNC(-fd * crbccd_x);
-        atomicAdd(&sh_xfrc[i_atom], ifrc_ix);
-        atomicAdd(&sh_xfrc[j_atom], ifrc_jx);
-        atomicAdd(&sh_xfrc[k_atom], -(ifrc_ix + ifrc_jx + ifrc_lx));
-        atomicAdd(&sh_xfrc[l_atom], ifrc_lx);
+        atomicAdd((ullint*)&sh_xfrc[i_atom], llitoulli(ifrc_ix));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(ifrc_jx));
+        atomicAdd((ullint*)&sh_xfrc[k_atom], llitoulli(-(ifrc_ix + ifrc_jx + ifrc_lx)));
+        atomicAdd((ullint*)&sh_xfrc[l_atom], llitoulli(ifrc_lx));
         const llint ifrc_iy = LLCONV_FUNC(crabbc_y * fa);
         const llint ifrc_jy = LLCONV_FUNC((fb1 * crabbc_y) - (fb2 * crbccd_y));
         const llint ifrc_ly = LLCONV_FUNC(-fd * crbccd_y);
-        atomicAdd(&sh_yfrc[i_atom], ifrc_iy);
-        atomicAdd(&sh_yfrc[j_atom], ifrc_jy);
-        atomicAdd(&sh_yfrc[k_atom], -(ifrc_iy + ifrc_jy + ifrc_ly));
-        atomicAdd(&sh_yfrc[l_atom], ifrc_ly);
+        atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(ifrc_iy));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(ifrc_jy));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-(ifrc_iy + ifrc_jy + ifrc_ly)));
+        atomicAdd((ullint*)&sh_yfrc[l_atom], llitoulli(ifrc_ly));
         const llint ifrc_iz = LLCONV_FUNC(crabbc_z * fa);
         const llint ifrc_jz = LLCONV_FUNC((fb1 * crabbc_z) - (fb2 * crbccd_z));
         const llint ifrc_lz = LLCONV_FUNC(-fd * crbccd_z);
-        atomicAdd(&sh_yfrc[i_atom], ifrc_iz);
-        atomicAdd(&sh_yfrc[j_atom], ifrc_jz);
-        atomicAdd(&sh_yfrc[k_atom], -(ifrc_iz + ifrc_jz + ifrc_lz));
-        atomicAdd(&sh_yfrc[l_atom], ifrc_lz);        
+        atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(ifrc_iz));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(ifrc_jz));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-(ifrc_iz + ifrc_jz + ifrc_lz)));
+        atomicAdd((ullint*)&sh_yfrc[l_atom], llitoulli(ifrc_lz));
 #endif
 #ifdef UPDATE_ATOMS
         }
@@ -563,49 +606,49 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::CMAP];
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::CMAP]) {
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::CMAP)];
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::CMAP)]) {
         
       }
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::INFR14];
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap::INFR14]) {
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::INFR14)];
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::INFR14)]) {
         
       }
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RPOSN];
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RPOSN]) {
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RPOSN)];
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RPOSN)]) {
         
       }
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RBOND];
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RBOND]) {
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RBOND)];
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RBOND)]) {
         
       }
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RANGL];
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RANGL]) {
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RANGL)];
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RANGL)]) {
         
       }
       pos += blockDim.x;
     }
     vterm_offset = vterm_limit;
-    vterm_limit = vterm_offset + vwu_padded_task_count[VwuAbstractMap::RDIHE];
-    while (pos < term_limit) {
-      if (pos - vterm_offset < vwu_task_count[VwuAbstractMap:RDIHE]) {
+    vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RDIHE)];
+    while (pos < vterm_limit) {
+      if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RDIHE)]) {
         
       }
       pos += blockDim.x;
@@ -633,7 +676,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, PsSynthesisWriter poly_ps,
       vwu_idx = atomicAdd(&poly_ps.valence_progress_counters[prog_counter_idx], 1);
     }
     if (threadIdx.x >= warp_size_int && threadIdx.x < twice_warp_size_int) {
-      const int step_modulus = polyps.step & twice_warp_bits_mask_int;
+      const int step_modulus = poly_ps.step & twice_warp_bits_mask_int;
       if (step_modulus == 0) {
         poly_ps.vwu_progress[threadIdx.x] = blockDim.x;
       }

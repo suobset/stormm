@@ -134,6 +134,14 @@ public:
   /// \brief Get the abstract for this exclusion mask object
   const StaticExclusionMaskReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+#ifdef OMNI_USE_HPC
+  /// \brief Upload the object's information to the GPU device
+  void upload();
+
+  /// \brief Download the object's information from the GPU device
+  void download();
+#endif
+  
   /// \brief Test whether some atom pair is an exclusion
   ///
   /// \param atom_i  The ith atom to test for a pair exclusion with atom_j

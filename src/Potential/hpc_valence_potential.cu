@@ -1,19 +1,41 @@
 // -*-c++-*-
 #include "Constants/hpc_bounds.h"
 #include "Constants/fixed_precision.h"
+#include "Constants/scaling.h"
+#include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
-#include "Topology/atomgraph_abstracts.h"
+#include "Potential/scorecard.h"
+#include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
+#include "Topology/atomgraph_abstracts.h"
+#include "Topology/atomgraph_enumerators.h"
 
 namespace omni {
 namespace energy {
 
+using constants::warp_size_int;
+using constants::twice_warp_bits_mask_int;
+using constants::twice_warp_size_int;
+using math::roundUp;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
+using symbols::asymptotic_to_one_f;
+using symbols::asymptotic_to_one_lf;
+using symbols::inverse_one_minus_asymptote_f;
+using symbols::inverse_one_minus_asymptote_lf;
+using symbols::near_to_one_f;
+using symbols::pi_f;
 using synthesis::maximum_valence_work_unit_atoms;
-
-#include accumulation.i
+using synthesis::SyValenceKit;
+using synthesis::PsSynthesisWriter;
+using synthesis::VwuAbstractMap;
+using synthesis::vwu_abstract_length;
+using topology::TorsionKind;
+  
+#include "accumulation.cui"
+#include "Math/rounding.cui"
 
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ double3 crossProduct(const double3 a, const double3 b) {
@@ -135,5 +157,3 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 
 } // namespace energy
 } // namespace omni
-
-#endif

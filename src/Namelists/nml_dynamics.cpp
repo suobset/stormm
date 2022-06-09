@@ -1,3 +1,4 @@
+#include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "namelist_element.h"
 #include "nml_dynamics.h"
@@ -5,6 +6,9 @@
 namespace omni {
 namespace namelist {
 
+using parse::realToString;
+using parse::NumberFormat;
+  
 //-------------------------------------------------------------------------------------------------
 DynamicsControls::DynamicsControls(const ExceptionResponse policy_in) :
   policy{policy_in},
@@ -29,9 +33,31 @@ int DynamicsControls::getStepCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+double DynamicsControls::getTimeStep() const {
+  return time_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+double DynamicsControls::getRattleTolerance() const {
+  return rattle_tolerance;
+}
+
+//-------------------------------------------------------------------------------------------------
 void DynamicsControls::setStepCount(const int nstlim_in) {
   nstlim = nstlim_in;
   validateStepCount();
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setTimeStep(const double time_step_in) {
+  time_step = time_step_in;
+  validateTimeStep();
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::setRattleTolerance(const double rattle_tolerance_in) {
+  rattle_tolerance = rattle_tolerance_in;
+  validateRattleTolerance();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -42,6 +68,38 @@ void DynamicsControls::validateStepCount() const {
           "2^31, which overflows the signed integer format.  Use checkpoint files to carry out "
           "runs with very large numbers of total steps in multiple segments.", "DynamicsControls",
           "validateStepCount");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::validateTimeStep() const {
+  if (time_step < minimum_dynamics_time_step) {
+    switch (policy) {
+    case ExceptionResponse::DIE:
+      rtErr("A time step of " + realToString(time_step, 11, 4, NumberFormat::SCIENTIFIC) +
+            "fs is too small for the dynamics to be accurate.  Use a time step larger than " +
+            realToString( minimum_dynamics_time_step, 11, 4, NumberFormat::SCIENTIFIC) +
+            "fs or a special command line option to ignore this input trap.", "DynamicsControls",
+            "validateTimeStep");
+    case ExceptionResponse::WARN:
+      rtWarn("A time step of " + realToString(time_step, 11, 4, NumberFormat::SCIENTIFIC) +
+             "fs is probably too small for the dynamics to be accurate.", "DynamicsControls",
+             "validateTimeStep");
+      break;
+    case ExceptionResponse::SILENT:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void DynamicsControls::validateRattleTolerance() const {
+  if (rattle_tolerance < minimum_rattle_tolerance) {
+    rtErr("A tolerance of " + realToString(rattle_tolerance, 11, 4, NumberFormat::SCIENTIFIC) +
+          " is likely to be unattainable.  Tolerances of less than " +
+          realToString(minimum_rattle_tolerance, 11, 4, NumberFormat::SCIENTIFIC) + " are not "
+          "likely to improve energy conservation any further.", "DynamicsControls",
+          "validateRattleTolerance");
   }
 }
   

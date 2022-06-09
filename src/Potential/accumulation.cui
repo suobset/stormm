@@ -1,6 +1,22 @@
 // -*-c++-*-
 
 //-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ unsigned long long int llitoulli(long long int l)
+{
+  unsigned long long int u;
+  asm("mov.b64    %0, %1;" : "=l"(u) : "l"(l));
+  return u;
+}
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ long long int ullitolli(unsigned long long int u)
+{
+  long long int l;
+  asm("mov.b64    %0, %1;" : "=l"(l) : "l"(u));
+  return l;
+}
+
+//-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ void splitForceContribution(const float fval, const int pos,
                                                        int* sh_primary, int* sh_overflow_active,
                                                        int* overflow) {
@@ -45,12 +61,14 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
                                                        int* sh_primary, int* sh_overflow_active,
                                                        int* overflow) {
   const int prim_old = atomicAdd(&sh_primary[pos], ival.x);
-  if ((ival.x > 0 && prim_old + ival.x < prim_old) || (ival.x < 0 && prim_old + ival > prim_old)) {
-    ival.y += (1 - (2 * (ival.x < 0))) * 2 * ((ival.x > 0 && prim_old + ival.x < prim_old) +
+  int ival_y = ival.y;
+  if ((ival.x > 0 && prim_old + ival.x < prim_old) ||
+      (ival.x < 0 && prim_old + ival.x > prim_old)) {
+    ival_y += (1 - (2 * (ival.x < 0))) * 2 * ((ival.x > 0 && prim_old + ival.x < prim_old) +
                                               (ival.x < 0 && prim_old + ival.x > prim_old));
   }
-  if (ival.y) {
-    atomicAdd(&overflow[pos], ival.y);
+  if (ival_y) {
+    atomicAdd(&overflow[pos], ival_y);
   }
 }
 

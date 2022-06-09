@@ -295,6 +295,22 @@ const StaticExclusionMaskReader StaticExclusionMask::data(const HybridTargetLeve
                                    all_masks.data(tier));
 }
 
+#ifdef OMNI_USE_HPC
+//-------------------------------------------------------------------------------------------------
+void StaticExclusionMask::upload() {
+  all_masks.upload();
+  supertile_map_indices.upload();
+  tile_map_indices.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void StaticExclusionMask::download() {
+  all_masks.download();
+  supertile_map_indices.download();
+  tile_map_indices.download();
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 bool StaticExclusionMask::testExclusion(const int atom_i, const int atom_j) const {
 

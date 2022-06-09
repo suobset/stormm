@@ -1,5 +1,5 @@
 # Verbosity
-VB=@
+#VB=@
 
 # Source and test directories
 SRCDIR=src
@@ -27,6 +27,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Math/statistics.cpp \
 		 $(SRCDIR)/Math/vector_ops.cpp \
 		 $(SRCDIR)/MolecularMechanics/minimization.cpp \
+		 $(SRCDIR)/MolecularMechanics/mm_controls.cpp \
 		 $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
 		 $(SRCDIR)/MoleculeFormat/mdl_mol_format.cpp \
 	         $(SRCDIR)/Namelists/input.cpp \
@@ -133,6 +134,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Math/summation.h \
 	           $(SRCDIR)/Math/vector_ops.h \
 		   $(SRCDIR)/MolecularMechanics/minimization.h \
+		   $(SRCDIR)/MolecularMechanics/mm_controls.h \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
 		   $(SRCDIR)/MoleculeFormat/mdl_mol_format.h \
 		   $(SRCDIR)/Namelists/input.h \
@@ -226,6 +228,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Math/summation.tpp \
 		 $(SRCDIR)/Math/vector_ops.tpp \
 		 $(SRCDIR)/MolecularMechanics/minimization.tpp \
+		 $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
 		 $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \
@@ -268,6 +271,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Math/statistics.o \
 	        $(SRCDIR)/Math/vector_ops.o \
 	        $(SRCDIR)/MolecularMechanics/minimization.o \
+	        $(SRCDIR)/MolecularMechanics/mm_controls.o \
 	        $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
 	        $(SRCDIR)/MoleculeFormat/mdl_mol_format.o \
 		$(SRCDIR)/Namelists/input.o \
@@ -346,6 +350,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 
 # OMNI CUDA source files
 OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
+		  $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		  $(SRCDIR)/Random/hpc_random.cu \
 		  $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
 
@@ -355,12 +360,14 @@ OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		    $(SRCDIR)/Accelerator/hpc_config.cuh \
 		    $(SRCDIR)/Accelerator/ptx_macros.h \
 		    $(SRCDIR)/Math/hpc_summation.cuh \
+		    $(SRCDIR)/Potential/hpc_valence_potential.cuh \
 		    $(SRCDIR)/Random/hpc_random.cuh \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
 # OMNI CUDA object files
 OMNI_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
+		 $(SRCDIR)/Potential/hpc_valence_potential.o \
 		 $(SRCDIR)/Random/hpc_random.o \
 		 $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
 
@@ -409,7 +416,7 @@ CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
 CPP_FLAGS = -std=c++17 -fPIC -O0 -g
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
              -gencode arch=compute_61,code=sm_61 \
