@@ -1,5 +1,5 @@
 # Verbosity
-#VB=@
+VB=@
 
 # Source and test directories
 SRCDIR=src

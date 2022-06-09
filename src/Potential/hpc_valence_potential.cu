@@ -20,6 +20,8 @@ namespace energy {
 using constants::warp_size_int;
 using constants::twice_warp_bits_mask_int;
 using constants::twice_warp_size_int;
+using constants::large_block_size;
+using constants::medium_block_size;
 using math::roundUp;
 using mm::MMControlKit;
 using numerics::max_int_accumulation_f;
@@ -52,6 +54,7 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 
 // Single-precision floating point definitions
 #define TCALC float
+#  define VALENCE_KERNEL_THREAD_COUNT large_block_size
 #  define TCALC3 float3
 #  define CONV_FUNC __float2int_rn
 #  define LLCONV_FUNC __float2ll_rn
@@ -99,6 +102,7 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 #  undef  COMPUTE_ENERGY
 
 // Clear single-precision floating point definitions
+#  undef VALENCE_KERNEL_THREAD_COUNT
 #  undef TCALC3
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
@@ -112,6 +116,7 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 
 // Double-precision floating point definitions
 #define TCALC double
+#  define VALENCE_KERNEL_THREAD_COUNT medium_block_size
 #  define TCALC3 double3
 #  define CONV_FUNC __double2ll_rn
 #  define LLCONV_FUNC __double2ll_rn
@@ -148,6 +153,7 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 #  undef  COMPUTE_ENERGY
 
 // Clear double-precision floating point definitions
+#  undef VALENCE_KERNEL_THREAD_COUNT
 #  undef TCALC3
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
