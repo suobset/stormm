@@ -1,5 +1,5 @@
 # Verbosity
-VB=@
+#VB=@
 
 # Source and test directories
 SRCDIR=src
@@ -408,6 +408,9 @@ OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 # Benchmark programs using omni
 OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
 
+# Benchmark programs using omni.cuda
+OMNI_BENCH_CUDA_PROGS = $(BENCHDIR)/bin/accumulate
+
 # Applications using omni
 OMNI_APPS = $(APPDIR)/bin/conformer.omni \
 	    $(APPDIR)/bin/dynamics.omni \
@@ -633,14 +636,22 @@ $(TESTDIR)/bin/test_hpc_math : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Math/test_hp
 	  -o $(TESTDIR)/bin/test_hpc_math $(TESTDIR)/Math/test_hpc_math.cu -L$(LIBDIR) \
 	  -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
 
-# Target: Benchmarking split accumulation of valence bond and angle forces 
+# Target: Benchmarking single, double, and fixed-precision computations of valence forces
 $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
 			  $(BENCHDIR)/ForceAccumulation/valence.cpp
 	@echo "[OMNI]  Building valence benchmark..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(BENCHDIR)/bin/valence \
 	  $(BENCHDIR)/ForceAccumulation/valence.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
-# Target: Benchmarking split accumulation of valence bond and angle forces 
+# Target: Benchmarking split accumulation of fixed-precision values for speed and resource usage
+$(BENCHDIR)/bin/accumulate : $(LIBDIR)/libomni_cuda.so \
+			     $(BENCHDIR)/ForceAccumulation/accumulate.cu
+	@echo "[OMNI]  Building accumulation benchmark..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o $(BENCHDIR)/bin/accumulate \
+	  $(BENCHDIR)/ForceAccumulation/accumulate.cu -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) \
+	  -lomni_cuda
+
+# Target: Conformer generation
 $(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so $(APPDIR)/Conf/src/conformer.cpp \
 			       $(APPDIR)/Conf/src/setup.cpp
 	@echo "[OMNI]  Building conformer.omni..."
@@ -648,13 +659,13 @@ $(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so $(APPDIR)/Conf/src/conformer
 	  $(APPDIR)/Conf/src/conformer.cpp $(APPDIR)/Conf/src/setup.cpp \
 	  -L$(LIBDIR) -I$(SRCDIR) -lomni
 
-# Target: Benchmarking split accumulation of valence bond and angle forces 
+# Target: Molecular dynamics
 $(APPDIR)/bin/dynamics.omni : $(LIBDIR)/libomni.so $(APPDIR)/Dyna/src/dynamics.cpp
 	@echo "[OMNI]  Building dynamics.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/dynamics.omni \
 	  $(APPDIR)/Dyna/src/dynamics.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
-# Target: Benchmarking split accumulation of valence bond and angle forces 
+# Target: Force field refinement
 $(APPDIR)/bin/ffrefine.omni : $(LIBDIR)/libomni.so $(APPDIR)/Ffrn/src/ffrefine.cpp
 	@echo "[OMNI]  Building ffrefine.omni..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(APPDIR)/bin/ffrefine.omni \
@@ -683,7 +694,7 @@ clean.apps:
 
 test.exe : $(OMNI_TEST_PROGS)
 
-bench.exe : $(OMNI_BENCH_PROGS)
+test.cuda.exe : $(OMNI_TEST_CUDA_PROGS)
 
 test : $(OMNI_TEST_PROGS)
 	for PROG in $(OMNI_TEST_PROGS) ; do \
@@ -691,19 +702,28 @@ test : $(OMNI_TEST_PROGS)
 		$$PROG ; \
 	done
 
+test.cuda : $(OMNI_TEST_CUDA_PROGS)
+	for PROG in $(OMNI_TEST_CUDA_PROGS) ; do \
+		echo "[OMNI] Execute $$PROG" ; \
+		$$PROG ; \
+	done
+
+bench.exe : $(OMNI_BENCH_PROGS)
+
+bench.cuda.exe : $(OMNI_BENCH_CUDA_PROGS)
+
 bench : $(OMNI_BENCH_PROGS)
 	for PROG in $(OMNI_BENCH_PROGS) ; do \
 		echo "[OMNI} Run benchmark $$PROG" ; \
 		$$PROG ; \
 	done
 
-apps : $(OMNI_APPS)
-test.cuda.exe : $(OMNI_TEST_CUDA_PROGS)
-
-test.cuda : $(OMNI_TEST_CUDA_PROGS)
-	for PROG in $(OMNI_TEST_CUDA_PROGS) ; do \
-		echo "[OMNI] Execute $$PROG" ; \
+bench.cuda : $(OMNI_BENCH_CUDA_PROGS)
+	for PROG in $(OMNI_BENCH_CUDA_PROGS) ; do \
+		echo "[OMNI} Run benchmark $$PROG" ; \
 		$$PROG ; \
 	done
+
+apps : $(OMNI_APPS)
 
 yes:  install

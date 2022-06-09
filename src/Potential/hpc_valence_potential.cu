@@ -22,6 +22,7 @@ using constants::twice_warp_bits_mask_int;
 using constants::twice_warp_size_int;
 using constants::large_block_size;
 using constants::medium_block_size;
+using constants::small_block_size;
 using math::roundUp;
 using mm::MMControlKit;
 using numerics::max_int_accumulation_f;
@@ -54,7 +55,13 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 
 // Single-precision floating point definitions
 #define TCALC float
-#  define VALENCE_KERNEL_THREAD_COUNT large_block_size
+#  if (__CUDA_ARCH__ == 610)
+#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#    define VALENCE_KERNEL_BLOCKS_MULT  2
+#  else
+#    define VALENCE_KERNEL_THREAD_COUNT large_block_size
+#    define VALENCE_KERNEL_BLOCKS_MULT  1
+#  endif
 #  define TCALC3 float3
 #  define CONV_FUNC __float2int_rn
 #  define LLCONV_FUNC __float2ll_rn
@@ -116,7 +123,13 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 
 // Double-precision floating point definitions
 #define TCALC double
-#  define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#  if (__CUDA_ARCH__ == 610)
+#    define VALENCE_KERNEL_THREAD_COUNT small_block_size
+#    define VALENCE_KERNEL_BLOCKS_MULT  2
+#  else
+#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#    define VALENCE_KERNEL_BLOCKS_MULT  1
+#  endif  
 #  define TCALC3 double3
 #  define CONV_FUNC __double2ll_rn
 #  define LLCONV_FUNC __double2ll_rn
