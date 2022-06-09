@@ -33,10 +33,9 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
     ival = __float2int_rn(fval);
   }
   const int prim_old = atomicAdd(&sh_primary[pos], ival);
-  if ((ival > 0 && prim_old + ival < prim_old) || (ival < 0 && prim_old + ival > prim_old)) {
-    atomicAdd(&overflow[pos],
-              (1 - (2 * (ival < 0))) * 2 * ((ival > 0 && prim_old + ival < prim_old) +
-                                            (ival < 0 && prim_old + ival > prim_old)));
+  const int prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0) {
+    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
     sh_overflow_active[pos / warp_size_int] = 1;
   }
 }
@@ -61,12 +60,9 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
                                                        int* sh_primary, int* sh_overflow_active,
                                                        int* overflow) {
   const int prim_old = atomicAdd(&sh_primary[pos], ival.x);
+  const int prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;
-  if ((ival.x > 0 && prim_old + ival.x < prim_old) ||
-      (ival.x < 0 && prim_old + ival.x > prim_old)) {
-    ival_y += (1 - (2 * (ival.x < 0))) * 2 * ((ival.x > 0 && prim_old + ival.x < prim_old) +
-                                              (ival.x < 0 && prim_old + ival.x > prim_old));
-  }
+  ival_y += (1 - (2 * (ival.x < 0))) * ((prim_old ^ prim_old_plus_x) < 0) * 2;
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }
@@ -75,10 +71,7 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ int2 combineSplitFixedPrecision(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
-  if ((b.x > 0 && result.x < a.x) || b.x < 0 && result.x > a.x) {
-    result.y += (1 - (2 * (b.x < 0))) * 2 * ((b.x > 0 && result.x < a.x) +
-                                             (b.x < 0 && result.x > a.x));
-  }
+  result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0) * 2;
   return result;
 }
 

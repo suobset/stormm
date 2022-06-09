@@ -1,5 +1,5 @@
 # Verbosity
-#VB=@
+VB=@
 
 # Source and test directories
 SRCDIR=src
@@ -369,6 +369,11 @@ OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
+# OMNI CUDA included files
+OMNI_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/rounding.cui \
+			   $(SRCDIR)/Potential/accumulation.cui \
+			   $(SRCDIR)/Potential/valence_potential.cui
+
 # OMNI CUDA object files
 OMNI_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		 $(SRCDIR)/Potential/hpc_valence_potential.o \
@@ -437,7 +442,7 @@ CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	$(VB)$(CC) $(CPP_FLAGS) $(CPP_DEFINES) -c -o $@ $< $(CPP_INCLUDES)
 
 # Target: compile a CUDA source file into a CUDA object file
-%.o : %.cu $(OMNI_CUDA_HEADERS)
+%.o : %.cu $(OMNI_CUDA_HEADERS) $(OMNI_CUDA_INCLUDED_FILES)
 	@echo "[OMNI]  CUCC $<"
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -c -o $@ $< $(CUDA_INCLUDES)
 
