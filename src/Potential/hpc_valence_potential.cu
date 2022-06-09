@@ -4,6 +4,8 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "MolecularMechanics/mm_controls.h"
+#include "Potential/cacheresource.h"
 #include "Potential/scorecard.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
@@ -19,6 +21,7 @@ using constants::warp_size_int;
 using constants::twice_warp_bits_mask_int;
 using constants::twice_warp_size_int;
 using math::roundUp;
+using mm::MMControlKit;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using symbols::asymptotic_to_one_f;

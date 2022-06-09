@@ -6,7 +6,7 @@
 
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
-KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, ControlKit ctrl, PsSynthesisWriter poly_ps,
+KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_ps,
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter sc,
 #endif
@@ -672,16 +672,16 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, ControlKit ctrl, PsSynthesisWrite
     // step number), the kernel will reset some of its block progress counters.
     __syncthreads();
     if (threadIdx.x == 0) {
-      const size_t prog_counter_idx = (poly_ps.step & twice_warp_bits_mask_int);
-      vwu_idx = atomicAdd(&poly_ps.valence_progress_counters[prog_counter_idx], 1);
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      vwu_idx = atomicAdd(&ctrl.vwu_progress[prog_counter_idx], 1);
     }
     if (threadIdx.x >= warp_size_int && threadIdx.x < twice_warp_size_int) {
-      const int step_modulus = poly_ps.step & twice_warp_bits_mask_int;
+      const int step_modulus = ctrl.step & twice_warp_bits_mask_int;
       if (step_modulus == 0) {
-        poly_ps.vwu_progress[threadIdx.x] = blockDim.x;
+        ctrl.vwu_progress[threadIdx.x] = blockDim.x;
       }
       if (step_modulus == warp_size_int) {
-        poly_ps.vwu_progress[threadIdx.x - warp_size_int] = blockDim.x;
+        ctrl.vwu_progress[threadIdx.x - warp_size_int] = blockDim.x;
       }
     }
     __syncthreads();

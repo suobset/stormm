@@ -51,6 +51,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	         $(SRCDIR)/Parsing/tabulation.cpp \
 	         $(SRCDIR)/Parsing/textfile.cpp \
 	         $(SRCDIR)/Parsing/textguard.cpp \
+	         $(SRCDIR)/Potential/cacheresource.cpp \
 	         $(SRCDIR)/Potential/eval_valence_workunit.cpp \
 	         $(SRCDIR)/Potential/forward_exclusionmask.cpp \
 	         $(SRCDIR)/Potential/nonbonded_potential.cpp \
@@ -158,6 +159,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Parsing/tabulation.h \
 	           $(SRCDIR)/Parsing/textfile.h \
 	           $(SRCDIR)/Parsing/textguard.h \
+	           $(SRCDIR)/Potential/cacheresource.h \
 	           $(SRCDIR)/Potential/energy_abstracts.h \
 	           $(SRCDIR)/Potential/energy_enumerators.h \
 	           $(SRCDIR)/Potential/eval_valence_workunit.h \
@@ -231,6 +233,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/MolecularMechanics/mm_controls.tpp \
 		 $(SRCDIR)/MolecularMechanics/mm_evaluation.tpp \
 		 $(SRCDIR)/Parsing/polynumeric.tpp \
+		 $(SRCDIR)/Potential/cacheresource.tpp \
 		 $(SRCDIR)/Potential/energy_abstracts.tpp \
 		 $(SRCDIR)/Potential/eval_synthesis.tpp \
 		 $(SRCDIR)/Potential/nonbonded_potential.tpp \
@@ -295,6 +298,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Parsing/tabulation.o \
 	        $(SRCDIR)/Parsing/textfile.o \
 	        $(SRCDIR)/Parsing/textguard.o \
+	        $(SRCDIR)/Potential/cacheresource.o \
 	        $(SRCDIR)/Potential/eval_valence_workunit.o \
 	        $(SRCDIR)/Potential/forward_exclusionmask.o \
 	        $(SRCDIR)/Potential/nonbonded_potential.o \
