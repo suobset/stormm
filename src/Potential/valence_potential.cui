@@ -368,6 +368,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
     llint dihe_acc = 0LL;
     llint impr_acc = 0LL;
     llint cimp_acc = 0LL;
+    llint qq14_acc = 0LL;
+    llint lj14_acc = 0LL;
 #endif
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::CDHE)]) {
@@ -398,6 +400,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
         const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_ps.inv_gpos_scale_f,
                             (TCALC)(lyloc - kyloc) * poly_ps.inv_gpos_scale_f,
                             (TCALC)(lzloc - kzloc) * poly_ps.inv_gpos_scale_f };
+        const TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(lyloc - iyloc) * poly_ps.inv_gpos_scale_f,
+                            (TCALC)(lzloc - izloc) * poly_ps.inv_gpos_scale_f };
         TCALC crabbc_x = (ab.y * bc.z) - (ab.z * bc.y);
         TCALC crabbc_y = (ab.z * bc.x) - (ab.x * bc.z);
         TCALC crabbc_z = (ab.x * bc.y) - (ab.y * bc.x);
@@ -451,11 +456,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
         costheta = (costheta < (TCALC)(-1.0)) ?
                    (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
         const TCALC theta = ((scr_x * bc.x) + (scr_y * bc.y) + (scr_z * bc.z) > (TCALC)(0.0)) ?
-                            acos(costheta) : -acos(costheta);
+                            ACOS_FUNC(costheta) : -ACOS_FUNC(costheta);
 #endif
         TCALC sangle, sangle_ii, stiffness;
 #ifdef COMPUTE_FORCE
         TCALC stiffness_ii;
+        TCALC f14 = (TCALC)(0.0);
 #endif
         if ((tinsr.x >> 30) & 0x1) {
           stiffness = __ldca(&poly_vk.cimp_keq[param_idx]);
@@ -480,16 +486,23 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
           }
           stiffness = ampl * freq;
           sangle = (freq * theta) - phi;
+
+          // Determine whether this cosine-based dihedral has a 1:4 term to apply
+          int attn14_idx = ((tinsr.y >> 10) & 0x1f);
 #ifdef COMPUTE_ENERGY
           TCALC contrib = ampl * ((TCALC)(1.0) + COS_FUNC(sangle));
 #endif
-          // Superimpose a second dihedral onto the same four atoms
+          // Superimpose a second dihedral onto the same four atoms.  Check for a new 1:4 screening
+          // parameter set index if one has not yet been found.
           if ((tinsr.y >> 15) & 0x1) {
-            const uint tinsr_z = poly_vk.cdhe_ovrt_insr[pos - vterm_offset];
+            const uint tinsr_z = __ldcs(&poly_vk.cdhe_ovrt_insr[pos - vterm_offset]);
             const int param_ii_idx = (tinsr_z & 0xfffff);
             const TCALC ampl_ii = __ldca(&poly_vk.dihe_amp[param_ii_idx]);
             const TCALC freq_ii = __ldca(&poly_vk.dihe_freq[param_ii_idx]);
             const TCALC phi_ii  = __ldca(&poly_vk.dihe_phi[param_ii_idx]);
+            if (attn14_idx == 0) {
+              attn14_idx = (tinsr_z >> 20);
+            }
 #ifdef COMPUTE_FORCE        
             stiffness_ii = ampl_ii * freq_ii;
 #endif
@@ -506,6 +519,35 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
             dihe_acc += LLCONV_FUNC(contrib * sc.nrg_scale_f);
           }
 #endif
+          // If there is a 1:4 interaction, compute its force and energy now
+          if (attn14_idx > 0) {
+            const TCALC attn_qq14 = __ldca(&poly_vk.attn14_elec[attn14_idx]);
+            const TCALC attn_lj14 = __ldca(&poly_vk.attn14_elec[attn14_idx]);
+            const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
+            const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
+            const int sysid = vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x;
+            const int il_ljidx = __ldca(&poly_vk.ljabc_offsets[sysid]) +
+                                 (__ldca(&poly_vk.n_lj_types[sysid]) * i_ljidx) + l_ljidx;
+            const TCALC qq_il = __ldca(&gmem_r.charges[i_atom]) * __ldca(&gmem_r.charges[l_atom]);
+            const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]);
+            const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]);
+            const TCALC invr_il = (TCALC)(1.0) /
+                                  SQRT_FUNC((ad.x * ad.x) + (ad.y * ad.y) + (ad.z * ad.z));
+            const TCALC invr2_il = invr_il * invr_il;
+            const TCALC invr4_il = invr2_il * invr2_il;
+#ifdef COMPUTE_ENERGY
+            const TCALC qq14_contrib = qq_il * invr_il / attn_qq14;
+            qq14_acc += LLCONV_FUNC(qq14_contrib * sc.nrg_scale_f);
+            const TCALC lj14_contrib = ((lja_il * invr4_il * invr4_il) - (ljb_il * invr2_il)) *
+                                       invr4_il / attn_qq14;
+            lj14_acc += LLCONV_FUNC(lj14_contrib * sc.nrg_scale_f);
+#endif
+#ifdef COMPUTE_FORCE
+            f14 = -(qq_il * invr2_il * invr_il) +
+                  (((TCALC)(6.0) * ljb_il) - ((TCALC)(12.0) * lja_il * invr4_il) *
+                   invr4_il * invr4_il);
+#endif
+          }
         }
 #ifdef COMPUTE_FORCE        
 #  ifdef UPDATE_ATOMS
@@ -515,12 +557,16 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
 #  endif
         TCALC fr;
         if ((tinsr.x >> 30) & 0x1) {
+
+          // Evaluate a CHARMM harmonic improper dihedral.
           fr = -2.0 * stiffness * sangle;
         }
         else {
+
+          // Evaluate a cosine-based dihedral.
           fr = stiffness * SIN_FUNC(sangle);
           if ((tinsr.y >> 15) & 0x1) {
-            fr += stiffness_ii * sin(sangle_ii);
+            fr += stiffness_ii * SIN_FUNC(sangle_ii);
           }
         }
         const TCALC mgab = SQRT_FUNC((ab.x * ab.x) + (ab.y * ab.y) + (ab.z * ab.z));
@@ -552,27 +598,27 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
         const TCALC fc2 = cosb * invbc * isinb2;
         const TCALC fd = -invcd * isinc2;
 #ifdef SPLIT_FORCE_ACCUMULATION
-        const int2 ifrc_ix = convertSplitFixedPrecision(crabbc_x * fa);
+        const int2 ifrc_ix = convertSplitFixedPrecision((crabbc_x * fa) + (f14 * ad.x));
         const int2 ifrc_jx = convertSplitFixedPrecision((fb1 * crabbc_x) - (fb2 * crbccd_x));
-        const int2 ifrc_lx = convertSplitFixedPrecision(-fd * crbccd_x);
+        const int2 ifrc_lx = convertSplitFixedPrecision((-fd * crbccd_x) - (f14 * ad.x));
         addSplitFixedPrecision(ifrc_ix, i_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow);
         addSplitFixedPrecision(ifrc_jx, j_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow);
         addSplitFixedPrecision(ifrc_lx, l_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow);
         const int2 ifrc_ijx = combineSplitFixedPrecision(ifrc_ix, ifrc_jx);
         const int2 ifrc_kx = antiCombineSplitFixedPrecision(ifrc_ijx, ifrc_lx);
         addSplitFixedPrecision(ifrc_kx, k_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow);
-        const int2 ifrc_iy = convertSplitFixedPrecision(crabbc_y * fa);
+        const int2 ifrc_iy = convertSplitFixedPrecision((crabbc_y * fa) + (f14 * ad.y));
         const int2 ifrc_jy = convertSplitFixedPrecision((fb1 * crabbc_y) - (fb2 * crbccd_y));
-        const int2 ifrc_ly = convertSplitFixedPrecision(-fd * crbccd_y);
+        const int2 ifrc_ly = convertSplitFixedPrecision((-fd * crbccd_y) - (f14 * ad.y));
         addSplitFixedPrecision(ifrc_iy, i_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow);
         addSplitFixedPrecision(ifrc_jy, j_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow);
         addSplitFixedPrecision(ifrc_ly, l_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow);
         const int2 ifrc_ijy = combineSplitFixedPrecision(ifrc_iy, ifrc_jy);
         const int2 ifrc_ky = antiCombineSplitFixedPrecision(ifrc_ijy, ifrc_ly);
         addSplitFixedPrecision(ifrc_ky, k_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow);
-        const int2 ifrc_iz = convertSplitFixedPrecision(crabbc_z * fa);
+        const int2 ifrc_iz = convertSplitFixedPrecision((crabbc_z * fa) + (f14 * ad.z));
         const int2 ifrc_jz = convertSplitFixedPrecision((fb1 * crabbc_z) - (fb2 * crbccd_z));
-        const int2 ifrc_lz = convertSplitFixedPrecision(-fd * crbccd_z);
+        const int2 ifrc_lz = convertSplitFixedPrecision((-fd * crbccd_z) - (f14 * ad.z));
         addSplitFixedPrecision(ifrc_iz, i_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow);
         addSplitFixedPrecision(ifrc_jz, j_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow);
         addSplitFixedPrecision(ifrc_lz, l_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow);
@@ -580,23 +626,23 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl, PsSynth
         const int2 ifrc_kz = antiCombineSplitFixedPrecision(ifrc_ijz, ifrc_lz);
         addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow);
 #else // SPLIT_FORCE_ACCUMULATION
-        const llint ifrc_ix = LLCONV_FUNC(crabbc_x * fa);
+        const llint ifrc_ix = LLCONV_FUNC((crabbc_x * fa) + (f14 * ad.x));
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc_x) - (fb2 * crbccd_x));
-        const llint ifrc_lx = LLCONV_FUNC(-fd * crbccd_x);
+        const llint ifrc_lx = LLCONV_FUNC((-fd * crbccd_x) - (f14 * ad.x));
         atomicAdd((ullint*)&sh_xfrc[i_atom], llitoulli(ifrc_ix));
         atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(ifrc_jx));
         atomicAdd((ullint*)&sh_xfrc[k_atom], llitoulli(-(ifrc_ix + ifrc_jx + ifrc_lx)));
         atomicAdd((ullint*)&sh_xfrc[l_atom], llitoulli(ifrc_lx));
-        const llint ifrc_iy = LLCONV_FUNC(crabbc_y * fa);
+        const llint ifrc_iy = LLCONV_FUNC((crabbc_y * fa) + (f14 * ad.y));
         const llint ifrc_jy = LLCONV_FUNC((fb1 * crabbc_y) - (fb2 * crbccd_y));
-        const llint ifrc_ly = LLCONV_FUNC(-fd * crbccd_y);
+        const llint ifrc_ly = LLCONV_FUNC((-fd * crbccd_y) - (f14 * ad.y));
         atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(ifrc_iy));
         atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(ifrc_jy));
         atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-(ifrc_iy + ifrc_jy + ifrc_ly)));
         atomicAdd((ullint*)&sh_yfrc[l_atom], llitoulli(ifrc_ly));
-        const llint ifrc_iz = LLCONV_FUNC(crabbc_z * fa);
+        const llint ifrc_iz = LLCONV_FUNC((crabbc_z * fa) + (f14 * ad.z));
         const llint ifrc_jz = LLCONV_FUNC((fb1 * crabbc_z) - (fb2 * crbccd_z));
-        const llint ifrc_lz = LLCONV_FUNC(-fd * crbccd_z);
+        const llint ifrc_lz = LLCONV_FUNC((-fd * crbccd_z) - (f14 * ad.z));
         atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(ifrc_iz));
         atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(ifrc_jz));
         atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-(ifrc_iz + ifrc_jz + ifrc_lz)));
