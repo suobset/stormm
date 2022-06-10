@@ -34,7 +34,7 @@ __global__ void __launch_bounds__(512, 2) kAddSplit(int* overflow, llint* result
   const size_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
   overflow[pos] = 0;
   int* ovrf_ptr = &overflow[blockIdx.x * blockDim.x];
-  for (int i = 0; i < 1000000; i++) {
+  for (int i = 0; i < 250000; i++) {
     if (contrib > 57.5f) {
       incr = -1.2f;
     }
@@ -42,8 +42,13 @@ __global__ void __launch_bounds__(512, 2) kAddSplit(int* overflow, llint* result
       incr = 1.3f;
     }
     contrib += incr;
-    splitForceContribution(contrib * 64.0f, threadIdx.x, primary, overflow_active,
-                           ovrf_ptr);
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    contrib += incr;
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    contrib += incr;
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    contrib += incr;
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
   }
   if (overflow_active[threadIdx.x / warp_size_int]) {
     const llint ovrf_val = overflow[pos];
@@ -62,7 +67,7 @@ __global__ void __launch_bounds__(512, 2) kAddUnified(llint* result) {
   float contrib = (float)(threadIdx.x);
   float incr = 1.3f;
   primary[threadIdx.x] = 0LL;
-  for (int i = 0; i < 1000000; i++) {
+  for (int i = 0; i < 250000; i++) {
     if (contrib > 57.5f) {
       incr = -1.2f;
     }
@@ -70,7 +75,13 @@ __global__ void __launch_bounds__(512, 2) kAddUnified(llint* result) {
       incr = 1.3f;
     }
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 64.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    contrib += incr;
+    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    contrib += incr;
+    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    contrib += incr;
+    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
   }
   result[(blockIdx.x * blockDim.x) + threadIdx.x] = primary[threadIdx.x];
 }

@@ -34,7 +34,7 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
   }
   const int prim_old = atomicAdd(&sh_primary[pos], ival);
   const int prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0) {
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
     atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
     sh_overflow_active[pos / warp_size_int] = 1;
   }
@@ -62,7 +62,8 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
   const int prim_old = atomicAdd(&sh_primary[pos], ival.x);
   const int prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;
-  ival_y += (1 - (2 * (ival.x < 0))) * ((prim_old ^ prim_old_plus_x) < 0) * 2;
+  ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
+            (1 - (2 * (ival.x < 0))) * 2;    
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }
@@ -71,7 +72,7 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ int2 combineSplitFixedPrecision(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
-  result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0) * 2;
+  result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
   return result;
 }
 
