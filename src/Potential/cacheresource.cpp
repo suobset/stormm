@@ -45,6 +45,105 @@ CacheResource::CacheResource(const int block_limit_in, const int atom_limit_in) 
 }
 
 //-------------------------------------------------------------------------------------------------
+CacheResource::CacheResource(const CacheResource &original) :
+    block_limit{original.block_limit},
+    atom_limit{original.atom_limit},
+    x_coordinates{original.x_coordinates},
+    y_coordinates{original.y_coordinates},
+    z_coordinates{original.z_coordinates},
+    x_velocities{original.x_velocities},
+    y_velocities{original.y_velocities},
+    z_velocities{original.z_velocities},
+    x_force_overflow{original.x_force_overflow},
+    y_force_overflow{original.y_force_overflow},
+    z_force_overflow{original.z_force_overflow},
+    charges{original.charges},
+    sp_charges{original.sp_charges},
+    lennard_jones_indices{original.lennard_jones_indices},
+    int_data{original.int_data},
+    llint_data{original.llint_data}
+{
+  repairPointers();
+}
+
+//-------------------------------------------------------------------------------------------------
+CacheResource::CacheResource(CacheResource &&original) :
+    block_limit{original.block_limit},
+    atom_limit{original.atom_limit},
+    x_coordinates{std::move(original.x_coordinates)},
+    y_coordinates{std::move(original.y_coordinates)},
+    z_coordinates{std::move(original.z_coordinates)},
+    x_velocities{std::move(original.x_velocities)},
+    y_velocities{std::move(original.y_velocities)},
+    z_velocities{std::move(original.z_velocities)},
+    x_force_overflow{std::move(original.x_force_overflow)},
+    y_force_overflow{std::move(original.y_force_overflow)},
+    z_force_overflow{std::move(original.z_force_overflow)},
+    charges{std::move(original.charges)},
+    sp_charges{std::move(original.sp_charges)},
+    lennard_jones_indices{std::move(original.lennard_jones_indices)},
+    int_data{std::move(original.int_data)},
+    llint_data{std::move(original.llint_data)}
+{}
+
+//-------------------------------------------------------------------------------------------------
+CacheResource& CacheResource::operator=(const CacheResource &other) {
+
+  // Guard against self-assignment.  Otherwise, copy the necessary elements.
+  if (this == &other) {
+    return *this;
+  }
+  block_limit = other.block_limit;
+  atom_limit = other.atom_limit;
+  x_coordinates = other.x_coordinates;
+  y_coordinates = other.y_coordinates;
+  z_coordinates = other.z_coordinates;
+  x_velocities = other.x_velocities;
+  y_velocities = other.y_velocities;
+  z_velocities = other.z_velocities;
+  x_force_overflow = other.x_force_overflow;
+  y_force_overflow = other.y_force_overflow;
+  z_force_overflow = other.z_force_overflow;
+  charges = other.charges;
+  sp_charges = other.sp_charges;
+  lennard_jones_indices = other.lennard_jones_indices;
+  int_data = other.int_data;
+  llint_data = other.llint_data;
+
+  // Repair the pointers and return the object
+  repairPointers();
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+CacheResource& CacheResource::operator=(CacheResource &&other) {
+
+  // Guard against self-assignment.  Otherwise, move the necessary elements.
+  if (this == &other) {
+    return *this;
+  }
+  block_limit = other.block_limit;
+  atom_limit = other.atom_limit;
+  x_coordinates = std::move(other.x_coordinates);
+  y_coordinates = std::move(other.y_coordinates);
+  z_coordinates = std::move(other.z_coordinates);
+  x_velocities = std::move(other.x_velocities);
+  y_velocities = std::move(other.y_velocities);
+  z_velocities = std::move(other.z_velocities);
+  x_force_overflow = std::move(other.x_force_overflow);
+  y_force_overflow = std::move(other.y_force_overflow);
+  z_force_overflow = std::move(other.z_force_overflow);
+  charges = std::move(other.charges);
+  sp_charges = std::move(other.sp_charges);
+  lennard_jones_indices = std::move(other.lennard_jones_indices);
+  int_data = std::move(other.int_data);
+  llint_data = std::move(other.llint_data);
+
+  // No further pointer repair is needed
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
 CacheResourceKit<double>
 CacheResource::getDoublePrecisionCacheResourceKit(const HybridTargetLevel tier) {
   return CacheResourceKit<double>(block_limit, atom_limit, x_coordinates.data(tier),
@@ -66,5 +165,19 @@ CacheResource::getSinglePrecisionCacheResourceKit(const HybridTargetLevel tier) 
                                  sp_charges.data(tier), lennard_jones_indices.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+void CacheResource::repairPointers() {
+  x_coordinates.swapTarget(&llint_data);
+  y_coordinates.swapTarget(&llint_data);
+  z_coordinates.swapTarget(&llint_data);
+  x_velocities.swapTarget(&llint_data);
+  y_velocities.swapTarget(&llint_data);
+  z_velocities.swapTarget(&llint_data);
+  x_force_overflow.swapTarget(&int_data);
+  y_force_overflow.swapTarget(&int_data);
+  z_force_overflow.swapTarget(&int_data);
+  lennard_jones_indices.swapTarget(&int_data);
+}
+  
 } // namespace energy
 } // namespace omni

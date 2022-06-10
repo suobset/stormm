@@ -62,10 +62,22 @@ public:
   /// \param atom_limit_in   The maximum number of atoms per block requiring local copies
   CacheResource(int block_limit_in, int atom_limit_in);
 
-  /// \brief A basic copy constructor
+  /// \brief Basic copy and move constructors
   ///
-  /// \param
-  
+  /// \param original  The object to copy
+  /// \{
+  CacheResource(const CacheResource &original);
+  CacheResource(CacheResource &&original);
+  /// \}
+
+  /// \brief Basic copy and move assignment operators
+  ///
+  /// \param other  The object to assign against
+  /// \{
+  CacheResource& operator=(const CacheResource &other);
+  CacheResource& operator=(CacheResource &&other);
+  /// \}
+
   /// \brief Get a set of pointers to this object with double-precision representations for the
   ///        charges.
   CacheResourceKit<double>
@@ -99,6 +111,11 @@ private:
                                       ///<   Hybrid member variables in this object
   Hybrid<llint> llint_data;           ///< Storage array targeted by all other POINTER-kind llint
                                       ///<   Hybrid member variables in this object
+
+  /// \brief Reset the POINTER-kind Hybrid objects of an object that has just been copied, making
+  ///        them target the object's own ARRAY-kind storage rather than that of some original
+  ///        object.
+  void repairPointers();
 };
 
 } // namespace energy
