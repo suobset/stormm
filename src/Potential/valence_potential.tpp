@@ -778,13 +778,13 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
   cos_psi = (cos_psi < -value_one) ? -value_one : (cos_psi > value_one) ? value_one : cos_psi;
   Tcalc psi;
   if (tcalc_is_double) {
-    psi = (scr_psi[0]*bc[0] + scr_psi[1]*bc[1] + scr_psi[2]*bc[2] > 0.0) ?  acos(cos_psi) :
+    psi = (scr_psi[0]*cd[0] + scr_psi[1]*cd[1] + scr_psi[2]*cd[2] > 0.0) ?  acos(cos_psi) :
                                                                            -acos(cos_psi);
     psi += pi;
     psi = (psi < 0.0) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
   }
   else {
-    psi = (scr_psi[0]*bc[0] + scr_psi[1]*bc[1] + scr_psi[2]*bc[2] > 0.0f) ?  acosf(cos_psi) :
+    psi = (scr_psi[0]*cd[0] + scr_psi[1]*cd[1] + scr_psi[2]*cd[2] > 0.0f) ?  acosf(cos_psi) :
                                                                             -acosf(cos_psi);
     psi += pi_f;
     psi = (psi < 0.0f) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
@@ -813,8 +813,8 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
   }
 
   // Perform the matrix multiplications to obtain the bicubic spline coefficients
-  phi_progression[0] = 1.0;
-  psi_progression[0] = 1.0;
+  phi_progression[0] = value_one;
+  psi_progression[0] = value_one;
   for (int i = 1; i < 4; i++) {
     phi_progression[i] = phi_progression[i - 1] * phifrac;
     psi_progression[i] = psi_progression[i - 1] * psifrac;

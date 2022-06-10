@@ -33,6 +33,8 @@ using symbols::inverse_one_minus_asymptote_f;
 using symbols::inverse_one_minus_asymptote_lf;
 using symbols::near_to_one_f;
 using symbols::pi_f;
+using symbols::twopi_f;
+using symbols::inverse_twopi_f;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::SyValenceKit;
 using synthesis::PsSynthesisWriter;
@@ -53,6 +55,44 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
   return { (a.y * b.z) - (a.z - b.y), (a.z * b.x) - (a.x - b.z), (a.x * b.y) - (a.y * b.x) };
 }
 
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ float angleVerification(const float costheta, const float3 crabbc,
+                                                   const float3 crbccd, const float3 bc,
+                                                   const float3 scr) {
+  if (fabsf(costheta) >= near_to_one_f) {
+
+    // The floating-point representation of costheta is numerically ill-conditioned.  Compute the
+    // distance from atom I to the plane of atoms J, K, and L to get the angle by the arcsin of an
+    // extremely acute angle.
+    const float mg_crabbc = 1.0f / sqrtf((crabbc.x * crabbc.x) + (crabbc.y * crabbc.y) +
+                                         (crabbc.z * crabbc.z));
+    const float mg_crbccd = 1.0f / sqrtf((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
+                                         (crbccd.z * crbccd.z));
+    const float nx_abbc = crabbc.x * mg_crabbc;
+    const float ny_abbc = crabbc.y * mg_crabbc;
+    const float nz_abbc = crabbc.z * mg_crabbc;
+    const float nx_bccd = crbccd.x * mg_crbccd;
+    const float ny_bccd = crbccd.y * mg_crbccd;
+    const float nz_bccd = crbccd.z * mg_crbccd;
+    float rdx = nx_bccd - nx_abbc;
+    float rdy = ny_bccd - ny_abbc;
+    float rdz = nz_bccd - nz_abbc;
+    float rs = sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    if (fabsf(rs) > 1.0f) {
+      rdx = nx_bccd + nx_abbc;
+      rdy = ny_bccd + ny_abbc;
+      rdz = nz_bccd + nz_abbc;
+      rs = pi_f - sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    }
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0f) ? rs : -rs;
+  }
+  else {
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0f) ?
+            acosf(costheta) : -acosf(costheta);
+  }
+  __builtin_unreachable();
+}
+  
 // Single-precision floating point definitions
 #define TCALC float
 #  if (__CUDA_ARCH__ == 610)
@@ -77,10 +117,20 @@ __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
 #      define KERNEL_NAME kfsValenceForceAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME  
+#      define UPDATE_ATOMS
+#        define KERNEL_NAME kfsValenceAtomUpdate
+#          include "valence_potential.cui"
+#        undef KERNEL_NAME
+#      undef UPDATE_ATOMS
 #      define COMPUTE_ENERGY
 #        define KERNEL_NAME kfsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
+#        define UPDATE_ATOMS
+#          define KERNEL_NAME kfsValenceEnergyAtomUpdate
+#            include "valence_potential.cui"
+#          undef KERNEL_NAME
+#        undef UPDATE_ATOMS
 #      undef COMPUTE_ENERGY
 #    undef SPLIT_FORCE_ACCUMULATION
 #    define KERNEL_NAME kfValenceForceAccumulation

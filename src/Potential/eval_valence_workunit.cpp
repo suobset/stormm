@@ -243,7 +243,12 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int i_atom = (tinsr.x & 0x3ff);
       const int l_atom = (tinsr.y & 0x3ff);
       if (activity == VwuTask::INFR14 || activity == VwuTask::ALL_TASKS) {
-        const int attn_idx = ((tinsr.y >> 10) & 0x1f);
+        int attn_idx = ((tinsr.y >> 10) & 0x1f);
+        if (attn_idx == 0 && ((tinsr.y >> 15) & 0x1)) {
+
+          // Check whether the secondary dihedral contains the 1:4 parameter set
+          attn_idx = ((tinsr.z >> 20) & 0xfff);
+        }
         if (attn_idx > 0) {
           const Vec2<double> uc =
             evaluateAttenuated14Pair(i_atom, l_atom, attn_idx, nbk.coulomb_constant, sh_charges,
