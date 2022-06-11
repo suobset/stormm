@@ -1,9 +1,11 @@
 // -*-c++-*-
+#include "Accelerator/gpu_details.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "Math/rounding.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Potential/cacheresource.h"
 #include "Potential/scorecard.h"
@@ -17,6 +19,7 @@
 namespace omni {
 namespace energy {
 
+using card::GpuDetails;
 using constants::warp_size_int;
 using constants::twice_warp_bits_mask_int;
 using constants::twice_warp_size_int;
@@ -233,7 +236,11 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 extern void launchValenceDp(SyValenceKit<double> *poly_vk, MMControlKit<double> *ctrl,
                             PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                             CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
-                            const EvaluateEnergy eval_energy, const VwuGoal purpose) {
+                            const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                            const GpuDetails &gpu) {
+  const int blocks_multiplier = (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) ? 2 : 1;
+  const int nblocks = gpu.getSMPCount() * blocks_multiplier;
+  const int nthreads = gpu.getMaxThreadsPerBlock() / (2 * blocks_multiplier);
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
 
@@ -245,17 +252,19 @@ extern void launchValenceDp(SyValenceKit<double> *poly_vk, MMControlKit<double> 
     case EvaluateForce::YES:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kdValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        kdValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                                *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kdValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+        kdValenceForceAccumulation<<<nblocks, nthreads>>>(*poly_vk, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
     case EvaluateForce::NO:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kdValenceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        kdValenceEnergyAccumulation<<<nblocks, nthreads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                           *gmem_r);
         break;
       case EvaluateEnergy::NO:
         rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
@@ -271,10 +280,10 @@ extern void launchValenceDp(SyValenceKit<double> *poly_vk, MMControlKit<double> 
     // kernel.
     switch (eval_energy) {
     case EvaluateEnergy::YES:
-      kdValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+      kdValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
       break;
     case EvaluateEnergy::NO:
-      kdValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+      kdValenceAtomUpdate<<<nblocks, nthreads>>>(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
       break;
     }
     break;
@@ -286,7 +295,11 @@ extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *c
                             PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                             CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                            const ForceAccumulationMethod force_sum) {
+                            const ForceAccumulationMethod force_sum, const GpuDetails &gpu) {
+  const int blocks_multiplier = (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) ? 2 : 1;
+  const int nblocks = gpu.getSMPCount() * blocks_multiplier;
+  const int max_threads = gpu.getMaxThreadsPerBlock() / (2 * blocks_multiplier);
+  const int trim_threads = roundUp<int>((max_threads * 7) / 8, twice_warp_size_int);
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
 
@@ -298,20 +311,24 @@ extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *c
       case ForceAccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          kfsValenceForceEnergyAccumulation<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                      *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfsValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+          kfsValenceForceAccumulation<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                *gmem_r);
           break;
         }
         break;
       case ForceAccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          kfValenceForceEnergyAccumulation<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                      *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+          kfValenceForceAccumulation<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                *gmem_r);
           break;
         }
         break;
@@ -319,20 +336,24 @@ extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *c
         if (poly_psw->frc_bits <= 23) {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfsValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+            kfsValenceForceEnergyAccumulation<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                        *scw, *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            kfsValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+            kfsValenceForceAccumulation<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                  *gmem_r);
             break;
           }
         }
         else {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+            kfValenceForceEnergyAccumulation<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                        *scw, *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            kfValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+            kfValenceForceAccumulation<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw,
+                                                                  *gmem_r);
             break;
           }
         }
@@ -342,7 +363,8 @@ extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *c
     case EvaluateForce::NO:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfValenceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        kfValenceEnergyAccumulation<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                              *gmem_r);
         break;
       case EvaluateEnergy::NO:
         rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
@@ -360,20 +382,22 @@ extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *c
     case ForceAccumulationMethod::SPLIT:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfsValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        kfsValenceEnergyAtomUpdate<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                             *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kfsValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+        kfsValenceAtomUpdate<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
     case ForceAccumulationMethod::WHOLE:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        kfValenceEnergyAtomUpdate<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                             *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kfValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+        kfValenceAtomUpdate<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
@@ -381,20 +405,22 @@ extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *c
       if (poly_psw->frc_bits <= 23) {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          kfsValenceEnergyAtomUpdate<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                               *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfsValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+          kfsValenceAtomUpdate<<<nblocks, max_threads>>>(*poly_vk, *ctrl, *poly_psw, *gmem_r);
           break;
         }
       }
       else {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          kfValenceEnergyAtomUpdate<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw, *scw,
+                                                               *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+          kfValenceAtomUpdate<<<nblocks, trim_threads>>>(*poly_vk, *ctrl, *poly_psw, *gmem_r);
           break;
         }
       }
