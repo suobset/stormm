@@ -144,7 +144,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < ncbnd; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(cbnd_acc_mask, pos) == 0) {
           continue;
         }
@@ -190,7 +190,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < nangl; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(angl_acc_mask, pos) == 0) {
           continue;
         }
@@ -225,7 +225,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < ncdhe; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(cdhe_acc_mask, pos) == 0) {
           continue;
         }
@@ -397,7 +397,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < ncmap; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(cmap_acc_mask, pos) == 0) {
           continue;
         }
@@ -443,7 +443,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < ninfr14; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(infr_acc_mask, pos) == 0) {
           continue;
         }
@@ -480,7 +480,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < nrposn; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(rposn_acc_mask, pos) == 0) {
           continue;
         }
@@ -515,7 +515,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < nrbond; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(rbond_acc_mask, pos) == 0) {
           continue;
         }
@@ -552,7 +552,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < nrangl; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(rangl_acc_mask, pos) == 0) {
           continue;
         }
@@ -590,7 +590,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
     for (int pos = 0; pos < nrdihe; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(rdihe_acc_mask, pos) == 0) {
           continue;
         }
@@ -685,7 +685,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                        sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force, activity, purpose,
                        step_number);
     switch (purpose) {
-    case VwuGoal::ACCUMULATE_FORCES:
+    case VwuGoal::ACCUMULATE:
 
       // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
       // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays
@@ -784,7 +784,7 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
     localVwuEvaluation(vk, vsk, nbk, rar, sh_charges.data(), sh_lj_idx.data(), sh_xcrd.data(),
                        sh_ycrd.data(), sh_zcrd.data(), sh_xfrc.data(), sh_yfrc.data(),
                        sh_zfrc.data(), ecard, sysid, vwu_list[vidx], eval_force, activity,
-                       VwuGoal::ACCUMULATE_FORCES, step_number);
+                       VwuGoal::ACCUMULATE, step_number);
     
     // Add accumulated forces back to the global arrays (this is not done by all GPU kernels, as
     // in some cases the ValenceWorkUnits also move atoms and then leave the global force arrays

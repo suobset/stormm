@@ -10,6 +10,13 @@ enum class EvaluateForce {
   NO, YES
 };
 
+/// \brief Enumerate the choices on whether to evaluate the energy... yes or no.  CPU functions
+///        are obligated to evaluate the energy, but GPU functions may or may not due to register
+///        pressure that it creates.
+enum class EvaluateEnergy {
+  NO, YES
+};
+
 /// \brief Enumerate the choices on whether to evaluate the virial... yes or no.
 enum class EvaluateVirial {
   NO, YES

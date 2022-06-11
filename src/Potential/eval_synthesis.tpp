@@ -36,7 +36,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
     for (int pos = cbnd_limits.x; pos < cbnd_limits.y; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(&syvk.cbnd_acc[cbnd_nrg_limits.x], pos - cbnd_limits.x) == 0) {
           continue;
         }
@@ -85,7 +85,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
     for (int pos = angl_limits.x; pos < angl_limits.y; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(&syvk.angl_acc[angl_nrg_limits.x], pos - angl_limits.x) == 0) {
           continue;
         }
@@ -127,7 +127,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
     for (int pos = cdhe_limits.x; pos < cdhe_limits.y; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(&syvk.cdhe_acc[cdhe_nrg_limits.x], pos - cdhe_limits.x) == 0) {
           continue;
         }
@@ -226,7 +226,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
     for (int pos = cmap_limits.x; pos < cmap_limits.y; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(&syvk.cmap_acc[cmap_nrg_limits.x], pos - cmap_limits.x) == 0) {
           continue;
         }
@@ -266,7 +266,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
     for (int pos = infr14_limits.x; pos < infr14_limits.y; pos++) {
       bool log_term = true;
       switch (purpose) {
-      case VwuGoal::ACCUMULATE_FORCES:
+      case VwuGoal::ACCUMULATE:
         if (readBitFromMask(&syvk.infr14_acc[infr14_nrg_limits.x], pos - infr14_limits.x) == 0) {
           continue;
         }
@@ -342,7 +342,7 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk, PsSynthesisWriter psyw,
                            psyw.inv_gpos_scale, psyw.frc_scale, ecard, i, eval_force, activity,
                            purpose, step_number);
     switch (purpose) {
-    case VwuGoal::ACCUMULATE_FORCES:
+    case VwuGoal::ACCUMULATE:
       for (int j = atom_limits.x; j < atom_limits.y; j++) {
         const int atom_idx = syvk.vwu_imports[j];
         const size_t j_sh = j - atom_limits.x;

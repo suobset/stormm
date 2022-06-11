@@ -25,6 +25,7 @@ using constants::medium_block_size;
 using constants::small_block_size;
 using math::roundUp;
 using mm::MMControlKit;
+using numerics::ForceAccumulationMethod;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using symbols::asymptotic_to_one_f;
@@ -39,6 +40,7 @@ using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::SyValenceKit;
 using synthesis::PsSynthesisWriter;
 using synthesis::VwuAbstractMap;
+using synthesis::VwuGoal;
 using synthesis::vwu_abstract_length;
 using topology::TorsionKind;
   
@@ -227,5 +229,180 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  undef ABS_FUNC
 #undef TCALC
 
+//-------------------------------------------------------------------------------------------------
+extern void launchValenceDp(SyValenceKit<double> *poly_vk, MMControlKit<double> *ctrl,
+                            PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                            CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                            const EvaluateEnergy eval_energy, const VwuGoal purpose) {
+  switch (purpose) {
+  case VwuGoal::ACCUMULATE:
+
+    // When the goal is to accumulate energies, forces, or both, the force accumulation method
+    // is set to use int64 data.  A 95-bit method that splits the accumulation with overflow into
+    // a secondary 32-bit int may be added, and likewise become the sole option for
+    // double-precision computations.
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kdValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+        break;
+      }
+      break;
+    case EvaluateForce::NO:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kdValenceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
+        break;
+      }
+      break;
+    }
+  case VwuGoal::MOVE_PARTICLES:
+
+    // When the goal is to move particles, evaluating the force is obligatory, but the manner in
+    // which forces are accumulated is still important.  Whether to accumulate energies while
+    // evaluating forces and moving the particles remains a consideration in choosing the proper
+    // kernel.
+    switch (eval_energy) {
+    case EvaluateEnergy::YES:
+      kdValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+      break;
+    case EvaluateEnergy::NO:
+      kdValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+      break;
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValenceSp(SyValenceKit<float> *poly_vk, MMControlKit<float> *ctrl,
+                            PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                            CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                            const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                            const ForceAccumulationMethod force_sum) {
+  switch (purpose) {
+  case VwuGoal::ACCUMULATE:
+
+    // When the goal is to accumulate energies, forces, or both, the force accumulation method
+    // becomes a critical detail when choosing the kernel.
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      switch (force_sum) {
+      case ForceAccumulationMethod::SPLIT:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kfsValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kfsValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+          break;
+        }
+        break;
+      case ForceAccumulationMethod::WHOLE:
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kfValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kfValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+          break;
+        }
+        break;
+      case ForceAccumulationMethod::AUTOMATIC:
+        if (poly_psw->frc_bits <= 23) {
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            kfsValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            kfsValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+            break;
+          }
+        }
+        else {
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            kfValenceForceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            kfValenceForceAccumulation(*poly_vk, *ctrl, *poly_psw, *gmem_r);
+            break;
+          }
+        }
+        break;
+      }
+      break;
+    case EvaluateForce::NO:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kfValenceEnergyAccumulation(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
+        break;
+      }
+      break;
+    }
+  case VwuGoal::MOVE_PARTICLES:
+
+    // When the goal is to move particles, evaluating the force is obligatory, but the manner in
+    // which forces are accumulated is still important.  Whether to accumulate energies while
+    // evaluating forces and moving the particles remains a consideration in choosing the proper
+    // kernel.
+    switch (force_sum) {
+    case ForceAccumulationMethod::SPLIT:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kfsValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kfsValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+        break;
+      }
+      break;
+    case ForceAccumulationMethod::WHOLE:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        kfValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        kfValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+        break;
+      }
+      break;
+    case ForceAccumulationMethod::AUTOMATIC:
+      if (poly_psw->frc_bits <= 23) {
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kfsValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kfsValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+          break;
+        }
+      }
+      else {
+        switch (eval_energy) {
+        case EvaluateEnergy::YES:
+          kfValenceEnergyAtomUpdate(*poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+          break;
+        case EvaluateEnergy::NO:
+          kfValenceAtomUpdate(*poly_vk, *ctrl, *poly_psw, *gmem_r);        
+          break;
+        }
+      }
+      break;
+    }
+    break;
+  }
+}
+  
 } // namespace energy
 } // namespace omni

@@ -71,7 +71,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
   ScoreCard sc(poly_ps->getSystemCount(), 1, 32);
   poly_ps->initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps->data(), &sc, EvaluateForce::YES, VwuTask::BOND,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+                              VwuGoal::ACCUMULATE, 0);
   const int nsys = poly_ps->getSystemCount();
   Approx error_limits(std::vector<double>(nsys, 0.0), ComparisonType::ABSOLUTE, verytiny);
   std::vector<double> bond_nrg, bond_nrg_answer, bond_frc_deviations;
@@ -92,7 +92,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
         "interactions are inconsistent with those computed using a simpler approach.", do_tests);
   poly_ps->initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps->data(), &sc, EvaluateForce::YES, VwuTask::ANGL,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+                              VwuGoal::ACCUMULATE, 0);
   std::vector<double> angl_nrg, angl_nrg_answer, angl_frc_deviations;
   for (int i = 0; i < nsys; i++) {
     angl_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ANGLE, i));
@@ -111,7 +111,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
         "computed using a simpler approach.", do_tests);
   poly_ps->initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps->data(), &sc, EvaluateForce::YES, VwuTask::DIHE,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+                              VwuGoal::ACCUMULATE, 0);
   std::vector<double> dihe_nrg, impr_nrg, dihe_nrg_answer, impr_nrg_answer, dihe_frc_deviations;
   for (int i = 0; i < nsys; i++) {
     dihe_nrg.push_back(sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, i));
@@ -136,7 +136,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
         "inconsistent with those computed using a simpler approach.", do_tests);
   poly_ps->initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps->data(), &sc, EvaluateForce::YES, VwuTask::INFR14,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+                              VwuGoal::ACCUMULATE, 0);
   std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer, attn14_frc_deviations;
   for (int i = 0; i < nsys; i++) {
     qq14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i));
@@ -161,7 +161,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
         "inconsistent with those computed using a simpler approach.", do_tests);
   poly_ps->initializeForces();
   evalSyValenceEnergy<double>(syvk, poly_ps->data(), &sc, EvaluateForce::YES, VwuTask::CMAP,
-                              VwuGoal::ACCUMULATE_FORCES, 0);
+                              VwuGoal::ACCUMULATE, 0);
   std::vector<double> cmap_nrg, cmap_nrg_answer, cmap_frc_deviations;
   for (int i = 0; i < nsys; i++) {
     cmap_nrg.push_back(sc.reportInstantaneousStates(StateVariable::CMAP, i));

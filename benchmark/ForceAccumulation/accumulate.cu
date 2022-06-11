@@ -24,6 +24,48 @@ using namespace omni::testing;
 #include "../../src/Potential/accumulation.cui"
 
 //-------------------------------------------------------------------------------------------------
+// Perform arithmetic with +, -, and * using int32 numbers.
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(512, 2) kWorkInt32(llint* result) {
+  int quant_i  = threadIdx.x;
+  int quant_ii = blockIdx.x;
+  int incr_i  = 1;
+  int incr_ii = 3;
+  int mult = -1;
+  for (int i = 0; i < 1000000; i++) {
+    quant_i += quant_ii + incr_i;
+    incr_i += 1 - 2 * (quant_i > 10000000);
+    incr_ii += 1 + (quant_i > 10000000) + (quant_i < -10000000);
+    quant_i -= incr_ii;
+    quant_i -= 100000 * (quant_i > 10000000);
+    quant_ii += i * mult;
+    mult *= -1;
+  }
+  result[blockIdx.x * blockDim.x + threadIdx.x] = quant_i;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Perform arithmetic with +, -, and * using int64 numbers.
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(512, 2) kWorkInt64(llint* result) {
+  llint quant_i  = threadIdx.x;
+  llint quant_ii = blockIdx.x;
+  llint incr_i  = 1;
+  llint incr_ii = 3;
+  llint mult = -1;
+  for (int i = 0; i < 1000000; i++) {
+    quant_i += quant_ii + incr_i;
+    incr_i += 1LL - 2LL * (quant_i > 10000000LL);
+    incr_ii += 1LL + (quant_i > 10000000LL) + (quant_i < -10000000LL);
+    quant_i -= incr_ii;
+    quant_i -= 100000LL * (quant_i > 10000000LL);
+    quant_ii += i * mult;
+    mult *= -1LL;
+  }
+  result[blockIdx.x * blockDim.x + threadIdx.x] = quant_i;
+}
+
+//-------------------------------------------------------------------------------------------------
 // This kernel will accumulate values using split int32 accumulators.
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(512, 2) kAddSplit(int* overflow, llint* result) {
@@ -131,6 +173,22 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(2);
   check(result_split.readHost(), RelationalOperator::EQUAL, result_unified.readHost(), "Split "
         "accumulation does not produce the same outcomes as unified int64 accumulation.");
+
+  // Make the GPU do int32 and int64-based calculations with +, -, and *
+  timer.addCategory("int32 Work");
+  timer.addCategory("int64 Work");
+  Hybrid<llint> testll(buffer_size);
+  llint* testll_data = testll.data(HybridTargetLevel::DEVICE);
+  for (int i = 0; i < 100; i++) {
+    kWorkInt32<<<nblocks, nthreads>>>(testll_data);
+  }
+  cudaDeviceSynchronize();
+  timer.assignTime(3);
+  for (int i = 0; i < 100; i++) {
+    kWorkInt64<<<nblocks, nthreads>>>(testll_data);
+  }
+  cudaDeviceSynchronize();
+  timer.assignTime(4);  
   
   // Report the timings
   if (oe.getDisplayTimingsOrder()) {

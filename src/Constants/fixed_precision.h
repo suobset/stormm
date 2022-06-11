@@ -23,7 +23,22 @@ enum class PrecisionLevel {
                 ///<   some fixed-precision bit settings.
   DOUBLE        ///< Computations will take place in fp64 or int64 fixed-precision
 };
-  
+
+/// \brief Enumerate the choices for carrying out fixed-precision accumulation
+enum class ForceAccumulationMethod {
+  SPLIT,     ///< Use split accumulation, stashing the low 32 bits in a locally cached int and the
+             ///<   high 32 bits in a secondary accumulator probably located further away in main
+             ///<   memory.  So long as most of the work happens in the low 32 bits, this reduces
+             ///<   local memory demand and overall memory bandwidth by a factor of two, lowers
+             ///<   GPU kernel register pressure on many architectures, and has shown 2.2 - 2.9x
+             ///<   the speed of accumulating in int64.
+  WHOLE,     ///< Sum fixed-precision numbers in int64 accumulators.  This is needed when the
+             ///<   fixed-precision work cannot be mostly confined to the low 32 bits.
+  AUTOMATIC  ///< Determine the accumulation method by looking at the number of fixed-precision
+             ///<   bits after the decimal and making some assumptions about typical molecular
+             ///<   mechanics forces.
+};
+
 /// \brief The fixed-precision discretizations of global and local coordinate frame positions, in
 ///        parts per Angstrom (the internal unit of length).  The local position scaling is
 ///        intended to work in local coordinate frames, perhaps in an implicit solvent enviroment

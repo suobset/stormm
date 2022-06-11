@@ -122,14 +122,14 @@ void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<doub
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
                           VwuTask activity = VwuTask::ALL_TASKS,
-                          VwuGoal goal = VwuGoal::ACCUMULATE_FORCES, int step_number = 0);
+                          VwuGoal goal = VwuGoal::ACCUMULATE, int step_number = 0);
 
 void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, const RestraintApparatus *ra,
                           ScoreCard *ecard, int sysid,
                           const std::vector<ValenceWorkUnit> &vwu_list,
                           EvaluateForce eval_force = EvaluateForce::NO,
                           VwuTask activity = VwuTask::ALL_TASKS,
-                          VwuGoal goal = VwuGoal::ACCUMULATE_FORCES, int step_number = 0);
+                          VwuGoal goal = VwuGoal::ACCUMULATE, int step_number = 0);
 
 void evalValenceWorkUnits(const ValenceKit<double> vk, const VirtualSiteKit<double> vsk,
                           const NonbondedKit<double> nbk,
