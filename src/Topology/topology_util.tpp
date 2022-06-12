@@ -104,5 +104,51 @@ void extractBoundedListEntries(std::vector<T> *result, const std::vector<T> &va,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float> &sp_item,
+                                 const HybridTargetLevel tier, const int low_index,
+                                 const int high_index, const char* caller, const char* method) {
+  const size_t ct = std::type_index(typeid(T)).hash_code();
+  if (ct == float_type_index) {
+    std::vector<float> tmpv;
+    switch (tier) {
+    case HybridTargetLevel::HOST:
+      tmpv = sp_item.readHost(low_index, high_index - low_index);
+      break;
+    case HybridTargetLevel::DEVICE:
+      tmpv = sp_item.readDevice(low_index, high_index - low_index);
+      break;
+    }
+    return std::vector<T>(tmpv.begin(), tmpv.end());
+  }
+  else if (ct == double_type_index) {
+    std::vector<double> tmpv;
+    switch (tier) {
+    case HybridTargetLevel::HOST:
+      tmpv = item.readHost(low_index, high_index - low_index);
+      break;
+    case HybridTargetLevel::DEVICE:
+      tmpv = item.readDevice(low_index, high_index - low_index);
+      break;
+    }
+    return std::vector<T>(tmpv.begin(), tmpv.end());
+  }
+  else {
+    if (isScalarType<T>()) {
+      rtErr("Data is not available in type " + getOmniScalarTypeName<T>() + ".", caller, method);
+    }
+    else if (isHpcVectorType<T>()) {
+      rtErr("Data is not available in type " + getOmniHpcVectorTypeName<T>() + ".", caller,
+            method);
+    }
+    else {
+      rtErr("Unrecognized data type " + std::string(std::type_index(typeid(T)).name()) + ".",
+            caller, method);
+    }
+  }
+  __builtin_unreachable();
+}
+
 } // namespace topology
 } // namespace omni

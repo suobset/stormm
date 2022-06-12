@@ -229,8 +229,9 @@ public:
                       int force_scale_bits_in = default_force_scale_bits);
 
   PhaseSpaceSynthesis(const SystemCache &sysc,
-                      const std::vector<Thermostat> &heat_baths_in,
-                      const std::vector<Barostat> &pistons_in, double time_step_in = 1.0,
+                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
+                      const std::vector<Barostat> &pistons_in = { Barostat() },
+                      double time_step_in = 1.0,
                       int globalpos_scale_bits_in = default_globalpos_scale_bits,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,

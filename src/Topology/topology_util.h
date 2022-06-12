@@ -4,6 +4,9 @@
 
 #include <string>
 #include <vector>
+#include "Accelerator/hybrid.h"
+#include "DataTypes/common_types.h"
+#include "DataTypes/omni_vector_types.h"
 #include "Math/sorting.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
@@ -13,6 +16,12 @@
 namespace omni {
 namespace topology {
 
+using card::Hybrid;
+using card::HybridTargetLevel;
+using data_types::getOmniScalarTypeName;
+using data_types::getOmniHpcVectorTypeName;
+using data_types::isScalarType;
+using data_types::isHpcVectorType;
 using math::UniqueValueHandling;
 using math::reduceUniqueValues;
 
@@ -53,6 +62,20 @@ extractBoundedListEntries(std::vector<T> *result, const std::vector<T> &va,
                           const std::vector<int> &va_bounds, const std::vector<int> &indices,
                           UniqueValueHandling filter = UniqueValueHandling::UNIQUE_VALUES_ONLY);
 /// \}
+
+/// \brief Obtain parameters in either single- or double-precision real data formats.
+///
+/// \param item        Double-precision representation of the data
+/// \param sp_item     Single-precision representation of the data
+/// \param tier        Indicator of whether to pull data from the host (CPU) or device (GPU)
+/// \param low_index   Lower limit of the data to obtain
+/// \param high_index  Upper limit of the data to obtain
+/// \param caller      Optional name of the calling object (for error reporting purposes)
+/// \param method      Optional member function within the calling object (for error reporting)
+template <typename T>
+std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float> &sp_item,
+                                 HybridTargetLevel tier, int low_index, int high_index,
+                                 const char* caller = nullptr, const char* method = nullptr);
   
 /// \brief Make a human-readable list of atoms based on a topology and a vector of indices,
 ///        providing atom numbers and name as well as residue numbers and names.  This is useful,

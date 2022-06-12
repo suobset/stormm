@@ -2,17 +2,21 @@
 #ifndef OMNI_MM_CONTROLS_H
 #define OMNI_MM_CONTROLS_H
 
+#include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Namelists/nml_dynamics.h"
+#include "Synthesis/atomgraph_synthesis.h"
 
 namespace omni {
 namespace mm {
 
+using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using namelist::default_dynamics_time_step;
 using namelist::default_rattle_tolerance;
-
+using synthesis::AtomGraphSynthesis;
+  
 /// \brief The C-style, always writeable abstract for the MolecularMechanicsControls object.  To
 ///        not be able to modify this object's contents would be nonsensical, as it is intended to
 ///        to keep counters of the simulation time step as well as force evaluation work units.
@@ -75,6 +79,22 @@ public:
   /// \brief Obtain a single-precision abstract for this object.
   MMControlKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
 
+  /// \brief Prime the work unit counters based on a particular GPU configuration.
+  ///
+  /// \param gpu  Description of the GPU available to the runtime process
+  void primeWorkUnitCounters(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+  
+#ifdef OMNI_USE_HPC
+  /// \brief Upload the object's contents to the device (needed so that CPU-primed work unit
+  ///        counters can go into effect)
+  void upload();
+
+  /// \brief Download the object's contents from the device (useful for debugging)
+  void download();
+#else
+                             
+#endif
+  
 private:
   int step_number;             ///< The step counter for the simulation
   double time_step;            ///< Time step of the simulation, units of femtoseconds.  This may

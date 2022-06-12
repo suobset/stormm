@@ -647,6 +647,10 @@ int main(const int argc, const char* argv[]) {
     foutp.close();
     oe.logFileCreated(mdin_name);
   }
+  else {
+    rtWarn("The temporary directory " + oe.getTemporaryDirectoryPath() + " is not writeable.  "
+           "This will lead to tests either failing or being impossible to run.", "test_synthesis");
+  }
   const bool mdin_exists = (getDrivePathType(mdin_name) == DrivePathType::FILE);
   const TextFile tf = (mdin_exists) ? TextFile(mdin_name) : TextFile();
   int start_line = 0;
@@ -881,7 +885,8 @@ int main(const int argc, const char* argv[]) {
   const std::string ubiq_top_name = base_top_name + osc + "ubiquitin.top";
   runValenceWorkUnitTests(ubiq_top_name, ubiq_crd_name, oe, &my_prng);
 
-  // Read additional implicit solvent models, then
+  // Read additional systems with implicit solvent, then construct exclusion masks and make a
+  // compilation of those masks for a synthesis of the topologies.
   const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
   const std::string lig1_crd_name = base_crd_name + osc + "stereo_L1.inpcrd";

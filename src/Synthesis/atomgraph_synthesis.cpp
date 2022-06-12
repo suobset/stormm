@@ -2924,7 +2924,7 @@ int AtomGraphSynthesis::getTopologyCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-AtomGraph* AtomGraphSynthesis::getTopologyPointer(const int system_index) const {
+AtomGraph* AtomGraphSynthesis::getSystemTopologyPointer(const int system_index) const {
   if (system_index < 0 || system_index >= system_count) {
     rtErr("A synthesis with " + std::to_string(system_count) + " systems cannot produce a "
           "topology relating to system index " + std::to_string(system_index) + ".",

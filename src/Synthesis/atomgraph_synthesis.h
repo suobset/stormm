@@ -7,6 +7,7 @@
 #include "DataTypes/omni_vector_types.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
+#include "Topology/topology_util.h"
 #include "UnitTesting/stopwatch.h"
 #include "synthesis_abstracts.h"
 #include "valence_workunit.h"
@@ -21,6 +22,7 @@ using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
 using topology::ChemicalDetailsKit;
+using topology::getRealParameters;
 using topology::ImplicitSolventModel;
 using topology::MassForm;
 using topology::SettleSetting;
@@ -77,7 +79,7 @@ public:
   /// \brief Get a const topology pointer for a specific system contained within the synthesis.
   ///
   /// \param system_index  Index of the system of interest
-  AtomGraph* getTopologyPointer(int system_index) const;
+  AtomGraph* getSystemTopologyPointer(int system_index) const;
   
   /// \brief Get the number of systems that this synthesis describes
   int getSystemCount() const;
@@ -159,6 +161,49 @@ public:
   std::string getPBRadiiSet(int index) const;
   /// \}
 
+  /// \brief Get partial charges stored within the synthesis.
+  ///
+  /// Overloaded:
+  ///   - Get partial charges for all systems, padded by the warp size between systems
+  ///   - Get partial charges for a single system
+  ///   - Get partial charges for a specific range of atoms in a single system
+  ///
+  /// \param tier          Obtain the data from arrays on the host or the device
+  /// \param system_index  Index of the specific system to query
+  /// \param low_index     Lower limit of atoms in the system to query (will be validated)
+  /// \param high_index    Upper limit of atoms in the system to query (will be validated)
+  /// \{
+  template <typename T>
+  std::vector<T> getPartialCharges(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  template <typename T>
+  std::vector<T> getPartialCharges(int system_index,
+                                   HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  template <typename T>
+  std::vector<T> getPartialCharges(int system_index, int low_index, int high_index,
+                                   HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+
+  /// \brief Get the masses (or inverse masses) of atoms in the synthesis.
+  ///
+  /// Overloaded:
+  ///   - Get masses for all systems, padded by the warp size between systems
+  ///   - Get masses for a single system
+  ///   - Get masses for a specific range of atoms in a single system
+  ///
+  /// \param tier          Obtain the data from arrays on the host or the device
+  /// \param system_index  Index of the specific system to query
+  /// \param low_index     Lower limit of atoms in the system to query (will be validated)
+  /// \param high_index    Upper limit of atoms in the system to query (will be validated)
+  /// \{
+  template <typename T> std::vector<T> getAtomicMasses(HybridTargetLevel tier) const;
+  template <typename T> std::vector<T> getAtomicMasses(HybridTargetLevel tier,
+                                                       int system_index) const;
+  template <typename T> std::vector<T> getAtomicMasses(HybridTargetLevel tier, int system_index,
+                                                       int low_index, int high_index) const;
+  /// \}
+ 
   /// \brief Get a minimal kit with double-precision parameter detail for computing valence
   ///        interactions for all systems based on the work units stored in this object.
   ///
@@ -1098,5 +1143,7 @@ private:
 
 } // namespace synthesis
 } // namespace omni
+
+#include "atomgraph_synthesis.tpp"
 
 #endif

@@ -1,10 +1,13 @@
+#include "Constants/scaling.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "mm_controls.h"
 
 namespace omni {
 namespace mm {
 
 using card::HybridKind;
-
+using topology::UnitCellType;
+  
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in,
                                                        const double rattle_tol_in) :
@@ -99,7 +102,59 @@ MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel t
                              nbwu_progress.data(tier), pmewu_progress.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::primeWorkUnitCounters(const GpuDetails &gpu,
+                                                       const AtomGraphSynthesis &poly_ag) {
+  const int arch_major = gpu.getArchMajor();
+  const int arch_minor = gpu.getArchMinor();
+  int vwu_block_count = gpu.getSMPCount();
+  int pmewu_block_count = gpu.getSMPCount();
+  if (arch_major == 6 && arch_minor == 1) {
+    vwu_block_count *= 2;
+    pmewu_block_count *= 2;
+  }
+  int nbwu_block_count = gpu.getSMPCount();
+  if (poly_ag.getUnitCellType() == UnitCellType::NONE) {
 
-  
+    // Use four non-bonded blocks per SM on Turing, five on all other NVIDIA architectures
+    if (arch_major == 7 && arch_minor >= 5) { 
+      nbwu_block_count *= 4;
+    }
+    else {
+      nbwu_block_count *= 5;
+    }
+  }
+  else {
+
+    // Use two non-bonded blocks per SM on Turing, three on all other NVIDIA architectures
+    if (arch_major == 7 && arch_minor >= 5) { 
+      nbwu_block_count *= 2;
+    }
+    else {
+      nbwu_block_count *= 3;
+    }
+  }
+  for (int i = 0; i < twice_warp_size_int; i++) {
+    vwu_progress.putHost(vwu_block_count, i);
+    nbwu_progress.putHost(nbwu_block_count, i);
+    pmewu_progress.putHost(pmewu_block_count, i);
+  }
+#ifdef OMNI_USE_HPC
+  upload();
+#endif
+}
+
+#ifdef OMNI_USE_HPC
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::upload() {
+  progress_data.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::download() {
+  progress_data.download();
+}
+#endif
+
 } // namespace mm
 } // namespace omni

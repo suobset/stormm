@@ -144,8 +144,7 @@ CacheResource& CacheResource::operator=(CacheResource &&other) {
 }
 
 //-------------------------------------------------------------------------------------------------
-CacheResourceKit<double>
-CacheResource::getDoublePrecisionCacheResourceKit(const HybridTargetLevel tier) {
+CacheResourceKit<double> CacheResource::dpData(const HybridTargetLevel tier) {
   return CacheResourceKit<double>(block_limit, atom_limit, x_coordinates.data(tier),
                                   y_coordinates.data(tier), z_coordinates.data(tier),
                                   x_velocities.data(tier), y_velocities.data(tier),
@@ -155,8 +154,7 @@ CacheResource::getDoublePrecisionCacheResourceKit(const HybridTargetLevel tier) 
 }
 
 //-------------------------------------------------------------------------------------------------
-CacheResourceKit<float>
-CacheResource::getSinglePrecisionCacheResourceKit(const HybridTargetLevel tier) {
+CacheResourceKit<float> CacheResource::spData(const HybridTargetLevel tier) {
   return CacheResourceKit<float>(block_limit, atom_limit, x_coordinates.data(tier),
                                  y_coordinates.data(tier), z_coordinates.data(tier),
                                  x_velocities.data(tier), y_velocities.data(tier),

@@ -408,7 +408,8 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 # Test programs using omni.cuda
 OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 		       $(TESTDIR)/bin/test_hpc_hybrid \
-		       $(TESTDIR)/bin/test_hpc_math
+		       $(TESTDIR)/bin/test_hpc_math \
+		       $(TESTDIR)/bin/test_hpc_synthesis
 
 # Benchmark programs using omni
 OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
@@ -641,6 +642,14 @@ $(TESTDIR)/bin/test_hpc_math : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Math/test_hp
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
 	  -o $(TESTDIR)/bin/test_hpc_math $(TESTDIR)/Math/test_hpc_math.cu -L$(LIBDIR) \
 	  -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
+
+# Target: HPC molecular system synthesis and associated operations
+$(TESTDIR)/bin/test_hpc_synthesis : $(LIBDIR)/libomni_cuda.so \
+				    $(TESTDIR)/Synthesis/test_hpc_synthesis.cu
+	@echo "[OMNI]  Building test_hpc_synthesis..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
+	  -o $(TESTDIR)/bin/test_hpc_synthesis $(TESTDIR)/Synthesis/test_hpc_synthesis.cu \
+	  -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
 
 # Target: Benchmarking single, double, and fixed-precision computations of valence forces
 $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \

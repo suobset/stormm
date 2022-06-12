@@ -80,13 +80,11 @@ public:
 
   /// \brief Get a set of pointers to this object with double-precision representations for the
   ///        charges.
-  CacheResourceKit<double>
-  getDoublePrecisionCacheResourceKit(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CacheResourceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST);
 
   /// \brief Get a set of pointers to this object with single-precision representations for the
   ///        charges.
-  CacheResourceKit<float>
-  getSinglePrecisionCacheResourceKit(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  CacheResourceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
 
 private:
   int block_limit;                    ///< The number of blocks that the resources are designed

@@ -13,16 +13,12 @@ std::vector<T> AtomGraph::getPartialCharge(const int low_index, const int high_i
   atomValidityCheck(low_index, high_index, atom_count, "AtomGraph", "getPartialCharge");
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == float_type_index) {
-    {
-      std::vector<float> tmpq = sp_atomic_charges.readHost(low_index, high_index - low_index);
-      return std::vector<T>(tmpq.begin(), tmpq.end());
-    }
+    std::vector<float> tmpq = sp_atomic_charges.readHost(low_index, high_index - low_index);
+    return std::vector<T>(tmpq.begin(), tmpq.end());
   }
   else if (ct == double_type_index) {
-    {
-      std::vector<double> tmpq = atomic_charges.readHost(low_index, high_index - low_index);
-      return std::vector<T>(tmpq.begin(), tmpq.end());
-    }
+    std::vector<double> tmpq = atomic_charges.readHost(low_index, high_index - low_index);
+    return std::vector<T>(tmpq.begin(), tmpq.end());
   }
   else {
     rtErr("Invalid request for partial charges in format " +

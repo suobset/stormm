@@ -25,7 +25,7 @@ constexpr int minimum_valence_work_unit_atoms = 128;
 
 /// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
 ///        of __shared__ memory in a block of 1024 threads might need to be stretched.
-constexpr int maximum_valence_work_unit_atoms = 768;
+constexpr int maximum_valence_work_unit_atoms = 1024;
 
 /// \brief The maximum tolerated number of recursive calls to various atom searching functions.
 ///        The halo region needed to determine the correct movement of any given atom cannot chain
