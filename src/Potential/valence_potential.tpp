@@ -26,7 +26,7 @@ Tcalc evalHarmonicStretch(const int i_atom, const int j_atom, const Tcalc stiffn
   const Tcalc dr = (tcalc_ct == double_type_index) ? sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
                                                      sqrtf((dx * dx) + (dy * dy) + (dz * dz));
   const Tcalc dl = dr - equilibrium;
-
+  
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
     const Tcalc fmag = 2.0 * stiffness * dl / dr;
@@ -1144,7 +1144,7 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
     dz = zcrd[l_atom] - zcrd[i_atom];
   }
   imageCoordinates(&dx, &dy, &dz, umat, invu, unit_cell, ImagingMethod::MINIMUM_IMAGE);
-  const Tcalc invr2 = 1.0 / ((dx * dx) + (dy * dy) + (dz * dz));
+  const Tcalc invr2 = value_one / ((dx * dx) + (dy * dy) + (dz * dz));
   const Tcalc invr = (tcalc_is_double) ? sqrt(invr2) : sqrtf(invr2);
   const Tcalc invr4 = invr2 * invr2;
   const Tcalc ele_scale = attn14_elec_factors[attn_idx];
@@ -1166,6 +1166,13 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
         fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
       }
     }
+
+    // CHECK
+    if (i_atom == 0 || l_atom == 0) {
+      printf(" 1:4 %2d       %2d -> %9.5f\n", i_atom, l_atom, fmag);
+    }
+    // END CHECK
+    
     if (isSignedIntegralScalarType<Tforce>()) {
       const Tforce ifmag_dx = llround(fmag * dx * force_factor);
       const Tforce ifmag_dy = llround(fmag * dy * force_factor);

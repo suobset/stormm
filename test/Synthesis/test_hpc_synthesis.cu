@@ -7,10 +7,12 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/rounding.h"
+#include "../../src/MolecularMechanics/mm_evaluation.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/cacheresource.h"
 #include "../../src/Potential/hpc_valence_potential.cuh"
+#include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
@@ -29,6 +31,7 @@ using namespace omni::errors;
 using namespace omni::diskutil;
 using namespace omni::energy;
 using namespace omni::math;
+using namespace omni::mm;
 using namespace omni::parse;
 using namespace omni::synthesis;
 using namespace omni::testing;
@@ -86,7 +89,7 @@ int main(const int argc, const char* argv[]) {
     topology_indices[i] = i;
   }
   AtomGraphSynthesis poly_ag(sysc.getSystemTopologyPointerCC(), topology_indices,
-                             ExceptionResponse::WARN, &timer);
+                             ExceptionResponse::WARN, max_vwu_atoms, &timer);
   PhaseSpaceSynthesis poly_ps(sysc);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
@@ -136,6 +139,27 @@ int main(const int argc, const char* argv[]) {
   // Launch the valence evaluation kernel
   launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
                   EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
+  std::vector<double> frc_deviations(nsys);
+  for (int i = 0; i < nsys; i++) {
+    PhaseSpace devc_result = poly_ps.exportSystem(i, HybridTargetLevel::DEVICE);
+    PhaseSpace host_result = poly_ps.exportSystem(i, HybridTargetLevel::HOST);
+    host_result.initializeForces();
+    ScoreCard isc(1, 1, 32);
+    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
+
+    // CHECK
+    PhaseSpaceWriter devc_access = devc_result.data();
+    PhaseSpaceWriter host_access = host_result.data();
+    printf("%s...\n", poly_ag.getSystemTopologyPointer(i)->getFileName().c_str());
+    for (int j = 0; j < devc_access.natom; j++) {
+      printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n",
+             host_access.xfrc[j], host_access.yfrc[j], host_access.zfrc[j], devc_access.xfrc[j],
+             devc_access.yfrc[j], devc_access.zfrc[j], host_access.xcrd[j], host_access.ycrd[j],
+             host_access.zcrd[j]);
+    }
+    printf("\n");
+    // END CHECK
+  }
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

@@ -65,11 +65,13 @@ public:
                      const std::vector<int> &topology_indices_in,
                      const std::vector<int> &restraint_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
+                     int vwu_atom_limit = maximum_valence_work_unit_atoms,
                      StopWatch *timer_in = nullptr);
 
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<int> &topology_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
+                     int vwu_atom_limit = maximum_valence_work_unit_atoms,
                      StopWatch *timer_in = nullptr);
   /// \}
 
@@ -1137,8 +1139,8 @@ private:
   /// \brief Construct valence work units for all systems and load their instructions into the
   ///        topology synthesis for availability on the GPU.
   ///
-  /// \param max_atoms_per_vwu  The maximum number of atoms to assign to any one valence work unit
-  void loadValenceWorkUnits(int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
+  /// \param vwu_atom_limit  The maximum number of atoms to assign to any one valence work unit
+  void loadValenceWorkUnits(int vwu_atom_limit = maximum_valence_work_unit_atoms);
 };
 
 } // namespace synthesis

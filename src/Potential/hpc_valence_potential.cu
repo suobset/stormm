@@ -40,12 +40,12 @@ using topology::TorsionKind;
 
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ double3 crossProduct(const double3 a, const double3 b) {
-  return { (a.y * b.z) - (a.z - b.y), (a.z * b.x) - (a.x - b.z), (a.x * b.y) - (a.y * b.x) };
+  return { (a.y * b.z) - (a.z * b.y), (a.z * b.x) - (a.x * b.z), (a.x * b.y) - (a.y * b.x) };
 }
 
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ float3 crossProduct(const float3 a, const float3 b) {
-  return { (a.y * b.z) - (a.z - b.y), (a.z * b.x) - (a.x - b.z), (a.x * b.y) - (a.y * b.x) };
+  return { (a.y * b.z) - (a.z * b.y), (a.z * b.x) - (a.x * b.z), (a.x * b.y) - (a.y * b.x) };
 }
 
 //-------------------------------------------------------------------------------------------------

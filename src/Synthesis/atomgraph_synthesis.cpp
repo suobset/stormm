@@ -40,7 +40,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
                                        const std::vector<RestraintApparatus*> &restraints_in,
                                        const std::vector<int> &topology_indices_in,
                                        const std::vector<int> &restraint_indices_in,
-                                       const ExceptionResponse policy_in, StopWatch *timer_in) :
+                                       const ExceptionResponse policy_in, const int vwu_atom_limit,
+                                       StopWatch *timer_in) :
 
     // Counts spanning all topologies
     policy{policy_in},
@@ -423,17 +424,18 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   if (timer != nullptr) timer->assignTime(param_cond_timings);
 
   // Create valence work units for all topologies, then load them into the synthesis
-  loadValenceWorkUnits();
+  loadValenceWorkUnits(vwu_atom_limit);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 }
 
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                                        const std::vector<int> &topology_indices_in,
-                                       const ExceptionResponse policy_in, StopWatch *timer_in) :
+                                       const ExceptionResponse policy_in, const int vwu_atom_limit,
+                                       StopWatch *timer_in) :
     AtomGraphSynthesis(topologies_in, std::vector<RestraintApparatus*>(1, nullptr),
                        topology_indices_in, std::vector<int>(topology_indices_in.size(), 0),
-                       policy_in, timer_in)
+                       policy_in, vwu_atom_limit, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -2560,7 +2562,7 @@ int AtomGraphSynthesis::setVwuAbstractLimits(const int item_counter, const int v
 }
 
 //-------------------------------------------------------------------------------------------------
-void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
+void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
 
   // Loop over all systems and create lists of valence work units
   std::vector<std::vector<ValenceWorkUnit>> all_vwu;
@@ -2576,7 +2578,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int max_atoms_per_vwu) {
     const RestraintApparatus ra_blank = RestraintApparatus(ag);
     const RestraintApparatus *ra = (restraint_networks[rn] == nullptr) ? &ra_blank :
                                                                          restraint_networks[rn];
-    all_vwu.push_back(buildValenceWorkUnits(ag, ra, max_atoms_per_vwu));
+    all_vwu.push_back(buildValenceWorkUnits(ag, ra, vwu_atom_limit));
     total_vwu += all_vwu[i].size();    
   }
 

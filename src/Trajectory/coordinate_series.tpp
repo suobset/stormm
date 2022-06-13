@@ -444,7 +444,7 @@ CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
     }
     break;
 #ifdef OMNI_USE_HPC
-  case HybridTargetLevel::HOST:
+  case HybridTargetLevel::DEVICE:
     {
       const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
       const std::vector<T> tmp_ycrd = y_coordinates.readDevice(frame_offset, natom_zu);

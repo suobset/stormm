@@ -138,7 +138,7 @@ void HpcMatrix<T>::resize(const size_t new_rows, const size_t new_cols) {
 
     // Lengthen each column to accommodate the new number of rows
     contents.resize(new_rows * n_cols_pr);
-    for (size_t counter = n_elem; counter >= 0LLU; counter--) {
+    for (size_t counter = n_elem; counter <= n_elem; counter--) {
       const size_t col_idx = counter / n_rows_pr;
       const size_t row_idx = counter - (col_idx * n_rows_pr);
       contents[(col_idx * new_rows) + row_idx] = contents[counter];
