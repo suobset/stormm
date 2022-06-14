@@ -103,9 +103,12 @@ private:
 } // namespace card
 } // namespace omni
 
+#ifndef OMNI_USE_HPC
 /// \brief ***Global*** GPU descriptor that describes no valid GPU.  This is the equivalent of
 ///        nullptr for the GpuDetails object, and if passed to various functions that might launch
-///        a CUDA kernel will trigger the corresponding CPU process instead.
+///        a CUDA kernel will trigger the corresponding CPU process instead.  An equivalent
+///        expression of this occurs in hpc_config.cuh if OMNI_USE_HPC is defined.
 extern omni::card::GpuDetails null_gpu;
+#endif
 
 #endif

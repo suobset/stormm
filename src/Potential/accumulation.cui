@@ -1,7 +1,7 @@
 // -*-c++-*-
 
 //-------------------------------------------------------------------------------------------------
-__device__ __forceinline__ unsigned long long int llitoulli(long long int l)
+__device__ __forceinline__ unsigned long long int lliToUlli(long long int l)
 {
   unsigned long long int u;
   asm("mov.b64    %0, %1;" : "=l"(u) : "l"(l));
@@ -9,7 +9,7 @@ __device__ __forceinline__ unsigned long long int llitoulli(long long int l)
 }
 
 //-------------------------------------------------------------------------------------------------
-__device__ __forceinline__ long long int ullitolli(unsigned long long int u)
+__device__ __forceinline__ long long int ulliToLli(unsigned long long int u)
 {
   long long int l;
   asm("mov.b64    %0, %1;" : "=l"(l) : "l"(u));

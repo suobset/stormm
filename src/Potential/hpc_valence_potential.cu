@@ -88,13 +88,6 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 
 // Single-precision floating point definitions
 #define TCALC float
-#  if (__CUDA_ARCH__ == 610)
-#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    define VALENCE_KERNEL_BLOCKS_MULT  2
-#  else
-#    define VALENCE_KERNEL_THREAD_COUNT large_block_size
-#    define VALENCE_KERNEL_BLOCKS_MULT  1
-#  endif
 #  define TCALC3 float3
 #  define CONV_FUNC __float2int_rn
 #  define LLCONV_FUNC __float2ll_rn
@@ -107,6 +100,13 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
+#      if (__CUDA_ARCH__ == 610)
+#        define VALENCE_KERNEL_THREAD_COUNT 448
+#      elif (__CUDA_ARCH__ == 600) || (__CUDA_ARCH__ == 700)
+#        define VALENCE_KERNEL_THREAD_COUNT 896
+#      else
+#        define VALENCE_KERNEL_THREAD_COUNT large_block_size
+#      endif
 #      define KERNEL_NAME kfsValenceForceAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME  
@@ -115,7 +115,13 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef UPDATE_ATOMS
+#      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
+#        if (__CUDA_ARCH__ == 610)
+#          define VALENCE_KERNEL_THREAD_COUNT 384
+#        else
+#          define VALENCE_KERNEL_THREAD_COUNT 768
+#        endif
 #        define KERNEL_NAME kfsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
@@ -124,8 +130,17 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #            include "valence_potential.cui"
 #          undef KERNEL_NAME
 #        undef UPDATE_ATOMS
+#        undef VALENCE_KERNEL_THREAD_COUNT
 #      undef COMPUTE_ENERGY
+#      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef SPLIT_FORCE_ACCUMULATION
+#    if (__CUDA_ARCH__ == 610)
+#      define VALENCE_KERNEL_THREAD_COUNT 512
+#    elif (__CUDA_ARCH__ == 700)
+#      define VALENCE_KERNEL_THREAD_COUNT 896
+#    else
+#      define VALENCE_KERNEL_THREAD_COUNT large_block_size
+#    endif
 #    define KERNEL_NAME kfValenceForceAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME  
@@ -134,7 +149,13 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
 #    undef UPDATE_ATOMS
+#    undef VALENCE_KERNEL_THREAD_COUNT
 #    define COMPUTE_ENERGY
+#      if (__CUDA_ARCH__ == 610)
+#        define VALENCE_KERNEL_THREAD_COUNT 384
+#      else
+#        define VALENCE_KERNEL_THREAD_COUNT 768
+#      endif
 #      define KERNEL_NAME kfValenceForceEnergyAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
@@ -143,16 +164,23 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef UPDATE_ATOMS
+#      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef COMPUTE_ENERGY
+#    undef VALENCE_KERNEL_THREAD_COUNT
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
+#    if (__CUDA_ARCH__ == 610)
+#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#    else
+#      define VALENCE_KERNEL_THREAD_COUNT large_block_size
+#    endif
 #    define KERNEL_NAME kfValenceEnergyAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME
+#    undef VALENCE_KERNEL_THREAD_COUNT
 #  undef  COMPUTE_ENERGY
 
 // Clear single-precision floating point definitions
-#  undef VALENCE_KERNEL_THREAD_COUNT
 #  undef TCALC3
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
@@ -210,6 +238,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 
 // Clear double-precision floating point definitions
 #  undef VALENCE_KERNEL_THREAD_COUNT
+#  undef VALENCE_KERNEL_BLOCKS_MULT
 #  undef TCALC3
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
@@ -327,16 +356,39 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
   // pressure might be too high to employ the full thread complement.
   const int max_threads = gpu.getMaxThreadsPerBlock() / blocks_multiplier;
   const int trim_threads = roundUp<int>((max_threads * 7) / 8, twice_warp_size_int);
+  const int lower_threads = roundUp<int>((max_threads * 3) / 4, twice_warp_size_int);
   int nthreads;
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
-    switch (force_sum) {
-    case ForceAccumulationMethod::SPLIT:
-      nthreads = (major_arch == 6 || (major_arch == 7 && minor_arch == 0)) ? trim_threads :
-                                                                             max_threads;
+    switch (eval_energy) {
+    case EvaluateEnergy::YES:
+      switch (eval_force) {
+      case EvaluateForce::YES:
+        switch (force_sum) {
+        case ForceAccumulationMethod::SPLIT:
+          nthreads = (major_arch == 6 || (major_arch == 7 && minor_arch == 0)) ? lower_threads :
+                                                                                 trim_threads;
+          break;
+        case ForceAccumulationMethod::WHOLE:
+          nthreads = (major_arch == 7 && minor_arch == 0) ? trim_threads : max_threads;
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        nthreads = max_threads;
+        break;
+      }
       break;
-    case ForceAccumulationMethod::WHOLE:
-      nthreads = (major_arch == 7 && minor_arch == 0) ? trim_threads : max_threads;
+    case EvaluateEnergy::NO:
+      switch (force_sum) {
+      case ForceAccumulationMethod::SPLIT:
+        nthreads = (major_arch == 6 || (major_arch == 7 && minor_arch == 0)) ? trim_threads :
+                                                                               max_threads;
+        break;
+      case ForceAccumulationMethod::WHOLE:
+        nthreads = (major_arch == 7 && minor_arch == 0) ? trim_threads : max_threads;
+        break;
+      }
       break;
     }
     

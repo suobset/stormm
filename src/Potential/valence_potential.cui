@@ -518,33 +518,33 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint ipsi_jx = LLCONV_FUNC(crbccd.x * psi_fa);
         const llint ipsi_kx = LLCONV_FUNC((psi_fb1 * crbccd.x) - (psi_fb2 * crcdde.x));
         const llint ipsi_mx = LLCONV_FUNC(-psi_fd * crcdde.x);
-        atomicAdd((ullint*)&sh_xfrc[i_atom], llitoulli(iphi_ix));
-        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(iphi_jx + ipsi_jx));
-        atomicAdd((ullint*)&sh_xfrc[k_atom], llitoulli(ipsi_kx - iphi_ix - iphi_jx - iphi_lx));
-        atomicAdd((ullint*)&sh_xfrc[l_atom], llitoulli(iphi_lx - ipsi_jx - ipsi_kx - ipsi_mx));
-        atomicAdd((ullint*)&sh_xfrc[m_atom], llitoulli(ipsi_mx));
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli(iphi_ix));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(iphi_jx + ipsi_jx));
+        atomicAdd((ullint*)&sh_xfrc[k_atom], lliToUlli(ipsi_kx - iphi_ix - iphi_jx - iphi_lx));
+        atomicAdd((ullint*)&sh_xfrc[l_atom], lliToUlli(iphi_lx - ipsi_jx - ipsi_kx - ipsi_mx));
+        atomicAdd((ullint*)&sh_xfrc[m_atom], lliToUlli(ipsi_mx));
         const llint iphi_iy = LLCONV_FUNC(crabbc.y * phi_fa);
         const llint iphi_jy = LLCONV_FUNC((phi_fb1 * crabbc.y) - (phi_fb2 * crbccd.y));
         const llint iphi_ly = LLCONV_FUNC(-phi_fd * crbccd.y);
         const llint ipsi_jy = LLCONV_FUNC(crbccd.y * psi_fa);
         const llint ipsi_ky = LLCONV_FUNC((psi_fb1 * crbccd.y) - (psi_fb2 * crcdde.y));
         const llint ipsi_my = LLCONV_FUNC(-psi_fd * crcdde.y);
-        atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(iphi_iy));
-        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(iphi_jy + ipsi_jy));
-        atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(ipsi_ky - iphi_iy - iphi_jy - iphi_ly));
-        atomicAdd((ullint*)&sh_yfrc[l_atom], llitoulli(iphi_ly - ipsi_jy - ipsi_ky - ipsi_my));
-        atomicAdd((ullint*)&sh_yfrc[m_atom], llitoulli(ipsi_my));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli(iphi_iy));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(iphi_jy + ipsi_jy));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], lliToUlli(ipsi_ky - iphi_iy - iphi_jy - iphi_ly));
+        atomicAdd((ullint*)&sh_yfrc[l_atom], lliToUlli(iphi_ly - ipsi_jy - ipsi_ky - ipsi_my));
+        atomicAdd((ullint*)&sh_yfrc[m_atom], lliToUlli(ipsi_my));
         const llint iphi_iz = LLCONV_FUNC(crabbc.z * phi_fa);
         const llint iphi_jz = LLCONV_FUNC((phi_fb1 * crabbc.z) - (phi_fb2 * crbccd.z));
         const llint iphi_lz = LLCONV_FUNC(-phi_fd * crbccd.z);
         const llint ipsi_jz = LLCONV_FUNC(crbccd.y * psi_fa);
         const llint ipsi_kz = LLCONV_FUNC((psi_fb1 * crbccd.z) - (psi_fb2 * crcdde.z));
         const llint ipsi_mz = LLCONV_FUNC(-psi_fd * crcdde.z);
-        atomicAdd((ullint*)&sh_zfrc[i_atom], llitoulli(iphi_iz));
-        atomicAdd((ullint*)&sh_zfrc[j_atom], llitoulli(iphi_jz + ipsi_jz));
-        atomicAdd((ullint*)&sh_zfrc[k_atom], llitoulli(ipsi_kz - iphi_iz - iphi_jz - iphi_lz));
-        atomicAdd((ullint*)&sh_zfrc[l_atom], llitoulli(iphi_lz - ipsi_jz - ipsi_kz - ipsi_mz));
-        atomicAdd((ullint*)&sh_zfrc[m_atom], llitoulli(ipsi_mz));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(iphi_iz));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(iphi_jz + ipsi_jz));
+        atomicAdd((ullint*)&sh_zfrc[k_atom], lliToUlli(ipsi_kz - iphi_iz - iphi_jz - iphi_lz));
+        atomicAdd((ullint*)&sh_zfrc[l_atom], lliToUlli(iphi_lz - ipsi_jz - ipsi_kz - ipsi_mz));
+        atomicAdd((ullint*)&sh_zfrc[m_atom], lliToUlli(ipsi_mz));
 #  endif
 #  ifndef UPDATE_ATOMS
         }
@@ -814,24 +814,24 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint ifrc_ix = LLCONV_FUNC((crabbc.x * fa) + (f14 * ad.x));
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
         const llint ifrc_lx = LLCONV_FUNC((-fd * crbccd.x) - (f14 * ad.x));
-        atomicAdd((ullint*)&sh_xfrc[i_atom], llitoulli(ifrc_ix));
-        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(ifrc_jx));
-        atomicAdd((ullint*)&sh_xfrc[k_atom], llitoulli(-(ifrc_ix + ifrc_jx + ifrc_lx)));
-        atomicAdd((ullint*)&sh_xfrc[l_atom], llitoulli(ifrc_lx));
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli(ifrc_ix));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(ifrc_jx));
+        atomicAdd((ullint*)&sh_xfrc[k_atom], lliToUlli(-(ifrc_ix + ifrc_jx + ifrc_lx)));
+        atomicAdd((ullint*)&sh_xfrc[l_atom], lliToUlli(ifrc_lx));
         const llint ifrc_iy = LLCONV_FUNC((crabbc.y * fa) + (f14 * ad.y));
         const llint ifrc_jy = LLCONV_FUNC((fb1 * crabbc.y) - (fb2 * crbccd.y));
         const llint ifrc_ly = LLCONV_FUNC((-fd * crbccd.y) - (f14 * ad.y));
-        atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(ifrc_iy));
-        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(ifrc_jy));
-        atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-(ifrc_iy + ifrc_jy + ifrc_ly)));
-        atomicAdd((ullint*)&sh_yfrc[l_atom], llitoulli(ifrc_ly));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli(ifrc_iy));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(ifrc_jy));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], lliToUlli(-(ifrc_iy + ifrc_jy + ifrc_ly)));
+        atomicAdd((ullint*)&sh_yfrc[l_atom], lliToUlli(ifrc_ly));
         const llint ifrc_iz = LLCONV_FUNC((crabbc.z * fa) + (f14 * ad.z));
         const llint ifrc_jz = LLCONV_FUNC((fb1 * crabbc.z) - (fb2 * crbccd.z));
         const llint ifrc_lz = LLCONV_FUNC((-fd * crbccd.z) - (f14 * ad.z));
-        atomicAdd((ullint*)&sh_zfrc[i_atom], llitoulli(ifrc_iz));
-        atomicAdd((ullint*)&sh_zfrc[j_atom], llitoulli(ifrc_jz));
-        atomicAdd((ullint*)&sh_zfrc[k_atom], llitoulli(-(ifrc_iz + ifrc_jz + ifrc_lz)));
-        atomicAdd((ullint*)&sh_zfrc[l_atom], llitoulli(ifrc_lz));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(ifrc_iz));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(ifrc_jz));
+        atomicAdd((ullint*)&sh_zfrc[k_atom], lliToUlli(-(ifrc_iz + ifrc_jz + ifrc_lz)));
+        atomicAdd((ullint*)&sh_zfrc[l_atom], lliToUlli(ifrc_lz));
 #  endif
 #  ifndef UPDATE_ATOMS
         }
@@ -943,15 +943,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint icdf_x = LLCONV_FUNC((ba_x * mbabc) - (costheta * bc_x * sqbc));
         const llint icdf_y = LLCONV_FUNC((ba_y * mbabc) - (costheta * bc_y * sqbc));
         const llint icdf_z = LLCONV_FUNC((ba_z * mbabc) - (costheta * bc_z * sqbc));
-        atomicAdd((ullint*)&sh_xfrc[i_atom], llitoulli(-iadf_x));
-        atomicAdd((ullint*)&sh_yfrc[i_atom], llitoulli(-iadf_y));
-        atomicAdd((ullint*)&sh_zfrc[i_atom], llitoulli(-iadf_z));
-        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(iadf_x + icdf_x));
-        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(iadf_y + icdf_y));
-        atomicAdd((ullint*)&sh_zfrc[j_atom], llitoulli(iadf_z + icdf_z));
-        atomicAdd((ullint*)&sh_xfrc[k_atom], llitoulli(-icdf_x));
-        atomicAdd((ullint*)&sh_yfrc[k_atom], llitoulli(-icdf_y));
-        atomicAdd((ullint*)&sh_zfrc[k_atom], llitoulli(-icdf_z));
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli(-iadf_x));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli(-iadf_y));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(-iadf_z));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(iadf_x + icdf_x));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(iadf_y + icdf_y));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(iadf_z + icdf_z));
+        atomicAdd((ullint*)&sh_xfrc[k_atom], lliToUlli(-icdf_x));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], lliToUlli(-icdf_y));
+        atomicAdd((ullint*)&sh_zfrc[k_atom], lliToUlli(-icdf_z));
 #  endif
 #  ifndef UPDATE_ATOMS
         }
@@ -964,6 +964,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     vterm_limit  = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::CBND)];
 #ifdef COMPUTE_ENERGY
     llint bond_acc = 0LL;
+    llint ubrd_acc = 0LL;
 #endif
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::CBND)]) {
@@ -996,7 +997,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 
           // The single-precision variant of the scaling factor is exact, like the double-precision
           // variant.  If TCALC is double, it will get promoted in an inexpensive operation.
-          bond_acc += LLCONV_FUNC(keq * dl * dl * scw.nrg_scale_f);
+          if (is_urey_bradley) {
+            ubrd_acc += LLCONV_FUNC(keq * dl * dl * scw.nrg_scale_f);
+          }
+          else {
+            bond_acc += LLCONV_FUNC(keq * dl * dl * scw.nrg_scale_f);
+          }
         }
 #endif
 #ifdef COMPUTE_FORCE
@@ -1036,12 +1042,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
         const llint ifmag_dz = LLCONV_FUNC(fmag_dz);
-        atomicAdd((ullint*)&sh_xfrc[i_atom],  llitoulli(ifmag_dx));
-        atomicAdd((ullint*)&sh_yfrc[i_atom],  llitoulli(ifmag_dy));
-        atomicAdd((ullint*)&sh_zfrc[i_atom],  llitoulli(ifmag_dz));
-        atomicAdd((ullint*)&sh_xfrc[j_atom], llitoulli(-ifmag_dx));
-        atomicAdd((ullint*)&sh_yfrc[j_atom], llitoulli(-ifmag_dy));
-        atomicAdd((ullint*)&sh_zfrc[j_atom], llitoulli(-ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[i_atom],  lliToUlli(ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[i_atom],  lliToUlli(ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[i_atom],  lliToUlli(ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(-ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(-ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(-ifmag_dz));
 #  endif
 #  ifndef UPDATE_ATOMS
         // See above for the reason these force accumulations sit within a conditional scope
@@ -1119,7 +1125,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #    ifdef COMPUTE_FORCE
         // Contribute forces to global accumulators
         const size_t write_idx  = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
-        atomicAdd((ullint*)&poly_psw.xfrc[write_idx], llitoulli(ixfrc));
+        atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(ixfrc));
 #    endif
 #  endif
       }
@@ -1143,7 +1149,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #    ifdef COMPUTE_FORCE
         // Contribute forces to global accumulators
         const size_t write_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        atomicAdd((ullint*)&poly_psw.yfrc[write_idx], llitoulli(iyfrc));
+        atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(iyfrc));
 #    endif
 #  endif
       }
@@ -1167,11 +1173,55 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #    ifdef COMPUTE_FORCE
         // Contribute forces to global accumulators
         const size_t write_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        atomicAdd((ullint*)&poly_psw.zfrc[write_idx], llitoulli(izfrc));
+        atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(izfrc));
 #    endif
 #  endif
       }
       pos += blockDim.x;
+    }
+#endif
+#ifdef COMPUTE_ENERGY
+    __syncthreads();
+    const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+    if (lane_idx == 0) {
+      pos = (threadIdx.x >> warp_bits);
+      const int sys_pos = pos + (vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x * scw.data_stride);
+      while (pos < (int)(StateVariable::ALL_STATES)) {
+        const StateVariable sv_pos = (StateVariable)(pos);
+        if (sv_pos == StateVariable::BOND) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(bond_acc));
+        }
+        else if (sv_pos == StateVariable::ANGLE) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(angl_acc));
+        }
+        else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(dihe_acc));
+        }
+        else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(impr_acc));
+        }
+        else if (sv_pos == StateVariable::UREY_BRADLEY) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(ubrd_acc));
+        }
+        else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(cimp_acc));
+        }
+        else if (sv_pos == StateVariable::CMAP) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(cmap_acc));
+        }
+        else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(lj14_acc));
+        }
+        else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(qq14_acc));
+        }
+#if 0
+        if (sv_pos == StateVariable::RESTRAINT) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(rstr_acc));
+        }
+#endif
+        pos += (blockDim.x >> warp_bits);
+      }
     }
 #endif
 

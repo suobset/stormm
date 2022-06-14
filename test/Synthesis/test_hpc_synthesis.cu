@@ -227,7 +227,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, trpi_ps, dhfr_ps, dhfr_ps, alad_ps,
                                                 trpi_ps, dhfr_ps, dhfr_ps, alad_ps, trpi_ps };
 #endif
-  for (int len = 4; len < 36; len += 4) {
+  for (int len = 4; len < 336; len += 4) {
     const std::vector<AtomGraph*> bigger_tops(len, &trpi_ag);
     const std::vector<PhaseSpace> bigger_crds(len, trpi_ps);
     std::vector<int> trpi_indices(len);
