@@ -85,7 +85,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
   }
   __builtin_unreachable();
 }
-  
+
 // Single-precision floating point definitions
 #define TCALC float
 #  if (__CUDA_ARCH__ == 610)
@@ -219,6 +219,20 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  undef SIN_FUNC
 #  undef ABS_FUNC
 #undef TCALC
+
+//-------------------------------------------------------------------------------------------------
+extern void valenceKernelSetup() {
+  cudaFuncSetSharedMemConfig(kfValenceAtomUpdate,              cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kfValenceEnergyAtomUpdate,        cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kfValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdValenceAtomUpdate,              cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdValenceEnergyAtomUpdate,        cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
+}
 
 //-------------------------------------------------------------------------------------------------
 extern void launchValenceDp(const SyValenceKit<double> &poly_vk, MMControlKit<double> *ctrl,
@@ -475,6 +489,6 @@ extern void launchValenceSp(const AtomGraphSynthesis &poly_ag, MolecularMechanic
   launchValenceSp(poly_vk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy, purpose,
                   force_sum, gpu);
 }
-
+  
 } // namespace energy
 } // namespace omni

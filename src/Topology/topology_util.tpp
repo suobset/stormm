@@ -116,9 +116,11 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
     case HybridTargetLevel::HOST:
       tmpv = sp_item.readHost(low_index, high_index - low_index);
       break;
+#ifdef OMNI_USE_HPC
     case HybridTargetLevel::DEVICE:
       tmpv = sp_item.readDevice(low_index, high_index - low_index);
       break;
+#endif
     }
     return std::vector<T>(tmpv.begin(), tmpv.end());
   }
@@ -128,9 +130,11 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
     case HybridTargetLevel::HOST:
       tmpv = item.readHost(low_index, high_index - low_index);
       break;
+#ifdef OMNI_USE_HPC
     case HybridTargetLevel::DEVICE:
       tmpv = item.readDevice(low_index, high_index - low_index);
       break;
+#endif
     }
     return std::vector<T>(tmpv.begin(), tmpv.end());
   }

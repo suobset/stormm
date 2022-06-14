@@ -953,18 +953,20 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
   
 //-------------------------------------------------------------------------------------------------
 #ifdef OMNI_USE_HPC
-void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu, const int index,
-                                           const HybridTargetLevel tier)
+void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu, const HybridTargetLevel tier,
+                                           const int index)
 #else
-void PhaseSpaceSynthesis::initializeForces(const int index, const HybridTargetLevel tier)
+void PhaseSpaceSynthesis::initializeForces(const int index)
 #endif
 {
   if (index >= system_count) {
     rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
           std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "initializeForces");
   }
+#ifdef OMNI_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
+#endif
     {
       llint* xptr = x_forces.data();
       llint* yptr = y_forces.data();
@@ -993,7 +995,7 @@ void PhaseSpaceSynthesis::initializeForces(const int index, const HybridTargetLe
 #ifdef OMNI_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
-      PsSynthesisWriter dptr = data();
+      PsSynthesisWriter dptr = data(HybridTargetLevel::DEVICE);
       psyInitializeForces(&dptr, index, gpu);
     }
 #endif

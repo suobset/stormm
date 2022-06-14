@@ -66,6 +66,9 @@ int main(const int argc, const char* argv[]) {
     max_vwu_atoms /= 2;
   }
 
+  // Configure the relevant kernels for this executable.
+  valenceKernelSetup();
+  
   // Collect coordinates and topologies
   const char osc = osSeparator();
   std::string buffer("&files\n  -p ");
@@ -164,7 +167,31 @@ int main(const int argc, const char* argv[]) {
   check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
         "by the valence interaction kernel, operating on systems without external restraints, "
         "exceed the maximum allowed errors for forces acting on any one particle.", do_tests);
-
+  poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
+  mmctrl.incrementStep();
+  launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
+                  EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::WHOLE, gpu);
+  for (int i = 0; i < nsys; i++) {
+    PhaseSpace devc_result = poly_ps.exportSystem(i, HybridTargetLevel::DEVICE);
+    PhaseSpace host_result = poly_ps.exportSystem(i, HybridTargetLevel::HOST);
+    host_result.initializeForces();
+    ScoreCard isc(1, 1, 32);
+    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
+    const TrajectoryKind frcid = TrajectoryKind::FORCES;
+    const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
+    const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
+    frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
+    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
+  }
+  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
+        "valence interaction kernel, operating on systems without external restraints, exceed the "
+        "tolerance for mean unsigned errors in their vector components when accumulated in int64.",
+        do_tests);
+  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
+        "by the valence interaction kernel, operating on systems without external restraints, "
+        "exceed the maximum allowed errors for forces acting on any one particle with "
+        "fixed-precision accumulation in int64.", do_tests);
+  
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
   const std::string trpi_top_name = topology_base + osc + "trpcage.top";
@@ -200,7 +227,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, trpi_ps, dhfr_ps, dhfr_ps, alad_ps,
                                                 trpi_ps, dhfr_ps, dhfr_ps, alad_ps, trpi_ps };
 #endif
-  for (int len = 4; len < 336; len += 4) {
+  for (int len = 4; len < 36; len += 4) {
     const std::vector<AtomGraph*> bigger_tops(len, &trpi_ag);
     const std::vector<PhaseSpace> bigger_crds(len, trpi_ps);
     std::vector<int> trpi_indices(len);
@@ -209,7 +236,7 @@ int main(const int argc, const char* argv[]) {
     }
     PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
     AtomGraphSynthesis big_poly_ag(bigger_tops, trpi_indices, ExceptionResponse::SILENT,
-                                   512, &timer);
+                                   max_vwu_atoms, &timer);
     big_poly_ag.upload();
     big_poly_ps.upload();
     timer.assignTime(0);

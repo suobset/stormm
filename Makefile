@@ -10,6 +10,7 @@ LIBDIR=lib
 
 # OMNI C++ source files
 OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
+		 $(SRCDIR)/Accelerator/gpu_details.cpp \
 		 $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Chemistry/chemical_features.cpp \
 		 $(SRCDIR)/Chemistry/indigo.cpp \
@@ -107,6 +108,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 
 # OMNI C++ header files
 OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
+		   $(SRCDIR)/Accelerator/gpu_details.h \
 		   $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemical_features.h \
 		   $(SRCDIR)/Chemistry/indigo.h \
@@ -257,6 +259,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 
 # OMNI C++ object files
 OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
+		$(SRCDIR)/Accelerator/gpu_details.o \
 		$(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/Chemistry/chemical_features.o \
 		$(SRCDIR)/Chemistry/indigo.o \
@@ -360,7 +363,6 @@ OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 
 # OMNI CUDA header files
 OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
-		    $(SRCDIR)/Accelerator/gpu_details.h \
 		    $(SRCDIR)/Accelerator/hpc_config.cuh \
 		    $(SRCDIR)/Accelerator/ptx_macros.h \
 		    $(SRCDIR)/Math/hpc_summation.cuh \
@@ -428,8 +430,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
              -gencode arch=compute_61,code=sm_61 \

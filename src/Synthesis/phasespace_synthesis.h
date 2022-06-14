@@ -390,16 +390,23 @@ public:
   /// \brief Initialize the forces within a PhaseSpaceSynthesis object.  This is the analog of the
   ///        eponymous function in the PhaseSpace object.
   ///
+  /// Overloaded:
+  ///   - Initialize one or more systems' forces on the host if OMNI is compiled for CPU only
+  ///   - Initialize one or more systems' forces on either the host or the device if OMNI is
+  ///     compiled for HPC
+  ///
+  /// \param tier   The level (host or device) at which to initialize forces
   /// \param index  Index of the system of interest within the synthesis--if negative, all systems
   ///               will have their forces initialized
-  /// \param tier   The level (host or device) at which to initialize forces
+  /// \{
 #ifdef OMNI_USE_HPC
-  void initializeForces(const GpuDetails &gpu, int index = -1,
-                        HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void initializeForces(const GpuDetails &gpu, HybridTargetLevel tier = HybridTargetLevel::HOST,
+                        int index = -1);
 #else
-  void initializeForces(int index = -1, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void initializeForces(int index = -1);
 #endif
-  
+  /// \}
+
   /// \brief Print a list of structures to a trajectory file.  Download will be performed when
   ///        calling this function, over the subset of relevant frames and data.
   ///

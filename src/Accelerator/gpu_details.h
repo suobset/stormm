@@ -4,8 +4,10 @@
 
 #include <vector>
 #include <string>
-#ifdef OMNI_USE_CUDA
-#include <cuda_runtime.h>
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+#    include <cuda_runtime.h>
+#  endif
 #endif
 #include "Constants/scaling.h"
 
@@ -31,7 +33,11 @@ public:
   /// \param dev_index  Index of the GPU in a longer list produced by the CUDA runtime library
   /// \{
   GpuDetails();
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
   GpuDetails(const cudaDeviceProp &devprop, int dev_index);
+#  endif
+#endif
   /// \}
 
   /// \brief Get the availability of the GPU

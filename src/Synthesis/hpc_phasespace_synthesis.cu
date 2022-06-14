@@ -218,7 +218,7 @@ kPsyInitializeForces(PsSynthesisWriter psyw, const int index) {
     minpos = psyw.atom_starts[index];
     maxpos = minpos + psyw.atom_counts[index];
   }
-  for (int pos = threadIdx.x + (blockDim.x * blockIdx.x);
+  for (int pos = minpos + threadIdx.x + (blockDim.x * blockIdx.x);
        pos < maxpos; pos += gridDim.x * blockDim.x) {
     psyw.xfrc[pos] = 0LL;
     psyw.yfrc[pos] = 0LL;

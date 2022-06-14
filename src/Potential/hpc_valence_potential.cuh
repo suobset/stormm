@@ -27,7 +27,10 @@ using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::SyValenceKit;
 using synthesis::VwuGoal;
-  
+
+/// \brief Set the __shared__ memory configuration for various valence interaction kernels.
+void valenceKernelSetup();
+
 /// \brief Evaluate valence work units and move atoms.
 ///
 /// Overloaded:

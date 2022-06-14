@@ -80,7 +80,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
     bond_nrg.push_back(sc.reportInstantaneousStates(StateVariable::BOND, i));
     PhaseSpace psi = poly_ps->exportSystem(i);
     psi.initializeForces();
-    bond_nrg_answer.push_back(evaluateBondTerms(poly_ag.getTopologyPointer(i), &psi, &tmp_sc,
+    bond_nrg_answer.push_back(evaluateBondTerms(poly_ag.getSystemTopologyPointer(i), &psi, &tmp_sc,
                                                 EvaluateForce::YES));
     bond_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
   }
@@ -98,8 +98,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
     angl_nrg.push_back(sc.reportInstantaneousStates(StateVariable::ANGLE, i));
     PhaseSpace psi = poly_ps->exportSystem(i);
     psi.initializeForces();
-    angl_nrg_answer.push_back(evaluateAngleTerms(poly_ag.getTopologyPointer(i), &psi, &tmp_sc,
-                                                 EvaluateForce::YES));
+    angl_nrg_answer.push_back(evaluateAngleTerms(poly_ag.getSystemTopologyPointer(i), &psi,
+                                                 &tmp_sc, EvaluateForce::YES));
     angl_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
   }
   error_limits.setValues(std::vector<double>(nsys, 5.0e-6));
@@ -118,7 +118,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
     impr_nrg.push_back(sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, i));
     PhaseSpace psi = poly_ps->exportSystem(i);
     psi.initializeForces();
-    const double2 du = evaluateDihedralTerms(poly_ag.getTopologyPointer(i), &psi, &tmp_sc,
+    const double2 du = evaluateDihedralTerms(poly_ag.getSystemTopologyPointer(i), &psi, &tmp_sc,
                                              EvaluateForce::YES);
     dihe_nrg_answer.push_back(du.x);
     impr_nrg_answer.push_back(du.y);
@@ -143,8 +143,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
     lj14_nrg.push_back(sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i));
     PhaseSpace psi = poly_ps->exportSystem(i);
     psi.initializeForces();
-    const double2 du = evaluateAttenuated14Terms(poly_ag.getTopologyPointer(i), &psi, &tmp_sc,
-                                                 EvaluateForce::YES, EvaluateForce::YES);
+    const double2 du = evaluateAttenuated14Terms(poly_ag.getSystemTopologyPointer(i), &psi,
+                                                 &tmp_sc, EvaluateForce::YES, EvaluateForce::YES);
     qq14_nrg_answer.push_back(du.x);
     lj14_nrg_answer.push_back(du.y);
     attn14_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
@@ -167,7 +167,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
     cmap_nrg.push_back(sc.reportInstantaneousStates(StateVariable::CMAP, i));
     PhaseSpace psi = poly_ps->exportSystem(i);
     psi.initializeForces();
-    cmap_nrg_answer.push_back(evaluateCmapTerms(poly_ag.getTopologyPointer(i), &psi, &tmp_sc,
+    cmap_nrg_answer.push_back(evaluateCmapTerms(poly_ag.getSystemTopologyPointer(i), &psi, &tmp_sc,
                                                 EvaluateForce::YES));
     cmap_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
   }
@@ -246,7 +246,8 @@ int main(const int argc, const char* argv[]) {
                                              &trpcage3_ag, &nbfix_ag, &ubiquitin_ag, &drug_ag,
                                              &brbz_ag};
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 8 };
-  AtomGraphSynthesis poly_ag(all_tops, system_ids, ExceptionResponse::SILENT, &timer);
+  AtomGraphSynthesis poly_ag(all_tops, system_ids, ExceptionResponse::SILENT,
+                             maximum_valence_work_unit_atoms, &timer);
   
   // Check various descriptors
   section(1);
@@ -311,7 +312,7 @@ int main(const int argc, const char* argv[]) {
   ag_list.reserve(poly_ag.getSystemCount());
   ps_list.reserve(poly_ag.getSystemCount());
   for (int i = 0; i < poly_ag.getSystemCount(); i++) {
-    AtomGraph *ag_ptr = poly_ag.getTopologyPointer(i);
+    AtomGraph *ag_ptr = poly_ag.getSystemTopologyPointer(i);
     ag_list.push_back(ag_ptr);
     if (ag_ptr == &tip3p_ag) {
       ps_list.push_back(tip3p_ps);
@@ -367,7 +368,8 @@ int main(const int argc, const char* argv[]) {
   }
   std::vector<AtomGraph*> agn_list = { &tiso_ag, &lig1_ag, &dhfr_ag };
   std::vector<PhaseSpace> psn_list = { tiso_ps, lig1_ps, dhfr_ps };
-  AtomGraphSynthesis poly_agn(agn_list, { 0, 1, 2 }, ExceptionResponse::SILENT, &timer);
+  AtomGraphSynthesis poly_agn(agn_list, { 0, 1, 2 }, ExceptionResponse::SILENT,
+                              maximum_valence_work_unit_atoms, &timer);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
   checkSynthesis(poly_agn, &poly_psn, do_tests);
 
