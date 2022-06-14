@@ -68,7 +68,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     }
 #endif
     __syncthreads();
-
+    
     // Import atomic coordinates, properties, and (if appropriate) velocities.  This employs all
     // threads of the block, breaking up each set of information at the warp level.
     const int import_llim = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].x;
@@ -422,8 +422,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #endif
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::CDHE)]) {
-        const int task_offset = vwu_map[(size_t)(VwuAbstractMap::CDHE)].x;
-        const uint2 tinsr = __ldcs(&poly_vk.cdhe_insr[task_offset + pos - vterm_offset]);
+        const int insr_idx = vwu_map[(size_t)(VwuAbstractMap::CDHE)].x + pos - vterm_offset;
+        const uint2 tinsr = __ldcs(&poly_vk.cdhe_insr[insr_idx]);
         int i_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
         int j_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
         int k_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
@@ -512,7 +512,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
           // Superimpose a second dihedral onto the same four atoms.  Check for a new 1:4 screening
           // parameter set index if one has not yet been found.
           if ((tinsr.y >> 15) & 0x1) {
-            const uint tinsr_z = __ldcs(&poly_vk.cdhe_ovrt_insr[pos - vterm_offset]);
+            const uint tinsr_z = __ldcs(&poly_vk.cdhe_ovrt_insr[insr_idx]);
             const int param_ii_idx = (tinsr_z & 0xfffff);
             const TCALC ampl_ii = __ldca(&poly_vk.dihe_amp[param_ii_idx]);
             const TCALC freq_ii = __ldca(&poly_vk.dihe_freq[param_ii_idx]);
@@ -627,7 +627,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         i_atom -= EXCL_GMEM_OFFSET;
         j_atom -= EXCL_GMEM_OFFSET;
         k_atom -= EXCL_GMEM_OFFSET;
-        l_atom -= EXCL_GMEM_OFFSET;
+        l_atom -= EXCL_GMEM_OFFSET;        
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const int2 ifrc_ix = convertSplitFixedPrecision((crabbc.x * fa) + (f14 * ad.x));
         const int2 ifrc_jx = convertSplitFixedPrecision((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -1186,15 +1186,17 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
       vwu_idx = atomicAdd(&ctrl.vwu_progress[prog_counter_idx], 1);
     }
-    if (threadIdx.x >= warp_size_int && threadIdx.x < twice_warp_size_int) {
-      const int step_modulus = ctrl.step & twice_warp_bits_mask_int;
-      if (step_modulus == 0) {
-        ctrl.vwu_progress[threadIdx.x] = gridDim.x;
-      }
-      if (step_modulus == warp_size_int) {
-        ctrl.vwu_progress[threadIdx.x - warp_size_int] = gridDim.x;
-      }
-    }
     __syncthreads();
+  }
+
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.vwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.vwu_progress[threadIdx.x] = gridDim.x;
+    }
   }
 }

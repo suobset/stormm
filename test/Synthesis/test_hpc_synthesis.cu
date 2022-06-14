@@ -46,6 +46,14 @@ int main(const int argc, const char* argv[]) {
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
   StopWatch timer;
+  
+  // Section 1
+  section("Coordinate compilation and staging");
+  
+  // Section 2
+  section("Topology compilation and staging");
+
+  // Get the GPU specs.  Set of parameters for the work units and launch grids.
   HpcConfig gpu_config(ExceptionResponse::WARN);
   std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
@@ -57,12 +65,6 @@ int main(const int argc, const char* argv[]) {
     nthreads /= 2;
     max_vwu_atoms /= 2;
   }
-  
-  // Section 1
-  section("Coordinate compilation and staging");
-  
-  // Section 2
-  section("Topology compilation and staging");
 
   // Collect coordinates and topologies
   const char osc = osSeparator();
@@ -135,30 +137,94 @@ int main(const int argc, const char* argv[]) {
   MolecularMechanicsControls mmctrl;
   mmctrl.primeWorkUnitCounters(gpu, poly_ag);
   ScoreCard sc(nsys, 1, 32);
-  
-  // Launch the valence evaluation kernel
+
+  // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
+  // and 1:4 attenuated interactions.
   launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
                   EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
-  std::vector<double> frc_deviations(nsys);
+  std::vector<double> frc_mues(nsys);
+  const std::vector<double> frc_mue_tolerance(nsys, 3.5e-5);
+  std::vector<double> frc_max_errors(nsys);
+  const std::vector<double> frc_max_error_tolerance(nsys, 2.0e-4);
   for (int i = 0; i < nsys; i++) {
     PhaseSpace devc_result = poly_ps.exportSystem(i, HybridTargetLevel::DEVICE);
     PhaseSpace host_result = poly_ps.exportSystem(i, HybridTargetLevel::HOST);
     host_result.initializeForces();
     ScoreCard isc(1, 1, 32);
     evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
+    const TrajectoryKind frcid = TrajectoryKind::FORCES;
+    const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
+    const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
+    frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
+    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
+  }
+  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
+        "valence interaction kernel, operating on systems without external restraints, exceed the "
+        "tolerance for mean unsigned errors in their vector components.", do_tests);
+  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
+        "by the valence interaction kernel, operating on systems without external restraints, "
+        "exceed the maximum allowed errors for forces acting on any one particle.", do_tests);
 
-    // CHECK
-    PhaseSpaceWriter devc_access = devc_result.data();
-    PhaseSpaceWriter host_access = host_result.data();
-    printf("%s...\n", poly_ag.getSystemTopologyPointer(i)->getFileName().c_str());
-    for (int j = 0; j < devc_access.natom; j++) {
-      printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n",
-             host_access.xfrc[j], host_access.yfrc[j], host_access.zfrc[j], devc_access.xfrc[j],
-             devc_access.yfrc[j], devc_access.zfrc[j], host_access.xcrd[j], host_access.ycrd[j],
-             host_access.zcrd[j]);
+  // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
+  const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string trpi_top_name = topology_base + osc + "trpcage.top";
+  const std::string dhfr_top_name = topology_base + osc + "dhfr_cmap.top";
+  const std::string alad_top_name = topology_base + osc + "ala_dipeptide.top";
+  const std::string coordinate_base = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string trpi_crd_name = coordinate_base + osc + "trpcage.inpcrd";
+  const std::string dhfr_crd_name = coordinate_base + osc + "dhfr_cmap.inpcrd";
+  const std::string alad_crd_name = coordinate_base + osc + "ala_dipeptide.inpcrd";  
+  const bool files_exist = (getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
+                            getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
+                            getDrivePathType(alad_top_name) == DrivePathType::FILE &&
+                            getDrivePathType(trpi_crd_name) == DrivePathType::FILE &&
+                            getDrivePathType(dhfr_crd_name) == DrivePathType::FILE &&
+                            getDrivePathType(alad_crd_name) == DrivePathType::FILE);
+  AtomGraph trpi_ag, dhfr_ag, alad_ag;
+  PhaseSpace trpi_ps, dhfr_ps, alad_ps;
+  if (files_exist) {
+    trpi_ag.buildFromPrmtop(trpi_top_name, ExceptionResponse::SILENT);
+    dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT);
+    alad_ag.buildFromPrmtop(alad_top_name, ExceptionResponse::SILENT);
+    trpi_ps.buildFromFile(trpi_crd_name);
+    dhfr_ps.buildFromFile(dhfr_crd_name);
+    alad_ps.buildFromFile(alad_crd_name);
+  }
+  else {
+    rtWarn("Files for several systems in implicit solvent were not found.  Check the "
+           "${OMNI_SOURCE} environment variable for validity.  Subsequent tests will be skipped.");
+  }
+#if 0
+  const std::vector<AtomGraph*> bigger_tops = { &trpi_ag, &trpi_ag, &dhfr_ag, &dhfr_ag, &alad_ag,
+                                                &trpi_ag, &dhfr_ag, &dhfr_ag, &alad_ag, &trpi_ag };
+  const std::vector<PhaseSpace> bigger_crds = { trpi_ps, trpi_ps, dhfr_ps, dhfr_ps, alad_ps,
+                                                trpi_ps, dhfr_ps, dhfr_ps, alad_ps, trpi_ps };
+#endif
+  for (int len = 4; len < 336; len += 4) {
+    const std::vector<AtomGraph*> bigger_tops(len, &trpi_ag);
+    const std::vector<PhaseSpace> bigger_crds(len, trpi_ps);
+    std::vector<int> trpi_indices(len);
+    for (int i = 0; i < len; i++) {
+      trpi_indices[i] = i;
     }
-    printf("\n");
-    // END CHECK
+    PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
+    AtomGraphSynthesis big_poly_ag(bigger_tops, trpi_indices, ExceptionResponse::SILENT,
+                                   512, &timer);
+    big_poly_ag.upload();
+    big_poly_ps.upload();
+    timer.assignTime(0);
+    const int i_timings = timer.addCategory("GPU VWU evaluation " + std::to_string(len));
+    const int cpu_timings = timer.addCategory("CPU VWU evaluation " + std::to_string(len));
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 1000; j++) {
+        mmctrl.incrementStep();
+        launchValenceSp(big_poly_ag, &mmctrl, &big_poly_ps, &sc, &tb_space, EvaluateForce::YES,
+                        EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT,
+                        gpu);
+      }
+      cudaDeviceSynchronize();
+      timer.assignTime(i_timings);
+    }
   }
   
   // Summary evaluation

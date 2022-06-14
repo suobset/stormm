@@ -1166,13 +1166,6 @@ Vec2<Tcalc> evaluateAttenuated14Pair(const int i_atom, const int l_atom, const i
         fmag += ((6.0f * ljb) - (12.0f * lja * invr4 * invr2)) * invr4 * invr4;
       }
     }
-
-    // CHECK
-    if (i_atom == 0 || l_atom == 0) {
-      printf(" 1:4 %2d       %2d -> %9.5f\n", i_atom, l_atom, fmag);
-    }
-    // END CHECK
-    
     if (isSignedIntegralScalarType<Tforce>()) {
       const Tforce ifmag_dx = llround(fmag * dx * force_factor);
       const Tforce ifmag_dy = llround(fmag * dy * force_factor);

@@ -144,6 +144,11 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const GpuDetails &gpu,
 #endif
 }
 
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::incrementStep() {
+  step_number += 1;
+}
+  
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void MolecularMechanicsControls::upload() {

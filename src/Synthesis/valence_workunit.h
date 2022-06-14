@@ -21,7 +21,7 @@ using topology::VirtualSiteKit;
 
 /// \brief The minimium value for the atom limit in a valence work unit--there should be no need
 ///        to force the size below 128, which was the maximum size in pmemd.cuda.
-constexpr int minimum_valence_work_unit_atoms = 128;
+constexpr int minimum_valence_work_unit_atoms = 64;
 
 /// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
 ///        of __shared__ memory in a block of 1024 threads might need to be stretched.

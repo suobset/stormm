@@ -83,6 +83,9 @@ public:
   ///
   /// \param gpu  Description of the GPU available to the runtime process
   void primeWorkUnitCounters(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+
+  /// \brief Increment the step counter, moving the controls to a different progress counter.
+  void incrementStep();
   
 #ifdef OMNI_USE_HPC
   /// \brief Upload the object's contents to the device (needed so that CPU-primed work unit

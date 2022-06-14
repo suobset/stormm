@@ -456,16 +456,22 @@ AtomGraphSynthesis::checkTopologyList(const std::vector<int> &topology_indices_i
   }
 
   // Check that all topologies are, in fact, unique.  Compact the list if necessary and update
-  // the system topology indexing.
+  // the system topology indexing.  Rebase the list of topology indices.
+  std::vector<int> topology_index_rebase(topology_count, -1);
+  int n_unique_top = 0;
   for (int i = 0; i < topology_count; i++) {
     if (topology_unique[i]) {
       const int topi_natom = topologies[i]->getAtomCount();
       for (int j = i + 1; j < topology_count; j++) {
-        if (topologies[j] == topologies[i] || topologies[j]->getAtomCount() == topi_natom &&
-            topologies[i]->getFileName() == topologies[j]->getFileName()) {
+        if (topologies[j] == topologies[i] ||
+            (topologies[j]->getAtomCount() == topi_natom &&
+             topologies[i]->getFileName() == topologies[j]->getFileName())) {
           topology_unique[j] = false;
+          topology_index_rebase[j] = n_unique_top;
         }
       }
+      topology_index_rebase[i] = n_unique_top;
+      n_unique_top++;
     }
   }
 
@@ -487,13 +493,11 @@ AtomGraphSynthesis::checkTopologyList(const std::vector<int> &topology_indices_i
     }
   }
 
-  // Rebase the list of topology indices
-  std::vector<int> topology_index_rebase(topology_count, -1);
-  int n_unique_top = 0;
+  // Condense the list of unique topologies
+  n_unique_top = 0;
   for (int i = 0; i < topology_count; i++) {
-    topology_index_rebase[i] = n_unique_top;
-    topologies[n_unique_top] = topologies[i];
     if (topology_unique[i]) {
+      topologies[n_unique_top] = topologies[i];
       n_unique_top++;
     }
   }
