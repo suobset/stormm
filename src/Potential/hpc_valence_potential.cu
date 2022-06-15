@@ -121,9 +121,9 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
 #        if (__CUDA_ARCH__ == 610)
-#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_KERNEL_THREAD_COUNT 448
 #        else
-#          define VALENCE_KERNEL_THREAD_COUNT 768
+#          define VALENCE_KERNEL_THREAD_COUNT 896
 #        endif
 #        define KERNEL_NAME kfsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
@@ -356,12 +356,6 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
   // pressure might be too high to employ the full thread complement.
   const int max_threads   = gpu.getMaxThreadsPerBlock() / blocks_multiplier;
   const int trim_threads  = roundUp<int>((max_threads * 7) / 8, twice_warp_size_int);
-  const int lower_threads = roundUp<int>((max_threads * 3) / 4, twice_warp_size_int);
-
-  // CHECK
-  //const int lower_threads = trim_threads;
-  // END CHECK
-  
   int nthreads;
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
@@ -371,14 +365,7 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
       // The combination of energy and force evaluation accumulates register pressure
       switch (eval_force) {
       case EvaluateForce::YES:
-        switch (force_sum) {
-        case ForceAccumulationMethod::SPLIT:
-          nthreads = lower_threads;
-          break;
-        case ForceAccumulationMethod::WHOLE:
-          nthreads = trim_threads;
-          break;
-        }
+        nthreads = trim_threads;
         break;
       case EvaluateForce::NO:
         nthreads = max_threads;

@@ -1189,9 +1189,90 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       pos += blockDim.x;
     }
     __syncthreads();
-
 #ifdef COMPUTE_ENERGY
-    // Contribute energies to global accumulators
+    // Contribute energies to global accumulators--get these numbers out of the way to make
+    // room for any other operations.
+    __syncthreads();
+    const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+    pos = (threadIdx.x >> warp_bits);
+    const bool iread = (lane_idx < (blockDim.x >> warp_bits));
+    while (pos < (int)(StateVariable::ALL_STATES)) {
+      const int sys_pos = pos + (vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x * scw.data_stride);
+      const StateVariable sv_pos = (StateVariable)(pos);
+      if (sv_pos == StateVariable::BOND) {
+        llint sum_bond_acc = (iread) ? sh_bond_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_bond_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_bond_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::ANGLE) {
+        llint sum_angl_acc = (iread) ? sh_angl_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_angl_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_angl_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
+        llint sum_dihe_acc = (iread) ? sh_dihe_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_dihe_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_dihe_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
+        llint sum_impr_acc = (iread) ? sh_impr_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_impr_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_impr_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::UREY_BRADLEY) {
+        llint sum_ubrd_acc = (iread) ? sh_ubrd_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_ubrd_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_ubrd_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
+        llint sum_cimp_acc = (iread) ? sh_cimp_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_cimp_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_cimp_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::CMAP) {
+        llint sum_cmap_acc = (iread) ? sh_cmap_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_cmap_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_cmap_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
+        llint sum_lj14_acc = (iread) ? sh_lj14_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_lj14_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_lj14_acc));
+        }
+      }
+      else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
+        llint sum_qq14_acc = (iread) ? sh_qq14_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_qq14_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_qq14_acc));
+        }
+      }
+#if 0
+      else if (sv_pos == StateVariable::RESTRAINT) {
+        llint sum_rstr_acc = (iread) ? sh_rstr_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_rstr_acc);
+        if (lane_idx == 0) {
+          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_rstr_acc));
+        }
+      }
+#endif
+      pos += (blockDim.x >> warp_bits);
+    }
 #endif
 
     // Loop back over all Cartesian X forces, Y forces, and then Z forces.  Reassemble forces if
@@ -1271,70 +1352,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       pos += blockDim.x;
     }
 #endif
-#ifdef COMPUTE_ENERGY
-    __syncthreads();
-    const int lane_idx = (threadIdx.x & warp_bits_mask_int);
-    pos = (threadIdx.x >> warp_bits);
-    const int sys_pos = pos + (vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x * scw.data_stride);
-    const bool iread = (lane_idx < (blockDim.x >> warp_bits));
-    while (pos < (int)(StateVariable::ALL_STATES)) {
-      const StateVariable sv_pos = (StateVariable)(pos);
-      if (sv_pos == StateVariable::BOND) {
-        llint sum_bond_acc = (iread) ? sh_bond_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_bond_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_bond_acc));
-      }
-      else if (sv_pos == StateVariable::ANGLE) {
-        llint sum_angl_acc = (iread) ? sh_angl_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_angl_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_angl_acc));
-      }
-      else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
-        llint sum_dihe_acc = (iread) ? sh_dihe_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_dihe_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_dihe_acc));
-      }
-      else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
-        llint sum_impr_acc = (iread) ? sh_impr_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_impr_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_impr_acc));
-      }
-      else if (sv_pos == StateVariable::UREY_BRADLEY) {
-        llint sum_ubrd_acc = (iread) ? sh_ubrd_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_ubrd_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_ubrd_acc));
-      }
-      else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
-        llint sum_cimp_acc = (iread) ? sh_cimp_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_cimp_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_cimp_acc));
-      }
-      else if (sv_pos == StateVariable::CMAP) {
-        llint sum_cmap_acc = (iread) ? sh_cmap_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_cmap_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_cmap_acc));
-      }
-      else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
-        llint sum_lj14_acc = (iread) ? sh_lj14_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_lj14_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_lj14_acc));
-      }
-      else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
-        llint sum_qq14_acc = (iread) ? sh_qq14_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_qq14_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_qq14_acc));
-      }
-#if 0
-      else if (sv_pos == StateVariable::RESTRAINT) {
-        llint sum_rstr_acc = (iread) ? sh_rstr_acc[lane_idx] : 0LL;
-        WARP_REDUCE_DOWN(sum_rstr_acc);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_rstr_acc));
-      }
-#endif
-      pos += (blockDim.x >> warp_bits);
-    }
-#endif
-
     // Proceed to the next valence work unit, incrementing one of a series of global counters
     // based on the current step number stored in the PhaseSpaceSynthesis object.  The CPU will
     // update the step counter just prior to launching this kernel so that the correct step number

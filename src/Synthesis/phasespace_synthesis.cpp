@@ -966,8 +966,8 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
 #ifdef OMNI_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
-#endif
     {
+#endif
       llint* xptr = x_forces.data();
       llint* yptr = y_forces.data();
       llint* zptr = z_forces.data();
@@ -991,15 +991,17 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
           zptr[i] = 0LL;
         }
       }
-    }
 #ifdef OMNI_USE_HPC
+    }
+    break;
   case HybridTargetLevel::DEVICE:
     {
       PsSynthesisWriter dptr = data(HybridTargetLevel::DEVICE);
       psyInitializeForces(&dptr, index, gpu);
     }
-#endif
+    break;
   }
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

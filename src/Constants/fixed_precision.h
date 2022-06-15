@@ -66,7 +66,6 @@ constexpr double default_inverse_trajpos_scale_lf = 1.0 / default_trajpos_scale_
 constexpr float  default_inverse_trajpos_scale_f  = (float)1.0 / default_trajpos_scale_f;
 constexpr int    min_trajpos_scale_bits = 10;
 constexpr int    max_trajpos_scale_bits = 48;
-
 /// \}
 
 /// \brief Velocities are expressed in A / sqrt(418.4) fs, and as such the velocity scaling should
@@ -139,6 +138,17 @@ PrecisionLevel translatePrecisionLevel(const std::string &choice, ExceptionRespo
 ///
 /// \param plevel  The precision level to name
 std::string getPrecisionLevelName(PrecisionLevel plevel);
+
+/// \brief Translate a string specifying a force accumulation method into the numerical code.
+///
+/// \param method  The string to translate
+ForceAccumulationMethod translateForceAccumulationMethod(const std::string &choice,
+                                                         ExceptionResponse policy);
+
+/// \brief Get a string for the name of a force accumulation method.
+///
+/// \param method  The method in question
+std::string getForceAccumulationMethodName(ForceAccumulationMethod method);
 
 /// \brief Produce an error message describing range violations in user choices for various
 ///        fixed-precision methods.

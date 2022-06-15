@@ -406,7 +406,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
     sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR);
   const std::vector<double> lj14_e =
     sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR);
-
+  
   // Check that energy terms computed with ValenceWorkUnits match the reference calculations
   check(bond_e[0], RelationalOperator::EQUAL, Approx(bond_e[1]).margin(1.0e-6), "Bond energies "
         "computed with ValenceWorkUnits do not agree with the reference calculations (topology " +

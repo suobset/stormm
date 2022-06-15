@@ -4,6 +4,7 @@
 #include <cusolverDn.h>
 #include <nvml.h>
 #include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/rounding.h"
@@ -32,11 +33,159 @@ using namespace omni::diskutil;
 using namespace omni::energy;
 using namespace omni::math;
 using namespace omni::mm;
+using namespace omni::numerics;
 using namespace omni::parse;
 using namespace omni::synthesis;
 using namespace omni::testing;
 using namespace omni::topology;
 using namespace omni::trajectory;
+
+//-------------------------------------------------------------------------------------------------
+// Compute forces due to valence interactions acting on a series of systems using topology and
+// coordinate compilations.  Check the results against the accumulations for individual systems.
+// This function assumes that the topology and coordinate compilations have already been uploaded
+// to the device.
+//
+// Arguments:
+//   poly_ps:        Coordinates for many systems
+//   mmctrl:         Molecular mechanics progress counters
+//   tb_space:       Thread block resources, pre-allocated on the GPU
+//   poly_ag:        Topologies for many systems
+//   facc_method:    Force accumulation method
+//   prec:           Precision level at which to perform the calculations (may not be compatible
+//                   with all force accumulation methods)
+//   gpu:            Details of the GPU to use
+//   mue_tol:        Tolerance for mean unsigned error in forces 
+//   max_error_tol:  Tolerance for maximum unsigned error in forces 
+//-------------------------------------------------------------------------------------------------
+void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl,
+                            CacheResource *tb_space, const AtomGraphSynthesis &poly_ag,
+                            const ForceAccumulationMethod facc_method, const PrecisionLevel prec,
+                            const GpuDetails &gpu, const double mue_tol,
+                            const double max_error_tol, const TestPriority do_tests) {
+  const int nsys = poly_ps->getSystemCount();
+  std::vector<double> frc_mues(nsys);
+  const std::vector<double> frc_mue_tolerance(nsys, mue_tol);
+  std::vector<double> frc_max_errors(nsys);
+  const std::vector<double> frc_max_error_tolerance(nsys, max_error_tol);
+  ScoreCard sc(nsys, 1, 32);
+  poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
+  mmctrl->incrementStep();
+  switch (prec) {
+  case PrecisionLevel::SINGLE:
+  case PrecisionLevel::SINGLE_PLUS:
+    launchValenceSp(poly_ag, mmctrl, poly_ps, &sc, tb_space, EvaluateForce::YES,
+                    EvaluateEnergy::NO, VwuGoal::ACCUMULATE, facc_method, gpu);
+    break;
+  case PrecisionLevel::DOUBLE:
+    launchValenceDp(poly_ag, mmctrl, poly_ps, &sc, tb_space, EvaluateForce::YES,
+                    EvaluateEnergy::NO, VwuGoal::ACCUMULATE, gpu);    
+    break;
+  }
+  for (int i = 0; i < nsys; i++) {
+    PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
+    PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
+    host_result.initializeForces();
+    ScoreCard isc(1, 1, 32);
+    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
+    const TrajectoryKind frcid = TrajectoryKind::FORCES;
+    const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
+    const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
+    frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
+    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
+  }
+  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
+        "valence interaction kernel, operating on systems without external restraints, exceed the "
+        "tolerance for mean unsigned errors in their vector components.  Force accumulation "
+        "method: " + getForceAccumulationMethodName(facc_method) + ".  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
+        "by the valence interaction kernel, operating on systems without external restraints, "
+        "exceed the maximum allowed errors for forces acting on any one particle.  Force "
+        "accumulation method: " + getForceAccumulationMethodName(facc_method) + ".  Precision "
+        "level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Compute energies of a series of systems, using topology and coordinate compilations on the GPU,
+// due to valence interactions.  Check the results against the accumulations for individual
+// systems.  This function assumes that the topology and coordinate compilations have already been
+// uploaded to the device.
+//
+// Arguments:
+//-------------------------------------------------------------------------------------------------
+void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl,
+                              CacheResource *tb_space, const AtomGraphSynthesis &poly_ag,
+                              const PrecisionLevel prec, const GpuDetails &gpu,
+                              const double bond_tol, const double angl_tol, const double dihe_tol,
+                              const double impr_tol, const double ubrd_tol, const double cimp_tol,
+                              const double cmap_tol, const double lj14_tol, const double qq14_tol,
+                              const double rstr_tol, const TestPriority do_tests) {
+  const int nsys = poly_ps->getSystemCount();
+  ScoreCard sc(nsys, 1, 32);
+  poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
+  mmctrl->incrementStep();
+  switch (prec) {
+  case PrecisionLevel::SINGLE:
+  case PrecisionLevel::SINGLE_PLUS:
+    launchValenceSp(poly_ag, mmctrl, poly_ps, &sc, tb_space, EvaluateForce::NO,
+                    EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
+    break;
+  case PrecisionLevel::DOUBLE:
+    launchValenceDp(poly_ag, mmctrl, poly_ps, &sc, tb_space, EvaluateForce::NO,
+                    EvaluateEnergy::YES, VwuGoal::ACCUMULATE, gpu);
+    break;
+  }
+  sc.download();
+  std::vector<double> cpu_bond(nsys), gpu_bond(nsys), cpu_angl(nsys), gpu_angl(nsys);
+  std::vector<double> cpu_dihe(nsys), gpu_dihe(nsys), cpu_impr(nsys), gpu_impr(nsys);
+  std::vector<double> cpu_ubrd(nsys), gpu_ubrd(nsys), cpu_cimp(nsys), gpu_cimp(nsys);
+  std::vector<double> cpu_cmap(nsys), gpu_cmap(nsys), cpu_qq14(nsys), gpu_qq14(nsys);
+  std::vector<double> cpu_lj14(nsys), gpu_lj14(nsys);
+  for (int i = 0; i < nsys; i++) {
+    PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
+    PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
+    host_result.initializeForces();
+    ScoreCard isc(1, 1, 32);
+    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::NO, 0);
+    gpu_bond[i] =  sc.reportInstantaneousStates(StateVariable::BOND, i);
+    cpu_bond[i] = isc.reportInstantaneousStates(StateVariable::BOND, 0);
+    gpu_angl[i] =  sc.reportInstantaneousStates(StateVariable::ANGLE, i);
+    cpu_angl[i] = isc.reportInstantaneousStates(StateVariable::ANGLE, 0);
+    gpu_dihe[i] =  sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, i);
+    cpu_dihe[i] = isc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0);
+    gpu_impr[i] =  sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, i);
+    cpu_impr[i] = isc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0);
+    gpu_ubrd[i] =  sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, i);
+    cpu_ubrd[i] = isc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, 0);
+    gpu_cimp[i] =  sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, i);
+    cpu_cimp[i] = isc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, 0);
+    gpu_cmap[i] =  sc.reportInstantaneousStates(StateVariable::CMAP, i);
+    cpu_cmap[i] = isc.reportInstantaneousStates(StateVariable::CMAP, 0);
+    gpu_qq14[i] =  sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, i);
+    cpu_qq14[i] = isc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0);
+    gpu_lj14[i] =  sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i);
+    cpu_lj14[i] = isc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0);
+  }
+  check(gpu_bond, RelationalOperator::EQUAL, Approx(cpu_bond).margin(bond_tol), "Bond energies "
+        "computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_angl, RelationalOperator::EQUAL, Approx(cpu_angl).margin(angl_tol), "Angle energies "
+        "computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_dihe, RelationalOperator::EQUAL, Approx(cpu_dihe).margin(dihe_tol), "Proper "
+        "dihedral energies computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_impr, RelationalOperator::EQUAL, Approx(cpu_impr).margin(impr_tol), "Improper "
+        "dihedral energies computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_ubrd, RelationalOperator::EQUAL, Approx(cpu_ubrd).margin(ubrd_tol), "Urey-Bradley "
+        "energies computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_cimp, RelationalOperator::EQUAL, Approx(cpu_cimp).margin(cimp_tol), "CHARMM "
+        "improper dihedral energies computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_cmap, RelationalOperator::EQUAL, Approx(cpu_cmap).margin(cmap_tol), "CMAP "
+        "energies computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_qq14, RelationalOperator::EQUAL, Approx(cpu_qq14).margin(qq14_tol), "Electrostatic "
+        "1:4 energies computed on the CPU and GPU do not agree.\n", do_tests);
+  check(gpu_lj14, RelationalOperator::EQUAL, Approx(cpu_lj14).margin(lj14_tol), "Lennard-Jones "
+        "1:4 energies computed on the CPU and GPU do not agree.\n", do_tests);
+}
 
 //-------------------------------------------------------------------------------------------------
 // main
@@ -143,54 +292,18 @@ int main(const int argc, const char* argv[]) {
 
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
   // and 1:4 attenuated interactions.
-  launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
-                  EvaluateEnergy::NO, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
-  std::vector<double> frc_mues(nsys);
-  const std::vector<double> frc_mue_tolerance(nsys, 3.5e-5);
-  std::vector<double> frc_max_errors(nsys);
-  const std::vector<double> frc_max_error_tolerance(nsys, 2.0e-4);
-  for (int i = 0; i < nsys; i++) {
-    PhaseSpace devc_result = poly_ps.exportSystem(i, HybridTargetLevel::DEVICE);
-    PhaseSpace host_result = poly_ps.exportSystem(i, HybridTargetLevel::HOST);
-    host_result.initializeForces();
-    ScoreCard isc(1, 1, 32);
-    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
-    const TrajectoryKind frcid = TrajectoryKind::FORCES;
-    const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
-    const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
-    frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
-    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
-  }
-  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
-        "valence interaction kernel, operating on systems without external restraints, exceed the "
-        "tolerance for mean unsigned errors in their vector components.", do_tests);
-  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
-        "by the valence interaction kernel, operating on systems without external restraints, "
-        "exceed the maximum allowed errors for forces acting on any one particle.", do_tests);
-  poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
-  mmctrl.incrementStep();
-  launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
-                  EvaluateEnergy::NO, VwuGoal::ACCUMULATE, ForceAccumulationMethod::WHOLE, gpu);
-  for (int i = 0; i < nsys; i++) {
-    PhaseSpace devc_result = poly_ps.exportSystem(i, HybridTargetLevel::DEVICE);
-    PhaseSpace host_result = poly_ps.exportSystem(i, HybridTargetLevel::HOST);
-    host_result.initializeForces();
-    ScoreCard isc(1, 1, 32);
-    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
-    const TrajectoryKind frcid = TrajectoryKind::FORCES;
-    const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
-    const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
-    frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
-    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
-  }
-  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
-        "valence interaction kernel, operating on systems without external restraints, exceed the "
-        "tolerance for mean unsigned errors in their vector components when accumulated in int64.",
-        do_tests);
-  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
-        "by the valence interaction kernel, operating on systems without external restraints, "
-        "exceed the maximum allowed errors for forces acting on any one particle with "
-        "fixed-precision accumulation in int64.", do_tests);
+  checkCompilationForces(&poly_ps, &mmctrl, &tb_space, poly_ag, ForceAccumulationMethod::WHOLE,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.0e-5, do_tests);
+  checkCompilationForces(&poly_ps, &mmctrl, &tb_space, poly_ag, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::SINGLE, gpu, 3.5e-5, 2.0e-4, do_tests);
+  checkCompilationForces(&poly_ps, &mmctrl, &tb_space, poly_ag, ForceAccumulationMethod::WHOLE,
+                         PrecisionLevel::SINGLE, gpu, 3.5e-5, 2.0e-4, do_tests);
+  checkCompilationEnergies(&poly_ps, &mmctrl, &tb_space, poly_ag, PrecisionLevel::DOUBLE,
+                           gpu, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, 1.0e-6, do_tests);
+  checkCompilationEnergies(&poly_ps, &mmctrl, &tb_space, poly_ag, PrecisionLevel::SINGLE,
+                           gpu, 1.5e-5, 1.5e-5, 5.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6,
+                           2.2e-5, 1.0e-6, do_tests);
   
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -227,7 +340,8 @@ int main(const int argc, const char* argv[]) {
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, trpi_ps, dhfr_ps, dhfr_ps, alad_ps,
                                                 trpi_ps, dhfr_ps, dhfr_ps, alad_ps, trpi_ps };
 #endif
-  for (int len = 4; len < 336; len += 4) {
+#if 0
+  for (int len = 4; len < 36; len += 4) {
     const std::vector<AtomGraph*> bigger_tops(len, &trpi_ag);
     const std::vector<PhaseSpace> bigger_crds(len, trpi_ps);
     std::vector<int> trpi_indices(len);
@@ -253,7 +367,7 @@ int main(const int argc, const char* argv[]) {
       timer.assignTime(i_timings);
     }
   }
-  
+#endif  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

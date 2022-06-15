@@ -8,7 +8,7 @@ namespace numerics {
 using parse::strcmpCased;
   
 //-------------------------------------------------------------------------------------------------
-PrecisionLevel translatePrecisionLevel(const std::string &choice, ExceptionResponse policy) {
+PrecisionLevel translatePrecisionLevel(const std::string &choice, const ExceptionResponse policy) {
   if (strcmpCased(choice, std::string("single"))) {
     return PrecisionLevel::SINGLE;
   }
@@ -25,7 +25,7 @@ PrecisionLevel translatePrecisionLevel(const std::string &choice, ExceptionRespo
 }
   
 //-------------------------------------------------------------------------------------------------
-std::string getPrecisionLevelName(PrecisionLevel plevel) {
+std::string getPrecisionLevelName(const PrecisionLevel plevel) {
   switch (plevel) {
   case PrecisionLevel::SINGLE:
     return std::string("SINGLE");
@@ -33,6 +33,29 @@ std::string getPrecisionLevelName(PrecisionLevel plevel) {
     return std::string("SINGLE_PLUS");
   case PrecisionLevel::DOUBLE:
     return std::string("DOUBLE");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+ForceAccumulationMethod translateForceAccumulationMethod(const std::string &choice,
+                                                         const ExceptionResponse policy) {
+  if (strcmpCased(choice, std::string("split"))) {
+    return ForceAccumulationMethod::SPLIT;
+  }
+  else if (strcmpCased(choice, std::string("whole"))) {    
+    return ForceAccumulationMethod::WHOLE;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getForceAccumulationMethodName(const ForceAccumulationMethod method) {
+  switch (method) {
+  case ForceAccumulationMethod::SPLIT:
+    return std::string("SPLIT");
+  case ForceAccumulationMethod::WHOLE:
+    return std::string("WHOLE");
   }
   __builtin_unreachable();
 }

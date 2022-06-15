@@ -84,10 +84,10 @@ double evaluateBondTerms(const ValenceKit<Tcalc> vk, const Tcoord* xcrd, const T
     bond_energy += du;
     bond_acc += llround(du * nrg_scale_factor);
   }
-
+  
   // Contribute results
   ecard->contribute(StateVariable::BOND, bond_acc, system_index);
-
+  
   // Return the double-precision bond energy sum, if of interest
   return bond_energy;
 }
