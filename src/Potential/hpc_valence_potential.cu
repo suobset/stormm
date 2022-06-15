@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "Accelerator/ptx_macros.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
@@ -13,6 +14,8 @@ namespace omni {
 namespace energy {
 
 using constants::warp_size_int;
+using constants::warp_bits;
+using constants::warp_bits_mask_int;
 using constants::twice_warp_bits_mask_int;
 using constants::twice_warp_size_int;
 using constants::large_block_size;
@@ -135,7 +138,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef SPLIT_FORCE_ACCUMULATION
 #    if (__CUDA_ARCH__ == 610)
-#      define VALENCE_KERNEL_THREAD_COUNT 512
+#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
 #    elif (__CUDA_ARCH__ == 700)
 #      define VALENCE_KERNEL_THREAD_COUNT 896
 #    else
@@ -152,9 +155,9 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #    define COMPUTE_ENERGY
 #      if (__CUDA_ARCH__ == 610)
-#        define VALENCE_KERNEL_THREAD_COUNT 384
+#        define VALENCE_KERNEL_THREAD_COUNT 448
 #      else
-#        define VALENCE_KERNEL_THREAD_COUNT 768
+#        define VALENCE_KERNEL_THREAD_COUNT 896
 #      endif
 #      define KERNEL_NAME kfValenceForceEnergyAccumulation
 #        include "valence_potential.cui"
@@ -196,10 +199,8 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #define TCALC double
 #  if (__CUDA_ARCH__ == 610)
 #    define VALENCE_KERNEL_THREAD_COUNT small_block_size
-#    define VALENCE_KERNEL_BLOCKS_MULT  2
 #  else
 #    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    define VALENCE_KERNEL_BLOCKS_MULT  1
 #  endif  
 #  define TCALC3 double3
 #  define CONV_FUNC __double2ll_rn
@@ -238,7 +239,6 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 
 // Clear double-precision floating point definitions
 #  undef VALENCE_KERNEL_THREAD_COUNT
-#  undef VALENCE_KERNEL_BLOCKS_MULT
 #  undef TCALC3
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
@@ -354,23 +354,29 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
 
   // Have ready a maximum number of threads per block, and a fallback number if the register
   // pressure might be too high to employ the full thread complement.
-  const int max_threads = gpu.getMaxThreadsPerBlock() / blocks_multiplier;
-  const int trim_threads = roundUp<int>((max_threads * 7) / 8, twice_warp_size_int);
+  const int max_threads   = gpu.getMaxThreadsPerBlock() / blocks_multiplier;
+  const int trim_threads  = roundUp<int>((max_threads * 7) / 8, twice_warp_size_int);
   const int lower_threads = roundUp<int>((max_threads * 3) / 4, twice_warp_size_int);
+
+  // CHECK
+  //const int lower_threads = trim_threads;
+  // END CHECK
+  
   int nthreads;
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
     switch (eval_energy) {
     case EvaluateEnergy::YES:
+
+      // The combination of energy and force evaluation accumulates register pressure
       switch (eval_force) {
       case EvaluateForce::YES:
         switch (force_sum) {
         case ForceAccumulationMethod::SPLIT:
-          nthreads = (major_arch == 6 || (major_arch == 7 && minor_arch == 0)) ? lower_threads :
-                                                                                 trim_threads;
+          nthreads = lower_threads;
           break;
         case ForceAccumulationMethod::WHOLE:
-          nthreads = (major_arch == 7 && minor_arch == 0) ? trim_threads : max_threads;
+          nthreads = trim_threads;
           break;
         }
         break;
@@ -380,10 +386,12 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
       }
       break;
     case EvaluateEnergy::NO:
+
+      // Forces must be computed or there is nothing to do
       switch (force_sum) {
       case ForceAccumulationMethod::SPLIT:
-        nthreads = (major_arch == 6 || (major_arch == 7 && minor_arch == 0)) ? trim_threads :
-                                                                               max_threads;
+        nthreads = (major_arch == 6 ||
+                    (major_arch == 7 && minor_arch == 0)) ? trim_threads : max_threads;
         break;
       case ForceAccumulationMethod::WHOLE:
         nthreads = (major_arch == 7 && minor_arch == 0) ? trim_threads : max_threads;
@@ -404,8 +412,7 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
                                                                    *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
-                                                             *gmem_r);
+          kfsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
           break;
         }
         break;

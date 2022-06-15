@@ -144,7 +144,7 @@ int main(const int argc, const char* argv[]) {
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
   // and 1:4 attenuated interactions.
   launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
-                  EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
+                  EvaluateEnergy::NO, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
   std::vector<double> frc_mues(nsys);
   const std::vector<double> frc_mue_tolerance(nsys, 3.5e-5);
   std::vector<double> frc_max_errors(nsys);
@@ -170,7 +170,7 @@ int main(const int argc, const char* argv[]) {
   poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl.incrementStep();
   launchValenceSp(poly_ag, &mmctrl, &poly_ps, &sc, &tb_space, EvaluateForce::YES,
-                  EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::WHOLE, gpu);
+                  EvaluateEnergy::NO, VwuGoal::ACCUMULATE, ForceAccumulationMethod::WHOLE, gpu);
   for (int i = 0; i < nsys; i++) {
     PhaseSpace devc_result = poly_ps.exportSystem(i, HybridTargetLevel::DEVICE);
     PhaseSpace host_result = poly_ps.exportSystem(i, HybridTargetLevel::HOST);
@@ -242,7 +242,7 @@ int main(const int argc, const char* argv[]) {
     timer.assignTime(0);
     const int i_timings = timer.addCategory("GPU VWU evaluation " + std::to_string(len));
     const int cpu_timings = timer.addCategory("CPU VWU evaluation " + std::to_string(len));
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 10; i++) {
       for (int j = 0; j < 1000; j++) {
         mmctrl.incrementStep();
         launchValenceSp(big_poly_ag, &mmctrl, &big_poly_ps, &sc, &tb_space, EvaluateForce::YES,

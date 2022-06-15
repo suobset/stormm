@@ -16,19 +16,31 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
   // Coordinates and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.  In this manner, only forces are held in __shared__ where they can
   // be accumulated with more efficient atomics.
-#ifdef SPLIT_FORCE_ACCUMULATION
+#ifdef COMPUTE_FORCE
+#  ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_xfrc[maximum_valence_work_unit_atoms];
   __shared__ int sh_yfrc[maximum_valence_work_unit_atoms];
   __shared__ int sh_zfrc[maximum_valence_work_unit_atoms];
   __shared__ int xoverflow_active[maximum_valence_work_unit_atoms / warp_size_int];
   __shared__ int yoverflow_active[maximum_valence_work_unit_atoms / warp_size_int];
   __shared__ int zoverflow_active[maximum_valence_work_unit_atoms / warp_size_int];
-#else
-#  ifdef COMPUTE_FORCE
+#  else
   __shared__ long long int sh_xfrc[maximum_valence_work_unit_atoms];
   __shared__ long long int sh_yfrc[maximum_valence_work_unit_atoms];
   __shared__ long long int sh_zfrc[maximum_valence_work_unit_atoms];
 #  endif
+#endif
+#ifdef COMPUTE_ENERGY
+  __shared__ llint sh_bond_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_angl_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_dihe_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_impr_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_ubrd_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_cimp_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_cmap_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_qq14_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_lj14_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
+  __shared__ llint sh_rstr_acc[VALENCE_KERNEL_THREAD_COUNT >> warp_bits];
 #endif
   __shared__ int2 vwu_map[vwu_abstract_length];
   __shared__ int vwu_task_count[vwu_abstract_length];
@@ -39,6 +51,47 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
   if (threadIdx.x == 0) {
     vwu_idx = blockIdx.x;
   }
+#ifdef COMPUTE_ENERGY
+  const int prime_lane_idx = (threadIdx.x & warp_bits_mask_int);
+  int prime_pos = (threadIdx.x >> warp_bits);
+  const bool iwrite = (prime_lane_idx < (VALENCE_KERNEL_THREAD_COUNT >> warp_bits));
+  while (prime_pos < (int)(StateVariable::ALL_STATES)) {
+    const StateVariable sv_pos = (StateVariable)(prime_pos);
+    if (iwrite) {
+      if (sv_pos == StateVariable::BOND) {
+        sh_bond_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::ANGLE) {
+        sh_angl_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
+        sh_dihe_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
+        sh_impr_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::UREY_BRADLEY) {
+        sh_ubrd_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
+        sh_cimp_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::CMAP) {
+        sh_cmap_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
+        sh_lj14_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
+        sh_qq14_acc[prime_lane_idx] = 0LL;
+      }
+      else if (sv_pos == StateVariable::RESTRAINT) {
+        sh_rstr_acc[prime_lane_idx] = 0LL;
+      }
+    }
+    prime_pos += (VALENCE_KERNEL_THREAD_COUNT >> warp_bits);
+  }
+#endif
   __syncthreads();
   while (vwu_idx < poly_vk.nvwu) {
 
@@ -553,6 +606,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       pos += blockDim.x;
     }
+#ifdef COMPUTE_ENERGY
+    // Stash the threads' accumulated CMAP energy values
+    WARP_REDUCE_DOWN(cmap_acc)
+    if ((threadIdx.x & warp_bits_mask_int) == 0) {
+      sh_cmap_acc[(threadIdx.x >> warp_bits)] = cmap_acc;
+    }
+#endif
     int vterm_offset = vterm_limit;
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::CDHE)];
 #ifdef COMPUTE_ENERGY
@@ -840,6 +900,21 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       pos += blockDim.x;
     }
+#ifdef COMPUTE_ENERGY
+    // Stash the threads' accumulated CMAP energy values
+    WARP_REDUCE_DOWN(dihe_acc)
+    WARP_REDUCE_DOWN(impr_acc)
+    WARP_REDUCE_DOWN(cimp_acc)
+    WARP_REDUCE_DOWN(qq14_acc)
+    WARP_REDUCE_DOWN(lj14_acc)
+    if ((threadIdx.x & warp_bits_mask_int) == 0) {
+      sh_dihe_acc[(threadIdx.x >> warp_bits)] = dihe_acc;
+      sh_impr_acc[(threadIdx.x >> warp_bits)] = impr_acc;
+      sh_cimp_acc[(threadIdx.x >> warp_bits)] = cimp_acc;
+      sh_qq14_acc[(threadIdx.x >> warp_bits)] = qq14_acc;
+      sh_lj14_acc[(threadIdx.x >> warp_bits)] = lj14_acc;
+    }
+#endif
     vterm_offset = vterm_limit;
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::ANGL)];
 #ifdef COMPUTE_ENERGY
@@ -960,6 +1035,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       pos += blockDim.x;
     }
+#ifdef COMPUTE_ENERGY
+    // Stash the threads' accumulated CMAP energy values
+    WARP_REDUCE_DOWN(angl_acc)
+    if ((threadIdx.x & warp_bits_mask_int) == 0) {
+      sh_angl_acc[(threadIdx.x >> warp_bits)] = angl_acc;
+    }
+#endif
     vterm_offset = vterm_limit;
     vterm_limit  = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::CBND)];
 #ifdef COMPUTE_ENERGY
@@ -1057,6 +1139,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       }
       pos += blockDim.x;
     }
+#ifdef COMPUTE_ENERGY
+    // Stash the threads' accumulated CMAP energy values
+    WARP_REDUCE_DOWN(bond_acc)
+    WARP_REDUCE_DOWN(ubrd_acc)
+    if ((threadIdx.x & warp_bits_mask_int) == 0) {
+      sh_bond_acc[(threadIdx.x >> warp_bits)] = bond_acc;
+      sh_ubrd_acc[(threadIdx.x >> warp_bits)] = ubrd_acc;
+    }
+#endif
     vterm_offset = vterm_limit;
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::INFR14)];
     while (pos < vterm_limit) {
@@ -1183,45 +1274,64 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #ifdef COMPUTE_ENERGY
     __syncthreads();
     const int lane_idx = (threadIdx.x & warp_bits_mask_int);
-    if (lane_idx == 0) {
-      pos = (threadIdx.x >> warp_bits);
-      const int sys_pos = pos + (vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x * scw.data_stride);
-      while (pos < (int)(StateVariable::ALL_STATES)) {
-        const StateVariable sv_pos = (StateVariable)(pos);
-        if (sv_pos == StateVariable::BOND) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(bond_acc));
-        }
-        else if (sv_pos == StateVariable::ANGLE) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(angl_acc));
-        }
-        else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(dihe_acc));
-        }
-        else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(impr_acc));
-        }
-        else if (sv_pos == StateVariable::UREY_BRADLEY) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(ubrd_acc));
-        }
-        else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(cimp_acc));
-        }
-        else if (sv_pos == StateVariable::CMAP) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(cmap_acc));
-        }
-        else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(lj14_acc));
-        }
-        else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(qq14_acc));
-        }
-#if 0
-        if (sv_pos == StateVariable::RESTRAINT) {
-          atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(rstr_acc));
-        }
-#endif
-        pos += (blockDim.x >> warp_bits);
+    pos = (threadIdx.x >> warp_bits);
+    const int sys_pos = pos + (vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x * scw.data_stride);
+    const bool iread = (lane_idx < (blockDim.x >> warp_bits));
+    while (pos < (int)(StateVariable::ALL_STATES)) {
+      const StateVariable sv_pos = (StateVariable)(pos);
+      if (sv_pos == StateVariable::BOND) {
+        llint sum_bond_acc = (iread) ? sh_bond_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_bond_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_bond_acc));
       }
+      else if (sv_pos == StateVariable::ANGLE) {
+        llint sum_angl_acc = (iread) ? sh_angl_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_angl_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_angl_acc));
+      }
+      else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
+        llint sum_dihe_acc = (iread) ? sh_dihe_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_dihe_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_dihe_acc));
+      }
+      else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
+        llint sum_impr_acc = (iread) ? sh_impr_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_impr_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_impr_acc));
+      }
+      else if (sv_pos == StateVariable::UREY_BRADLEY) {
+        llint sum_ubrd_acc = (iread) ? sh_ubrd_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_ubrd_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_ubrd_acc));
+      }
+      else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
+        llint sum_cimp_acc = (iread) ? sh_cimp_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_cimp_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_cimp_acc));
+      }
+      else if (sv_pos == StateVariable::CMAP) {
+        llint sum_cmap_acc = (iread) ? sh_cmap_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_cmap_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_cmap_acc));
+      }
+      else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
+        llint sum_lj14_acc = (iread) ? sh_lj14_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_lj14_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_lj14_acc));
+      }
+      else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
+        llint sum_qq14_acc = (iread) ? sh_qq14_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_qq14_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_qq14_acc));
+      }
+#if 0
+      else if (sv_pos == StateVariable::RESTRAINT) {
+        llint sum_rstr_acc = (iread) ? sh_rstr_acc[lane_idx] : 0LL;
+        WARP_REDUCE_DOWN(sum_rstr_acc);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_rstr_acc));
+      }
+#endif
+      pos += (blockDim.x >> warp_bits);
     }
 #endif
 
