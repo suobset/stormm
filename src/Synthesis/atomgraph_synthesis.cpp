@@ -3133,6 +3133,56 @@ AtomGraphSynthesis::getSinglePrecisionValenceKit(const HybridTargetLevel tier) c
                              accumulate_infr14_energy.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+SyRestraintKit<double, double2, double4>
+AtomGraphSynthesis::getDoublePrecisionRestraintKit(const HybridTargetLevel tier) const {
+  return SyRestraintKit<double,
+                        double2,
+                        double4>(rposn_step_bounds.data(tier), rbond_step_bounds.data(tier),
+                                 rangl_step_bounds.data(tier), rdihe_step_bounds.data(tier),
+                                 rposn_init_k.data(tier), rposn_final_k.data(tier),
+                                 rposn_init_r.data(tier), rposn_final_r.data(tier),
+                                 rposn_init_xy.data(tier), rposn_init_z.data(tier),
+                                 rposn_final_xy.data(tier), rposn_final_z.data(tier),
+                                 rbond_init_k.data(tier), rbond_final_k.data(tier),
+                                 rbond_init_r.data(tier), rbond_final_r.data(tier),
+                                 rangl_init_k.data(tier), rangl_final_k.data(tier),
+                                 rangl_init_r.data(tier), rangl_final_r.data(tier),
+                                 rdihe_init_k.data(tier), rdihe_final_k.data(tier),
+                                 rdihe_init_r.data(tier), rdihe_final_r.data(tier),
+                                 rposn_instructions.data(tier), rbond_instructions.data(tier),
+                                 rangl_instructions.data(tier), rdihe_instructions.data(tier),
+                                 accumulate_rposn_energy.data(tier),
+                                 accumulate_rbond_energy.data(tier),
+                                 accumulate_rangl_energy.data(tier),
+                                 accumulate_rdihe_energy.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+SyRestraintKit<float, float2, float4>
+AtomGraphSynthesis::getSinglePrecisionRestraintKit(const HybridTargetLevel tier) const {
+  return SyRestraintKit<float,
+                        float2,
+                        float4>(rposn_step_bounds.data(tier), rbond_step_bounds.data(tier),
+                                rangl_step_bounds.data(tier), rdihe_step_bounds.data(tier),
+                                sp_rposn_init_k.data(tier), sp_rposn_final_k.data(tier),
+                                sp_rposn_init_r.data(tier), sp_rposn_final_r.data(tier),
+                                sp_rposn_init_xy.data(tier), sp_rposn_init_z.data(tier),
+                                sp_rposn_final_xy.data(tier), sp_rposn_final_z.data(tier),
+                                sp_rbond_init_k.data(tier), sp_rbond_final_k.data(tier),
+                                sp_rbond_init_r.data(tier), sp_rbond_final_r.data(tier),
+                                sp_rangl_init_k.data(tier), sp_rangl_final_k.data(tier),
+                                sp_rangl_init_r.data(tier), sp_rangl_final_r.data(tier),
+                                sp_rdihe_init_k.data(tier), sp_rdihe_final_k.data(tier),
+                                sp_rdihe_init_r.data(tier), sp_rdihe_final_r.data(tier),
+                                rposn_instructions.data(tier), rbond_instructions.data(tier),
+                                rangl_instructions.data(tier), rdihe_instructions.data(tier),
+                                accumulate_rposn_energy.data(tier),
+                                accumulate_rbond_energy.data(tier),
+                                accumulate_rangl_energy.data(tier),
+                                accumulate_rdihe_energy.data(tier));
+}
+
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::upload() {

@@ -93,7 +93,9 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 
 // Single-precision floating point definitions
 #define TCALC float
+#  define TCALC2 float2
 #  define TCALC3 float3
+#  define TCALC4 float4
 #  define CONV_FUNC __float2int_rn
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
@@ -186,7 +188,9 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  undef  COMPUTE_ENERGY
 
 // Clear single-precision floating point definitions
+#  undef TCALC2
 #  undef TCALC3
+#  undef TCALC4
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
@@ -204,7 +208,9 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  else
 #    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
 #  endif  
+#  define TCALC2 double2
 #  define TCALC3 double3
+#  define TCALC4 double4
 #  define CONV_FUNC __double2ll_rn
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
@@ -241,7 +247,9 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 
 // Clear double-precision floating point definitions
 #  undef VALENCE_KERNEL_THREAD_COUNT
+#  undef TCALC2
 #  undef TCALC3
+#  undef TCALC4
 #  undef CONV_FUNC
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC

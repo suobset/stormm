@@ -22,6 +22,7 @@ using math::readBitFromMask;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::PsSynthesisWriter;
 using synthesis::SyValenceKit;
+using synthesis::SyRestraintKit;
 using synthesis::vwu_abstract_length;
 using synthesis::VwuAbstractMap;
 using synthesis::VwuGoal;
@@ -34,36 +35,52 @@ using synthesis::VwuTask;
 ///        velocities, and forces of various particles.
 ///
 /// \param syvk         Consensus tables of valence parameters and instructions
-/// \param sh_xcrd      
-/// \param sh_ycrd
-/// \param sh_zcrd
-/// \param sh_xvel
-/// \param sh_yvel
-/// \param sh_zvel
-/// \param sh_xfrc
-/// \param sh_yfrc
-/// \param sh_zfrc
-/// \param ecard
-/// \param vwu_idx
-/// \param eval_force
-/// \param activity
-/// \param purpose
-/// \param step_number
-template <typename Tcalc>
-void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_charges,
-                            const int* sh_lj_idx, llint* sh_xcrd, llint* sh_ycrd, llint* sh_zcrd,
-                            llint* sh_xvel, llint* sh_yvel, llint* sh_zvel, llint* sh_xfrc,
-                            llint* sh_yfrc, llint* sh_zfrc, double inv_gpos_scale,
-                            double force_scale, ScoreCard *ecard, int vwu_idx,
-                            EvaluateForce eval_force, VwuTask activity, VwuGoal purpose,
-                            int step_number);
+/// \param syrk         Consensus tables of restraint parameters and instructions  
+/// \param sh_xcrd      Mock data array for locally cached particle X coordinates
+/// \param sh_ycrd      Mock data array for locally cached particle Y coordinates
+/// \param sh_zcrd      Mock data array for locally cached particle Z coordinates
+/// \param sh_xvel      Mock data array for locally cached particle X velocities
+/// \param sh_yvel      Mock data array for locally cached particle Y velocities
+/// \param sh_zvel      Mock data array for locally cached particle Z velocities
+/// \param sh_xfrc      Mock data array for locally accumulating particle X forces
+/// \param sh_yfrc      Mock data array for locally accumulating particle Y forces
+/// \param sh_zfrc      Mock data array for locally accumulating particle Z forces
+/// \param ecard        Energy tracking object
+/// \param vwu_idx      Index of the valence work unit to evaluate, as stored in the topology
+///                     synthesis
+/// \param eval_force   Flag to have forces evaluated
+/// \param activity     Evaluate a particular energy component, or all components
+/// \param purpose      Purpose of the evaluation: to accumulate forces and / or energies, or to
+///                     move particles
+/// \param step_number  Number of the step in the simulation (relevant to restraint applications)
+template <typename Tcalc, typename Tcalc2, typename Tcalc4>
+void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
+                            const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk,
+                            const Tcalc* sh_charges, const int* sh_lj_idx, llint* sh_xcrd,
+                            llint* sh_ycrd, llint* sh_zcrd, llint* sh_xvel, llint* sh_yvel,
+                            llint* sh_zvel, llint* sh_xfrc, llint* sh_yfrc, llint* sh_zfrc,
+                            double inv_gpos_scale, double force_scale, ScoreCard *ecard,
+                            int vwu_idx, EvaluateForce eval_force, VwuTask activity,
+                            VwuGoal purpose, int step_number);
 
-/// \brief Evaluate all work units in an AtomGraphSynthesis (synthesis of topologies).  The
-///        
-template <typename Tcalc>
-void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk, PsSynthesisWriter psyw, ScoreCard *ecard,
-                         EvaluateForce eval_force, VwuTask activity, VwuGoal purpose,
-                         int step_number);
+/// \brief Evaluate all work units in an AtomGraphSynthesis (synthesis of topologies).  This
+///        function will allocate mock data arrays to drive synthesisVwuEvaluation() above.
+///
+/// \param syvk         Topology synthesis-based abstract for parameters on valence interactions
+/// \param syrk         Topology synthesis-based abstract for parameters on restraints
+/// \param psyw         Writeable abstract for the coordinate synthesis
+/// \param ecard        Energy tracker object
+/// \param eval_force   Flag to also carry out force evaluation (energy is always evaluated in CPU
+///                     functions)
+/// \param activity     Evaluate a particular energy component, or all components
+/// \param purpose      Purpose of the evaluation: to accumulate forces and / or energies, or to
+///                     move particles
+/// \param step_number  Number of the step in the simulation (relevant to restraint applications)
+template <typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
+                         const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
+                         ScoreCard *ecard, EvaluateForce eval_force, VwuTask activity,
+                         VwuGoal purpose, int step_number);
 
 } // namespace energy
 } // namespace omni

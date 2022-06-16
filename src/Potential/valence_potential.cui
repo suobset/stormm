@@ -912,7 +912,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       pos += blockDim.x;
     }
 #ifdef COMPUTE_ENERGY
-    // Stash the threads' accumulated CMAP energy values
+    // Stash the threads' accumulated dihedral and 1:4 energy values
     WARP_REDUCE_DOWN(dihe_acc)
     WARP_REDUCE_DOWN(impr_acc)
     WARP_REDUCE_DOWN(cimp_acc)
@@ -1047,7 +1047,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       pos += blockDim.x;
     }
 #ifdef COMPUTE_ENERGY
-    // Stash the threads' accumulated CMAP energy values
+    // Stash the threads' accumulated angle energy values
     WARP_REDUCE_DOWN(angl_acc)
     if ((threadIdx.x & warp_bits_mask_int) == 0) {
       sh_angl_acc[(threadIdx.x >> warp_bits)] = angl_acc;
@@ -1151,7 +1151,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       pos += blockDim.x;
     }
 #ifdef COMPUTE_ENERGY
-    // Stash the threads' accumulated CMAP energy values
+    // Stash the threads' accumulated bond energy values
     WARP_REDUCE_DOWN(bond_acc)
     WARP_REDUCE_DOWN(ubrd_acc)
     if ((threadIdx.x & warp_bits_mask_int) == 0) {
@@ -1161,17 +1161,115 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #endif
     vterm_offset = vterm_limit;
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::INFR14)];
+#ifdef COMPUTE_ENERGY
+    qq14_acc = 0LL;
+    lj14_acc = 0LL;
+#endif
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::INFR14)]) {
-        
+        const int task_offset = vwu_map[(size_t)(VwuAbstractMap::INFR14)].x;
+        const uint tinsr = __ldcs(&poly_vk.infr14_insr[task_offset + pos - vterm_offset]);
+        const int i_atom = (tinsr & 0x3ff);
+        const int l_atom = ((tinsr >> 10) & 0x3ff);
+        const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
+        const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
+        const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
+        const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
+        const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
+        const TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
+        const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
+        const TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
+        const int attn_idx = ((tinsr >> 20) & 0xfff);
+        const TCALC attn_qq14 = __ldca(&poly_vk.attn14_elec[attn_idx]);
+        const TCALC attn_lj14 = __ldca(&poly_vk.attn14_vdw[attn_idx]);
+        const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
+        const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
+        const int sysid = vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x;
+        const int il_ljidx = __ldca(&poly_vk.ljabc_offsets[sysid]) +
+                             (__ldca(&poly_vk.n_lj_types[sysid]) * i_ljidx) + l_ljidx;
+        const TCALC qq_il = __ldca(&gmem_r.charges[i_atom]) * __ldca(&gmem_r.charges[l_atom]) *
+                            poly_vk.coulomb / attn_qq14;
+        const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]);
+        const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]);
+        const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
+        const TCALC invr2 = invr  * invr;
+        const TCALC invr4 = invr2 * invr2;
+#ifdef COMPUTE_ENERGY
+        const TCALC ele_contrib = qq_il * invr;
+        const TCALC vdw_contrib = (lja_il * invr4 * invr4 * invr4) - (ljb_il * invr4 * invr2);
+        qq14_acc += LLCONV_FUNC(ele_contrib * scw.nrg_scale_f);
+        lj14_acc += LLCONV_FUNC(vdw_contrib * scw.nrg_scale_f);
+#endif
+#ifdef COMPUTE_FORCE
+        const TCALC fmag = (qq_il * invr * invr2) +
+                           (((TCALC)(6.0) * ljb_il) -
+                            ((TCALC)(12.0) * lja_il * invr4 * invr2)) * invr4 * invr4;        
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        const TCALC fmag_dx = fmag * dx;
+        const TCALC fmag_dy = fmag * dy;
+        const TCALC fmag_dz = fmag * dz;
+        splitForceContribution( fmag_dx, i_atom, sh_xfrc, xoverflow_active,
+                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution( fmag_dy, i_atom, sh_yfrc, yoverflow_active,
+                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution( fmag_dz, i_atom, sh_zfrc, zoverflow_active,
+                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution(-fmag_dx, l_atom, sh_xfrc, xoverflow_active,
+                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution(-fmag_dy, l_atom, sh_yfrc, yoverflow_active,
+                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution(-fmag_dz, l_atom, sh_zfrc, zoverflow_active,
+                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+#  else // SPLIT_FORCE_ACCUMULATION
+        const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
+        const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
+        const llint ifmag_dz = LLCONV_FUNC(fmag * dz);
+        atomicAdd((ullint*)&sh_xfrc[i_atom],  lliToUlli(ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[i_atom],  lliToUlli(ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[i_atom],  lliToUlli(ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[l_atom], lliToUlli(-ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[l_atom], lliToUlli(-ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[l_atom], lliToUlli(-ifmag_dz));
+#  endif
+#endif
       }
       pos += blockDim.x;
     }
+#ifdef COMPUTE_ENERGY
+    // Stash the threads' accumulated 1:4 interaction energy values
+    WARP_REDUCE_DOWN(qq14_acc)
+    WARP_REDUCE_DOWN(lj14_acc)
+    if ((threadIdx.x & warp_bits_mask_int) == 0) {
+      sh_qq14_acc[(threadIdx.x >> warp_bits)] = qq14_acc;
+      sh_lj14_acc[(threadIdx.x >> warp_bits)] = lj14_acc;
+    }
+#endif
     vterm_offset = vterm_limit;
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RPOSN)];
+#ifdef COMPUTE_ENERGY
+    llint rstr_acc = 0LL;
+#endif
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RPOSN)]) {
-        
+        const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RPOSN)].x;
+        const uint2 tinsr = __ldcs(&poly_vk.rposn_insr[task_offset + pos - vterm_offset]);
+        const int p_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
+        const int xyz_param_idx = tinsr.y;
+
+
+        // The reference coordinate storage in floating point numbers may not be as good for
+        // precision in the calculations, but restraints of this sort are generally employed
+        // at the beginning of a simulation, when the molecule is near the origin (and hence
+        // the numbers will not be large), and also with the intention of bleeding off excess
+        // energy in the system while keeping its general structure intact.  There are a few
+        // applications which may involve both positional restraints and energy conservation,
+        // but the damage done by keeping positional restraints in 32-bit floats will likely
+        // be marginal in those cases.
+#if 0
+        const TCALC dx = ((TCALC)(__ldca(&gmem_r.xcrd[p_atom])) * poly_psw.inv_gpos_scale_f);
+#endif
       }
       pos += blockDim.x;
     }
@@ -1179,7 +1277,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RBOND)];
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RBOND)]) {
-        
+        const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RBOND)].x;
+        const uint2 tinsr = __ldcs(&poly_vk.rbond_insr[task_offset + pos - vterm_offset]);
       }
       pos += blockDim.x;
     }
@@ -1187,7 +1286,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RANGL)];
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RANGL)]) {
-        
+        const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RANGL)].x;
+        const uint2 tinsr = __ldcs(&poly_vk.rangl_insr[task_offset + pos - vterm_offset]);        
       }
       pos += blockDim.x;
     }
@@ -1195,7 +1295,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     vterm_limit = vterm_offset + vwu_padded_task_count[(size_t)(VwuAbstractMap::RDIHE)];
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RDIHE)]) {
-        
+        const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RDIHE)].x;
+        const uint2 tinsr = __ldcs(&poly_vk.rdihe_insr[task_offset + pos - vterm_offset]);
       }
       pos += blockDim.x;
     }

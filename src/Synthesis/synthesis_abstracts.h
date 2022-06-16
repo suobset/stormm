@@ -78,6 +78,67 @@ template <typename T> struct SyValenceKit {
   const uint* infr14_acc;        ///< Inferred 1:4 interaction energy accumulation masks
 };
 
+/// \brief Collect the critical restraint parameters and masking information for work unit-based
+///        evaluation of the systems in an AtomGraphSynthesis.
+template <typename T, typename T2, typename T4> struct SyRestraintKit {
+
+  /// \brief The constructor takes a straight list of arguments for each member variable.
+  explicit SyRestraintKit(const int2* rposn_step_bounds_in, const int2* rbond_step_bounds_in,
+                          const int2* rangl_step_bounds_in, const int2* rdihe_step_bounds_in,
+                          const T2* rposn_init_k_in, const T2* rposn_finl_k_in,
+                          const T4* rposn_init_r_in, const T4* rposn_finl_r_in,
+                          const T2* rposn_init_xy_in, const T* rposn_init_z_in,
+                          const T2* rposn_finl_xy_in, const T* rposn_finl_z_in,
+                          const T2* rbond_init_k_in, const T2* rbond_finl_k_in,
+                          const T4* rbond_init_r_in, const T4* rbond_finl_r_in,
+                          const T2* rangl_init_k_in, const T2* rangl_finl_k_in,
+                          const T4* rangl_init_r_in, const T4* rangl_finl_r_in,
+                          const T2* rdihe_init_k_in, const T2* rdihe_finl_k_in,
+                          const T4* rdihe_init_r_in, const T4* rdihe_finl_r_in,
+                          const uint2* rposn_insr_in, const uint2* rbond_insr_in,
+                          const uint2* rangl_insr_in, const uint2* rdihe_insr_in,
+                          const uint* rposn_acc_in, const uint* rbond_acc_in,
+                          const uint* rangl_acc_in, const uint* rdihe_acc_in);
+
+  // Member variables (all public)
+  const int2* rposn_step_bounds;  ///< Steps for initiating and completely applying positional
+                                  ///<   restraints
+  const int2* rbond_step_bounds;  ///< Steps for initiating and completely applying distance
+                                  ///<   restraints
+  const int2* rangl_step_bounds;  ///< Steps for initiating and completely applying angle
+                                  ///<   restraints
+  const int2* rdihe_step_bounds;  ///< Steps for initiating and completely applying dihedral
+                                  ///<   restraints
+  const T2* rposn_init_k;         ///< Initial positional restraint stiffness parameters
+  const T2* rposn_finl_k;         ///< Final positional restraint stiffness parameters
+  const T4* rposn_init_r;         ///< Initial positional restraint displacement parameters
+  const T4* rposn_finl_r;         ///< Final positional restraint displacement parameters
+  const T2* rposn_init_xy;        ///< Initial positional restraint X and Y reference coordinates
+  const T* rposn_init_z;          ///< Initial positional restraint Z reference coordinates
+  const T2* rposn_finl_xy;        ///< Final positional restraint X and Y reference coordinates
+  const T* rposn_finl_z;          ///< Final positional restraint Z reference coordinates
+  const T2* rbond_init_k;         ///< Initial distance restraint stiffness parameters
+  const T2* rbond_finl_k;         ///< Final distance restraint stiffness parameters
+  const T4* rbond_init_r;         ///< Initial distance restraint displacement parameters
+  const T4* rbond_finl_r;         ///< Final distance restraint displacement parameters
+  const T2* rangl_init_k;         ///< Initial angle restraint stiffness parameters
+  const T2* rangl_finl_k;         ///< Final angle restraint stiffness parameters
+  const T4* rangl_init_r;         ///< Initial angle restraint displacement parameters
+  const T4* rangl_finl_r;         ///< Final angle restraint displacement parameters
+  const T2* rdihe_init_k;         ///< Initial dihedral angel restraint stiffness parameters
+  const T2* rdihe_finl_k;         ///< Final dihedral angle restraint stiffness parameters
+  const T4* rdihe_init_r;         ///< Initial dihedral angle restraint displacement parameters
+  const T4* rdihe_finl_r;         ///< Final dihedral angle restraint displacement parameters
+  const uint2* rposn_insr;        ///< Instructions for positional restraints
+  const uint2* rbond_insr;        ///< Instructions for distance restraints
+  const uint2* rangl_insr;        ///< Instructions for three-point angle restraints
+  const uint2* rdihe_insr;        ///< Instructions for four-point dihedral restraints
+  const uint* rposn_acc;          ///< Masks of whether to accumulate positional restraint effects
+  const uint* rbond_acc;          ///< Masks of whether to accumulate distance restraint effects
+  const uint* rangl_acc;          ///< Masks of whether to accumulate angle restraint effects
+  const uint* rdihe_acc;          ///< Masks of whether to accumulate dihedral restraint effects
+};
+
 /// \brief Collect the critical non-bonded parameters and masking information for work unit-based
 ///        evaluation of the systems in an AtomGraphSynthesis.
 template <typename T> struct SyNonbondedKit {

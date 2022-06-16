@@ -3,14 +3,15 @@ namespace omni {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcalc>
-void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_charges,
-                            const int* sh_lj_idx, llint* sh_xcrd, llint* sh_ycrd, llint* sh_zcrd,
-                            llint* sh_xvel, llint* sh_yvel, llint* sh_zvel, llint* sh_xfrc,
-                            llint* sh_yfrc, llint* sh_zfrc, const double inv_gpos_scale,
-                            const double force_scale, ScoreCard *ecard, const int vwu_idx,
-                            const EvaluateForce eval_force, const VwuTask activity,
-                            const VwuGoal purpose, const int step_number) {
+template <typename Tcalc, typename Tcalc2, typename Tcalc4>
+void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
+                            const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk,
+                            const Tcalc* sh_charges, const int* sh_lj_idx, llint* sh_xcrd,
+                            llint* sh_ycrd, llint* sh_zcrd, llint* sh_xvel, llint* sh_yvel,
+                            llint* sh_zvel, llint* sh_xfrc, llint* sh_yfrc, llint* sh_zfrc,
+                            const double inv_gpos_scale, const double force_scale,
+                            ScoreCard *ecard, const int vwu_idx, const EvaluateForce eval_force,
+                            const VwuTask activity, const VwuGoal purpose, const int step_number) {
 
   // Initialize energy accumulators
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
@@ -295,15 +296,177 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk, const Tcalc* sh_char
     }
   }
 
+  // Evaluate positional restraints
+  if (activity == VwuTask::RPOSN || activity == VwuTask::ALL_TASKS) {
+    const int2 rposn_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                 static_cast<int>(VwuAbstractMap::RPOSN)];
+    const int2 rposn_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                     static_cast<int>(VwuAbstractMap::RPOSN_NRG)];
+    for (int pos = rposn_limits.x; pos < rposn_limits.y; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE:
+        if (readBitFromMask(&syrk.rposn_acc[rposn_nrg_limits.x], pos - rposn_limits.x) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(&syrk.rposn_acc[rposn_nrg_limits.x], pos - rposn_limits.x);
+        break;
+      }
+      const uint2 tinsr = syrk.rposn_insr[pos];
+      const int p_atom = (tinsr.x & 0x3ff);
+      const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
+      const int xyz_param_idx = tinsr.y;
+      const double contrib =
+        evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number,
+                          syrk.rposn_step_bounds[kr_param_idx].x,
+                          syrk.rposn_step_bounds[kr_param_idx].y,
+                          syrk.rposn_init_xy[xyz_param_idx], syrk.rposn_finl_xy[xyz_param_idx],
+                          syrk.rposn_init_z[xyz_param_idx], syrk.rposn_finl_z[xyz_param_idx],
+                          syrk.rposn_init_k[kr_param_idx], syrk.rposn_finl_k[kr_param_idx],
+                          syrk.rposn_init_r[kr_param_idx], syrk.rposn_finl_r[kr_param_idx],
+                          sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
+                          sh_yfrc, sh_zfrc, eval_force);
+      if (log_term) {
+        rest_acc += llround(contrib * nrg_scale_factor);
+      }
+    }
+  }
+
+  // Evaluate distance restraints
+  if (activity == VwuTask::RBOND || activity == VwuTask::ALL_TASKS) {
+    const int2 rbond_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                 static_cast<int>(VwuAbstractMap::RBOND)];
+    const int2 rbond_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                     static_cast<int>(VwuAbstractMap::RBOND_NRG)];
+    for (int pos = rbond_limits.x; pos < rbond_limits.y; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE:
+        if (readBitFromMask(&syrk.rbond_acc[rbond_nrg_limits.x], pos - rbond_limits.x) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(&syrk.rbond_acc[rbond_nrg_limits.x], pos - rbond_limits.x);
+        break;
+      }
+      const uint2 tinsr = syrk.rbond_insr[pos];
+      const int i_atom = (tinsr.x & 0x3ff);
+      const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+      const int param_idx = tinsr.y;
+      const double contrib =
+        evalBondRestraint<llint,
+                          llint,
+                          double,
+                          double2,
+                          double4>(i_atom, j_atom, (tinsr.x >> 31), step_number,
+                                   syrk.rbond_step_bounds[param_idx].x,
+                                   syrk.rbond_step_bounds[param_idx].y,
+                                   syrk.rbond_init_k[param_idx], syrk.rbond_finl_k[param_idx],
+                                   syrk.rbond_init_r[param_idx], syrk.rbond_finl_r[param_idx],
+                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+      if (log_term) {
+        rest_acc += llround(contrib * nrg_scale_factor);
+      }
+    }
+  }
+
+  // Evaluate angle restraints
+  if (activity == VwuTask::RANGL || activity == VwuTask::ALL_TASKS) {
+    const int2 rangl_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                 static_cast<int>(VwuAbstractMap::RANGL)];
+    const int2 rangl_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                     static_cast<int>(VwuAbstractMap::RANGL_NRG)];
+    for (int pos = rangl_limits.x; pos < rangl_limits.y; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE:
+        if (readBitFromMask(&syrk.rangl_acc[rangl_nrg_limits.x], pos - rangl_limits.x) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(&syrk.rangl_acc[rangl_nrg_limits.x], pos - rangl_limits.x);
+        break;
+      }
+      const uint2 tinsr = syrk.rangl_insr[pos];
+      const int i_atom = (tinsr.x & 0x3ff);
+      const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+      const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+      const int param_idx = tinsr.y;
+      const double contrib =
+        evalAnglRestraint<llint,
+                          llint,
+                          double,
+                          double2,
+                          double4>(i_atom, j_atom, k_atom, (tinsr.x >> 31), step_number,
+                                   syrk.rangl_step_bounds[param_idx].x,
+                                   syrk.rangl_step_bounds[param_idx].y,
+                                   syrk.rangl_init_k[param_idx], syrk.rangl_finl_k[param_idx],
+                                   syrk.rangl_init_r[param_idx], syrk.rangl_finl_r[param_idx],
+                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+      if (log_term) {
+        rest_acc += llround(contrib * nrg_scale_factor);
+      }      
+    }
+  }
+
+  // Evaluate dihedral restraints
+  if (activity == VwuTask::RANGL || activity == VwuTask::ALL_TASKS) {
+    const int2 rdihe_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                 static_cast<int>(VwuAbstractMap::RDIHE)];
+    const int2 rdihe_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
+                                                     static_cast<int>(VwuAbstractMap::RDIHE_NRG)];
+    for (int pos = rdihe_limits.x; pos < rdihe_limits.y; pos++) {
+      bool log_term = true;
+      switch (purpose) {
+      case VwuGoal::ACCUMULATE:
+        if (readBitFromMask(&syrk.rdihe_acc[rdihe_nrg_limits.x], pos - rdihe_limits.x) == 0) {
+          continue;
+        }
+        break;
+      case VwuGoal::MOVE_PARTICLES:
+        log_term = readBitFromMask(&syrk.rdihe_acc[rdihe_nrg_limits.x], pos - rdihe_limits.x);
+        break;
+      }
+      const uint2 tinsr = syrk.rangl_insr[pos];
+      const int i_atom = (tinsr.x & 0x3ff);
+      const int j_atom = ((tinsr.x >> 10) & 0x3ff);
+      const int k_atom = ((tinsr.x >> 20) & 0x3ff);
+      const int l_atom = (tinsr.y & 0x3ff);
+      const int param_idx = ((tinsr.y >> 10) * 0x3fffff);
+      const double contrib =
+        evalDiheRestraint<llint,
+                          llint,
+                          double,
+                          double2,
+                          double4>(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31), step_number,
+                                   syrk.rdihe_step_bounds[param_idx].x,
+                                   syrk.rdihe_step_bounds[param_idx].y,
+                                   syrk.rdihe_init_k[param_idx], syrk.rdihe_finl_k[param_idx],
+                                   syrk.rdihe_init_r[param_idx], syrk.rdihe_finl_r[param_idx],
+                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+      if (log_term) {
+        rest_acc += llround(contrib * nrg_scale_factor);
+      }
+    }
+  }
+  
   // Contribute results as the instantaneous states
   commitVwuEnergies(bond_acc, angl_acc, dihe_acc, impr_acc, ubrd_acc, cimp_acc, cmap_acc,
                     qq14_acc, lj14_acc, rest_acc, sysid, activity, ecard);
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcalc>
-void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk, PsSynthesisWriter psyw, ScoreCard *ecard,
-                         const EvaluateForce eval_force, const VwuTask activity,
+template <typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
+                         const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
+                         ScoreCard *ecard, const EvaluateForce eval_force, const VwuTask activity,
                          const VwuGoal purpose, const int step_number) {
 
   // Loop over all valence work units within the topology synthesis.  Each holds within it the
@@ -336,7 +499,7 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk, PsSynthesisWriter psyw,
       sh_yfrc[j_sh]    = 0LL;
       sh_zfrc[j_sh]    = 0LL;
     }
-    synthesisVwuEvaluation(syvk, sh_charges.data(), sh_lj_idx.data(), sh_xcrd.data(),
+    synthesisVwuEvaluation(syvk, syrk, sh_charges.data(), sh_lj_idx.data(), sh_xcrd.data(),
                            sh_ycrd.data(), sh_zcrd.data(), sh_xvel.data(), sh_yvel.data(),
                            sh_zvel.data(), sh_xfrc.data(), sh_yfrc.data(), sh_zfrc.data(),
                            psyw.inv_gpos_scale, psyw.frc_scale, ecard, i, eval_force, activity,

@@ -36,5 +36,39 @@ SyValenceKit<T>::SyValenceKit(const int nvwu_in, const T coulomb_in, const T* bo
     infr14_acc{infr14_acc_in}
 {}
 
+//-------------------------------------------------------------------------------------------------
+template <typename T, typename T2, typename T4>
+SyRestraintKit<T, T2, T4>::SyRestraintKit(const int2* rposn_step_bounds_in,
+                                          const int2* rbond_step_bounds_in,
+                                          const int2* rangl_step_bounds_in,
+                                          const int2* rdihe_step_bounds_in,
+                                          const T2* rposn_init_k_in, const T2* rposn_finl_k_in,
+                                          const T4* rposn_init_r_in, const T4* rposn_finl_r_in,
+                                          const T2* rposn_init_xy_in, const T* rposn_init_z_in,
+                                          const T2* rposn_finl_xy_in, const T* rposn_finl_z_in,
+                                          const T2* rbond_init_k_in, const T2* rbond_finl_k_in,
+                                          const T4* rbond_init_r_in, const T4* rbond_finl_r_in,
+                                          const T2* rangl_init_k_in, const T2* rangl_finl_k_in,
+                                          const T4* rangl_init_r_in, const T4* rangl_finl_r_in,
+                                          const T2* rdihe_init_k_in, const T2* rdihe_finl_k_in,
+                                          const T4* rdihe_init_r_in, const T4* rdihe_finl_r_in,
+                                          const uint2* rposn_insr_in, const uint2* rbond_insr_in,
+                                          const uint2* rangl_insr_in, const uint2* rdihe_insr_in,
+                                          const uint* rposn_acc_in, const uint* rbond_acc_in,
+                                          const uint* rangl_acc_in, const uint* rdihe_acc_in) :
+    rposn_step_bounds{rposn_step_bounds_in}, rbond_step_bounds{rbond_step_bounds_in},
+    rangl_step_bounds{rangl_step_bounds_in}, rdihe_step_bounds{rdihe_step_bounds_in},
+    rposn_init_k{rposn_init_k_in}, rposn_finl_k{rposn_finl_k_in}, rposn_init_r{rposn_init_r_in},
+    rposn_finl_r{rposn_finl_r_in}, rposn_init_xy{rposn_init_xy_in}, rposn_init_z{rposn_init_z_in},
+    rposn_finl_xy{rposn_finl_xy_in}, rposn_finl_z{rposn_finl_z_in}, rbond_init_k{rbond_init_k_in},
+    rbond_finl_k{rbond_finl_k_in}, rbond_init_r{rbond_init_r_in}, rbond_finl_r{rbond_finl_r_in},
+    rangl_init_k{rangl_init_k_in}, rangl_finl_k{rangl_finl_k_in}, rangl_init_r{rangl_init_r_in},
+    rangl_finl_r{rangl_finl_r_in}, rdihe_init_k{rdihe_init_k_in}, rdihe_finl_k{rdihe_finl_k_in},
+    rdihe_init_r{rdihe_init_r_in}, rdihe_finl_r{rdihe_finl_r_in}, rposn_insr{rposn_insr_in},
+    rbond_insr{rbond_insr_in}, rangl_insr{rangl_insr_in}, rdihe_insr{rdihe_insr_in},
+    rposn_acc{rposn_acc_in}, rbond_acc{rbond_acc_in}, rangl_acc{rangl_acc_in},
+    rdihe_acc{rdihe_acc_in}
+{}
+
 } // namespace synthesis
 } // namespace omni

@@ -499,9 +499,8 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                           rar.rposn_finl_xy[xyz_param_idx], rar.rposn_init_z[xyz_param_idx],
                           rar.rposn_finl_z[xyz_param_idx], rar.rposn_init_keq[kr_param_idx],
                           rar.rposn_finl_keq[kr_param_idx], rar.rposn_init_r[kr_param_idx],
-                          rar.rposn_finl_r[kr_param_idx], sh_xcrd, sh_ycrd, sh_zcrd,
-                          nullptr, nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
-                          eval_force);
+                          rar.rposn_finl_r[kr_param_idx], sh_xcrd, sh_ycrd, sh_zcrd, nullptr,
+                          nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
       if (log_term) {
         rest_acc += llround(contrib * nrg_scale_factor);
       }
@@ -604,7 +603,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int l_atom = (tinsr.y & 0x3ff);
-      const int param_idx = (tinsr.y >> 10);
+      const int param_idx = ((tinsr.y >> 10) & 0x3fffff);
       const double contrib =
         evalDiheRestraint<double,
                           double,

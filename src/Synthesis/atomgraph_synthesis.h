@@ -220,6 +220,20 @@ public:
   SyValenceKit<float>
   getSinglePrecisionValenceKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  /// \brief Get a minimal kit with double-precision parameter detail for computing valence
+  ///        interactions for all systems based on the work units stored in this object.
+  ///
+  /// \param tier  Level at which to obtain pointers for the abstract
+  SyRestraintKit<double, double2, double4>
+  getDoublePrecisionRestraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get a minimal kit with single-precision parameter detail for computing valence
+  ///        interactions for all systems based on the work units stored in this object.
+  ///
+  /// \param tier  Level at which to obtain pointers for the abstract
+  SyRestraintKit<float, float2, float4>
+  getSinglePrecisionRestraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
 #ifdef OMNI_USE_HPC
   /// \brief Upload the object
   void upload();
