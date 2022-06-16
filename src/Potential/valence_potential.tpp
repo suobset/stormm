@@ -270,6 +270,44 @@ double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrit
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
+                        const Tcalc* bc, const Tcalc* scr) {
+  if (fabsf(costheta) >= near_to_one_f) {
+
+    // The Tcalcing-point representation of costheta is numerically ill-conditioned.  Compute
+    // the distance from atom I to the plane of atoms J, K, and L to get the angle by the
+    // arcsin of an extremely acute angle.
+    const Tcalc mg_crabbc = 1.0f / sqrtf(crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] +
+                                         crabbc[2]*crabbc[2]);
+    const Tcalc mg_crbccd = 1.0f / sqrtf(crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] +
+                                         crbccd[2]*crbccd[2]);
+    const Tcalc nx_abbc = crabbc[0] * mg_crabbc;
+    const Tcalc ny_abbc = crabbc[1] * mg_crabbc;
+    const Tcalc nz_abbc = crabbc[2] * mg_crabbc;
+    const Tcalc nx_bccd = crbccd[0] * mg_crbccd;
+    const Tcalc ny_bccd = crbccd[1] * mg_crbccd;
+    const Tcalc nz_bccd = crbccd[2] * mg_crbccd;
+    Tcalc rdx = nx_bccd - nx_abbc;
+    Tcalc rdy = ny_bccd - ny_abbc;
+    Tcalc rdz = nz_bccd - nz_abbc;
+    Tcalc rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    if (fabsf(rs) > 1.0f) {
+      rdx = nx_bccd + nx_abbc;
+      rdy = ny_bccd + ny_abbc;
+      rdz = nz_bccd + nz_abbc;
+      rs = pi_f - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    }
+    return (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ? rs : -rs;
+  }
+  else {
+    return (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ?  acosf(costheta) :
+                                                                 -acosf(costheta);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc>
 Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
                         const Tcalc amplitude, const Tcalc phase_angle, const Tcalc frequency,
@@ -329,37 +367,7 @@ Tcalc evalDihedralTwist(const int i_atom, const int j_atom, const int k_atom, co
     theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ? acos(costheta) : -acos(costheta);
   }
   else {
-    if (std::abs(costheta) >= near_to_one_f) {
-
-      // The floating-point representation of costheta is numerically ill-conditioned.  Compute
-      // the distance from atom I to the plane of atoms J, K, and L to get the angle by the
-      // arcsin of an extremely acute angle.
-      const Tcalc mg_crabbc = value_one / sqrtf(crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] +
-                                                crabbc[2]*crabbc[2]);
-      const Tcalc mg_crbccd = value_one / sqrtf(crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] +
-                                                crbccd[2]*crbccd[2]);
-      const Tcalc nx_abbc = crabbc[0] * mg_crabbc;
-      const Tcalc ny_abbc = crabbc[1] * mg_crabbc;
-      const Tcalc nz_abbc = crabbc[2] * mg_crabbc;
-      const Tcalc nx_bccd = crbccd[0] * mg_crbccd;
-      const Tcalc ny_bccd = crbccd[1] * mg_crbccd;
-      const Tcalc nz_bccd = crbccd[2] * mg_crbccd;
-      Tcalc rdx = nx_bccd - nx_abbc;
-      Tcalc rdy = ny_bccd - ny_abbc;
-      Tcalc rdz = nz_bccd - nz_abbc;
-      Tcalc rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-      if (std::abs(rs) > value_one) {
-        rdx = nx_bccd + nx_abbc;
-        rdy = ny_bccd + ny_abbc;
-        rdz = nz_bccd + nz_abbc;
-        rs = pi_f - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-      }
-      theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ? rs : -rs;
-    }
-    else {
-      theta = (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ?  acosf(costheta) :
-                                                                    -acosf(costheta);
-    }
+    theta = angleVerification(costheta, crabbc, crbccd, bc, scr);
   }
   Tcalc sangle;
   switch (kind) {
@@ -757,8 +765,7 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
     phi = (phi < 0.0) ? phi + twopi : (phi >= twopi) ? phi - twopi : phi;
   }
   else {
-    phi = (scr_phi[0]*bc[0] + scr_phi[1]*bc[1] + scr_phi[2]*bc[2] > 0.0f) ?  acosf(cos_phi) :
-                                                                            -acosf(cos_phi);
+    phi = angleVerification(cos_phi, crabbc, crbccd, bc, scr_phi);
     phi += pi_f;
     phi = (phi < 0.0f) ? phi + twopi_f : (phi >= twopi_f) ? phi - twopi_f : phi;
   }
@@ -784,8 +791,7 @@ Tcalc evalCmap(const Tcalc* cmap_patches, const int* cmap_patch_bounds, const in
     psi = (psi < 0.0) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
   }
   else {
-    psi = (scr_psi[0]*cd[0] + scr_psi[1]*cd[1] + scr_psi[2]*cd[2] > 0.0f) ?  acosf(cos_psi) :
-                                                                            -acosf(cos_psi);
+    psi = angleVerification(cos_psi, crbccd, crcdde, cd, scr_psi);
     psi += pi_f;
     psi = (psi < 0.0f) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
   }

@@ -311,13 +311,21 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         TCALC3 scr_phi = crossProduct(crabbc, crbccd);
 #ifdef CHECK_COSARG
         TCALC phi = angleVerification(cos_phi, crabbc, crbccd, bc, scr_phi);
+
+        // The single-precision floating point representation of PI is not the same as the
+        // double-precision floating point representation, so use the fact that single precision
+        // calculations use this branch of the code to specify the correct constant for each
+        // precision mode.
+        phi += pi_f;
+        phi = (phi < (TCALC)(0.0)) ? phi + twopi_f : (phi >= twopi_f) ? phi - twopi_f : phi;
 #else
         cos_phi = (cos_phi < (TCALC)(-1.0)) ? (TCALC)(-1.0) :
                                               (cos_phi > (TCALC)(1.0)) ? (TCALC)(1.0) : cos_phi;
         TCALC phi = ((scr_phi.x * bc.x) + (scr_phi.y * bc.y) + (scr_phi.z * bc.z) > (TCALC)(0.0)) ?
                     ACOS_FUNC(cos_phi) : -ACOS_FUNC(cos_phi);
+        phi += pi;
+        phi = (phi < (TCALC)(0.0)) ? phi + twopi : (phi >= twopi) ? phi - twopi : phi;
 #endif
-        phi = (phi < (TCALC)(0.0)) ? phi + twopi_f : (phi >= twopi_f) ? phi - twopi_f : phi;
 
         // Compute the second dihedral angle
         TCALC3 crcdde = crossProduct(cd, de);
@@ -329,14 +337,17 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         TCALC3 scr_psi = crossProduct(crbccd, crcdde);
 #ifdef CHECK_COSARG
         TCALC psi = angleVerification(cos_psi, crbccd, crcdde, cd, scr_psi);
+        psi += pi_f;
+        psi = (psi < (TCALC)(0.0)) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
 #else
         cos_psi = (cos_psi < (TCALC)(-1.0)) ? (TCALC)(-1.0) :
                                               (cos_psi > (TCALC)(1.0)) ? (TCALC)(1.0) : cos_psi;
         TCALC psi = ((scr_psi.x * cd.x) + (scr_psi.y * cd.y) + (scr_psi.z * cd.z) > (TCALC)(0.0)) ?
                     ACOS_FUNC(cos_psi) : -ACOS_FUNC(cos_psi);
+        psi += pi;
+        psi = (psi < (TCALC)(0.0)) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
 #endif
-        psi = (psi < (TCALC)(0.0)) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
-
+        
         // Compute the patch index
         const int int_surf_dim    = __ldca(&poly_vk.cmap_dim[surf_idx]);
         const TCALC real_surf_dim = (TCALC)(int_surf_dim);
@@ -590,7 +601,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint iphi_iz = LLCONV_FUNC(crabbc.z * phi_fa);
         const llint iphi_jz = LLCONV_FUNC((phi_fb1 * crabbc.z) - (phi_fb2 * crbccd.z));
         const llint iphi_lz = LLCONV_FUNC(-phi_fd * crbccd.z);
-        const llint ipsi_jz = LLCONV_FUNC(crbccd.y * psi_fa);
+        const llint ipsi_jz = LLCONV_FUNC(crbccd.z * psi_fa);
         const llint ipsi_kz = LLCONV_FUNC((psi_fb1 * crbccd.z) - (psi_fb2 * crcdde.z));
         const llint ipsi_mz = LLCONV_FUNC(-psi_fd * crcdde.z);
         atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(iphi_iz));

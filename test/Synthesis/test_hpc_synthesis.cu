@@ -168,23 +168,32 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
     cpu_lj14[i] = isc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0);
   }
   check(gpu_bond, RelationalOperator::EQUAL, Approx(cpu_bond).margin(bond_tol), "Bond energies "
-        "computed on the CPU and GPU do not agree.\n", do_tests);
+        "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
+        getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_angl, RelationalOperator::EQUAL, Approx(cpu_angl).margin(angl_tol), "Angle energies "
-        "computed on the CPU and GPU do not agree.\n", do_tests);
+        "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
+        getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_dihe, RelationalOperator::EQUAL, Approx(cpu_dihe).margin(dihe_tol), "Proper "
-        "dihedral energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "dihedral energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_impr, RelationalOperator::EQUAL, Approx(cpu_impr).margin(impr_tol), "Improper "
-        "dihedral energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "dihedral energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_ubrd, RelationalOperator::EQUAL, Approx(cpu_ubrd).margin(ubrd_tol), "Urey-Bradley "
-        "energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_cimp, RelationalOperator::EQUAL, Approx(cpu_cimp).margin(cimp_tol), "CHARMM "
-        "improper dihedral energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "improper dihedral energies computed on the CPU and GPU do not agree.  Precision level in "
+        "the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_cmap, RelationalOperator::EQUAL, Approx(cpu_cmap).margin(cmap_tol), "CMAP "
-        "energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_qq14, RelationalOperator::EQUAL, Approx(cpu_qq14).margin(qq14_tol), "Electrostatic "
-        "1:4 energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(gpu_lj14, RelationalOperator::EQUAL, Approx(cpu_lj14).margin(lj14_tol), "Lennard-Jones "
-        "1:4 energies computed on the CPU and GPU do not agree.\n", do_tests);
+        "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -334,12 +343,33 @@ int main(const int argc, const char* argv[]) {
     rtWarn("Files for several systems in implicit solvent were not found.  Check the "
            "${OMNI_SOURCE} environment variable for validity.  Subsequent tests will be skipped.");
   }
-#if 0
-  const std::vector<AtomGraph*> bigger_tops = { &trpi_ag, &trpi_ag, &dhfr_ag, &dhfr_ag, &alad_ag,
-                                                &trpi_ag, &dhfr_ag, &dhfr_ag, &alad_ag, &trpi_ag };
-  const std::vector<PhaseSpace> bigger_crds = { trpi_ps, trpi_ps, dhfr_ps, dhfr_ps, alad_ps,
-                                                trpi_ps, dhfr_ps, dhfr_ps, alad_ps, trpi_ps };
-#endif
+
+  // Read some larger topologies, with CHARMM CMAP and other force field terms
+  const std::vector<AtomGraph*> bigger_tops = { &trpi_ag, &dhfr_ag, &alad_ag };
+  const std::vector<PhaseSpace> bigger_crds = { trpi_ps, dhfr_ps, alad_ps };
+  PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
+  const std::vector<int> big_top_indices = { 0, 1, 2 };
+  AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT,
+                                 max_vwu_atoms, &timer);
+  big_poly_ag.upload();
+  big_poly_ps.upload();
+  timer.assignTime(0);
+  checkCompilationForces(&big_poly_ps, &mmctrl, &tb_space, big_poly_ag,
+                         ForceAccumulationMethod::WHOLE, PrecisionLevel::DOUBLE, gpu, 3.5e-6,
+                         2.0e-5, do_tests);
+  checkCompilationForces(&big_poly_ps, &mmctrl, &tb_space, big_poly_ag,
+                         ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu, 7.5e-5,
+                         3.0e-3, do_tests);
+  checkCompilationForces(&big_poly_ps, &mmctrl, &tb_space, big_poly_ag,
+                         ForceAccumulationMethod::WHOLE, PrecisionLevel::SINGLE, gpu, 7.5e-5,
+                         3.0e-3, do_tests);
+  checkCompilationEnergies(&big_poly_ps, &mmctrl, &tb_space, big_poly_ag, PrecisionLevel::DOUBLE,
+                           gpu, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6,
+                           1.0e-6, 1.0e-6, do_tests);
+  checkCompilationEnergies(&big_poly_ps, &mmctrl, &tb_space, big_poly_ag, PrecisionLevel::SINGLE,
+                           gpu, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5,
+                           2.2e-4, 1.0e-6, do_tests);
+  
 #if 0
   for (int len = 4; len < 36; len += 4) {
     const std::vector<AtomGraph*> bigger_tops(len, &trpi_ag);

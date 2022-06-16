@@ -242,6 +242,23 @@ double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrit
                           ScoreCard *ecard, int system_index = 0, int force_scale_bits = 23);
 /// \}
 
+/// \brief Guard against the ill-conditioned region of the arccos function when its argument is
+///        close to 1.0 in single-precision.  This will produce a much more accurate dihedral
+///        angle representation when computing torsions and CMAPs, particularly in improper terms
+///        when the force constants are larger and the angles tend to occupy the ill-conditioned
+///        regions.
+///
+/// \param costheta  Argument to the arccos function, naively computed as the dot product of
+///                  crabbc and crbccd over the product of their magnitudes.
+/// \param crabbc    Normal vector to the ABC (atoms I-J-K) plane
+/// \param crbccd    Normal vector to the BCD (atoms J-K-L) plane
+/// \param bc        B-C (atoms J-K) vector
+/// \param scr       Cross product of crabbc and crbccd, pre-computed for prior use in the naive
+///                  computation
+template <typename Tcalc>
+Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
+                        const Tcalc* bc, const Tcalc* scr);
+  
 /// \brief Evalaute the energy and forces due to a cosine-based or harmonic dihedral term.
 ///        Parameters for this function follow evalHarmonicBend, with the addition of:
 ///
