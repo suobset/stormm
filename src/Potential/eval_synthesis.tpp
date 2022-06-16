@@ -208,11 +208,16 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
                                                      inv_gpos_scale, force_scale);
       }
       if (log_term) {
-        if (kind == TorsionKind::PROPER) {
-          dihe_acc += llround(du * nrg_scale_factor);
+        if (is_charmm_improper) {
+          cimp_acc += llround(du * nrg_scale_factor);
         }
         else {
-          impr_acc += llround(du * nrg_scale_factor);
+          if (kind == TorsionKind::PROPER) {
+            dihe_acc += llround(du * nrg_scale_factor);
+          }
+          else {
+            impr_acc += llround(du * nrg_scale_factor);
+          }
         }
       }
     }

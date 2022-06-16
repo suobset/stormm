@@ -71,6 +71,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
   SyValenceKit<double> syvk = poly_ag.getDoublePrecisionValenceKit();
   SyRestraintKit<double, double2, double4> syrk = poly_ag.getDoublePrecisionRestraintKit();
   ScoreCard sc(poly_ps->getSystemCount(), 1, 32);
+
+  // Bonds
   poly_ps->initializeForces();
   evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::BOND,
@@ -93,6 +95,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
         "a simpler approach.", do_tests);
   check(bond_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to bond "
         "interactions are inconsistent with those computed using a simpler approach.", do_tests);
+
+  // Typical harmonic angles
   poly_ps->initializeForces();
   evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::ANGL,
@@ -113,6 +117,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
   check(angl_nrg, RelationalOperator::EQUAL, Approx(angl_nrg_answer).margin(3.1e-7),
         "Harmonic angle energies computed using the synthesis methods are inconsistent with those "
         "computed using a simpler approach.", do_tests);
+
+  // Cosine-based dihedrals
   poly_ps->initializeForces();
   evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::DIHE,
@@ -139,6 +145,8 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
   check(impr_nrg, RelationalOperator::EQUAL, Approx(impr_nrg_answer).margin(2.5e-9),
         "Cosine-based improper dihedral energies computed using the synthesis methods are "
         "inconsistent with those computed using a simpler approach.", do_tests);
+
+  // General 1:4 interactions
   poly_ps->initializeForces();
   evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::INFR14,
@@ -165,6 +173,52 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
   check(lj14_nrg, RelationalOperator::EQUAL, Approx(lj14_nrg_answer).margin(2.5e-7),
         "Attenuated 1:4 van-der Waals energies computed using the synthesis methods are "
         "inconsistent with those computed using a simpler approach.", do_tests);
+
+  // Urey-Bradley interactions
+  poly_ps->initializeForces();
+  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+                                                EvaluateForce::YES, VwuTask::UBRD,
+                                                VwuGoal::ACCUMULATE, 0);
+  std::vector<double> ubrd_nrg, ubrd_nrg_answer, ubrd_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
+    ubrd_nrg.push_back(sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, i));
+    PhaseSpace psi = poly_ps->exportSystem(i);
+    psi.initializeForces();
+    ubrd_nrg_answer.push_back(evaluateUreyBradleyTerms(poly_ag.getSystemTopologyPointer(i), &psi,
+                                                       &tmp_sc, EvaluateForce::YES));
+    ubrd_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
+  }
+  error_limits.setValues(std::vector<double>(nsys, 4.5e-6));
+  check(ubrd_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to "
+        "Urey-Bradley interactions are inconsistent with those computed using a simpler approach.",
+        do_tests);
+  check(ubrd_nrg, RelationalOperator::EQUAL, Approx(ubrd_nrg_answer).margin(1.5e-7),
+        "Urey-Bradley interaction energies computed using the synthesis methods are inconsistent "
+        "with those computed using a simpler approach.", do_tests);
+  
+  // CHARMM improper dihedral interactions
+  poly_ps->initializeForces();
+  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+                                                EvaluateForce::YES, VwuTask::CIMP,
+                                                VwuGoal::ACCUMULATE, 0);
+  std::vector<double> cimp_nrg, cimp_nrg_answer, cimp_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
+    cimp_nrg.push_back(sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, i));
+    PhaseSpace psi = poly_ps->exportSystem(i);
+    psi.initializeForces();
+    cimp_nrg_answer.push_back(evaluateCharmmImproperTerms(poly_ag.getSystemTopologyPointer(i),
+                                                          &psi, &tmp_sc, EvaluateForce::YES));
+    cimp_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
+  }
+  error_limits.setValues(std::vector<double>(nsys, 4.5e-6));
+  check(cimp_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to "
+        "CHARMM improper interactions are inconsistent with those computed using a simpler "
+        "approach.", do_tests);
+  check(cimp_nrg, RelationalOperator::EQUAL, Approx(cimp_nrg_answer).margin(1.5e-7),
+        "CHARMM improper interaction energies computed using the synthesis methods are "
+        "inconsistent with those computed using a simpler approach.", do_tests);
+  
+  // CMAP interactions
   poly_ps->initializeForces();
   evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::CMAP,
