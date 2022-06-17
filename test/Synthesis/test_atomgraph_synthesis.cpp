@@ -9,6 +9,7 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Restraints/bounded_restraint.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
@@ -22,6 +23,7 @@
 using omni::constants::ExceptionResponse;
 using omni::constants::verytiny;
 using omni::data_types::double2;
+using omni::data_types::double3;
 using omni::data_types::double4;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
@@ -31,7 +33,8 @@ using omni::energy::EvaluateForce;
 using omni::energy::ScoreCard;
 using omni::energy::StateVariable;
 using omni::errors::rtWarn;
-using omni::random::Ran2Generator;
+using omni::random::Xoroshiro128pGenerator;
+using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
 using namespace omni::synthesis;
 using namespace omni::topology;
@@ -239,6 +242,75 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
   check(cmap_nrg, RelationalOperator::EQUAL, Approx(cmap_nrg_answer).margin(3.1e-7),
         "CMAP energies computed using the synthesis methods are inconsistent with those "
         "computed using a simpler approach.", do_tests);
+
+  // Various restraints
+  poly_ps->initializeForces();
+  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+                                                EvaluateForce::YES, VwuTask::RPOSN,
+                                                VwuGoal::ACCUMULATE, 0);
+  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+                                                EvaluateForce::YES, VwuTask::RBOND,
+                                                VwuGoal::ACCUMULATE, 0);
+  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+                                                EvaluateForce::YES, VwuTask::RANGL,
+                                                VwuGoal::ACCUMULATE, 0);
+  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+                                                EvaluateForce::YES, VwuTask::RDIHE,
+                                                VwuGoal::ACCUMULATE, 0);
+  std::vector<double> rstr_nrg, rstr_nrg_answer, rstr_frc_deviations;
+  for (int i = 0; i < nsys; i++) {
+    rstr_nrg.push_back(sc.reportInstantaneousStates(StateVariable::RESTRAINT, i));
+    PhaseSpace psi = poly_ps->exportSystem(i);
+    psi.initializeForces();
+    rstr_nrg_answer.push_back(evaluateRestraints(poly_ag.getSystemRestraintPointer(i), &psi,
+                                                 &tmp_sc, EvaluateForce::YES));
+    rstr_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Create a collection of positional, distance, angle, and dihedral restraints acting on a system
+// which will exert mild to moderate forces.  All of the restraints, together, will be checked for
+// total energy and forces.  This feeds into tests that are not designed to weed out individual
+// problems but instead take a "pooled sample" and verify that there are no problems in it.
+//
+// Arguments:
+//   ag:      System topology
+//   ps:      System coordinates
+//-------------------------------------------------------------------------------------------------
+RestraintApparatus assembleRestraints(const AtomGraph *ag, const PhaseSpace &ps) {
+  const CoordinateFrameReader cfr(ps);
+  std::vector<BoundedRestraint> rlist;
+  rlist.reserve((cfr.natom / 8) + 12);
+  Xoroshiro128pGenerator xrs(87293);
+  for (int i = 0; i < cfr.natom; i += cfr.natom / 8) {
+    rlist.emplace_back(i, ag, cfr, 1.1, 1.4, 0.2, 0.6, 0.8, 1.4);
+    double3 ts = rlist[i].getTargetSite();
+    ts.x += 0.25 * (0.5 - xrs.uniformRandomNumber());
+    ts.y += 0.25 * (0.5 - xrs.uniformRandomNumber());
+    ts.z += 0.25 * (0.5 - xrs.uniformRandomNumber());
+    rlist[i].setTargetSite(ts);
+  }
+  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
+  for (int pos = 0; pos < vk.nbond; pos += vk.nbond / 4) {
+    const int i_atom = vk.bond_i_atoms[pos];
+    const int j_atom = vk.bond_j_atoms[pos];
+    rlist.emplace_back(i_atom, j_atom, ag, 2.4, 2.7, 0.5, 2.0, 2.4, 3.9);
+  }
+  for (int pos = 0; pos < vk.nangl; pos += vk.nangl / 4) {
+    const int i_atom = vk.angl_i_atoms[pos];
+    const int j_atom = vk.angl_j_atoms[pos];
+    const int k_atom = vk.angl_k_atoms[pos];
+    rlist.emplace_back(i_atom, j_atom, k_atom, ag, 3.1, 1.7, 1.5, 2.1, 2.1, 2.7);
+  }
+  for (int pos = 0; pos < vk.ndihe; pos += vk.ndihe / 4) {
+    const int i_atom = vk.dihe_i_atoms[pos];
+    const int j_atom = vk.dihe_j_atoms[pos];
+    const int k_atom = vk.dihe_k_atoms[pos];
+    const int l_atom = vk.dihe_l_atoms[pos];
+    rlist.emplace_back(i_atom, j_atom, k_atom, l_atom, ag, 3.1, 1.7, 1.5, 2.1, 2.1, 2.7);
+  }
+  return RestraintApparatus(rlist, ag);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -435,7 +507,9 @@ int main(const int argc, const char* argv[]) {
   checkSynthesis(poly_agn, &poly_psn, do_tests);
 
   // Create some restraints and apply them, then check the synthesis implementation
-  
+  RestraintApparatus tiso_ra = assembleRestraints(&tiso_ag, tiso_ps);
+  RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
+  RestraintApparatus dhfr_ra = assembleRestraints(&dhfr_ag, dhfr_ps);
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

@@ -65,6 +65,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     // describing one or more of the individual systems within the synthesis
     topologies{topologies_in},
     restraint_networks{restraints_in},
+    restraint_dummies{},
     topology_indices{HybridKind::POINTER, "tpsyn_top_indices"},
     restraint_indices{HybridKind::POINTER, "tpsyn_rst_indices"},
     atom_counts{HybridKind::POINTER, "tpsyn_atom_counts"},
@@ -394,10 +395,123 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     // also be used to track access and other usage of the object.
     timer{timer_in}
 {
+  // CHECK
+  printf("Point A:\n");
+  for (int i = 0; i < system_count; i++) {
+    if (restraint_networks[restraint_indices_in[i]] == nullptr) {
+      printf("  %2d %s -> R( nullptr )\n", i,
+             topologies[topology_indices_in[i]]->getFileName().c_str());
+    }
+    else {
+      const AtomGraph *ag_ptr = restraint_networks[restraint_indices_in[i]]->getTopologyPointer();
+      printf("  %2d %s -> R( %s )\n", i,
+             topologies[topology_indices_in[i]]->getFileName().c_str(),
+             ag_ptr->getFileName().c_str());
+    }
+  }
+  printf("\n");
+  // END CHECK
+
+  // Set up dummy restaint apparatuses for systems that do not have a restraint apparatus.  These
+  // restraint apparatuses will exist for the duration of the object.
+  const std::vector<int> new_restraint_indices = createDummyRestraints(restraint_indices_in,
+                                                                       topology_indices_in);
+
+  // CHECK
+  printf("Point B:\n");
+  for (int i = 0; i < system_count; i++) {
+    if (restraint_networks[new_restraint_indices[i]] == nullptr) {
+      printf("  %2d %s -> R( nullptr )\n", i,
+             topologies[topology_indices_in[i]]->getFileName().c_str());
+    }
+    else {
+      const AtomGraph *ag_ptr = restraint_networks[new_restraint_indices[i]]->getTopologyPointer();
+      printf("  %2d %s -> R( %s )\n", i,
+             topologies[topology_indices_in[i]]->getFileName().c_str(),
+             ag_ptr->getFileName().c_str());
+    }
+  }
+  printf("\n");
+  // END CHECK
+
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
-  const std::vector<int> restraint_index_rebase = checkRestraintList(restraint_indices_in,
+
+  // CHECK
+  printf("topology_indices_in   = [ ");
+  for (size_t i = 0; i < topology_indices_in.size(); i++) {
+    printf("%2d ", topology_indices_in[i]);
+  }
+  printf("];\n");
+  printf("topology_index_rebase = [ ");
+  for (size_t i = 0; i < topology_index_rebase.size(); i++) {
+    printf("%2d ", topology_index_rebase[i]);
+  }
+  printf("];\n");
+  // END CHECK
+  
+  // CHECK
+  printf("Point B:\n");
+  for (int i = 0; i < system_count; i++) {
+    if (restraint_networks[new_restraint_indices[i]] == nullptr) {
+      printf("  %2d %s -> R( nullptr )\n", i,
+             topologies[topology_index_rebase[topology_indices_in[i]]]->getFileName().c_str());
+    }
+    else {
+      const AtomGraph *ag_ptr = restraint_networks[new_restraint_indices[i]]->getTopologyPointer();
+      printf("  %2d %s -> R( %s )\n", i,
+             topologies[topology_index_rebase[topology_indices_in[i]]]->getFileName().c_str(),
+             ag_ptr->getFileName().c_str());
+    }
+  }
+  printf("\n");
+  // END CHECK
+
+  const std::vector<int> restraint_index_rebase = checkRestraintList(new_restraint_indices,
+                                                                     topology_indices_in,
                                                                      topology_index_rebase);
+
+  // CHECK
+  printf("Restraint apparatuses:\n");
+  for (size_t i = 0; i < restraint_networks.size(); i++) {
+    printf("  %2zu ", i);
+    if (restraint_networks[i] == nullptr) {
+      printf("nullptr\n");
+    }
+    else {
+      printf("%s\n", restraint_networks[i]->getTopologyPointer()->getFileName().c_str());
+    }
+  }
+  // END CHECK
+  
+  // CHECK
+  printf("restraint_indices_in = [");
+  for (int i = 0; i < restraint_indices_in.size(); i++) {
+    printf(" %2d", restraint_indices_in[i]);
+  }
+  printf(" ];\n");
+  printf("new_restraint_indices = [");
+  for (int i = 0; i < new_restraint_indices.size(); i++) {
+    printf(" %2d", new_restraint_indices[i]);
+  }
+  printf(" ];\n");
+  printf("restraint_index_rebase = [");
+  for (int i = 0; i < restraint_index_rebase.size(); i++) {
+    printf(" %2d", restraint_index_rebase[i]);
+  }
+  printf(" ];\n");
+  printf("Rebased restraint apparatuses:\n  ");
+  for (int i = 0; i < system_count; i++) {
+    const RestraintApparatus *ra_ptr =
+      restraint_networks[restraint_index_rebase[new_restraint_indices[i]]];
+    const AtomGraph *ag_ptr = ra_ptr->getTopologyPointer();
+    printf("  %s\n", ag_ptr->getFileName().c_str());
+    printf("    %4d %4d %4d %4d\n", ra_ptr->getPositionalRestraintCount(),
+           ra_ptr->getDistanceRestraintCount(), ra_ptr->getAngleRestraintCount(),
+           ra_ptr->getDihedralRestraintCount());
+  }
+  // END CHECK
+  
   checkCommonSettings();
   int term_array_timings, param_cond_timings, vwu_creation_timings;
   if (timer != nullptr) {
@@ -437,6 +551,33 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
                        topology_indices_in, std::vector<int>(topology_indices_in.size(), 0),
                        policy_in, vwu_atom_limit, timer_in)
 {}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int>
+AtomGraphSynthesis::createDummyRestraints(const std::vector<int> &restraint_indices_in,
+                                          const std::vector<int> &topology_indices_in) {
+  const int ntop = topologies.size();
+  restraint_dummies.reserve(ntop);
+  for (int i = 0; i < ntop; i++) {
+    restraint_dummies.emplace_back(topologies[i]);
+  }
+  const int n_orig_networks = restraint_networks.size();
+  for (int i = 0; i < ntop; i++) {
+    restraint_networks.push_back(&restraint_dummies[i]);
+  }
+  const int nsys = restraint_indices_in.size();
+  std::vector<int> new_restraint_indices(nsys);
+  for (int i = 0; i < nsys; i++) {
+    if (restraint_networks[restraint_indices_in[i]] == nullptr) {
+      new_restraint_indices[i] = n_orig_networks + topology_indices_in[i];
+    }
+    else {
+      new_restraint_indices[i] = restraint_indices_in[i];
+    }
+  }
+  restraint_network_count = restraint_networks.size();
+  return new_restraint_indices;
+}
 
 //-------------------------------------------------------------------------------------------------
 std::vector<int>
@@ -516,7 +657,8 @@ AtomGraphSynthesis::checkTopologyList(const std::vector<int> &topology_indices_i
 //-------------------------------------------------------------------------------------------------
 std::vector<int>
 AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices_in,
-                                       const std::vector<int> &topology_indices) {
+                                       const std::vector<int> &topology_indices_in,
+                                       const std::vector<int> &topology_index_rebase) {
   
   // For each system in the synthesis, there is a restraint group and a topology.  Each restraint
   // group references a topology, to ensure consistency in future applications.  Check that the
@@ -541,13 +683,14 @@ AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices
     if (restraint_indices_in[i] < 0 || restraint_networks[restraint_indices_in[i]] == nullptr) {
       continue;
     }
-    const AtomGraph *topref = topologies[topology_indices[i]];    
+    const AtomGraph *topref = topologies[topology_index_rebase[topology_indices_in[i]]];    
     const AtomGraph *rstref = restraint_networks[restraint_indices_in[i]]->getTopologyPointer();
-    if (rstref != topref) {
+    if (rstref != topref && rstref->getFileName() != topref->getFileName()) {
       rtErr("Mismatch in topologies referenced by the restraint apparatus for system " +
             std::to_string(i) + " and the system itself.  Atom counts of the topologies are " +
             std::to_string(rstref->getAtomCount()) + " and " +
-            std::to_string(topref->getAtomCount()) + ".", "AtomGraphSynthesis",
+            std::to_string(topref->getAtomCount()) + ".  Topology names are " +
+            rstref->getFileName() + " and " + topref->getFileName() + ".", "AtomGraphSynthesis",
             "checkRestraintList");
     }
   }
@@ -2934,9 +3077,19 @@ AtomGraph* AtomGraphSynthesis::getSystemTopologyPointer(const int system_index) 
   if (system_index < 0 || system_index >= system_count) {
     rtErr("A synthesis with " + std::to_string(system_count) + " systems cannot produce a "
           "topology relating to system index " + std::to_string(system_index) + ".",
-          "AtomGraphSynthesis", "getTopologyPointer");
+          "AtomGraphSynthesis", "getSystemTopologyPointer");
   }
   return topologies[topology_indices.readHost(system_index)];
+}
+
+//-------------------------------------------------------------------------------------------------
+RestraintApparatus* AtomGraphSynthesis::getSystemRestraintPointer(const int system_index) const {
+  if (system_index < 0 || system_index >= system_count) {
+    rtErr("A synthesis with " + std::to_string(system_count) + " systems cannot produce a "
+          "restraint apparatus relating to system index " + std::to_string(system_index) + ".",
+          "AtomGraphSynthesis", "getSystemRestraintPointer");
+  }
+  return restraint_networks[restraint_indices.readHost(system_index)];
 }
 
 //-------------------------------------------------------------------------------------------------

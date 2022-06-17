@@ -78,10 +78,16 @@ public:
   /// \brief Get the number of unique topologies described by the synthesis
   int getTopologyCount() const;
 
-  /// \brief Get a const topology pointer for a specific system contained within the synthesis.
+  /// \brief Get a topology pointer for a specific system contained within the synthesis.
   ///
   /// \param system_index  Index of the system of interest
   AtomGraph* getSystemTopologyPointer(int system_index) const;
+
+  /// \brief Get a restraint apparatus pointer for a sepcific system contained within the
+  ///        synthesis.
+  ///
+  /// \param system_index  Index of the system of interest
+  RestraintApparatus* getSystemRestraintPointer(int system_index) const;
   
   /// \brief Get the number of systems that this synthesis describes
   int getSystemCount() const;
@@ -317,6 +323,11 @@ private:
   /// only accessible on the host.
   std::vector<RestraintApparatus*> restraint_networks;
 
+  /// Dummy restraint apparatuses, created and stored in the object for each unique topology to
+  /// stand in where external restraint apparatuses were not supplied.  This is critical to make
+  /// persistent objects that will be available for the lifetime of the AtomGraphSynthesis.
+  std::vector<RestraintApparatus> restraint_dummies;
+  
   /// An array of indices for the source topologies guiding the motion of each system (this array
   /// is system_count in length)
   Hybrid<int> topology_indices;
@@ -1040,6 +1051,17 @@ private:
 
   /// Timings data, for reporting purposes
   StopWatch* timer;
+
+  /// \brief Create a series of dummy restraints for all topologies, then redirect any systems
+  ///        which have nullptr for the restraint network (RestraintApparatus) pointer to the
+  ///        topology-specific set of dummy restraints.
+  ///
+  /// \param restraint_indices_in  Input restraint network indices, referencing the object member
+  ///                              variable restraint_networks and passed down in the constructor
+  /// \param topology_indices_in   Input topology indices, referencing the object member variable
+  ///                              topologies and passed down in the constructor
+  std::vector<int> createDummyRestraints(const std::vector<int> &restraint_indices_in,
+                                         const std::vector<int> &topology_indices_in);
   
   /// \brief Check the central lists of topologies and system indices to ensure that the requested
   ///        synthesis is sane.  Condense the list of topologies by weeding out duplicates.
@@ -1061,7 +1083,8 @@ private:
   /// \param topology_indices_in   List of topologies which describe each system involved in this
   ///                              synthesis.  Must be supplied in its original, unpruned form.
   std::vector<int> checkRestraintList(const std::vector<int> &restraint_indices_in,
-                                      const std::vector<int> &topology_indices_in);
+                                      const std::vector<int> &topology_indices_in,
+                                      const std::vector<int> &topology_index_rebase);
   
   /// \brief Check settings that must be consistent between all topologies in the synthesis.
   void checkCommonSettings();
