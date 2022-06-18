@@ -494,7 +494,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
       const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
       const int xyz_param_idx = tinsr.y;
       const double contrib =
-        evalPosnRestraint(p_atom, (tinsr.x >> 31), step_number, rar.rposn_init_step[kr_param_idx],
+        evalPosnRestraint(p_atom, step_number, rar.rposn_init_step[kr_param_idx],
                           rar.rposn_finl_step[kr_param_idx], rar.rposn_init_xy[xyz_param_idx],
                           rar.rposn_finl_xy[xyz_param_idx], rar.rposn_init_z[xyz_param_idx],
                           rar.rposn_finl_z[xyz_param_idx], rar.rposn_init_keq[kr_param_idx],
@@ -532,12 +532,12 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                           double,
                           double,
                           double2,
-                          double4>(i_atom, j_atom, (tinsr.x >> 31), step_number,
-                                   rar.rbond_init_step[param_idx], rar.rbond_finl_step[param_idx],
-                                   rar.rbond_init_keq[param_idx], rar.rbond_finl_keq[param_idx],
-                                   rar.rbond_init_r[param_idx], rar.rbond_finl_r[param_idx],
-                                   sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+                          double4>(i_atom, j_atom, step_number, rar.rbond_init_step[param_idx],
+                                   rar.rbond_finl_step[param_idx], rar.rbond_init_keq[param_idx],
+                                   rar.rbond_finl_keq[param_idx], rar.rbond_init_r[param_idx],
+                                   rar.rbond_finl_r[param_idx], sh_xcrd, sh_ycrd, sh_zcrd, nullptr,
+                                   nullptr, UnitCellType::NONE, sh_xfrc, sh_yfrc, sh_zfrc,
+                                   eval_force);
       if (log_term) {
         rest_acc += llround(contrib * nrg_scale_factor);
       }
@@ -570,7 +570,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                           double,
                           double,
                           double2,
-                          double4>(i_atom, j_atom, k_atom, (tinsr.x >> 31), step_number,
+                          double4>(i_atom, j_atom, k_atom, step_number,
                                    rar.rangl_init_step[param_idx], rar.rangl_finl_step[param_idx],
                                    rar.rangl_init_keq[param_idx], rar.rangl_finl_keq[param_idx],
                                    rar.rangl_init_r[param_idx], rar.rangl_finl_r[param_idx],
@@ -609,7 +609,7 @@ void localVwuEvaluation(const ValenceKit<double> vk, const VirtualSiteKit<double
                           double,
                           double,
                           double2,
-                          double4>(i_atom, j_atom, k_atom, l_atom, (tinsr.x >> 31), step_number,
+                          double4>(i_atom, j_atom, k_atom, l_atom, step_number,
                                    rar.rdihe_init_step[param_idx], rar.rdihe_finl_step[param_idx],
                                    rar.rdihe_init_keq[param_idx], rar.rdihe_finl_keq[param_idx],
                                    rar.rdihe_init_r[param_idx], rar.rdihe_finl_r[param_idx],

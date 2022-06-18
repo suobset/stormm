@@ -91,6 +91,137 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
   __builtin_unreachable();
 }
 
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__
+double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
+                      const double4 final_r, const double2 mixwt, const double dr) {
+  const double r1 = (mixwt.x * init_r.x) + (mixwt.y * final_r.x);
+  const double r2 = (mixwt.x * init_r.y) + (mixwt.y * final_r.y);
+  const double r3 = (mixwt.x * init_r.z) + (mixwt.y * final_r.z);
+  const double r4 = (mixwt.x * init_r.w) + (mixwt.y * final_r.w);
+  const double k2 = (mixwt.x * init_k.x) + (mixwt.y * final_k.x);
+  const double k3 = (mixwt.x * init_k.y) + (mixwt.y * final_k.y);
+  double dl, du, keq;
+  if (dr < r1) {
+    dl = r1 - r2;
+    du = k2 * ((dl * dl) + (2.0 * dl * (dr - r1)));
+    keq = k2;
+  }
+  else if (dr < r2) {
+    dl = dr - r2;
+    du = k2 * dl * dl;
+    keq = k2;
+  }
+  else if (dr < r3) {
+    dl = 0.0;
+    du = 0.0;
+    keq = 0.0;
+  }
+  else if (dr < r4) {
+    dl = dr - r3;
+    du = k3 * dl * dl;
+    keq = k3;
+  }
+  else {
+    dl = r4 - r3;
+    du = k3 * ((dl * dl) + (2.0 * dl * (dr - r4)));
+    keq = k3;
+  }
+  return { keq, dl, du };
+}
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__
+float3 restraintDelta(const float2 init_k, const float2 final_k, const float4 init_r,
+                      const float4 final_r, const float2 mixwt, const float dr) {
+  const float r1 = (mixwt.x * init_r.x) + (mixwt.y * final_r.x);
+  const float r2 = (mixwt.x * init_r.y) + (mixwt.y * final_r.y);
+  const float r3 = (mixwt.x * init_r.z) + (mixwt.y * final_r.z);
+  const float r4 = (mixwt.x * init_r.w) + (mixwt.y * final_r.w);
+  const float k2 = (mixwt.x * init_k.x) + (mixwt.y * final_k.x);
+  const float k3 = (mixwt.x * init_k.y) + (mixwt.y * final_k.y);
+  float dl, du, keq;
+  if (dr < r1) {
+    dl = r1 - r2;
+    du = k2 * ((dl * dl) + (2.0 * dl * (dr - r1)));
+    keq = k2;
+  }
+  else if (dr < r2) {
+    dl = dr - r2;
+    du = k2 * dl * dl;
+    keq = k2;
+  }
+  else if (dr < r3) {
+    dl = 0.0;
+    du = 0.0;
+    keq = 0.0;
+  }
+  else if (dr < r4) {
+    dl = dr - r3;
+    du = k3 * dl * dl;
+    keq = k3;
+  }
+  else {
+    dl = r4 - r3;
+    du = k3 * ((dl * dl) + (2.0 * dl * (dr - r4)));
+    keq = k3;
+  }
+  return { keq, dl, du };
+}
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__
+double2 computeRestraintMixtureD(const int step_number, const int init_step,
+                                 const int final_step) {
+  if (step_number < init_step) {
+
+    // If the restraint has not yet engaged, neither its initial or final values have any weight
+    return { (double)(0.0), (double)(0.0) };
+  }
+  else if (init_step == final_step) {
+
+    // The step count is far enough along that the restraint has been engaged, and it is constant.
+    // Only the initial value matters.
+    return { (double)(1.0), (double)(0.0) };
+  }
+  else if (step_number < final_step) {
+    const double wslide = (double)(step_number - init_step) / (double)(final_step - init_step);
+
+    // The difference between the initial and final steps is nonzero.  The mixture is a linear
+    // combination of the two end points.
+    return { (double)(1.0) - wslide, wslide };
+  }
+
+  // The step number has advanced beyond the point at which the restraint is mature.
+  return { (double)(0.0), (double)(1.0) };
+}
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__
+float2 computeRestraintMixtureF(const int step_number, const int init_step, const int final_step) {
+  if (step_number < init_step) {
+
+    // If the restraint has not yet engaged, neither its initial or final values have any weight
+    return { (float)(0.0), (float)(0.0) };
+  }
+  else if (init_step == final_step) {
+
+    // The step count is far enough along that the restraint has been engaged, and it is constant.
+    // Only the initial value matters.
+    return { (float)(1.0), (float)(0.0) };
+  }
+  else if (step_number < final_step) {
+    const float wslide = (float)(step_number - init_step) / (float)(final_step - init_step);
+
+    // The difference between the initial and final steps is nonzero.  The mixture is a linear
+    // combination of the two end points.
+    return { (float)(1.0) - wslide, wslide };
+  }
+
+  // The step number has advanced beyond the point at which the restraint is mature.
+  return { (float)(0.0), (float)(1.0) };
+}
+
 // Single-precision floating point definitions
 #define TCALC float
 #  define TCALC2 float2
@@ -103,6 +234,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  define COS_FUNC  cosf
 #  define SIN_FUNC  sinf
 #  define ABS_FUNC  fabsf
+#  define MIX_FUNC  computeRestraintMixtureF
 #  define CHECK_COSARG
 
 #  define COMPUTE_FORCE
@@ -198,6 +330,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  undef COS_FUNC
 #  undef SIN_FUNC
 #  undef ABS_FUNC
+#  undef MIX_FUNC
 #  undef CHECK_COSARG
 #undef TCALC
 
@@ -218,6 +351,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  define COS_FUNC  cos
 #  define SIN_FUNC  sin
 #  define ABS_FUNC  fabs
+#  define MIX_FUNC  computeRestraintMixtureD
 
 #  define COMPUTE_FORCE
 #    define KERNEL_NAME kdValenceForceAccumulation
@@ -257,6 +391,7 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
 #  undef COS_FUNC
 #  undef SIN_FUNC
 #  undef ABS_FUNC
+#  undef MIX_FUNC
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
@@ -274,11 +409,12 @@ extern void valenceKernelSetup() {
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchValenceDp(const SyValenceKit<double> &poly_vk, MMControlKit<double> *ctrl,
-                            PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                            CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
-                            const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                            const GpuDetails &gpu) {
+extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
+                            const SyRestraintKit<double, double2, double4> &poly_rk,
+                            MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                            ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
+                            const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                            const VwuGoal purpose, const GpuDetails &gpu) {
   const int blocks_multiplier = (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) ? 2 : 1;
   const int nblocks = gpu.getSMPCount() * blocks_multiplier;
   const int nthreads = gpu.getMaxThreadsPerBlock() / (2 * blocks_multiplier);
@@ -293,19 +429,20 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk, MMControlKit<do
     case EvaluateForce::YES:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kdValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw,
-                                                                *gmem_r);
+        kdValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                                *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kdValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+        kdValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                          *gmem_r);
         break;
       }
       break;
     case EvaluateForce::NO:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kdValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw,
-                                                           *gmem_r);
+        kdValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
         rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
@@ -322,10 +459,11 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk, MMControlKit<do
     // kernel.
     switch (eval_energy) {
     case EvaluateEnergy::YES:
-      kdValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+      kdValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                       *gmem_r);
       break;
     case EvaluateEnergy::NO:
-      kdValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);        
+      kdValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
       break;
     }
     break;
@@ -339,19 +477,24 @@ extern void launchValenceDp(const AtomGraphSynthesis &poly_ag, MolecularMechanic
                             const VwuGoal purpose, const GpuDetails &gpu) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
+  const SyRestraintKit<double,
+                       double2, double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit(tier);
   MMControlKit<double> ctrl = mmctrl->dpData(tier);
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
   CacheResourceKit<double> gmem_r = tb_space->dpData(tier); 
-  launchValenceDp(poly_vk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy, purpose, gpu);
+  launchValenceDp(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
+                  purpose, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<float> *ctrl,
-                            PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                            CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
-                            const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                            const ForceAccumulationMethod force_sum, const GpuDetails &gpu) {
+extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
+                            const SyRestraintKit<float, float2, float4> &poly_rk,
+                            MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                            ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
+                            const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                            const VwuGoal purpose, const ForceAccumulationMethod force_sum,
+                            const GpuDetails &gpu) {
 
   // Determine the number of blocks to use, based on the architecture.  Other aspects of the
   // valence work units themselves will be adjusted based on the architecture in order to avoid
@@ -405,22 +548,23 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
       case ForceAccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
-                                                                   *scw, *gmem_r);
+          kfsValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl,
+                                                                   *poly_psw, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+          kfsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                             *gmem_r);
           break;
         }
         break;
       case ForceAccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
-                                                                  *scw, *gmem_r);
+          kfValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl,
+                                                                  *poly_psw, *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
+          kfValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
                                                             *gmem_r);
           break;
         }
@@ -429,11 +573,11 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
         if (poly_psw->frc_bits <= 23) {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfsValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
-                                                                     *scw, *gmem_r);
+            kfsValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl,
+                                                                     *poly_psw, *scw, *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            kfsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
+            kfsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
                                                                *gmem_r);
             break;
           }
@@ -441,11 +585,12 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
         else {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            kfValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw,
-                                                                    *scw, *gmem_r);
+            kfValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl,
+                                                                    *poly_psw, *scw, *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            kfValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+            kfValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                              *gmem_r);
             break;
           }
         }
@@ -455,8 +600,8 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
     case EvaluateForce::NO:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw,
-                                                           *gmem_r);
+        kfValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
         rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
@@ -483,21 +628,22 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
     case ForceAccumulationMethod::SPLIT:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfsValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw,
+        kfsValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
                                                           *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kfsValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+        kfsValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
     case ForceAccumulationMethod::WHOLE:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw, *gmem_r);
+        kfValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+                                                         *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kfValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+        kfValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
@@ -505,22 +651,22 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk, MMControlKit<flo
       if (poly_psw->frc_bits <= 23) {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfsValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw,
-                                                            *gmem_r);
+          kfsValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                            *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfsValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+          kfsValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
           break;
         }
       }
       else {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          kfValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *scw,
-                                                           *gmem_r);
+          kfValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                           *scw, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          kfValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, *ctrl, *poly_psw, *gmem_r);
+          kfValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
           break;
         }
       }
@@ -538,12 +684,14 @@ extern void launchValenceSp(const AtomGraphSynthesis &poly_ag, MolecularMechanic
                             const GpuDetails &gpu) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
+  const SyRestraintKit<float,
+                       float2, float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit(tier);
   MMControlKit<float> ctrl = mmctrl->spData(tier);
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
   CacheResourceKit<float> gmem_r = tb_space->spData(tier);
-  launchValenceSp(poly_vk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy, purpose,
-                  force_sum, gpu);
+  launchValenceSp(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
+                  purpose, force_sum, gpu);
 }
   
 } // namespace energy

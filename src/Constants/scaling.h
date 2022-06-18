@@ -19,12 +19,15 @@ constexpr size_t giga_zu = mega_zu * kilo_zu;
 
 /// \brief a value bigger than tiny but still small enough to often be negligible
 constexpr double small = 1.0e-8;
+constexpr float small_f = small;
   
 /// \brief The default tiny value, below which most quantities are unimportant
 constexpr double tiny = 1.0e-10;
+constexpr float tiny_f = tiny;
 
 /// \brief An even tinier value, for the most stringent comparisons
 constexpr double verytiny = 1.0e-12;
+constexpr float verytiny_f = verytiny;
 
 /// \brief The warp size can be given in many number formats to minimize type conversions during
 ///        compute-intensive processes

@@ -1324,15 +1324,14 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int step_number,
-                        const int init_step, const int finl_step, const Tcalc2 init_xy,
-                        const Tcalc2 finl_xy, const Tcalc init_z, const Tcalc finl_z,
-                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
-                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
-                        const Tcoord* zcrd, const double* umat, const double* invu,
-                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-                        const Tcalc force_factor) {
+Tcalc evalPosnRestraint(const int p_atom, const int step_number, const int init_step,
+                        const int finl_step, const Tcalc2 init_xy, const Tcalc2 finl_xy,
+                        const Tcalc init_z, const Tcalc finl_z, const Tcalc2 init_keq,
+                        const Tcalc2 finl_keq, const Tcalc4 init_r, const Tcalc4 finl_r,
+                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, const UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
+                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
@@ -1403,14 +1402,13 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_dependence,
-                        const int step_number, const int init_step, const int finl_step,
-                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
-                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
-                        const Tcoord* zcrd, const double* umat, const double* invu,
-                        const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        const EvaluateForce eval_force, const Tcalc inv_gpos_factor,
-                        const Tcalc force_factor) {
+Tcalc evalBondRestraint(const int i_atom, const int j_atom, const int step_number,
+                        const int init_step, const int finl_step, const Tcalc2 init_keq,
+                        const Tcalc2 finl_keq, const Tcalc4 init_r, const Tcalc4 finl_r,
+                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, const UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, const EvaluateForce eval_force,
+                        const Tcalc inv_gpos_factor, const Tcalc force_factor) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Vec2<Tcalc> mixwt = computeRestraintMixture<Tcalc>(step_number, init_step, finl_step);
@@ -1465,9 +1463,8 @@ Tcalc evalBondRestraint(const int i_atom, const int j_atom, const bool time_depe
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
-                        const bool time_dependence, const int step_number, const int init_step,
-                        const int finl_step, const Tcalc2 init_keq,
-                        const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const int step_number, const int init_step, const int finl_step,
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
                         const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
@@ -1558,9 +1555,8 @@ Tcalc evalAnglRestraint(const int i_atom, const int j_atom, const int k_atom,
 //-------------------------------------------------------------------------------------------------
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
 Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, const int l_atom,
-                        const bool time_dependence, const int step_number, const int init_step,
-                        const int finl_step, const Tcalc2 init_keq,
-                        const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const int step_number, const int init_step, const int finl_step,
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
                         const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
                         const Tcoord* zcrd, const double* umat, const double* invu,
                         const UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
@@ -1752,12 +1748,12 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
   // Accumulate results by looping over all restraint terms
   for (int i = 0; i < rar.nposn; i++) {
     const double contrib =
-      evalPosnRestraint(rar.rposn_atoms[i], rar.time_dependence, step_number,
-                        rar.rposn_init_step[i], rar.rposn_finl_step[i], rar.rposn_init_xy[i],
-                        rar.rposn_finl_xy[i], rar.rposn_init_z[i], rar.rposn_finl_z[i],
-                        rar.rposn_init_keq[i], rar.rposn_finl_keq[i], rar.rposn_init_r[i],
-                        rar.rposn_finl_r[i], xcrd, ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                        zfrc, eval_force, inv_gpos_factor, force_factor);
+      evalPosnRestraint(rar.rposn_atoms[i], step_number, rar.rposn_init_step[i],
+                        rar.rposn_finl_step[i], rar.rposn_init_xy[i], rar.rposn_finl_xy[i],
+                        rar.rposn_init_z[i], rar.rposn_finl_z[i], rar.rposn_init_keq[i],
+                        rar.rposn_finl_keq[i], rar.rposn_init_r[i], rar.rposn_finl_r[i], xcrd,
+                        ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc, eval_force,
+                        inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
@@ -1765,12 +1761,12 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
     const double contrib =
       evalBondRestraint<Tcoord, Tforce,
                         Tcalc, Tcalc2, Tcalc4>(rar.rbond_i_atoms[pos], rar.rbond_j_atoms[pos],
-                                               rar.time_dependence, step_number,
-                                               rar.rbond_init_step[pos], rar.rbond_finl_step[pos],
-                                               rar.rbond_init_keq[pos], rar.rbond_finl_keq[pos],
-                                               rar.rbond_init_r[pos], rar.rbond_finl_r[pos], xcrd,
-                                               ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                                               zfrc, eval_force, inv_gpos_factor, force_factor);
+                                               step_number, rar.rbond_init_step[pos],
+                                               rar.rbond_finl_step[pos], rar.rbond_init_keq[pos],
+                                               rar.rbond_finl_keq[pos], rar.rbond_init_r[pos],
+                                               rar.rbond_finl_r[pos], xcrd, ycrd, zcrd, umat, invu,
+                                               unit_cell, xfrc, yfrc, zfrc, eval_force,
+                                               inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
@@ -1778,13 +1774,12 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
     const double contrib =
       evalAnglRestraint<Tcoord, Tforce,
                         Tcalc, Tcalc2, Tcalc4>(rar.rangl_i_atoms[pos], rar.rangl_j_atoms[pos],
-                                               rar.rangl_k_atoms[pos], rar.time_dependence,
-                                               step_number, rar.rangl_init_step[pos],
-                                               rar.rangl_finl_step[pos], rar.rangl_init_keq[pos],
-                                               rar.rangl_finl_keq[pos], rar.rangl_init_r[pos],
-                                               rar.rangl_finl_r[pos], xcrd, ycrd, zcrd, umat, invu,
-                                               unit_cell, xfrc, yfrc, zfrc, eval_force,
-                                               inv_gpos_factor, force_factor);
+                                               rar.rangl_k_atoms[pos], step_number,
+                                               rar.rangl_init_step[pos], rar.rangl_finl_step[pos],
+                                               rar.rangl_init_keq[pos], rar.rangl_finl_keq[pos],
+                                               rar.rangl_init_r[pos], rar.rangl_finl_r[pos], xcrd,
+                                               ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc, zfrc,
+                                               eval_force, inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }
@@ -1793,12 +1788,12 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar, const T
       evalDiheRestraint<Tcoord, Tforce,
                         Tcalc, Tcalc2, Tcalc4>(rar.rdihe_i_atoms[pos], rar.rdihe_j_atoms[pos],
                                                rar.rdihe_k_atoms[pos], rar.rdihe_l_atoms[pos],
-                                               rar.time_dependence, step_number,
-                                               rar.rdihe_init_step[pos], rar.rdihe_finl_step[pos],
-                                               rar.rdihe_init_keq[pos], rar.rdihe_finl_keq[pos],
-                                               rar.rdihe_init_r[pos], rar.rdihe_finl_r[pos], xcrd,
-                                               ycrd, zcrd, umat, invu, unit_cell, xfrc, yfrc,
-                                               zfrc, eval_force, inv_gpos_factor, force_factor);
+                                               step_number, rar.rdihe_init_step[pos],
+                                               rar.rdihe_finl_step[pos], rar.rdihe_init_keq[pos],
+                                               rar.rdihe_finl_keq[pos], rar.rdihe_init_r[pos],
+                                               rar.rdihe_finl_r[pos], xcrd, ycrd, zcrd, umat, invu,
+                                               unit_cell, xfrc, yfrc, zfrc, eval_force,
+                                               inv_gpos_factor, force_factor);
     rest_energy += contrib;
     rest_acc += llround(contrib * nrg_scale_factor);
   }

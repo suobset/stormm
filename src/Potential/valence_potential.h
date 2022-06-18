@@ -748,7 +748,6 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
 ///
 /// \param p_atom           The atom being restraint (in distance, angle, or dihedral restraints
 ///                         the atoms become I, J, K, and L)
-/// \param time_dependence  Flag to indicate that the restraint parameters evolve over time
 /// \param step_number      The current step of the simulation, relevant only if the restraint
 ///                         evolves with time
 /// \param init_step        Array of initial steps at which the restraint engages
@@ -772,13 +771,13 @@ double2 evaluateAttenuated14Terms(const ValenceKit<Tcalc> vk,
 /// \param zfrc             Cartesian Z forces acting on all particles
 /// \param eval_force       Flag to have forces due to the restraint evaluated
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-Tcalc evalPosnRestraint(int p_atom, bool time_dependence, int step_number, int init_step,
-                        int finl_step, const Tcalc2 init_xy, const Tcalc2 finl_xy,
-                        Tcalc init_z, Tcalc finl_z, const Tcalc2 init_keq, const Tcalc2 finl_keq,
-                        const Tcalc4 init_r, const Tcalc4 finl_r, const Tcoord* xcrd,
-                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+Tcalc evalPosnRestraint(int p_atom, int step_number, int init_step, int finl_step,
+                        const Tcalc2 init_xy, const Tcalc2 finl_xy, Tcalc init_z, Tcalc finl_z,
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
                         Tcalc force_factor = 1.0);
 
 /// \brief Evaluate distance restraints.  See the descriptions in evalPosnRestraint (above) for
@@ -786,12 +785,12 @@ Tcalc evalPosnRestraint(int p_atom, bool time_dependence, int step_number, int i
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-Tcalc evalBondRestraint(int i_atom, int j_atom, bool time_dependence, int step_number,
-                        int init_step, int finl_step, const Tcalc2 init_keq, const Tcalc2 finl_keq,
-                        const Tcalc4 init_r, const Tcalc4 finl_r, const Tcoord* xcrd,
-                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
-                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
-                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+Tcalc evalBondRestraint(int i_atom, int j_atom, int step_number, int init_step, int finl_step,
+                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
+                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
+                        const Tcoord* zcrd, const double* umat, const double* invu,
+                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
                         Tcalc force_factor = 1.0);
 
 /// \brief Evaluate three-point angle restraints.  See the descriptions in evalPosnRestraint
@@ -799,27 +798,26 @@ Tcalc evalBondRestraint(int i_atom, int j_atom, bool time_dependence, int step_n
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-Tcalc evalAnglRestraint(int i_atom, int j_atom, int k_atom, bool time_dependence, int step_number,
-                        const int init_step, const int finl_step, const Tcalc2 init_keq,
-                        const Tcalc2 finl_keq, const Tcalc4 init_r, const Tcalc4 finl_r,
-                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
-                        const double* umat, const double* invu, UnitCellType unit_cell,
-                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
-                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
+Tcalc evalAnglRestraint(int i_atom, int j_atom, int k_atom, int step_number, const int init_step,
+                        const int finl_step, const Tcalc2 init_keq, const Tcalc2 finl_keq,
+                        const Tcalc4 init_r, const Tcalc4 finl_r, const Tcoord* xcrd,
+                        const Tcoord* ycrd, const Tcoord* zcrd, const double* umat,
+                        const double* invu, UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc,
+                        Tforce* zfrc, EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
+                        Tcalc force_factor = 1.0);
 
 /// \brief Evaluate four-point dihedral restraints.  See the descriptions in evalPosnRestraint
 ///        (above) for explanations of each input parameter.  The restraint energy is returned.
 ///
 /// Parameters for this function follow eponymous inputs to evalPosnRestraint(), above.
 template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
-Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, bool time_dependence,
-                        int step_number, const int init_step, const int finl_step,
-                        const Tcalc2 init_keq, const Tcalc2 finl_keq, const Tcalc4 init_r,
-                        const Tcalc4 finl_r, const Tcoord* xcrd, const Tcoord* ycrd,
-                        const Tcoord* zcrd, const double* umat, const double* invu,
-                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
-                        EvaluateForce eval_force, Tcalc inv_gpos_factor = 1.0,
-                        Tcalc force_factor = 1.0);
+Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, int step_number,
+                        const int init_step, const int finl_step, const Tcalc2 init_keq,
+                        const Tcalc2 finl_keq, const Tcalc4 init_r, const Tcalc4 finl_r,
+                        const Tcoord* xcrd, const Tcoord* ycrd, const Tcoord* zcrd,
+                        const double* umat, const double* invu, UnitCellType unit_cell,
+                        Tforce* xfrc, Tforce* yfrc, Tforce* zfrc, EvaluateForce eval_force,
+                        Tcalc inv_gpos_factor = 1.0, Tcalc force_factor = 1.0);
 
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
 ///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is

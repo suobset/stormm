@@ -6,8 +6,8 @@
 
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, 1)
-KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
-            PsSynthesisWriter poly_psw,
+KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC2, TCALC4> poly_rk,
+            MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter scw,
 #endif
@@ -1112,10 +1112,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
 #    endif
         if ((__ldca(&poly_vk.cbnd_acc[acc_offset + acc_elem]) >> acc_bit) & 0x1) {
 #  endif
-        const TCALC fmag = (TCALC)(2.0) * keq * dl / dr;
-        const TCALC fmag_dx = fmag * dx * poly_psw.frc_scale;
-        const TCALC fmag_dy = fmag * dy * poly_psw.frc_scale;
-        const TCALC fmag_dz = fmag * dz * poly_psw.frc_scale;
+        const TCALC fmag = poly_psw.frc_scale * (TCALC)(2.0) * keq * dl / dr;
+        const TCALC fmag_dx = fmag * dx;
+        const TCALC fmag_dy = fmag * dy;
+        const TCALC fmag_dz = fmag * dz;
         i_atom -= EXCL_GMEM_OFFSET;
         j_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
@@ -1135,9 +1135,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
         const llint ifmag_dz = LLCONV_FUNC(fmag_dz);
-        atomicAdd((ullint*)&sh_xfrc[i_atom],  lliToUlli(ifmag_dx));
-        atomicAdd((ullint*)&sh_yfrc[i_atom],  lliToUlli(ifmag_dy));
-        atomicAdd((ullint*)&sh_zfrc[i_atom],  lliToUlli(ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli( ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli( ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli( ifmag_dz));
         atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(-ifmag_dx));
         atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(-ifmag_dy));
         atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(-ifmag_dz));
@@ -1169,8 +1169,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::INFR14)]) {
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::INFR14)].x;
         const uint tinsr = __ldcs(&poly_vk.infr14_insr[task_offset + pos - vterm_offset]);
-        const int i_atom = (tinsr & 0x3ff);
-        const int l_atom = ((tinsr >> 10) & 0x3ff);
+        int i_atom = (tinsr & 0x3ff);
+        int l_atom = ((tinsr >> 10) & 0x3ff);
         const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
@@ -1202,9 +1202,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         lj14_acc += LLCONV_FUNC(vdw_contrib * scw.nrg_scale_f);
 #endif
 #ifdef COMPUTE_FORCE
-        const TCALC fmag = (qq_il * invr * invr2) +
-                           (((TCALC)(6.0) * ljb_il) -
-                            ((TCALC)(12.0) * lja_il * invr4 * invr2)) * invr4 * invr4;        
+        const TCALC fmag = poly_psw.frc_scale * ((qq_il * invr * invr2) +
+                                                 (((TCALC)(6.0) * ljb_il) -
+                                                  ((TCALC)(12.0) * lja_il * invr4 * invr2)) *
+                                                 invr4 * invr4);
+        i_atom -= EXCL_GMEM_OFFSET;
+        l_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const TCALC fmag_dx = fmag * dx;
         const TCALC fmag_dy = fmag * dy;
@@ -1225,9 +1228,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
         const llint ifmag_dz = LLCONV_FUNC(fmag * dz);
-        atomicAdd((ullint*)&sh_xfrc[i_atom],  lliToUlli(ifmag_dx));
-        atomicAdd((ullint*)&sh_yfrc[i_atom],  lliToUlli(ifmag_dy));
-        atomicAdd((ullint*)&sh_zfrc[i_atom],  lliToUlli(ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli( ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli( ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli( ifmag_dz));
         atomicAdd((ullint*)&sh_xfrc[l_atom], lliToUlli(-ifmag_dx));
         atomicAdd((ullint*)&sh_yfrc[l_atom], lliToUlli(-ifmag_dy));
         atomicAdd((ullint*)&sh_zfrc[l_atom], lliToUlli(-ifmag_dz));
@@ -1253,11 +1256,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RPOSN)]) {
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RPOSN)].x;
-        const uint2 tinsr = __ldcs(&poly_vk.rposn_insr[task_offset + pos - vterm_offset]);
-        const int p_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        const uint2 tinsr = __ldcs(&poly_rk.rposn_insr[task_offset + pos - vterm_offset]);
+        int p_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
         const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
         const int xyz_param_idx = tinsr.y;
-
 
         // The reference coordinate storage in floating point numbers may not be as good for
         // precision in the calculations, but restraints of this sort are generally employed
@@ -1267,8 +1269,68 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
         // applications which may involve both positional restraints and energy conservation,
         // but the damage done by keeping positional restraints in 32-bit floats will likely
         // be marginal in those cases.
-#if 0
-        const TCALC dx = ((TCALC)(__ldca(&gmem_r.xcrd[p_atom])) * poly_psw.inv_gpos_scale_f);
+        const int2 step_bounds = __ldca(&poly_rk.rposn_step_bounds[kr_param_idx]);
+        const TCALC2 mixwt = MIX_FUNC(ctrl.step, step_bounds.x, step_bounds.y);
+        const TCALC2 init_xy = __ldca(&poly_rk.rposn_init_xy[xyz_param_idx]);
+        const TCALC2 finl_xy = __ldca(&poly_rk.rposn_finl_xy[xyz_param_idx]);
+        const TCALC  init_z  = __ldca(&poly_rk.rposn_init_z[xyz_param_idx]);
+        const TCALC  finl_z  = __ldca(&poly_rk.rposn_finl_z[xyz_param_idx]);
+        const TCALC dx = ((TCALC)(__ldca(&gmem_r.xcrd[p_atom])) * poly_psw.inv_gpos_scale_f) -
+                         ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
+        const TCALC dy = ((TCALC)(__ldca(&gmem_r.ycrd[p_atom])) * poly_psw.inv_gpos_scale_f) -
+                         ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
+        const TCALC dz = ((TCALC)(__ldca(&gmem_r.zcrd[p_atom])) * poly_psw.inv_gpos_scale_f) -
+                         ((mixwt.x * init_z) + (mixwt.y * finl_z));
+        const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
+
+        // There is no 256-bit operation for global memory loads, so __ldca cannot be applied to
+        // double4 types.  The __ldca operation will be implemented for a naive L1-caching scheme,
+        // so regardless of data type just use the straight memory reference for the 4-tuple data.
+        const TCALC3 rst_eval = restraintDelta(__ldca(&poly_rk.rposn_init_k[kr_param_idx]),
+                                               __ldca(&poly_rk.rposn_finl_k[kr_param_idx]),
+                                               poly_rk.rposn_init_r[kr_param_idx],
+                                               poly_rk.rposn_finl_r[kr_param_idx], mixwt, dr);
+#ifdef COMPUTE_ENERGY
+        rstr_acc += LLCONV_FUNC(rst_eval.z * scw.nrg_scale_f);
+#endif
+#ifdef COMPUTE_FORCE
+        p_atom -= EXCL_GMEM_OFFSET;
+        if (dr < constants::tiny_f) {
+
+          // See the explanation in the CPU routine (valence_potential.tpp) as to why an
+          // arbitrary direction must be applied to the force.
+          const TCALC fmag = poly_psw.frc_scale * (TCALC)(2.0) * rst_eval.x * rst_eval.y /
+                             SQRT_FUNC((TCALC)(3.0));
+#  ifdef SPLIT_FORCE_ACCUMULATION
+          const int2 ifmag = convertSplitFixedPrecision(-fmag);
+          addSplitFixedPrecision(ifmag, p_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
+                                 EXCL_GMEM_OFFSET);
+          addSplitFixedPrecision(ifmag, p_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
+                                 EXCL_GMEM_OFFSET);
+          addSplitFixedPrecision(ifmag, p_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
+                                 EXCL_GMEM_OFFSET);
+#  else // SPLIT_FORCE_ACCUMULATION
+          const llint ifmag = LLCONV_FUNC(-fmag);
+          atomicAdd((ullint*)&sh_xfrc[p_atom], lliToUlli(ifmag));
+          atomicAdd((ullint*)&sh_yfrc[p_atom], lliToUlli(ifmag));
+          atomicAdd((ullint*)&sh_zfrc[p_atom], lliToUlli(ifmag));
+#  endif
+        }
+        else {
+          const TCALC fmag = poly_psw.frc_scale * (TCALC)(2.0) * rst_eval.x * rst_eval.y / dr;
+#  ifdef SPLIT_FORCE_ACCUMULATION
+          splitForceContribution(-fmag * dx, p_atom, sh_xfrc, xoverflow_active,
+                                 gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+          splitForceContribution(-fmag * dy, p_atom, sh_yfrc, yoverflow_active,
+                                 gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+          splitForceContribution(-fmag * dz, p_atom, sh_zfrc, zoverflow_active,
+                                 gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+#  else // SPLIT_FORCE_ACCUMULATION
+          atomicAdd((ullint*)&sh_xfrc[p_atom], lliToUlli(LLCONV_FUNC(-fmag * dx)));
+          atomicAdd((ullint*)&sh_yfrc[p_atom], lliToUlli(LLCONV_FUNC(-fmag * dy)));
+          atomicAdd((ullint*)&sh_zfrc[p_atom], lliToUlli(LLCONV_FUNC(-fmag * dz)));
+#  endif          
+        }
 #endif
       }
       pos += blockDim.x;
@@ -1278,7 +1340,56 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RBOND)]) {
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RBOND)].x;
-        const uint2 tinsr = __ldcs(&poly_vk.rbond_insr[task_offset + pos - vterm_offset]);
+        const uint2 tinsr = __ldcs(&poly_rk.rbond_insr[task_offset + pos - vterm_offset]);
+        int i_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        int j_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int kr_param_idx = tinsr.y;
+        const int2 step_bounds = __ldca(&poly_rk.rbond_step_bounds[kr_param_idx]);
+        const TCALC2 mixwt = MIX_FUNC(ctrl.step, step_bounds.x, step_bounds.y);
+        const TCALC dx = ((TCALC)(__ldca(&gmem_r.xcrd[j_atom])) * poly_psw.inv_gpos_scale_f) -
+                         ((TCALC)(__ldca(&gmem_r.xcrd[i_atom])) * poly_psw.inv_gpos_scale_f);
+        const TCALC dy = ((TCALC)(__ldca(&gmem_r.ycrd[j_atom])) * poly_psw.inv_gpos_scale_f) -
+                         ((TCALC)(__ldca(&gmem_r.ycrd[i_atom])) * poly_psw.inv_gpos_scale_f);
+        const TCALC dz = ((TCALC)(__ldca(&gmem_r.zcrd[j_atom])) * poly_psw.inv_gpos_scale_f) -
+                         ((TCALC)(__ldca(&gmem_r.zcrd[i_atom])) * poly_psw.inv_gpos_scale_f);
+        const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
+        const TCALC3 rst_eval = restraintDelta(__ldca(&poly_rk.rbond_init_k[kr_param_idx]),
+                                               __ldca(&poly_rk.rbond_finl_k[kr_param_idx]),
+                                               poly_rk.rbond_init_r[kr_param_idx],
+                                               poly_rk.rbond_finl_r[kr_param_idx], mixwt, dr);
+#ifdef COMPUTE_ENERGY
+        rstr_acc += LLCONV_FUNC(rst_eval.z * scw.nrg_scale_f);
+#endif
+#ifdef COMPUTE_FORCE
+        const TCALC fmag = poly_psw.frc_scale * (TCALC)(2.0) * rst_eval.x * rst_eval.y / dr;
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        const TCALC fmag_dx = fmag * dx;
+        const TCALC fmag_dy = fmag * dy;
+        const TCALC fmag_dz = fmag * dz;
+        splitForceContribution( fmag_dx, j_atom, sh_xfrc, xoverflow_active,
+                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution( fmag_dy, j_atom, sh_yfrc, yoverflow_active,
+                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution( fmag_dz, j_atom, sh_zfrc, zoverflow_active,
+                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution(-fmag_dx, j_atom, sh_xfrc, xoverflow_active,
+                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution(-fmag_dy, j_atom, sh_yfrc, yoverflow_active,
+                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+        splitForceContribution(-fmag_dz, j_atom, sh_zfrc, zoverflow_active,
+                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+#  else // SPLIT_FORCE_ACCUMULATION
+        const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
+        const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
+        const llint ifmag_dz = LLCONV_FUNC(fmag * dz);
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli( ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli( ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli( ifmag_dz));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(-ifmag_dx));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(-ifmag_dy));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(-ifmag_dz));
+#  endif
+#endif
       }
       pos += blockDim.x;
     }
@@ -1287,7 +1398,94 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RANGL)]) {
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RANGL)].x;
-        const uint2 tinsr = __ldcs(&poly_vk.rangl_insr[task_offset + pos - vterm_offset]);        
+        const uint2 tinsr = __ldcs(&poly_rk.rangl_insr[task_offset + pos - vterm_offset]);
+        int i_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
+        int j_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
+        int k_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int kr_param_idx = tinsr.y;
+        const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
+        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
+        const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
+        const TCALC ba_x = (TCALC)(ixloc - jxloc) * poly_psw.inv_gpos_scale_f;
+        const TCALC bc_x = (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f;
+        const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
+        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
+        const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
+        const TCALC ba_y = (TCALC)(iyloc - jyloc) * poly_psw.inv_gpos_scale_f;
+        const TCALC bc_y = (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f;
+        const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+        const llint kzloc = __ldca(&gmem_r.zcrd[k_atom]);
+        const TCALC ba_z = (TCALC)(izloc - jzloc) * poly_psw.inv_gpos_scale_f;
+        const TCALC bc_z = (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f;
+        const TCALC mgba = (ba_x * ba_x) + (ba_y * ba_y) + (ba_z * ba_z);
+        const TCALC mgbc = (bc_x * bc_x) + (bc_y * bc_y) + (bc_z * bc_z);
+        const TCALC invbabc = (TCALC)(1.0) / SQRT_FUNC(mgba * mgbc);
+        TCALC costheta = ((ba_x * bc_x) + (ba_y * bc_y) + (ba_z * bc_z)) * invbabc;
+        costheta = (costheta < (TCALC)(-1.0)) ?
+                   (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
+        const TCALC theta = ACOS_FUNC(costheta);
+        const int2 step_bounds = __ldca(&poly_rk.rbond_step_bounds[kr_param_idx]);
+        const TCALC2 mixwt = MIX_FUNC(ctrl.step, step_bounds.x, step_bounds.y);
+        const TCALC3 rst_eval = restraintDelta(__ldca(&poly_rk.rangl_init_k[kr_param_idx]),
+                                               __ldca(&poly_rk.rangl_finl_k[kr_param_idx]),
+                                               poly_rk.rangl_init_r[kr_param_idx],
+                                               poly_rk.rangl_finl_r[kr_param_idx], mixwt, theta);
+#ifdef COMPUTE_ENERGY
+        rstr_acc += LLCONV_FUNC(rst_eval.z * scw.nrg_scale_f);
+#endif
+#ifdef COMPUTE_FORCE
+        const TCALC dA = (TCALC)(-2.0) * rst_eval.x * rst_eval.y /
+                         SQRT_FUNC((TCALC)(1.0) - (costheta * costheta));
+        const TCALC sqba = dA / mgba;
+        const TCALC sqbc = dA / mgbc;
+        const TCALC mbabc = dA * invbabc;
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        const int2 iadf_x = convertSplitFixedPrecision((costheta * ba_x * sqba) - (bc_x * mbabc));
+        const int2 iadf_y = convertSplitFixedPrecision((costheta * ba_y * sqba) - (bc_y * mbabc));
+        const int2 iadf_z = convertSplitFixedPrecision((costheta * ba_z * sqba) - (bc_z * mbabc));
+        addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        const int2 icdf_x = convertSplitFixedPrecision((costheta * bc_x * sqbc) - (ba_x * mbabc));
+        const int2 icdf_y = convertSplitFixedPrecision((costheta * bc_y * sqbc) - (ba_y * mbabc));
+        const int2 icdf_z = convertSplitFixedPrecision((costheta * bc_z * sqbc) - (ba_z * mbabc));
+        addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        const int2 iacdf_x = antiCombineSplitFixedPrecision(iadf_x, icdf_x);
+        const int2 iacdf_y = antiCombineSplitFixedPrecision(iadf_y, icdf_y);
+        const int2 iacdf_z = antiCombineSplitFixedPrecision(iadf_z, icdf_z);
+        addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
+                               EXCL_GMEM_OFFSET);
+#  else // SPLIT_FORCE_ACCUMULATION
+        const llint iadf_x = LLCONV_FUNC((bc_x * mbabc) - (costheta * ba_x * sqba));
+        const llint iadf_y = LLCONV_FUNC((bc_y * mbabc) - (costheta * ba_y * sqba));
+        const llint iadf_z = LLCONV_FUNC((bc_z * mbabc) - (costheta * ba_z * sqba));
+        const llint icdf_x = LLCONV_FUNC((ba_x * mbabc) - (costheta * bc_x * sqbc));
+        const llint icdf_y = LLCONV_FUNC((ba_y * mbabc) - (costheta * bc_y * sqbc));
+        const llint icdf_z = LLCONV_FUNC((ba_z * mbabc) - (costheta * bc_z * sqbc));
+        atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli(-iadf_x));
+        atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli(-iadf_y));
+        atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(-iadf_z));
+        atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(iadf_x + icdf_x));
+        atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(iadf_y + icdf_y));
+        atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(iadf_z + icdf_z));
+        atomicAdd((ullint*)&sh_xfrc[k_atom], lliToUlli(-icdf_x));
+        atomicAdd((ullint*)&sh_yfrc[k_atom], lliToUlli(-icdf_y));
+        atomicAdd((ullint*)&sh_zfrc[k_atom], lliToUlli(-icdf_z));
+#  endif
+#endif
       }
       pos += blockDim.x;
     }
@@ -1296,10 +1494,18 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
     while (pos < vterm_limit) {
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::RDIHE)]) {
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::RDIHE)].x;
-        const uint2 tinsr = __ldcs(&poly_vk.rdihe_insr[task_offset + pos - vterm_offset]);
+        const uint2 tinsr = __ldcs(&poly_rk.rdihe_insr[task_offset + pos - vterm_offset]);
+        
       }
       pos += blockDim.x;
     }
+#ifdef COMPUTE_ENERGY
+    // Stash the threads' accumulated restraint energy penalty values
+    WARP_REDUCE_DOWN(rstr_acc)
+    if ((threadIdx.x & warp_bits_mask_int) == 0) {
+      sh_rstr_acc[(threadIdx.x >> warp_bits)] = rstr_acc;
+    }
+#endif
     __syncthreads();
 #ifdef COMPUTE_ENERGY
     // Contribute energies to global accumulators--get these numbers out of the way to make
@@ -1374,7 +1580,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
           atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_qq14_acc));
         }
       }
-#if 0
       else if (sv_pos == StateVariable::RESTRAINT) {
         llint sum_rstr_acc = (iread) ? sh_rstr_acc[lane_idx] : 0LL;
         WARP_REDUCE_DOWN(sum_rstr_acc);
@@ -1382,7 +1587,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, MMControlKit<TCALC> ctrl,
           atomicAdd((ullint*)&scw.instantaneous_accumulators[sys_pos], lliToUlli(sum_rstr_acc));
         }
       }
-#endif
       pos += (blockDim.x >> warp_bits);
     }
 #endif
