@@ -1650,9 +1650,9 @@ Tcalc evalDiheRestraint(const int i_atom, const int j_atom, const int k_atom, co
       mgbc = sqrtf(bc[0]*bc[0] + bc[1]*bc[1] + bc[2]*bc[2]);
       mgcd = sqrtf(cd[0]*cd[0] + cd[1]*cd[1] + cd[2]*cd[2]);
     }
-    const Tcalc invab = 1.0 / mgab;
-    const Tcalc invbc = 1.0 / mgbc;
-    const Tcalc invcd = 1.0 / mgcd;
+    const Tcalc invab = value_one / mgab;
+    const Tcalc invbc = value_one / mgbc;
+    const Tcalc invcd = value_one / mgcd;
     const Tcalc cosb = -(ab[0]*bc[0] + ab[1]*bc[1] + ab[2]*bc[2]) * invab * invbc;
     const Tcalc cosc = -(bc[0]*cd[0] + bc[1]*cd[1] + bc[2]*cd[2]) * invbc * invcd;
     Tcalc isinb2, isinc2;
