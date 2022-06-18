@@ -608,7 +608,7 @@ AtomGraphSynthesis::checkRestraintList(const std::vector<int> &restraint_indices
   // Warn if there are unused restraint apparatuses
   int n_unused_network = 0;
   for (int i = 0; i < restraint_network_count; i++) {
-    n_unused_network += (network_unique[i] == false);
+    n_unused_network += (network_unique[i] == false && restraint_networks[i] != nullptr);
   }
   if (n_unused_network > 0) {
     switch (policy) {

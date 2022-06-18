@@ -1256,12 +1256,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       pos += blockDim.x;
     }
 #ifdef COMPUTE_ENERGY
-    // Stash the threads' accumulated 1:4 interaction energy values
+    // Stash the threads' accumulated 1:4 interaction energy values.  There may (likely, will)
+    // already be accumulated 1:4 energies in these slots, so in this particular case the
+    // new energies add to existing ones rather than just setting the __shared__ array values.
     WARP_REDUCE_DOWN(qq14_acc)
     WARP_REDUCE_DOWN(lj14_acc)
     if ((threadIdx.x & warp_bits_mask_int) == 0) {
-      sh_qq14_acc[(threadIdx.x >> warp_bits)] = qq14_acc;
-      sh_lj14_acc[(threadIdx.x >> warp_bits)] = lj14_acc;
+      sh_qq14_acc[(threadIdx.x >> warp_bits)] += qq14_acc;
+      sh_lj14_acc[(threadIdx.x >> warp_bits)] += lj14_acc;
     }
 #endif
     vterm_offset = vterm_limit;
