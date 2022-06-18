@@ -575,10 +575,13 @@ $(TESTDIR)/bin/test_synthesis : $(LIBDIR)/libomni.so \
 
 # Target: prmtop collating object test program
 $(TESTDIR)/bin/test_atomgraph_synthesis : $(LIBDIR)/libomni.so \
-					  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp
+					  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp \
+					  $(TESTDIR)/Synthesis/assemble_restraints.h \
+					  $(TESTDIR)/Synthesis/assemble_restraints.cpp
 	@echo "[OMNI]  Building test_atomgraph_synthesis..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_atomgraph_synthesis \
-	  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
+	  $(TESTDIR)/Synthesis/test_atomgraph_synthesis.cpp \
+	  $(TESTDIR)/Synthesis/assemble_restraints.cpp -L$(LIBDIR) -I$(SRCDIR) -lomni
 
 # Target: valence term evaluation by the most basic CPU routines
 $(TESTDIR)/bin/test_valence_evaluation : $(LIBDIR)/libomni.so \
@@ -647,11 +650,14 @@ $(TESTDIR)/bin/test_hpc_math : $(LIBDIR)/libomni_cuda.so $(TESTDIR)/Math/test_hp
 
 # Target: HPC molecular system synthesis and associated operations
 $(TESTDIR)/bin/test_hpc_synthesis : $(LIBDIR)/libomni_cuda.so \
-				    $(TESTDIR)/Synthesis/test_hpc_synthesis.cu
+				    $(TESTDIR)/Synthesis/test_hpc_synthesis.cu \
+				    $(TESTDIR)/Synthesis/assemble_restraints.h \
+				    $(TESTDIR)/Synthesis/assemble_restraints.cpp
 	@echo "[OMNI]  Building test_hpc_synthesis..."
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
 	  -o $(TESTDIR)/bin/test_hpc_synthesis $(TESTDIR)/Synthesis/test_hpc_synthesis.cu \
-	  -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) -lomni_cuda
+	  $(TESTDIR)/Synthesis/assemble_restraints.cpp -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) \
+	  -lomni_cuda
 
 # Target: Benchmarking single, double, and fixed-precision computations of valence forces
 $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \

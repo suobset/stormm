@@ -15,6 +15,7 @@
 #include "../../src/Potential/hpc_valence_potential.cuh"
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -25,6 +26,7 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/stopwatch.h"
+#include "assemble_restraints.h"
 
 using namespace omni::card;
 using namespace omni::constants;
@@ -35,6 +37,7 @@ using namespace omni::math;
 using namespace omni::mm;
 using namespace omni::numerics;
 using namespace omni::parse;
+using namespace omni::restraints;
 using namespace omni::synthesis;
 using namespace omni::testing;
 using namespace omni::topology;
@@ -368,7 +371,32 @@ int main(const int argc, const char* argv[]) {
                            1.0e-6, 1.0e-6, do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &tb_space, big_poly_ag, PrecisionLevel::SINGLE,
                            gpu, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5,
-                           2.2e-4, 1.0e-6, do_tests);
+                           2.2e-4, 1.0e-6, do_tests);  
+
+  // Read some topologies with virtual sites.  First, test the forces that appear to act on the
+  // virtual sites.  Add restraints to these ligands.
+  const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs.top";
+  const std::string lig1_top_name = topology_base + osc + "stereo_L1_vs.top";
+  const std::string lig2_top_name = topology_base + osc + "symmetry_L1_vs.top";
+  const std::string brbz_crd_name = coordinate_base + osc + "bromobenzene_vs.inpcrd";
+  const std::string lig1_crd_name = coordinate_base + osc + "stereo_L1_vs.inpcrd";
+  const std::string lig2_crd_name = coordinate_base + osc + "symmetry_L1_vs.inpcrd";
+  const bool ligands_exist = (getDrivePathType(brbz_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(lig2_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(brbz_crd_name) == DrivePathType::FILE &&
+                              getDrivePathType(lig1_crd_name) == DrivePathType::FILE &&
+                              getDrivePathType(lig2_crd_name) == DrivePathType::FILE);
+  AtomGraph brbz_ag, lig1_ag, lig2_ag;
+  PhaseSpace brbz_ps, lig1_ps, lig2_ps;
+  if (ligands_exist) {
+    brbz_ag.buildFromPrmtop(brbz_top_name);
+    lig1_ag.buildFromPrmtop(lig1_top_name);
+    lig2_ag.buildFromPrmtop(lig2_top_name);
+  }
+  const RestraintApparatus brbz_ra = assembleRestraints(&brbz_ag, brbz_ps);
+  const RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
+  const RestraintApparatus lig2_ra = assembleRestraints(&lig2_ag, lig2_ps);
   
 #if 0
   for (int len = 4; len < 36; len += 4) {
@@ -397,7 +425,8 @@ int main(const int argc, const char* argv[]) {
       timer.assignTime(i_timings);
     }
   }
-#endif  
+#endif
+
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);
