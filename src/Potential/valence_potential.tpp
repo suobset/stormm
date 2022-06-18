@@ -1358,7 +1358,7 @@ Tcalc evalPosnRestraint(const int p_atom, const bool time_dependence, const int 
                                               Vec4<Tcalc>(init_r.x, init_r.y, init_r.z, init_r.w),
                                               Vec4<Tcalc>(finl_r.x, finl_r.y, finl_r.z, finl_r.w),
                                               mixwt, dr);
-
+  
   // Compute forces
   if (eval_force == EvaluateForce::YES) {
     if (dr < constants::tiny) {

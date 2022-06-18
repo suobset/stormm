@@ -266,6 +266,14 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly
                                                  &tmp_sc, EvaluateForce::YES));
     rstr_frc_deviations.push_back(getForceDeviation(psi, poly_ps, i));
   }
+  error_limits.setValues(std::vector<double>(nsys, 1.0e-6));
+  check(rstr_frc_deviations, RelationalOperator::LESS_THAN, error_limits, "Forces due to "
+        "restraint contributions are inconsistent with those computed using a simpler "
+        "approach.", do_tests);
+  check(rstr_nrg, RelationalOperator::EQUAL, Approx(rstr_nrg_answer).margin(3.1e-7),
+        "Restraint energy penalties computed using the synthesis methods are inconsistent with "
+        "those computed using a simpler approach.", do_tests);
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -283,13 +291,15 @@ RestraintApparatus assembleRestraints(const AtomGraph *ag, const PhaseSpace &ps)
   std::vector<BoundedRestraint> rlist;
   rlist.reserve((cfr.natom / 8) + 12);
   Xoroshiro128pGenerator xrs(87293);
+  int nrst = 0;
   for (int i = 0; i < cfr.natom; i += cfr.natom / 8) {
     rlist.emplace_back(i, ag, cfr, 1.1, 1.4, 0.2, 0.6, 0.8, 1.4);
-    double3 ts = rlist[i].getTargetSite();
+    double3 ts = rlist[nrst].getTargetSite();
     ts.x += 0.25 * (0.5 - xrs.uniformRandomNumber());
     ts.y += 0.25 * (0.5 - xrs.uniformRandomNumber());
     ts.z += 0.25 * (0.5 - xrs.uniformRandomNumber());
-    rlist[i].setTargetSite(ts);
+    rlist[nrst].setTargetSite(ts);
+    nrst++;
   }
   const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
   for (int pos = 0; pos < vk.nbond; pos += vk.nbond / 4) {
@@ -499,17 +509,19 @@ int main(const int argc, const char* argv[]) {
            "are the same as for other files needed by this test program.  Subsequent tests will "
            "be skipped.", "test_atomgraph_synthesis");
   }
-  std::vector<AtomGraph*> agn_list = { &tiso_ag, &lig1_ag, &dhfr_ag };
-  std::vector<PhaseSpace> psn_list = { tiso_ps, lig1_ps, dhfr_ps };
-  AtomGraphSynthesis poly_agn(agn_list, { 0, 1, 2 }, ExceptionResponse::SILENT,
-                              maximum_valence_work_unit_atoms, &timer);
-  PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
-  checkSynthesis(poly_agn, &poly_psn, do_tests);
 
   // Create some restraints and apply them, then check the synthesis implementation
   RestraintApparatus tiso_ra = assembleRestraints(&tiso_ag, tiso_ps);
   RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
   RestraintApparatus dhfr_ra = assembleRestraints(&dhfr_ag, dhfr_ps);
+  std::vector<AtomGraph*> agn_list = { &tiso_ag, &lig1_ag, &dhfr_ag };
+  std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &lig1_ra, &dhfr_ra };
+  std::vector<PhaseSpace> psn_list = { tiso_ps, lig1_ps, dhfr_ps };
+  AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2 }, { 0, 1, 2 },
+                                  ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
+                                  &timer);
+  PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
+  checkSynthesis(poly_agn_rst, &poly_psn, do_tests);
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

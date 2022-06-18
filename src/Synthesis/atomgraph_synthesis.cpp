@@ -395,123 +395,16 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     // also be used to track access and other usage of the object.
     timer{timer_in}
 {
-  // CHECK
-  printf("Point A:\n");
-  for (int i = 0; i < system_count; i++) {
-    if (restraint_networks[restraint_indices_in[i]] == nullptr) {
-      printf("  %2d %s -> R( nullptr )\n", i,
-             topologies[topology_indices_in[i]]->getFileName().c_str());
-    }
-    else {
-      const AtomGraph *ag_ptr = restraint_networks[restraint_indices_in[i]]->getTopologyPointer();
-      printf("  %2d %s -> R( %s )\n", i,
-             topologies[topology_indices_in[i]]->getFileName().c_str(),
-             ag_ptr->getFileName().c_str());
-    }
-  }
-  printf("\n");
-  // END CHECK
-
   // Set up dummy restaint apparatuses for systems that do not have a restraint apparatus.  These
   // restraint apparatuses will exist for the duration of the object.
   const std::vector<int> new_restraint_indices = createDummyRestraints(restraint_indices_in,
                                                                        topology_indices_in);
 
-  // CHECK
-  printf("Point B:\n");
-  for (int i = 0; i < system_count; i++) {
-    if (restraint_networks[new_restraint_indices[i]] == nullptr) {
-      printf("  %2d %s -> R( nullptr )\n", i,
-             topologies[topology_indices_in[i]]->getFileName().c_str());
-    }
-    else {
-      const AtomGraph *ag_ptr = restraint_networks[new_restraint_indices[i]]->getTopologyPointer();
-      printf("  %2d %s -> R( %s )\n", i,
-             topologies[topology_indices_in[i]]->getFileName().c_str(),
-             ag_ptr->getFileName().c_str());
-    }
-  }
-  printf("\n");
-  // END CHECK
-
   // Setup and memory layout
   const std::vector<int> topology_index_rebase = checkTopologyList(topology_indices_in);
-
-  // CHECK
-  printf("topology_indices_in   = [ ");
-  for (size_t i = 0; i < topology_indices_in.size(); i++) {
-    printf("%2d ", topology_indices_in[i]);
-  }
-  printf("];\n");
-  printf("topology_index_rebase = [ ");
-  for (size_t i = 0; i < topology_index_rebase.size(); i++) {
-    printf("%2d ", topology_index_rebase[i]);
-  }
-  printf("];\n");
-  // END CHECK
-  
-  // CHECK
-  printf("Point B:\n");
-  for (int i = 0; i < system_count; i++) {
-    if (restraint_networks[new_restraint_indices[i]] == nullptr) {
-      printf("  %2d %s -> R( nullptr )\n", i,
-             topologies[topology_index_rebase[topology_indices_in[i]]]->getFileName().c_str());
-    }
-    else {
-      const AtomGraph *ag_ptr = restraint_networks[new_restraint_indices[i]]->getTopologyPointer();
-      printf("  %2d %s -> R( %s )\n", i,
-             topologies[topology_index_rebase[topology_indices_in[i]]]->getFileName().c_str(),
-             ag_ptr->getFileName().c_str());
-    }
-  }
-  printf("\n");
-  // END CHECK
-
   const std::vector<int> restraint_index_rebase = checkRestraintList(new_restraint_indices,
                                                                      topology_indices_in,
                                                                      topology_index_rebase);
-
-  // CHECK
-  printf("Restraint apparatuses:\n");
-  for (size_t i = 0; i < restraint_networks.size(); i++) {
-    printf("  %2zu ", i);
-    if (restraint_networks[i] == nullptr) {
-      printf("nullptr\n");
-    }
-    else {
-      printf("%s\n", restraint_networks[i]->getTopologyPointer()->getFileName().c_str());
-    }
-  }
-  // END CHECK
-  
-  // CHECK
-  printf("restraint_indices_in = [");
-  for (int i = 0; i < restraint_indices_in.size(); i++) {
-    printf(" %2d", restraint_indices_in[i]);
-  }
-  printf(" ];\n");
-  printf("new_restraint_indices = [");
-  for (int i = 0; i < new_restraint_indices.size(); i++) {
-    printf(" %2d", new_restraint_indices[i]);
-  }
-  printf(" ];\n");
-  printf("restraint_index_rebase = [");
-  for (int i = 0; i < restraint_index_rebase.size(); i++) {
-    printf(" %2d", restraint_index_rebase[i]);
-  }
-  printf(" ];\n");
-  printf("Rebased restraint apparatuses:\n  ");
-  for (int i = 0; i < system_count; i++) {
-    const RestraintApparatus *ra_ptr =
-      restraint_networks[restraint_index_rebase[new_restraint_indices[i]]];
-    const AtomGraph *ag_ptr = ra_ptr->getTopologyPointer();
-    printf("  %s\n", ag_ptr->getFileName().c_str());
-    printf("    %4d %4d %4d %4d\n", ra_ptr->getPositionalRestraintCount(),
-           ra_ptr->getDistanceRestraintCount(), ra_ptr->getAngleRestraintCount(),
-           ra_ptr->getDihedralRestraintCount());
-  }
-  // END CHECK
-  
   checkCommonSettings();
   int term_array_timings, param_cond_timings, vwu_creation_timings;
   if (timer != nullptr) {
@@ -520,7 +413,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     vwu_creation_timings = timer->addCategory("[AtomGraphSynthesis] VWU creation");
     timer->assignTime(0);
   }
-  buildAtomAndTermArrays(topology_indices_in, topology_index_rebase, restraint_indices_in,
+  buildAtomAndTermArrays(topology_indices_in, topology_index_rebase, new_restraint_indices,
                          restraint_index_rebase);
   if (timer != nullptr) timer->assignTime(term_array_timings);
 
@@ -855,7 +748,7 @@ void AtomGraphSynthesis::checkCommonSettings() {
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
                                                 const std::vector<int> &topology_index_rebase,
-                                                const std::vector<int> &restraint_indices_in,
+                                                const std::vector<int> &new_restraint_indices,
                                                 const std::vector<int> &restraint_index_rebase) {
 
   // Allocate memory and set POINTER-kind arrays for the small packets of data
@@ -955,7 +848,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   // Load the topology indexing first
   for (int i = 0; i < system_count; i++) {
     topology_indices.putHost(topology_index_rebase[topology_indices_in[i]], i);
-    restraint_indices.putHost(restraint_index_rebase[restraint_indices_in[i]], i);
+    restraint_indices.putHost(restraint_index_rebase[new_restraint_indices[i]], i);
   }
 
   // Loop over all systems, fill in the above details, and compute the sizes of various arrays
@@ -1053,14 +946,14 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       total_distance_restraints += rar.nbond;
       total_angle_restraints    += rar.nangl;
       total_dihedral_restraints += rar.ndihe;
-      rposn_offset += roundUp(rar.nposn, warp_size_int);
       posn_restraint_offsets.putHost(rposn_offset, i);
-      rbond_offset += roundUp(rar.nbond, warp_size_int);
+      rposn_offset += roundUp(rar.nposn, warp_size_int);
       bond_restraint_offsets.putHost(rbond_offset, i);
-      rangl_offset += roundUp(rar.nangl, warp_size_int);
+      rbond_offset += roundUp(rar.nbond, warp_size_int);
       angl_restraint_offsets.putHost(rangl_offset, i);
-      rdihe_offset += roundUp(rar.ndihe, warp_size_int);
+      rangl_offset += roundUp(rar.nangl, warp_size_int);
       dihe_restraint_offsets.putHost(rdihe_offset, i);
+      rdihe_offset += roundUp(rar.ndihe, warp_size_int);
     }
     sett_group_offsets.putHost(sett_offset, i);
     sett_offset += roundUp(cnk.nsettle, warp_size_int);
@@ -1124,8 +1017,8 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   residue_names.setPointer(&chem_char4_data, pivot, resi_offset);
 
   // Fill the above atom and residue descriptor arrays
-  int2* residue_limits_ptr      = residue_limits.data();
-  int2* molecule_limits_ptr     = molecule_limits.data();
+  int2* residue_limits_ptr     = residue_limits.data();
+  int2* molecule_limits_ptr    = molecule_limits.data();
   int* atom_struc_numbers_ptr  = atom_struc_numbers.data();
   int* residue_numbers_ptr     = residue_numbers.data();
   int* atomic_numbers_ptr      = atomic_numbers.data();
@@ -2280,7 +2173,7 @@ int AtomGraphSynthesis::mapUniqueRestraintKRSeries(const int order,
       const int ij_init_step = irstr_init_step[j];
       const int ij_finl_step = irstr_finl_step[j];
       const bool ij_time_dep = (ij_finl_step == 0);
-
+      
       // Skip restraints that have already been determined to have a known k / r series
       if (synthesis_index_ptr[network_table_offsets[i] + j] < 0) {
         const Approx ij_posn_init_k2(irstr_init_keq[j].x, constants::verytiny);
@@ -2453,21 +2346,21 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
                                                           &filtered_rposn_finl_keq,
                                                           &filtered_rposn_init_r,
                                                           &filtered_rposn_finl_r);
-  const int n_unique_bond    = mapUniqueRestraintKRSeries(1, network_rbond_table_offsets,
+  const int n_unique_bond    = mapUniqueRestraintKRSeries(2, network_rbond_table_offsets,
                                                           &rbond_synthesis_index,
                                                           &filtered_rbond_step_bounds,
                                                           &filtered_rbond_init_keq,
                                                           &filtered_rbond_finl_keq,
                                                           &filtered_rbond_init_r,
                                                           &filtered_rbond_finl_r);
-  const int n_unique_angl    = mapUniqueRestraintKRSeries(1, network_rangl_table_offsets,
+  const int n_unique_angl    = mapUniqueRestraintKRSeries(3, network_rangl_table_offsets,
                                                           &rangl_synthesis_index,
                                                           &filtered_rangl_step_bounds,
                                                           &filtered_rangl_init_keq,
                                                           &filtered_rangl_finl_keq,
                                                           &filtered_rangl_init_r,
                                                           &filtered_rangl_finl_r);
-  const int n_unique_dihe    = mapUniqueRestraintKRSeries(1, network_rdihe_table_offsets,
+  const int n_unique_dihe    = mapUniqueRestraintKRSeries(4, network_rdihe_table_offsets,
                                                           &rdihe_synthesis_index,
                                                           &filtered_rdihe_step_bounds,
                                                           &filtered_rdihe_init_keq,

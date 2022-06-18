@@ -1099,14 +1099,14 @@ private:
   /// \param topology_index_rebase   Re-arrangement of system topology indices meeting the
   ///                                condensed list of unique topologies created by
   ///                                checkTopologyList()
-  /// \param restraint_indices_in    Original list of restraint group indices, oriented towards
+  /// \param new_restraint_indices   Refined list of restraint group indices, oriented towards
   ///                                the input list of RestraintApparatus pointers
   /// \param restraint_index_rebase  Re-arrangement of restraint group indices meeting the
   ///                                condensed list of unique restraints created by
   ///                                checkRestraintList()
   void buildAtomAndTermArrays(const std::vector<int> &topology_indices_in,
                               const std::vector<int> &topology_index_rebase,
-                              const std::vector<int> &restraint_indices_in,
+                              const std::vector<int> &new_restraint_indices,
                               const std::vector<int> &restraint_index_rebase);
 
   /// \brief Find unique parameters for each of the valence energy components, charges, and

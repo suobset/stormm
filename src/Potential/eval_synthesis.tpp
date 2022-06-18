@@ -332,7 +332,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
                           syrk.rposn_init_k[kr_param_idx], syrk.rposn_finl_k[kr_param_idx],
                           syrk.rposn_init_r[kr_param_idx], syrk.rposn_finl_r[kr_param_idx],
                           sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE, sh_xfrc,
-                          sh_yfrc, sh_zfrc, eval_force);
+                          sh_yfrc, sh_zfrc, eval_force, inv_gpos_scale, force_scale);
       if (log_term) {
         rest_acc += llround(contrib * nrg_scale_factor);
       }
@@ -372,7 +372,8 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
                                    syrk.rbond_init_k[param_idx], syrk.rbond_finl_k[param_idx],
                                    syrk.rbond_init_r[param_idx], syrk.rbond_finl_r[param_idx],
                                    sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force, inv_gpos_scale,
+                                   force_scale);
       if (log_term) {
         rest_acc += llround(contrib * nrg_scale_factor);
       }
@@ -413,7 +414,8 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
                                    syrk.rangl_init_k[param_idx], syrk.rangl_finl_k[param_idx],
                                    syrk.rangl_init_r[param_idx], syrk.rangl_finl_r[param_idx],
                                    sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force, inv_gpos_scale,
+                                   force_scale);
       if (log_term) {
         rest_acc += llround(contrib * nrg_scale_factor);
       }      
@@ -421,7 +423,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
   }
 
   // Evaluate dihedral restraints
-  if (activity == VwuTask::RANGL || activity == VwuTask::ALL_TASKS) {
+  if (activity == VwuTask::RDIHE || activity == VwuTask::ALL_TASKS) {
     const int2 rdihe_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
                                                  static_cast<int>(VwuAbstractMap::RDIHE)];
     const int2 rdihe_nrg_limits = syvk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +
@@ -438,12 +440,12 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
         log_term = readBitFromMask(&syrk.rdihe_acc[rdihe_nrg_limits.x], pos - rdihe_limits.x);
         break;
       }
-      const uint2 tinsr = syrk.rangl_insr[pos];
+      const uint2 tinsr = syrk.rdihe_insr[pos];
       const int i_atom = (tinsr.x & 0x3ff);
       const int j_atom = ((tinsr.x >> 10) & 0x3ff);
       const int k_atom = ((tinsr.x >> 20) & 0x3ff);
       const int l_atom = (tinsr.y & 0x3ff);
-      const int param_idx = ((tinsr.y >> 10) * 0x3fffff);
+      const int param_idx = ((tinsr.y >> 10) & 0x3fffff);
       const double contrib =
         evalDiheRestraint<llint,
                           llint,
@@ -455,7 +457,8 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
                                    syrk.rdihe_init_k[param_idx], syrk.rdihe_finl_k[param_idx],
                                    syrk.rdihe_init_r[param_idx], syrk.rdihe_finl_r[param_idx],
                                    sh_xcrd, sh_ycrd, sh_zcrd, nullptr, nullptr, UnitCellType::NONE,
-                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force);
+                                   sh_xfrc, sh_yfrc, sh_zfrc, eval_force, inv_gpos_scale,
+                                   force_scale);
       if (log_term) {
         rest_acc += llround(contrib * nrg_scale_factor);
       }
