@@ -1278,7 +1278,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         int p_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
         const int kr_param_idx = ((tinsr.x >> 10) & 0x1fffff);
         const int xyz_param_idx = tinsr.y;
-
+        
         // The reference coordinate storage in floating point numbers may not be as good for
         // precision in the calculations, but restraints of this sort are generally employed
         // at the beginning of a simulation, when the molecule is near the origin (and hence
@@ -1409,15 +1409,17 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         if ((__ldca(&poly_rk.rbond_acc[acc_offset + acc_elem]) >> acc_bit) & 0x1) {
 #  endif
         const TCALC fmag = poly_psw.frc_scale * (TCALC)(2.0) * rst_eval.x * rst_eval.y / dr;
+        i_atom -= EXCL_GMEM_OFFSET;
+        j_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const TCALC fmag_dx = fmag * dx;
         const TCALC fmag_dy = fmag * dy;
         const TCALC fmag_dz = fmag * dz;
-        splitForceContribution( fmag_dx, j_atom, sh_xfrc, xoverflow_active,
+        splitForceContribution( fmag_dx, i_atom, sh_xfrc, xoverflow_active,
                                gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
-        splitForceContribution( fmag_dy, j_atom, sh_yfrc, yoverflow_active,
+        splitForceContribution( fmag_dy, i_atom, sh_yfrc, yoverflow_active,
                                gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
-        splitForceContribution( fmag_dz, j_atom, sh_zfrc, zoverflow_active,
+        splitForceContribution( fmag_dz, i_atom, sh_zfrc, zoverflow_active,
                                gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
         splitForceContribution(-fmag_dx, j_atom, sh_xfrc, xoverflow_active,
                                gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
@@ -1503,6 +1505,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC sqba = dA / mgba;
         const TCALC sqbc = dA / mgbc;
         const TCALC mbabc = dA * invbabc;
+        i_atom -= EXCL_GMEM_OFFSET;
+        j_atom -= EXCL_GMEM_OFFSET;
+        k_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const int2 iadf_x = convertSplitFixedPrecision((costheta * ba_x * sqba) - (bc_x * mbabc));
         const int2 iadf_y = convertSplitFixedPrecision((costheta * ba_y * sqba) - (bc_y * mbabc));
@@ -1642,7 +1647,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    endif
         if ((__ldca(&poly_rk.rdihe_acc[acc_offset + acc_elem]) >> acc_bit) & 0x1) {
 #  endif
-        const TCALC fr = (TCALC)(-2.0) * rst_eval.x * rst_eval.y;
+        const TCALC fr = (TCALC)(-2.0) * rst_eval.x * rst_eval.y * poly_psw.frc_scale_f;
         const TCALC mgab = SQRT_FUNC((ab.x * ab.x) + (ab.y * ab.y) + (ab.z * ab.z));
         const TCALC mgbc = SQRT_FUNC((bc.x * bc.x) + (bc.y * bc.y) + (bc.z * bc.z));
         const TCALC mgcd = SQRT_FUNC((cd.x * cd.x) + (cd.y * cd.y) + (cd.z * cd.z));
@@ -1662,8 +1667,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC isinc2 = (cosc * cosc < asymptotic_to_one_f) ?
                              fr / (1.0f - (cosc * cosc)) : fr * inverse_one_minus_asymptote_f;
 #endif
-        const TCALC invabc = invab * invbc * poly_psw.frc_scale_f;
-        const TCALC invbcd = invbc * invcd * poly_psw.frc_scale_f;
+        const TCALC invabc = invab * invbc;
+        const TCALC invbcd = invbc * invcd;
         crabbc.x *= invabc;
         crabbc.y *= invabc;
         crabbc.z *= invabc;
@@ -1676,6 +1681,10 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
         const TCALC fc2 = cosb * invbc * isinb2;
         const TCALC fd = -invcd * isinc2;
+        i_atom -= EXCL_GMEM_OFFSET;
+        j_atom -= EXCL_GMEM_OFFSET;
+        k_atom -= EXCL_GMEM_OFFSET;
+        l_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const int2 ifrc_ix = convertSplitFixedPrecision(crabbc.x * fa);
         const int2 ifrc_jx = convertSplitFixedPrecision((fb1 * crabbc.x) - (fb2 * crbccd.x));

@@ -90,7 +90,8 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
     host_result.initializeForces();
     ScoreCard isc(1, 1, 32);
-    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
+    evalValeRestMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i),
+                   *(poly_ag.getSystemRestraintPointer(i)), EvaluateForce::YES, 0);
     const TrajectoryKind frcid = TrajectoryKind::FORCES;
     const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
@@ -405,7 +406,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra };
   const std::vector<int> ligand_tiling = { 0, 1, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
   PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
-  AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, //ligand_ra_list, ligand_tiling,
+  AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,
                                     ExceptionResponse::WARN, max_vwu_atoms, &timer);
   ligand_poly_ag.upload();
