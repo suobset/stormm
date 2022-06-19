@@ -764,7 +764,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
             const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
             const int sysid = vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x;
             const int il_ljidx = __ldca(&poly_vk.ljabc_offsets[sysid]) +
-                                 (__ldca(&poly_vk.n_lj_types[sysid]) * i_ljidx) + l_ljidx;
+                                 (__ldca(&poly_vk.n_lj_types[sysid]) * l_ljidx) + i_ljidx;
             const TCALC qq_il = __ldca(&gmem_r.charges[i_atom]) * __ldca(&gmem_r.charges[l_atom]) *
                                 poly_vk.coulomb / attn_qq14;
             const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]);
@@ -1169,8 +1169,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       if (pos - vterm_offset < vwu_task_count[(size_t)(VwuAbstractMap::INFR14)]) {
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::INFR14)].x;
         const uint tinsr = __ldcs(&poly_vk.infr14_insr[task_offset + pos - vterm_offset]);
-        int i_atom = (tinsr & 0x3ff);
-        int l_atom = ((tinsr >> 10) & 0x3ff);
+        int i_atom = (tinsr & 0x3ff) + EXCL_GMEM_OFFSET;
+        int l_atom = ((tinsr >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int attn_idx = ((tinsr >> 20) & 0xfff);
+        TCALC attn_qq14 = (TCALC)(0.0);
+        TCALC attn_lj14 = (TCALC)(0.0);
+        if (attn_idx > 0) {
+          attn_qq14 = (TCALC)(1.0) / __ldca(&poly_vk.attn14_elec[attn_idx]);
+          attn_lj14 = (TCALC)(1.0) / __ldca(&poly_vk.attn14_vdw[attn_idx]);
+        }
         const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
@@ -1180,18 +1187,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
         const TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
-        const int attn_idx = ((tinsr >> 20) & 0xfff);
-        const TCALC attn_qq14 = __ldca(&poly_vk.attn14_elec[attn_idx]);
-        const TCALC attn_lj14 = __ldca(&poly_vk.attn14_vdw[attn_idx]);
         const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
         const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
         const int sysid = vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x;
         const int il_ljidx = __ldca(&poly_vk.ljabc_offsets[sysid]) +
-                             (__ldca(&poly_vk.n_lj_types[sysid]) * i_ljidx) + l_ljidx;
+                             (__ldca(&poly_vk.n_lj_types[sysid]) * l_ljidx) + i_ljidx;
         const TCALC qq_il = __ldca(&gmem_r.charges[i_atom]) * __ldca(&gmem_r.charges[l_atom]) *
-                            poly_vk.coulomb / attn_qq14;
-        const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]);
-        const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]);
+                            poly_vk.coulomb * attn_qq14;
+        const TCALC lja_il = __ldca(&poly_vk.lja_14_coeff[il_ljidx]) * attn_lj14;
+        const TCALC ljb_il = __ldca(&poly_vk.ljb_14_coeff[il_ljidx]) * attn_lj14;
         const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
         const TCALC invr2 = invr  * invr;
         const TCALC invr4 = invr2 * invr2;
@@ -1215,7 +1219,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
 #    endif
         if ((__ldca(&poly_vk.infr14_acc[acc_offset + acc_elem]) >> acc_bit) & 0x1) {
 #  endif        
-        const TCALC fmag = poly_psw.frc_scale * ((qq_il * invr * invr2) +
+        const TCALC fmag = poly_psw.frc_scale * (-(qq_il * invr * invr2) +
                                                  (((TCALC)(6.0) * ljb_il) -
                                                   ((TCALC)(12.0) * lja_il * invr4 * invr2)) *
                                                  invr4 * invr4);

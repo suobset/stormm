@@ -85,6 +85,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                     EvaluateEnergy::NO, VwuGoal::ACCUMULATE, gpu);    
     break;
   }
+  int total_restraints = 0;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
     PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
@@ -97,17 +98,19 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
     frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
+    total_restraints += poly_ag.getSystemRestraintPointer(i)->getTotalRestraintCount();
   }
+  const std::string restraint_presence = (total_restraints > 0) ? "with" : "without";
   check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
-        "valence interaction kernel, operating on systems without external restraints, exceed the "
-        "tolerance for mean unsigned errors in their vector components.  Force accumulation "
-        "method: " + getForceAccumulationMethodName(facc_method) + ".  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "valence interaction kernel, operating on systems " + restraint_presence + " external " +
+        "restraints, exceed the tolerance for mean unsigned errors in their vector components.  "
+        "Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
+        ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
   check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
-        "by the valence interaction kernel, operating on systems without external restraints, "
-        "exceed the maximum allowed errors for forces acting on any one particle.  Force "
-        "accumulation method: " + getForceAccumulationMethodName(facc_method) + ".  Precision "
-        "level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "by the valence interaction kernel, operating on systems " + restraint_presence +
+        " external restraints, exceed the maximum allowed errors for forces acting on any one "
+        "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
+        ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -376,12 +379,12 @@ int main(const int argc, const char* argv[]) {
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
-  const std::string brbz_top_name = topology_base + osc + "bromobenzene_iso.top";
-  const std::string lig1_top_name = topology_base + osc + "stereo_L1.top";
-  const std::string lig2_top_name = topology_base + osc + "symmetry_L1.top";
-  const std::string brbz_crd_name = coordinate_base + osc + "bromobenzene_iso.inpcrd";
-  const std::string lig1_crd_name = coordinate_base + osc + "stereo_L1.inpcrd";
-  const std::string lig2_crd_name = coordinate_base + osc + "symmetry_L1.inpcrd";
+  const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs_iso.top";
+  const std::string lig1_top_name = topology_base + osc + "stereo_L1_vs.top";
+  const std::string lig2_top_name = topology_base + osc + "symmetry_L1_vs.top";
+  const std::string brbz_crd_name = coordinate_base + osc + "bromobenzene_vs_iso.inpcrd";
+  const std::string lig1_crd_name = coordinate_base + osc + "stereo_L1_vs.inpcrd";
+  const std::string lig2_crd_name = coordinate_base + osc + "symmetry_L1_vs.inpcrd";
   const bool ligands_exist = (getDrivePathType(brbz_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig2_top_name) == DrivePathType::FILE &&
@@ -404,7 +407,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomGraph*> ligand_ag_list = { &brbz_ag, &lig1_ag, &lig2_ag };
   const std::vector<PhaseSpace> ligand_ps_list = {  brbz_ps,  lig1_ps,  lig2_ps };
   const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra };
-  const std::vector<int> ligand_tiling = { 0, 1, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
+  const std::vector<int> ligand_tiling = { 0, 1, 2 };//, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
   PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,

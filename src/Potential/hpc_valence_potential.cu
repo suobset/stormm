@@ -504,7 +504,7 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
   const int minor_arch = gpu.getArchMinor();
   const int blocks_multiplier = (major_arch == 6 && minor_arch == 1) ? 2 : 1;
   const int nblocks = gpu.getSMPCount() * blocks_multiplier;
-
+  
   // Have ready a maximum number of threads per block, and a fallback number if the register
   // pressure might be too high to employ the full thread complement.
   const int max_threads   = gpu.getMaxThreadsPerBlock() / blocks_multiplier;
