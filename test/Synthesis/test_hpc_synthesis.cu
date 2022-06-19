@@ -74,16 +74,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   ScoreCard sc(nsys, 1, 32);
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
-
-  // CHECK
-  printf("  point a\n");
-  for (int i = 0; i < nsys; i++) {
-    PhaseSpace test_host = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
-    PhaseSpace test_devc = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
-  }
-  printf("  point b\n");
-  // END CHECK
-  
   switch (prec) {
   case PrecisionLevel::SINGLE:
   case PrecisionLevel::SINGLE_PLUS:
@@ -98,11 +88,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
     PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
-
-    // CHECK
-    printf("  point c %2d\n", i);
-    // END CHECK
-    
     host_result.initializeForces();
     ScoreCard isc(1, 1, 32);
     evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
