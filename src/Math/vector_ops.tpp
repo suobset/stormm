@@ -1167,5 +1167,17 @@ findUnmatchedValues(const Hybrid<T> &va, const Hybrid<T> &vb,
   return findUnmatchedValues(tva, tvb, check_repeats);
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx) {
+  std::vector<T> result;
+  const size_t ntiles = tidx.size();
+  result.reserve(ntiles);
+  for (size_t i = 0; i < ntiles; i++) {
+    result.emplace_back(va[tidx[i]]);
+  }
+  return result;
+}
+  
 } // namespace math
 } // namespace omni

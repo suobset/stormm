@@ -8,6 +8,7 @@
 #include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
+#include "Math/vector_ops.h"
 #include "Trajectory/write_frame.h"
 #include "phasespace_synthesis.h"
 #ifdef OMNI_USE_HPC
@@ -24,6 +25,7 @@ using diskutil::DrivePathType;
 using diskutil::getDrivePathType;
 using math::roundUp;
 using math::invertSquareMatrix;
+using math::tileVector;
 using numerics::checkGlobalPositionBits;
 using numerics::checkLocalPositionBits;
 using numerics::checkVelocityBits;
@@ -287,6 +289,39 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     sp_box_space_transforms.putHost(box_space_transforms.readHost(i), i);
   }
 }
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<int> &index_key,
+                                         const std::vector<Thermostat> &heat_baths_in,
+                                         const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
+                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<int> &ps_index_key,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<int> &ag_index_key,
+                                         const std::vector<Thermostat> &heat_baths_in,
+                                         const std::vector<Barostat> &pistons_in,
+                                         const double time_step_in,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
+                        heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
@@ -883,7 +918,7 @@ PhaseSpace PhaseSpaceSynthesis::exportSystem(const int index, const HybridTarget
     rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
           std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "exportSystem");
   }
-  PhaseSpace result(atom_counts.readHost(index));
+  PhaseSpace result(atom_counts.readHost(index), unit_cell);
   extractSystem(&result, index, tier);
   return result;
 }

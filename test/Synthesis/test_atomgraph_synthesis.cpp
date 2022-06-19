@@ -437,24 +437,36 @@ int main(const int argc, const char* argv[]) {
   // Prepare some more systems
   const std::string tiso_top_name = base_top_name + osc + "trpcage.top";
   const std::string tiso_crd_name = base_crd_name + osc + "trpcage.inpcrd";
+  const std::string brbi_top_name = base_top_name + osc + "bromobenzene_vs_iso.top";
+  const std::string brbi_crd_name = base_crd_name + osc + "bromobenzene_vs_iso.inpcrd";
   const std::string lig1_top_name = base_top_name + osc + "stereo_L1_vs.top";
   const std::string lig1_crd_name = base_crd_name + osc + "stereo_L1_vs.inpcrd";
+  const std::string lig2_top_name = base_top_name + osc + "symmetry_L1_vs.top";
+  const std::string lig2_crd_name = base_crd_name + osc + "symmetry_L1_vs.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
   const bool new_exist = (getDrivePathType(tiso_top_name) == DrivePathType::FILE &&
+                          getDrivePathType(brbi_top_name) == DrivePathType::FILE &&
                           getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
+                          getDrivePathType(lig2_top_name) == DrivePathType::FILE &&
                           getDrivePathType(dhfr_top_name) == DrivePathType::FILE &&
                           getDrivePathType(tiso_crd_name) == DrivePathType::FILE &&
+                          getDrivePathType(brbi_crd_name) == DrivePathType::FILE &&
                           getDrivePathType(lig1_crd_name) == DrivePathType::FILE &&
+                          getDrivePathType(lig2_crd_name) == DrivePathType::FILE &&
                           getDrivePathType(dhfr_crd_name) == DrivePathType::FILE);
-  AtomGraph tiso_ag, lig1_ag, dhfr_ag;
-  PhaseSpace tiso_ps, lig1_ps, dhfr_ps;
+  AtomGraph tiso_ag, brbi_ag, lig1_ag, lig2_ag, dhfr_ag;
+  PhaseSpace tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps;
   if (new_exist) {
     tiso_ag.buildFromPrmtop(tiso_top_name, ExceptionResponse::SILENT);
+    brbi_ag.buildFromPrmtop(brbi_top_name, ExceptionResponse::SILENT);
     lig1_ag.buildFromPrmtop(lig1_top_name, ExceptionResponse::SILENT);
+    lig2_ag.buildFromPrmtop(lig2_top_name, ExceptionResponse::SILENT);
     dhfr_ag.buildFromPrmtop(dhfr_top_name, ExceptionResponse::SILENT);
     tiso_ps.buildFromFile(tiso_crd_name);
+    brbi_ps.buildFromFile(brbi_crd_name);
     lig1_ps.buildFromFile(lig1_crd_name);
+    lig2_ps.buildFromFile(lig2_crd_name);
     dhfr_ps.buildFromFile(dhfr_crd_name);
   }
   else {
@@ -466,12 +478,14 @@ int main(const int argc, const char* argv[]) {
 
   // Create some restraints and apply them, then check the synthesis implementation
   RestraintApparatus tiso_ra = assembleRestraints(&tiso_ag, tiso_ps);
+  RestraintApparatus brbi_ra = assembleRestraints(&brbi_ag, brbi_ps);
   RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
+  RestraintApparatus lig2_ra = assembleRestraints(&lig2_ag, lig2_ps);
   RestraintApparatus dhfr_ra = assembleRestraints(&dhfr_ag, dhfr_ps);
-  std::vector<AtomGraph*> agn_list = { &tiso_ag, &lig1_ag, &dhfr_ag };
-  std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &lig1_ra, &dhfr_ra };
-  std::vector<PhaseSpace> psn_list = { tiso_ps, lig1_ps, dhfr_ps };
-  AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2 }, { 0, 1, 2 },
+  std::vector<AtomGraph*> agn_list = { &tiso_ag, &brbi_ag, &lig1_ag, &lig2_ag, &dhfr_ag };
+  std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &brbi_ra, &lig1_ra, &lig2_ra, &dhfr_ra };
+  std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
+  AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 },
                                   ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
                                   &timer);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list);

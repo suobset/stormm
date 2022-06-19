@@ -74,6 +74,16 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   ScoreCard sc(nsys, 1, 32);
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
+
+  // CHECK
+  printf("  point a\n");
+  for (int i = 0; i < nsys; i++) {
+    PhaseSpace test_host = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
+    PhaseSpace test_devc = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
+  }
+  printf("  point b\n");
+  // END CHECK
+  
   switch (prec) {
   case PrecisionLevel::SINGLE:
   case PrecisionLevel::SINGLE_PLUS:
@@ -86,8 +96,13 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     break;
   }
   for (int i = 0; i < nsys; i++) {
-    PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
+    PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
+
+    // CHECK
+    printf("  point c %2d\n", i);
+    // END CHECK
+    
     host_result.initializeForces();
     ScoreCard isc(1, 1, 32);
     evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::YES, 0);
@@ -375,12 +390,12 @@ int main(const int argc, const char* argv[]) {
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
-  const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs.top";
-  const std::string lig1_top_name = topology_base + osc + "stereo_L1_vs.top";
-  const std::string lig2_top_name = topology_base + osc + "symmetry_L1_vs.top";
-  const std::string brbz_crd_name = coordinate_base + osc + "bromobenzene_vs.inpcrd";
-  const std::string lig1_crd_name = coordinate_base + osc + "stereo_L1_vs.inpcrd";
-  const std::string lig2_crd_name = coordinate_base + osc + "symmetry_L1_vs.inpcrd";
+  const std::string brbz_top_name = topology_base + osc + "bromobenzene_iso.top";
+  const std::string lig1_top_name = topology_base + osc + "stereo_L1.top";
+  const std::string lig2_top_name = topology_base + osc + "symmetry_L1.top";
+  const std::string brbz_crd_name = coordinate_base + osc + "bromobenzene_iso.inpcrd";
+  const std::string lig1_crd_name = coordinate_base + osc + "stereo_L1.inpcrd";
+  const std::string lig2_crd_name = coordinate_base + osc + "symmetry_L1.inpcrd";
   const bool ligands_exist = (getDrivePathType(brbz_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig2_top_name) == DrivePathType::FILE &&
@@ -393,10 +408,39 @@ int main(const int argc, const char* argv[]) {
     brbz_ag.buildFromPrmtop(brbz_top_name);
     lig1_ag.buildFromPrmtop(lig1_top_name);
     lig2_ag.buildFromPrmtop(lig2_top_name);
+    brbz_ps.buildFromFile(brbz_crd_name);
+    lig1_ps.buildFromFile(lig1_crd_name);
+    lig2_ps.buildFromFile(lig2_crd_name);
   }
-  const RestraintApparatus brbz_ra = assembleRestraints(&brbz_ag, brbz_ps);
-  const RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
-  const RestraintApparatus lig2_ra = assembleRestraints(&lig2_ag, lig2_ps);
+  RestraintApparatus brbz_ra = assembleRestraints(&brbz_ag, brbz_ps);
+  RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
+  RestraintApparatus lig2_ra = assembleRestraints(&lig2_ag, lig2_ps);
+  const std::vector<AtomGraph*> ligand_ag_list = { &brbz_ag, &lig1_ag, &lig2_ag };
+  const std::vector<PhaseSpace> ligand_ps_list = {  brbz_ps,  lig1_ps,  lig2_ps };
+  const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra };
+  const std::vector<int> ligand_tiling = { 0, 1, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
+  PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
+  AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, //ligand_ra_list, ligand_tiling,
+                                    ligand_tiling,
+                                    ExceptionResponse::WARN, max_vwu_atoms, &timer);
+  ligand_poly_ag.upload();
+  ligand_poly_ps.upload();
+  timer.assignTime(0);
+  checkCompilationForces(&ligand_poly_ps, &mmctrl, &tb_space, ligand_poly_ag,
+                         ForceAccumulationMethod::WHOLE, PrecisionLevel::DOUBLE, gpu, 3.5e-6,
+                         2.0e-5, do_tests);
+  checkCompilationForces(&ligand_poly_ps, &mmctrl, &tb_space, ligand_poly_ag,
+                         ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu, 7.5e-5,
+                         3.0e-3, do_tests);
+  checkCompilationForces(&ligand_poly_ps, &mmctrl, &tb_space, ligand_poly_ag,
+                         ForceAccumulationMethod::WHOLE, PrecisionLevel::SINGLE, gpu, 7.5e-5,
+                         3.0e-3, do_tests);
+  checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &tb_space, ligand_poly_ag,
+                           PrecisionLevel::DOUBLE, gpu, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
+  checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &tb_space, ligand_poly_ag,
+                           PrecisionLevel::SINGLE, gpu, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5,
+                           3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6, do_tests);
   
 #if 0
   for (int len = 4; len < 36; len += 4) {

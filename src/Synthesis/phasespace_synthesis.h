@@ -213,6 +213,14 @@ public:
   ///   - Take a SystemCache object and unpack it
   ///
   /// \param ps_list       Array of input coordinates, velocities, and forces objects
+  /// \param ag_list       Array of pointers to input topologies
+  /// \param index_key     Indices of the given topology and coordinate objects to assemble into a
+  ///                      larger list of systems to be held within the resulting
+  ///                      PhaseSpaceSynthesis object.
+  /// \param ps_index_key  Indices of the given coordinate objects to assemble into a larger list
+  ///                      of systems to be held within the resulting PhaseSpaceSynthesis object.
+  /// \param ag_index_key  Indices of the given topology objects to assemble into a larger list of
+  ///                      systems to be held within the resulting PhaseSpaceSynthesis object.
   /// \param time_step_in  The initial time step (will be converted to integer representation as
   ///                      described above, default 1.0fs which converts to llint(8))
   /// \param heat_bath_in  A thermostat to govern integration of the equations of motion
@@ -220,6 +228,26 @@ public:
   /// \{
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list,
+                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
+                      const std::vector<Barostat> &pistons_in = { Barostat() },
+                      double time_step_in = 1.0,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &index_key,
+                      const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
+                      const std::vector<Barostat> &pistons_in = { Barostat() },
+                      double time_step_in = 1.0,
+                      int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
                       const std::vector<Thermostat> &heat_baths_in = { Thermostat() },
                       const std::vector<Barostat> &pistons_in = { Barostat() },
                       double time_step_in = 1.0,

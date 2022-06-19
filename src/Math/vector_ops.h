@@ -642,6 +642,14 @@ int readBitFromMask(const ushort* va, const size_t pos);
 int readBitFromMask(const std::vector<ushort> &va, const size_t pos);
 /// \}
 
+/// \brief Construct a vector based on an existing vector of any object type and an ordered list
+///        of indices.  The original vector is limited to INT_MAX unique entries.
+///
+/// \param va    The original vector of objects
+/// \param tidx  Vector of indices into va, from which to construct the result
+template <typename T>
+std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx);
+  
 } // namespace math
 } // namespace omni
 
