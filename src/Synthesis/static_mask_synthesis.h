@@ -38,7 +38,11 @@ struct SeMaskSynthesisReader {
   const int* tile_map_idx;          ///< Tile maps for all unique supertiles
   const uint* mask_data;            ///< Mask data for all unique tiles
 };
-  
+
+/// \brief An exclusion mask object for a compilation of systems.  All systems are represented in
+///        full detail, and a series of systems using the same topology will each get their own
+///        entries in the supertile map indices array, filtering on down to tile indices and the
+///        unique mask data.
 class StaticExclusionMaskSynthesis {
 public:
 

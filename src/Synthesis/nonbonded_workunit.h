@@ -5,6 +5,7 @@
 #include "Topology/atomgraph.h"
 #include "Potential/static_exclusionmask.h"
 #include "static_mask_synthesis.h"
+#include "synthesis_enumerators.h"
 
 namespace omni {
 namespace synthesis {
@@ -32,7 +33,13 @@ constexpr int large_nbwu_tiles  = 8 * small_block_tile_width;
 
 /// \brief Tile count for non-bonded work units using the large block size
 constexpr int huge_nbwu_tiles   = tile_lengths_per_supertile * tile_lengths_per_supertile;
-  
+
+/// \brief Length of the abstract for a non-bonded work unit based on all-to-all tile groups
+constexpr int tile_groups_wu_abstract_length = 64;
+
+/// \brief Length of the abstract for a non-bonded work unit based on all-to-all supertiles
+constexpr int supertile_wu_abstract_length = 8;
+
 /// \brief Collect a series of tiles for non-bonded computations as well as the required atom
 ///        imports to carry them out.  This will accomplish the task of planning the non-bonded
 ///        computation, given a single topology or a synthesis of topologies, to optimize the
@@ -47,8 +54,8 @@ public:
   ///
   ///        Static exclusion mask, tiny up to large work units:
   ///        This will be the majority of the cases with implicit-solvent systems.  In practice,
-  ///        the non-bonded work unit becomes a list of 28 integers representing the upper limit
-  ///        of atoms in the particular system and up to 20 starting locations of tile atoms to
+  ///        the non-bonded work unit becomes a list of 28 integers representing the total number
+  ///        of tile imports (up to 20) followed by the starting locations of each tile's atoms to
   ///        import (and convert to floating point representations) from within what may be a
   ///        concatenated list of atoms for many systems.  Five integers following these import
   ///        starting positions indicate the numbers of atoms to import in each tile (usually the
@@ -65,17 +72,17 @@ public:
   ///        Static exclusion mask, huge work units:
   ///        This will handle cases of implicit-solvent systems with sizes so large that millions
   ///        of smaller work units would be required to cover everything.  In practice, the
-  ///        non-bonded work unit is reduced to a list of 4 integers, now representing the upper
-  ///        limit of atoms in the system and the lower limits of the abscissa and ordinate atoms
-  ///        to import in a supertile for which the work unit is to compute all interactions.
-  ///        There is no meaningful list of all interactions in this case, as it might be
-  ///        prohibitive even to store such a thing.  Instead, the work unit will proceed over all
-  ///        tiles in the supertile after computing whether it lies along the diagonal.  This will
-  ///        require a larger block size (512 threads minimum, up to 768 depending on the
-  ///        architecture).
+  ///        non-bonded work unit is reduced to a list of 4 integers, now representing the lower
+  ///        limits of the abscissa and ordinate atoms to import, and the numbers of atoms to
+  ///        import along each axis, in a supertile for which the work unit is to compute all
+  ///        interactions.  There is no meaningful list of all interactions in this case, as it
+  ///        might be prohibitive even to store such a thing.  Instead, the work unit will proceed
+  ///        over all tiles in the supertile after computing whether it lies along the diagonal.
+  ///        This will require a larger block size (512 threads minimum, up to 768 depending on
+  ///        the architecture).
   ///
   ///        Forward exclusion mask:
-  ///        This will handle cases of neighborlist-based non-bonded work units.  The work unit
+  ///        This will handle cases of neighbor list-based non-bonded work units.  The work unit
   ///        assumes a honeycomb-packed image of all atoms in or about the primary unit cell (some
   ///        honeycomb pencils will straddle the unit cell boundary but their positions will be
   ///        known as part of the decomposition).  The work unit will consist of thirty integers:
@@ -100,16 +107,23 @@ public:
   ///                        static exclusion mask in extreme circumstances of very large implicit
   ///                        solvent systems.  This will call for importing 512 atoms
   ///                        (2 x supertile_length) in the most general case and will require
-  ///                        larger thread blocks.
-  /// \param ordinate_start  The ordinate axis start of the supertile to process.
+  ///                        larger thread blocks.  If computing for a synthesis of static
+  ///                        exclusion masks, the abscissa starting point is given as a relative
+  ///                        index within the local system to which the supertile belongs.
+  /// \param ordinate_start  The ordinate axis start of the supertile to process.  If computing for
+  ///                        a synthesis of static exclusion masks, the ordinate starting point is
+  ///                        given as a relative index within the local system to which the
+  ///                        supertile belongs.
   /// \{
   NonbondedWorkUnit(const StaticExclusionMask &se, const std::vector<int3> &tile_list);
   
-  NonbondedWorkUnit(const StaticExclusionMask &se, const int abscissa_start,
-                    const int ordinate_start);
+  NonbondedWorkUnit(const StaticExclusionMask &se, int abscissa_start, int ordinate_start);
 
   NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
                     const std::vector<int3> &tile_list);
+
+  NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se, int abscissa_start, int ordinate_start,
+                    int system_index);
   /// \}
 
   /// \brief Get the tile count of this work units.
@@ -121,17 +135,42 @@ public:
   ///
   /// \param index  Index of the tile from within the work unit
   int4 getTileLimits(int index) const;
+
+  /// \brief Get the list of tile instructions for this work unit.
+  const std::vector<uint2>& getTileInstructions() const;
+  
+  /// \brief Get an abstract for this work unit, layed out to work within an AtomGraphSynthesis.
+  ///
+  /// \param instruction_start  The starting point of instructions for this group of tiles, if
+  ///                           the work unit will fit on a small thread block, having less than
+  ///                           huge_nbwu_tiles tiles.  Otherwise no instruction start is needed.
+  std::vector<int> getAbstract(int instruction_start = 0) const;
   
 private:
-  int tile_count;                        ///< Number of tiles to be processed by this work unit
-  int score;                             ///< The estimated effort score of this work unit
-  std::vector<int> imports;              ///< List of starting positions for atoms that must be
-                                         ///<   cached in order to process all tiles in this work
-                                         ///<   unit
-  std::vector<int> import_size_keys;     ///< Bit-packed integers with the number of atoms to
-                                         ///<   import after each starting position
-  std::vector<uint2> tile_instructions;  ///< Instructions for  processing each tile based on an
-                                         ///<   appropriate exclusion mask
+  int tile_count;                          ///< Number of tiles to be processed by this work unit
+  NbwuKind kind;                           ///< The type of non-bonded work unit.  For isolated
+                                           ///<   boundary conditions, there is a choice between
+                                           ///<   TILE_GROUPS and SUPERTILES.
+  int score;                               ///< The estimated effort score of this work unit
+  std::vector<int> imports;                ///< List of starting positions for atoms that must be
+                                           ///<   cached in order to process all tiles in this
+                                           ///<   work unit
+  std::vector<int> import_system_indices;  ///< System indices of each imported tile.  All atoms
+                                           ///<   in any one tile pertain to the same system, but
+                                           ///<   each imported tile within the work unit may be
+                                           ///<   part of a different system.
+  std::vector<int> import_size_keys;       ///< Bit-packed integers with the number of atoms to
+                                           ///<   import after each starting position
+  std::vector<uint2> tile_instructions;    ///< Instructions for processing each tile based on an
+                                           ///<   appropriate exclusion mask
+
+  /// \brief Find the system to which a particular import belongs.  This function is only used in
+  ///        the event that the non-bonded work unit pertains to synthesis of systems, otherwise
+  ///        the system index is obviously zero.
+  ///
+  /// \param ser         Reader abstract for the exclusion mask synthesis
+  /// \param atom_index  Index of the first imported atom in the tile of interest
+  int getImportSystemIndex(const SeMaskSynthesisReader &ser, int atom_index);
 };
 
 /// \brief Add one tile to the growing list that will eventually define a work unit, if it is

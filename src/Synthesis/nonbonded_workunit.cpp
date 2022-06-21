@@ -12,14 +12,17 @@ using energy::supertile_length;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
 using math::accumulateBitmask;
+using math::findBin;
 using math::reduceUniqueValues;
-  
+
 //-------------------------------------------------------------------------------------------------
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
                                      const std::vector<int3> &tile_list) :
     tile_count{static_cast<int>(tile_list.size())},
+    kind{NbwuKind::TILE_GROUPS},
     score{0},
     imports{std::vector<int>(small_block_max_imports)},
+    import_system_indices{std::vector<int>(small_block_max_imports, 0)},
     import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
     tile_instructions{std::vector<uint2>(tile_count)}
 {
@@ -103,17 +106,23 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
                                      const int abscissa_start, const int ordinate_start) :
     tile_count{0},
+    kind{NbwuKind::SUPERTILES},
     score{0},
     imports{},
+    import_system_indices{std::vector<int>(1, 0)},
     import_size_keys{},
     tile_instructions{}
 {
-  imports.resize(2);
+  imports.resize(3);
   imports[0] = abscissa_start;
   imports[1] = ordinate_start;
   
   // Compute the tile count and the work unit score
   const int atom_limit = se.getAtomCount();
+  imports[2] = (abscissa_start + supertile_length > atom_limit) ? atom_limit - abscissa_start :
+                                                                  supertile_length;
+  imports[3] = (ordinate_start + supertile_length > atom_limit) ? atom_limit - ordinate_start :
+                                                                  supertile_length;
   if (abscissa_start == ordinate_start) {
     if (abscissa_start < atom_limit - supertile_length &&
         ordinate_start < atom_limit - supertile_length) {
@@ -153,11 +162,13 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
 //-------------------------------------------------------------------------------------------------
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
                                      const std::vector<int3> &tile_list) :
-  tile_count{static_cast<int>(tile_list.size())},
-  score{0},
-  imports{std::vector<int>(small_block_max_imports)},
-  import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
-  tile_instructions{std::vector<uint2>(tile_count)}
+    tile_count{static_cast<int>(tile_list.size())},
+    kind{NbwuKind::TILE_GROUPS},
+    score{0},
+    imports{std::vector<int>(small_block_max_imports)},
+    import_system_indices{std::vector<int>(small_block_max_imports)},
+    import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
+    tile_instructions{std::vector<uint2>(tile_count)}
 {
   // As before, loop over tiles to determine the array of imported atoms.  Work from the static
   // exclusion mask compilation rather than a solitary system's exclusions.  The imports will be
@@ -202,9 +213,9 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
   // all the way to tile_length, or stops at the upper limit of system atoms).
   reduceUniqueValues(&tmp_imports);
   const int n_imports = tmp_imports.size();
-  std::vector<int> import_system_indices(n_imports, -1);
   for (int i = 0; i < n_imports; i++) {
-    import_system_indices[i] = static_cast<int>(tmp_imports[i] >> int_bit_count_int);
+    import_system_indices[i] = static_cast<int>((tmp_imports[i] >> int_bit_count_int) &
+                                                0x00000000ffffffffLL);
     imports[i] = (static_cast<int>(tmp_imports[i] & 0x00000000ffffffffLL) * tile_length) +
                  ser.atom_offsets[import_system_indices[i]];
   }
@@ -250,6 +261,72 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     import_size_keys[key_idx] |= (import_batch_size << (8 * key_pos));
   }
 }
+
+//-------------------------------------------------------------------------------------------------
+NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
+                                     const int abscissa_start, const int ordinate_start,
+                                     const int system_index) :
+    tile_count{0},
+    kind{NbwuKind::SUPERTILES},
+    score{0},
+    imports{},
+    import_system_indices{std::vector<int>(1)},
+    import_size_keys{},
+    tile_instructions{}
+{
+  imports.resize(3);
+  imports[0] = abscissa_start;
+  imports[1] = ordinate_start;
+
+  /// Obtain the system index
+  const SeMaskSynthesisReader ser = se.data();
+  import_system_indices[0] = getImportSystemIndex(ser, abscissa_start);
+  if (import_system_indices[0] != getImportSystemIndex(ser, ordinate_start)) {
+    rtErr("The abscissa and ordinate starting indices do not correspond to the same atoms.",
+          "NonbondedWorkUnit");
+  }
+  
+  // Compute the tile count and the work unit score
+  const int atom_limit = se.getAtomCount(system_index);
+  imports[2] = (abscissa_start + supertile_length > atom_limit) ? atom_limit - abscissa_start :
+                                                                  supertile_length;
+  imports[3] = (ordinate_start + supertile_length > atom_limit) ? atom_limit - ordinate_start :
+                                                                  supertile_length;
+  if (abscissa_start == ordinate_start) {
+    if (abscissa_start < atom_limit - supertile_length &&
+        ordinate_start < atom_limit - supertile_length) {
+      tile_count = tile_lengths_per_supertile * (tile_lengths_per_supertile + 1) / 2;
+      score = tile_lengths_per_supertile;
+    }
+    else {
+      const int ntile_rem = (atom_limit - abscissa_start + tile_length - 1) / tile_length;  
+      tile_count = ntile_rem * (ntile_rem + 1) / 2;
+      score = ntile_rem;
+    }
+  }
+  else {
+    if (abscissa_start < atom_limit - supertile_length &&
+        ordinate_start < atom_limit - supertile_length) {
+      tile_count = tile_lengths_per_supertile * tile_lengths_per_supertile;
+      score = tile_lengths_per_supertile * 2;
+    }
+    else if (abscissa_start < atom_limit - supertile_length) {
+      const int ntile_rem = (atom_limit - ordinate_start + tile_length - 1) / tile_length;
+      tile_count = tile_lengths_per_supertile * ntile_rem;
+      score = tile_lengths_per_supertile + ntile_rem;
+    }
+    else if (ordinate_start < atom_limit - supertile_length) {
+      const int ntile_rem = (atom_limit - abscissa_start + tile_length - 1) / tile_length;
+      tile_count = tile_lengths_per_supertile * ntile_rem;
+      score = tile_lengths_per_supertile + ntile_rem;
+    }
+    else {
+      rtErr("A trapezoidal tile should not exist in a supertile-based work unit.",
+            "NonbondedWorkUnit");
+    }
+  }
+  score += tile_count * 8;
+}
   
 //-------------------------------------------------------------------------------------------------
 int NonbondedWorkUnit::getTileCount() const {
@@ -268,6 +345,63 @@ int4 NonbondedWorkUnit::getTileLimits(const int index) const {
   const int ordi_length = ((import_size_keys[ordi_key] >> (8 * ordi_pos)) & 0xff);
   return { imports[absc_idx], imports[absc_idx] + absc_length,
            imports[ordi_idx], imports[ordi_idx] + ordi_length };
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<uint2>& NonbondedWorkUnit::getTileInstructions() const {
+  return tile_instructions;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) const {
+  std::vector<int> result;
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    result.resize(tile_groups_wu_abstract_length, -1);
+    result[0] = tile_count;
+    for (int i = 0; i < tile_count; i++) {
+      result[i + 1] = imports[i];
+    }
+    for (int i = 0; i < 5; i++) {
+      result[1 + small_block_max_imports + i] = import_size_keys[i];
+    }
+    result[26] = instruction_start;
+    result[27] = instruction_start + tile_count;
+    for (int i = 0; i < tile_count; i++) {
+      result[28 + i] = import_system_indices[i];
+    }    
+    return result;
+  case NbwuKind::SUPERTILES:
+    result.resize(supertile_wu_abstract_length);
+    for (int i = 0; i < 4; i++) {
+      result[i] = imports[i];
+    }
+    result[4] = (import_system_indices[0]);
+    return result;
+  case NbwuKind::DOMAIN:
+  case NbwuKind::UNKNOWN:
+    return result;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int NonbondedWorkUnit::getImportSystemIndex(const SeMaskSynthesisReader &ser,
+                                            const int atom_index) {
+  if (atom_index >= ser.atom_offsets[ser.nsys - 1]) {
+    if (atom_index >= ser.atom_offsets[ser.nsys - 1] + ser.atom_counts[ser.nsys - 1]) {
+      rtErr("Atom index " + std::to_string(atom_index) + " is out of range in a synthesis of " +
+            std::to_string(ser.nsys) + " systems with a maximum limit of " +
+            std::to_string(ser.atom_offsets[ser.nsys - 1]) + " + " +
+            std::to_string(ser.atom_counts[ser.nsys - 1]) + " atoms.", "NonbondedWorkUnit",
+            "getImportSystemIndex");
+    }
+    return ser.nsys - 1;
+  }
+  else {
+    return findBin(ser.atom_counts, atom_index, ser.nsys - 1);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

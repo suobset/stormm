@@ -407,7 +407,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomGraph*> ligand_ag_list = { &brbz_ag, &lig1_ag, &lig2_ag };
   const std::vector<PhaseSpace> ligand_ps_list = {  brbz_ps,  lig1_ps,  lig2_ps };
   const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra };
-  const std::vector<int> ligand_tiling = { 0, 1, 2 };//, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
+  const std::vector<int> ligand_tiling = { 0, 1, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
   PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,
@@ -430,35 +430,6 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &tb_space, ligand_poly_ag,
                            PrecisionLevel::SINGLE, gpu, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5,
                            3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6, do_tests);
-  
-#if 0
-  for (int len = 4; len < 36; len += 4) {
-    const std::vector<AtomGraph*> bigger_tops(len, &trpi_ag);
-    const std::vector<PhaseSpace> bigger_crds(len, trpi_ps);
-    std::vector<int> trpi_indices(len);
-    for (int i = 0; i < len; i++) {
-      trpi_indices[i] = i;
-    }
-    PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
-    AtomGraphSynthesis big_poly_ag(bigger_tops, trpi_indices, ExceptionResponse::SILENT,
-                                   max_vwu_atoms, &timer);
-    big_poly_ag.upload();
-    big_poly_ps.upload();
-    timer.assignTime(0);
-    const int i_timings = timer.addCategory("GPU VWU evaluation " + std::to_string(len));
-    const int cpu_timings = timer.addCategory("CPU VWU evaluation " + std::to_string(len));
-    for (int i = 0; i < 10; i++) {
-      for (int j = 0; j < 1000; j++) {
-        mmctrl.incrementStep();
-        launchValenceSp(big_poly_ag, &mmctrl, &big_poly_ps, &sc, &tb_space, EvaluateForce::YES,
-                        EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT,
-                        gpu);
-      }
-      cudaDeviceSynchronize();
-      timer.assignTime(i_timings);
-    }
-  }
-#endif
 
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

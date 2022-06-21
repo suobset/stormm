@@ -542,5 +542,67 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, PsSynthesisWriter psyw,
+                               ScoreCard *ecard, const EvaluateForce eval_force) {
+
+  // Loop over all non-bonded work units within the topology synthesis.  Each holds within it a
+  // list of atom imports and a series of tiles.  Within each tile, all atoms pertain to the same
+  // system, but within each work unit, depending on the boundary conditions and the non-bonded
+  // list type, different tiles may correspond to different systems.
+  std::vector<int> nbwu_abstract(tile_groups_wu_abstract_length);
+  std::vector<Tcalc> sh_charges(maximum_valence_work_unit_atoms);
+  std::vector<int> sh_lj_idx(maximum_valence_work_unit_atoms);
+  std::vector<int> sh_n_lj_types(small_block_max_imports);
+  std::vector<int> sh_ljabc_offsets(small_block_max_imports);
+  std::vector<llint> sh_xcrd(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_ycrd(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_zcrd(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_xfrc(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_yfrc(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_zfrc(maximum_valence_work_unit_atoms);
+  for (int i = 0; i < synbk.nnbwu; i++) {
+
+    // Import the abstract.
+    for (int j = 0; j < 48; j++) {
+      nbwu_abstract[j] = synbk[(tile_groups_wu_abstract_length * i) + j];
+    }
+    const int ntile_sides = nbwu_abstract[0];
+    for (int j = 0; j < ntile_sides; j++) {
+      const int system_idx = nbwu_abstract[j + 28];
+      sh_n_lj_types[j]    = synbk.n_lj_types[system_idx];
+      sh_ljabc_offsets[j] = synbk.ljabc_offsets[system_idx];
+    }
+
+    // Import atoms into the appropriate arrays
+    for (int j = 0; j < ntile_sides; j++) {
+      const int atom_start_idx = nbwu_abstract[j + 1];
+      const int system_idx     = nbwu_abstract[j + 28];
+      const int key_idx        = j / 4;
+      const int key_pos        = j - (key_idx * 4);
+      const int tside_count    = ((nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
+      for (int k = 0; k < tside_count; k++) {
+        const size_t localpos = (tile_length * j) + k;
+        const size_t synthpos = atom_start_idx + k;
+        sh_xcrd[localpos]    = psyw.xcrd[synthpos];
+        sh_ycrd[localpos]    = psyw.ycrd[synthpos];
+        sh_zcrd[localpos]    = psyw.zcrd[synthpos];
+        sh_xfrc[localpos]    = 0LL;
+        sh_yfrc[localpos]    = 0LL;
+        sh_zfrc[localpos]    = 0LL;
+        sh_charges[localpos] = synbk.charge[synthpos];
+
+        // The Lennard-Jones indices recorded here are specific to each system.  For each tile,
+        // it is still critical to know the relevant system's total number of Lennard-Jones types
+        // as well as its table offset.  On the GPU, these pieces of information will be imported
+        // into __shared__ memory for convenient access.
+        sh_lj_idx[localpos]  = synbk.lj_idx[synthpos];
+      }
+    }
+
+  }
+}
+
 } // namespace energy
 } // namespace omni

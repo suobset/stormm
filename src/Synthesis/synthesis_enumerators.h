@@ -4,7 +4,19 @@
 
 namespace omni {
 namespace synthesis {
-
+  
+/// \brief Enumerate the different kinds of non-bonded work.  All-to-all calculations for systems
+///        in isolated boundary conditions have two options, based on how large the system or
+///        systems are.  Neighbor list-based calculations for systems in periodic boundary
+///        conditions have only one option.
+enum class NbwuKind {
+  TILE_GROUPS,  ///< Work units process small lists of all-to-all non-bonded tiles
+  SUPERTILES,   ///< Work units process large, regular arrangements of all-to-all non-bonded tiles
+  DOMAIN,       ///< Neighbor list-based spatial decomposition, with each work unit being a
+                ///<   locally clustered patch of atoms
+  UNKNOWN       ///< Placeholder for the non-bonded work type until it is properly set
+};
+  
 /// \brief Enumerate the different tasks that this work unit can perform.
 enum class VwuTask {
   BOND = 0,  ///< Harmonic bond interactions

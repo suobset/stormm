@@ -9,6 +9,7 @@
 #include "Topology/atomgraph.h"
 #include "Topology/topology_util.h"
 #include "UnitTesting/stopwatch.h"
+#include "static_mask_synthesis.h"
 #include "synthesis_abstracts.h"
 #include "valence_workunit.h"
 
@@ -239,6 +240,20 @@ public:
   /// \param tier  Level at which to obtain pointers for the abstract
   SyRestraintKit<float, float2, float4>
   getSinglePrecisionRestraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get a minimal fit with double-precision real numbers for computing non-bonded
+  ///        interactions for all systems based on work units stored in this object.
+  ///
+  /// \param tier  Level at which to obtain pointers for the abstract
+  SyNonbondedKit<double>
+  getDoublePrecisionNonbondedKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
+  /// \brief Get a minimal fit with single-precision real numbers for computing non-bonded
+  ///        interactions for all systems based on work units stored in this object.
+  ///
+  /// \param tier  Level at which to obtain pointers for the abstract
+  SyNonbondedKit<float>
+  getSinglePrecisionNonbondedKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
 #ifdef OMNI_USE_HPC
   /// \brief Upload the object
@@ -1049,6 +1064,45 @@ private:
   /// Collected array of all uint2 instructions
   Hybrid<uint2> insr_uint2_data;
 
+  // Non-bonded work units (NBWUs): the synthesis also stores information on how to carry out
+  // non-bonded tiles (or domain decomposition workloads, depending on the nature of the boundary
+  // conditions).  These are less detailed, overall, than the valence work units.
+  int total_nonbonded_work_units;  ///< The total number of non-bonded work units (tile groups for
+                                   ///<   simulations in isolated-boundary conditions or cell
+                                   ///<   groups for simulations in periodic boundary conditions)
+  NbwuKind nonbonded_work_type;    ///< Enumerator for the type of work to expect in non-bonded
+                                   ///<   work units.  This will inform the nature of the kernel
+                                   ///<   to call in order to compute non-bonded interactions.
+
+  /// Abstracts for non-bonded work units.  The nature of this array varies with the setting of
+  /// nonbonded_work_type above, but each kernel will know how to interpret data in this array for
+  /// its own purposes.
+  ///
+  /// NbwuKind: TILE_GROUPS
+  /// Each abstract is a series of 32 integers.  The contents include: (index 0) the total number
+  /// of tiles to import (up to 20), (indices 1-20) the starting index of atoms in each tile side,
+  /// (indices 21-25) the number of atoms to import in each tile, and (indices 26-27) the limits
+  /// of tile instructions to carry out based on content in tile_group_instructions.
+  ///
+  /// NbwuKind: SUPERTILES
+  /// Each abstract is a series of 4 integers: (index 0) the upper limit of atoms in the
+  /// particular system (one of many within the synthesis) to which the supertile belongs,
+  /// (indices 1-2) lower limits of atoms for the supertile's abscissa and ordinate axes, (index
+  /// 4) the supertile map index within some associated StaticExclusionsMaskSynthesis
+  /// (pre-inflated by the square of the tile lengths per supertile).  In supertile work units,
+  /// all tiles pertain to the same system.
+  ///
+  /// NbwuKind: DOMAIN
+  /// Abstracts for domain decompositions in neighbor list-based periodic systems.  Each abstract
+  /// is a series of 32 integers, 30 of which are used.
+  Hybrid<int> nonbonded_abstracts;
+
+  /// Instructions for the non-bonded work.  Each element is an instruction to do one non-bonded
+  /// tile, along with an index into the exclusion masks data array held within some associated
+  /// mask object.  The exclusion masks are not kept as part of this topology synthesis, but
+  /// abstracts for the non-bonded work will span it and the associated mask object.  
+  Hybrid<uint2> nbwu_instructions;
+  
   /// Timings data, for reporting purposes
   StopWatch* timer;
 
@@ -1178,6 +1232,16 @@ private:
   ///
   /// \param vwu_atom_limit  The maximum number of atoms to assign to any one valence work unit
   void loadValenceWorkUnits(int vwu_atom_limit = maximum_valence_work_unit_atoms);
+
+  /// \brief Construct non-bonded work units for all unique topologies (there are no restraints
+  ///        for non-bonded interactions that might distinguish systems with the same topology, as
+  ///        was a consideration when developing the valecne work units).  Load the instructions
+  ///        into the topology synthesis for availability on the GPU.
+  ///
+  /// \param poly_se  Synthesis of static exclusion masks for a compilation of systems in
+  ///                 isolated boundary conditions.  Each topology in the AtomGraphSynthesis need
+  ///                 only be represented once in this mask synthesis.
+  void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
 };
 
 } // namespace synthesis

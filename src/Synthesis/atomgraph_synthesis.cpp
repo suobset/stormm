@@ -9,6 +9,7 @@
 #include "Topology/atomgraph_enumerators.h"
 #include "Topology/atomgraph_refinement.h"
 #include "atomgraph_synthesis.h"
+#include "nonbonded_workunit.h"
 #include "synthesis_enumerators.h"
 
 namespace omni {
@@ -391,6 +392,12 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     insr_uint_data{HybridKind::ARRAY, "tpsyn_insr_data1"},
     insr_uint2_data{HybridKind::ARRAY, "tpsyn_insr_data2"},
 
+    // Non-bonded work units and their instructions
+    total_nonbonded_work_units{0},
+    nonbonded_work_type{NbwuKind::UNKNOWN},
+    nonbonded_abstracts{HybridKind::ARRAY, "tpsyn_nbwu_abstract"},
+    nbwu_instructions{HybridKind::ARRAY, "tpsyn_nbwu_insr"},
+    
     // Pointer to the timer used to track time needed for assembling this object.  The timer can
     // also be used to track access and other usage of the object.
     timer{timer_in}
@@ -2962,6 +2969,60 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
 }
 
 //-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
+
+  // Build a list of non-bonded work units from the exclusion mask.  Translate those work units
+  // into non-bonded abstracts and instructions.  All work units are assumed to have the same
+  // target tile count.
+  const std::vector<NonbondedWorkUnit> nbwu_list = buildNonbondedWorkUnits(poly_se);
+  const int nbwu_count = nbwu_list.size();
+  total_nonbonded_work_units = nbwu_count;
+  int max_tile_count = 0;
+  size_t total_tiles = 0LLU;
+  for (int i = 0; i < nbwu_count; i++) {
+    const int n_tiles = nbwu_list[i].getTileCount();
+    max_tile_count = std::max(n_tiles, max_tile_count);
+    total_tiles += n_tiles;
+  }
+  nonbonded_work_type = (max_tile_count <= large_nbwu_tiles) ? NbwuKind::TILE_GROUPS :
+                                                               NbwuKind::SUPERTILES;
+  switch (nonbonded_work_type) {
+  case NbwuKind::TILE_GROUPS:
+    nonbonded_abstracts.resize(nbwu_count * tile_groups_wu_abstract_length);
+    nbwu_instructions.resize(total_tiles);
+  case NbwuKind::SUPERTILES:
+    nonbonded_abstracts.resize(nbwu_count * supertile_wu_abstract_length);
+  case NbwuKind::DOMAIN:
+  case NbwuKind::UNKNOWN:
+    break;
+  }
+  int insr_offset = 0;
+  int abstract_offset = 0;
+  for (int i = 0; i < nbwu_count; i++) {
+    switch (nonbonded_work_type) {
+    case NbwuKind::TILE_GROUPS:
+      {
+        const int n_tiles = nbwu_list[i].getTileCount();
+        nonbonded_abstracts.putHost(nbwu_list[i].getAbstract(insr_offset),
+                                    tile_groups_wu_abstract_length * i, 48);
+        nbwu_instructions.putHost(nbwu_list[i].getTileInstructions(), insr_offset, n_tiles);
+        insr_offset += roundUp(n_tiles, warp_size_int);
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+      {
+        nonbonded_abstracts.putHost(nbwu_list[i].getAbstract(insr_offset),
+                                    supertile_wu_abstract_length * i, 5);
+      }
+      break;
+    case NbwuKind::DOMAIN:
+    case NbwuKind::UNKNOWN:
+      break;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getTopologyCount() const {
   return topology_count;
 }
@@ -3230,6 +3291,29 @@ AtomGraphSynthesis::getSinglePrecisionRestraintKit(const HybridTargetLevel tier)
                                 accumulate_rdihe_energy.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+SyNonbondedKit<double>
+AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
+  return SyNonbondedKit<double>(total_nonbonded_work_units, nonbonded_abstracts.data(tier),
+                                nbwu_instructions.data(tier), coulomb_constant,
+                                atomic_charges.data(tier), lennard_jones_indices.data(tier),
+                                atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
+                                lennard_jones_a_coeff.data(tier), lennard_jones_b_coeff.data(tier),
+                                lennard_jones_c_coeff.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+SyNonbondedKit<float>
+AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier) const {
+  return SyNonbondedKit<float>(total_nonbonded_work_units, nonbonded_abstracts.data(tier),
+                               nbwu_instructions.data(tier), coulomb_constant,
+                               sp_atomic_charges.data(tier), lennard_jones_indices.data(tier),
+                               atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
+                               sp_lennard_jones_a_coeff.data(tier),
+                               sp_lennard_jones_b_coeff.data(tier),
+                               sp_lennard_jones_c_coeff.data(tier));
+}
+
 #ifdef OMNI_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::upload() {
@@ -3283,6 +3367,8 @@ void AtomGraphSynthesis::upload() {
   vwu_instruction_sets.upload();
   insr_uint_data.upload();
   insr_uint2_data.upload();
+  nonbonded_abstracts.upload();
+  nbwu_instructions.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3337,6 +3423,8 @@ void AtomGraphSynthesis::download() {
   vwu_instruction_sets.download();
   insr_uint_data.download();
   insr_uint2_data.download();
+  nonbonded_abstracts.download();
+  nbwu_instructions.download();
 }
 #endif
 

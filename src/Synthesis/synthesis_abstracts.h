@@ -144,7 +144,28 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
 template <typename T> struct SyNonbondedKit {
 
   /// \brief The constructor takes a straight list of arguments for each member variable.
-  explicit SyNonbondedKit();
+  explicit SyNonbondedKit(int nnbwu_in, const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
+                          T coulomb_in, const T* charge_in, const int* lj_idx_in,
+                          const int* n_lj_types_in, const int* ljabc_offsets_in,
+                          const T* lja_coeff_in, const T* ljb_coeff_in, const T* ljc_coeff_in);
+
+  // Member variables (all public)
+  const int nnbwu;            ///< The number of non-bonded work units in the synthesis
+  const int* nbwu_abstracts;  ///< Abstracts for all non-bonded work units
+  const uint2* nbwu_insr;     ///< Instructions for all non-bonded work units
+  const T coulomb;            ///< Coulomb's constant (charges are stored in atomic units and
+                              ///<   converted to factor this in at the time they are cached)
+  const T* charge;            ///< Partial charges for all atoms in the synthesis (one concatenated
+                              ///<   array, with each system's atoms padded by the warp size)
+  const int* lj_idx;          ///< Lennard-Jones indices for all atoms.  Each system may have its
+                              ///<   own specific parameter matricies, with offsets given in the
+                              ///<   ljabc_offsets array (see below).
+  const int* n_lj_types;      ///< Lennard-Jones type counts for all systems
+  const int* ljabc_offsets;   ///< Offsets for Lennard-Jones A, B, and C coefficient tables for
+                              ///<   all systems
+  const T* lja_coeff;         ///< Lennard-Jones interaction A coefficients
+  const T* ljb_coeff;         ///< Lennard-Jones interaction B coefficients
+  const T* ljc_coeff;         ///< Lennard-Jones interaction C coefficients
 };
   
 } // namespace synthesis

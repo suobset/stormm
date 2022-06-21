@@ -4,10 +4,12 @@
 
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
-#include "Potential/scorecard.h"
-#include "Potential/valence_potential.h"
 #include "Potential/eval_valence_workunit.h"
+#include "Potential/scorecard.h"
+#include "Potential/static_exclusionmask.h"
+#include "Potential/valence_potential.h"
 #include "Synthesis/phasespace_synthesis.h"
+#include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
@@ -20,7 +22,11 @@ using energy::evalHarmonicStretch;
 using energy::commitVwuEnergies;
 using math::readBitFromMask;
 using synthesis::maximum_valence_work_unit_atoms;
+using synthesis::small_block_max_imports;
+using synthesis::supertile_wu_abstract_length;
+using synthesis::tile_groups_wu_abstract_length;
 using synthesis::PsSynthesisWriter;
+using synthesis::SyNonbondedKit;
 using synthesis::SyValenceKit;
 using synthesis::SyRestraintKit;
 using synthesis::vwu_abstract_length;
@@ -82,6 +88,19 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
                          ScoreCard *ecard, EvaluateForce eval_force, VwuTask activity,
                          VwuGoal purpose, int step_number);
 
+/// \brief Evaluate the non-bonded energies (and possibly forces) of a synthesis of systems in
+///        isolated boundary conditions using non-bonded work units composed of tile groups.  These
+///        smaller forms of the all-to-all non-bonded work units enumerate all of the tiles they
+///        process.
+///
+/// \param synbk       Non-bonded parameters for all atoms in the compilation of systems
+/// \param psyw        Writeable abstract for the coordinate synthesis
+/// \param ecard       Energy tracker object
+/// \param eval_force  Flag to also carry out force evaluation (energy is always evaluated in CPU
+///                    functions)
+template <typename Tcalc>
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, PsSynthesisWriter psyw,
+                               ScoreCard *ecard, const EvaluateForce eval_force);
 } // namespace energy
 } // namespace omni
 
