@@ -544,63 +544,193 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
-void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, PsSynthesisWriter psyw,
-                               ScoreCard *ecard, const EvaluateForce eval_force) {
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
+                               const PsSynthesisWriter psyw, ScoreCard *ecard,
+                               const EvaluateForce eval_force) {
+
+  // Critical indexing and offsets for each work unit
+  std::vector<int> sh_nbwu_abstract(tile_groups_wu_abstract_length);
+  std::vector<int> sh_system_indices(small_block_max_imports);
+  std::vector<int> sh_n_lj_types(small_block_max_imports);
+  std::vector<int> sh_ljabc_offsets(small_block_max_imports);
+
+  // Pre-computed information for rapidly manipulating the particles of any one tile
+  std::vector<Tcalc> sh_tile_xcog(small_block_max_imports);
+  std::vector<Tcalc> sh_tile_ycog(small_block_max_imports);
+  std::vector<Tcalc> sh_tile_zcog(small_block_max_imports);
+  std::vector<Tcalc> sh_tile_tpts(small_block_max_imports);
+
+  // L1-cached coordinates of particles.  These will be accessed repeatedly as the list of tile
+  // instructions gets processed.
+  std::vector<llint> lc_xcrd(maximum_valence_work_unit_atoms);
+  std::vector<llint> lc_ycrd(maximum_valence_work_unit_atoms);
+  std::vector<llint> lc_zcrd(maximum_valence_work_unit_atoms);
+  std::vector<Tcalc> lc_charge(maximum_valence_work_unit_atoms);
+  std::vector<int>   lc_lj_idx(maximum_valence_work_unit_atoms);
+
+  // Local force accumulators, stored in __shared__ on the GPU to do atomic operations to L1.
+  std::vector<llint> sh_xfrc(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_yfrc(maximum_valence_work_unit_atoms);
+  std::vector<llint> sh_zfrc(maximum_valence_work_unit_atoms);
+
+  // Arrays for mocking the register content of various threads
+  std::vector<Tcalc> reg_xcrd(tile_length * 2);
+  std::vector<Tcalc> reg_ycrd(tile_length * 2);
+  std::vector<Tcalc> reg_zcrd(tile_length * 2);
+  std::vector<uint>  reg_excl(tile_length * 2);
+  std::vector<int>   reg_lj_idx(tile_length * 2);
+  std::vector<int>   reg_charge(tile_length * 2);
+
+  // Constants needed for the calculation precision
+  const Tcalc value_one = 1.0;
 
   // Loop over all non-bonded work units within the topology synthesis.  Each holds within it a
   // list of atom imports and a series of tiles.  Within each tile, all atoms pertain to the same
   // system, but within each work unit, depending on the boundary conditions and the non-bonded
   // list type, different tiles may correspond to different systems.
-  std::vector<int> nbwu_abstract(tile_groups_wu_abstract_length);
-  std::vector<Tcalc> sh_charges(maximum_valence_work_unit_atoms);
-  std::vector<int> sh_lj_idx(maximum_valence_work_unit_atoms);
-  std::vector<int> sh_n_lj_types(small_block_max_imports);
-  std::vector<int> sh_ljabc_offsets(small_block_max_imports);
-  std::vector<llint> sh_xcrd(maximum_valence_work_unit_atoms);
-  std::vector<llint> sh_ycrd(maximum_valence_work_unit_atoms);
-  std::vector<llint> sh_zcrd(maximum_valence_work_unit_atoms);
-  std::vector<llint> sh_xfrc(maximum_valence_work_unit_atoms);
-  std::vector<llint> sh_yfrc(maximum_valence_work_unit_atoms);
-  std::vector<llint> sh_zfrc(maximum_valence_work_unit_atoms);
-  for (int i = 0; i < synbk.nnbwu; i++) {
+  for (int nbwu_idx = 0; nbwu_idx < synbk.nnbwu; nbwu_idx++) {
 
     // Import the abstract.
-    for (int j = 0; j < 48; j++) {
-      nbwu_abstract[j] = synbk[(tile_groups_wu_abstract_length * i) + j];
+    for (int pos = 0; pos < 48; pos++) {
+      sh_nbwu_abstract[pos] = synbk[(tile_groups_wu_abstract_length * nbwu_idx) + pos];
     }
     const int ntile_sides = nbwu_abstract[0];
-    for (int j = 0; j < ntile_sides; j++) {
-      const int system_idx = nbwu_abstract[j + 28];
-      sh_n_lj_types[j]    = synbk.n_lj_types[system_idx];
-      sh_ljabc_offsets[j] = synbk.ljabc_offsets[system_idx];
+    for (int pos = 0; pos < ntile_sides; pos++) {
+      const int system_idx   = nbwu_abstract[pos + 28];
+      sh_system_indices[pos] = system_idx
+      sh_n_lj_types[pos]     = synbk.n_lj_types[system_idx];
+      sh_ljabc_offsets[pos]  = synbk.ljabc_offsets[system_idx];
     }
-
-    // Import atoms into the appropriate arrays
-    for (int j = 0; j < ntile_sides; j++) {
-      const int atom_start_idx = nbwu_abstract[j + 1];
-      const int system_idx     = nbwu_abstract[j + 28];
-      const int key_idx        = j / 4;
-      const int key_pos        = j - (key_idx * 4);
+    const int tile_insr_start = nbwu_abstract[26];
+    const int tile_insr_end   = nbwu_abstract[27];
+        
+    // Import atoms into the appropriate arrays.  Prepare to compute the center of geometry for
+    // all imported atoms.
+    for (int pos = 0; pos < ntile_sides; pos++) {
+      const int atom_start_idx = nbwu_abstract[pos + 1];
+      const int system_idx     = sh_system_indices[pos];
+      const int key_idx        = pos / 4;
+      const int key_pos        = pos - (key_idx * 4);
       const int tside_count    = ((nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
-      for (int k = 0; k < tside_count; k++) {
-        const size_t localpos = (tile_length * j) + k;
-        const size_t synthpos = atom_start_idx + k;
-        sh_xcrd[localpos]    = psyw.xcrd[synthpos];
-        sh_ycrd[localpos]    = psyw.ycrd[synthpos];
-        sh_zcrd[localpos]    = psyw.zcrd[synthpos];
+
+      // Pre-compute the centers of geometry for each batch of tile_length atoms, storing the
+      // results (totals plus weights) in floating-point format.  When it comes time to do actual
+      // tiles, combine the results for the abscissa and ordinate atoms, divide by the combined
+      // weight, and use that number to shift the tile atoms to the optimal, precision-preserving
+      // locations in the fixed-precision format prior to converting to floating point numbers.
+      Tcalc x_cog = 0.0;
+      Tcalc y_cog = 0.0;
+      Tcalc z_cog = 0.0;
+      Tcalc t_pts = 0.0;
+      for (int i = 0; i < tside_count; i++) {
+        const size_t localpos = (tile_length * pos) + i;
+        const size_t synthpos = atom_start_idx + i;
+        lc_xcrd[localpos]    = psyw.xcrd[synthpos];
+        lc_ycrd[localpos]    = psyw.ycrd[synthpos];
+        lc_zcrd[localpos]    = psyw.zcrd[synthpos];
         sh_xfrc[localpos]    = 0LL;
         sh_yfrc[localpos]    = 0LL;
         sh_zfrc[localpos]    = 0LL;
-        sh_charges[localpos] = synbk.charge[synthpos];
+        lc_charge[localpos]  = synbk.charge[synthpos];
 
         // The Lennard-Jones indices recorded here are specific to each system.  For each tile,
         // it is still critical to know the relevant system's total number of Lennard-Jones types
         // as well as its table offset.  On the GPU, these pieces of information will be imported
         // into __shared__ memory for convenient access.
-        sh_lj_idx[localpos]  = synbk.lj_idx[synthpos];
+        lc_lj_idx[localpos]  = synbk.lj_idx[synthpos];
+
+        // Center of geometry computation--coordinates are not scaled to real units at this stage
+        if (synthpos < synbk.atom_offsets[system_idx] + synbk.atom_counts[system_idx]) {
+          x_cog += static_cast<Tcalc>(lc_xcrd[localpos]);
+          y_cog += static_cast<Tcalc>(lc_ycrd[localpos]);
+          z_cog += static_cast<Tcalc>(lc_zcrd[localpos]);
+          t_pts += value_one;
+        }
+      }
+      sh_tile_xcog[pos] = x_cog;
+      sh_tile_ycog[pos] = y_cog;
+      sh_tile_zcog[pos] = z_cog;
+      sh_tile_tpts[pos] = t_pts;
+    }
+    
+    // Loop over tile instructions
+    for (int pos = tile_insr_start; pos < tile_insr_end; pos++) {
+      uint2 tinsr = synbk.nbwu_insr[pos];
+      for (int i = 0; i < 2 * tile_length; i++) {
+        reg_excl[i] = syse.mask_data[tinsr.y + i];
+      }
+      const int local_absc_start = (tinsr.x & 0xffff);
+      const int local_ordi_start = ((tinsr.x >> 16) & 0xffff);
+      const int absc_import_idx = local_absc_start >> tile_length_bits;
+      const int ordi_import_idx = local_ordi_start >> tile_length_bits;
+
+      // The system index is needed in order to know where to accumulate the resulting energy
+      const int system_idx = sh_system_indices[local_absc_start >> tile_length_bits];
+
+      // On the GPU, the atomic coordinates stored in signed long long integers will be converted
+      // to floating point numbers at the beginning of the tile calculation, but to preserve as
+      // much information as possible that conversion will also involve centering those atoms on
+      // the tile's center of geometry.
+      const Tcalc inv_tile_pts = value_one /
+                                 (sh_tile_tpts[absc_import_idx] + sh_tile_tpts[ordi_import_idx]);
+      const Tcalc tx_cog = (sh_tile_xcog[absc_import_idx] + sh_tile_xcog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const Tcalc ty_cog = (sh_tile_ycog[absc_import_idx] + sh_tile_ycog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const Tcalc tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const llint x_center = static_cast<llint>(tx_cog);
+      const llint y_center = static_cast<llint>(ty_cog);
+      const llint z_center = static_cast<llint>(tz_cog);
+
+      // Based on knowledge of the proper centering, re-import the coordinates after making the
+      // shift in precision-preserving integer arithemtic.
+      for (int i = 0; i < tile_length; i++) {
+        const size_t ilabsc  = i + local_absc_start;
+        const size_t ilordi  = i + local_ordi_start;
+        const size_t iplust = i + tile_length;
+        reg_xcrd[i]   = static_cast<Tcalc>(lc_xcrd[ilabsc] - x_center) * psyw.inv_gpos_scale;
+        reg_ycrd[i]   = static_cast<Tcalc>(lc_ycrd[ilabsc] - y_center) * psyw.inv_gpos_scale;
+        reg_zcrd[i]   = static_cast<Tcalc>(lc_zcrd[ilabsc] - z_center) * psyw.inv_gpos_scale;
+        reg_lj_idx[i] = lc_lj_idx[ilabsc];
+        reg_charge[i] = lc_charges[ilabsc];
+        reg_xcrd[iplust]   = static_cast<Tcalc>(lc_xcrd[ilordi] - x_center) * psyw.inv_gpos_scale;
+        reg_ycrd[iplust]   = static_cast<Tcalc>(lc_ycrd[ilordi] - y_center) * psyw.inv_gpos_scale;
+        reg_zcrd[iplust]   = static_cast<Tcalc>(lc_zcrd[ilordi] - z_center) * psyw.inv_gpos_scale;
+        reg_lj_idx[iplust] = lc_lj_idx[ilordi];
+        reg_charge[iplust] = lc_charge[ilordi];
+      }
+      
+      // Scan over the entire tile--if the tile runs past the end of the system's atoms, there
+      // will be a solid mask of excluded interactions.
+      const int nljt = sh_n_lj_types[local_absc_start >> tile_length_bits];
+      const int lj_offset = sh_ljabc_offsets[local_absc_start >> tile_length_bits];
+      for (int i = 0; i < tile_length; i++) {
+        const uint i_mask = reg_excl[i];
+        const Tcalc xi = reg_xcrd[i];
+        const Tcalc yi = reg_ycrd[i];
+        const Tcalc zi = reg_zcrd[i];
+        const Tcalc qi = reg_charge[i];
+        const int ilj_idx = (nljt * reg_lj_idx[i]) + lj_offset;
+        for (int j = tile_length; j < 2 * tile_length; j++) {
+          if ((i_mask >> (j - tile_length)) & 0x1) {
+            continue;
+          }
+          const Tcalc dx       = reg_xcrd[j] - xi;
+          const Tcalc dy       = reg_ycrd[j] - yi;
+          const Tcalc dz       = reg_zcrd[j] - zi;
+          const Tcalc dr       = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+          const Tcalc invr     = value_one / dr;
+          const Tcalc invr2    = invr * invr;
+          const Tcalc invr4    = invr2 * invr2;
+          const Tcalc qqij     = reg_charge[j] * qi;
+          const int   ij_ljidx = reg_lj_idx[j] + ilj_idx;
+          const Tcalc lja      = synbk.lja_coeff[ij_ljidx];
+          const Tcalc ljb      = synbk.ljb_coeff[ij_ljidx];
+          const 
+        }
       }
     }
-
   }
 }
 

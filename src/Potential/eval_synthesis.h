@@ -10,6 +10,7 @@
 #include "Potential/valence_potential.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/nonbonded_workunit.h"
+#include "Synthesis/static_mask_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
@@ -17,15 +18,13 @@
 namespace omni {
 namespace energy {
 
-using energy::ScoreCard;
-using energy::evalHarmonicStretch;
-using energy::commitVwuEnergies;
 using math::readBitFromMask;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::small_block_max_imports;
 using synthesis::supertile_wu_abstract_length;
 using synthesis::tile_groups_wu_abstract_length;
 using synthesis::PsSynthesisWriter;
+using synthesis::SeMaskSynthesisReader;
 using synthesis::SyNonbondedKit;
 using synthesis::SyValenceKit;
 using synthesis::SyRestraintKit;

@@ -70,7 +70,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
   // calling a binary search function.  Each instruction's y member has already been filled out.
   for (int i = 0; i < n_imports; i++) {
     const int import_idx = imports[i] / tile_length;
-    const uint absc_mask = 16 * i;
+    const uint absc_mask = tile_length * i;
     const uint ordi_mask = (absc_mask << 16);
     for (int j = 0; j < tile_count; j++) {
       if (tile_list[j].x == import_idx) {
@@ -240,7 +240,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     }
   }
 
-  // Fill out the size keys for each import, a series of bit-packed integer with one import batch
+  // Fill out the size keys for each import, a series of bit-packed integers with one import batch
   // size (up to tile_length atoms, i.e. 16) per eight bits.
   if (constants::int_bit_count_int < 32) {
     rtErr("Descriptors for non-bonded work units require that signed integers be of size >= 32 "

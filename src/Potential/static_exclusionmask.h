@@ -25,7 +25,10 @@ constexpr int max_unique_tiles = 67108864;
 constexpr int supertile_length = 256;
 
 /// \brief The number of atoms in a tile stride (tiles are tile_length x tile_length atoms)
+/// \{
 constexpr int tile_length = 16;
+constexpr int tile_length_bits = 4;
+/// \}
 
 /// \brief The number of tile lengths that fit into one supertile length
 constexpr int tile_lengths_per_supertile = supertile_length / tile_length;

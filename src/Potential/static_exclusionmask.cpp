@@ -118,7 +118,27 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
           const int jtl_start = jsptl_start + (tj * tile_length);
           const int jtl_end = std::min(jtl_start + tile_length, jsptl_end);
           std::vector<uint> mask_buffer(2 * tile_length, 0);
-          bool excl_found = false;
+          bool excl_found = (itl_end - itl_start < tile_length ||
+                             jtl_end - jtl_start < tile_length);
+
+          // If the tile is incomplete due to running off the end of the number of system atoms,
+          // the extra interactions must be listed as exclusions for the GPU code to understand
+          // not to count them.
+          for (int i = itl_end - itl_start; i < tile_length; i++) {
+            mask_buffer[i] = 0xffffffff;
+            for (int j = 0; j < tile_length; j++) {
+              mask_buffer[tile_length + j] |= (0x1 << i);
+            }
+          }
+          for (int j = jtl_end - jtl_start; j < tile_length; j++) {
+            mask_buffer[tile_length + j] = 0xffffffff;
+            for (int i = 0; i < tile_length; i++) {
+              mask_buffer[i] |= (0x1 << j);
+            }
+          }
+
+          // Scan all atoms along the abscissa to see if their known 1:1, 1:2, 1:3, or 1:4
+          // exclusions cover any atoms along the ordinate for this tile.
           for (int i = itl_start; i < itl_end; i++) {
 
             // The self-exclusion is not handled in the context of this list (it would introduce
