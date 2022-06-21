@@ -44,9 +44,9 @@ void splitForceContribution(const float fval, int *primary, int *overflow) {
   }
   const int prim_old = *primary;
   *primary += ival;
-  if ((ival > 0 && prim_old + ival < prim_old) || (ival < 0 && prim_old + ival > prim_old)) {
-    *overflow += (1 - (2 * (ival < 0))) * 2 * ((ival > 0 && prim_old + ival < prim_old) +
-                                               (ival < 0 && prim_old + ival > prim_old));
+  const int prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    *overflow += (1 - (2 * (ival < 0))) * 2;
   }
 }
 
@@ -107,11 +107,11 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
   check(n_basic_fail == 0, "A total of " + std::to_string(n_basic_fail) + " failures were "
         "recorded converting the range " + realToString(llim, 8, 4) + " : " +
         realToString(hlim, 8, 4) + " to split integer fixed-precision values when sampled with "
-        "a " + realToString(incr, 9, 2) + " increment.");
+        "a " + realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.");
   check(n_inc_fail == 0, "A total of " + std::to_string(n_inc_fail) + " failures were recorded "
         "converting the range " + realToString(ellim, 8, 4) + " : " + realToString(ehlim, 8, 4) +
         " to split integer fixed-precision values by incrementing 9x when sampled with a " +
-        realToString(incr, 9, 2) + " increment.");
+        realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.");
 }
 
 //-------------------------------------------------------------------------------------------------
