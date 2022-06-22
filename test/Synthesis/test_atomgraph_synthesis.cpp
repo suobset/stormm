@@ -278,11 +278,11 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
         "Restraint energy penalties computed using the synthesis methods are inconsistent with "
         "those computed using a simpler approach.", do_tests);
 
-  // Non-bonded interactions
-  
+  // Non-bonded interactions  
   SyNonbondedKit<double> synbk = poly_ag.getDoublePrecisionNonbondedKit();
   poly_ps->initializeForces();
   evalSyNonbondedTileGroups<double>(synbk, syse.data(), poly_ps->data(), &sc, EvaluateForce::YES);
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -351,10 +351,11 @@ int main(const int argc, const char* argv[]) {
                                              &trpcage3_ag, &nbfix_ag, &ubiquitin_ag, &drug_ag,
                                              &brbz_ag};
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 8 };
-  const AtomGraphSynthesis poly_ag(all_tops, system_ids, ExceptionResponse::SILENT,
-                                   maximum_valence_work_unit_atoms, &timer);
+  AtomGraphSynthesis poly_ag(all_tops, system_ids, ExceptionResponse::SILENT,
+                             maximum_valence_work_unit_atoms, &timer);
   const StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
-                                             poly_ag.getTopologyIndices());  
+                                             poly_ag.getTopologyIndices());
+  poly_ag.loadNonbondedWorkUnits(poly_se);
   
   // Check various descriptors
   section(1);
@@ -495,11 +496,12 @@ int main(const int argc, const char* argv[]) {
   std::vector<AtomGraph*> agn_list = { &tiso_ag, &brbi_ag, &lig1_ag, &lig2_ag, &dhfr_ag };
   std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &brbi_ra, &lig1_ra, &lig2_ra, &dhfr_ra };
   std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
-  const AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 },
-                                        ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
+  AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 },
+                                  ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
                                         &timer);
   const StaticExclusionMaskSynthesis poly_sen(poly_agn_rst.getTopologyPointers(),
                                               poly_agn_rst.getTopologyIndices());
+  poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
   checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests);
   

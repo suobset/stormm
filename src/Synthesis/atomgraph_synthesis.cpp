@@ -3039,17 +3039,32 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
   total_nonbonded_work_units = nbwu_count;
   int max_tile_count = 0;
   size_t total_tiles = 0LLU;
+  size_t padded_tile_count = 0LLU;
   for (int i = 0; i < nbwu_count; i++) {
     const int n_tiles = nbwu_list[i].getTileCount();
     max_tile_count = std::max(n_tiles, max_tile_count);
     total_tiles += n_tiles;
+    padded_tile_count += roundUp(n_tiles, warp_size_int);
   }
   nonbonded_work_type = (max_tile_count <= large_nbwu_tiles) ? NbwuKind::TILE_GROUPS :
                                                                NbwuKind::SUPERTILES;
+
+  // CHECK
+  if (nonbonded_work_type == NbwuKind::TILE_GROUPS) {
+    printf("It's TILE_GROUPS.\n");
+  }
+  else {
+    printf("It's SUPERTILES.\n");
+  }
+  printf("There are %4d non-bonded work units.\n", nbwu_count);
+  printf("  Resize the abstracts to %d\n", nbwu_count * tile_groups_wu_abstract_length);
+  printf("  Resize the instructions to %zu\n", total_tiles);
+  // END CHECK
+  
   switch (nonbonded_work_type) {
   case NbwuKind::TILE_GROUPS:
     nonbonded_abstracts.resize(nbwu_count * tile_groups_wu_abstract_length);
-    nbwu_instructions.resize(total_tiles);
+    nbwu_instructions.resize(padded_tile_count);
   case NbwuKind::SUPERTILES:
     nonbonded_abstracts.resize(nbwu_count * supertile_wu_abstract_length);
   case NbwuKind::DOMAIN:
@@ -3080,6 +3095,11 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
       break;
     }
   }
+
+  // CHECK
+  printf("All done.\n");
+  // END CHECK
+  
 }
 
 //-------------------------------------------------------------------------------------------------

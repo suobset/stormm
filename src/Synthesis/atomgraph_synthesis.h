@@ -271,6 +271,16 @@ public:
   void download();
 #endif
 
+  /// \brief Construct non-bonded work units for all unique topologies (there are no restraints
+  ///        for non-bonded interactions that might distinguish systems with the same topology, as
+  ///        was a consideration when developing the valence work units).  Load the instructions
+  ///        into the topology synthesis for availability on the GPU.
+  ///
+  /// \param poly_se  Synthesis of static exclusion masks for a compilation of systems in
+  ///                 isolated boundary conditions.  Each topology in the AtomGraphSynthesis need
+  ///                 only be represented once in this mask synthesis.
+  void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
+
 private:
 
   // The first member variables pertain to totals across all systems: atoms, potential function
@@ -1258,16 +1268,6 @@ private:
   ///
   /// \param vwu_atom_limit  The maximum number of atoms to assign to any one valence work unit
   void loadValenceWorkUnits(int vwu_atom_limit = maximum_valence_work_unit_atoms);
-
-  /// \brief Construct non-bonded work units for all unique topologies (there are no restraints
-  ///        for non-bonded interactions that might distinguish systems with the same topology, as
-  ///        was a consideration when developing the valecne work units).  Load the instructions
-  ///        into the topology synthesis for availability on the GPU.
-  ///
-  /// \param poly_se  Synthesis of static exclusion masks for a compilation of systems in
-  ///                 isolated boundary conditions.  Each topology in the AtomGraphSynthesis need
-  ///                 only be represented once in this mask synthesis.
-  void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
 };
 
 } // namespace synthesis
