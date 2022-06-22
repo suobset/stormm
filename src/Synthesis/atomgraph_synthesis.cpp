@@ -3098,6 +3098,16 @@ AtomGraph* AtomGraphSynthesis::getSystemTopologyPointer(const int system_index) 
 }
 
 //-------------------------------------------------------------------------------------------------
+const std::vector<AtomGraph*>& AtomGraphSynthesis::getTopologyPointers() const {
+  return topologies;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> AtomGraphSynthesis::getTopologyIndices() const {
+  return topology_indices.readHost();
+}
+
+//-------------------------------------------------------------------------------------------------
 RestraintApparatus* AtomGraphSynthesis::getSystemRestraintPointer(const int system_index) const {
   if (system_index < 0 || system_index >= system_count) {
     rtErr("A synthesis with " + std::to_string(system_count) + " systems cannot produce a "

@@ -84,6 +84,14 @@ public:
   /// \param system_index  Index of the system of interest
   AtomGraph* getSystemTopologyPointer(int system_index) const;
 
+  /// \brief Get a const reference to the list of all pointers for unique topologies making up
+  ///        this synthesis.
+  const std::vector<AtomGraph*>& getTopologyPointers() const;
+
+  /// \brief Get a const reference to the list of all topology indices, indicating the topologies
+  ///        describing each systems contained within this synthesis.
+  std::vector<int> getTopologyIndices() const;
+  
   /// \brief Get a restraint apparatus pointer for a sepcific system contained within the
   ///        synthesis.
   ///

@@ -174,7 +174,8 @@ std::vector<std::string> pullNamelist(const TextFile &tf, const NamelistEmulator
               if (tweaked_line[k] == '&' && k < n_pad_char - 3) {
                 bool card_clear = true;
                 for (int m = 0; m < 4; m++) {
-                  card_clear = (card_clear && commented[k + m] == false && quoted[k + m] == false);
+                  card_clear = (card_clear && line_commented[k + m] == false &&
+                                line_quoted[k + m] == false);
                 }
                 if (card_clear) {
                   switch (case_sensitivity) {

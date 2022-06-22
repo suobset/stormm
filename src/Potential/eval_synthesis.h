@@ -100,6 +100,7 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 template <typename Tcalc>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, PsSynthesisWriter psyw,
                                ScoreCard *ecard, const EvaluateForce eval_force);
+
 } // namespace energy
 } // namespace omni
 

@@ -592,7 +592,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
 
     // Import the abstract.
     for (int pos = 0; pos < 48; pos++) {
-      sh_nbwu_abstract[pos] = synbk[(tile_groups_wu_abstract_length * nbwu_idx) + pos];
+      sh_nbwu_abstract[pos] = synbk.nbwu_abstracts[(tile_groups_wu_abstract_length * nbwu_idx) +
+                                                   pos];
     }
     const int ntile_sides = sh_nbwu_abstract[0];
     for (int pos = 0; pos < ntile_sides; pos++) {

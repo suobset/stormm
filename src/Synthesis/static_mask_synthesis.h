@@ -62,6 +62,8 @@ public:
   ///                          masks outside this function)
   /// \param topology_indices  List of indices into base_masks indicating how to compile the
   ///                          synthesis of systems
+  /// \param poly_ag           Existing synthesis of AtomGraph objects describing a collection of
+  ///                          systems
   /// \{
   StaticExclusionMaskSynthesis();
   
