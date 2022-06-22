@@ -722,7 +722,7 @@ test.cuda.exe : $(OMNI_TEST_CUDA_PROGS)
 test : $(OMNI_TEST_PROGS)
 	for PROG in $(OMNI_TEST_PROGS) ; do \
 		echo "[OMNI] Execute $$PROG" ; \
-		$$PROG ; \
+		valgrind $$PROG ; \
 	done
 
 test.cuda : $(OMNI_TEST_CUDA_PROGS)

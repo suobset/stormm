@@ -3354,9 +3354,10 @@ AtomGraphSynthesis::getSinglePrecisionRestraintKit(const HybridTargetLevel tier)
 //-------------------------------------------------------------------------------------------------
 SyNonbondedKit<double>
 AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return SyNonbondedKit<double>(system_count, total_nonbonded_work_units,
+  return SyNonbondedKit<double>(system_count, periodic_box_class, total_nonbonded_work_units,
                                 nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
                                 atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
+                                dielectric_constant, salt_concentration, gb_style,
                                 atomic_charges.data(tier), lennard_jones_indices.data(tier),
                                 atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                 lennard_jones_a_coeff.data(tier), lennard_jones_b_coeff.data(tier),
@@ -3369,9 +3370,10 @@ AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier)
 //-------------------------------------------------------------------------------------------------
 SyNonbondedKit<float>
 AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return SyNonbondedKit<float>(system_count, total_nonbonded_work_units,
+  return SyNonbondedKit<float>(system_count, periodic_box_class, total_nonbonded_work_units,
                                nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
                                atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
+                               dielectric_constant, salt_concentration, gb_style,
                                sp_atomic_charges.data(tier), lennard_jones_indices.data(tier),
                                atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                sp_lennard_jones_a_coeff.data(tier),

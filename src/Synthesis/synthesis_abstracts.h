@@ -4,10 +4,14 @@
 
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Topology/atomgraph_enumerators.h"
 
 namespace omni {
 namespace synthesis {
 
+using topology::UnitCellType;
+using topology::ImplicitSolventModel;
+  
 /// \brief Collect the critical valence parameters and indexing information for work unit-based
 ///        evaluation of the systems in an AtomGraphSynthesis.
 template <typename T> struct SyValenceKit {
@@ -147,44 +151,51 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
 template <typename T> struct SyNonbondedKit {
 
   /// \brief The constructor takes a straight list of arguments for each member variable.
-  explicit SyNonbondedKit(int nsys_in, int nnbwu_in, const int* nbwu_abstracts_in,
-                          const uint2* nbwu_insr_in, const int* atom_offsets,
-                          const int* atom_counts, T coulomb_in, const T* charge_in,
-                          const int* lj_idx_in, const int* n_lj_types_in,
+  explicit SyNonbondedKit(int nsys_in, UnitCellType unit_cell_in, int nnbwu_in,
+                          const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
+                          const int* atom_offsets, const int* atom_counts, T coulomb_in,
+                          T dielectric_in, T saltcon_in, ImplicitSolventModel igb_in,
+                          const T* charge_in, const int* lj_idx_in, const int* n_lj_types_in,
                           const int* ljabc_offsets_in, const T* lja_coeff_in,
                           const T* ljb_coeff_in, const T* ljc_coeff_in, const int* neck_gb_idx_in,
                           const T* pb_radii_in, const T* gb_screen_in, const T* gb_alpha_in,
                           const T* gb_beta_in, const T* gb_gamma_in);
 
   // Member variables (all public)
-  const int nsys;             ///< The total number of systems in the synthesis
-  const int nnbwu;            ///< The number of non-bonded work units in the synthesis
-  const int* nbwu_abstracts;  ///< Abstracts for all non-bonded work units
-  const uint2* nbwu_insr;     ///< Instructions for all non-bonded work units
-  const int* atom_offsets;    ///< Offsets for the atom indices of each system (needed to determine
-                              ///<   whether tiles overrun the end of any one system)
-  const int* atom_counts;     ///< Atom counts for each system (needed to determine whether tiles
-                              ///<   overrun the end of any one system)
-  const T coulomb;            ///< Coulomb's constant (charges are stored in atomic units and
-                              ///<   converted to factor this in at the time they are cached)
-  const T* charge;            ///< Partial charges for all atoms in the synthesis (one concatenated
-                              ///<   array, with each system's atoms padded by the warp size)
-  const int* lj_idx;          ///< Lennard-Jones indices for all atoms.  Each system may have its
-                              ///<   own specific parameter matricies, with offsets given in the
-                              ///<   ljabc_offsets array (see below).
-  const int* n_lj_types;      ///< Lennard-Jones type counts for all systems
-  const int* ljabc_offsets;   ///< Offsets for Lennard-Jones A, B, and C coefficient tables for
-                              ///<   all systems
-  const T* lja_coeff;         ///< Lennard-Jones interaction A coefficients
-  const T* ljb_coeff;         ///< Lennard-Jones interaction B coefficients
-  const T* ljc_coeff;         ///< Lennard-Jones interaction C coefficients
-  const int* neck_gb_idx;     ///< Neck GB indicies for all atoms in each system, applicable for
-                              ///<   Mongan's "neck" GB models
-  const T* pb_radii;          ///< Atomic PB radii for all atoms in all systems
-  const T* gb_screen;         ///< Generalized Born screening factors for all atoms and systems
-  const T* gb_alpha;          ///< Generalized born alpha parameters (one parameter per atom)
-  const T* gb_beta;           ///< Generalized born beta parameters (one parameter per atom)
-  const T* gb_gamma;          ///< Generalized born gamma parameters (one parameter per atom)
+  const int nsys;                 ///< The total number of systems in the synthesis
+  const UnitCellType unit_cell;   ///< The type of unit cell for all systems
+  const int nnbwu;                ///< The number of non-bonded work units in the synthesis
+  const int* nbwu_abstracts;      ///< Abstracts for all non-bonded work units
+  const uint2* nbwu_insr;         ///< Instructions for all non-bonded work units
+  const int* atom_offsets;        ///< Offsets for the atom indices of each system (needed to
+                                  ///<   determine whether tiles overrun the end of any one system)
+  const int* atom_counts;         ///< Atom counts for each system (needed to determine whether
+                                  ///<   tiles overrun the end of any one system)
+  const T coulomb;                ///< Coulomb's constant (charges are stored in atomic units and
+                                  ///<   converted to factor this in at the time they are cached)
+  const T dielectric;             ///< Solvent dielectric constant
+  const T saltcon;                ///< The salt concentration to use in GB calculations
+  const ImplicitSolventModel igb; ///< The flavor of Generalized Born to use, i.e. Hawkins /
+                                  ///<   Cramer / Truhlar
+  const T* charge;                ///< Partial charges for all atoms in the synthesis (one
+                                  ///<   concatenated array, with each system's atoms padded by the
+                                  ///<   warp size)
+  const int* lj_idx;              ///< Lennard-Jones indices for all atoms.  Each system may have
+                                  ///<   its own specific parameter matricies, with offsets given
+                                  ///<   in the ljabc_offsets array (see below).
+  const int* n_lj_types;          ///< Lennard-Jones type counts for all systems
+  const int* ljabc_offsets;       ///< Offsets for Lennard-Jones A, B, and C coefficient tables for
+                                  ///<   all systems
+  const T* lja_coeff;             ///< Lennard-Jones interaction A coefficients
+  const T* ljb_coeff;             ///< Lennard-Jones interaction B coefficients
+  const T* ljc_coeff;             ///< Lennard-Jones interaction C coefficients
+  const int* neck_gb_idx;         ///< Neck GB indicies for all atoms in each system, applicable
+                                  ///<   for Mongan's "neck" GB models
+  const T* pb_radii;              ///< Atomic PB radii for all atoms in all systems
+  const T* gb_screen;             ///< Generalized Born screening factors for all atoms and systems
+  const T* gb_alpha;              ///< Generalized born alpha parameters (one parameter per atom)
+  const T* gb_beta;               ///< Generalized born beta parameters (one parameter per atom)
+  const T* gb_gamma;              ///< Generalized born gamma parameters (one parameter per atom)
 };
   
 } // namespace synthesis
