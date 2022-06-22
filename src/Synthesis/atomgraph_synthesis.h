@@ -649,6 +649,24 @@ private:
   Hybrid<float> sp_lennard_jones_14_c_coeff;    ///< Lennard-Jones C coefficients, a series of
                                                 ///<  tables covering all systems (single
                                                 ///<   precision)
+
+  // Implicit solvent model parameters.  Like the atomic partial charges arrays, these will
+  // target chem_double_data, chem_float_data, and (in the case of the indices) chem_int_data,
+  // for convenience.
+  Hybrid<int> neck_gb_indices;           ///< Indicies into separation and maximum value parameter
+                                         ///<   tables for Mongan's "neck" GB implementations
+  Hybrid<double> atomic_pb_radii;        ///< Radii of all atoms according to the pb_radii_set
+  Hybrid<double> gb_screening_factors;   ///< Generalized Born screening factors for all atoms
+  Hybrid<double> gb_alpha_parameters;    ///< Generalized Born alpha parameters for each atom (set
+                                         ///<   according to a particular GB scheme, not part of
+                                         ///<   an Amber topology file but added later)
+  Hybrid<double> gb_beta_parameters;     ///< Generalized Born beta parameters for each atom
+  Hybrid<double> gb_gamma_parameters;    ///< Generalized Born gamma parameters for each atom
+  Hybrid<float> sp_atomic_pb_radii;      ///< P.B. Radii of all atoms (single precision)
+  Hybrid<float> sp_gb_screening_factors; ///< Generalized Born screening factors (single precision)
+  Hybrid<float> sp_gb_alpha_parameters;  ///< Single-precision Generalized Born alpha parameters
+  Hybrid<float> sp_gb_beta_parameters;   ///< Single-precision Generalized Born beta parameters
+  Hybrid<float> sp_gb_gamma_parameters;  ///< Single-precision Generalized Born gamma parameters
   
   // NMR restraint terms and details: these function exactly like other parameter sets and are
   // indexed by lists of atoms in the bond work units arrays.  They can be included in the

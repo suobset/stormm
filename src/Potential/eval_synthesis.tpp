@@ -594,24 +594,24 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
     for (int pos = 0; pos < 48; pos++) {
       sh_nbwu_abstract[pos] = synbk[(tile_groups_wu_abstract_length * nbwu_idx) + pos];
     }
-    const int ntile_sides = nbwu_abstract[0];
+    const int ntile_sides = sh_nbwu_abstract[0];
     for (int pos = 0; pos < ntile_sides; pos++) {
-      const int system_idx   = nbwu_abstract[pos + 28];
-      sh_system_indices[pos] = system_idx
+      const int system_idx   = sh_nbwu_abstract[pos + 28];
+      sh_system_indices[pos] = system_idx;
       sh_n_lj_types[pos]     = synbk.n_lj_types[system_idx];
       sh_ljabc_offsets[pos]  = synbk.ljabc_offsets[system_idx];
     }
-    const int tile_insr_start = nbwu_abstract[26];
-    const int tile_insr_end   = nbwu_abstract[27];
+    const int tile_insr_start = sh_nbwu_abstract[26];
+    const int tile_insr_end   = sh_nbwu_abstract[27];
         
     // Import atoms into the appropriate arrays.  Prepare to compute the center of geometry for
     // all imported atoms.
     for (int pos = 0; pos < ntile_sides; pos++) {
-      const int atom_start_idx = nbwu_abstract[pos + 1];
+      const int atom_start_idx = sh_nbwu_abstract[pos + 1];
       const int system_idx     = sh_system_indices[pos];
       const int key_idx        = pos / 4;
       const int key_pos        = pos - (key_idx * 4);
-      const int tside_count    = ((nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
+      const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
 
       // Pre-compute the centers of geometry for each batch of tile_length atoms, storing the
       // results (totals plus weights) in floating-point format.  When it comes time to do actual
@@ -693,7 +693,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         reg_ycrd[i]   = static_cast<Tcalc>(lc_ycrd[ilabsc] - y_center) * psyw.inv_gpos_scale;
         reg_zcrd[i]   = static_cast<Tcalc>(lc_zcrd[ilabsc] - z_center) * psyw.inv_gpos_scale;
         reg_lj_idx[i] = lc_lj_idx[ilabsc];
-        reg_charge[i] = lc_charges[ilabsc];
+        reg_charge[i] = lc_charge[ilabsc];
         reg_xcrd[iplust]   = static_cast<Tcalc>(lc_xcrd[ilordi] - x_center) * psyw.inv_gpos_scale;
         reg_ycrd[iplust]   = static_cast<Tcalc>(lc_ycrd[ilordi] - y_center) * psyw.inv_gpos_scale;
         reg_zcrd[iplust]   = static_cast<Tcalc>(lc_zcrd[ilordi] - z_center) * psyw.inv_gpos_scale;
@@ -727,7 +727,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
           const int   ij_ljidx = reg_lj_idx[j] + ilj_idx;
           const Tcalc lja      = synbk.lja_coeff[ij_ljidx];
           const Tcalc ljb      = synbk.ljb_coeff[ij_ljidx];
-          const 
+          
         }
       }
     }

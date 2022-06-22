@@ -29,6 +29,7 @@ using topology::accepted_coulomb_constant;
 using topology::CmapAccessories;
 using topology::ComputeCmapDerivatives;
 using topology::ConstraintKit;
+using topology::ImplicitSolventKit;
 using topology::NonbondedKit;
 using topology::ValenceKit;
 using topology::VirtualSiteKit;
@@ -250,6 +251,19 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_lennard_jones_14_b_coeff{HybridKind::ARRAY, "tpsyn_lj_14_b_sp"},
     sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
 
+    // Implicit solvent model parameters
+    neck_gb_indices{HybridKind::POINTER, "tpsyn_gb_idx"},
+    atomic_pb_radii{HybridKind::POINTER, "tpsyn_atom_pb_rad"},
+    gb_screening_factors{HybridKind::POINTER, "tpsyn_gbscreen"},
+    gb_alpha_parameters{HybridKind::POINTER, "tpsyn_gbalpha"},
+    gb_beta_parameters{HybridKind::POINTER, "tpsyn_gbbeta"},
+    gb_gamma_parameters{HybridKind::POINTER, "tpsyn_gbgamma"},
+    sp_atomic_pb_radii{HybridKind::POINTER, "tpsyn_atom_pb_rad_sp"},
+    sp_gb_screening_factors{HybridKind::POINTER, "tpsyn_gbscreen_sp"},
+    sp_gb_alpha_parameters{HybridKind::POINTER, "tpsyn_gbalpha_sp"},
+    sp_gb_beta_parameters{HybridKind::POINTER, "tpsyn_gbbeta_sp"},
+    sp_gb_gamma_parameters{HybridKind::POINTER, "tpsyn_gbgamma_sp"},    
+    
     // Restraint parameters for all systems
     rposn_step_bounds{HybridKind::POINTER, "tpsyn_rposn_steps"},
     rbond_step_bounds{HybridKind::POINTER, "tpsyn_rbond_steps"},
@@ -980,10 +994,10 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
 
   // Allocate detailed arrays for each descriptor, then collate all topologies.  This
   // fills the "atom and residue details" arrays listed in atomgraph_synthesis.h.
-  chem_int_data.resize(8 * atom_offset);
+  chem_int_data.resize(9 * atom_offset);
   chem_int2_data.resize(resi_offset + mole_offset);
-  chem_double_data.resize(3 * atom_offset);
-  chem_float_data.resize(3 * atom_offset);
+  chem_double_data.resize(8 * atom_offset);
+  chem_float_data.resize(8 * atom_offset);
   chem_char4_data.resize(resi_offset + (2 * atom_offset));
   pivot = 0;
   residue_limits.setPointer(&chem_int2_data, pivot, resi_offset);
@@ -1005,18 +1019,40 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   charge_indices.setPointer(&chem_int_data, pivot, atom_offset);
   pivot += atom_offset;
   lennard_jones_indices.setPointer(&chem_int_data, pivot, atom_offset);
+  pivot += atom_offset;
+  neck_gb_indices.setPointer(&chem_int_data, pivot, atom_offset);
   pivot = 0;
   atomic_charges.setPointer(&chem_double_data, pivot, atom_offset);
   pivot += atom_offset;
   atomic_masses.setPointer(&chem_double_data, pivot, atom_offset);
   pivot += atom_offset;
   inverse_atomic_masses.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  atomic_pb_radii.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  gb_screening_factors.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  gb_alpha_parameters.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  gb_beta_parameters.setPointer(&chem_double_data, pivot, atom_offset);
+  pivot += atom_offset;
+  gb_gamma_parameters.setPointer(&chem_double_data, pivot, atom_offset);
   pivot = 0;
   sp_atomic_charges.setPointer(&chem_float_data, pivot, atom_offset);
   pivot += atom_offset;
   sp_atomic_masses.setPointer(&chem_float_data, pivot, atom_offset);
   pivot += atom_offset;
   sp_inverse_atomic_masses.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_atomic_pb_radii.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_gb_screening_factors.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_gb_alpha_parameters.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_gb_beta_parameters.setPointer(&chem_float_data, pivot, atom_offset);
+  pivot += atom_offset;
+  sp_gb_gamma_parameters.setPointer(&chem_float_data, pivot, atom_offset);
   pivot = 0;
   atom_names.setPointer(&chem_char4_data, pivot, atom_offset);
   pivot += atom_offset;
@@ -1033,17 +1069,30 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
   int* molecule_membership_ptr = molecule_membership.data();
   int* molecule_contents_ptr   = molecule_contents.data();
   int* lj_idx_ptr              = lennard_jones_indices.data();
+  int* neck_gb_indices_ptr     = neck_gb_indices.data();
   double* atomic_charges_ptr   = atomic_charges.data();
+  double* pb_radii_ptr         = atomic_pb_radii.data();
+  double* gb_screen_ptr        = gb_screening_factors.data();
+  double* gb_alpha_ptr         = gb_alpha_parameters.data();
+  double* gb_beta_ptr          = gb_beta_parameters.data();
+  double* gb_gamma_ptr         = gb_gamma_parameters.data();
   float* sp_atomic_charges_ptr = sp_atomic_charges.data();
+  float* sp_pb_radii_ptr       = sp_atomic_pb_radii.data();
+  float* sp_gb_screen_ptr      = sp_gb_screening_factors.data();
+  float* sp_gb_alpha_ptr       = sp_gb_alpha_parameters.data();
+  float* sp_gb_beta_ptr        = sp_gb_beta_parameters.data();
+  float* sp_gb_gamma_ptr       = sp_gb_gamma_parameters.data();
   char4* atom_names_ptr        = atom_names.data();
   char4* atom_types_ptr        = atom_types.data();
   char4* residue_names_ptr     = residue_names.data();
   for (int i = 0; i < system_count; i++) {
     const AtomGraph *ag_ptr = topologies[topology_indices.readHost(i)];
-    const ChemicalDetailsKit cdk     = ag_ptr->getChemicalDetailsKit();
-    const NonbondedKit<double> nbk   = ag_ptr->getDoublePrecisionNonbondedKit();
-    const NonbondedKit<float> nbk_sp = ag_ptr->getSinglePrecisionNonbondedKit();
-    const ValenceKit<double> vk      = ag_ptr->getDoublePrecisionValenceKit();
+    const ChemicalDetailsKit cdk           = ag_ptr->getChemicalDetailsKit();
+    const NonbondedKit<double> nbk         = ag_ptr->getDoublePrecisionNonbondedKit();
+    const NonbondedKit<float> nbk_sp       = ag_ptr->getSinglePrecisionNonbondedKit();
+    const ImplicitSolventKit<double> isk   = ag_ptr->getDoublePrecisionImplicitSolventKit();
+    const ImplicitSolventKit<float> isk_sp = ag_ptr->getSinglePrecisionImplicitSolventKit();
+    const ValenceKit<double> vk            = ag_ptr->getDoublePrecisionValenceKit();
     const int synth_bit_base = atom_bit_offsets.readHost(i);
     const int synth_atom_base = atom_offsets.readHost(i);
     const int synth_residue_base = residue_offsets.readHost(i);
@@ -1064,6 +1113,17 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
       molecule_contents_ptr[synth_atom_base + j] = cdk.mol_contents[j] + synth_atom_base;
       atomic_charges_ptr[synth_atom_base + j] = nbk.charge[j];
       sp_atomic_charges_ptr[synth_atom_base + j] = nbk_sp.charge[j];
+      neck_gb_indices_ptr[synth_atom_base + j] = isk.neck_gb_idx[j];
+      pb_radii_ptr[synth_atom_base + j] = isk.pb_radii[j];
+      gb_screen_ptr[synth_atom_base + j] = isk.gb_screen[j];
+      gb_alpha_ptr[synth_atom_base + j] = isk.gb_alpha[j];
+      gb_beta_ptr[synth_atom_base + j] = isk.gb_beta[j];
+      gb_gamma_ptr[synth_atom_base + j] = isk.gb_gamma[j];
+      sp_pb_radii_ptr[synth_atom_base + j] = isk_sp.pb_radii[j];
+      sp_gb_screen_ptr[synth_atom_base + j] = isk_sp.gb_screen[j];
+      sp_gb_alpha_ptr[synth_atom_base + j] = isk_sp.gb_alpha[j];
+      sp_gb_beta_ptr[synth_atom_base + j] = isk_sp.gb_beta[j];
+      sp_gb_gamma_ptr[synth_atom_base + j] = isk_sp.gb_gamma[j];
       lj_idx_ptr[synth_atom_base + j] = nbk.lj_idx[j];
       atom_names_ptr[synth_atom_base + j].x = cdk.atom_names[j].x;
       atom_names_ptr[synth_atom_base + j].y = cdk.atom_names[j].y;
@@ -3294,24 +3354,32 @@ AtomGraphSynthesis::getSinglePrecisionRestraintKit(const HybridTargetLevel tier)
 //-------------------------------------------------------------------------------------------------
 SyNonbondedKit<double>
 AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return SyNonbondedKit<double>(total_nonbonded_work_units, nonbonded_abstracts.data(tier),
-                                nbwu_instructions.data(tier), coulomb_constant,
+  return SyNonbondedKit<double>(system_count, total_nonbonded_work_units,
+                                nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
+                                atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
                                 atomic_charges.data(tier), lennard_jones_indices.data(tier),
                                 atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                 lennard_jones_a_coeff.data(tier), lennard_jones_b_coeff.data(tier),
-                                lennard_jones_c_coeff.data(tier));
+                                lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
+                                atomic_pb_radii.data(tier), gb_screening_factors.data(tier),
+                                gb_alpha_parameters.data(tier), gb_beta_parameters.data(tier),
+                                gb_gamma_parameters.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 SyNonbondedKit<float>
 AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return SyNonbondedKit<float>(total_nonbonded_work_units, nonbonded_abstracts.data(tier),
-                               nbwu_instructions.data(tier), coulomb_constant,
+  return SyNonbondedKit<float>(system_count, total_nonbonded_work_units,
+                               nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
+                               atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
                                sp_atomic_charges.data(tier), lennard_jones_indices.data(tier),
                                atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                sp_lennard_jones_a_coeff.data(tier),
                                sp_lennard_jones_b_coeff.data(tier),
-                               sp_lennard_jones_c_coeff.data(tier));
+                               sp_lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
+                               sp_atomic_pb_radii.data(tier), sp_gb_screening_factors.data(tier),
+                               sp_gb_alpha_parameters.data(tier), sp_gb_beta_parameters.data(tier),
+                               sp_gb_gamma_parameters.data(tier));
 }
 
 #ifdef OMNI_USE_HPC

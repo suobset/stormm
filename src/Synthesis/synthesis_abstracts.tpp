@@ -72,15 +72,22 @@ SyRestraintKit<T, T2, T4>::SyRestraintKit(const int2* rposn_step_bounds_in,
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-SyNonbondedKit<T>::SyNonbondedKit(const int nnbwu_in, const int* nbwu_abstracts_in,
-                                  const uint2* nbwu_insr_in, T coulomb_in, const T* charge_in,
-                                  const int* lj_idx_in, const int* n_lj_types_in,
-                                  const int* ljabc_offsets_in, const T* lja_coeff_in,
-                                  const T* ljb_coeff_in, const T* ljc_coeff_in) :
-    nnbwu{nnbwu_in}, nbwu_abstracts{nbwu_abstracts_in}, nbwu_insr{nbwu_insr_in},
-    coulomb{coulomb_in}, charge{charge_in}, lj_idx{lj_idx_in}, n_lj_types{n_lj_types_in},
+SyNonbondedKit<T>::SyNonbondedKit(const int nsys_in, const int nnbwu_in,
+                                  const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
+                                  const int* atom_offsets_in, const int* atom_counts_in,
+                                  T coulomb_in, const T* charge_in, const int* lj_idx_in,
+                                  const int* n_lj_types_in, const int* ljabc_offsets_in,
+                                  const T* lja_coeff_in, const T* ljb_coeff_in,
+                                  const T* ljc_coeff_in, const int* neck_gb_idx_in,
+                                  const T* pb_radii_in, const T* gb_screen_in,
+                                  const T* gb_alpha_in, const T* gb_beta_in,
+                                  const T* gb_gamma_in) :
+    nsys{nsys_in}, nnbwu{nnbwu_in}, nbwu_abstracts{nbwu_abstracts_in}, nbwu_insr{nbwu_insr_in},
+    atom_offsets{atom_offsets_in}, atom_counts{atom_counts_in}, coulomb{coulomb_in},
+    charge{charge_in}, lj_idx{lj_idx_in}, n_lj_types{n_lj_types_in},
     ljabc_offsets{ljabc_offsets_in}, lja_coeff{lja_coeff_in}, ljb_coeff{ljb_coeff_in},
-    ljc_coeff{ljc_coeff_in}
+    ljc_coeff{ljc_coeff_in}, neck_gb_idx{neck_gb_idx_in}, pb_radii{pb_radii_in},
+    gb_screen{gb_screen_in}, gb_alpha{gb_alpha_in}, gb_beta{gb_beta_in}, gb_gamma{gb_gamma_in}
 {}
 
 } // namespace synthesis

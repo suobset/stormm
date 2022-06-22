@@ -140,19 +140,31 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
 };
 
 /// \brief Collect the critical non-bonded parameters and masking information for work unit-based
-///        evaluation of the systems in an AtomGraphSynthesis.
+///        evaluation of the systems in an AtomGraphSynthesis.  Compared to the abstracts for a
+///        single system's AtomGraph, this merges the ImplicitSolventKit and NonbondedKit.  For
+///        comparison, the SyValenceKit object merges the information for valence interactions,
+///        constraints, and virtual sites abstracts from the single topology's set of abstracts. 
 template <typename T> struct SyNonbondedKit {
 
   /// \brief The constructor takes a straight list of arguments for each member variable.
-  explicit SyNonbondedKit(int nnbwu_in, const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
-                          T coulomb_in, const T* charge_in, const int* lj_idx_in,
-                          const int* n_lj_types_in, const int* ljabc_offsets_in,
-                          const T* lja_coeff_in, const T* ljb_coeff_in, const T* ljc_coeff_in);
+  explicit SyNonbondedKit(int nsys_in, int nnbwu_in, const int* nbwu_abstracts_in,
+                          const uint2* nbwu_insr_in, const int* atom_offsets,
+                          const int* atom_counts, T coulomb_in, const T* charge_in,
+                          const int* lj_idx_in, const int* n_lj_types_in,
+                          const int* ljabc_offsets_in, const T* lja_coeff_in,
+                          const T* ljb_coeff_in, const T* ljc_coeff_in, const int* neck_gb_idx_in,
+                          const T* pb_radii_in, const T* gb_screen_in, const T* gb_alpha_in,
+                          const T* gb_beta_in, const T* gb_gamma_in);
 
   // Member variables (all public)
+  const int nsys;             ///< The total number of systems in the synthesis
   const int nnbwu;            ///< The number of non-bonded work units in the synthesis
   const int* nbwu_abstracts;  ///< Abstracts for all non-bonded work units
   const uint2* nbwu_insr;     ///< Instructions for all non-bonded work units
+  const int* atom_offsets;    ///< Offsets for the atom indices of each system (needed to determine
+                              ///<   whether tiles overrun the end of any one system)
+  const int* atom_counts;     ///< Atom counts for each system (needed to determine whether tiles
+                              ///<   overrun the end of any one system)
   const T coulomb;            ///< Coulomb's constant (charges are stored in atomic units and
                               ///<   converted to factor this in at the time they are cached)
   const T* charge;            ///< Partial charges for all atoms in the synthesis (one concatenated
@@ -166,6 +178,13 @@ template <typename T> struct SyNonbondedKit {
   const T* lja_coeff;         ///< Lennard-Jones interaction A coefficients
   const T* ljb_coeff;         ///< Lennard-Jones interaction B coefficients
   const T* ljc_coeff;         ///< Lennard-Jones interaction C coefficients
+  const int* neck_gb_idx;     ///< Neck GB indicies for all atoms in each system, applicable for
+                              ///<   Mongan's "neck" GB models
+  const T* pb_radii;          ///< Atomic PB radii for all atoms in all systems
+  const T* gb_screen;         ///< Generalized Born screening factors for all atoms and systems
+  const T* gb_alpha;          ///< Generalized born alpha parameters (one parameter per atom)
+  const T* gb_beta;           ///< Generalized born beta parameters (one parameter per atom)
+  const T* gb_gamma;          ///< Generalized born gamma parameters (one parameter per atom)
 };
   
 } // namespace synthesis
