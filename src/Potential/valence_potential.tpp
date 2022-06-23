@@ -271,7 +271,7 @@ double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrit
 
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
-Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
+float angleVerification(const float costheta, const Tcalc* crabbc, const Tcalc* crbccd,
                         const Tcalc* bc, const Tcalc* scr) {
   if (fabsf(costheta) >= near_to_one_f) {
 
@@ -291,12 +291,12 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
     Tcalc rdx = nx_bccd - nx_abbc;
     Tcalc rdy = ny_bccd - ny_abbc;
     Tcalc rdz = nz_bccd - nz_abbc;
-    Tcalc rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    float rs = sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
     if (fabsf(rs) > 1.0f) {
       rdx = nx_bccd + nx_abbc;
       rdy = ny_bccd + ny_abbc;
       rdz = nz_bccd + nz_abbc;
-      rs = pi_f - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+      rs = pi_f - sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
     }
     return (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ? rs : -rs;
   }

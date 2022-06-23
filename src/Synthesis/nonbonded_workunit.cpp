@@ -378,7 +378,7 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
     }
     result[4] = (import_system_indices[0]);
     return result;
-  case NbwuKind::DOMAIN:
+  case NbwuKind::HONEYCOMB:
   case NbwuKind::UNKNOWN:
     return result;
   }

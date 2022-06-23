@@ -46,6 +46,9 @@ ForceAccumulationMethod translateForceAccumulationMethod(const std::string &choi
   else if (strcmpCased(choice, std::string("whole"))) {    
     return ForceAccumulationMethod::WHOLE;
   }
+  else if (strcmpCased(choice, std::string("automatic"))) {    
+    return ForceAccumulationMethod::AUTOMATIC;
+  }
   __builtin_unreachable();
 }
 
@@ -56,6 +59,8 @@ std::string getForceAccumulationMethodName(const ForceAccumulationMethod method)
     return std::string("SPLIT");
   case ForceAccumulationMethod::WHOLE:
     return std::string("WHOLE");
+  case ForceAccumulationMethod::AUTOMATIC:
+    return std::string("AUTOMATIC");
   }
   __builtin_unreachable();
 }

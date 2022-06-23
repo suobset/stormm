@@ -119,7 +119,7 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
           const int jtl_end = std::min(jtl_start + tile_length, jsptl_end);
           std::vector<uint> mask_buffer(2 * tile_length, 0);
           bool excl_found = (itl_end - itl_start < tile_length ||
-                             jtl_end - jtl_start < tile_length);
+                             jtl_end - jtl_start < tile_length || itl_start == jtl_start);
 
           // If the tile is incomplete due to running off the end of the number of system atoms,
           // the extra interactions must be listed as exclusions for the GPU code to understand
@@ -134,6 +134,20 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
             mask_buffer[tile_length + j] = 0xffffffff;
             for (int i = 0; i < tile_length; i++) {
               mask_buffer[i] |= (0x1 << j);
+            }
+          }
+
+          // Diagonal tiles must exclude all atoms for which j >= i
+          if (itl_start == jtl_start) {
+            uint diag_mask = 0xffff;
+            for (int i = 0; i < tile_length; i++) {
+              mask_buffer[i] |= diag_mask;
+              diag_mask ^= (0x1 << i);
+            }
+            diag_mask = 0U;
+            for (int i = tile_length; i < 2 * tile_length; i++) {
+              diag_mask |= (0x1 << (i - tile_length));
+              mask_buffer[i] |= diag_mask;
             }
           }
 

@@ -256,7 +256,7 @@ double evaluateAngleTerms(const ValenceKit<Tcalc> vk, const CoordinateSeriesWrit
 /// \param scr       Cross product of crabbc and crbccd, pre-computed for prior use in the naive
 ///                  computation
 template <typename Tcalc>
-Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* crbccd,
+float angleVerification(const float costheta, const Tcalc* crabbc, const Tcalc* crbccd,
                         const Tcalc* bc, const Tcalc* scr);
   
 /// \brief Evalaute the energy and forces due to a cosine-based or harmonic dihedral term.

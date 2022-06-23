@@ -282,7 +282,6 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   SyNonbondedKit<double> synbk = poly_ag.getDoublePrecisionNonbondedKit();
   poly_ps->initializeForces();
   evalSyNonbondedTileGroups<double>(synbk, syse.data(), poly_ps->data(), &sc, EvaluateForce::YES);
-
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -498,7 +497,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
   AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 },
                                   ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
-                                        &timer);
+                                  &timer);
   const StaticExclusionMaskSynthesis poly_sen(poly_agn_rst.getTopologyPointers(),
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);

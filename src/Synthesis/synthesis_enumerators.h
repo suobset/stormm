@@ -12,7 +12,7 @@ namespace synthesis {
 enum class NbwuKind {
   TILE_GROUPS,  ///< Work units process small lists of all-to-all non-bonded tiles
   SUPERTILES,   ///< Work units process large, regular arrangements of all-to-all non-bonded tiles
-  DOMAIN,       ///< Neighbor list-based spatial decomposition, with each work unit being a
+  HONEYCOMB,    ///< Neighbor list-based spatial decomposition, with each work unit being a
                 ///<   locally clustered patch of atoms
   UNKNOWN       ///< Placeholder for the non-bonded work type until it is properly set
 };

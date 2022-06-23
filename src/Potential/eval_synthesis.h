@@ -93,13 +93,14 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 ///        process.
 ///
 /// \param synbk       Non-bonded parameters for all atoms in the compilation of systems
-/// \param psyw        Writeable abstract for the coordinate synthesis
-/// \param ecard       Energy tracker object
+/// \param psyw        Abstract for the coordinate synthesis (it will be a const writer abstract,
+///                    as in other contexts the coordinates need to change, but not here)
+/// \param ecardw      Energy tracker object writer
 /// \param eval_force  Flag to also carry out force evaluation (energy is always evaluated in CPU
 ///                    functions)
 template <typename Tcalc>
-void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, PsSynthesisWriter psyw,
-                               ScoreCard *ecard, const EvaluateForce eval_force);
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
+                               PsSynthesisWriter psyw, ScoreCard *ecard, EvaluateForce eval_force);
 
 } // namespace energy
 } // namespace omni

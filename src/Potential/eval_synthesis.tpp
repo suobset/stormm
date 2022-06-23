@@ -583,7 +583,11 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
 
   // Constants needed for the calculation precision
   const Tcalc value_one = 1.0;
-
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  const Tcalc sqrt_coul = (tcalc_is_double) ? sqrt(synbk.coulomb) : sqrtf(synbk.coulomb);
+  const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
+  
   // Loop over all non-bonded work units within the topology synthesis.  Each holds within it a
   // list of atom imports and a series of tiles.  Within each tile, all atoms pertain to the same
   // system, but within each work unit, depending on the boundary conditions and the non-bonded
@@ -632,7 +636,11 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         sh_xfrc[localpos]    = 0LL;
         sh_yfrc[localpos]    = 0LL;
         sh_zfrc[localpos]    = 0LL;
-        lc_charge[localpos]  = synbk.charge[synthpos];
+
+        // Pre-scale all charges by the square root of Coulomb's constant so that it will carry
+        // through in all subsequent electrostatic calculations.  On the GPU, the latency involved
+        // in this step will likely hide all of
+        lc_charge[localpos]  = synbk.charge[synthpos] * sqrt_coul;
 
         // The Lennard-Jones indices recorded here are specific to each system.  For each tile,
         // it is still critical to know the relevant system's total number of Lennard-Jones types
@@ -706,6 +714,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       // will be a solid mask of excluded interactions.
       const int nljt = sh_n_lj_types[local_absc_start >> tile_length_bits];
       const int lj_offset = sh_ljabc_offsets[local_absc_start >> tile_length_bits];
+      Tcalc elec_nrg = 0.0;
+      Tcalc vdw_nrg  = 0.0;
       for (int i = 0; i < tile_length; i++) {
         const uint i_mask = reg_excl[i];
         const Tcalc xi = reg_xcrd[i];
@@ -728,11 +738,41 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
           const int   ij_ljidx = reg_lj_idx[j] + ilj_idx;
           const Tcalc lja      = synbk.lja_coeff[ij_ljidx];
           const Tcalc ljb      = synbk.ljb_coeff[ij_ljidx];
-          
+
+          // Log the energy.  This is obligatory on the CPU, but the GPU may or may not do it.
+          elec_nrg += qqij * invr;
+          vdw_nrg  += ((lja * invr4 * invr2) - ljb) * invr4 * invr2;
         }
       }
+
+      // CHECK
+#if 0
+      if (nbwu_idx == 0) {
+        printf("NBWU %5d %4d -> %12.4lf %12.4lf\n", nbwu_idx, pos, elec_nrg, vdw_nrg);
+      }
+#endif
+      // END CHECK
+      
+      // There is no need to test whether each work unit is responsible for accumulating the
+      // energy computed in a tile.  However, each tile will need to contribute its result to
+      // the energy accumulator for a particular system, due to the fact that work units can
+      // contain tiles from different systems.
+      const llint elec_acc = llround(elec_nrg * nrg_scale_factor);
+      ecard->contribute(StateVariable::ELECTROSTATIC, elec_acc, system_idx);
+      const llint vdw_acc  = llround(vdw_nrg * nrg_scale_factor);
+      ecard->contribute(StateVariable::VDW, vdw_acc, system_idx);
     }
   }
+
+  // CHECK
+#if 0
+  printf("System non-bonded energy:\n");
+  for (int i = 0; i < psyw.system_count; i++) {
+    printf("  %12.4f  %12.4f\n", ecard->reportInstantaneousStates(StateVariable::ELECTROSTATIC, i),
+           ecard->reportInstantaneousStates(StateVariable::VDW, i));
+  }
+#endif
+  // END CHECK
 }
 
 } // namespace energy

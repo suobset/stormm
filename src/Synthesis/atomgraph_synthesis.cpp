@@ -3048,26 +3048,15 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
   }
   nonbonded_work_type = (max_tile_count <= large_nbwu_tiles) ? NbwuKind::TILE_GROUPS :
                                                                NbwuKind::SUPERTILES;
-
-  // CHECK
-  if (nonbonded_work_type == NbwuKind::TILE_GROUPS) {
-    printf("It's TILE_GROUPS.\n");
-  }
-  else {
-    printf("It's SUPERTILES.\n");
-  }
-  printf("There are %4d non-bonded work units.\n", nbwu_count);
-  printf("  Resize the abstracts to %d\n", nbwu_count * tile_groups_wu_abstract_length);
-  printf("  Resize the instructions to %zu\n", total_tiles);
-  // END CHECK
-  
   switch (nonbonded_work_type) {
   case NbwuKind::TILE_GROUPS:
     nonbonded_abstracts.resize(nbwu_count * tile_groups_wu_abstract_length);
     nbwu_instructions.resize(padded_tile_count);
+    break;
   case NbwuKind::SUPERTILES:
     nonbonded_abstracts.resize(nbwu_count * supertile_wu_abstract_length);
-  case NbwuKind::DOMAIN:
+    break;
+  case NbwuKind::HONEYCOMB:
   case NbwuKind::UNKNOWN:
     break;
   }
@@ -3090,16 +3079,11 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
                                     supertile_wu_abstract_length * i, 5);
       }
       break;
-    case NbwuKind::DOMAIN:
+    case NbwuKind::HONEYCOMB:
     case NbwuKind::UNKNOWN:
       break;
     }
   }
-
-  // CHECK
-  printf("All done.\n");
-  // END CHECK
-  
 }
 
 //-------------------------------------------------------------------------------------------------

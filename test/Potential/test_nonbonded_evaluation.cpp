@@ -98,9 +98,8 @@ int3 checkMarkedExclusions(const StaticExclusionMask &se) {
   for (int i = 0; i < natom; i++) {
     for (int j = 0; j <= i; j++) {
       const bool is_excl = se.testExclusion(i, j);
-      if (j == i && is_excl) {
+      if (j == i && is_excl == false) {
         n_errors.x += 1;
-        continue;
       }
       bool topol_excl = false;
       for (int k = nbk.nb11_bounds[i]; k < nbk.nb11_bounds[i + 1]; k++) {
@@ -116,7 +115,7 @@ int3 checkMarkedExclusions(const StaticExclusionMask &se) {
         topol_excl = (topol_excl || j == nbk.nb14x[k]);
       }
       n_errors.y += (topol_excl && (is_excl == false));
-      n_errors.z += ((topol_excl == false) && is_excl);
+      n_errors.z += ((topol_excl == false) && is_excl && j != i);
     }
   }
   return n_errors;
