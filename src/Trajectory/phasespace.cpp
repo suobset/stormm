@@ -20,6 +20,18 @@ using math::roundUp;
 using parse::TextFile;
 
 //-------------------------------------------------------------------------------------------------
+PhaseSpaceWriter::PhaseSpaceWriter(const int natom_in, const UnitCellType unit_cell_in,
+                                   double* xcrd_in, double* ycrd_in, double* zcrd_in,
+                                   double* umat_in, double* invu_in, double* boxdim_in,
+                                   double* xvel_in, double* yvel_in, double* zvel_in,
+                                   double* xfrc_in, double* yfrc_in, double* zfrc_in,
+                                   double* xprv_in, double* yprv_in, double* zprv_in) :
+    natom{natom_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
+    umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}, xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in},
+    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xprv{xprv_in}, yprv{yprv_in}, zprv{zprv_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 PhaseSpaceReader::PhaseSpaceReader(const int natom_in, const UnitCellType unit_cell_in,
                                    const double* xcrd_in, const double* ycrd_in,
                                    const double* zcrd_in, const double* umat_in,
@@ -35,15 +47,14 @@ PhaseSpaceReader::PhaseSpaceReader(const int natom_in, const UnitCellType unit_c
 {}
 
 //-------------------------------------------------------------------------------------------------
-PhaseSpaceWriter::PhaseSpaceWriter(const int natom_in, const UnitCellType unit_cell_in,
-                                   double* xcrd_in, double* ycrd_in, double* zcrd_in,
-                                   double* umat_in, double* invu_in, double* boxdim_in,
-                                   double* xvel_in, double* yvel_in, double* zvel_in,
-                                   double* xfrc_in, double* yfrc_in, double* zfrc_in,
-                                   double* xprv_in, double* yprv_in, double* zprv_in) :
-    natom{natom_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
-    umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}, xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in},
-    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xprv{xprv_in}, yprv{yprv_in}, zprv{zprv_in}
+PhaseSpaceReader::PhaseSpaceReader(const PhaseSpaceWriter &psw) :
+    natom{psw.natom},
+    unit_cell{psw.unit_cell},
+    xcrd{psw.xcrd}, ycrd{psw.ycrd}, zcrd{psw.zcrd},
+    umat{psw.umat}, invu{psw.invu}, boxdim{psw.boxdim},
+    xvel{psw.xvel}, yvel{psw.yvel}, zvel{psw.zvel},
+    xfrc{psw.xfrc}, yfrc{psw.yfrc}, zfrc{psw.zfrc},
+    xprv{psw.xprv}, yprv{psw.yprv}, zprv{psw.zprv}
 {}
 
 //-------------------------------------------------------------------------------------------------

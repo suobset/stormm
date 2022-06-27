@@ -3,11 +3,13 @@
 #define OMNI_EVAL_SYNTHESIS_H
 
 #include "DataTypes/common_types.h"
+#include "DataTypes/omni_vector_types.h"
 #include "Math/vector_ops.h"
 #include "Potential/eval_valence_workunit.h"
 #include "Potential/scorecard.h"
 #include "Potential/static_exclusionmask.h"
 #include "Potential/valence_potential.h"
+#include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/static_mask_synthesis.h"
@@ -15,16 +17,27 @@
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
 
+// CHECK
+#include "Potential/nonbonded_potential.h"
+// END CHECK
+
 namespace omni {
 namespace energy {
 
+// CHECK
+using energy::evaluateNonbondedEnergy;
+// END CHECK
+  
 using math::readBitFromMask;
+using synthesis::AtomGraphSynthesis;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::small_block_max_imports;
 using synthesis::supertile_wu_abstract_length;
 using synthesis::tile_groups_wu_abstract_length;
+using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::SeMaskSynthesisReader;
+using synthesis::StaticExclusionMaskSynthesis;
 using synthesis::SyNonbondedKit;
 using synthesis::SyValenceKit;
 using synthesis::SyRestraintKit;
@@ -93,14 +106,22 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 ///        process.
 ///
 /// \param synbk       Non-bonded parameters for all atoms in the compilation of systems
-/// \param psyw        Abstract for the coordinate synthesis (it will be a const writer abstract,
-///                    as in other contexts the coordinates need to change, but not here)
+/// \param psyr        Abstract for the coordinate synthesis
 /// \param ecardw      Energy tracker object writer
 /// \param eval_force  Flag to also carry out force evaluation (energy is always evaluated in CPU
 ///                    functions)
 template <typename Tcalc>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
-                               PsSynthesisWriter psyw, ScoreCard *ecard, EvaluateForce eval_force);
+                               PsSynthesisWriter *psyw, ScoreCard *ecard,
+                               EvaluateForce eval_force);
+
+/// \brief Evaluate the non-bondede energy with a particular precision level.  This will invoke
+///        the proper C++ function.
+template <typename Tcalc>
+void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
+                           const StaticExclusionMaskSynthesis &poly_se,
+                           PhaseSpaceSynthesis *poly_ps, ScoreCard *ecard,
+                           EvaluateForce eval_force);
 
 } // namespace energy
 } // namespace omni

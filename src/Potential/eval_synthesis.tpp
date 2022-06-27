@@ -545,7 +545,7 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
-                               const PsSynthesisWriter psyw, ScoreCard *ecard,
+                               PsSynthesisWriter psyw, ScoreCard *ecard,
                                const EvaluateForce eval_force) {
 
   // Critical indexing and offsets for each work unit
@@ -586,7 +586,18 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   const Tcalc sqrt_coul = (tcalc_is_double) ? sqrt(synbk.coulomb) : sqrtf(synbk.coulomb);
+
+  // CHECK
+  printf("sqrt_coul = %12.6lf\n", sqrt_coul);
+  // END CHECK
+  
   const Tcalc nrg_scale_factor = ecard->getEnergyScalingFactor<Tcalc>();
+
+  // Initialize the appropriate energy terms in all systems
+  for (int i = 0; i < psyw.system_count; i++) {
+    ecard->initialize(StateVariable::ELECTROSTATIC, i);
+    ecard->initialize(StateVariable::VDW, i);
+  }
   
   // Loop over all non-bonded work units within the topology synthesis.  Each holds within it a
   // list of atom imports and a series of tiles.  Within each tile, all atoms pertain to the same
@@ -618,6 +629,10 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       const int key_pos        = pos - (key_idx * 4);
       const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
 
+      // CHECK
+      const bool trep = (system_idx == 1 && atom_start_idx == synbk.atom_offsets[1]);
+      // END CHECK
+      
       // Pre-compute the centers of geometry for each batch of tile_length atoms, storing the
       // results (totals plus weights) in floating-point format.  When it comes time to do actual
       // tiles, combine the results for the abscissa and ordinate atoms, divide by the combined
@@ -636,11 +651,20 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         sh_xfrc[localpos]    = 0LL;
         sh_yfrc[localpos]    = 0LL;
         sh_zfrc[localpos]    = 0LL;
-
+        
         // Pre-scale all charges by the square root of Coulomb's constant so that it will carry
         // through in all subsequent electrostatic calculations.  On the GPU, the latency involved
         // in this step will likely hide all of
         lc_charge[localpos]  = synbk.charge[synthpos] * sqrt_coul;
+
+        // CHECK
+        if (system_idx == 1) {
+          printf("Atom %4d [ %4zu %4zu ] is at %9.4lf %9.4lf %9.4lf with charge %9.6lf\n", i,
+                 localpos, synthpos, lc_xcrd[localpos] * psyw.inv_gpos_scale,
+                 lc_ycrd[localpos] * psyw.inv_gpos_scale,
+                 lc_zcrd[localpos] * psyw.inv_gpos_scale, synbk.charge[synthpos]);
+        }
+        // END CHECK
 
         // The Lennard-Jones indices recorded here are specific to each system.  For each tile,
         // it is still critical to know the relevant system's total number of Lennard-Jones types
@@ -661,6 +685,32 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       sh_tile_zcog[pos] = z_cog;
       sh_tile_tpts[pos] = t_pts;
     }
+
+    // CHECK
+    for (int pos = 0; pos < ntile_sides; pos++) {
+      const int system_idx     = sh_system_indices[pos];
+      const int key_idx        = pos / 4;
+      const int key_pos        = pos - (key_idx * 4);
+      const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
+      if (system_idx != 1) {
+        continue;
+      }
+      int j = 0;
+      printf("Point A charges = [\n");
+      for (int i = 0; i < tside_count; i++) {
+        printf("  %9.4f", lc_charge[(pos * tile_length) + i]);
+        j++;
+        if (j == 9) {
+          printf("\n");
+          j = 0;
+        }
+      }
+      if (j > 0) {
+        printf("\n");
+      }
+      printf("];\n");
+    }
+    // END CHECK
     
     // Loop over tile instructions
     for (int pos = tile_insr_start; pos < tile_insr_end; pos++) {
@@ -675,7 +725,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
 
       // The system index is needed in order to know where to accumulate the resulting energy
       const int system_idx = sh_system_indices[local_absc_start >> tile_length_bits];
-
+      
       // On the GPU, the atomic coordinates stored in signed long long integers will be converted
       // to floating point numbers at the beginning of the tile calculation, but to preserve as
       // much information as possible that conversion will also involve centering those atoms on
@@ -695,8 +745,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       // Based on knowledge of the proper centering, re-import the coordinates after making the
       // shift in precision-preserving integer arithemtic.
       for (int i = 0; i < tile_length; i++) {
-        const size_t ilabsc  = i + local_absc_start;
-        const size_t ilordi  = i + local_ordi_start;
+        const size_t ilabsc = i + local_absc_start;
+        const size_t ilordi = i + local_ordi_start;
         const size_t iplust = i + tile_length;
         reg_xcrd[i]   = static_cast<Tcalc>(lc_xcrd[ilabsc] - x_center) * psyw.inv_gpos_scale;
         reg_ycrd[i]   = static_cast<Tcalc>(lc_ycrd[ilabsc] - y_center) * psyw.inv_gpos_scale;
@@ -709,6 +759,16 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         reg_lj_idx[iplust] = lc_lj_idx[ilordi];
         reg_charge[iplust] = lc_charge[ilordi];
       }
+
+      // CHECK
+      if (system_idx == 1) {
+        printf("Tile %d:\n", pos);
+        for (int i = 0; i < tile_length; i++) {
+          printf("  %9.6lf %9.6lf\n", reg_charge[i] / sqrt_coul,
+                 reg_charge[i + tile_length] / sqrt_coul);
+        }
+      }
+      // END CHECK
       
       // Scan over the entire tile--if the tile runs past the end of the system's atoms, there
       // will be a solid mask of excluded interactions.
@@ -730,7 +790,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
           const Tcalc dx       = reg_xcrd[j] - xi;
           const Tcalc dy       = reg_ycrd[j] - yi;
           const Tcalc dz       = reg_zcrd[j] - zi;
-          const Tcalc dr       = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+          const Tcalc dr       = (tcalc_is_double) ?  sqrt((dx * dx) + (dy * dy) + (dz * dz)) :
+                                                     sqrtf((dx * dx) + (dy * dy) + (dz * dz));
           const Tcalc invr     = value_one / dr;
           const Tcalc invr2    = invr * invr;
           const Tcalc invr4    = invr2 * invr2;
@@ -741,16 +802,23 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
 
           // Log the energy.  This is obligatory on the CPU, but the GPU may or may not do it.
           elec_nrg += qqij * invr;
+
+          // CHECK
+          if (system_idx == 1) {
+            printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %% Tiled\n", reg_charge[i] / sqrt_coul,
+                   reg_charge[j] / sqrt_coul, dr, qqij * invr);
+          }
+          // END CHECK
+          
           vdw_nrg  += ((lja * invr4 * invr2) - ljb) * invr4 * invr2;
         }
       }
 
       // CHECK
-#if 0
       if (nbwu_idx == 0) {
-        printf("NBWU %5d %4d -> %12.4lf %12.4lf\n", nbwu_idx, pos, elec_nrg, vdw_nrg);
+        printf("NBWU %5d %4d [ %4d %4d ]-> %12.4lf %12.4lf\n", nbwu_idx, pos, local_absc_start,
+               local_ordi_start, elec_nrg, vdw_nrg);
       }
-#endif
       // END CHECK
       
       // There is no need to test whether each work unit is responsible for accumulating the
@@ -758,20 +826,71 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       // the energy accumulator for a particular system, due to the fact that work units can
       // contain tiles from different systems.
       const llint elec_acc = llround(elec_nrg * nrg_scale_factor);
-      ecard->contribute(StateVariable::ELECTROSTATIC, elec_acc, system_idx);
+      ecard->add(StateVariable::ELECTROSTATIC, elec_acc, system_idx);
       const llint vdw_acc  = llround(vdw_nrg * nrg_scale_factor);
-      ecard->contribute(StateVariable::VDW, vdw_acc, system_idx);
+      ecard->add(StateVariable::VDW, vdw_acc, system_idx);
     }
-  }
 
-  // CHECK
-#if 0
-  printf("System non-bonded energy:\n");
-  for (int i = 0; i < psyw.system_count; i++) {
-    printf("  %12.4f  %12.4f\n", ecard->reportInstantaneousStates(StateVariable::ELECTROSTATIC, i),
-           ecard->reportInstantaneousStates(StateVariable::VDW, i));
+    // CHECK
+    for (int pos = 0; pos < ntile_sides; pos++) {
+      const int system_idx     = sh_system_indices[pos];
+      const int key_idx        = pos / 4;
+      const int key_pos        = pos - (key_idx * 4);
+      const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
+      if (system_idx != 1) {
+        continue;
+      }
+      int j = 0;
+      printf("Point B charges = [\n");
+      for (int i = 0; i < tside_count; i++) {
+        printf("  %9.4f", lc_charge[(pos * tile_length) + i]);
+        j++;
+        if (j == 9) {
+          printf("\n");
+          j = 0;
+        }
+      }
+      if (j > 0) {
+        printf("\n");
+      }
+      printf("];\n");
+    }
+    // END CHECK
+
   }
-#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename Tcalc>
+void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
+                           const StaticExclusionMaskSynthesis &poly_se,
+                           PhaseSpaceSynthesis *poly_ps, ScoreCard *ecard,
+                           const EvaluateForce eval_force) {
+  const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
+  const bool tcalc_is_double = (tcalc_ct == double_type_index);
+  if (tcalc_is_double) {
+    evalSyNonbondedTileGroups(poly_ag.getDoublePrecisionNonbondedKit(), poly_se.data(),
+                              poly_ps->data(), ecard, eval_force);
+  }
+  else {
+    evalSyNonbondedTileGroups(poly_ag.getSinglePrecisionNonbondedKit(), poly_se.data(),
+                              poly_ps->data(), ecard, eval_force);
+  }
+  
+  // CHECK
+  printf("System non-bonded energy:\n");
+  for (int i = 0; i < poly_ps->getSystemCount(); i++) {
+    const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
+    PhaseSpace ips = poly_ps->exportSystem(i);
+    const StaticExclusionMask ise(iag_ptr);
+    ScoreCard isc(1, 1, 32);
+    const double2 inb_nrg = evaluateNonbondedEnergy(iag_ptr, ise, &ips, &isc);
+    printf("  %12.4lf  %12.4lf  %12.4lf %12.4lf\n",
+           ecard->reportInstantaneousStates(StateVariable::ELECTROSTATIC, i),
+           ecard->reportInstantaneousStates(StateVariable::VDW, i),
+           inb_nrg.x, inb_nrg.y);
+  }
+  exit(1);
   // END CHECK
 }
 

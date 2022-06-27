@@ -30,20 +30,22 @@ using omni::data_types::double4;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
-using omni::energy::evalSyValenceEnergy;
-using omni::energy::evalSyNonbondedTileGroups;
-using omni::energy::EvaluateForce;
-using omni::energy::ScoreCard;
-using omni::energy::StateVariable;
-using omni::energy::SeMaskSynthesisReader;
 using omni::errors::rtWarn;
 using omni::random::Xoroshiro128pGenerator;
 using omni::restraints::BoundedRestraint;
 using omni::restraints::RestraintApparatus;
+using namespace omni::energy;
 using namespace omni::synthesis;
 using namespace omni::topology;
 using namespace omni::trajectory;
 using namespace omni::testing;
+
+//-------------------------------------------------------------------------------------------------
+// Simple enumerator to call for non-bonded computations based on a topology synthesis.
+//-------------------------------------------------------------------------------------------------
+enum class EvaluateNonbonded {
+  YES, NO
+};
 
 //-------------------------------------------------------------------------------------------------
 // Compare the forces from a single system and one member of a multi-system representation.
@@ -72,7 +74,8 @@ double getForceDeviation(const PhaseSpace &ps, const PhaseSpaceSynthesis *psy, i
 //   do_tests:  Indication that tests are possible
 //-------------------------------------------------------------------------------------------------
 void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMaskSynthesis &syse,
-                    PhaseSpaceSynthesis *poly_ps, const TestPriority do_tests) {
+                    PhaseSpaceSynthesis *poly_ps, const TestPriority do_tests,
+                    const EvaluateNonbonded do_nonbonded = EvaluateNonbonded::NO) {
   
   // Get the valence abstract and prepare for energy calculations
   SyValenceKit<double> syvk = poly_ag.getDoublePrecisionValenceKit();
@@ -278,10 +281,14 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
         "Restraint energy penalties computed using the synthesis methods are inconsistent with "
         "those computed using a simpler approach.", do_tests);
 
-  // Non-bonded interactions  
-  SyNonbondedKit<double> synbk = poly_ag.getDoublePrecisionNonbondedKit();
-  poly_ps->initializeForces();
-  evalSyNonbondedTileGroups<double>(synbk, syse.data(), poly_ps->data(), &sc, EvaluateForce::YES);
+  // Non-bonded interactions
+  if (do_nonbonded == EvaluateNonbonded::YES) {
+    SyNonbondedKit<double> synbk = poly_ag.getDoublePrecisionNonbondedKit();
+    poly_ps->initializeForces();
+    //evalSyNonbondedTileGroups<double>(synbk, syse.data(), poly_ps->data(), &sc,
+    //                                  EvaluateForce::YES);
+    evalSyNonbondedEnergy<double>(poly_ag, syse, poly_ps, &sc, EvaluateForce::YES);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -442,7 +449,7 @@ int main(const int argc, const char* argv[]) {
     }
   }
   PhaseSpaceSynthesis poly_ps(ps_list, ag_list);
-  checkSynthesis(poly_ag, poly_se, &poly_ps, do_tests);
+  checkSynthesis(poly_ag, poly_se, &poly_ps, do_tests, EvaluateNonbonded::NO);
 
   // Prepare some more systems
   const std::string tiso_top_name = base_top_name + osc + "trpcage.top";
@@ -492,9 +499,9 @@ int main(const int argc, const char* argv[]) {
   RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
   RestraintApparatus lig2_ra = assembleRestraints(&lig2_ag, lig2_ps);
   RestraintApparatus dhfr_ra = assembleRestraints(&dhfr_ag, dhfr_ps);
-  std::vector<AtomGraph*> agn_list = { &tiso_ag, &brbi_ag, &lig1_ag, &lig2_ag, &dhfr_ag };
-  std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &brbi_ra, &lig1_ra, &lig2_ra, &dhfr_ra };
-  std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
+  std::vector<AtomGraph*> agn_list = { &brbi_ag, &brbi_ag, &lig1_ag, &lig2_ag, &dhfr_ag };
+  std::vector<RestraintApparatus*> rsn_list = { &brbi_ra, &brbi_ra, &lig1_ra, &lig2_ra, &dhfr_ra };
+  std::vector<PhaseSpace> psn_list = { brbi_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
   AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 },
                                   ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
                                   &timer);
@@ -502,7 +509,7 @@ int main(const int argc, const char* argv[]) {
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
-  checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests);
+  checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests, EvaluateNonbonded::YES);
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

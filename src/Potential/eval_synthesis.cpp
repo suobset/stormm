@@ -16,6 +16,5 @@ using synthesis::SyValenceKit;
 
 //-------------------------------------------------------------------------------------------------
 
-
 } // namespace energy
 } // namespace omni

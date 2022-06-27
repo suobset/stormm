@@ -17,44 +17,6 @@ using constants::CartesianDimension;
 using topology::AtomGraph;
 using topology::UnitCellType;
 
-/// \brief Collect constants and pointers to the components of a read-only PhaseSpace object.
-struct PhaseSpaceReader {
-
-  /// Constructor takes a large list of arguments passed in from the original PhaseSpace object
-  PhaseSpaceReader(const int natom_in, const UnitCellType unit_cell_in, const double* xcrd_in,
-                   const double* ycrd_in, const double* zcrd_in, const double* umat_in,
-                   const double* invu_in, const double* boxdim_in, const double* xvel_in,
-                   const double* yvel_in, const double* zvel_in, const double* xfrc_in,
-                   const double* yfrc_in, const double* zfrc_in, const double* xprv_in,
-                   const double* yprv_in, const double* zprv_in);
-
-  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
-  /// \{
-  PhaseSpaceReader(const PhaseSpaceReader &original) = default;
-  PhaseSpaceReader(PhaseSpaceReader &&original) = default;
-  /// \}
-  
-  const int natom;                ///< Atom count for this system (still a constant)
-  const UnitCellType unit_cell;  ///< The type of unit cell
-  const double* xcrd;            ///< Cartesian X positions of all particles
-  const double* ycrd;            ///< Cartesian Y positions of all particles
-  const double* zcrd;            ///< Cartesian Z positions of all particles
-  const double* umat;            ///< Transformation matrix to take coordinates into box
-                                 ///<   (fractional) space
-  const double* invu;            ///< Transformation matrix to take coordinates into real space
-  const double* boxdim;          ///< Box dimensions (stored for convenience and accuracy if the
-                                 ///<   box is resized repeatedly)
-  const double* xvel;            ///< Cartesian X velocities of all particles
-  const double* yvel;            ///< Cartesian Y velocities of all particles
-  const double* zvel;            ///< Cartesian Z velocities of all particles
-  const double* xfrc;            ///< Cartesian X forces acting on all particles
-  const double* yfrc;            ///< Cartesian Y forces acting on all particles
-  const double* zfrc;            ///< Cartesian Z forces acting on all particles
-  const double* xprv;            ///< Prior Cartesian X positions of all particles
-  const double* yprv;            ///< Prior Cartesian Y positions of all particles
-  const double* zprv;            ///< Prior Cartesian Z positions of all particles
-};
-
 /// \brief Collect constants and pointers to the components of a modifiable PhaseSpace object.
 struct PhaseSpaceWriter {
 
@@ -90,6 +52,49 @@ struct PhaseSpaceWriter {
   double* xprv;                  ///< Prior Cartesian X positions of all particles
   double* yprv;                  ///< Prior Cartesian Y positions of all particles
   double* zprv;                  ///< Prior Cartesian Z positions of all particles
+};
+
+/// \brief Collect constants and pointers to the components of a read-only PhaseSpace object.
+struct PhaseSpaceReader {
+
+  /// The constructor takes a large list of arguments passed in from the original PhaseSpace
+  /// object, or the cognate writer to make all of the associated pointers const.
+  /// \{
+  PhaseSpaceReader(const int natom_in, const UnitCellType unit_cell_in, const double* xcrd_in,
+                   const double* ycrd_in, const double* zcrd_in, const double* umat_in,
+                   const double* invu_in, const double* boxdim_in, const double* xvel_in,
+                   const double* yvel_in, const double* zvel_in, const double* xfrc_in,
+                   const double* yfrc_in, const double* zfrc_in, const double* xprv_in,
+                   const double* yprv_in, const double* zprv_in);
+
+  PhaseSpaceReader(const PhaseSpaceWriter &psw);
+  /// \}
+  
+  /// \brief Copy and move constructors.  The move assignment operator is implicitly deleted.
+  /// \{
+  PhaseSpaceReader(const PhaseSpaceReader &original) = default;
+  PhaseSpaceReader(PhaseSpaceReader &&original) = default;
+  /// \}
+  
+  const int natom;                ///< Atom count for this system (still a constant)
+  const UnitCellType unit_cell;  ///< The type of unit cell
+  const double* xcrd;            ///< Cartesian X positions of all particles
+  const double* ycrd;            ///< Cartesian Y positions of all particles
+  const double* zcrd;            ///< Cartesian Z positions of all particles
+  const double* umat;            ///< Transformation matrix to take coordinates into box
+                                 ///<   (fractional) space
+  const double* invu;            ///< Transformation matrix to take coordinates into real space
+  const double* boxdim;          ///< Box dimensions (stored for convenience and accuracy if the
+                                 ///<   box is resized repeatedly)
+  const double* xvel;            ///< Cartesian X velocities of all particles
+  const double* yvel;            ///< Cartesian Y velocities of all particles
+  const double* zvel;            ///< Cartesian Z velocities of all particles
+  const double* xfrc;            ///< Cartesian X forces acting on all particles
+  const double* yfrc;            ///< Cartesian Y forces acting on all particles
+  const double* zfrc;            ///< Cartesian Z forces acting on all particles
+  const double* xprv;            ///< Prior Cartesian X positions of all particles
+  const double* yprv;            ///< Prior Cartesian Y positions of all particles
+  const double* zprv;            ///< Prior Cartesian Z positions of all particles
 };
 
 /// \brief An object to complement a topology and hold positions, velocities, and forces of all
