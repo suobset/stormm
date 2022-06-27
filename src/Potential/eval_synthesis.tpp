@@ -782,7 +782,6 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
   }
   
   // CHECK
-#if 0  
   printf("System non-bonded energy:\n");
   for (int i = 0; i < poly_ps->getSystemCount(); i++) {
     const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
@@ -795,7 +794,6 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
            ecard->reportInstantaneousStates(StateVariable::VDW, i),
            inb_nrg.x, inb_nrg.y);
   }
-#endif
   // END CHECK
 }
 

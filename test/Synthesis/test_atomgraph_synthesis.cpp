@@ -502,13 +502,14 @@ int main(const int argc, const char* argv[]) {
   std::vector<AtomGraph*> agn_list = { &tiso_ag, &brbi_ag, &lig1_ag, &lig2_ag, &dhfr_ag };
   std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &brbi_ra, &lig1_ra, &lig2_ra, &dhfr_ra };
   std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
-  AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, { 0, 1, 2, 3, 4 }, { 0, 1, 2, 3, 4 },
+  std::vector<int> system_list = { 0, 0, 0, 0, 0, 1, 2, 0, 3, 0, 4, 4, 4 };
+  AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, system_list, system_list,
                                   ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
                                   &timer);
   const StaticExclusionMaskSynthesis poly_sen(poly_agn_rst.getTopologyPointers(),
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
-  PhaseSpaceSynthesis poly_psn(psn_list, agn_list);
+  PhaseSpaceSynthesis poly_psn(psn_list, agn_list, system_list);
   checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests, EvaluateNonbonded::YES);
   
   // Summary evaluation
