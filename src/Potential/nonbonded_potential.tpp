@@ -195,15 +195,6 @@ double2 evaluateNonbondedEnergy(const NonbondedKit<Tcalc> nbk, const StaticExclu
                 const Tcalc invr4 = invr2 * invr2;
                 const Tcalc qiqj = qi * cachj_q[j];
                 ele_contrib += qiqj * invr;
-
-                // CHECK
-                if (nbk.natom == 25) {
-                  printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %% Straightforward\n",
-                         cachi_q[i] / nbk.coulomb_constant, cachj_q[j], value_one / invr,
-                         qiqj * invr);
-                }
-                // END CHECK
-
                 const int ljt_j = cachj_ljidx[j];
                 const Tcalc lja = nbk.lja_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
                 const Tcalc ljb = nbk.ljb_coeff[(ljt_j * nbk.n_lj_types) + ljt_i];
