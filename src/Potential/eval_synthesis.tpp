@@ -823,11 +823,13 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
                                  sqrt_coul;
             const Tcalc chk_qj = dhfr_ag->getPartialCharge<Tcalc>(reg_system_atom_id[j].y) *
                                  sqrt_coul;
+#if 0
             if (fabs(chk_qi - qi) > 1.0e-8 || fabs(chk_qj - reg_charge[j]) > 1.0e-8) {
               printf("  Atoms %4d / %4d Q  : %9.4lf %9.4lf (from synthesis) vs "
                      "%9.4lf %9.4lf (from original)\n", reg_system_atom_id[i].y,
                      reg_system_atom_id[j].y, qi, reg_charge[j], chk_qi, chk_qj);
             }
+#endif
           }
           // END CHECK
           
@@ -895,6 +897,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
   }
 
   // CHECK
+#if 0
   const StaticExclusionMask dhfr_se(dhfr_ag);
   for (int i = 0; i < dhfr_natom; i++) {
     for (int j = 0; j < i; j++) {
@@ -911,6 +914,7 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       }
     }
   }
+#endif
   // END CHECK
 }
 
@@ -935,7 +939,7 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
   }
   
   // CHECK
-  printf("Last tile masking:\n");
+  printf("DHFR synthesis last tile masking:\n");
   int k = 0;
   for (int i = 2480; i < 2496; i++) {
     printf("  ");
@@ -956,6 +960,29 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
   if (k > 0) {
     printf("\n");
   }
+  const StaticExclusionMask dhfr_se(poly_ag.getSystemTopologyPointer(0));
+  printf("DHFR singleton last tile masking:\n");
+  k = 0;
+  for (int i = 2480; i < 2496; i++) {
+    printf("  ");
+    for (int j = 0; j < 16; j++) {
+      if (dhfr_se.testExclusion(i, j)) {
+        printf("1");
+      }
+      else {
+        printf("0");
+      }
+    }
+    k++;
+    if (k == 4) {
+      printf("\n");
+      k = 0;
+    }
+  }
+  if (k > 0) {
+    printf("\n");
+  }
+  exit(1);
   printf("System non-bonded energy:\n");
   for (int i = 0; i < poly_ps->getSystemCount(); i++) {
     const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
