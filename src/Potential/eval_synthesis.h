@@ -105,15 +105,17 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 ///        smaller forms of the all-to-all non-bonded work units enumerate all of the tiles they
 ///        process.
 ///
-/// \param synbk       Non-bonded parameters for all atoms in the compilation of systems
-/// \param psyr        Abstract for the coordinate synthesis
-/// \param ecardw      Energy tracker object writer
-/// \param eval_force  Flag to also carry out force evaluation (energy is always evaluated in CPU
-///                    functions)
+/// \param synbk            Non-bonded parameters for all atoms in the compilation of systems
+/// \param psyr             Abstract for the coordinate synthesis
+/// \param ecardw           Energy tracker object writer
+/// \param eval_elec_force  Flag to also carry out force evaluation of electrostatic interactions
+///                         (energy is always evaluated in CPU functions)
+/// \param eval_vdw_force   Flag to also carry out force evaluation of van-der Waals interactions
 template <typename Tcalc>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
                                PsSynthesisWriter *psyw, ScoreCard *ecard,
-                               EvaluateForce eval_force);
+                               EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
+                               const AtomGraph *dhfr_ag);
 
 /// \brief Evaluate the non-bondede energy with a particular precision level.  This will invoke
 ///        the proper C++ function.
@@ -121,7 +123,7 @@ template <typename Tcalc>
 void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
                            const StaticExclusionMaskSynthesis &poly_se,
                            PhaseSpaceSynthesis *poly_ps, ScoreCard *ecard,
-                           EvaluateForce eval_force);
+                           EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
 
 } // namespace energy
 } // namespace omni

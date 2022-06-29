@@ -90,6 +90,14 @@ public:
   /// \param index  The system index for which to query the atom offset
   int getAtomOffset(int index = 0) const;
 
+  /// \brief Obtain from the mask whether a combination of two atoms in a particular system
+  ///        constitutes an exclusion.
+  ///
+  /// \param system_index  Index the system of interest
+  /// \param atom_i        Index of the first atom within the system of interest
+  /// \param atom_j        Index of the second atom within the system of interest
+  bool testExclusion(int system_index, int atom_i, int atom_j) const;
+
   /// \brief Get the abstract for this static exclusion mask synthesis.
   SeMaskSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 

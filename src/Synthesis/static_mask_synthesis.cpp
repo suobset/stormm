@@ -6,6 +6,7 @@ namespace synthesis {
 
 using card::HybridKind;
 using energy::StaticExclusionMaskReader;
+using energy::supertile_length;
 using energy::tile_length;
 using energy::tiles_per_supertile;
 using math::roundUp;
@@ -188,6 +189,24 @@ int StaticExclusionMaskSynthesis::getAtomCount(const int index) const {
 //-------------------------------------------------------------------------------------------------
 int StaticExclusionMaskSynthesis::getAtomOffset(const int index) const {
   return atom_offsets.readHost(index);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool StaticExclusionMaskSynthesis::testExclusion(int system_index, int atom_i, int atom_j) const {
+  const int st_bound  = supertile_map_bounds.readHost(system_index);
+  const int natom     = atom_counts.readHost(system_index);
+  const int nst       = (natom + supertile_length - 1) / supertile_length;
+  const int sti_idx   = atom_i / supertile_length;
+  const int stj_idx   = atom_j / supertile_length;
+  const int st_index  = st_bound + (stj_idx * nst) + sti_idx;
+  const int ti_idx    = (atom_i - (sti_idx * supertile_length)) / tile_length;
+  const int tj_idx    = (atom_j - (stj_idx * supertile_length)) / tile_length;
+  const int ri_idx    = atom_i - (sti_idx * supertile_length) - (ti_idx * tile_length);
+  const int rj_idx    = atom_j - (stj_idx * supertile_length) - (tj_idx * tile_length);
+  const int stmap_idx = supertile_map_indices.readHost(st_index);
+  const int tmap_idx  = tile_map_indices.readHost(stmap_idx);
+  const uint mask_i   = all_masks.readHost(tmap_idx + ri_idx);
+  return ((mask_i >> rj_idx) & 0x1);
 }
 
 //-------------------------------------------------------------------------------------------------

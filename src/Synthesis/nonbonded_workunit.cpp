@@ -357,19 +357,23 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
   std::vector<int> result;
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
-    result.resize(tile_groups_wu_abstract_length, -1);
-    result[0] = tile_count;
-    for (int i = 0; i < tile_count; i++) {
-      result[i + 1] = imports[i];
+    {
+      result.resize(tile_groups_wu_abstract_length, -1);
+      int import_count = 0;
+      for (int i = 0; i < tile_count; i++) {
+        result[i + 1] = imports[i];
+        import_count += (imports[i] != -1);
+      }
+      result[0] = import_count;
+      for (int i = 0; i < 5; i++) {
+        result[1 + small_block_max_imports + i] = import_size_keys[i];
+      }
+      result[26] = instruction_start;
+      result[27] = instruction_start + tile_count;
+      for (int i = 0; i < tile_count; i++) {
+        result[28 + i] = import_system_indices[i];
+      }    
     }
-    for (int i = 0; i < 5; i++) {
-      result[1 + small_block_max_imports + i] = import_size_keys[i];
-    }
-    result[26] = instruction_start;
-    result[27] = instruction_start + tile_count;
-    for (int i = 0; i < tile_count; i++) {
-      result[28 + i] = import_system_indices[i];
-    }    
     return result;
   case NbwuKind::SUPERTILES:
     result.resize(supertile_wu_abstract_length);

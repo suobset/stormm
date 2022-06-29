@@ -121,6 +121,15 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
           bool excl_found = (itl_end - itl_start < tile_length ||
                              jtl_end - jtl_start < tile_length || itl_start == jtl_start);
 
+          // CHECK
+          if (itl_end - itl_start < tile_length && jtl_start == 0) {
+            printf("Here is the last tile for the abscissa and first tile for the ordinate.\n");
+            if (excl_found) {
+              printf("  Exclusion masks are pre-activated.\n");
+            }
+          }
+          // END CHECK
+          
           // If the tile is incomplete due to running off the end of the number of system atoms,
           // the extra interactions must be listed as exclusions for the GPU code to understand
           // not to count them.
