@@ -66,9 +66,11 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
       const int jsptl_end = std::min((stj + 1) * supertile_length, atom_count);
 
       // Identify any exclusions within this tile.
-      bool excl_found = false;
+      bool excl_found = ((isptl_end - isptl_start) % tile_length > 0 ||
+                         (jsptl_end - jsptl_start) % tile_length > 0 ||
+                         isptl_start == jsptl_start);
       for (int i = isptl_start; i < isptl_end; i++) {
-
+        
         // Check 1:1 exclusions
         for (int j = nbk.nb11_bounds[i]; j < nbk.nb11_bounds[i + 1]; j++) {
           excl_found = (excl_found || (nbk.nb11x[j] >= jsptl_start && nbk.nb11x[j] < jsptl_end));
@@ -118,32 +120,31 @@ StaticExclusionMask::StaticExclusionMask(const AtomGraph *ag_in) :
           const int jtl_start = jsptl_start + (tj * tile_length);
           const int jtl_end = std::min(jtl_start + tile_length, jsptl_end);
           std::vector<uint> mask_buffer(2 * tile_length, 0);
-          bool excl_found = (itl_end - itl_start < tile_length ||
-                             jtl_end - jtl_start < tile_length || itl_start == jtl_start);
-
-          // CHECK
-          if (itl_end - itl_start < tile_length && jtl_start == 0) {
-            printf("Here is the last tile for the abscissa and first tile for the ordinate.\n");
-            if (excl_found) {
-              printf("  Exclusion masks are pre-activated.\n");
-            }
-          }
-          // END CHECK
+          excl_found = (itl_end - itl_start < tile_length ||
+                        jtl_end - jtl_start < tile_length || itl_start == jtl_start);
           
           // If the tile is incomplete due to running off the end of the number of system atoms,
           // the extra interactions must be listed as exclusions for the GPU code to understand
           // not to count them.
+          uint jmask = 0U;
+          for (int i = itl_end - itl_start; i < tile_length; i++) {
+            jmask |= (0x1 << i);
+          }
           for (int i = itl_end - itl_start; i < tile_length; i++) {
             mask_buffer[i] = 0xffffffff;
-            for (int j = 0; j < tile_length; j++) {
-              mask_buffer[tile_length + j] |= (0x1 << i);
-            }
+          }
+          for (int i = tile_length; i < 2 * tile_length; i++) {
+            mask_buffer[i] |= jmask;
+          }
+          int imask = 0U;
+          for (int j = jtl_end - jtl_start; j < tile_length; j++) {
+            imask |= (0x1 << j);
           }
           for (int j = jtl_end - jtl_start; j < tile_length; j++) {
             mask_buffer[tile_length + j] = 0xffffffff;
-            for (int i = 0; i < tile_length; i++) {
-              mask_buffer[i] |= (0x1 << j);
-            }
+          }
+          for (int j = 0; j < tile_length; j++) {
+            mask_buffer[j] |= imask;
           }
 
           // Diagonal tiles must exclude all atoms for which j >= i

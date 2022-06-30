@@ -23,10 +23,6 @@
 
 namespace omni {
 namespace energy {
-
-// CHECK
-using energy::evaluateNonbondedEnergy;
-// END CHECK
   
 using math::readBitFromMask;
 using synthesis::AtomGraphSynthesis;
@@ -114,10 +110,9 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 template <typename Tcalc>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
                                PsSynthesisWriter *psyw, ScoreCard *ecard,
-                               EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force,
-                               const AtomGraph *dhfr_ag);
+                               EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
 
-/// \brief Evaluate the non-bondede energy with a particular precision level.  This will invoke
+/// \brief Evaluate the non-bonded energy with a particular precision level.  This will invoke
 ///        the proper C++ function.
 template <typename Tcalc>
 void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,

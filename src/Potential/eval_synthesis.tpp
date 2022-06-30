@@ -547,7 +547,7 @@ template <typename Tcalc>
 void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
                                PsSynthesisWriter psyw, ScoreCard *ecard,
                                const EvaluateForce eval_elec_force,
-                               const EvaluateForce eval_vdw_force, const AtomGraph *dhfr_ag) {
+                               const EvaluateForce eval_vdw_force) {
 
   // Critical indexing and offsets for each work unit
   std::vector<int> sh_nbwu_abstract(tile_groups_wu_abstract_length);
@@ -600,11 +600,6 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
     ecard->initialize(StateVariable::ELECTROSTATIC, i);
     ecard->initialize(StateVariable::VDW, i);
   }
-
-  // CHECK
-  const int dhfr_natom = synbk.atom_counts[0];
-  std::vector<int> interacted(dhfr_natom * dhfr_natom, 0);
-  // END CHECK
   
   // Loop over all non-bonded work units within the topology synthesis.  Each holds within it a
   // list of atom imports and a series of tiles.  Within each tile, all atoms pertain to the same
@@ -626,11 +621,6 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
     }
     const int tile_insr_start = sh_nbwu_abstract[26];
     const int tile_insr_end   = sh_nbwu_abstract[27];
-
-    // CHECK
-    std::vector<int2> system_atom_id(tile_length * ntile_sides);
-    std::vector<int2> reg_system_atom_id(2 * tile_length);
-    // END CHECK
     
     // Import atoms into the appropriate arrays.  Prepare to compute the center of geometry for
     // all imported atoms.
@@ -659,11 +649,6 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         sh_xfrc[localpos]    = 0LL;
         sh_yfrc[localpos]    = 0LL;
         sh_zfrc[localpos]    = 0LL;
-
-        // CHECK
-        system_atom_id[localpos].x = system_idx;
-        system_atom_id[localpos].y = atom_start_idx + i - synbk.atom_offsets[system_idx];
-        // END CHECK
         
         // Pre-scale all charges by the square root of Coulomb's constant so that it will carry
         // through in all subsequent electrostatic calculations.  On the GPU, the latency involved
@@ -736,11 +721,6 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         reg_zcrd[iplust]   = static_cast<Tcalc>(lc_zcrd[ilordi] - z_center) * psyw.inv_gpos_scale;
         reg_lj_idx[iplust] = lc_lj_idx[ilordi];
         reg_charge[iplust] = lc_charge[ilordi];
-
-        // CHECK
-        reg_system_atom_id[i] = system_atom_id[ilabsc];
-        reg_system_atom_id[iplust] = system_atom_id[ilordi];
-        // END CHECK
       }
       for (int i = 0; i < 2 * tile_length; i++) {
         reg_xfrc[i] = 0.0;
@@ -781,57 +761,6 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
           // Log the energy.  This is obligatory on the CPU, but the GPU may or may not do it.
           elec_nrg += qqij * invr;
           vdw_nrg  += ((lja * invr4 * invr2) - ljb) * invr4 * invr2;
-
-          // CHECK
-          if (reg_system_atom_id[i].x == 0 && reg_system_atom_id[j].x != 0) {
-            rtErr("System ID mismatch " + std::to_string(reg_system_atom_id[i].x) + " vs " +
-                  std::to_string(reg_system_atom_id[j].x) + ".", "evalSyNonbondedTileGroups");
-          }
-          if (reg_system_atom_id[i].x == 0) {
-            const int ival = std::max(reg_system_atom_id[i].y, reg_system_atom_id[j].y);
-            const int jval = std::min(reg_system_atom_id[i].y, reg_system_atom_id[j].y);
-            if (ival == 1 && jval == 0) {
-              printf("Interact 0 : 1 in work unit %4d, tile %2d, imports %2d - %2d, elem %2d - "
-                     "%2d\n", nbwu_idx, pos, absc_import_idx, ordi_import_idx, i, j);
-              const int key_idx     = absc_import_idx / 4;
-              const int key_pos     = absc_import_idx - (key_idx * 4);
-              const int tside_count = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
-              const int absc_start_idx = sh_nbwu_abstract[1 + absc_import_idx];
-              printf("  Absc. Imports(%2d) = [ %4d - %4d ]\n", tside_count, absc_start_idx,
-                     absc_start_idx + tile_length);
-              const int ordi_start_idx = sh_nbwu_abstract[1 + ordi_import_idx];
-              printf("  Ordi. Imports(%2d) = [ %4d - %4d ]\n", tside_count, ordi_start_idx,
-                     ordi_start_idx + tile_length);
-              int nr = 0;
-              for (int k = 0; k < 2 * tile_length; k++) {
-                printf("  ");
-                for (int m = 0; m < 16; m++) {
-                  printf("%u", ((reg_excl[k] >> m) & 0x1));
-                }
-                nr++;
-                if (nr == 4) {
-                  nr = 0;
-                  printf("\n");
-                }
-              }
-              if (nr > 0) {
-                printf("\n");
-              }
-            }
-            interacted[(jval * dhfr_natom) + ival] += 1;
-            const Tcalc chk_qi = dhfr_ag->getPartialCharge<Tcalc>(reg_system_atom_id[i].y) *
-                                 sqrt_coul;
-            const Tcalc chk_qj = dhfr_ag->getPartialCharge<Tcalc>(reg_system_atom_id[j].y) *
-                                 sqrt_coul;
-#if 0
-            if (fabs(chk_qi - qi) > 1.0e-8 || fabs(chk_qj - reg_charge[j]) > 1.0e-8) {
-              printf("  Atoms %4d / %4d Q  : %9.4lf %9.4lf (from synthesis) vs "
-                     "%9.4lf %9.4lf (from original)\n", reg_system_atom_id[i].y,
-                     reg_system_atom_id[j].y, qi, reg_charge[j], chk_qi, chk_qj);
-            }
-#endif
-          }
-          // END CHECK
           
           // Compute the forces and contribute them to accumulators.
           if (do_either_force) {
@@ -895,27 +824,6 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       }
     }
   }
-
-  // CHECK
-#if 0
-  const StaticExclusionMask dhfr_se(dhfr_ag);
-  for (int i = 0; i < dhfr_natom; i++) {
-    for (int j = 0; j < i; j++) {
-      if (interacted[(j * dhfr_natom) + i] > 1) {
-        printf("There are %d interactions for atoms %4d - %4d\n",
-               interacted[(j * dhfr_natom) + i], i, j);
-      }
-      if (dhfr_se.testExclusion(i, j) && interacted[(j * dhfr_natom) + i] > 0) {
-        printf("There are %d interactions for atoms %4d - %4d, despite this being an exclusion.\n",
-               interacted[(j * dhfr_natom) + i], i, j);
-      }
-      if (dhfr_se.testExclusion(i, j) == false && interacted[(j * dhfr_natom) + i] == 0) {
-        printf("Missing interaction between %4d - %4d\n", i, j);
-      }
-    }
-  }
-#endif
-  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -929,86 +837,12 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
   const bool tcalc_is_double = (tcalc_ct == double_type_index);
   if (tcalc_is_double) {
     evalSyNonbondedTileGroups(poly_ag.getDoublePrecisionNonbondedKit(), poly_se.data(),
-                              poly_ps->data(), ecard, eval_elec_force, eval_vdw_force,
-                              poly_ag.getSystemTopologyPointer(0));
+                              poly_ps->data(), ecard, eval_elec_force, eval_vdw_force);
   }
   else {
     evalSyNonbondedTileGroups(poly_ag.getSinglePrecisionNonbondedKit(), poly_se.data(),
-                              poly_ps->data(), ecard, eval_elec_force, eval_vdw_force,
-                              poly_ag.getSystemTopologyPointer(0));
+                              poly_ps->data(), ecard, eval_elec_force, eval_vdw_force);
   }
-  
-  // CHECK
-  printf("DHFR synthesis last tile masking:\n");
-  int k = 0;
-  for (int i = 2480; i < 2496; i++) {
-    printf("  ");
-    for (int j = 0; j < 16; j++) {
-      if (poly_se.testExclusion(0, i, j)) {
-        printf("1");
-      }
-      else {
-        printf("0");
-      }
-    }
-    k++;
-    if (k == 4) {
-      printf("\n");
-      k = 0;
-    }
-  }
-  if (k > 0) {
-    printf("\n");
-  }
-  const StaticExclusionMask dhfr_se(poly_ag.getSystemTopologyPointer(0));
-  printf("DHFR singleton last tile masking:\n");
-  k = 0;
-  for (int i = 2480; i < 2496; i++) {
-    printf("  ");
-    for (int j = 0; j < 16; j++) {
-      if (dhfr_se.testExclusion(i, j)) {
-        printf("1");
-      }
-      else {
-        printf("0");
-      }
-    }
-    k++;
-    if (k == 4) {
-      printf("\n");
-      k = 0;
-    }
-  }
-  if (k > 0) {
-    printf("\n");
-  }
-  exit(1);
-  printf("System non-bonded energy:\n");
-  for (int i = 0; i < poly_ps->getSystemCount(); i++) {
-    const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
-    PhaseSpace ips = poly_ps->exportSystem(i);
-    PhaseSpace sy_ips = ips;
-    ips.initializeForces();
-    const StaticExclusionMask ise(iag_ptr);
-    ScoreCard isc(1, 1, 32);
-    const double2 inb_nrg = evaluateNonbondedEnergy(iag_ptr, ise, &ips, &isc, eval_elec_force,
-                                                    eval_vdw_force);
-    printf("  %12.4lf  %12.4lf  %12.4lf %12.4lf\n",
-           ecard->reportInstantaneousStates(StateVariable::ELECTROSTATIC, i),
-           ecard->reportInstantaneousStates(StateVariable::VDW, i),
-           inb_nrg.x, inb_nrg.y);
-    PhaseSpaceWriter ipsw = ips.data();
-    PhaseSpaceWriter sy_ipsw = sy_ips.data();
-    for (int j = 0; j < ipsw.natom; j++) {
-      if (fabs(ipsw.xfrc[j] - sy_ipsw.xfrc[j]) > 1.0e-5 ||
-          fabs(ipsw.yfrc[j] - sy_ipsw.yfrc[j]) > 1.0e-5 ||
-          fabs(ipsw.zfrc[j] - sy_ipsw.zfrc[j]) > 1.0e-5) {
-        printf("  Atom %4d : %9.4lf %9.4lf %9.4lf\n", j, sy_ipsw.xfrc[j] - ipsw.xfrc[j],
-               sy_ipsw.yfrc[j] - ipsw.yfrc[j], sy_ipsw.zfrc[j] - ipsw.zfrc[j]);
-      }
-    }
-  }
-  // END CHECK
 }
 
 } // namespace energy

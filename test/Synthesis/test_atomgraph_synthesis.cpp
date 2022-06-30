@@ -503,9 +503,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<AtomGraph*> agn_list = { &tiso_ag, &brbi_ag, &lig1_ag, &lig2_ag, &dhfr_ag };
   std::vector<RestraintApparatus*> rsn_list = { &tiso_ra, &brbi_ra, &lig1_ra, &lig2_ra, &dhfr_ra };
   std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
-  std::vector<int> system_list = { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-                                   4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 1, 2, 3 };
-  system_list = std::vector<int>(1, 4);
+  std::vector<int> system_list = { 0, 1, 2, 3, 4 };
   AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, system_list, system_list,
                                   ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
                                   &timer);
