@@ -53,50 +53,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
   }
   __syncthreads();
   while (vwu_idx < poly_vk.nvwu) {
-#if 0
-    // Energy accumulators must be initialized at the start of every work unit, as it is not known
-    // which warps will contribute to any one type of term for a given work unit.  If the warp
-    // makes no contribution to a term for that work unit, its contribution must be zet to zero.
-    const int prime_lane_idx = (threadIdx.x & warp_bits_mask_int);
-    int prime_pos = (threadIdx.x >> warp_bits);
-    const bool iwrite = (prime_lane_idx < (VALENCE_KERNEL_THREAD_COUNT >> warp_bits));
-    while (prime_pos < (int)(StateVariable::ALL_STATES)) {
-      const StateVariable sv_pos = (StateVariable)(prime_pos);
-      if (iwrite) {
-        if (sv_pos == StateVariable::BOND) {
-          sh_bond_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::ANGLE) {
-          sh_angl_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::PROPER_DIHEDRAL) {
-          sh_dihe_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::IMPROPER_DIHEDRAL) {
-          sh_impr_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::UREY_BRADLEY) {
-          sh_ubrd_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::CHARMM_IMPROPER) {
-          sh_cimp_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::CMAP) {
-          sh_cmap_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::VDW_ONE_FOUR) {
-          sh_lj14_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::ELECTROSTATIC_ONE_FOUR) {
-          sh_qq14_acc[prime_lane_idx] = 0LL;
-        }
-        else if (sv_pos == StateVariable::RESTRAINT) {
-          sh_rstr_acc[prime_lane_idx] = 0LL;
-        }
-      }
-      prime_pos += (VALENCE_KERNEL_THREAD_COUNT >> warp_bits);
-    }
-#endif
     
     // The instruction set map is read and stored in __shared__ for convenience, and to ensure
     // that it never leaves cache.  The instructions themselves are "streamed," which for purposes
