@@ -1,0 +1,121 @@
+// -*-c++-*-
+
+#ifndef EXCL_GMEM_OFFSET
+#define EXCL_GMEM_OFFSET
+#endif
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, 1)
+KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl,
+            PsSynthesisWriter poly_psw,
+#ifdef COMPUTE_ENERGY
+            ScoreCardWriter scw,
+#endif
+            CacheResourceKit<TCALC> gmem_r) {
+
+  // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
+  // exclusively by this block.
+#ifdef COMPUTE_FORCE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+  __shared__ int sh_xfrc[NONBOND_KERNEL_ATOM_COUNT];
+  __shared__ int sh_yfrc[NONBOND_KERNEL_ATOM_COUNT];
+  __shared__ int sh_zfrc[NONBOND_KERNEL_ATOM_COUNT];
+  __shared__ int xoverflow_active[NONBOND_KERNEL_ATOM_COUNT >> warp_bits];
+  __shared__ int yoverflow_active[NONBOND_KERNEL_ATOM_COUNT >> warp_bits];
+  __shared__ int zoverflow_active[NONBOND_KERNEL_ATOM_COUNT >> warp_bits];
+#  else
+  __shared__ long long int sh_xfrc[NONBOND_KERNEL_ATOM_COUNT];
+  __shared__ long long int sh_yfrc[NONBOND_KERNEL_ATOM_COUNT];
+  __shared__ long long int sh_zfrc[NONBOND_KERNEL_ATOM_COUNT]; 
+#  endif
+#endif
+#ifdef COMPUTE_ENERGY
+  __shared__ llint sh_elec_acc[small_block_max_imports];
+  __shared__ llint sh_vdw_acc[small_block_max_imports];
+  __shared__ llint sh_gb_acc[small_block_max_imports];
+#endif
+  __shared__ int nbwu_map[tile_groups_wu_abstract_length];
+  __shared__ int nbwu_idx;
+
+  // Each block takes its first non-bonded work unit based on its block index.
+  if (threadIdx.x == 0) {
+    nbwu_idx = blocKIdx.x;
+  }
+  __syncthreads();
+  while (nbwu_idx < poly_nbk.nnbwu) {
+#if 0
+    // There are only three possible types of energy to track, but with up to 20
+    // (small_block_max_imports) different systems there must be trackers for each system that the
+    // non-bonded calculation could be dealing with.  The simplest approach is to dump accumulators
+    // to __shared__ at the end of every tile computation, and since energies are not computed
+    // frequently this should not have a great impact on overall performance.
+    int pos = threadIdx.x;
+    while (pos < small_block_max_imports) {
+      sh_elec_acc[pos] = 0LL;
+      pos += blockDim.x;
+    }
+    while (pos < 2 * small_block_max_imports) {
+      sh_vdw_acc[pos] = 0LL;
+      pos += blockDim.x;
+    }
+    while (pos < 3 * small_block_max_imports) {
+      sh_gb_acc[pos] = 0LL;
+      pos += blockDim.x;
+    }
+#endif
+    // The instruction set is read and stored in __shared__ for convenience
+#ifdef SPLIT_FORCE_ACCUMULATION
+    const int noverflow_flags = maximum_valence_work_unit_atoms / warp_size_int;
+#endif
+    if (threadIdx.x < NBWU_ABSTRACT_LENGTH) {
+      nbwu_map[threadIdx.x] = __ldcv(&poly_vk.nbwu_abstracts[(nbwu_idx * NBWU_ABSTRACT_LENGTH) +
+                                                             threadIdx.x]);
+      nbwu_task_count[threadIdx.x] = nbwu_map[threadIdx.x].y - nbwu_map[threadIdx.x].x;
+      nbwu_padded_task_count[threadIdx.x] = devcRoundUp(nbwu_task_count[threadIdx.x],
+                                                        warp_size_int);
+    }
+#ifdef SPLIT_FORCE_ACCUMULATION
+    else if (threadIdx.x < NBWU_ABSTRACT_LENGTH + noverflow_flags) {
+      xoverflow_active[threadIdx.x - NBWU_ABSTRACT_LENGTH] = 0;
+    }
+    else if (threadIdx.x < NBWU_ABSTRACT_LENGTH + (2 * noverflow_flags)) {
+      yoverflow_active[threadIdx.x - NBWU_ABSTRACT_LENGTH - noverflow_flags] = 0;
+    }
+    else if (threadIdx.x < NBWU_ABSTRACT_LENGTH + (3 * noverflow_flags)) {
+      zoverflow_active[threadIdx.x - NBWU_ABSTRACT_LENGTH - (2 * noverflow_flags)] = 0;
+    }
+#endif
+    __syncthreads();
+
+    // Import atomic coordinates and properties.  Each warp will handle importing one of the
+    // Cartesian coordinates or properties of as many tile sides as it can handle, in order to
+    // get the most threads reaching out to global memory.
+    const int tile_sides_per_warp = (warp_size_int / tile_length);
+    const int warp_idx = (threadIdx.x >> warp_bits);
+    const int warps_per_block = blockDim.x >> warp_bits;
+    const int warp_lane_idx = (threadIdx.x & warp_bits_mask_int);
+    const int tile_side_offset = warp_lane_idx / tile_length;
+    const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+    const int import_count = nbwu_map[0];
+    int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;    
+    while (pos < import_count) {
+      const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
+      const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
+      const int key_idx  = pos / 4;
+      const int key_slot = pos - (key_idx * 4);
+      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                (8 * key_slot)) & 0xff);
+      if (tile_lane_idx < tside_count) {
+        __stwb(&gmem_r.xcrd[write_idx], __ldcs(&poly_psw.xcrd[read_idx]));
+        
+      }
+      else {
+        __stwb(&gmem_r.xcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 2 * import_count) {
+
+    }
+  }
+}

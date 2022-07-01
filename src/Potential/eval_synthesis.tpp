@@ -629,7 +629,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       const int system_idx     = sh_system_indices[pos];
       const int key_idx        = pos / 4;
       const int key_pos        = pos - (key_idx * 4);
-      const int tside_count    = ((sh_nbwu_abstract[21 + key_idx] >> (8 * key_pos)) & 0xff);
+      const int tside_count    = ((sh_nbwu_abstract[small_block_max_imports + 1 + key_idx] >>
+                                   (8 * key_pos)) & 0xff);
       
       // Pre-compute the centers of geometry for each batch of tile_length atoms, storing the
       // results (totals plus weights) in floating-point format.  When it comes time to do actual
