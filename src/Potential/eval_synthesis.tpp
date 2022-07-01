@@ -663,12 +663,10 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
         lc_lj_idx[localpos]  = synbk.lj_idx[synthpos];
 
         // Center of geometry computation--coordinates are not scaled to real units at this stage
-        if (synthpos < synbk.atom_offsets[system_idx] + synbk.atom_counts[system_idx]) {
-          x_cog += static_cast<Tcalc>(lc_xcrd[localpos]);
-          y_cog += static_cast<Tcalc>(lc_ycrd[localpos]);
-          z_cog += static_cast<Tcalc>(lc_zcrd[localpos]);
-          t_pts += value_one;
-        }
+        x_cog += static_cast<Tcalc>(lc_xcrd[localpos]);
+        y_cog += static_cast<Tcalc>(lc_ycrd[localpos]);
+        z_cog += static_cast<Tcalc>(lc_zcrd[localpos]);
+        t_pts += value_one;
       }
       sh_tile_xcog[pos] = x_cog;
       sh_tile_ycog[pos] = y_cog;

@@ -15,6 +15,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
 
   // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.
+  __shared__ TCALC sh_tile_xcog[small_block_max_imports];
+  __shared__ TCALC sh_tile_ycog[small_block_max_imports];
+  __shared__ TCALC sh_tile_zcog[small_block_max_imports];
+  __shared__ int sh_tile_tpts[small_block_max_imports];
 #ifdef COMPUTE_FORCE
 #  ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_xfrc[NONBOND_KERNEL_ATOM_COUNT];
@@ -159,5 +163,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
+    __syncthreads();
+    
   }
 }
