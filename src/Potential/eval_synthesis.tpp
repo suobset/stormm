@@ -619,8 +619,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
       sh_n_lj_types[pos]     = synbk.n_lj_types[system_idx];
       sh_ljabc_offsets[pos]  = synbk.ljabc_offsets[system_idx];
     }
-    const int tile_insr_start = sh_nbwu_abstract[26];
-    const int tile_insr_end   = sh_nbwu_abstract[27];
+    const int tile_insr_start = sh_nbwu_abstract[small_block_max_imports + 6];
+    const int tile_insr_end   = sh_nbwu_abstract[small_block_max_imports + 7];
     
     // Import atoms into the appropriate arrays.  Prepare to compute the center of geometry for
     // all imported atoms.
@@ -729,8 +729,8 @@ void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSy
 
       // Scan over the entire tile--if the tile runs past the end of the system's atoms, there
       // will be a solid mask of excluded interactions.
-      const int nljt = sh_n_lj_types[local_absc_start >> tile_length_bits];
-      const int lj_offset = sh_ljabc_offsets[local_absc_start >> tile_length_bits];
+      const int nljt = sh_n_lj_types[absc_import_idx];
+      const int lj_offset = sh_ljabc_offsets[absc_import_idx];
       Tcalc elec_nrg = 0.0;
       Tcalc vdw_nrg  = 0.0;
       for (int i = 0; i < tile_length; i++) {

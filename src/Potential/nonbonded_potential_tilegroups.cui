@@ -6,8 +6,8 @@
 
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, 1)
-KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl,
-            PsSynthesisWriter poly_psw,
+KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader poly_se,
+            const MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter scw,
 #endif
@@ -18,7 +18,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
   __shared__ TCALC sh_tile_xcog[small_block_max_imports];
   __shared__ TCALC sh_tile_ycog[small_block_max_imports];
   __shared__ TCALC sh_tile_zcog[small_block_max_imports];
-  __shared__ int sh_tile_tpts[small_block_max_imports];
+  __shared__ TCALC sh_tile_tpts[small_block_max_imports];
+  __shared__ int sh_system_indices[small_block_max_imports];
+  __shared__ int sh_n_lj_types[small_block_max_imports];
+  __shared__ int sh_ljabc_offsets[small_block_max_imports];
 #ifdef COMPUTE_FORCE
 #  ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_xfrc[NONBOND_KERNEL_ATOM_COUNT];
@@ -90,11 +93,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
       const int key_slot = pos - (key_idx * 4);
       const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
                                 (8 * key_slot)) & 0xff);
+      TCALC fxval;
       if (tile_lane_idx < tside_count) {
-        __stwb(&gmem_r.xcrd[write_idx], __ldcs(&poly_psw.xcrd[read_idx]));
+        const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
+        fxval = (TCALC)(ixval);
+        __stwb(&gmem_r.xcrd[write_idx], ixval);
       }
       else {
+        fxval = (TCALC)0.0;
         __stwb(&gmem_r.xcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+      }
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        fxval += SHFL_DOWN(fxval, i);
+      }
+      if (tile_lane_idx == 0) {
+        sh_tile_xcog[pos] = fxval;
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
@@ -106,11 +119,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
       const int key_slot = rel_pos - (key_idx * 4);
       const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
                                 (8 * key_slot)) & 0xff);
+      TCALC fyval;
       if (tile_lane_idx < tside_count) {
-        __stwb(&gmem_r.ycrd[write_idx], __ldcs(&poly_psw.ycrd[read_idx]));
+        const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
+        fyval = (TCALC)(iyval);
+        __stwb(&gmem_r.ycrd[write_idx], iyval);
       }
       else {
+        fyval = (TCALC)0.0;
         __stwb(&gmem_r.ycrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+      }
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        fyval += SHFL_DOWN(fyval, i);
+      }
+      if (tile_lane_idx == 0) {
+        sh_tile_ycog[pos] = fyval;
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
@@ -122,11 +145,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
       const int key_slot = rel_pos - (key_idx * 4);
       const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
                                 (8 * key_slot)) & 0xff);
+      TCALC fzval;
       if (tile_lane_idx < tside_count) {
-        __stwb(&gmem_r.zcrd[write_idx], __ldcs(&poly_psw.zcrd[read_idx]));
+        const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
+        fzval = (TCALC)(izval);
+        __stwb(&gmem_r.zcrd[write_idx], izval);
       }
       else {
+        fzval = (TCALC)0.0;
         __stwb(&gmem_r.zcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+      }
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        fzval += SHFL_DOWN(fzval, i);
+      }
+      if (tile_lane_idx == 0) {
+        sh_tile_zcog[pos] = fzval;
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
@@ -145,6 +178,15 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
       else {
         __stwb(&gmem_r.charges[write_idx], (TCALC)(0.0));
       }
+
+      // Stuff the total number of particles in this tile side into its shared memory slot.
+      // Obtain this system's Lennard-Jone atom type count.  Any of the five warps gathering
+      // preliminary data could do this, but have this one do it for better load balancing.
+      if (tile_lane_idx == 0) {
+        sh_tile_tpts[pos] = (TCALC)(tside_count);
+        const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
+        sh_n_lj_types[pos] = poly_nbk.n_lj_types[system_idx];
+      }
       pos += tile_sides_per_warp * warps_per_block;
     }
     while (pos < 5 * import_count) {
@@ -161,9 +203,78 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const MMControlKit<TCALC> ctrl
       else {
         __stwb(&gmem_r.lj_idx[write_idx], 0);
       }
+
+      // Transfer the system index of this group of atoms (this "tile side") into the appropriate
+      // __shared__ memory slot.  Obtain the Lennard-Jones table offsets for this tile's system.
+      // Any of the five warps could do this, but have this one do it for beetter load balancing.
+      if (tile_lane_idx == 0) {
+        const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
+        sh_system_indices[pos] = system_idx;
+        sh_ljabc_offsets[pos] = poly_nbk.ljabc_offsets[system_idx];
+      }
       pos += tile_sides_per_warp * warps_per_block;
     }
     __syncthreads();
-    
+
+    // Loop over tile instructions
+    int pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
+    while (pos < nbwu_map[small_block_max_imports + 7]) {
+
+      // The following code will handle one tile per warp.  On NVIDIA architectures and AMD
+      // architectures with 32 threads per warp, this means that the first and second halves of
+      // the warp handle the abscissa and ordinate atoms, respectively.  On AMD architectures
+      // with 64 threads per warp, the atom data could be replicated with slight tweaks to the
+      // shuffling pattern.  On Intel architectures with 16 threads per warp, each thread will
+      // need to store both abscissa and ordinate atoms.
+      uint2 tinsr = poly_nbk.nbwu_insr[pos];
+      const uint excl_mask = poly_se.mask_data[tinsr.y + warp_lane_idx];
+      const int local_absc_start = (tinsr.x & 0xffff);
+      const int local_ordi_start = ((tinsr.x >> 16) & 0xffff);
+      const int absc_import_idx = local_absc_start >> tile_length_bits;
+      const int ordi_import_idx = local_ordi_start >> tile_length_bits;
+
+      // Obtain the centering for best single-precision results.  This can be done in either
+      // precision level.  It is unnecessary with double-precision, but the cost is marginal and
+      // performance is not the purpose of double-precision computations.  As with the CPU code,
+      // all of the numbers are already scaled by the position fixed-precision scaling factor.
+      const TCALC inv_tile_pts = (TCALC)(1.0) /
+                                 (sh_tile_tpts[absc_import_idx] + sh_tile_pts[ordi_import_idx]);
+      const TCALC tx_cog = (sh_tile_xcog[absc_import_idx] + sh_tile_xcog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const TCALC ty_cog = (sh_tile_ycog[absc_import_idx] + sh_tile_ycog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const TCALC tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const llint x_center = (llint)(tx_cog);
+      const llint y_center = (llint)(ty_cog);
+      const llint z_center = (llint)(tz_cog);
+      const size_t read_idx = ((warp_lane_idx <  tile_length) * local_absc_start) +
+                              ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
+      const TCALC t_xcrd  = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd  = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd  = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+      const int t_ljidx   = gmem_r.lj_idx[read_idx];
+      const TCALC t_q     = gmem_r.charges[read_idx];
+      const int nljt      = sh_n_lj_types[absc_import_idx];
+      const int lj_offset = sh_ljabc_offsets[absc_import_idx];
+#ifdef COMPUTE_ENERGY
+      TCALC elec_nrg = 0.0;
+      TCALC vdw_nrg = 0.0;
+#endif
+      for (int i = 0; i < half_tile_length; i++) {
+      }
+#ifdef COMPUTE_ENERGY
+      const int system_idx = sh_system_indices[absc_import_idx];
+      const llint elec_acc = elec_nrg * nrg_scale_factor;
+      ecard->add(StateVariable::ELECTROSTATIC, elec_acc, system_idx);
+      const llint vdw_acc  = vdw_nrg * nrg_scale_factor;
+      ecard->add(StateVariable::VDW, vdw_acc, system_idx);
+#endif
+      // Increment the tile counter.  No synchronization is needed here as each thread will take
+      // a deterministic route through the next iteration of this loop, or exit.  The design
+      // decision to handle all tiles in the same manner, irrespective of their excluded content,
+      // makes this asynchronous method the simplest and most efficient.
+      pos += warps_per_block;
+    }
   }
 }
