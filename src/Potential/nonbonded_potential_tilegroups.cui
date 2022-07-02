@@ -1,7 +1,7 @@
 // -*-c++-*-
 
 #ifndef EXCL_GMEM_OFFSET
-#define EXCL_GMEM_OFFSET
+#define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
 #endif
 
 //-------------------------------------------------------------------------------------------------
@@ -100,7 +100,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         __stwb(&gmem_r.xcrd[write_idx], ixval);
       }
       else {
-        fxval = (TCALC)0.0;
+        fxval = (TCALC)(0.0);
         __stwb(&gmem_r.xcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
       }
       for (int i = half_tile_length; i > 0; i >>= 1) {
@@ -126,7 +126,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         __stwb(&gmem_r.ycrd[write_idx], iyval);
       }
       else {
-        fyval = (TCALC)0.0;
+        fyval = (TCALC)(0.0);
         __stwb(&gmem_r.ycrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
       }
       for (int i = half_tile_length; i > 0; i >>= 1) {
@@ -152,7 +152,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         __stwb(&gmem_r.zcrd[write_idx], izval);
       }
       else {
-        fzval = (TCALC)0.0;
+        fzval = (TCALC)(0.0);
         __stwb(&gmem_r.zcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
       }
       for (int i = half_tile_length; i > 0; i >>= 1) {
@@ -217,7 +217,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     __syncthreads();
 
     // Loop over tile instructions
-    int pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
+    pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
     while (pos < nbwu_map[small_block_max_imports + 7]) {
 
       // The following code will handle one tile per warp.  On NVIDIA architectures and AMD
@@ -227,7 +227,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       // shuffling pattern.  On Intel architectures with 16 threads per warp, each thread will
       // need to store both abscissa and ordinate atoms.
       uint2 tinsr = poly_nbk.nbwu_insr[pos];
-      const uint excl_mask = poly_se.mask_data[tinsr.y + warp_lane_idx];
+      const uint t_mask = poly_se.mask_data[tinsr.y + warp_lane_idx];
       const int local_absc_start = (tinsr.x & 0xffff);
       const int local_ordi_start = ((tinsr.x >> 16) & 0xffff);
       const int absc_import_idx = local_absc_start >> tile_length_bits;
@@ -248,8 +248,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       const llint x_center = (llint)(tx_cog);
       const llint y_center = (llint)(ty_cog);
       const llint z_center = (llint)(tz_cog);
-      const size_t read_idx = ((warp_lane_idx <  tile_length) * local_absc_start) +
-                              ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
+      int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
+                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx +
+                      EXCL_GMEM_OFFSET;
       const TCALC t_xcrd  = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
       const TCALC t_ycrd  = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
       const TCALC t_zcrd  = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
@@ -261,7 +262,62 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       TCALC elec_nrg = 0.0;
       TCALC vdw_nrg = 0.0;
 #endif
+#ifdef COMPUTE_FORCE
+      const TCALC t_xfrc = (TCALC)(0.0);
+      const TCALC t_yfrc = (TCALC)(0.0);
+      const TCALC t_zfrc = (TCALC)(0.0);
+#endif
       for (int i = 0; i < half_tile_length; i++) {
+        int crd_src_lane = ((warp_lane_idx <  tile_length) * (warp_lane_idx + tile_length - j)) +
+                           ((warp_lane_idx >= tile_length) *
+                           (warp_lane_idx - three_halves_tile_length + j));
+        crd_src_lane += tile_length * ((crdSrcLane < tile_length && warp_lane_idx <  tile_length) +
+                                       (crdSrcLane <           0 && warp_lane_idx >= tile_length));
+        const TCALC o_xcrd  = SHFL(t_xcrd,  crd_src_lane);
+        const TCALC o_ycrd  = SHFL(t_ycrd,  crd_src_lane);
+        const TCALC o_zcrd  = SHFL(t_zcrd,  crd_src_lane);
+        const TCALC o_ljidx = SHFL(t_ljidx, crd_src_lane);
+        const TCALC o_q     = SHFL(t_q,     crd_src_lane);
+        const TCALC ot_qq   = t_q * o_q;
+        const TCALC dx      = o_xcrd - t_xcrd;
+        const TCALC dy      = o_ycrd - t_ycrd;
+        const TCALC dz      = o_zcrd - t_zcrd;
+        const TCALC r2      = (dx * dx) + (dy * dy) + (dz * dz);
+#ifdef COMPUTE_FORCE
+        TCALC fmag = (TCALC)(0.0);
+#endif
+        if ((t_mask >> (crd_src_lane - (tile_length * (warp_lane_idx < tile_length)))) & 0x1) {
+          const TCALC invr    = rsqrt(r2);
+          const TCALC invr2   = invr * invr;
+          const TCALC invr4   = invr2 * invr2;
+          const size_t ot_ljidx = (t_ljidx * nljt) + o_ljidx + lj_offset;
+          const TCALC lja   = poly_nbk.lja_coeff[ot_ljidx];
+          const TCALC ljb   = poly_nbk.ljb_coeff[ot_ljidx];
+#ifdef COMPUTE_FORCE
+          fmag += -(ot_qq * invr2 * invr) +
+                  ((((TCALC)(6.0) * ljb) - ((TCALC)(12.0) * lja * invr4 * invr2)) * invr4 * invr4);
+#endif
+#ifdef COMPUTE_ENERGY
+          elec_nrg += ot_qq * invr;
+          vdw_nrg  += ((lja * invr4 * invr2) - ljb) * invr4 * invr2;
+#endif
+        }
+#ifdef COMPUTE_FORCE
+        const TCALC fmag_dx = fmag * dx;
+        const TCALC fmag_dy = fmag * dy;
+        const TCALC fmag_dz = fmag * dz;
+        t_xfrc += fmag_dx;
+        t_yfrc += fmag_dy;
+        t_zfrc += fmag_dz;
+        int frc_ret_lane = ((tgx <  tile_length) * (tgx + three_halves_tile_length - j)) +
+                           ((tgx >= tile_length) * (tgx - tile_length + j));
+        frc_ret_lane += tile_length *
+                        ((frc_ret_lane >= tile_length && warp_lane_idx >= tile_length) -
+                         (frc_ret_lane >= warp_size_int && warp_lane_idx <  tile_length));
+        t_xfrc -= SHFL(fmag_dx, frc_ret_lane);
+        t_yfrc -= SHFL(fmag_dy, frc_ret_lane);
+        t_zfrc -= SHFL(fmag_dz, frc_ret_lane);
+#endif
       }
 #ifdef COMPUTE_ENERGY
       const int system_idx = sh_system_indices[absc_import_idx];
@@ -270,11 +326,134 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       const llint vdw_acc  = vdw_nrg * nrg_scale_factor;
       ecard->add(StateVariable::VDW, vdw_acc, system_idx);
 #endif
+#ifdef COMPUTE_FORCE
+      read_Idx -= EXCL_GMEM_OFFSET;
+#  ifdef SPLIT_FORCE_ACCUMULATION
+      splitForceContribution(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xcrd, xoverflow_active,
+                             gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+      splitForceContribution(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_ycrd, yoverflow_active,
+                             gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+      splitForceContribution(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zcrd, zoverflow_active,
+                             gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+#  else
+      atomicAdd((ullint*)&sh_xfrc[read_idx], lliToUlli((llint)(t_xfrc * poly_psw.frc_scale_f)));
+      atomicAdd((ullint*)&sh_yfrc[read_idx], lliToUlli((llint)(t_yfrc * poly_psw.frc_scale_f)));
+      atomicAdd((ullint*)&sh_zfrc[read_idx], lliToUlli((llint)(t_zfrc * poly_psw.frc_scale_f)));
+#  endif
+#endif
+
       // Increment the tile counter.  No synchronization is needed here as each thread will take
       // a deterministic route through the next iteration of this loop, or exit.  The design
       // decision to handle all tiles in the same manner, irrespective of their excluded content,
       // makes this asynchronous method the simplest and most efficient.
       pos += warps_per_block;
+    }
+    __syncthreads();
+
+    // Re-read the __shared__ memory value as a local constant to avoid having to carry it through
+    // the loops above and thus reduce register pressure.  Commit the locally accumulated forces
+    // back to global arrays.
+    const int import_count_ii = nbwu_map[0];
+    int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
+#ifdef COMPUTE_FORCE
+    while (pos < import_count_ii) {
+      const size_t write_idx = nbwu_map[pos + 1] + tile_lane_idx;
+      const int read_idx = (pos * tile_length) + tile_lane_idx;
+      const int key_idx  = pos / 4;
+      const int key_slot = pos - (key_idx * 4);
+      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                (8 * key_slot)) & 0xff);
+      if (tile_lane_idx < tside_count) {
+#ifdef SPLIT_FORCE_ACCUMULATION
+        const size_t ovrf_group = pos / warp_size_int;
+        llint ixfrc;
+        if (xoverflow_active[ovrf_group]) {
+          ixfrc = __ldca(&gmem_r.xfrc_overflow[read_idx + EXCL_GMEM_OFFSET]);
+          ixfrc *= max_int_accumulation_ll;
+        }
+        else {
+          ixfrc = 0LL;
+        }
+        ixfrc += (llint)(sh_xfrc[read_idx]);
+        atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(ixfrc));        
+#else
+        atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(sh_xfrc[read_idx]));
+#endif
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 2 * import_count_ii) {
+      const int rel_pos = pos - import_count_ii;
+      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
+      const int key_idx  = rel_pos / 4;
+      const int key_slot = rel_pos - (key_idx * 4);
+      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                (8 * key_slot)) & 0xff);
+      if (tile_lane_idx < tside_count) {
+#ifdef SPLIT_FORCE_ACCUMULATION
+        const size_t ovrf_group = rel_pos / warp_size_int;
+        llint iyfrc;
+        if (yoverflow_active[ovrf_group]) {
+          iyfrc = __ldca(&gmem_r.yfrc_overflow[read_idx + EXCL_GMEM_OFFSET]);
+          iyfrc *= max_int_accumulation_ll;
+        }
+        else {
+          iyfrc = 0LL;
+        }
+        iyfrc += (llint)(sh_yfrc[read_idx]);
+        atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(iyfrc));        
+#else
+        atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(sh_yfrc[read_idx]));
+#endif
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 3 * import_count_ii) {
+      const int rel_pos = pos - (2 * import_count_ii);
+      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
+      const int key_idx  = rel_pos / 4;
+      const int key_slot = rel_pos - (key_idx * 4);
+      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                (8 * key_slot)) & 0xff);
+      if (tile_lane_idx < tside_count) {
+#ifdef SPLIT_FORCE_ACCUMULATION
+        const size_t ovrf_group = rel_pos / warp_size_int;
+        llint izfrc;
+        if (zoverflow_active[ovrf_group]) {
+          izfrc = __ldca(&gmem_r.zfrc_overflow[read_idx + EXCL_GMEM_OFFSET]);
+          izfrc *= max_int_accumulation_ll;
+        }
+        else {
+          izfrc = 0LL;
+        }
+        izfrc += (llint)(sh_zfrc[read_idx]);
+        atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(izfrc));        
+#else
+        atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(sh_zfrc[read_idx]));
+#endif
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+
+    // Increment the work unit counter
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      nbwu_idx = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);
+    }
+    __syncthreads();
+  }
+
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.nbwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.nbwu_progress[threadIdx.x] = gridDim.x;
     }
   }
 }

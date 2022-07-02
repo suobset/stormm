@@ -1819,9 +1819,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       if (pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const size_t ovrf_group = pos / warp_size_int;
-        const size_t gmem_atom_idx = EXCL_GMEM_OFFSET + pos;
-        llint ixfrc = (xoverflow_active[ovrf_group]) ?
-                      __ldca(&gmem_r.xfrc_overflow[gmem_atom_idx]) * max_int_accumulation_ll : 0LL;
+        llint ixfrc;
+        if (xoverflow_active[ovrf_group]) {
+          ixfrc = __ldca(&gmem_r.xfrc_overflow[pos + EXCL_GMEM_OFFSET]);
+          ixfrc *= max_int_accumulation_ll;
+        }
+        else {
+          ixfrc = 0LL;
+        }
         ixfrc += (llint)(sh_xfrc[pos]);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ixfrc = sh_xfrc[pos];
@@ -1843,9 +1848,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const size_t ovrf_group = rel_pos / warp_size_int;
-        const size_t gmem_atom_idx = EXCL_GMEM_OFFSET + rel_pos;
-        llint iyfrc = (yoverflow_active[ovrf_group]) ?
-                      __ldca(&gmem_r.yfrc_overflow[gmem_atom_idx]) * max_int_accumulation_ll : 0LL;
+        llint iyfrc;
+        if (yoverflow_active[ovrf_group]) {
+          iyfrc = __ldca(&gmem_r.yfrc_overflow[pos + EXCL_GMEM_OFFSET]);
+          iyfrc *= max_int_accumulation_ll;
+        }
+        else {
+          iyfrc = 0LL;
+        }
         iyfrc += (llint)(sh_yfrc[rel_pos]);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iyfrc = sh_yfrc[rel_pos];
@@ -1867,9 +1877,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const size_t ovrf_group = rel_pos / warp_size_int;
-        const size_t gmem_atom_idx = EXCL_GMEM_OFFSET + rel_pos;
-        llint izfrc = (zoverflow_active[ovrf_group]) ?
-                      __ldca(&gmem_r.zfrc_overflow[gmem_atom_idx]) * max_int_accumulation_ll : 0LL;
+        llint izfrc;
+        if (zoverflow_active[ovrf_group]) {
+          izfrc = __ldca(&gmem_r.zfrc_overflow[pos + EXCL_GMEM_OFFSET]);
+          izfrc *= max_int_accumulation_ll;
+        }
+        else {
+          izfrc = 0LL;
+        }
         izfrc += (llint)(sh_zfrc[rel_pos]);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint izfrc = sh_zfrc[rel_pos];
