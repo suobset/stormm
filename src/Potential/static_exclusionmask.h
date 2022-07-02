@@ -27,7 +27,8 @@ constexpr int supertile_length = 256;
 /// \brief The number of atoms in a tile stride (tiles are tile_length x tile_length atoms)
 /// \{
 constexpr int tile_length = 16;
-constexpr int half_tile_length = 8;
+constexpr int half_tile_length = tile_length / 2;
+constexpr int three_halves_tile_length = (tile_length * 3) / 2;
 constexpr int tile_length_bits_mask = tile_length - 1;
 constexpr int tile_length_bits = 4;
 /// \}

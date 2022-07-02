@@ -121,7 +121,7 @@ private:
   Hybrid<int> pmewu_progress;  ///< Progress counters for long-ranged, mesh-based PME work units,
                                ///<   arrayed in a manner similar to the valence work units.
   Hybrid<int> progress_data;   ///< ARRAY-kind Hybrid object targeted by the above POINTER-kind
-                              ///<   Hybrid objects
+                               ///<   Hybrid objects
 };
 
 } // namespace mm

@@ -227,7 +227,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TCALC2 float2
 #  define TCALC3 float3
 #  define TCALC4 float4
-#  define CONV_FUNC __float2int_rn
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
 #  define ACOS_FUNC acosf
@@ -323,7 +322,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
-#  undef CONV_FUNC
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef ACOS_FUNC
@@ -344,7 +342,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TCALC2 double2
 #  define TCALC3 double3
 #  define TCALC4 double4
-#  define CONV_FUNC __double2ll_rn
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
 #  define ACOS_FUNC acos
@@ -384,7 +381,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
-#  undef CONV_FUNC
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef ACOS_FUNC
@@ -439,15 +435,8 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
       }
       break;
     case EvaluateForce::NO:
-      switch (eval_energy) {
-      case EvaluateEnergy::YES:
-        kdValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                           *scw, *gmem_r);
-        break;
-      case EvaluateEnergy::NO:
-        rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
-        break;
-      }
+      kdValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                         *scw, *gmem_r);
       break;
     }
     break;
@@ -606,15 +595,8 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
       }
       break;
     case EvaluateForce::NO:
-      switch (eval_energy) {
-      case EvaluateEnergy::YES:
-        kfValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                           *scw, *gmem_r);
-        break;
-      case EvaluateEnergy::NO:
-        rtErr("Either forces, energies, or both must be accumulated.", "launchValenceSp");
-        break;
-      }
+      kfValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+                                                         *scw, *gmem_r);
       break;
     }
     break;

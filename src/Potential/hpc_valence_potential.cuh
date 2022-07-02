@@ -6,15 +6,13 @@
 #include "Constants/fixed_precision.h"
 #include "DataTypes/omni_vector_types.h"
 #include "MolecularMechanics/mm_controls.h"
-#include "Potential/cacheresource.h"
-#include "Potential/energy_enumerators.h"
-#include "Potential/scorecard.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
-
-#define EXCL_GMEM_OFSET (blockIdx.x * maximum_valence_work_unit_atoms)
+#include "cacheresource.h"
+#include "energy_enumerators.h"
+#include "scorecard.h"
 
 namespace omni {
 namespace energy {
