@@ -19,6 +19,7 @@ using math::reduceUniqueValues;
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
                                      const std::vector<int3> &tile_list) :
     tile_count{static_cast<int>(tile_list.size())},
+    import_count{0},
     kind{NbwuKind::TILE_GROUPS},
     score{0},
     imports{std::vector<int>(small_block_max_imports)},
@@ -51,24 +52,30 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
     tmp_imports[(2 * i) + 1] = tile_list[i].y;
   }
   reduceUniqueValues(&tmp_imports);
-  const int n_imports = tmp_imports.size();
-  for (int i = 0; i < n_imports; i++) {
+  import_count = tmp_imports.size();
+  if (import_count >= small_block_max_imports) {
+    rtErr("Too many imports (" + std::to_string(import_count) + ", with " +
+          std::to_string(small_block_max_imports) + " being the maximum) would be required in a "
+          "non-bonded work unit for topology " + se.getTopologyPointer()->getFileName() + ".",
+          "NonbondedWorkUnit");
+  }
+  for (int i = 0; i < import_count; i++) {
     tmp_imports[i] *= tile_length;
     imports[i] = tmp_imports[i];
   }
-  for (int i = n_imports; i < small_block_max_imports; i++) {
+  for (int i = import_count; i < small_block_max_imports; i++) {
     imports[i] = -1;
   }
   
   // Compute the workunit effort score, an estimate of how long one work unit will take relative
   // to others.  Work units with the highest effort will be placed first, to backfill idle
   // processes with shorter work units.
-  score = n_imports + (tile_count * 8);
+  score = import_count + (tile_count * 8);
   
   // The limited number of imports, and the manipulations that need to happen to assemble the
   // work unit instructions, likely makes it preferable to just search them all rather than
   // calling a binary search function.  Each instruction's y member has already been filled out.
-  for (int i = 0; i < n_imports; i++) {
+  for (int i = 0; i < import_count; i++) {
     const int import_idx = imports[i] / tile_length;
     const uint absc_mask = tile_length * i;
     const uint ordi_mask = (absc_mask << 16);
@@ -88,7 +95,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
     rtErr("Descriptors for non-bonded work units require that signed integers be of size >= 32 "
           "bits.", "NonbondedWorkUnit");
   }
-  for (int i = 0; i < n_imports; i++) {
+  for (int i = 0; i < import_count; i++) {
     const int key_idx = i / 4;
     const int key_pos = i - (key_idx * 4);
     int import_batch_size;
@@ -106,6 +113,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
                                      const int abscissa_start, const int ordinate_start) :
     tile_count{0},
+    import_count{0},
     kind{NbwuKind::SUPERTILES},
     score{0},
     imports{},
@@ -127,42 +135,43 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
     if (abscissa_start < atom_limit - supertile_length &&
         ordinate_start < atom_limit - supertile_length) {
       tile_count = tile_lengths_per_supertile * (tile_lengths_per_supertile + 1) / 2;
-      score = tile_lengths_per_supertile;
+      import_count = tile_lengths_per_supertile;
     }
     else {
       const int ntile_rem = (atom_limit - abscissa_start + tile_length - 1) / tile_length;  
       tile_count = ntile_rem * (ntile_rem + 1) / 2;
-      score = ntile_rem;
+      import_count = ntile_rem;
     }
   }
   else {
     if (abscissa_start < atom_limit - supertile_length &&
         ordinate_start < atom_limit - supertile_length) {
       tile_count = tile_lengths_per_supertile * tile_lengths_per_supertile;
-      score = tile_lengths_per_supertile * 2;
+      import_count = 2 * tile_lengths_per_supertile;
     }
     else if (abscissa_start < atom_limit - supertile_length) {
       const int ntile_rem = (atom_limit - ordinate_start + tile_length - 1) / tile_length;
       tile_count = tile_lengths_per_supertile * ntile_rem;
-      score = tile_lengths_per_supertile + ntile_rem;
+      import_count = tile_lengths_per_supertile + ntile_rem;
     }
     else if (ordinate_start < atom_limit - supertile_length) {
       const int ntile_rem = (atom_limit - abscissa_start + tile_length - 1) / tile_length;
       tile_count = tile_lengths_per_supertile * ntile_rem;
-      score = tile_lengths_per_supertile + ntile_rem;
+      import_count = tile_lengths_per_supertile + ntile_rem;
     }
     else {
       rtErr("A trapezoidal tile should not exist in a supertile-based work unit.",
             "NonbondedWorkUnit");
     }
   }
-  score += tile_count * 8;
+  score = import_count + (tile_count * 8);
 }
 
 //-------------------------------------------------------------------------------------------------
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
                                      const std::vector<int3> &tile_list) :
     tile_count{static_cast<int>(tile_list.size())},
+    import_count{0},
     kind{NbwuKind::TILE_GROUPS},
     score{0},
     imports{std::vector<int>(small_block_max_imports)},
@@ -212,20 +221,20 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
   // maximum numbers of atoms in each system and thus the extent of the import (whether it goes
   // all the way to tile_length, or stops at the upper limit of system atoms).
   reduceUniqueValues(&tmp_imports);
-  const int n_imports = tmp_imports.size();
-  for (int i = 0; i < n_imports; i++) {
+  import_count = tmp_imports.size();
+  for (int i = 0; i < import_count; i++) {
     import_system_indices[i] = static_cast<int>((tmp_imports[i] >> int_bit_count_int) &
                                                 0x00000000ffffffffLL);
     imports[i] = (static_cast<int>(tmp_imports[i] & 0x00000000ffffffffLL) * tile_length) +
                  ser.atom_offsets[import_system_indices[i]];
   }
-  for (int i = n_imports; i < small_block_max_imports; i++) {
+  for (int i = import_count; i < small_block_max_imports; i++) {
     imports[i] = -1;
   }
-  score = n_imports + (tile_count * 8);
+  score = import_count + (tile_count * 8);
 
   // Assemble work unit instructions
-  for (int i = 0; i < n_imports; i++) {
+  for (int i = 0; i < import_count; i++) {
     const int system_idx = import_system_indices[i];
     const int tile_idx = (imports[i] - ser.atom_offsets[system_idx]) / tile_length;
     const uint absc_mask = 16 * i;
@@ -246,7 +255,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     rtErr("Descriptors for non-bonded work units require that signed integers be of size >= 32 "
           "bits.", "NonbondedWorkUnit");
   }
-  for (int i = 0; i < n_imports; i++) {
+  for (int i = 0; i < import_count; i++) {
     const int key_idx = i / 4;
     const int key_pos = i - (key_idx * 4);
     const int system_idx = import_system_indices[i];
@@ -267,6 +276,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
                                      const int abscissa_start, const int ordinate_start,
                                      const int system_index) :
     tile_count{0},
+    import_count{0},
     kind{NbwuKind::SUPERTILES},
     score{0},
     imports{},
@@ -296,41 +306,46 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     if (abscissa_start < atom_limit - supertile_length &&
         ordinate_start < atom_limit - supertile_length) {
       tile_count = tile_lengths_per_supertile * (tile_lengths_per_supertile + 1) / 2;
-      score = tile_lengths_per_supertile;
+      import_count = tile_lengths_per_supertile;
     }
     else {
       const int ntile_rem = (atom_limit - abscissa_start + tile_length - 1) / tile_length;  
       tile_count = ntile_rem * (ntile_rem + 1) / 2;
-      score = ntile_rem;
+      import_count = ntile_rem;
     }
   }
   else {
     if (abscissa_start < atom_limit - supertile_length &&
         ordinate_start < atom_limit - supertile_length) {
       tile_count = tile_lengths_per_supertile * tile_lengths_per_supertile;
-      score = tile_lengths_per_supertile * 2;
+      import_count = 2 * tile_lengths_per_supertile;
     }
     else if (abscissa_start < atom_limit - supertile_length) {
       const int ntile_rem = (atom_limit - ordinate_start + tile_length - 1) / tile_length;
       tile_count = tile_lengths_per_supertile * ntile_rem;
-      score = tile_lengths_per_supertile + ntile_rem;
+      import_count = tile_lengths_per_supertile + ntile_rem;
     }
     else if (ordinate_start < atom_limit - supertile_length) {
       const int ntile_rem = (atom_limit - abscissa_start + tile_length - 1) / tile_length;
       tile_count = tile_lengths_per_supertile * ntile_rem;
-      score = tile_lengths_per_supertile + ntile_rem;
+      import_count = tile_lengths_per_supertile + ntile_rem;
     }
     else {
       rtErr("A trapezoidal tile should not exist in a supertile-based work unit.",
             "NonbondedWorkUnit");
     }
   }
-  score += tile_count * 8;
+  score = import_count + (tile_count * 8);
 }
   
 //-------------------------------------------------------------------------------------------------
 int NonbondedWorkUnit::getTileCount() const {
   return tile_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int NonbondedWorkUnit::getImportCount() const {
+  return import_count;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -359,12 +374,10 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
   case NbwuKind::TILE_GROUPS:
     {
       result.resize(tile_groups_wu_abstract_length, -1);
-      int import_count = 0;
-      for (int i = 0; i < tile_count; i++) {
-        result[i + 1] = imports[i];
-        import_count += (imports[i] != -1);
-      }
       result[0] = import_count;
+      for (int i = 0; i < import_count; i++) {
+        result[i + 1] = imports[i];
+      }
       for (int i = 0; i < 5; i++) {
         result[1 + small_block_max_imports + i] = import_size_keys[i];
       }

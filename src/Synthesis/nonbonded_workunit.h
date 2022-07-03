@@ -129,6 +129,9 @@ public:
   /// \brief Get the tile count of this work units.
   int getTileCount() const;
 
+  /// \brief Get the number of tile_length atom imports needed for this work units.
+  int getImportCount() const;
+
   /// \brief Get the abscissa and ordinate atom limits for a tile from within this work unit.
   ///        The abscissa limits are returned in the x and y members, the ordinate limits in the
   ///        z and w members.
@@ -148,6 +151,8 @@ public:
   
 private:
   int tile_count;                          ///< Number of tiles to be processed by this work unit
+  int import_count;                        ///< Number of imported tile abscissa or ordinate atom
+                                           ///<   sets to be stored locally by this work unit
   NbwuKind kind;                           ///< The type of non-bonded work unit.  For isolated
                                            ///<   boundary conditions, there is a choice between
                                            ///<   TILE_GROUPS and SUPERTILES.
