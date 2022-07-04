@@ -18,25 +18,20 @@ __device__ __forceinline__ long long int ulliToLli(unsigned long long int u)
 
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ void splitForceContribution(const float fval, const int pos,
-                                                       int* sh_primary, int* sh_overflow_active,
-                                                       int* overflow, int gmem_offset) {
+                                                       int* primary, int* overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
     const int spillover = fval / max_int_accumulation_f;
     ival = __float2int_rn(fval - ((float)(spillover) * max_int_accumulation_f));
-    atomicAdd(&overflow[gmem_offset + pos], spillover);
-
-    // No atomic needed as this just sets the value, which started as zero, to one
-    sh_overflow_active[pos >> warp_bits] = 1;
+    atomicAdd(&overflow[pos], spillover);
   }
   else {
     ival = __float2int_rn(fval);
   }
-  const int prim_old = atomicAdd(&sh_primary[pos], ival);
+  const int prim_old = atomicAdd(&primary[pos], ival);
   const int prim_old_plus_ival = prim_old + ival;
   if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    atomicAdd(&overflow[gmem_offset + pos], (1 - (2 * (ival < 0))) * 2);
-    sh_overflow_active[pos >> warp_bits] = 1;
+    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
   }
 }
 
@@ -57,15 +52,14 @@ __device__ __forceinline__ int2 convertSplitFixedPrecision(const float fval) {
 
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const int pos,
-                                                       int* sh_primary, int* sh_overflow_active,
-                                                       int* overflow, int gmem_offset) {
-  const int prim_old = atomicAdd(&sh_primary[pos], ival.x);
+                                                       int* primary, int* overflow) {
+  const int prim_old = atomicAdd(&primary[pos], ival.x);
   const int prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;
   ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
             (1 - (2 * (ival.x < 0))) * 2;    
   if (ival_y) {
-    atomicAdd(&overflow[gmem_offset + pos], ival_y);
+    atomicAdd(&overflow[pos], ival_y);
   }
 }
 
