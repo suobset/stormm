@@ -151,7 +151,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
     // CHECK
-#if 0
     printf("System %2d forces = [\n", i);
     for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
       if (fabs(devc_frc[3 * j] - host_frc[3 * j]) > 1.0e-4 ||
@@ -163,7 +162,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
       }
     }
     printf("];\n");
-#endif
     // END CHECK
     
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);

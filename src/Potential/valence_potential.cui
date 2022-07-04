@@ -19,6 +19,9 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
   __shared__ int sh_xfrc[maximum_valence_work_unit_atoms];
   __shared__ int sh_yfrc[maximum_valence_work_unit_atoms];
   __shared__ int sh_zfrc[maximum_valence_work_unit_atoms];
+  __shared__ int sh_xfrc_overflow[maximum_valence_work_unit_atoms];
+  __shared__ int sh_yfrc_overflow[maximum_valence_work_unit_atoms];
+  __shared__ int sh_zfrc_overflow[maximum_valence_work_unit_atoms];
   __shared__ int xoverflow_active[maximum_valence_work_unit_atoms / warp_size_int];
   __shared__ int yoverflow_active[maximum_valence_work_unit_atoms / warp_size_int];
   __shared__ int zoverflow_active[maximum_valence_work_unit_atoms / warp_size_int];
@@ -170,8 +173,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - (8 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
-        __stwb(&gmem_r.xfrc_overflow[write_idx], 0);
+        sh_xfrc_overflow[rel_pos] = 0;
         sh_xfrc[rel_pos] = 0;
 #  else        
         sh_xfrc[rel_pos] = 0LL;
@@ -183,8 +185,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - (9 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
-        __stwb(&gmem_r.yfrc_overflow[write_idx], 0);
+        sh_yfrc_overflow[rel_pos] = 0;
         sh_yfrc[rel_pos] = 0;
 #  else
         sh_yfrc[rel_pos] = 0LL;
@@ -196,8 +197,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - (10 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
-        __stwb(&gmem_r.zfrc_overflow[write_idx], 0);
+        sh_zfrc_overflow[rel_pos] = 0;
         sh_zfrc[rel_pos] = 0;
 #  else
         sh_zfrc[rel_pos] = 0LL;
@@ -476,15 +476,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 icmb_kx  = combineSplitFixedPrecision(iphi_kx, ipsi_kx);
         const int2 icmb_lx  = combineSplitFixedPrecision(iphi_lx, ipsi_lx);
         addSplitFixedPrecision(iphi_ix, i_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(icmb_jx, j_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(icmb_kx, k_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(icmb_lx, l_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(ipsi_mx, m_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         const int2 iphi_iy  = convertSplitFixedPrecision(crabbc.y * phi_fa);
         const int2 iphi_jy  = convertSplitFixedPrecision((phi_fb1 * crabbc.y) -
                                                          (phi_fb2 * crbccd.y));
@@ -502,15 +502,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 icmb_ky  = combineSplitFixedPrecision(iphi_ky, ipsi_ky);
         const int2 icmb_ly  = combineSplitFixedPrecision(iphi_ly, ipsi_ly);
         addSplitFixedPrecision(iphi_iy, i_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(icmb_jy, j_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(icmb_ky, k_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(icmb_ly, l_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(ipsi_my, m_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         const int2 iphi_iz  = convertSplitFixedPrecision(crabbc.z * phi_fa);
         const int2 iphi_jz  = convertSplitFixedPrecision((phi_fb1 * crabbc.z) -
                                                          (phi_fb2 * crbccd.z));
@@ -528,15 +528,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 icmb_kz  = combineSplitFixedPrecision(iphi_kz, ipsi_kz);
         const int2 icmb_lz  = combineSplitFixedPrecision(iphi_lz, ipsi_lz);
         addSplitFixedPrecision(iphi_iz, i_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         addSplitFixedPrecision(icmb_jz, j_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         addSplitFixedPrecision(icmb_kz, k_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         addSplitFixedPrecision(icmb_lz, l_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         addSplitFixedPrecision(ipsi_mz, m_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iphi_ix = LLCONV_FUNC(crabbc.x * phi_fa);
         const llint iphi_jx = LLCONV_FUNC((phi_fb1 * crabbc.x) - (phi_fb2 * crbccd.x));
@@ -808,41 +808,41 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 ifrc_jx = convertSplitFixedPrecision((fb1 * crabbc.x) - (fb2 * crbccd.x));
         const int2 ifrc_lx = convertSplitFixedPrecision((-fd * crbccd.x) - (f14 * ad.x));
         addSplitFixedPrecision(ifrc_ix, i_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(ifrc_jx, j_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(ifrc_lx, l_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         const int2 ifrc_ijx = combineSplitFixedPrecision(ifrc_ix, ifrc_jx);
         const int2 ifrc_kx = antiCombineSplitFixedPrecision(ifrc_ijx, ifrc_lx);
         addSplitFixedPrecision(ifrc_kx, k_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         const int2 ifrc_iy = convertSplitFixedPrecision((crabbc.y * fa) + (f14 * ad.y));
         const int2 ifrc_jy = convertSplitFixedPrecision((fb1 * crabbc.y) - (fb2 * crbccd.y));
         const int2 ifrc_ly = convertSplitFixedPrecision((-fd * crbccd.y) - (f14 * ad.y));
         addSplitFixedPrecision(ifrc_iy, i_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(ifrc_jy, j_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(ifrc_ly, l_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         const int2 ifrc_ijy = combineSplitFixedPrecision(ifrc_iy, ifrc_jy);
         const int2 ifrc_ky = antiCombineSplitFixedPrecision(ifrc_ijy, ifrc_ly);
         addSplitFixedPrecision(ifrc_ky, k_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         const int2 ifrc_iz = convertSplitFixedPrecision((crabbc.z * fa) + (f14 * ad.z));
         const int2 ifrc_jz = convertSplitFixedPrecision((fb1 * crabbc.z) - (fb2 * crbccd.z));
         const int2 ifrc_lz = convertSplitFixedPrecision((-fd * crbccd.z) - (f14 * ad.z));
         addSplitFixedPrecision(ifrc_iz, i_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         addSplitFixedPrecision(ifrc_jz, j_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         addSplitFixedPrecision(ifrc_lz, l_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         const int2 ifrc_ijz = combineSplitFixedPrecision(ifrc_iz, ifrc_jz);
         const int2 ifrc_kz = antiCombineSplitFixedPrecision(ifrc_ijz, ifrc_lz);
         addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifrc_ix = LLCONV_FUNC((crabbc.x * fa) + (f14 * ad.x));
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -961,29 +961,29 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 iadf_y = convertSplitFixedPrecision((costheta * ba_y * sqba) - (bc_y * mbabc));
         const int2 iadf_z = convertSplitFixedPrecision((costheta * ba_z * sqba) - (bc_z * mbabc));
         addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         const int2 icdf_x = convertSplitFixedPrecision((costheta * bc_x * sqbc) - (ba_x * mbabc));
         const int2 icdf_y = convertSplitFixedPrecision((costheta * bc_y * sqbc) - (ba_y * mbabc));
         const int2 icdf_z = convertSplitFixedPrecision((costheta * bc_z * sqbc) - (ba_z * mbabc));
         addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         const int2 iacdf_x = antiCombineSplitFixedPrecision(iadf_x, icdf_x);
         const int2 iacdf_y = antiCombineSplitFixedPrecision(iadf_y, icdf_y);
         const int2 iacdf_z = antiCombineSplitFixedPrecision(iadf_z, icdf_z);
         addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iadf_x = LLCONV_FUNC((bc_x * mbabc) - (costheta * ba_x * sqba));
         const llint iadf_y = LLCONV_FUNC((bc_y * mbabc) - (costheta * ba_y * sqba));
@@ -1077,17 +1077,17 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         j_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
         splitForceContribution( fmag_dx, i_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         splitForceContribution( fmag_dy, i_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         splitForceContribution( fmag_dz, i_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         splitForceContribution(-fmag_dx, j_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         splitForceContribution(-fmag_dy, j_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         splitForceContribution(-fmag_dz, j_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
@@ -1187,17 +1187,17 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC fmag_dy = fmag * dy;
         const TCALC fmag_dz = fmag * dz;
         splitForceContribution( fmag_dx, i_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         splitForceContribution( fmag_dy, i_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         splitForceContribution( fmag_dz, i_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         splitForceContribution(-fmag_dx, l_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         splitForceContribution(-fmag_dy, l_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         splitForceContribution(-fmag_dz, l_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
@@ -1295,12 +1295,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                              SQRT_FUNC((TCALC)(3.0));
 #  ifdef SPLIT_FORCE_ACCUMULATION
           const int2 ifmag = convertSplitFixedPrecision(-fmag);
-          addSplitFixedPrecision(ifmag, p_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                                 EXCL_GMEM_OFFSET);
-          addSplitFixedPrecision(ifmag, p_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                                 EXCL_GMEM_OFFSET);
-          addSplitFixedPrecision(ifmag, p_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                                 EXCL_GMEM_OFFSET);
+          addSplitFixedPrecision(ifmag, p_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                                 0);
+          addSplitFixedPrecision(ifmag, p_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                                 0);
+          addSplitFixedPrecision(ifmag, p_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                                 0);
 #  else // SPLIT_FORCE_ACCUMULATION
           const llint ifmag = LLCONV_FUNC(-fmag);
           atomicAdd((ullint*)&sh_xfrc[p_atom], lliToUlli(ifmag));
@@ -1312,11 +1312,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
           const TCALC fmag = poly_psw.frc_scale * (TCALC)(2.0) * rst_eval.x * rst_eval.y / dr;
 #  ifdef SPLIT_FORCE_ACCUMULATION
           splitForceContribution(-fmag * dx, p_atom, sh_xfrc, xoverflow_active,
-                                 gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                                 sh_xfrc_overflow, 0);
           splitForceContribution(-fmag * dy, p_atom, sh_yfrc, yoverflow_active,
-                                 gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                                 sh_yfrc_overflow, 0);
           splitForceContribution(-fmag * dz, p_atom, sh_zfrc, zoverflow_active,
-                                 gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                                 sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
           atomicAdd((ullint*)&sh_xfrc[p_atom], lliToUlli(LLCONV_FUNC(-fmag * dx)));
           atomicAdd((ullint*)&sh_yfrc[p_atom], lliToUlli(LLCONV_FUNC(-fmag * dy)));
@@ -1377,17 +1377,17 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC fmag_dy = fmag * dy;
         const TCALC fmag_dz = fmag * dz;
         splitForceContribution( fmag_dx, i_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         splitForceContribution( fmag_dy, i_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         splitForceContribution( fmag_dz, i_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
         splitForceContribution(-fmag_dx, j_atom, sh_xfrc, xoverflow_active,
-                               gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_xfrc_overflow, 0);
         splitForceContribution(-fmag_dy, j_atom, sh_yfrc, yoverflow_active,
-                               gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_yfrc_overflow, 0);
         splitForceContribution(-fmag_dz, j_atom, sh_zfrc, zoverflow_active,
-                               gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                               sh_zfrc_overflow, 0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
@@ -1473,30 +1473,30 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 iadf_x = convertSplitFixedPrecision((costheta * ba_x * sqba) - (bc_x * mbabc));
         const int2 iadf_y = convertSplitFixedPrecision((costheta * ba_y * sqba) - (bc_y * mbabc));
         const int2 iadf_z = convertSplitFixedPrecision((costheta * ba_z * sqba) - (bc_z * mbabc));
-        addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
+        addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
+        addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
         const int2 icdf_x = convertSplitFixedPrecision((costheta * bc_x * sqbc) - (ba_x * mbabc));
         const int2 icdf_y = convertSplitFixedPrecision((costheta * bc_y * sqbc) - (ba_y * mbabc));
         const int2 icdf_z = convertSplitFixedPrecision((costheta * bc_z * sqbc) - (ba_z * mbabc));
-        addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
+        addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
+        addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
         const int2 iacdf_x = antiCombineSplitFixedPrecision(iadf_x, icdf_x);
         const int2 iacdf_y = antiCombineSplitFixedPrecision(iadf_y, icdf_y);
         const int2 iacdf_z = antiCombineSplitFixedPrecision(iadf_z, icdf_z);
-        addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
+        addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
+        addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iadf_x = LLCONV_FUNC((bc_x * mbabc) - (costheta * ba_x * sqba));
         const llint iadf_y = LLCONV_FUNC((bc_y * mbabc) - (costheta * ba_y * sqba));
@@ -1650,42 +1650,42 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int2 ifrc_ix = convertSplitFixedPrecision(crabbc.x * fa);
         const int2 ifrc_jx = convertSplitFixedPrecision((fb1 * crabbc.x) - (fb2 * crbccd.x));
         const int2 ifrc_lx = convertSplitFixedPrecision(-fd * crbccd.x);
-        addSplitFixedPrecision(ifrc_ix, i_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(ifrc_jx, j_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(ifrc_lx, l_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(ifrc_ix, i_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
+        addSplitFixedPrecision(ifrc_jx, j_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
+        addSplitFixedPrecision(ifrc_lx, l_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
         const int2 ifrc_ijx = combineSplitFixedPrecision(ifrc_ix, ifrc_jx);
         const int2 ifrc_kx = antiCombineSplitFixedPrecision(ifrc_ijx, ifrc_lx);
-        addSplitFixedPrecision(ifrc_kx, k_atom, sh_xfrc, xoverflow_active, gmem_r.xfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(ifrc_kx, k_atom, sh_xfrc, xoverflow_active, sh_xfrc_overflow,
+                               0);
         const int2 ifrc_iy = convertSplitFixedPrecision(crabbc.y * fa);
         const int2 ifrc_jy = convertSplitFixedPrecision((fb1 * crabbc.y) - (fb2 * crbccd.y));
         const int2 ifrc_ly = convertSplitFixedPrecision(-fd * crbccd.y);
-        addSplitFixedPrecision(ifrc_iy, i_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(ifrc_jy, j_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(ifrc_ly, l_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(ifrc_iy, i_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
+        addSplitFixedPrecision(ifrc_jy, j_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
+        addSplitFixedPrecision(ifrc_ly, l_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
         const int2 ifrc_ijy = combineSplitFixedPrecision(ifrc_iy, ifrc_jy);
         const int2 ifrc_ky = antiCombineSplitFixedPrecision(ifrc_ijy, ifrc_ly);
-        addSplitFixedPrecision(ifrc_ky, k_atom, sh_yfrc, yoverflow_active, gmem_r.yfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(ifrc_ky, k_atom, sh_yfrc, yoverflow_active, sh_yfrc_overflow,
+                               0);
         const int2 ifrc_iz = convertSplitFixedPrecision(crabbc.z * fa);
         const int2 ifrc_jz = convertSplitFixedPrecision((fb1 * crabbc.z) - (fb2 * crbccd.z));
         const int2 ifrc_lz = convertSplitFixedPrecision(-fd * crbccd.z);
-        addSplitFixedPrecision(ifrc_iz, i_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(ifrc_jz, j_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
-        addSplitFixedPrecision(ifrc_lz, l_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(ifrc_iz, i_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
+        addSplitFixedPrecision(ifrc_jz, j_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
+        addSplitFixedPrecision(ifrc_lz, l_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
         const int2 ifrc_ijz = combineSplitFixedPrecision(ifrc_iz, ifrc_jz);
         const int2 ifrc_kz = antiCombineSplitFixedPrecision(ifrc_ijz, ifrc_lz);
-        addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, zoverflow_active, gmem_r.zfrc_overflow,
-                               EXCL_GMEM_OFFSET);
+        addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, zoverflow_active, sh_zfrc_overflow,
+                               0);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifrc_ix = LLCONV_FUNC(crabbc.x * fa);
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -1816,15 +1816,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     while (pos < import_stride) {
       if (pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = (pos >> warp_bits);
-        llint ixfrc;
-        if (xoverflow_active[ovrf_group]) {
-          ixfrc = __ldca(&gmem_r.xfrc_overflow[pos + EXCL_GMEM_OFFSET]);
-          ixfrc *= max_int_accumulation_ll;
-        }
-        else {
-          ixfrc = 0LL;
-        }
+        llint ixfrc = sh_xfrc_overflow[pos];
+        ixfrc *= max_int_accumulation_ll;
         ixfrc += (llint)(sh_xfrc[pos]);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ixfrc = sh_xfrc[pos];
@@ -1845,15 +1838,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - import_stride;
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = (rel_pos >> warp_bits);
-        llint iyfrc;
-        if (yoverflow_active[ovrf_group]) {
-          iyfrc = __ldca(&gmem_r.yfrc_overflow[pos + EXCL_GMEM_OFFSET]);
-          iyfrc *= max_int_accumulation_ll;
-        }
-        else {
-          iyfrc = 0LL;
-        }
+        llint iyfrc = sh_yfrc_overflow[rel_pos];
+        iyfrc *= max_int_accumulation_ll;
         iyfrc += (llint)(sh_yfrc[rel_pos]);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iyfrc = sh_yfrc[rel_pos];
@@ -1874,15 +1860,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - (2 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = (rel_pos >> warp_bits);
-        llint izfrc;
-        if (zoverflow_active[ovrf_group]) {
-          izfrc = __ldca(&gmem_r.zfrc_overflow[pos + EXCL_GMEM_OFFSET]);
-          izfrc *= max_int_accumulation_ll;
-        }
-        else {
-          izfrc = 0LL;
-        }
+        llint izfrc = sh_zfrc_overflow[rel_pos];
+        izfrc *= max_int_accumulation_ll;
         izfrc += (llint)(sh_zfrc[rel_pos]);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint izfrc = sh_zfrc[rel_pos];
