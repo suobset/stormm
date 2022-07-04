@@ -27,7 +27,7 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
     atomicAdd(&overflow[gmem_offset + pos], spillover);
 
     // No atomic needed as this just sets the value, which started as zero, to one
-    sh_overflow_active[pos / warp_size_int] = 1;
+    sh_overflow_active[pos >> warp_bits] = 1;
   }
   else {
     ival = __float2int_rn(fval);
@@ -36,7 +36,7 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
   const int prim_old_plus_ival = prim_old + ival;
   if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
     atomicAdd(&overflow[gmem_offset + pos], (1 - (2 * (ival < 0))) * 2);
-    sh_overflow_active[pos / warp_size_int] = 1;
+    sh_overflow_active[pos >> warp_bits] = 1;
   }
 }
 

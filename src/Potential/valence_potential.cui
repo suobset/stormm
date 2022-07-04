@@ -1816,7 +1816,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     while (pos < import_stride) {
       if (pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = pos / warp_size_int;
+        const size_t ovrf_group = (pos >> warp_bits);
         llint ixfrc;
         if (xoverflow_active[ovrf_group]) {
           ixfrc = __ldca(&gmem_r.xfrc_overflow[pos + EXCL_GMEM_OFFSET]);
@@ -1845,7 +1845,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - import_stride;
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = rel_pos / warp_size_int;
+        const size_t ovrf_group = (rel_pos >> warp_bits);
         llint iyfrc;
         if (yoverflow_active[ovrf_group]) {
           iyfrc = __ldca(&gmem_r.yfrc_overflow[pos + EXCL_GMEM_OFFSET]);
@@ -1874,7 +1874,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       const int rel_pos = pos - (2 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = rel_pos / warp_size_int;
+        const size_t ovrf_group = (rel_pos >> warp_bits);
         llint izfrc;
         if (zoverflow_active[ovrf_group]) {
           izfrc = __ldca(&gmem_r.zfrc_overflow[pos + EXCL_GMEM_OFFSET]);

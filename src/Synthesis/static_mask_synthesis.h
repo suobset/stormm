@@ -55,6 +55,7 @@ public:
   ///   - Accept a list of static exclusion mask object pointers
   ///   - Accept a list of static exclusion mask objects
   ///   - Accept a list of topology pointers, from which exclusion masks will be constructed
+  ///   - Accept an existing synthesis of topologies
   ///
   /// \param base_masks        List of exclusion masks for all unique topologies in the synthesis
   /// \param base_topologies   List of topologies from which to construct the exclusion masks
@@ -62,8 +63,6 @@ public:
   ///                          masks outside this function)
   /// \param topology_indices  List of indices into base_masks indicating how to compile the
   ///                          synthesis of systems
-  /// \param poly_ag           Existing synthesis of AtomGraph objects describing a collection of
-  ///                          systems
   /// \{
   StaticExclusionMaskSynthesis();
   

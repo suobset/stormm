@@ -283,10 +283,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Non-bonded interactions
   if (do_nonbonded == EvaluateNonbonded::YES) {
-    SyNonbondedKit<double> synbk = poly_ag.getDoublePrecisionNonbondedKit();
     poly_ps->initializeForces();
-    //evalSyNonbondedTileGroups<double>(synbk, syse.data(), poly_ps->data(), &sc,
-    //                                  EvaluateForce::YES);
     evalSyNonbondedEnergy<double>(poly_ag, syse, poly_ps, &sc, EvaluateForce::YES,
                                   EvaluateForce::YES);
   }

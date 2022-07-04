@@ -25,6 +25,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
   __shared__ int sh_xfrc[small_block_max_atoms];
   __shared__ int sh_yfrc[small_block_max_atoms];
   __shared__ int sh_zfrc[small_block_max_atoms];
+  __shared__ int sh_xfrc_overflow[small_block_max_atoms];
+  __shared__ int sh_yfrc_overflow[small_block_max_atoms];
+  __shared__ int sh_zfrc_overflow[small_block_max_atoms];
   __shared__ int xoverflow_active[small_block_max_atoms >> warp_bits];
   __shared__ int yoverflow_active[small_block_max_atoms >> warp_bits];
   __shared__ int zoverflow_active[small_block_max_atoms >> warp_bits];
@@ -55,17 +58,15 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     // an extra loop.
     const int padded_abstract_length = devcRoundUp(tile_groups_wu_abstract_length, warp_size_int);
 #ifdef SPLIT_FORCE_ACCUMULATION
-    const int noverflow_flags = small_block_max_atoms / warp_size_int;
+    const int noverflow_flags = small_block_max_atoms >> warp_bits;
 #endif
 #ifdef COMPUTE_ENERGY
 #  ifdef SPLIT_FORCE_ACCUMULATION
-    const int elec_nrg_accumulator_offset = padded_abstract_length +
-                                            devcRoundUp(noverflow_flags, warp_size_int);
+    const int nrg_accumulator_offset = padded_abstract_length +
+                                       devcRoundUp(noverflow_flags, warp_size_int);
 #  else
-    const int elec_nrg_accumulator_offset = padded_abstract_length;
+    const int nrg_accumulator_offset = padded_abstract_length;
 #  endif
-    const int vdw_nrg_accumulator_offset = elec_nrg_accumulator_offset +
-                                           devcRoundUp(small_block_max_imports, warp_size_int);
 #endif
     if (threadIdx.x < tile_groups_wu_abstract_length) {
       nbwu_map[threadIdx.x] =__ldcv(&poly_nbk.nbwu_abstracts[(nbwu_idx *
@@ -81,17 +82,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     }
 #endif
 #ifdef COMPUTE_ENERGY
-    else if (threadIdx.x >= elec_nrg_accumulator_offset &&
-             threadIdx.x <  elec_nrg_accumulator_offset + small_block_max_imports) {
-      sh_elec_acc[threadIdx.x - elec_nrg_accumulator_offset] = 0LL;
-    }
-    else if (threadIdx.x >= vdw_nrg_accumulator_offset &&
-             threadIdx.x <  vdw_nrg_accumulator_offset + small_block_max_imports) {
-      sh_vdw_acc[ threadIdx.x -  vdw_nrg_accumulator_offset] = 0LL;
+    else if (threadIdx.x >= nrg_accumulator_offset &&
+             threadIdx.x <  nrg_accumulator_offset + small_block_max_imports) {
+      sh_elec_acc[threadIdx.x - nrg_accumulator_offset] = 0LL;
+      sh_vdw_acc[ threadIdx.x - nrg_accumulator_offset] = 0LL;
     }
 #endif
     __syncthreads();
-
+    
     // Import atomic coordinates and properties.  Each warp will handle importing one of the
     // Cartesian coordinates or properties of as many tile sides as it can handle, in order to
     // get the most threads reaching out to global memory.
@@ -102,132 +100,176 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     const int tile_side_offset = warp_lane_idx / tile_length;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
     const int import_count = nbwu_map[0];
-    int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;    
-    while (pos < import_count) {
-      const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
-      const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
-      const int key_idx  = pos / 4;
-      const int key_slot = pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
+    int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
+    const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
+    while (pos < padded_import_count) {
       TCALC fxval;
-      if (tile_lane_idx < tside_count) {
-        const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
-        fxval = (TCALC)(ixval);
-        __stwb(&gmem_r.xcrd[write_idx], ixval);
+      if (pos < import_count) {
+        const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
+        const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
+        const int key_idx  = pos / 4;
+        const int key_slot = pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
+          const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
+          fxval = (TCALC)(ixval);
+          __stwb(&gmem_r.xcrd[write_idx], ixval);
+        }
+        else {
+          fxval = (TCALC)(0.0);
+          __stwb(&gmem_r.xcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+        }
+#ifdef COMPUTE_FORCE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        sh_xfrc[write_idx - EXCL_GMEM_OFFSET] = 0;
+        sh_xfrc_overflow[write_idx - EXCL_GMEM_OFFSET] = 0;
+#  else
+        sh_xfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
+#  endif
+#endif
       }
       else {
         fxval = (TCALC)(0.0);
-        __stwb(&gmem_r.xcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
       }
       for (int i = half_tile_length; i > 0; i >>= 1) {
         fxval += SHFL_DOWN(fxval, i);
       }
-      if (tile_lane_idx == 0) {
+      if (tile_lane_idx == 0 && pos < import_count) {
         sh_tile_xcog[pos] = fxval;
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    while (pos < 2 * import_count) {
-      const int rel_pos = pos -import_count;
-      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-      const int key_idx  = rel_pos / 4;
-      const int key_slot = rel_pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
+    while (pos < 2 * padded_import_count) {
       TCALC fyval;
-      if (tile_lane_idx < tside_count) {
-        const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
-        fyval = (TCALC)(iyval);
-        __stwb(&gmem_r.ycrd[write_idx], iyval);
+      const int rel_pos = pos - padded_import_count;
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
+        const int key_idx  = rel_pos / 4;
+        const int key_slot = rel_pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
+          const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
+          fyval = (TCALC)(iyval);
+          __stwb(&gmem_r.ycrd[write_idx], iyval);
+        }
+        else {
+          fyval = (TCALC)(0.0);
+          __stwb(&gmem_r.ycrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+        }
+#ifdef COMPUTE_FORCE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        sh_yfrc[write_idx - EXCL_GMEM_OFFSET] = 0;
+        sh_yfrc_overflow[write_idx - EXCL_GMEM_OFFSET] = 0;
+#  else
+        sh_yfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
+#  endif
+#endif
       }
       else {
         fyval = (TCALC)(0.0);
-        __stwb(&gmem_r.ycrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
       }
       for (int i = half_tile_length; i > 0; i >>= 1) {
         fyval += SHFL_DOWN(fyval, i);
       }
-      if (tile_lane_idx == 0) {
-        sh_tile_ycog[pos] = fyval;
+      if (tile_lane_idx == 0 && rel_pos < import_count) {
+        sh_tile_ycog[rel_pos] = fyval;
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    while (pos < 3 * import_count) {
-      const int rel_pos = pos - (2 * import_count);
-      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-      const int key_idx  = rel_pos / 4;
-      const int key_slot = rel_pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
+    while (pos < 3 * padded_import_count) {
       TCALC fzval;
-      if (tile_lane_idx < tside_count) {
-        const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
-        fzval = (TCALC)(izval);
-        __stwb(&gmem_r.zcrd[write_idx], izval);
+      const int rel_pos = pos - (2 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
+        const int key_idx  = rel_pos / 4;
+        const int key_slot = rel_pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
+          const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
+          fzval = (TCALC)(izval);
+          __stwb(&gmem_r.zcrd[write_idx], izval);
+        }
+        else {
+          fzval = (TCALC)(0.0);
+          __stwb(&gmem_r.zcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+        }
+#ifdef COMPUTE_FORCE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+        sh_zfrc[write_idx - EXCL_GMEM_OFFSET] = 0;
+        sh_zfrc_overflow[write_idx - EXCL_GMEM_OFFSET] = 0;
+#  else
+        sh_zfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
+#  endif
+#endif
       }
       else {
         fzval = (TCALC)(0.0);
-        __stwb(&gmem_r.zcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
       }
       for (int i = half_tile_length; i > 0; i >>= 1) {
         fzval += SHFL_DOWN(fzval, i);
       }
-      if (tile_lane_idx == 0) {
-        sh_tile_zcog[pos] = fzval;
+      if (tile_lane_idx == 0 && rel_pos < import_count) {
+        sh_tile_zcog[rel_pos] = fzval;
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    while (pos < 4 * import_count) {
-      const int rel_pos = pos - (3 * import_count);
-      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-      const int key_idx  = rel_pos / 4;
-      const int key_slot = rel_pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
-      if (tile_lane_idx < tside_count) {
-        __stwb(&gmem_r.charges[write_idx],
-               __ldcs(&poly_nbk.charge[read_idx]) * SQRT_FUNC(poly_nbk.coulomb));
-      }
-      else {
-        __stwb(&gmem_r.charges[write_idx], (TCALC)(0.0));
-      }
-
-      // Stuff the total number of particles in this tile side into its shared memory slot.
-      // Obtain this system's Lennard-Jone atom type count.  Any of the five warps gathering
-      // preliminary data could do this, but have this one do it for better load balancing.
-      if (tile_lane_idx == 0) {
-        sh_tile_tpts[pos] = (TCALC)(tside_count);
-        const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
-        sh_n_lj_types[pos] = poly_nbk.n_lj_types[system_idx];
+    while (pos < 4 * padded_import_count) {
+      const int rel_pos = pos - (3 * padded_import_count);
+      if (rel_pos < import_count) {
+        const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const int write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
+        const int key_idx  = rel_pos / 4;
+        const int key_slot = rel_pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
+          __stwb(&gmem_r.charges[write_idx],
+                 __ldcs(&poly_nbk.charge[read_idx]) * SQRT_FUNC(poly_nbk.coulomb));
+        }
+        else {
+          __stwb(&gmem_r.charges[write_idx], (TCALC)(0.0));
+        }
+      
+        // Stuff the total number of particles in this tile side into its shared memory slot.
+        // Obtain this system's Lennard-Jone atom type count.  Any of the five warps gathering
+        // preliminary data could do this, but have this one do it for better load balancing.
+        if (tile_lane_idx == 0) {
+          sh_tile_tpts[rel_pos] = (TCALC)(tside_count);
+          const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
+          sh_n_lj_types[rel_pos] = poly_nbk.n_lj_types[system_idx];
+        }
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    while (pos < 5 * import_count) {
-      const int rel_pos = pos - (4 * import_count);
-      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-      const int key_idx  = rel_pos / 4;
-      const int key_slot = rel_pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
-      if (tile_lane_idx < tside_count) {
-        __stwb(&gmem_r.lj_idx[write_idx], __ldcs(&poly_nbk.lj_idx[read_idx]));
-      }
-      else {
-        __stwb(&gmem_r.lj_idx[write_idx], 0);
-      }
+    while (pos < 5 * padded_import_count) {
+      const int rel_pos = pos - (4 * padded_import_count);
+      if (rel_pos < import_count) {
+        const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const int write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
+        const int key_idx  = rel_pos / 4;
+        const int key_slot = rel_pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
+          __stwb(&gmem_r.lj_idx[write_idx], __ldcs(&poly_nbk.lj_idx[read_idx]));
+        }
+        else {
+          __stwb(&gmem_r.lj_idx[write_idx], 0);
+        }
 
-      // Transfer the system index of this group of atoms (this "tile side") into the appropriate
-      // __shared__ memory slot.  Obtain the Lennard-Jones table offsets for this tile's system.
-      // Any of the five warps could do this, but have this one do it for beetter load balancing.
-      if (tile_lane_idx == 0) {
-        const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
-        sh_system_indices[pos] = system_idx;
-        sh_ljabc_offsets[pos] = poly_nbk.ljabc_offsets[system_idx];
+        // Transfer the system index of this group of atoms (this "tile side") into the appropriate
+        // __shared__ memory slot.  Obtain the Lennard-Jones table offsets for this tile's system.
+        // Any of the five warps could do this, but have this one do it for beetter load balancing.
+        if (tile_lane_idx == 0) {
+          const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
+          sh_system_indices[rel_pos] = system_idx;
+          sh_ljabc_offsets[rel_pos] = poly_nbk.ljabc_offsets[system_idx];
+        }
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
@@ -303,9 +345,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         const TCALC dz      = o_zcrd - t_zcrd;
         const TCALC r2      = (dx * dx) + (dy * dy) + (dz * dz);
 #ifdef COMPUTE_FORCE
-        TCALC fmag = (TCALC)(0.0);
+        TCALC fmag;
 #endif
         if ((t_mask >> (crd_src_lane - (tile_length * (warp_lane_idx < tile_length)))) & 0x1) {
+#ifdef COMPUTE_FORCE
+          fmag = (TCALC)(0.0);
+#endif
+        }
+        else {
           const TCALC invr    = rsqrt(r2);
           const TCALC invr2   = invr * invr;
           const TCALC invr4   = invr2 * invr2;
@@ -313,8 +360,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           const TCALC lja   = poly_nbk.lja_coeff[ot_ljidx];
           const TCALC ljb   = poly_nbk.ljb_coeff[ot_ljidx];
 #ifdef COMPUTE_FORCE
-          fmag += -(ot_qq * invr2 * invr) +
-                  ((((TCALC)(6.0) * ljb) - ((TCALC)(12.0) * lja * invr4 * invr2)) * invr4 * invr4);
+          fmag = ((((TCALC)(6.0) * ljb) - ((TCALC)(12.0) * lja * invr4 * invr2)) * invr4 * invr4) -
+                 (ot_qq * invr2 * invr);
 #endif
 #ifdef COMPUTE_ENERGY
           elec_nrg += ot_qq * invr;
@@ -353,11 +400,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       read_idx -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
       splitForceContribution(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xfrc, xoverflow_active,
-                             gmem_r.xfrc_overflow, EXCL_GMEM_OFFSET);
+                             sh_xfrc_overflow, 0);
       splitForceContribution(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, yoverflow_active,
-                             gmem_r.yfrc_overflow, EXCL_GMEM_OFFSET);
+                             sh_yfrc_overflow, 0);
       splitForceContribution(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, zoverflow_active,
-                             gmem_r.zfrc_overflow, EXCL_GMEM_OFFSET);
+                             sh_zfrc_overflow, 0);
 #  else
       atomicAdd((ullint*)&sh_xfrc[read_idx],
                 lliToUlli(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
@@ -380,89 +427,97 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     // the loops above and thus reduce register pressure.  Commit the locally accumulated forces
     // back to global arrays.
     const int import_count_ii = nbwu_map[0];
+    const int padded_import_count_ii = devcRoundUp(import_count_ii, tile_sides_per_warp);
     pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef COMPUTE_FORCE
-    while (pos < import_count_ii) {
-      const size_t write_idx = nbwu_map[pos + 1] + tile_lane_idx;
-      const int read_idx = (pos * tile_length) + tile_lane_idx;
-      const int key_idx  = pos / 4;
-      const int key_slot = pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
-      if (tile_lane_idx < tside_count) {
+    while (pos < padded_import_count_ii) {
+      if (pos < import_count_ii) {
+        const size_t write_idx = nbwu_map[pos + 1] + tile_lane_idx;
+        const int read_idx = (pos * tile_length) + tile_lane_idx;
+        const int key_idx  = pos / 4;
+        const int key_slot = pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = pos / warp_size_int;
-        llint ixfrc;
-        if (xoverflow_active[ovrf_group]) {
-          ixfrc = __ldca(&gmem_r.xfrc_overflow[read_idx + EXCL_GMEM_OFFSET]);
-          ixfrc *= max_int_accumulation_ll;
-        }
-        else {
-          ixfrc = 0LL;
-        }
-        ixfrc += (llint)(sh_xfrc[read_idx]);
-        atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(ixfrc));        
+          const int ovrf_group = (read_idx >> warp_bits);
+          llint ixfrc;
+          if (xoverflow_active[ovrf_group]) {
+            ixfrc = sh_xfrc_overflow[read_idx];
+            ixfrc *= max_int_accumulation_ll;
+          }
+          else {
+            ixfrc = 0LL;
+          }
+          ixfrc += (llint)(sh_xfrc[read_idx]);
+          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(ixfrc));        
 #  else
-        atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(sh_xfrc[read_idx]));
+          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(sh_xfrc[read_idx]));
 #  endif
+        }
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    while (pos < 2 * import_count_ii) {
-      const int rel_pos = pos - import_count_ii;
-      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
-      const int key_idx  = rel_pos / 4;
-      const int key_slot = rel_pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
-      if (tile_lane_idx < tside_count) {
+    while (pos < 2 * padded_import_count_ii) {
+      const int rel_pos = pos - padded_import_count_ii;
+      if (rel_pos < import_count_ii) {
+        const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
+        const int key_idx  = rel_pos / 4;
+        const int key_slot = rel_pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = rel_pos / warp_size_int;
-        llint iyfrc;
-        if (yoverflow_active[ovrf_group]) {
-          iyfrc = __ldca(&gmem_r.yfrc_overflow[read_idx + EXCL_GMEM_OFFSET]);
-          iyfrc *= max_int_accumulation_ll;
-        }
-        else {
-          iyfrc = 0LL;
-        }
-        iyfrc += (llint)(sh_yfrc[read_idx]);
-        atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(iyfrc));        
+          const int ovrf_group = (read_idx >> warp_bits);
+          llint iyfrc;
+          if (yoverflow_active[ovrf_group]) {
+            iyfrc = sh_yfrc_overflow[read_idx];
+            iyfrc *= max_int_accumulation_ll;
+          }
+          else {
+            iyfrc = 0LL;
+          }
+          iyfrc += (llint)(sh_yfrc[read_idx]);
+          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(iyfrc));        
 #  else
-        atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(sh_yfrc[read_idx]));
+          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(sh_yfrc[read_idx]));
 #  endif
+        }
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    while (pos < 3 * import_count_ii) {
-      const int rel_pos = pos - (2 * import_count_ii);
-      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
-      const int key_idx  = rel_pos / 4;
-      const int key_slot = rel_pos - (key_idx * 4);
-      const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                (8 * key_slot)) & 0xff);
-      if (tile_lane_idx < tside_count) {
+    while (pos < 3 * padded_import_count_ii) {
+      const int rel_pos = pos - (2 * padded_import_count_ii);
+      if (rel_pos < import_count_ii) {
+        const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
+        const int key_idx  = rel_pos / 4;
+        const int key_slot = rel_pos - (key_idx * 4);
+        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
+                                  (8 * key_slot)) & 0xff);
+        if (tile_lane_idx < tside_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const size_t ovrf_group = rel_pos / warp_size_int;
-        llint izfrc;
-        if (zoverflow_active[ovrf_group]) {
-          izfrc = __ldca(&gmem_r.zfrc_overflow[read_idx + EXCL_GMEM_OFFSET]);
-          izfrc *= max_int_accumulation_ll;
-        }
-        else {
-          izfrc = 0LL;
-        }
-        izfrc += (llint)(sh_zfrc[read_idx]);
-        atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(izfrc));        
+          const int ovrf_group = (read_idx >> warp_bits);
+          llint izfrc;
+          if (zoverflow_active[ovrf_group]) {
+            izfrc = sh_zfrc_overflow[read_idx];
+            izfrc *= max_int_accumulation_ll;
+          }
+          else {
+            izfrc = 0LL;
+          }
+          izfrc += (llint)(sh_zfrc[read_idx]);
+          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(izfrc));        
 #  else
-        atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(sh_zfrc[read_idx]));
+          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(sh_zfrc[read_idx]));
 #  endif
+        }
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
 #endif
+
     // Increment the work unit counter
     __syncthreads();
     if (threadIdx.x == 0) {

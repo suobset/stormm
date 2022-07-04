@@ -232,7 +232,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     imports[i] = -1;
   }
   score = import_count + (tile_count * 8);
-
+  
   // Assemble work unit instructions
   for (int i = 0; i < import_count; i++) {
     const int system_idx = import_system_indices[i];
