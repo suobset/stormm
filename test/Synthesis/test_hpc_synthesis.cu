@@ -330,15 +330,16 @@ int main(const int argc, const char* argv[]) {
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc);
+  PhaseSpaceSynthesis poly_ps_dbl(sysc, 40, 24, 40, 55);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
 
   // Upload the compiled systems and check the results
-  PsSynthesisWriter psw = poly_ps.data();
   poly_ag.upload();
   poly_se.upload();
   poly_ps.upload();
+  poly_ps_dbl.upload();
   std::vector<double> gpu_charges = poly_ag.getPartialCharges<double>(HybridTargetLevel::DEVICE);
   int padded_atom_count = 0;
   for (int i = 0; i < nsys; i++) {
@@ -379,9 +380,9 @@ int main(const int argc, const char* argv[]) {
 
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
   // and 1:4 attenuated interactions.
-  checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
-                         ForceAccumulationMethod::WHOLE, PrecisionLevel::DOUBLE, gpu, 3.5e-6,
-                         2.0e-5, do_tests);
+  checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                         poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::DOUBLE, gpu,
+                         3.5e-6, 2.0e-5, do_tests);
   checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
                          ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu, 3.5e-5,
                          2.0e-4, do_tests);

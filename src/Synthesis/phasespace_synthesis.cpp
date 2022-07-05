@@ -379,6 +379,43 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
 {}
 
 //-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<int> &index_key,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
+                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<int> &ps_index_key,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const std::vector<int> &ag_index_key,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(tileVector(ps_list, ps_index_key), tileVector(ag_list, ag_index_key),
+                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getSystemTopologyPointerCC(),
+                        { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
+                        localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     system_count{original.system_count},
     unit_cell{original.unit_cell},
