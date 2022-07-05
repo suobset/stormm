@@ -217,6 +217,9 @@ public:
   /// Overloaded:
   ///   - Take arrays of PhaseSpace objects and AtomGraph pointers
   ///   - Take a SystemCache object and unpack it
+  ///   - Skip the specification of thermostats, barostats, and the time step (just use defaults),
+  ///     but explicitly specify at least the global position scaling bit count and possibly other
+  ///     bit counts
   ///
   /// \param ps_list       Array of input coordinates, velocities, and forces objects
   /// \param ag_list       Array of pointers to input topologies
@@ -267,6 +270,26 @@ public:
                       const std::vector<Barostat> &pistons_in = { Barostat() },
                       double time_step_in = 1.0,
                       int globalpos_scale_bits_in = default_globalpos_scale_bits,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &index_key,
+                      int globalpos_scale_bits_in,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list, const std::vector<int> &ps_index_key,
+                      const std::vector<AtomGraph*> &ag_list, const std::vector<int> &ag_index_key,
+                      int globalpos_scale_bits_in,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const SystemCache &sysc,
+                      int globalpos_scale_bits_in,
                       int localpos_scale_bits_in = default_localpos_scale_bits,
                       int velocity_scale_bits_in = default_velocity_scale_bits,
                       int force_scale_bits_in = default_force_scale_bits);
