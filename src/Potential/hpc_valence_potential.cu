@@ -233,6 +233,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TCALC3 float3
 #  define TCALC4 float4
 #  define LLCONV_FUNC __float2ll_rn
+#  define SPLITCONV_FUNC convertSplitFixedPrecision
+#  define SPLIT_TYPE int2
 #  define SQRT_FUNC sqrtf
 #  define ACOS_FUNC acosf
 #  define COS_FUNC  cosf
@@ -240,7 +242,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define ABS_FUNC  fabsf
 #  define MIX_FUNC  computeRestraintMixtureF
 #  define CHECK_COSARG
-
+  
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
 #      if (__CUDA_ARCH__ == 610)
@@ -326,6 +328,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef TCALC3
 #  undef TCALC4
 #  undef LLCONV_FUNC
+#  undef SPLITCONV_FUNC
+#  undef SPLIT_TYPE
 #  undef SQRT_FUNC
 #  undef ACOS_FUNC
 #  undef COS_FUNC
@@ -346,12 +350,15 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TCALC3 double3
 #  define TCALC4 double4
 #  define LLCONV_FUNC __double2ll_rn
+#  define SPLITCONV_FUNC convertSplitFixedPrecision95
+#  define SPLIT_TYPE int95_t
 #  define SQRT_FUNC sqrt
 #  define ACOS_FUNC acos
 #  define COS_FUNC  cos
 #  define SIN_FUNC  sin
 #  define ABS_FUNC  fabs
 #  define MIX_FUNC  computeRestraintMixtureD
+#  define SPLIT_FORCE_ACCUMULATION
 
 #  define COMPUTE_FORCE
 #    define KERNEL_NAME kdValenceForceAccumulation
@@ -385,12 +392,15 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef TCALC3
 #  undef TCALC4
 #  undef LLCONV_FUNC
+#  undef SPLITCONV_FUNC
+#  undef SPLIT_TYPE
 #  undef SQRT_FUNC
 #  undef ACOS_FUNC
 #  undef COS_FUNC
 #  undef SIN_FUNC
 #  undef ABS_FUNC
 #  undef MIX_FUNC
+#  undef SPLIT_FORCE_ACCUMULATION
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
