@@ -147,23 +147,21 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const StaticExclusionMask ise(iag_ptr);
     const double2 tnbe = evaluateNonbondedEnergy(iag_ptr, ise, &host_result, &isc,
                                                  EvaluateForce::YES, EvaluateForce::YES, 0);
-    const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
-    const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
+    std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
+    std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
-    // CHECK
-    printf("System %2d forces = [\n", i);
-    for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
-      if (fabs(devc_frc[3 * j] - host_frc[3 * j]) > 1.0e-4 ||
-          fabs(devc_frc[(3 * j) + 1] - host_frc[(3 * j) + 1]) > 1.0e-4 ||
-          fabs(devc_frc[(3 * j) + 2] - host_frc[(3 * j) + 2]) > 1.0e-4) {
-        printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n", host_frc[3 * j],
-               host_frc[(3 * j) + 1], host_frc[(3 * j) + 2], devc_frc[3 * j],
-               devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
+    // These systems contain some hard clashes, which generate very large forces.  This is good
+    // for testing the split force accumulation, but not for discerning values that are truly
+    // inaccurate.  Check the forces individually and clean out large values that are within
+    // relative tolerances.
+    const int natom = iag_ptr->getAtomCount();
+    for (int j = 0; j < 3 * natom; j++) {
+      if ((fabs(devc_frc[j]) >= 200.0 || fabs(host_frc[j]) >= 200.0) &&
+          1.0 - (host_frc[j] / devc_frc[j]) <= max_error_tol) {
+        devc_frc[j] = 0.0;
+        host_frc[j] = 0.0;
       }
     }
-    printf("];\n");
-    // END CHECK
-    
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
     frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);    
   }
