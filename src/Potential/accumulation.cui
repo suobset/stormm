@@ -16,7 +16,38 @@ __device__ __forceinline__ long long int ulliToLli(unsigned long long int u)
   return l;
 }
 
-//-------------------------------------------------------------------------------------------------
+/// Add a floating point number to two integer accumulators, one intended to absorb the vast
+/// majority of the work and the other kept in reserve in case the primary accumulator cannot
+/// handle the value by itself.
+///
+/// Overloaded:
+///   - Convert a double-precision number to 95-bit int64 / int32 format
+///   - Convert a single-precision number to 63-bit int32 / int32 format
+///
+/// \param dval  Double-precision floating point number, pre-scaled to the fixed-precision range
+/// \param fval  Single-precision floating point number, pre-scaled to the fixed-precision range
+/// \param pos   Position in each accumulator array to contribute the results
+/// \param primary   The first accumulator, which receives most of the traffic
+/// \param overflow  The emergency accumulator
+/// \{
+__device__ __forceinline__ void splitForceContribution(const double dval, const int pos,
+                                                       llint* primary, int* overflow) {
+  llint ival;
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    ival = __double2ll_rn(dval - ((double)(spillover) * max_llint_accumulation));
+    atomicAdd(&overflow[pos], spillover);
+  }
+  else {
+    ival = __double2ll_rn(dval);
+  }
+  const llint prim_old = atomicAdd((ullint*)&primary[pos], lliToUlli(ival));
+  const llint prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
+  }
+}
+
 __device__ __forceinline__ void splitForceContribution(const float fval, const int pos,
                                                        int* primary, int* overflow) {
   int ival;
@@ -34,8 +65,32 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
     atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
   }
 }
+/// \}
 
-//-------------------------------------------------------------------------------------------------
+/// \brief Convert a floating point number to fixed precision format split between two integer
+///        accumulators.
+///
+/// Overloaded:
+///   - Convert a double-precision number to 95-bit int64 / int32 format
+///   - Convert a single-precision number to 63-bit int32 / int32 format
+///
+/// \param dval  Double-precision floating point number, pre-scaled to the fixed-precision range
+/// \param fval  Single-precision floating point number, pre-scaled to the fixed-precision range
+/// \{
+__device__ __forceinline__ int95_t convertSplitFixedPrecision95(const double dval) {
+  int95_t result = { 0, 0 };
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    result.x = __double2ll_rn(dval - ((double)(spillover) * max_llint_accumulation));
+    result.y = spillover;
+  }
+  else {
+    result.x = __double2int_rn(dval);
+    result.y = 0;
+  }
+  return result;
+}
+
 __device__ __forceinline__ int2 convertSplitFixedPrecision(const float fval) {
   int2 result = { 0, 0 };
   if (fabsf(fval) >= max_int_accumulation_f) {
@@ -49,8 +104,32 @@ __device__ __forceinline__ int2 convertSplitFixedPrecision(const float fval) {
   }
   return result;
 }
+/// \}
 
-//-------------------------------------------------------------------------------------------------
+/// \brief Contribute a fixed precision value, split between two integers, to the proper
+///        accumulators.
+///
+/// Overloaded:
+///   - Accept int64 / int32 (95-bit accumulation of double-precision floating point calculations)
+///   - Accept int32 / int32 (standard 63-bit accumulation of single-precision floating point math)
+///
+/// \param ival       The value to contribute
+/// \param pos        Position in the relevant arrays to contribute it into
+/// \param primary    Primary accumulator
+/// \param overflow   Secondary / emergency accumulator
+/// \{
+__device__ __forceinline__ void addSplitFixedPrecision(const int95_t ival, const int pos,
+                                                       llint* primary, int* overflow) {
+  const llint prim_old = atomicAdd((ullint*)&primary[pos], lliToUlli(ival.x));
+  const llint prim_old_plus_x = prim_old + ival.x;
+  int ival_y = ival.y;
+  ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
+            (1 - (2 * (ival.x < 0))) * 2;    
+  if (ival_y) {
+    atomicAdd(&overflow[pos], ival_y);
+  }
+}
+
 __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const int pos,
                                                        int* primary, int* overflow) {
   const int prim_old = atomicAdd(&primary[pos], ival.x);
@@ -62,15 +141,52 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
     atomicAdd(&overflow[pos], ival_y);
   }
 }
+/// \}
 
-//-------------------------------------------------------------------------------------------------
+/// \brief Combine two fixed precision values, each split across two accumulators.
+///
+/// Overloaded:
+///   - Accept int64 / int32 (95-bit accumulation of double-precision floating point numbers)
+///   - Accept int32 / int32 (63-bit accumulation of single-precision floating point numbers)
+///
+/// \param a  The first of two split accumulators to combine
+/// \param b  The second of two split accumulators to combine
+/// \{
+__device__ __forceinline__ int95_t combineSplitFixedPrecision(const int95_t a, const int95_t b) {
+  int95_t result = { a.x + b.x, a.y + b.y };
+  result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 2;
+  return result;
+}
+
 __device__ __forceinline__ int2 combineSplitFixedPrecision(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
   result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
   return result;
 }
+/// \}
 
-//-------------------------------------------------------------------------------------------------
+/// \brief Combine two fixed precision values, each split across two accumulators, and multiply
+///        the result by -1.
+///
+/// Overloaded:
+///   - Accept int64 / int32 (95-bit accumulation of double-precision floating point numbers)
+///   - Accept int32 / int32 (63-bit accumulation of single-precision floating point numbers)
+///
+/// \param a  The first of two split accumulators to combine
+/// \param b  The second of two split accumulators to combine
+/// \{
+__device__ __forceinline__ int95_t antiCombineSplitFixedPrecision(const int95_t a,
+                                                                  const int95_t b) {
+  int95_t result = { a.x + b.x, a.y + b.y };
+  if ((b.x > 0LL && result.x < a.x) || b.x < 0LL && result.x > a.x) {
+    result.y += (1 - (2 * (b.x < 0LL))) * 2 * ((b.x > 0LL && result.x < a.x) +
+                                               (b.x < 0LL && result.x > a.x));
+  }
+  result.x = -result.x;
+  result.y = -result.y;
+  return result;
+}
+
 __device__ __forceinline__ int2 antiCombineSplitFixedPrecision(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
   if ((b.x > 0 && result.x < a.x) || b.x < 0 && result.x > a.x) {
@@ -81,3 +197,4 @@ __device__ __forceinline__ int2 antiCombineSplitFixedPrecision(const int2 a, con
   result.y = -result.y;
   return result;
 }
+/// \}

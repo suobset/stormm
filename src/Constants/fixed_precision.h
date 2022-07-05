@@ -13,6 +13,7 @@ namespace numerics {
 
 using constants::ExceptionResponse;
 using constants::int_bit_count_int;
+using constants::llint_bit_count_int;
   
 /// \brief Enumerate different available precision models
 enum class PrecisionLevel {
@@ -125,9 +126,13 @@ constexpr int    max_charge_mesh_scale_bits = 48;
 
 /// \brief The maximum contribution for signed integer accumulation
 /// \{
+constexpr llint max_llint_accumulation_ll = (1LL << (llint_bit_count_int - 1));
+constexpr double max_llint_accumulation   = max_llint_accumulation_ll;
+constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 constexpr llint max_int_accumulation_ll = (1LL << (int_bit_count_int - 1));
 constexpr double max_int_accumulation   = max_int_accumulation_ll;
 constexpr float max_int_accumulation_f  = max_int_accumulation;
+/// \}
 
 /// \brief Translate a string into a known precision level enumeration.
 ///

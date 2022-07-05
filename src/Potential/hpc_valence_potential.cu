@@ -4,6 +4,7 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "DataTypes/omni_vector_types.h"
 #include "Math/rounding.h"
 #include "Synthesis/valence_workunit.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -21,9 +22,13 @@ using constants::twice_warp_size_int;
 using constants::large_block_size;
 using constants::medium_block_size;
 using constants::small_block_size;
+using data_types::int95_t;
 using math::roundUp;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
+using numerics::max_llint_accumulation;
+using numerics::max_llint_accumulation_f;
+using numerics::max_llint_accumulation_ll;
 using symbols::asymptotic_to_one_f;
 using symbols::asymptotic_to_one_lf;
 using symbols::inverse_one_minus_asymptote_f;
@@ -239,9 +244,9 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
 #      if (__CUDA_ARCH__ == 610)
-#        define VALENCE_KERNEL_THREAD_COUNT 448
+#        define VALENCE_KERNEL_THREAD_COUNT 512
 #      elif (__CUDA_ARCH__ == 600) || (__CUDA_ARCH__ == 700)
-#        define VALENCE_KERNEL_THREAD_COUNT 896
+#        define VALENCE_KERNEL_THREAD_COUNT 1024
 #      else
 #        define VALENCE_KERNEL_THREAD_COUNT large_block_size
 #      endif
@@ -256,9 +261,9 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
 #        if (__CUDA_ARCH__ == 610)
-#          define VALENCE_KERNEL_THREAD_COUNT 384
+#          define VALENCE_KERNEL_THREAD_COUNT 448
 #        else
-#          define VALENCE_KERNEL_THREAD_COUNT 768
+#          define VALENCE_KERNEL_THREAD_COUNT 896
 #        endif
 #        define KERNEL_NAME kfsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
@@ -274,8 +279,6 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    undef SPLIT_FORCE_ACCUMULATION
 #    if (__CUDA_ARCH__ == 610)
 #      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    elif (__CUDA_ARCH__ == 700)
-#      define VALENCE_KERNEL_THREAD_COUNT 896
 #    else
 #      define VALENCE_KERNEL_THREAD_COUNT large_block_size
 #    endif
@@ -508,14 +511,7 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
       // The combination of energy and force evaluation accumulates register pressure
       switch (eval_force) {
       case EvaluateForce::YES:
-        switch (force_sum) {
-        case ForceAccumulationMethod::SPLIT:
-          nthreads = lower_threads;
-          break;
-        case ForceAccumulationMethod::WHOLE:
-          nthreads = trim_threads;
-          break;
-        }
+        nthreads = trim_threads;
         break;
       case EvaluateForce::NO:
         nthreads = max_threads;
@@ -523,17 +519,7 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
       }
       break;
     case EvaluateEnergy::NO:
-
-      // Forces must be computed or there is nothing to do
-      switch (force_sum) {
-      case ForceAccumulationMethod::SPLIT:
-        nthreads = (major_arch == 6 ||
-                    (major_arch == 7 && minor_arch == 0)) ? trim_threads : max_threads;
-        break;
-      case ForceAccumulationMethod::WHOLE:
-        nthreads = (major_arch == 7 && minor_arch == 0) ? trim_threads : max_threads;
-        break;
-      }
+      nthreads = max_threads;
       break;
     }
     

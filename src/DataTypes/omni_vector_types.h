@@ -257,6 +257,16 @@ template <typename T> int getHpcVectorTypeSize();
 /// \brief Produce a platform-independent name by which to identify one of the scalar data types.
 template <typename T> std::string getOmniHpcVectorTypeName();
 
+/// \brief A mixed tuple for 95-bit integer accumulation.  This is the proper way to take
+///        double-precision floating point arithmetic into fixed precision format with minimal
+///        loss.
+struct int95_t {
+  long long int x;  ///< The primary accumulator.  If the fixed precision takes 55 bits after
+                    ///<   the decimal, this accumulator is enough to capture all the
+                    ///<   information in a 64-bit floating point number in the range +/-256.
+  int y;            ///< Overflow accumulator, used when the primary value would be exceeded
+};
+  
 /// \brief A template-compatible class for implementing vectorized two-tuples in C++ code, based
 ///        on a single scalar type.
 template <typename T> struct Vec2 {
