@@ -43,8 +43,8 @@ __device__ __forceinline__ void splitForceContribution(const double dval, const 
   }
   const llint prim_old = atomicAdd((ullint*)&primary[pos], lliToUlli(ival));
   const llint prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
+  if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
+    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 4);
   }
 }
 
@@ -154,7 +154,7 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
 /// \{
 __device__ __forceinline__ int95_t combineSplitFixedPrecision(const int95_t a, const int95_t b) {
   int95_t result = { a.x + b.x, a.y + b.y };
-  result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 2;
+  result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 4;
   return result;
 }
 
@@ -179,7 +179,7 @@ __device__ __forceinline__ int95_t antiCombineSplitFixedPrecision(const int95_t 
                                                                   const int95_t b) {
   int95_t result = { a.x + b.x, a.y + b.y };
   if ((b.x > 0LL && result.x < a.x) || b.x < 0LL && result.x > a.x) {
-    result.y += (1 - (2 * (b.x < 0LL))) * 2 * ((b.x > 0LL && result.x < a.x) +
+    result.y += (1 - (2 * (b.x < 0LL))) * 4 * ((b.x > 0LL && result.x < a.x) +
                                                (b.x < 0LL && result.x > a.x));
   }
   result.x = -result.x;

@@ -20,10 +20,9 @@ template <typename T> struct CacheResourceKit {
   ///        of the charges.
   CacheResourceKit(int max_blocks_in, int max_atoms_in, llint* xcrd_in, llint* ycrd_in,
                    llint* zcrd_in, llint* xvel_in, llint* yvel_in, llint* zvel_in,
-                   int* xcrd_overflow_in, int* ycrd_overflow_in, int* zcrd_overflow_in,
-                   int* xvel_overflow_in, int* yvel_overflow_in, int* zvel_overflow_in,
-                   int* xfrc_overflow_in, int* yfrc_overflow_in, int* zfrc_overflow_in,
-                   T* charges_in, int* lj_idx_in);
+                   int* xcrd_ovrf_in, int* ycrd_ovrf_in, int* zcrd_ovrf_in, int* xvel_ovrf_in,
+                   int* yvel_ovrf_in, int* zvel_ovrf_in, int* xfrc_ovrf_in, int* yfrc_ovrf_in,
+                   int* zfrc_ovrf_in, T* charges_in, int* lj_idx_in);
 
   /// \brief The usual copy and move constructors for an abstract with one or more const member
   ///        variables apply.
@@ -41,15 +40,15 @@ template <typename T> struct CacheResourceKit {
   llint* xvel;           ///< Cartesian X velocities of locally cached particles
   llint* yvel;           ///< Cartesian Y velocities of locally cached particles
   llint* zvel;           ///< Cartesian Z velocities of locally cached particles
-  int* xcrd_overflow;    ///< Cartesian X coordinate overflow buffers
-  int* ycrd_overflow;    ///< Cartesian Y coordinate overflow buffers
-  int* zcrd_overflow;    ///< Cartesian Z coordinate overflow buffers
-  int* xvel_overflow;    ///< Cartesian X velocity overflow buffers
-  int* yvel_overflow;    ///< Cartesian Y velocity overflow buffers
-  int* zvel_overflow;    ///< Cartesian Z velocity overflow buffers
-  int* xfrc_overflow;    ///< Cartesian X force overflow buffers
-  int* yfrc_overflow;    ///< Cartesian Y force overflow buffers
-  int* zfrc_overflow;    ///< Cartesian Z force overflow buffers
+  int* xcrd_ovrf;        ///< Cartesian X coordinate overflow buffers
+  int* ycrd_ovrf;        ///< Cartesian Y coordinate overflow buffers
+  int* zcrd_ovrf;        ///< Cartesian Z coordinate overflow buffers
+  int* xvel_ovrf;        ///< Cartesian X velocity overflow buffers
+  int* yvel_ovrf;        ///< Cartesian Y velocity overflow buffers
+  int* zvel_ovrf;        ///< Cartesian Z velocity overflow buffers
+  int* xfrc_ovrf;        ///< Cartesian X force overflow buffers
+  int* yfrc_ovrf;        ///< Cartesian Y force overflow buffers
+  int* zfrc_ovrf;        ///< Cartesian Z force overflow buffers
   T* charges;            ///< Charge parameters for locally cached particles (non-const
                          ///<   anticipating some future support of a polarizable model)
   int* lj_idx;           ///< Lennard-Jones indices of locally cached particles

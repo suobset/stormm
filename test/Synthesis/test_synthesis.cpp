@@ -25,6 +25,7 @@
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Restraints/restraint_builder.h"
 #include "../../src/Structure/local_arrangement.h"
+#include "../../src/Synthesis/nonbonded_workunit.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
@@ -71,13 +72,6 @@ using namespace omni::synthesis;
 using namespace omni::testing;
 using namespace omni::topology;
 using namespace omni::trajectory;
-
-// CHECK
-#include "../../src/Synthesis/nonbonded_workunit.h"
-using omni::synthesis::NonbondedWorkUnit;
-using omni::synthesis::buildNonbondedWorkUnits;
-using omni::data_types::int4;
-// END CHECK
 
 //-------------------------------------------------------------------------------------------------
 // Check the coverage of a simple task form a ValenceWorkUnit.
@@ -629,7 +623,9 @@ int main(const int argc, const char* argv[]) {
 
   // Section 4
   section("Static exclusion mask compilation");
-  
+
+  // Test the construction of a systems cache (one possible precursor to a synthesis of
+  // coordinates and / or topologies)
   section(1);
   const char osc = osSeparator();
   const TestPriority test_sysc = (oe.getTemporaryDirectoryAccess()) ? TestPriority::CRITICAL :
@@ -831,6 +827,69 @@ int main(const int argc, const char* argv[]) {
   check(y_muta, RelationalOperator::NOT_EQUAL, Approx(y_copy).margin(1.0e-8),
         "The PhaseSpaceSynthesis object returns an image of one of its systems with higher "
         "fidelity to the original than expected.", do_tests);
+
+  // Check the high-precision modes of a phase-space synthesis: are the extended coordinate,
+  // velocity, and force arrays reporting the correct results?
+  PhaseSpaceSynthesis highres(psv, agv, 54, 24, 60, 55);
+  PsSynthesisWriter highres_w = highres.data();
+  std::vector<double> pos_mues(highres_w.system_count);
+  std::vector<double> vel_mues(highres_w.system_count);
+  std::vector<double> frc_mues(highres_w.system_count);
+  for (int i = 0; i < highres_w.system_count; i++) {
+    const int jlim = highres_w.atom_starts[i] + highres_w.atom_counts[i];
+    PhaseSpace sysi_ps = highres.exportSystem(i);
+    PhaseSpaceWriter sysi_psw = sysi_ps.data();
+    for (int j = highres_w.atom_starts[i]; j < jlim; j++) {
+      const size_t jlocal = j - highres_w.atom_starts[i];
+      const double tx_frc = 1024.0 * (0.5 - my_prng.uniformRandomNumber());
+      const double ty_frc = 1024.0 * (0.5 - my_prng.uniformRandomNumber());
+      const double tz_frc = 1024.0 * (0.5 - my_prng.uniformRandomNumber());
+      sysi_psw.xfrc[jlocal] = tx_frc;
+      sysi_psw.yfrc[jlocal] = ty_frc;
+      sysi_psw.zfrc[jlocal] = tz_frc;
+      splitRealConversion(tx_frc * highres_w.frc_scale, &highres_w.xfrc[j],
+                          &highres_w.xfrc_ovrf[j]);
+      splitRealConversion(ty_frc * highres_w.frc_scale, &highres_w.yfrc[j],
+                          &highres_w.yfrc_ovrf[j]);
+      splitRealConversion(tz_frc * highres_w.frc_scale, &highres_w.zfrc[j],
+                          &highres_w.zfrc_ovrf[j]);
+      const double tx_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
+      const double ty_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
+      const double tz_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
+      sysi_psw.xvel[jlocal] = tx_vel;
+      sysi_psw.yvel[jlocal] = ty_vel;
+      sysi_psw.zvel[jlocal] = tz_vel;
+      splitRealConversion(tx_vel * highres_w.vel_scale, &highres_w.xvel[j],
+                          &highres_w.xvel_ovrf[j]);
+      splitRealConversion(ty_vel * highres_w.vel_scale, &highres_w.yvel[j],
+                          &highres_w.yvel_ovrf[j]);
+      splitRealConversion(tz_vel * highres_w.vel_scale, &highres_w.zvel[j],
+                          &highres_w.zvel_ovrf[j]);
+    }
+    const PhaseSpace sysi_rb = highres.exportSystem(i);
+    const TrajectoryKind tjpos = TrajectoryKind::POSITIONS;
+    const TrajectoryKind tjvel = TrajectoryKind::VELOCITIES;
+    const TrajectoryKind tjfrc = TrajectoryKind::FORCES;
+    const std::vector<double> ps_coords = sysi_ps.getInterlacedCoordinates(tjpos);
+    const std::vector<double> ps_velocs = sysi_ps.getInterlacedCoordinates(tjvel);
+    const std::vector<double> ps_forces = sysi_ps.getInterlacedCoordinates(tjfrc);
+    const std::vector<double> rb_coords = sysi_rb.getInterlacedCoordinates(tjpos);
+    const std::vector<double> rb_velocs = sysi_rb.getInterlacedCoordinates(tjvel);
+    const std::vector<double> rb_forces = sysi_rb.getInterlacedCoordinates(tjfrc);
+    pos_mues[i] = meanUnsignedError(ps_coords, rb_coords);
+    vel_mues[i] = meanUnsignedError(ps_velocs, rb_velocs);
+    frc_mues[i] = meanUnsignedError(ps_forces, rb_forces);
+  }
+  const Approx dead_on = Approx(std::vector<double>(highres_w.system_count, 0.0)).margin(verytiny);
+  check(pos_mues, RelationalOperator::EQUAL, dead_on, "Positions recorded in a high-precision "
+        "PhaseSpaceSynthesis object do not produce the correct values when a PhaseSpace object is "
+        "exported.", do_tests);
+  check(vel_mues, RelationalOperator::EQUAL, dead_on, "Velocities recorded in a high-precision "
+        "PhaseSpaceSynthesis object do not produce the correct values when a PhaseSpace object is "
+        "exported.", do_tests);
+  check(frc_mues, RelationalOperator::EQUAL, dead_on, "Forces recorded in a high-precision "
+        "PhaseSpaceSynthesis object do not produce the correct values when a PhaseSpace object is "
+        "exported.", do_tests);
 
   // Prepare valence work units for the array of topologies
   section(3);

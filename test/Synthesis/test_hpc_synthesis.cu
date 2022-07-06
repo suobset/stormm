@@ -150,6 +150,18 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
+    // CHECK
+    for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
+      if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 1.0e-4 ||
+          fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-4 ||
+          fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-4) {
+        printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
+               i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
+               devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
+      }
+    }
+    // END CHECK
+
     // These systems contain some hard clashes, which generate very large forces.  This is good
     // for testing the split force accumulation, but not for discerning values that are truly
     // inaccurate.  Check the forces individually and clean out large values that are within
@@ -277,6 +289,12 @@ int main(const int argc, const char* argv[]) {
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
   StopWatch timer;
+
+  // CHECK
+  printf("max_llint_accumulation_ll = %20lld\n", max_llint_accumulation_ll);
+  printf("max_llint_accumulation    = %20.12e\n", max_llint_accumulation);
+  printf("max_llint_accumulation_f  = %20.12e\n", max_llint_accumulation_f);
+  // END CHECK
   
   // Section 1
   section("Coordinate compilation and staging");
@@ -330,7 +348,7 @@ int main(const int argc, const char* argv[]) {
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc);
-  PhaseSpaceSynthesis poly_ps_dbl(sysc, 40, 24, 40, 55);
+  PhaseSpaceSynthesis poly_ps_dbl(sysc, 28, 24, 40, 45);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);

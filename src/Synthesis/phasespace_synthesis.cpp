@@ -80,7 +80,7 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
     sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
     xcrd_ovrf{xcrd_ovrf_in}, ycrd_ovrf{ycrd_ovrf_in}, zcrd_ovrf{zcrd_ovrf_in}, 
     xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xvel_ovrf{xvel_ovrf_in}, yvel_ovrf{yvel_ovrf_in},
-    zvel_ovrf{zcrd_ovrf_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
+    zvel_ovrf{zvel_ovrf_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
     yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
 {}
 
@@ -127,7 +127,7 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
     sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
     xcrd_ovrf{xcrd_ovrf_in}, ycrd_ovrf{ycrd_ovrf_in}, zcrd_ovrf{zcrd_ovrf_in}, 
     xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xvel_ovrf{xvel_ovrf_in}, yvel_ovrf{yvel_ovrf_in},
-    zvel_ovrf{zcrd_ovrf_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
+    zvel_ovrf{zvel_ovrf_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
     yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
 {}
 
@@ -456,6 +456,18 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const SystemCache &sysc,
     PhaseSpaceSynthesis(sysc.getCoordinateReference(), sysc.getSystemTopologyPointerCC(),
                         heat_baths_in, pistons_in, time_step_in, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                                         const std::vector<AtomGraph*> &ag_list,
+                                         const int globalpos_scale_bits_in,
+                                         const int localpos_scale_bits_in,
+                                         const int velocity_scale_bits_in,
+                                         const int force_scale_bits_in) :
+    PhaseSpaceSynthesis(ps_list, ag_list, { Thermostat() }, { Barostat() }, 1.0,
+                        globalpos_scale_bits_in, localpos_scale_bits_in, velocity_scale_bits_in,
+                        force_scale_bits_in)
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -1625,6 +1637,17 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
       tmp_ycrd[j - fr_start] = static_cast<double>(xcrd_ptr[j]) * inverse_globalpos_scale;
       tmp_zcrd[j - fr_start] = static_cast<double>(xcrd_ptr[j]) * inverse_globalpos_scale;
     }
+    if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+      const int* xcrd_ovrf_ptr = x_coordinate_overflow.data();
+      const int* ycrd_ovrf_ptr = y_coordinate_overflow.data();
+      const int* zcrd_ovrf_ptr = z_coordinate_overflow.data();
+      const double inv_ovrf_scale = inverse_globalpos_scale * max_llint_accumulation;
+      for (int j = fr_start; j < fr_end; j++) {
+        tmp_xcrd[j - fr_start] += static_cast<double>(xcrd_ovrf_ptr[j]) * inv_ovrf_scale;
+        tmp_ycrd[j - fr_start] += static_cast<double>(ycrd_ovrf_ptr[j]) * inv_ovrf_scale;
+        tmp_zcrd[j - fr_start] += static_cast<double>(zcrd_ovrf_ptr[j]) * inv_ovrf_scale;
+      }
+    }
 
     // Transfer the particle velocities, if necessary
     switch (output_kind) {
@@ -1646,6 +1669,17 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
           tmp_xvel[j - fr_start] = static_cast<double>(xvel_ptr[j]) * inverse_velocity_scale;
           tmp_yvel[j - fr_start] = static_cast<double>(yvel_ptr[j]) * inverse_velocity_scale;
           tmp_zvel[j - fr_start] = static_cast<double>(zvel_ptr[j]) * inverse_velocity_scale;
+        }
+        if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+          const int* xvel_ovrf_ptr = x_velocity_overflow.data();
+          const int* yvel_ovrf_ptr = y_velocity_overflow.data();
+          const int* zvel_ovrf_ptr = z_velocity_overflow.data();
+          const double inv_ovrf_scale = inverse_velocity_scale * max_llint_accumulation;
+          for (int j = fr_start; j < fr_end; j++) {
+            tmp_xvel[j - fr_start] += static_cast<double>(xvel_ovrf_ptr[j]) * inv_ovrf_scale;
+            tmp_yvel[j - fr_start] += static_cast<double>(yvel_ovrf_ptr[j]) * inv_ovrf_scale;
+            tmp_zvel[j - fr_start] += static_cast<double>(zvel_ovrf_ptr[j]) * inv_ovrf_scale;
+          }
         }
       }
       break;

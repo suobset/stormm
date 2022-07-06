@@ -1,6 +1,8 @@
 #include "../../src/Constants/fixed_precision.h"
+#include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/common_types.h"
+#include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/vector_ops.h"
@@ -10,8 +12,10 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
+using omni::constants::tiny;
 using omni::data_types::llint;
 using omni::data_types::float2;
+using omni::data_types::int95_t;
 using omni::diskutil::DrivePathType;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::osSeparator;
@@ -25,32 +29,6 @@ using namespace omni::numerics;
 using namespace omni::testing;
 
 //-------------------------------------------------------------------------------------------------
-// Convert a floating point number into a fixed-precision representation with two integers.
-//
-// Arguments:
-//   fval:      The value to convert to fixed-precision
-//   primary:   The primary accumulator (the low 32 bits)
-//   overflow:  The secondary accumulator (the high 31 bits)
-//-------------------------------------------------------------------------------------------------
-void splitForceContribution(const float fval, int *primary, int *overflow) {
-  int ival;
-  if (fabsf(fval) >= max_int_accumulation) {
-    const int spillover = fval / max_int_accumulation_f;
-    ival = fval - (spillover * max_int_accumulation_f);
-    *overflow += spillover;
-  }
-  else {
-    ival = fval;
-  }
-  const int prim_old = *primary;
-  *primary += ival;
-  const int prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    *overflow += (1 - (2 * (ival < 0))) * 2;
-  }
-}
-
-//-------------------------------------------------------------------------------------------------
 // Test the split accumulation method over a segment of the number line.
 //
 // Arguments:
@@ -60,24 +38,37 @@ void splitForceContribution(const float fval, int *primary, int *overflow) {
 //   scale_bits:  The number of bits after the decimal
 //-------------------------------------------------------------------------------------------------
 void testSplitAccumulation(const double llim, const double hlim, const double incr,
-                           const int scale_bits) {
+                           const int scale_bits, const PrecisionLevel lvl) {
   const double scale_factor = pow(2.0, scale_bits);
+  const double inv_scale_factor = 1.0 / scale_factor;
+  const double inv_overflow_factor = max_llint_accumulation / scale_factor;
   const float scale_factorf = scale_factor;
   int n_basic_fail = 0;
   for (double r = llim; r < hlim; r += incr) {
     const double scaled_r = r * scale_factor;
-    const llint dp_result = scaled_r;
-    float fr = r;
-    const float scaled_fr = fr * scale_factor;
-    const llint fp_result = scaled_fr;
-    int overflow = 0;
-    int workbin = 0;
-    splitForceContribution(scaled_fr, &workbin, &overflow);
-    const llint lloverflow = overflow;
-    const llint llworkbin  = workbin;
-    const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
-    if (fp_reconst != fp_result) {
-      n_basic_fail++;
+    switch (lvl) {
+    case PrecisionLevel::SINGLE:
+    case PrecisionLevel::SINGLE_PLUS:
+      {
+        const llint dp_result = scaled_r;
+        float fr = r;
+        const float scaled_fr = fr * scale_factor;
+        const llint fp_result = scaled_fr;
+        int overflow, workbin;
+        splitRealConversion(scaled_fr, &workbin, &overflow);
+        const llint lloverflow = overflow;
+        const llint llworkbin  = workbin;
+        const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
+        if (fp_reconst != fp_result) {
+          n_basic_fail++;
+        }
+      }
+      break;
+    case PrecisionLevel::DOUBLE:
+      {
+        
+      }
+      break;
     }
   }
   const double ellim = llim * 0.125;
@@ -85,33 +76,59 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
   const double eincr = incr * 0.125;
   int n_inc_fail = 0;
   for (double r = ellim; r < ehlim; r += eincr) {
-    llint dp_result = 0LL;
-    llint fp_result = 0LL;
-    int overflow = 0;
-    int workbin = 0;
-    for (int i = 0; i < 9; i++) {
-      float fr = r;
-      double scaled_r = r * scale_factor;
-      float scaled_fr = fr * scale_factorf;
-      splitForceContribution(scaled_fr, &workbin, &overflow);
-      dp_result += static_cast<llint>(scaled_r);
-      fp_result += static_cast<llint>(scaled_fr);
-    }
-    const llint lloverflow = overflow;
-    const llint llworkbin  = workbin;
-    const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
-    if (fp_reconst != fp_result) {
-      n_inc_fail++;
+    switch (lvl) {
+    case PrecisionLevel::SINGLE:
+    case PrecisionLevel::SINGLE_PLUS:
+      {
+        llint dp_result = 0LL;
+        llint fp_result = 0LL;
+        int overflow = 0;
+        int workbin = 0;
+        for (int i = 0; i < 9; i++) {
+          float fr = r;
+          double scaled_r = r * scale_factor;
+          float scaled_fr = fr * scale_factorf;
+          splitRealAccumulation(scaled_fr, &workbin, &overflow);
+          dp_result += static_cast<llint>(scaled_r);
+          fp_result += static_cast<llint>(scaled_fr);
+        }
+        const llint lloverflow = overflow;
+        const llint llworkbin  = workbin;
+        const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
+        if (fp_reconst != fp_result) {
+          n_inc_fail++;
+        }
+      }
+      break;
+    case PrecisionLevel::DOUBLE:
+      {
+        double dp_tracker = 0.0;
+        int overflow = 0;
+        llint workbin = 0LL;
+        for (int i = 0; i < 9; i++) {
+          double scaled_r = r * scale_factor;
+          splitRealAccumulation(scaled_r, &workbin, &overflow);
+          dp_tracker += r;
+        }
+        double dp_reconstruct = static_cast<double>(workbin) * inv_scale_factor;
+        dp_reconstruct += static_cast<double>(overflow) * inv_overflow_factor;
+        if (fabs(dp_reconstruct - dp_tracker) > tiny) {
+          n_inc_fail++;
+        }
+      }
+      break;
     }
   }
   check(n_basic_fail == 0, "A total of " + std::to_string(n_basic_fail) + " failures were "
         "recorded converting the range " + realToString(llim, 8, 4) + " : " +
         realToString(hlim, 8, 4) + " to split integer fixed-precision values when sampled with "
-        "a " + realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.");
+        "a " + realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.  Precision "
+        "model: " + getPrecisionLevelName(lvl) + ".");
   check(n_inc_fail == 0, "A total of " + std::to_string(n_inc_fail) + " failures were recorded "
         "converting the range " + realToString(ellim, 8, 4) + " : " + realToString(ehlim, 8, 4) +
         " to split integer fixed-precision values by incrementing 9x when sampled with a " +
-        realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.");
+        realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.  Precision model: " +
+        getPrecisionLevelName(lvl) + ".");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -212,13 +229,20 @@ int main(const int argc, const char* argv[]) {
 
   // Test direct conversion
   section(2);
-  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 26);
-  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 26);
-  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 26);
-  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 26);
-  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 26);
-  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 26);
-  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 26);
+  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
+  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
 
   // Print results
   printTestSummary(oe.getVerbosity());

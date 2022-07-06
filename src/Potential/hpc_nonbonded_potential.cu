@@ -32,6 +32,7 @@ using synthesis::tile_groups_wu_abstract_length;
 // Single-precision floating point definitions
 #define NONBOND_KERNEL_THREAD_COUNT 256
 #define TCALC float
+#  define TCALC_IS_SINGLE
 #  if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
 #    define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
 #  else
@@ -67,6 +68,7 @@ using synthesis::tile_groups_wu_abstract_length;
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
+#  undef TCALC_IS_SINGLE
 #undef TCALC
 
 #define TCALC double

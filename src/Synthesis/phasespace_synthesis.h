@@ -299,6 +299,12 @@ public:
                       int force_scale_bits_in = default_force_scale_bits);
 
   PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
+                      const std::vector<AtomGraph*> &ag_list, int globalpos_scale_bits_in,
+                      int localpos_scale_bits_in = default_localpos_scale_bits,
+                      int velocity_scale_bits_in = default_velocity_scale_bits,
+                      int force_scale_bits_in = default_force_scale_bits);
+
+  PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
                       const std::vector<AtomGraph*> &ag_list, const std::vector<int> &index_key,
                       int globalpos_scale_bits_in,
                       int localpos_scale_bits_in = default_localpos_scale_bits,

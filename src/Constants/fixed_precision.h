@@ -138,7 +138,7 @@ constexpr int    max_charge_mesh_scale_bits = 48;
 
 /// \brief The maximum contribution for signed integer accumulation
 /// \{
-constexpr llint max_llint_accumulation_ll = (1LL << (llint_bit_count_int - 1));
+constexpr llint max_llint_accumulation_ll = (1LL << (llint_bit_count_int - 2));
 constexpr double max_llint_accumulation   = max_llint_accumulation_ll;
 constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 constexpr llint max_int_accumulation_ll = (1LL << (int_bit_count_int - 1));

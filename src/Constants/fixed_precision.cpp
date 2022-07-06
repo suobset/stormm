@@ -176,6 +176,7 @@ void splitRealConversion(const float fval, int *primary, int *overflow) {
   }
   else {
     *primary = fval;
+    *overflow = 0;
   }
 }
 
@@ -188,6 +189,7 @@ void splitRealConversion(const double dval, llint *primary, int *overflow) {
   }
   else {
     *primary = dval;
+    *overflow = 0;
   }
 }
 
@@ -225,7 +227,7 @@ void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
   *primary += ival;
   const llint prim_old_plus_ival = prim_old + ival;
   if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    *overflow += (1 - (2 * (ival < 0))) * 2;
+    *overflow += (1 - (2 * (ival < 0))) * 4;
   }
 }
 

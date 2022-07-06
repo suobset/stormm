@@ -241,7 +241,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define SIN_FUNC  sinf
 #  define ABS_FUNC  fabsf
 #  define MIX_FUNC  computeRestraintMixtureF
-#  define CHECK_COSARG
+#  define TCALC_IS_SINGLE
   
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
@@ -336,7 +336,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef SIN_FUNC
 #  undef ABS_FUNC
 #  undef MIX_FUNC
-#  undef CHECK_COSARG
+#  undef TCALC_IS_SINGLE
 #undef TCALC
 
 // Double-precision floating point definitions
