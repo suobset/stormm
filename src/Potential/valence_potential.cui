@@ -224,28 +224,79 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
         const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
         const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 ab = { (TCALC)(jxloc - ixloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(jyloc - iyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(jzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);
+        const TCALC3 ab = { (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
         const llint kzloc = __ldca(&gmem_r.zcrd[k_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 bc = { (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int kxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[k_atom]);
+        const int kyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[k_atom]);
+        const int kzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[k_atom]);
+        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - kyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - kzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int lxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[l_atom]);
+        const int lyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[l_atom]);
+        const int lzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[l_atom]);
+        const TCALC3 cd = { (((TCALC)(lxloc_ovrf - kxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lxloc - kxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lyloc_ovrf - kyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lyloc - kyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lzloc_ovrf - kzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lzloc - kzloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint mxloc = __ldca(&gmem_r.xcrd[m_atom]);
         const llint myloc = __ldca(&gmem_r.ycrd[m_atom]);
         const llint mzloc = __ldca(&gmem_r.zcrd[m_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 de = { (TCALC)(mxloc - lxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(myloc - lyloc) * poly_psw.inv_gpos_scale_f,
-                            (TCALC)(mzloc - lzloc) * poly_psw.inv_gpos_scale_f };
-
+                            (TCALC)(mzloc - lzloc) * poly_psw.inv_gpos_scale_f };        
+#else
+        const int mxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[m_atom]);
+        const int myloc_ovrf = __ldca(&gmem_r.ycrd_overflow[m_atom]);
+        const int mzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[m_atom]);
+        const TCALC3 de = { (((TCALC)(mxloc_ovrf - lxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(mxloc - lxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(myloc_ovrf - lyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(myloc - lyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(mzloc_ovrf - lzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(mzloc - lzloc)) * poly_psw.inv_gpos_scale };
+#endif
+        
         // Compute the first dihedral angle
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);
@@ -575,24 +626,69 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
         const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
         const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 ab = { (TCALC)(jxloc - ixloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(jyloc - iyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(jzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);        
+        const TCALC3 ab = { (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
         const llint kzloc = __ldca(&gmem_r.zcrd[k_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 bc = { (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int kxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[k_atom]);
+        const int kyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[k_atom]);
+        const int kzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[k_atom]);
+        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - kyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - kzloc) * poly_psw.inv_gpos_scale_f };
         const TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int lxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[l_atom]);
+        const int lyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[l_atom]);
+        const int lzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[l_atom]);
+        const TCALC3 cd = { (((TCALC)(lxloc_ovrf - kxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lxloc - kxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lyloc_ovrf - kyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lyloc - kyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lzloc_ovrf - kzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lzloc - kzloc)) * poly_psw.inv_gpos_scale };
+        const TCALC3 ad = { (((TCALC)(lxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lxloc - ixloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lyloc - iyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lzloc - izloc)) * poly_psw.inv_gpos_scale };
+#endif
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);
         const TCALC3 scr = crossProduct(crabbc, crbccd);
@@ -857,24 +953,51 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC keq      = __ldca(&poly_vk.angl_keq[param_idx]);
         const TCALC theta_eq = __ldca(&poly_vk.angl_theta[param_idx]);
         const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
-        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
-        const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
-        const TCALC ba_x = (TCALC)(ixloc - jxloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC bc_x = (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f;
         const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
-        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
-        const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
-        const TCALC ba_y = (TCALC)(iyloc - jyloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC bc_y = (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f;
         const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
+        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
         const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
+        const TCALC3 ba = { (TCALC)(ixloc - jxloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(iyloc - jyloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(izloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);
+        const TCALC3 ba = { (((TCALC)(ixloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(ixloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(iyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(iyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(izloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(izloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
+        const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
+        const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
         const llint kzloc = __ldca(&gmem_r.zcrd[k_atom]);
-        const TCALC ba_z = (TCALC)(izloc - jzloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC bc_z = (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC mgba = (ba_x * ba_x) + (ba_y * ba_y) + (ba_z * ba_z);
-        const TCALC mgbc = (bc_x * bc_x) + (bc_y * bc_y) + (bc_z * bc_z);
+#ifdef CHECK_COSARG
+        const TCALC3 bc = { (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int kxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[k_atom]);
+        const int kyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[k_atom]);
+        const int kzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[k_atom]);
+        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
+        const TCALC mgba = (ba.x * ba.x) + (ba.y * ba.y) + (ba.z * ba.z);
+        const TCALC mgbc = (bc.x * bc.x) + (bc.y * bc.y) + (bc.z * bc.z);
         const TCALC invbabc = (TCALC)(1.0) / SQRT_FUNC(mgba * mgbc);
-        TCALC costheta = ((ba_x * bc_x) + (ba_y * bc_y) + (ba_z * bc_z)) * invbabc;
+        TCALC costheta = ((ba.x * bc.x) + (ba.y * bc.y) + (ba.z * bc.z)) * invbabc;
         costheta = (costheta < (TCALC)(-1.0)) ?
                    (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
         const TCALC theta = ACOS_FUNC(costheta);
@@ -910,15 +1033,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         // in the CPU, which are then added to the I and K atoms, respectively.  The "anti-sum"
         // of the two (the most convenient way to flip the signs of both elements of an int2) is
         // then added to the J atom.
-        const SPLIT_TYPE iadf_x = SPLITCONV_FUNC((costheta * ba_x * sqba) - (bc_x * mbabc));
-        const SPLIT_TYPE iadf_y = SPLITCONV_FUNC((costheta * ba_y * sqba) - (bc_y * mbabc));
-        const SPLIT_TYPE iadf_z = SPLITCONV_FUNC((costheta * ba_z * sqba) - (bc_z * mbabc));
+        const SPLIT_TYPE iadf_x = SPLITCONV_FUNC((costheta * ba.x * sqba) - (bc.x * mbabc));
+        const SPLIT_TYPE iadf_y = SPLITCONV_FUNC((costheta * ba.y * sqba) - (bc.y * mbabc));
+        const SPLIT_TYPE iadf_z = SPLITCONV_FUNC((costheta * ba.z * sqba) - (bc.z * mbabc));
         addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, sh_zfrc_overflow);
-        const SPLIT_TYPE icdf_x = SPLITCONV_FUNC((costheta * bc_x * sqbc) - (ba_x * mbabc));
-        const SPLIT_TYPE icdf_y = SPLITCONV_FUNC((costheta * bc_y * sqbc) - (ba_y * mbabc));
-        const SPLIT_TYPE icdf_z = SPLITCONV_FUNC((costheta * bc_z * sqbc) - (ba_z * mbabc));
+        const SPLIT_TYPE icdf_x = SPLITCONV_FUNC((costheta * bc.x * sqbc) - (ba.x * mbabc));
+        const SPLIT_TYPE icdf_y = SPLITCONV_FUNC((costheta * bc.y * sqbc) - (ba.y * mbabc));
+        const SPLIT_TYPE icdf_z = SPLITCONV_FUNC((costheta * bc.z * sqbc) - (ba.z * mbabc));
         addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, sh_zfrc_overflow);
@@ -929,12 +1052,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, sh_zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
-        const llint iadf_x = LLCONV_FUNC((bc_x * mbabc) - (costheta * ba_x * sqba));
-        const llint iadf_y = LLCONV_FUNC((bc_y * mbabc) - (costheta * ba_y * sqba));
-        const llint iadf_z = LLCONV_FUNC((bc_z * mbabc) - (costheta * ba_z * sqba));
-        const llint icdf_x = LLCONV_FUNC((ba_x * mbabc) - (costheta * bc_x * sqbc));
-        const llint icdf_y = LLCONV_FUNC((ba_y * mbabc) - (costheta * bc_y * sqbc));
-        const llint icdf_z = LLCONV_FUNC((ba_z * mbabc) - (costheta * bc_z * sqbc));
+        const llint iadf_x = LLCONV_FUNC((bc.x * mbabc) - (costheta * ba.x * sqba));
+        const llint iadf_y = LLCONV_FUNC((bc.y * mbabc) - (costheta * ba.y * sqba));
+        const llint iadf_z = LLCONV_FUNC((bc.z * mbabc) - (costheta * ba.z * sqba));
+        const llint icdf_x = LLCONV_FUNC((ba.x * mbabc) - (costheta * bc.x * sqbc));
+        const llint icdf_y = LLCONV_FUNC((ba.y * mbabc) - (costheta * bc.y * sqbc));
+        const llint icdf_z = LLCONV_FUNC((ba.z * mbabc) - (costheta * bc.z * sqbc));
         atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli(-iadf_x));
         atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli(-iadf_y));
         atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(-iadf_z));
@@ -978,14 +1101,29 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC leq = (is_urey_bradley) ? __ldca(&poly_vk.ubrd_leq[param_idx]) :
                                               ABS_FUNC(__ldca(&poly_vk.bond_leq[param_idx]));
         const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
-        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
-        const TCALC dx = (TCALC)(jxloc - ixloc) * poly_psw.inv_gpos_scale_f;
         const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
-        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
-        const TCALC dy = (TCALC)(jyloc - iyloc) * poly_psw.inv_gpos_scale_f;
         const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
+        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
         const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
+        const TCALC dx = (TCALC)(jxloc - ixloc) * poly_psw.inv_gpos_scale_f;
+        const TCALC dy = (TCALC)(jyloc - iyloc) * poly_psw.inv_gpos_scale_f;
         const TCALC dz = (TCALC)(jzloc - izloc) * poly_psw.inv_gpos_scale_f;
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);
+        const TCALC dx = (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale;
+        const TCALC dy = (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale;
+        const TCALC dz = (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale;
+#endif
         const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
         const TCALC dl = dr - leq;
 #ifdef COMPUTE_ENERGY
@@ -1074,14 +1212,29 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
           attn_lj14 = (TCALC)(1.0) / __ldca(&poly_vk.attn14_vdw[attn_idx]);
         }
         const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
-        const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
-        const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
         const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
-        const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
-        const TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
         const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
+        const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
+#ifdef CHECK_COSARG
+        const TCALC dx = (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f;
+        const TCALC dy = (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f;
         const TCALC dz = (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f;
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int lxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[l_atom]);
+        const int lyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[l_atom]);
+        const int lzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[l_atom]);
+        const TCALC dx = (((TCALC)(lxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(lxloc - ixloc)) * poly_psw.inv_gpos_scale;
+        const TCALC dy = (((TCALC)(lyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(lyloc - iyloc)) * poly_psw.inv_gpos_scale;
+        const TCALC dz = (((TCALC)(lzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(lzloc - izloc)) * poly_psw.inv_gpos_scale;
+#endif
         const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
         const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
         const int sysid = vwu_map[(size_t)(VwuAbstractMap::SYSTEM_ID)].x;
@@ -1186,12 +1339,27 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC2 finl_xy = __ldca(&poly_rk.rposn_finl_xy[xyz_param_idx]);
         const TCALC  init_z  = __ldca(&poly_rk.rposn_init_z[xyz_param_idx]);
         const TCALC  finl_z  = __ldca(&poly_rk.rposn_finl_z[xyz_param_idx]);
+#ifdef CHECK_COSARG
         const TCALC dx = ((TCALC)(__ldca(&gmem_r.xcrd[p_atom])) * poly_psw.inv_gpos_scale_f) -
                          ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
         const TCALC dy = ((TCALC)(__ldca(&gmem_r.ycrd[p_atom])) * poly_psw.inv_gpos_scale_f) -
                          ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
         const TCALC dz = ((TCALC)(__ldca(&gmem_r.zcrd[p_atom])) * poly_psw.inv_gpos_scale_f) -
                          ((mixwt.x * init_z) + (mixwt.y * finl_z));
+#else
+        const TCALC dx = ((((TCALC)(__ldca(&gmem_r.xcrd_overflow[p_atom])) *
+                            max_llint_accumulation) +
+                           (TCALC)(__ldca(&gmem_r.xcrd[p_atom]))) * poly_psw.inv_gpos_scale_f) -
+                         ((mixwt.x * init_xy.x) + (mixwt.y * finl_xy.x));
+        const TCALC dy = ((((TCALC)(__ldca(&gmem_r.ycrd_overflow[p_atom])) *
+                            max_llint_accumulation) +
+                           (TCALC)(__ldca(&gmem_r.ycrd[p_atom]))) * poly_psw.inv_gpos_scale_f) -
+                         ((mixwt.x * init_xy.y) + (mixwt.y * finl_xy.y));
+        const TCALC dz = ((((TCALC)(__ldca(&gmem_r.zcrd_overflow[p_atom])) *
+                            max_llint_accumulation) +
+                           (TCALC)(__ldca(&gmem_r.zcrd[p_atom]))) * poly_psw.inv_gpos_scale_f) -
+                         ((mixwt.x * init_z) + (mixwt.y * finl_z));
+#endif
         const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
 
         // There is no 256-bit operation for global memory loads, so __ldca cannot be applied to
@@ -1267,12 +1435,30 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int kr_param_idx = tinsr.y;
         const int2 step_bounds = __ldca(&poly_rk.rbond_step_bounds[kr_param_idx]);
         const TCALC2 mixwt = MIX_FUNC(ctrl.step, step_bounds.x, step_bounds.y);
-        const TCALC dx = ((TCALC)(__ldca(&gmem_r.xcrd[j_atom])) * poly_psw.inv_gpos_scale_f) -
-                         ((TCALC)(__ldca(&gmem_r.xcrd[i_atom])) * poly_psw.inv_gpos_scale_f);
-        const TCALC dy = ((TCALC)(__ldca(&gmem_r.ycrd[j_atom])) * poly_psw.inv_gpos_scale_f) -
-                         ((TCALC)(__ldca(&gmem_r.ycrd[i_atom])) * poly_psw.inv_gpos_scale_f);
-        const TCALC dz = ((TCALC)(__ldca(&gmem_r.zcrd[j_atom])) * poly_psw.inv_gpos_scale_f) -
-                         ((TCALC)(__ldca(&gmem_r.zcrd[i_atom])) * poly_psw.inv_gpos_scale_f);
+        const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
+        const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
+        const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
+        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
+        const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
+        const TCALC dx = (TCALC)(jxloc - ixloc) * poly_psw.inv_gpos_scale;
+        const TCALC dy = (TCALC)(jyloc - iyloc) * poly_psw.inv_gpos_scale;
+        const TCALC dz = (TCALC)(jzloc - izloc) * poly_psw.inv_gpos_scale;
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);
+        const TCALC dx = (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale;
+        const TCALC dy = (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale;
+        const TCALC dz = (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                          (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale;
+#endif
         const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
         const TCALC3 rst_eval = restraintDelta(__ldca(&poly_rk.rbond_init_k[kr_param_idx]),
                                                __ldca(&poly_rk.rbond_finl_k[kr_param_idx]),
@@ -1337,24 +1523,51 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         int k_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
         const int kr_param_idx = tinsr.y;
         const llint ixloc = __ldca(&gmem_r.xcrd[i_atom]);
-        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
-        const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
-        const TCALC ba_x = (TCALC)(ixloc - jxloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC bc_x = (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f;
         const llint iyloc = __ldca(&gmem_r.ycrd[i_atom]);
-        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
-        const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
-        const TCALC ba_y = (TCALC)(iyloc - jyloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC bc_y = (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f;
         const llint izloc = __ldca(&gmem_r.zcrd[i_atom]);
+        const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
+        const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
         const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
+        const TCALC3 ba = { (TCALC)(ixloc - jxloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(iyloc - jyloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(izloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);
+        const TCALC3 ba = { (((TCALC)(ixloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(ixloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(iyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(iyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(izloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(izloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
+        const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
+        const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
         const llint kzloc = __ldca(&gmem_r.zcrd[k_atom]);
-        const TCALC ba_z = (TCALC)(izloc - jzloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC bc_z = (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f;
-        const TCALC mgba = (ba_x * ba_x) + (ba_y * ba_y) + (ba_z * ba_z);
-        const TCALC mgbc = (bc_x * bc_x) + (bc_y * bc_y) + (bc_z * bc_z);
+#ifdef CHECK_COSARG
+        const TCALC3 bc = { (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f,
+                            (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int kxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[k_atom]);
+        const int kyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[k_atom]);
+        const int kzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[k_atom]);
+        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
+        const TCALC mgba = (ba.x * ba.x) + (ba.y * ba.y) + (ba.z * ba.z);
+        const TCALC mgbc = (bc.x * bc.x) + (bc.y * bc.y) + (bc.z * bc.z);
         const TCALC invbabc = (TCALC)(1.0) / SQRT_FUNC(mgba * mgbc);
-        TCALC costheta = ((ba_x * bc_x) + (ba_y * bc_y) + (ba_z * bc_z)) * invbabc;
+        TCALC costheta = ((ba.x * bc.x) + (ba.y * bc.y) + (ba.z * bc.z)) * invbabc;
         costheta = (costheta < (TCALC)(-1.0)) ?
                    (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
         const TCALC theta = ACOS_FUNC(costheta);
@@ -1390,15 +1603,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         j_atom -= EXCL_GMEM_OFFSET;
         k_atom -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
-        const SPLIT_TYPE iadf_x = SPLITCONV_FUNC((costheta * ba_x * sqba) - (bc_x * mbabc));
-        const SPLIT_TYPE iadf_y = SPLITCONV_FUNC((costheta * ba_y * sqba) - (bc_y * mbabc));
-        const SPLIT_TYPE iadf_z = SPLITCONV_FUNC((costheta * ba_z * sqba) - (bc_z * mbabc));
+        const SPLIT_TYPE iadf_x = SPLITCONV_FUNC((costheta * ba.x * sqba) - (bc.x * mbabc));
+        const SPLIT_TYPE iadf_y = SPLITCONV_FUNC((costheta * ba.y * sqba) - (bc.y * mbabc));
+        const SPLIT_TYPE iadf_z = SPLITCONV_FUNC((costheta * ba.z * sqba) - (bc.z * mbabc));
         addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, sh_zfrc_overflow);
-        const SPLIT_TYPE icdf_x = SPLITCONV_FUNC((costheta * bc_x * sqbc) - (ba_x * mbabc));
-        const SPLIT_TYPE icdf_y = SPLITCONV_FUNC((costheta * bc_y * sqbc) - (ba_y * mbabc));
-        const SPLIT_TYPE icdf_z = SPLITCONV_FUNC((costheta * bc_z * sqbc) - (ba_z * mbabc));
+        const SPLIT_TYPE icdf_x = SPLITCONV_FUNC((costheta * bc.x * sqbc) - (ba.x * mbabc));
+        const SPLIT_TYPE icdf_y = SPLITCONV_FUNC((costheta * bc.y * sqbc) - (ba.y * mbabc));
+        const SPLIT_TYPE icdf_z = SPLITCONV_FUNC((costheta * bc.z * sqbc) - (ba.z * mbabc));
         addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, sh_zfrc_overflow);
@@ -1409,12 +1622,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, sh_zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
-        const llint iadf_x = LLCONV_FUNC((bc_x * mbabc) - (costheta * ba_x * sqba));
-        const llint iadf_y = LLCONV_FUNC((bc_y * mbabc) - (costheta * ba_y * sqba));
-        const llint iadf_z = LLCONV_FUNC((bc_z * mbabc) - (costheta * ba_z * sqba));
-        const llint icdf_x = LLCONV_FUNC((ba_x * mbabc) - (costheta * bc_x * sqbc));
-        const llint icdf_y = LLCONV_FUNC((ba_y * mbabc) - (costheta * bc_y * sqbc));
-        const llint icdf_z = LLCONV_FUNC((ba_z * mbabc) - (costheta * bc_z * sqbc));
+        const llint iadf_x = LLCONV_FUNC((bc.x * mbabc) - (costheta * ba.x * sqba));
+        const llint iadf_y = LLCONV_FUNC((bc.y * mbabc) - (costheta * ba.y * sqba));
+        const llint iadf_z = LLCONV_FUNC((bc.z * mbabc) - (costheta * ba.z * sqba));
+        const llint icdf_x = LLCONV_FUNC((ba.x * mbabc) - (costheta * bc.x * sqbc));
+        const llint icdf_y = LLCONV_FUNC((ba.y * mbabc) - (costheta * bc.y * sqbc));
+        const llint icdf_z = LLCONV_FUNC((ba.z * mbabc) - (costheta * bc.z * sqbc));
         atomicAdd((ullint*)&sh_xfrc[i_atom], lliToUlli(-iadf_x));
         atomicAdd((ullint*)&sh_yfrc[i_atom], lliToUlli(-iadf_y));
         atomicAdd((ullint*)&sh_zfrc[i_atom], lliToUlli(-iadf_z));
@@ -1449,24 +1662,60 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const llint jxloc = __ldca(&gmem_r.xcrd[j_atom]);
         const llint jyloc = __ldca(&gmem_r.ycrd[j_atom]);
         const llint jzloc = __ldca(&gmem_r.zcrd[j_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 ab = { (TCALC)(jxloc - ixloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(jyloc - iyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(jzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int ixloc_ovrf = __ldca(&gmem_r.xcrd_overflow[i_atom]);
+        const int iyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[i_atom]);
+        const int izloc_ovrf = __ldca(&gmem_r.zcrd_overflow[i_atom]);
+        const int jxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[j_atom]);
+        const int jyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[j_atom]);
+        const int jzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[j_atom]);
+        const TCALC3 ab = { (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
         const llint kzloc = __ldca(&gmem_r.zcrd[k_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 bc = { (TCALC)(kxloc - jxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(kyloc - jyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(kzloc - jzloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int kxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[k_atom]);
+        const int kyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[k_atom]);
+        const int kzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[k_atom]);
+        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+#endif
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
         const llint lzloc = __ldca(&gmem_r.zcrd[l_atom]);
+#ifdef CHECK_COSARG
         const TCALC3 cd = { (TCALC)(lxloc - kxloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lyloc - kyloc) * poly_psw.inv_gpos_scale_f,
                             (TCALC)(lzloc - kzloc) * poly_psw.inv_gpos_scale_f };
-        const TCALC3 ad = { (TCALC)(lxloc - ixloc) * poly_psw.inv_gpos_scale_f,
-                            (TCALC)(lyloc - iyloc) * poly_psw.inv_gpos_scale_f,
-                            (TCALC)(lzloc - izloc) * poly_psw.inv_gpos_scale_f };
+#else
+        const int lxloc_ovrf = __ldca(&gmem_r.xcrd_overflow[l_atom]);
+        const int lyloc_ovrf = __ldca(&gmem_r.ycrd_overflow[l_atom]);
+        const int lzloc_ovrf = __ldca(&gmem_r.zcrd_overflow[l_atom]);
+        const TCALC3 cd = { (((TCALC)(lxloc_ovrf - kxloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lxloc - kxloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lyloc_ovrf - kyloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lyloc - kyloc)) * poly_psw.inv_gpos_scale,
+                            (((TCALC)(lzloc_ovrf - kzloc_ovrf) * max_llint_accumulation) +
+                             (TCALC)(lzloc - kzloc)) * poly_psw.inv_gpos_scale };
+#endif
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);
         const TCALC3 scr = crossProduct(crabbc, crbccd);
@@ -1529,15 +1778,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC cosb = -((ab.x * bc.x) + (ab.y * bc.y) + (ab.z * bc.z)) * invab * invbc;
         const TCALC cosc = -((bc.x * cd.x) + (bc.y * cd.y) + (bc.z * cd.z)) * invbc * invcd;
 #ifdef CHECK_COSARG
-        const TCALC isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
-                             fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
-        const TCALC isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
-                             fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
-#else // CHECK_COSARG
         const TCALC isinb2 = (cosb * cosb < asymptotic_to_one_f) ?
                              fr / (1.0f - (cosb * cosb)) : fr * inverse_one_minus_asymptote_f;
         const TCALC isinc2 = (cosc * cosc < asymptotic_to_one_f) ?
                              fr / (1.0f - (cosc * cosc)) : fr * inverse_one_minus_asymptote_f;
+#else // CHECK_COSARG
+        const TCALC isinb2 = (cosb * cosb < asymptotic_to_one_lf) ?
+                             fr / (1.0 - (cosb * cosb)) : fr * inverse_one_minus_asymptote_lf;
+        const TCALC isinc2 = (cosc * cosc < asymptotic_to_one_lf) ?
+                             fr / (1.0 - (cosc * cosc)) : fr * inverse_one_minus_asymptote_lf;
 #endif
         const TCALC invabc = invab * invbc;
         const TCALC invbcd = invbc * invcd;

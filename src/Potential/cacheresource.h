@@ -20,6 +20,8 @@ template <typename T> struct CacheResourceKit {
   ///        of the charges.
   CacheResourceKit(int max_blocks_in, int max_atoms_in, llint* xcrd_in, llint* ycrd_in,
                    llint* zcrd_in, llint* xvel_in, llint* yvel_in, llint* zvel_in,
+                   int* xcrd_overflow_in, int* ycrd_overflow_in, int* zcrd_overflow_in,
+                   int* xvel_overflow_in, int* yvel_overflow_in, int* zvel_overflow_in,
                    int* xfrc_overflow_in, int* yfrc_overflow_in, int* zfrc_overflow_in,
                    T* charges_in, int* lj_idx_in);
 
@@ -39,6 +41,12 @@ template <typename T> struct CacheResourceKit {
   llint* xvel;           ///< Cartesian X velocities of locally cached particles
   llint* yvel;           ///< Cartesian Y velocities of locally cached particles
   llint* zvel;           ///< Cartesian Z velocities of locally cached particles
+  int* xcrd_overflow;    ///< Cartesian X coordinate overflow buffers
+  int* ycrd_overflow;    ///< Cartesian Y coordinate overflow buffers
+  int* zcrd_overflow;    ///< Cartesian Z coordinate overflow buffers
+  int* xvel_overflow;    ///< Cartesian X velocity overflow buffers
+  int* yvel_overflow;    ///< Cartesian Y velocity overflow buffers
+  int* zvel_overflow;    ///< Cartesian Z velocity overflow buffers
   int* xfrc_overflow;    ///< Cartesian X force overflow buffers
   int* yfrc_overflow;    ///< Cartesian Y force overflow buffers
   int* zfrc_overflow;    ///< Cartesian Z force overflow buffers
@@ -98,6 +106,12 @@ private:
   Hybrid<llint> x_velocities;         ///< Cartesian X velocities of locally cached particles
   Hybrid<llint> y_velocities;         ///< Cartesian Y velocities of locally cached particles
   Hybrid<llint> z_velocities;         ///< Cartesian Z velocities of locally cached particles
+  Hybrid<int> x_coordinate_overflow;  ///< Cartesian X coordinate overflow buffers
+  Hybrid<int> y_coordinate_overflow;  ///< Cartesian Y coordintae overflow buffers
+  Hybrid<int> z_coordinate_overflow;  ///< Cartesian Z coordinate overflow buffers
+  Hybrid<int> x_velocity_overflow;    ///< Cartesian X velocity overflow buffers
+  Hybrid<int> y_velocity_overflow;    ///< Cartesian Y velocity overflow buffers
+  Hybrid<int> z_velocity_overflow;    ///< Cartesian Z velocity overflow buffers
   Hybrid<int> x_force_overflow;       ///< Cartesian X force overflow buffers
   Hybrid<int> y_force_overflow;       ///< Cartesian Y force overflow buffers
   Hybrid<int> z_force_overflow;       ///< Cartesian Z force overflow buffers

@@ -22,16 +22,22 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
   __shared__ int sh_ljabc_offsets[small_block_max_imports];
 #ifdef COMPUTE_FORCE
 #  ifdef SPLIT_FORCE_ACCUMULATION
+#    ifdef CHECK_COSARG
   __shared__ int sh_xfrc[small_block_max_atoms];
   __shared__ int sh_yfrc[small_block_max_atoms];
   __shared__ int sh_zfrc[small_block_max_atoms];
+#    else
+  __shared__ llint sh_xfrc[small_block_max_atoms];
+  __shared__ llint sh_yfrc[small_block_max_atoms];
+  __shared__ llint sh_zfrc[small_block_max_atoms];
+#    endif
   __shared__ int sh_xfrc_overflow[small_block_max_atoms];
   __shared__ int sh_yfrc_overflow[small_block_max_atoms];
   __shared__ int sh_zfrc_overflow[small_block_max_atoms];
 #  else
-  __shared__ long long int sh_xfrc[small_block_max_atoms];
-  __shared__ long long int sh_yfrc[small_block_max_atoms];
-  __shared__ long long int sh_zfrc[small_block_max_atoms]; 
+  __shared__ llint sh_xfrc[small_block_max_atoms];
+  __shared__ llint sh_yfrc[small_block_max_atoms];
+  __shared__ llint sh_zfrc[small_block_max_atoms]; 
 #  endif
 #endif
 #ifdef COMPUTE_ENERGY
