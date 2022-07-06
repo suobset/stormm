@@ -51,8 +51,11 @@ struct PsSynthesisWriter {
                     double frc_scale_in, int gpos_bits_in, int lpos_bits_in, int vel_bits_in,
                     int frc_bits_in, llint* boxvecs_in, double* umat_in, double* invu_in,
                     double* boxdims_in, float* sp_umat_in, float* sp_invu_in, float* sp_boxdims_in,
-                    llint* xcrd_in, llint* ycrd_in, llint* zcrd_in, llint* xvel_in, llint* yvel_in,
-                    llint* zvel_in, llint* xfrc_in, llint* yfrc_in, llint* zfrc_in);
+                    llint* xcrd_in, llint* ycrd_in, llint* zcrd_in, int* xcrd_ovrf_in,
+                    int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in, llint* yvel_in,
+                    llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in, int* zvel_ovrf_in,
+                    llint* xfrc_in, llint* yfrc_in, llint* zfrc_in, int* xfrc_ovrf_in,
+                    int* yfrc_ovrf_in, int* zfrc_ovrf_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -106,15 +109,24 @@ struct PsSynthesisWriter {
 
   // Pointers to the coordinate, velocity, and force data--these are mutable for accumulating
   // forces and letting a trajectory evolve.
-  llint* xcrd;  ///< Non-wrapped Cartesian X coordinates of all particles
-  llint* ycrd;  ///< Non-wrapped Cartesian Y coordinates of all particles
-  llint* zcrd;  ///< Non-wrapped Cartesian Z coordinates of all particles
-  llint* xvel;  ///< Cartesian X velocities
-  llint* yvel;  ///< Cartesian Y velocities
-  llint* zvel;  ///< Cartesian Z velocities
-  llint* xfrc;  ///< Discretized Cartesian X forces
-  llint* yfrc;  ///< Discretized Cartesian Y forces
-  llint* zfrc;  ///< Discretized Cartesian Z forces
+  llint* xcrd;     ///< Non-wrapped Cartesian X coordinates of all particles
+  llint* ycrd;     ///< Non-wrapped Cartesian Y coordinates of all particles
+  llint* zcrd;     ///< Non-wrapped Cartesian Z coordinates of all particles
+  int* xcrd_ovrf;  ///< Non-wrapped Cartesian X coordinate overflow buffers
+  int* ycrd_ovrf;  ///< Non-wrapped Cartesian Y coordinate overflow buffers
+  int* zcrd_ovrf;  ///< Non-wrapped Cartesian Z coordinate overflow buffers
+  llint* xvel;     ///< Cartesian X velocities
+  llint* yvel;     ///< Cartesian Y velocities
+  llint* zvel;     ///< Cartesian Z velocities
+  int* xvel_ovrf;  ///< Cartesian X velocity overflow buffers
+  int* yvel_ovrf;  ///< Cartesian Y velocity overflow buffers
+  int* zvel_ovrf;  ///< Cartesian Z velocity overflow buffers
+  llint* xfrc;     ///< Discretized Cartesian X forces
+  llint* yfrc;     ///< Discretized Cartesian Y forces
+  llint* zfrc;     ///< Discretized Cartesian Z forces
+  int* xfrc_ovrf;  ///< Discretized Cartesian X force overflow buffers
+  int* yfrc_ovrf;  ///< Discretized Cartesian Y force overflow buffers
+  int* zfrc_ovrf;  ///< Discretized Cartesian Z force overflow buffers
 };
 
 /// \brief The reader for a PhaseSpaceSynthesis object, containing all of the data relevant for
@@ -135,8 +147,11 @@ struct PsSynthesisReader {
                     const double* invu_in, const double* boxdims_in, const float* sp_umat_in,
                     const float* sp_invu_in, const float* sp_boxdims_in,
                     const llint* xcrd_in, const llint* ycrd_in, const llint* zcrd_in,
+                    const int* xcrd_ovrf_in, const int* ycrd_ovrf_in, const int* zcrd_ovrf_in,
                     const llint* xvel_in, const llint* yvel_in, const llint* zvel_in,
-                    const llint* xfrc_in, const llint* yfrc_in, const llint* zfrc_in);
+                    const int* xvel_ovrf_in, const int* yvel_ovrf_in, const int* zvel_ovrf_in,
+                    const llint* xfrc_in, const llint* yfrc_in, const llint* zfrc_in,
+                    const int* xfrc_ovrf_in, const int* yfrc_ovrf_in, const int* zfrc_ovrf_in);
 
   PsSynthesisReader(const PsSynthesisWriter &psyw);
   /// \}
@@ -192,15 +207,24 @@ struct PsSynthesisReader {
 
   // Pointers to the coordinate, velocity, and force data--these are mutable for accumulating
   // forces and letting a trajectory evolve.
-  const llint* xcrd;  ///< Non-wrapped Cartesian X coordinates of all particles
-  const llint* ycrd;  ///< Non-wrapped Cartesian Y coordinates of all particles
-  const llint* zcrd;  ///< Non-wrapped Cartesian Z coordinates of all particles
-  const llint* xvel;  ///< Cartesian X velocities
-  const llint* yvel;  ///< Cartesian Y velocities
-  const llint* zvel;  ///< Cartesian Z velocities
-  const llint* xfrc;  ///< Discretized Cartesian X forces
-  const llint* yfrc;  ///< Discretized Cartesian Y forces
-  const llint* zfrc;  ///< Discretized Cartesian Z forces
+  const llint* xcrd;     ///< Non-wrapped Cartesian X coordinates of all particles
+  const llint* ycrd;     ///< Non-wrapped Cartesian Y coordinates of all particles
+  const llint* zcrd;     ///< Non-wrapped Cartesian Z coordinates of all particles
+  const int* xcrd_ovrf;  ///< Non-wrapped Cartesian X coordinate overflow buffers
+  const int* ycrd_ovrf;  ///< Non-wrapped Cartesian Y coordinate overflow buffers
+  const int* zcrd_ovrf;  ///< Non-wrapped Cartesian Z coordinate overflow buffers
+  const llint* xvel;     ///< Cartesian X velocities
+  const llint* yvel;     ///< Cartesian Y velocities
+  const llint* zvel;     ///< Cartesian Z velocities
+  const int* xvel_ovrf;  ///< Cartesian X velocity overflow buffers
+  const int* yvel_ovrf;  ///< Cartesian Y velocity overflow buffers
+  const int* zvel_ovrf;  ///< Cartesian Z velocity overflow buffers
+  const llint* xfrc;     ///< Discretized Cartesian X forces
+  const llint* yfrc;     ///< Discretized Cartesian Y forces
+  const llint* zfrc;     ///< Discretized Cartesian Z forces
+  const int* xfrc_ovrf;  ///< Discretized Cartesian X force overflow buffers
+  const int* yfrc_ovrf;  ///< Discretized Cartesian Y force overflow buffers
+  const int* zfrc_ovrf;  ///< Discretized Cartesian Z force overflow buffers
 };
 
 /// \brief A fixed-precision representation of coordinates, velocities, and forces to manage a set
@@ -521,20 +545,29 @@ private:
   Hybrid<int> atom_counts;
 
   // These variables are POINTER-kind Hybrid objects targeting the llint_data array
-  Hybrid<llint> x_coordinates;  ///< Cartesian coordinates of all particles in the X direction
-  Hybrid<llint> y_coordinates;  ///< Cartesian coordinates of all particles in the Y direction
-  Hybrid<llint> z_coordinates;  ///< Cartesian coordinates of all particles in the Z direction
-  Hybrid<llint> x_velocities;   ///< Cartesian velocities of all particles in the X direction
-  Hybrid<llint> y_velocities;   ///< Cartesian velocities of all particles in the Y direction
-  Hybrid<llint> z_velocities;   ///< Cartesian velocities of all particles in the Z direction
-  Hybrid<llint> x_forces;       ///< Cartesian forces acting on all particles in the X direction
-  Hybrid<llint> y_forces;       ///< Cartesian forces acting on all particles in the Y direction
-  Hybrid<llint> z_forces;       ///< Cartesian forces acting on all particles in the Z direction
-  Hybrid<llint> box_vectors;    ///< Scaled real space transformation matrix--moving particles
-                                ///<   between images by adding or subtracting multiples of these
-                                ///<   vectors can be expeditious and keeps coordinate
-                                ///<   representations consistent between the lab frame and the
-                                ///<   primary unit cell.
+  Hybrid<llint> x_coordinates;        ///< Cartesian X coordinates of all particles
+  Hybrid<llint> y_coordinates;        ///< Cartesian Y coordinates of all particles
+  Hybrid<llint> z_coordinates;        ///< Cartesian Z coordinates of all particles
+  Hybrid<int> x_coordinate_overflow;  ///< X direction coordinate overflow buffers
+  Hybrid<int> y_coordinate_overflow;  ///< Y direction coordinate overflow buffers
+  Hybrid<int> z_coordinate_overflow;  ///< Z direction coordinate overflow buffers
+  Hybrid<llint> x_velocities;         ///< Cartesian X velocities of all particles
+  Hybrid<llint> y_velocities;         ///< Cartesian Y velocities of all particles
+  Hybrid<llint> z_velocities;         ///< Cartesian Z velocities of all particles
+  Hybrid<int> x_velocity_overflow;    ///< Overflow buffers for velocities in the X direction
+  Hybrid<int> y_velocity_overflow;    ///< Overflow buffers for velocities in the Y direction
+  Hybrid<int> z_velocity_overflow;    ///< Overflow buffers for velocities in the Z direction
+  Hybrid<llint> x_forces;             ///< Cartesian forces acting on particles in the X direction
+  Hybrid<llint> y_forces;             ///< Cartesian forces acting on particles in the Y direction
+  Hybrid<llint> z_forces;             ///< Cartesian forces acting on particles in the Z direction
+  Hybrid<int> x_force_overflow;       ///< Force overflows acting on particles in the X direction
+  Hybrid<int> y_force_overflow;       ///< Force overflows acting on particles in the Y direction
+  Hybrid<int> z_force_overflow;       ///< Force overflows acting on particles in the Z direction
+  Hybrid<llint> box_vectors;          ///< Scaled real space transformation matrix--moving
+                                      ///<   particles between images by adding or subtracting
+                                      ///<   multiples of these vectors can be expeditious and
+                                      ///<   keeps coordinate representations consistent between
+                                      ///<   the lab frame and the primary unit cell.
 
   // The following are POINTER-kind Hybrid objects targeting the floating point data arrays
   Hybrid<double> box_space_transforms;   ///< Transformation matrices to take coordinates into
@@ -550,7 +583,8 @@ private:
   Hybrid<float> sp_box_dimensions;       ///< Single precision box dimensions
 
   // Data arrays
-  Hybrid<int> int_data;        ///< Counts of atoms and starting points for each system 
+  Hybrid<int> int_data;        ///< Counts of atoms and starting points for each system, plus
+                               ///<   overflow data
   Hybrid<llint> llint_data;    ///< The discretized data for all of phase space and forces
   Hybrid<double> double_data;  ///< Double-precision floating point transformations--these are the
                                ///<   standard for moving coordinates into a re-imaged

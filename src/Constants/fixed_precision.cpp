@@ -166,5 +166,68 @@ void checkChargeMeshBits(const int choice, const PrecisionLevel pmodel) {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+void splitRealConversion(const float fval, int *primary, int *overflow) {
+  int ival;
+  if (fabsf(fval) >= max_int_accumulation_f) {
+    const int spillover = fval / max_int_accumulation_f;
+    *primary = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
+    *overflow = spillover;
+  }
+  else {
+    *primary = fval;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void splitRealConversion(const double dval, llint *primary, int *overflow) {
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    *primary = dval - (static_cast<double>(spillover) * max_llint_accumulation);
+    *overflow = spillover;
+  }
+  else {
+    *primary = dval;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void splitRealAccumulation(const float fval, int *primary, int *overflow) {
+  int ival;
+  if (fabsf(fval) >= max_int_accumulation_f) {
+    const int spillover = fval / max_int_accumulation_f;
+    ival = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
+    *overflow += spillover;
+  }
+  else {
+    ival = fval;
+  }
+  const int prim_old = *primary;
+  *primary += ival;
+  const int prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    *overflow += (1 - (2 * (ival < 0))) * 2;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
+  llint ival;
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    ival = dval - (static_cast<double>(spillover) * max_llint_accumulation);
+    *overflow += spillover;
+  }
+  else {
+    ival = dval;
+  }
+  const llint prim_old = *primary;
+  *primary += ival;
+  const llint prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    *overflow += (1 - (2 * (ival < 0))) * 2;
+  }
+}
+
 } // namespace numerics
 } // namespace omni

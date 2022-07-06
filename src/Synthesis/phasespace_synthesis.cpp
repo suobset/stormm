@@ -30,6 +30,12 @@ using numerics::checkGlobalPositionBits;
 using numerics::checkLocalPositionBits;
 using numerics::checkVelocityBits;
 using numerics::checkForceBits;
+using numerics::force_scale_nonoverflow_bits;
+using numerics::globalpos_scale_nonoverflow_bits;
+using numerics::max_llint_accumulation;
+using numerics::splitRealConversion;
+using numerics::transform_scale_lf;
+using numerics::velocity_scale_nonoverflow_bits;
 using topology::UnitCellType;
 using trajectory::PhaseSpaceWriter;
 using trajectory::PhaseSpaceReader;
@@ -47,9 +53,12 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
                                      llint* boxvecs_in, double* umat_in, double* invu_in,
                                      double* boxdims_in, float* sp_umat_in, float* sp_invu_in,
                                      float* sp_boxdims_in, llint* xcrd_in, llint* ycrd_in,
-                                     llint* zcrd_in, llint* xvel_in, llint* yvel_in,
-                                     llint* zvel_in, llint* xfrc_in, llint* yfrc_in,
-                                     llint* zfrc_in) :
+                                     llint* zcrd_in, int* xcrd_ovrf_in, int* ycrd_ovrf_in,
+                                     int* zcrd_ovrf_in, llint* xvel_in, llint* yvel_in,
+                                     llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in,
+                                     int* zvel_ovrf_in, llint* xfrc_in, llint* yfrc_in,
+                                     llint* zfrc_in, int* xfrc_ovrf_in, int* yfrc_ovrf_in,
+                                     int* zfrc_ovrf_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
     atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
@@ -69,7 +78,10 @@ PsSynthesisWriter::PsSynthesisWriter(const int system_count_in, const UnitCellTy
     gpos_bits{gpos_bits_in}, lpos_bits{lpos_bits_in}, vel_bits{vel_bits_in}, frc_bits{frc_bits_in},
     boxvecs{boxvecs_in}, umat{umat_in}, invu{invu_in}, boxdims{boxdims_in}, sp_umat{sp_umat_in},
     sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
-    xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}
+    xcrd_ovrf{xcrd_ovrf_in}, ycrd_ovrf{ycrd_ovrf_in}, zcrd_ovrf{zcrd_ovrf_in}, 
+    xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xvel_ovrf{xvel_ovrf_in}, yvel_ovrf{yvel_ovrf_in},
+    zvel_ovrf{zcrd_ovrf_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
+    yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -86,9 +98,14 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
                                      const float* sp_umat_in, const float* sp_invu_in,
                                      const float* sp_boxdims_in, const llint* xcrd_in,
                                      const llint* ycrd_in, const llint* zcrd_in,
-                                     const llint* xvel_in, const llint* yvel_in,
-                                     const llint* zvel_in, const llint* xfrc_in,
-                                     const llint* yfrc_in, const llint* zfrc_in) :
+                                     const int* xcrd_ovrf_in, const int* ycrd_ovrf_in,
+                                     const int* zcrd_ovrf_in, const llint* xvel_in,
+                                     const llint* yvel_in, const llint* zvel_in,
+                                     const int* xvel_ovrf_in, const int* yvel_ovrf_in,
+                                     const int* zvel_ovrf_in, const llint* xfrc_in,
+                                     const llint* yfrc_in, const llint* zfrc_in,
+                                     const int* xfrc_ovrf_in, const int* yfrc_ovrf_in,
+                                     const int* zfrc_ovrf_in) :
     system_count{system_count_in}, unit_cell{unit_cell_in}, heat_bath_kind{heat_bath_kind_in},
     piston_kind{piston_kind_in}, time_step{time_step_in}, atom_starts{atom_starts_in},
     atom_counts{atom_counts_in}, gpos_scale{gpos_scale_in}, lpos_scale{lpos_scale_in},
@@ -108,7 +125,10 @@ PsSynthesisReader::PsSynthesisReader(const int system_count_in, const UnitCellTy
     gpos_bits{gpos_bits_in}, lpos_bits{lpos_bits_in}, vel_bits{vel_bits_in}, frc_bits{frc_bits_in},
     boxvecs{boxvecs_in}, umat{umat_in}, invu{invu_in}, boxdims{boxdims_in}, sp_umat{sp_umat_in},
     sp_invu{sp_invu_in}, sp_boxdims{sp_boxdims_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
-    xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}
+    xcrd_ovrf{xcrd_ovrf_in}, ycrd_ovrf{ycrd_ovrf_in}, zcrd_ovrf{zcrd_ovrf_in}, 
+    xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in}, xvel_ovrf{xvel_ovrf_in}, yvel_ovrf{yvel_ovrf_in},
+    zvel_ovrf{zcrd_ovrf_in}, xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xfrc_ovrf{xfrc_ovrf_in},
+    yfrc_ovrf{yfrc_ovrf_in}, zfrc_ovrf{zfrc_ovrf_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -148,8 +168,11 @@ PsSynthesisReader::PsSynthesisReader(const PsSynthesisWriter &psyw) :
     sp_invu{psyw.sp_invu},
     sp_boxdims{psyw.sp_boxdims},
     xcrd{psyw.xcrd}, ycrd{psyw.ycrd}, zcrd{psyw.zcrd},
+    xcrd_ovrf{psyw.xcrd_ovrf}, ycrd_ovrf{psyw.ycrd_ovrf}, zcrd_ovrf{psyw.zcrd_ovrf},
     xvel{psyw.xvel}, yvel{psyw.yvel}, zvel{psyw.zvel},
-    xfrc{psyw.xfrc}, yfrc{psyw.yfrc}, zfrc{psyw.zfrc}
+    xvel_ovrf{psyw.xvel_ovrf}, yvel_ovrf{psyw.yvel_ovrf}, zvel_ovrf{psyw.zvel_ovrf},
+    xfrc{psyw.xfrc}, yfrc{psyw.yfrc}, zfrc{psyw.zfrc},
+    xfrc_ovrf{psyw.xfrc_ovrf}, yfrc_ovrf{psyw.yfrc_ovrf}, zfrc_ovrf{psyw.zfrc_ovrf}
 {}
   
 //-------------------------------------------------------------------------------------------------
@@ -184,12 +207,21 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     x_coordinates{HybridKind::POINTER, "labframe_xpos"},
     y_coordinates{HybridKind::POINTER, "labframe_ypos"},
     z_coordinates{HybridKind::POINTER, "labframe_zpos"},
+    x_coordinate_overflow{HybridKind::POINTER, "labframe_xpos_ovrf"},
+    y_coordinate_overflow{HybridKind::POINTER, "labframe_ypos_ovrf"},
+    z_coordinate_overflow{HybridKind::POINTER, "labframe_zpos_ovrf"},
     x_velocities{HybridKind::POINTER, "labframe_vx"},
     y_velocities{HybridKind::POINTER, "labframe_vy"},
     z_velocities{HybridKind::POINTER, "labframe_vz"},
+    x_velocity_overflow{HybridKind::POINTER, "labframe_vx_ovrf"},
+    y_velocity_overflow{HybridKind::POINTER, "labframe_vy_ovrf"},
+    z_velocity_overflow{HybridKind::POINTER, "labframe_vz_ovrf"},
     x_forces{HybridKind::POINTER, "labframe_fx"},
     y_forces{HybridKind::POINTER, "labframe_fy"},
     z_forces{HybridKind::POINTER, "labframe_fz"},
+    x_force_overflow{HybridKind::POINTER, "labframe_fx_ovrf"},
+    y_force_overflow{HybridKind::POINTER, "labframe_fy_ovrf"},
+    z_force_overflow{HybridKind::POINTER, "labframe_fz_ovrf"},
     box_vectors{HybridKind::POINTER, "labframe_boxdims"},
     box_space_transforms{HybridKind::POINTER, "labframe_umat"},
     inverse_transforms{HybridKind::POINTER, "labframe_invu"},
@@ -286,26 +318,74 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     llint* xpos_ptr = x_coordinates.data();
     llint* ypos_ptr = y_coordinates.data();
     llint* zpos_ptr = z_coordinates.data();
+    int* xpos_ovrf_ptr  = x_coordinate_overflow.data();
+    int* ypos_ovrf_ptr  = y_coordinate_overflow.data();
+    int* zpos_ovrf_ptr  = z_coordinate_overflow.data();
     llint* xvel_ptr = x_velocities.data();
     llint* yvel_ptr = y_velocities.data();
     llint* zvel_ptr = z_velocities.data();
+    int* xvel_ovrf_ptr  = x_velocity_overflow.data();
+    int* yvel_ovrf_ptr  = y_velocity_overflow.data();
+    int* zvel_ovrf_ptr  = z_velocity_overflow.data();
     llint* xfrc_ptr = x_forces.data();
     llint* yfrc_ptr = y_forces.data();
     llint* zfrc_ptr = z_forces.data();
+    int* xfrc_ovrf_ptr  = x_force_overflow.data();
+    int* yfrc_ovrf_ptr  = y_force_overflow.data();
+    int* zfrc_ovrf_ptr  = z_force_overflow.data();
     const int asi = atom_starts.readHost(i);
     for (int j = 0; j < psr.natom; j++) {
 
       // The x, y, and z components hold x, y, and z positions in a "lab frame" unwrapped form.
+      // In this conversion, lower-precision forms of each coordinate (positions, velocities, or
+      // forces), those that most simulations will run with, are rounded to the nearest integer
+      // values rather than truncated rounding towards zero.  Very high precision formats, those
+      // with more than 53-54 bits after the decimal, are likely to need no rounding as the
+      // fixed precision format will already be more precise than the double-precision floating
+      // point number's mantissa.  However, there is a "no man's land" in this implementation,
+      // between the non-overflow bit counts for each coordinate (36-44 bits) and the point at
+      // which the fixed-precision representation will capture all of the information in nearly
+      // all numbers, where rounding towards zero will occur.
       const size_t asi_j = asi + j;
-      xpos_ptr[asi_j] = llround(psr.xcrd[j] * globalpos_scale);
-      ypos_ptr[asi_j] = llround(psr.ycrd[j] * globalpos_scale);
-      zpos_ptr[asi_j] = llround(psr.zcrd[j] * globalpos_scale);
-      xvel_ptr[asi_j] = llround(psr.xvel[j] * velocity_scale);
-      yvel_ptr[asi_j] = llround(psr.yvel[j] * velocity_scale);
-      zvel_ptr[asi_j] = llround(psr.zvel[j] * velocity_scale);
-      xfrc_ptr[asi_j] = llround(psr.xfrc[j] * force_scale);
-      yfrc_ptr[asi_j] = llround(psr.yfrc[j] * force_scale);
-      zfrc_ptr[asi_j] = llround(psr.zfrc[j] * force_scale);
+      if (globalpos_scale_bits <= globalpos_scale_nonoverflow_bits) {
+        xpos_ptr[asi_j] = llround(psr.xcrd[j] * globalpos_scale);
+        ypos_ptr[asi_j] = llround(psr.ycrd[j] * globalpos_scale);
+        zpos_ptr[asi_j] = llround(psr.zcrd[j] * globalpos_scale);
+      }
+      else {
+        splitRealConversion(psr.xcrd[j] * globalpos_scale, &xpos_ptr[asi_j],
+                            &xpos_ovrf_ptr[asi_j]);
+        splitRealConversion(psr.ycrd[j] * globalpos_scale, &ypos_ptr[asi_j],
+                            &ypos_ovrf_ptr[asi_j]);
+        splitRealConversion(psr.zcrd[j] * globalpos_scale, &zpos_ptr[asi_j],
+                            &zpos_ovrf_ptr[asi_j]);
+      }
+      if (velocity_scale_bits <= velocity_scale_nonoverflow_bits) {
+        xvel_ptr[asi_j] = llround(psr.xvel[j] * velocity_scale);
+        yvel_ptr[asi_j] = llround(psr.yvel[j] * velocity_scale);
+        zvel_ptr[asi_j] = llround(psr.zvel[j] * velocity_scale);
+      }
+      else {
+        splitRealConversion(psr.xvel[j] * globalpos_scale, &xvel_ptr[asi_j],
+                            &xvel_ovrf_ptr[asi_j]);
+        splitRealConversion(psr.yvel[j] * globalpos_scale, &yvel_ptr[asi_j],
+                            &yvel_ovrf_ptr[asi_j]);
+        splitRealConversion(psr.zvel[j] * globalpos_scale, &zvel_ptr[asi_j],
+                            &zvel_ovrf_ptr[asi_j]);
+      }
+      if (force_scale_bits <= force_scale_nonoverflow_bits) {
+        xfrc_ptr[asi_j] = llround(psr.xfrc[j] * force_scale);
+        yfrc_ptr[asi_j] = llround(psr.yfrc[j] * force_scale);
+        zfrc_ptr[asi_j] = llround(psr.zfrc[j] * force_scale);
+      }
+      else {
+        splitRealConversion(psr.xfrc[j] * globalpos_scale, &xfrc_ptr[asi_j],
+                            &xfrc_ovrf_ptr[asi_j]);
+        splitRealConversion(psr.yfrc[j] * globalpos_scale, &yfrc_ptr[asi_j],
+                            &yfrc_ovrf_ptr[asi_j]);
+        splitRealConversion(psr.zfrc[j] * globalpos_scale, &zfrc_ptr[asi_j],
+                            &zfrc_ovrf_ptr[asi_j]);
+      }
     }
 
     // Handle the box space transformation.  The transformation matrices of the labframe will
@@ -313,8 +393,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     // interest of making a system which can be represented in fixed precision, pixelated
     // coordinates with box vectors which are likewise multiples of the positional discretization.
     for (int j = 0; j < 9; j++) {
-      const llint lli_invu = psr.invu[j] * globalpos_scale;
-      const double d_invu = static_cast<double>(lli_invu >> globalpos_scale_bits);
+      const llint lli_invu = llround(psr.invu[j] * transform_scale_lf);
+      const double d_invu = static_cast<double>(lli_invu);
       inverse_transforms.putHost(d_invu, (i * mtrx_stride) + j);
       sp_inverse_transforms.putHost(d_invu, (i * mtrx_stride) + j);
     }
@@ -389,6 +469,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
     PhaseSpaceSynthesis(tileVector(ps_list, index_key), tileVector(ag_list, index_key),
                         { Thermostat() }, { Barostat() }, 1.0, globalpos_scale_bits_in,
                         localpos_scale_bits_in, velocity_scale_bits_in, force_scale_bits_in)
+{}
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
@@ -439,12 +520,21 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     x_coordinates{original.x_coordinates},
     y_coordinates{original.y_coordinates},
     z_coordinates{original.z_coordinates},
+    x_coordinate_overflow{original.x_coordinate_overflow},
+    y_coordinate_overflow{original.y_coordinate_overflow},
+    z_coordinate_overflow{original.z_coordinate_overflow},
     x_velocities{original.x_velocities},
     y_velocities{original.y_velocities},
     z_velocities{original.z_velocities},
+    x_velocity_overflow{original.x_velocity_overflow},
+    y_velocity_overflow{original.y_velocity_overflow},
+    z_velocity_overflow{original.z_velocity_overflow},
     x_forces{original.x_forces},
     y_forces{original.y_forces},
     z_forces{original.z_forces},
+    x_force_overflow{original.x_force_overflow},
+    y_force_overflow{original.y_force_overflow},
+    z_force_overflow{original.z_force_overflow},
     box_vectors{original.box_vectors},
     box_space_transforms{original.box_space_transforms},
     inverse_transforms{original.inverse_transforms},
@@ -492,12 +582,21 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(PhaseSpaceSynthesis &&original) :
     x_coordinates{std::move(original.x_coordinates)},
     y_coordinates{std::move(original.y_coordinates)},
     z_coordinates{std::move(original.z_coordinates)},
+    x_coordinate_overflow{std::move(original.x_coordinate_overflow)},
+    y_coordinate_overflow{std::move(original.y_coordinate_overflow)},
+    z_coordinate_overflow{std::move(original.z_coordinate_overflow)},
     x_velocities{std::move(original.x_velocities)},
     y_velocities{std::move(original.y_velocities)},
     z_velocities{std::move(original.z_velocities)},
+    x_velocity_overflow{std::move(original.x_velocity_overflow)},
+    y_velocity_overflow{std::move(original.y_velocity_overflow)},
+    z_velocity_overflow{std::move(original.z_velocity_overflow)},
     x_forces{std::move(original.x_forces)},
     y_forces{std::move(original.y_forces)},
     z_forces{std::move(original.z_forces)},
+    x_force_overflow{std::move(original.x_force_overflow)},
+    y_force_overflow{std::move(original.y_force_overflow)},
+    z_force_overflow{std::move(original.z_force_overflow)},
     box_vectors{std::move(original.box_vectors)},
     box_space_transforms{std::move(original.box_space_transforms)},
     inverse_transforms{std::move(original.inverse_transforms)},
@@ -522,9 +621,13 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(HybridTargetLevel tier) const 
                            sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
                            sp_box_dimensions.data(tier), x_coordinates.data(tier),
                            y_coordinates.data(tier), z_coordinates.data(tier),
-                           x_velocities.data(tier), y_velocities.data(tier),
-                           z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                           z_forces.data(tier));
+                           x_coordinate_overflow.data(tier), y_coordinate_overflow.data(tier),
+                           z_coordinate_overflow.data(tier), x_velocities.data(tier),
+                           y_velocities.data(tier), z_velocities.data(tier),
+                           x_velocity_overflow.data(tier), y_velocity_overflow.data(tier),
+                           z_velocity_overflow.data(tier), x_forces.data(tier),
+                           y_forces.data(tier), z_forces.data(tier), x_force_overflow.data(tier),
+                           y_force_overflow.data(tier), z_force_overflow.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -538,9 +641,13 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(HybridTargetLevel tier) {
                            sp_box_space_transforms.data(tier), sp_inverse_transforms.data(tier),
                            sp_box_dimensions.data(tier), x_coordinates.data(tier),
                            y_coordinates.data(tier), z_coordinates.data(tier),
-                           x_velocities.data(tier), y_velocities.data(tier),
-                           z_velocities.data(tier), x_forces.data(tier), y_forces.data(tier),
-                           z_forces.data(tier));
+                           x_coordinate_overflow.data(tier), y_coordinate_overflow.data(tier),
+                           z_coordinate_overflow.data(tier), x_velocities.data(tier),
+                           y_velocities.data(tier), z_velocities.data(tier),
+                           x_velocity_overflow.data(tier), y_velocity_overflow.data(tier),
+                           z_velocity_overflow.data(tier), x_forces.data(tier),
+                           y_forces.data(tier), z_forces.data(tier), x_force_overflow.data(tier),
+                           y_force_overflow.data(tier), z_force_overflow.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -576,24 +683,33 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
   // Hybrids were allocated to infer the values of subsequent pointers, but
   // cudaHostGetDevicePointer is not a high-latency or laborious call.  Reduce complexity in the
   // central Hybrid object by generating the pointers every time this special case occurs.
-  int*       devc_atom_starts;
-  int*       devc_atom_counts;
-  llint*     devc_boxvecs;
-  double*    devc_umat;
-  double*    devc_invu;
-  double*    devc_boxdims;
-  float*     devc_sp_umat;
-  float*     devc_sp_invu;
-  float*     devc_sp_boxdims;
-  llint*     devc_xcrd;
-  llint*     devc_ycrd;
-  llint*     devc_zcrd;
-  llint*     devc_xvel;
-  llint*     devc_yvel;
-  llint*     devc_zvel;
-  llint*     devc_xfrc;
-  llint*     devc_yfrc;
-  llint*     devc_zfrc;
+  int*    devc_atom_starts;
+  int*    devc_atom_counts;
+  llint*  devc_boxvecs;
+  double* devc_umat;
+  double* devc_invu;
+  double* devc_boxdims;
+  float*  devc_sp_umat;
+  float*  devc_sp_invu;
+  float*  devc_sp_boxdims;
+  llint*  devc_xcrd;
+  llint*  devc_ycrd;
+  llint*  devc_zcrd;
+  int*    devc_xcrd_ovrf;
+  int*    devc_ycrd_ovrf;
+  int*    devc_zcrd_ovrf;
+  llint*  devc_xvel;
+  llint*  devc_yvel;
+  llint*  devc_zvel;
+  int*    devc_xvel_ovrf;
+  int*    devc_yvel_ovrf;
+  int*    devc_zvel_ovrf;
+  llint*  devc_xfrc;
+  llint*  devc_yfrc;
+  llint*  devc_zfrc;
+  int*    devc_xfrc_ovrf;
+  int*    devc_yfrc_ovrf;
+  int*    devc_zfrc_ovrf;
   bool problem = false;
 #  ifdef OMNI_USE_CUDA
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_starts,
@@ -625,18 +741,45 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
                                                  (void *)y_coordinates.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_zcrd,
                                                  (void *)z_coordinates.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_xcrd_ovrf,
+                                      (void *)x_coordinate_overflow.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_ycrd_ovrf,
+                                      (void *)y_coordinate_overflow.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_zcrd_ovrf,
+                                      (void *)z_coordinate_overflow.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_xvel,
                                                  (void *)x_velocities.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_yvel,
                                                  (void *)y_velocities.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_zvel,
                                                  (void *)z_velocities.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_xvel_ovrf,
+                                      (void *)x_velocity_overflow.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_yvel_ovrf,
+                                      (void *)y_velocity_overflow.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_zvel_ovrf,
+                                      (void *)z_velocity_overflow.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_xfrc,
                                                  (void *)x_forces.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_yfrc,
                                                  (void *)y_forces.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_zfrc,
                                                  (void *)z_forces.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_xfrc_ovrf,
+                                      (void *)x_force_overflow.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_yfrc_ovrf,
+                                      (void *)y_force_overflow.data(), 0) != cudaSuccess);
+  problem = (problem ||
+             cudaHostGetDevicePointer((void **)&devc_zfrc_ovrf,
+                                      (void *)z_force_overflow.data(), 0) != cudaSuccess);
 #  endif
   if (problem) {
     rtErr("Unable to get device-mapped pointers to host memory.  Types of memory used in each "
@@ -652,7 +795,9 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
                            localpos_scale_bits, velocity_scale_bits, force_scale_bits,
                            devc_boxvecs, devc_umat, devc_invu, devc_boxdims, devc_sp_umat,
                            devc_sp_invu, devc_sp_boxdims, devc_xcrd, devc_ycrd, devc_zcrd,
-                           devc_xvel, devc_yvel, devc_zvel, devc_xfrc, devc_yfrc, devc_zfrc);
+                           devc_xcrd_ovrf, devc_ycrd_ovrf, devc_zcrd_ovrf, devc_xvel, devc_yvel,
+                           devc_zvel, devc_xvel_ovrf, devc_yvel_ovrf, devc_zvel_ovrf, devc_xfrc,
+                           devc_yfrc, devc_zfrc, devc_xfrc_ovrf, devc_yfrc_ovrf, devc_zfrc_ovrf);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -671,6 +816,11 @@ void PhaseSpaceSynthesis::upload(const TrajectoryKind kind) {
     x_coordinates.upload();
     y_coordinates.upload();
     z_coordinates.upload();
+    if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+      x_coordinate_overflow.upload();
+      y_coordinate_overflow.upload();
+      z_coordinate_overflow.upload();
+    }
     double_data.upload();
     float_data.upload();
     box_vectors.upload();
@@ -679,11 +829,21 @@ void PhaseSpaceSynthesis::upload(const TrajectoryKind kind) {
     x_velocities.upload();
     y_velocities.upload();
     z_velocities.upload();
+    if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+      x_velocity_overflow.upload();
+      y_velocity_overflow.upload();
+      z_velocity_overflow.upload();
+    }
     break;
   case TrajectoryKind::FORCES:
     x_forces.upload();
     y_forces.upload();
     z_forces.upload();
+    if (force_scale_bits > force_scale_nonoverflow_bits) {
+      x_force_overflow.upload();
+      y_force_overflow.upload();
+      z_force_overflow.upload();
+    }
     break;
   }
 }
@@ -718,6 +878,11 @@ void PhaseSpaceSynthesis::download(const TrajectoryKind kind) {
     x_coordinates.download();
     y_coordinates.download();
     z_coordinates.download();
+    if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+      x_coordinate_overflow.download();
+      y_coordinate_overflow.download();
+      z_coordinate_overflow.download();
+    }
     double_data.download();
     float_data.download();
     box_vectors.download();
@@ -726,11 +891,21 @@ void PhaseSpaceSynthesis::download(const TrajectoryKind kind) {
     x_velocities.download();
     y_velocities.download();
     z_velocities.download();
+    if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+      x_velocity_overflow.download();
+      y_velocity_overflow.download();
+      z_velocity_overflow.download();
+    }
     break;
   case TrajectoryKind::FORCES:
     x_forces.download();
     y_forces.download();
     z_forces.download();
+    if (force_scale_bits > force_scale_nonoverflow_bits) {
+      x_force_overflow.download();
+      y_force_overflow.download();
+      z_force_overflow.download();
+    }
     break;
   }
 }
@@ -789,6 +964,9 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
   const double crd_deflation = inverse_globalpos_scale;
   const double vel_deflation = inverse_velocity_scale;
   const double frc_deflation = inverse_force_scale;
+  const double crd_ovrf_deflation = crd_deflation * max_llint_accumulation;
+  const double vel_ovrf_deflation = vel_deflation * max_llint_accumulation;
+  const double frc_ovrf_deflation = frc_deflation * max_llint_accumulation;
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
@@ -815,12 +993,42 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
         psw.yfrc[i] = static_cast<double>(yfrc_ptr[atom_offset + i]) * frc_deflation;
         psw.zfrc[i] = static_cast<double>(zfrc_ptr[atom_offset + i]) * frc_deflation;
       }
+      if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+        const int* xcrd_ovrf_ptr = x_coordinate_overflow.data();
+        const int* ycrd_ovrf_ptr = y_coordinate_overflow.data();
+        const int* zcrd_ovrf_ptr = z_coordinate_overflow.data();
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xcrd[i] += static_cast<double>(xcrd_ovrf_ptr[atom_offset + i]) * crd_ovrf_deflation;
+          psw.ycrd[i] += static_cast<double>(ycrd_ovrf_ptr[atom_offset + i]) * crd_ovrf_deflation;
+          psw.zcrd[i] += static_cast<double>(zcrd_ovrf_ptr[atom_offset + i]) * crd_ovrf_deflation;
+        }
+      }
+      if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+        const int* xvel_ovrf_ptr = x_velocity_overflow.data();
+        const int* yvel_ovrf_ptr = y_velocity_overflow.data();
+        const int* zvel_ovrf_ptr = z_velocity_overflow.data();
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xvel[i] += static_cast<double>(xvel_ovrf_ptr[atom_offset + i]) * vel_ovrf_deflation;
+          psw.yvel[i] += static_cast<double>(yvel_ovrf_ptr[atom_offset + i]) * vel_ovrf_deflation;
+          psw.zvel[i] += static_cast<double>(zvel_ovrf_ptr[atom_offset + i]) * vel_ovrf_deflation;
+        }
+      }
+      if (force_scale_bits > force_scale_nonoverflow_bits) {
+        const int* xfrc_ovrf_ptr = x_force_overflow.data();
+        const int* yfrc_ovrf_ptr = y_force_overflow.data();
+        const int* zfrc_ovrf_ptr = z_force_overflow.data();
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xfrc[i] += static_cast<double>(xfrc_ovrf_ptr[atom_offset + i]) * frc_ovrf_deflation;
+          psw.yfrc[i] += static_cast<double>(yfrc_ovrf_ptr[atom_offset + i]) * frc_ovrf_deflation;
+          psw.zfrc[i] += static_cast<double>(zfrc_ovrf_ptr[atom_offset + i]) * frc_ovrf_deflation;
+        }
+      }
       for (int i = 0; i < 9; i++) {
         psw.umat[i] = box_ptr[mtrx_offset + i];
         psw.invu[i] = inv_ptr[mtrx_offset + i];
       }
       for (int i = 0; i < 6; i++) {
-        psw.boxdim[i] = dim_ptr[bdim_offset + i];        
+        psw.boxdim[i] = dim_ptr[bdim_offset + i];
       }
     }
     break;
@@ -849,6 +1057,45 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
         psw.xfrc[i] = static_cast<double>(xfrc_buff[i]) * frc_deflation;
         psw.yfrc[i] = static_cast<double>(yfrc_buff[i]) * frc_deflation;
         psw.zfrc[i] = static_cast<double>(zfrc_buff[i]) * frc_deflation;
+      }
+      if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+        const std::vector<int> xcrd_ovrf_buff = x_coordinate_overflow.readDevice(atom_offset,
+                                                                                 psw.natom);
+        const std::vector<int> ycrd_ovrf_buff = y_coordinate_overflow.readDevice(atom_offset,
+                                                                                 psw.natom);
+        const std::vector<int> zcrd_ovrf_buff = z_coordinate_overflow.readDevice(atom_offset,
+                                                                                 psw.natom);
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xcrd[i] += static_cast<double>(xcrd_ovrf_buff[i]) * crd_ovrf_deflation;
+          psw.ycrd[i] += static_cast<double>(ycrd_ovrf_buff[i]) * crd_ovrf_deflation;
+          psw.zcrd[i] += static_cast<double>(zcrd_ovrf_buff[i]) * crd_ovrf_deflation;
+        }
+      }
+      if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+        const std::vector<int> xvel_ovrf_buff = x_velocity_overflow.readDevice(atom_offset,
+                                                                               psw.natom);
+        const std::vector<int> yvel_ovrf_buff = y_velocity_overflow.readDevice(atom_offset,
+                                                                               psw.natom);
+        const std::vector<int> zvel_ovrf_buff = z_velocity_overflow.readDevice(atom_offset,
+                                                                               psw.natom);
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xvel[i] += static_cast<double>(xvel_ovrf_buff[i]) * vel_ovrf_deflation;
+          psw.yvel[i] += static_cast<double>(yvel_ovrf_buff[i]) * vel_ovrf_deflation;
+          psw.zvel[i] += static_cast<double>(zvel_ovrf_buff[i]) * vel_ovrf_deflation;
+        }
+      }
+      if (force_scale_bits > force_scale_nonoverflow_bits) {
+        const std::vector<int> xfrc_ovrf_buff = x_force_overflow.readDevice(atom_offset,
+                                                                            psw.natom);
+        const std::vector<int> yfrc_ovrf_buff = y_force_overflow.readDevice(atom_offset,
+                                                                            psw.natom);
+        const std::vector<int> zfrc_ovrf_buff = z_force_overflow.readDevice(atom_offset,
+                                                                            psw.natom);
+        for (int i = 0; i < psw.natom; i++) {
+          psw.xfrc[i] += static_cast<double>(xfrc_ovrf_buff[i]) * frc_ovrf_deflation;
+          psw.yfrc[i] += static_cast<double>(yfrc_ovrf_buff[i]) * frc_ovrf_deflation;
+          psw.zfrc[i] += static_cast<double>(zfrc_ovrf_buff[i]) * frc_ovrf_deflation;
+        }
       }
       for (int i = 0; i < 9; i++) {
         psw.umat[i] = box_buff[i];
@@ -895,6 +1142,17 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
           psw.ycrd[i] = static_cast<double>(ycrd_ptr[atom_offset + i]) * crd_deflation;
           psw.zcrd[i] = static_cast<double>(zcrd_ptr[atom_offset + i]) * crd_deflation;
         }
+        if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+          const int* x_ovrf_ptr = x_coordinate_overflow.data();
+          const int* y_ovrf_ptr = y_coordinate_overflow.data();
+          const int* z_ovrf_ptr = z_coordinate_overflow.data();
+          const double crd_ovrf_deflation = crd_deflation * max_llint_accumulation;
+          for (int i = 0; i < psw.natom; i++) {
+            psw.xcrd[i] += static_cast<double>(x_ovrf_ptr[atom_offset + i]) * crd_ovrf_deflation;
+            psw.ycrd[i] += static_cast<double>(y_ovrf_ptr[atom_offset + i]) * crd_ovrf_deflation;
+            psw.zcrd[i] += static_cast<double>(z_ovrf_ptr[atom_offset + i]) * crd_ovrf_deflation;
+          }
+        }
         for (int i = 0; i < 9; i++) {
           psw.umat[i] = box_ptr[mtrx_offset + i];
           psw.invu[i] = inv_ptr[mtrx_offset + i];
@@ -915,6 +1173,17 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
           psw.yvel[i] = static_cast<double>(yvel_ptr[atom_offset + i]) * vel_deflation;
           psw.zvel[i] = static_cast<double>(zvel_ptr[atom_offset + i]) * vel_deflation;
         }
+        if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+          const int* x_ovrf_ptr = x_velocity_overflow.data();          
+          const int* y_ovrf_ptr = y_velocity_overflow.data();          
+          const int* z_ovrf_ptr = z_velocity_overflow.data();
+          const double vel_ovrf_deflation = vel_deflation * max_llint_accumulation;
+          for (int i = 0; i < psw.natom; i++) {
+            psw.xvel[i] += static_cast<double>(x_ovrf_ptr[atom_offset + i]) * vel_ovrf_deflation;
+            psw.yvel[i] += static_cast<double>(y_ovrf_ptr[atom_offset + i]) * vel_ovrf_deflation;
+            psw.zvel[i] += static_cast<double>(z_ovrf_ptr[atom_offset + i]) * vel_ovrf_deflation;
+          }
+        }
       }
       break;
     case TrajectoryKind::FORCES:
@@ -927,6 +1196,17 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
           psw.xfrc[i] = static_cast<double>(xfrc_ptr[atom_offset + i]) * frc_deflation;
           psw.yfrc[i] = static_cast<double>(yfrc_ptr[atom_offset + i]) * frc_deflation;
           psw.zfrc[i] = static_cast<double>(zfrc_ptr[atom_offset + i]) * frc_deflation;
+        }
+        if (force_scale_bits > force_scale_nonoverflow_bits) {
+          const int* x_ovrf_ptr = x_force_overflow.data();
+          const int* y_ovrf_ptr = y_force_overflow.data();
+          const int* z_ovrf_ptr = z_force_overflow.data();
+          const double frc_ovrf_deflation = frc_deflation * max_llint_accumulation;
+          for (int i = 0; i < psw.natom; i++) {
+            psw.xfrc[i] += static_cast<double>(x_ovrf_ptr[atom_offset + i]) * frc_ovrf_deflation;
+            psw.yfrc[i] += static_cast<double>(y_ovrf_ptr[atom_offset + i]) * frc_ovrf_deflation;
+            psw.zfrc[i] += static_cast<double>(z_ovrf_ptr[atom_offset + i]) * frc_ovrf_deflation;
+          }
         }
       }
       break;
@@ -949,6 +1229,20 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
           psw.ycrd[i] = static_cast<double>(ycrd_buff[i]) * crd_deflation;
           psw.zcrd[i] = static_cast<double>(zcrd_buff[i]) * crd_deflation;
         }
+        if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+          const std::vector<int> xcrd_ovrf_buff = x_coordinate_overflow.readDevice(atom_offset,
+                                                                                   psw.natom);
+          const std::vector<int> ycrd_ovrf_buff = y_coordinate_overflow.readDevice(atom_offset,
+                                                                                   psw.natom);
+          const std::vector<int> zcrd_ovrf_buff = z_coordinate_overflow.readDevice(atom_offset,
+                                                                                   psw.natom);
+          const double crd_ovrf_deflation = crd_deflation * max_llint_accumulation;
+          for (int i = 0; i < psw.natom; i++) {
+            psw.xcrd[i] += static_cast<double>(xcrd_ovrf_buff[i]) * crd_ovrf_deflation;
+            psw.ycrd[i] += static_cast<double>(ycrd_ovrf_buff[i]) * crd_ovrf_deflation;
+            psw.zcrd[i] += static_cast<double>(zcrd_ovrf_buff[i]) * crd_ovrf_deflation;
+          }
+        }
         for (int i = 0; i < 9; i++) {
           psw.umat[i] = box_buff[i];
           psw.invu[i] = inv_buff[i];
@@ -969,6 +1263,20 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
           psw.yvel[i] = static_cast<double>(yvel_buff[i]) * vel_deflation;
           psw.zvel[i] = static_cast<double>(zvel_buff[i]) * vel_deflation;
         }
+        if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
+          const std::vector<int> xvel_ovrf_buff = x_velocity_overflow.readDevice(atom_offset,
+                                                                                 psw.natom);
+          const std::vector<int> yvel_ovrf_buff = y_velocity_overflow.readDevice(atom_offset,
+                                                                                 psw.natom);
+          const std::vector<int> zvel_ovrf_buff = z_velocity_overflow.readDevice(atom_offset,
+                                                                                 psw.natom);
+          const double vel_ovrf_deflation = vel_deflation * max_llint_accumulation;
+          for (int i = 0; i < psw.natom; i++) {
+            psw.xvel[i] += static_cast<double>(xvel_ovrf_buff[i]) * vel_ovrf_deflation;
+            psw.yvel[i] += static_cast<double>(yvel_ovrf_buff[i]) * vel_ovrf_deflation;
+            psw.zvel[i] += static_cast<double>(zvel_ovrf_buff[i]) * vel_ovrf_deflation;
+          }
+        }
       }
       break;
     case TrajectoryKind::FORCES:
@@ -981,6 +1289,20 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
           psw.xfrc[i] = static_cast<double>(xfrc_buff[i]) * frc_deflation;
           psw.yfrc[i] = static_cast<double>(yfrc_buff[i]) * frc_deflation;
           psw.zfrc[i] = static_cast<double>(zfrc_buff[i]) * frc_deflation;
+        }
+        if (force_scale_bits > force_scale_nonoverflow_bits) {
+          const std::vector<int> xfrc_ovrf_buff = x_force_overflow.readDevice(atom_offset,
+                                                                              psw.natom);
+          const std::vector<int> yfrc_ovrf_buff = y_force_overflow.readDevice(atom_offset,
+                                                                              psw.natom);
+          const std::vector<int> zfrc_ovrf_buff = z_force_overflow.readDevice(atom_offset,
+                                                                              psw.natom);
+          const double frc_ovrf_deflation = frc_deflation * max_llint_accumulation;
+          for (int i = 0; i < psw.natom; i++) {
+            psw.xfrc[i] += static_cast<double>(xfrc_ovrf_buff[i]) * frc_ovrf_deflation;
+            psw.yfrc[i] += static_cast<double>(yfrc_ovrf_buff[i]) * frc_ovrf_deflation;
+            psw.zfrc[i] += static_cast<double>(zfrc_ovrf_buff[i]) * frc_ovrf_deflation;
+          }
         }
       }
       break;
@@ -1061,6 +1383,57 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
     rsw.ycrd[i] = static_cast<double>(ybuffer[i]) * frc_deflation;
     rsw.zcrd[i] = static_cast<double>(zbuffer[i]) * frc_deflation;
   }
+  if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
+    std::vector<int> x_ovrf_buffer, y_ovrf_buffer, z_ovrf_buffer;
+    switch (tier) {
+    case HybridTargetLevel::HOST:
+      switch (trajkind) {
+      case TrajectoryKind::POSITIONS:
+        x_ovrf_buffer = x_coordinate_overflow.readHost(astart, rsw.natom);
+        y_ovrf_buffer = y_coordinate_overflow.readHost(astart, rsw.natom);
+        z_ovrf_buffer = z_coordinate_overflow.readHost(astart, rsw.natom);
+        break;
+      case TrajectoryKind::VELOCITIES:
+        x_ovrf_buffer = x_velocity_overflow.readHost(astart, rsw.natom);
+        y_ovrf_buffer = y_velocity_overflow.readHost(astart, rsw.natom);
+        z_ovrf_buffer = z_velocity_overflow.readHost(astart, rsw.natom);
+        break;
+      case TrajectoryKind::FORCES:
+        x_ovrf_buffer = x_force_overflow.readHost(astart, rsw.natom);
+        y_ovrf_buffer = y_force_overflow.readHost(astart, rsw.natom);
+        z_ovrf_buffer = z_force_overflow.readHost(astart, rsw.natom);
+        break;
+      }
+      break;
+#ifdef OMNI_USE_HPC
+    case HybridTargetLevel::DEVICE:
+      switch (trajkind) {
+      case TrajectoryKind::POSITIONS:
+        x_ovrf_buffer = x_coordinate_overflow.readDevice(astart, rsw.natom);
+        y_ovrf_buffer = y_coordinate_overflow.readDevice(astart, rsw.natom);
+        z_ovrf_buffer = z_coordinate_overflow.readDevice(astart, rsw.natom);
+        break;
+      case TrajectoryKind::VELOCITIES:
+        x_ovrf_buffer = x_velocity_overflow.readDevice(astart, rsw.natom);
+        y_ovrf_buffer = y_velocity_overflow.readDevice(astart, rsw.natom);
+        z_ovrf_buffer = z_velocity_overflow.readDevice(astart, rsw.natom);
+        break;
+      case TrajectoryKind::FORCES:
+        x_ovrf_buffer = x_force_overflow.readDevice(astart, rsw.natom);
+        y_ovrf_buffer = y_force_overflow.readDevice(astart, rsw.natom);
+        z_ovrf_buffer = z_force_overflow.readDevice(astart, rsw.natom);
+        break;
+      }
+      break;
+#endif
+    }
+    const double frc_ovrf_deflation = inverse_force_scale * max_llint_accumulation;
+    for (int i = 0; i < rsw.natom; i++) {
+      rsw.xcrd[i] += static_cast<double>(x_ovrf_buffer[i]) * frc_ovrf_deflation;
+      rsw.ycrd[i] += static_cast<double>(y_ovrf_buffer[i]) * frc_ovrf_deflation;
+      rsw.zcrd[i] += static_cast<double>(z_ovrf_buffer[i]) * frc_ovrf_deflation;
+    }  
+  }
   return result;
 }
   
@@ -1084,6 +1457,9 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
       llint* xptr = x_forces.data();
       llint* yptr = y_forces.data();
       llint* zptr = z_forces.data();
+      int* x_ovrf_ptr = x_force_overflow.data();
+      int* y_ovrf_ptr = y_force_overflow.data();
+      int* z_ovrf_ptr = z_force_overflow.data();
       if (index < 0) {
         for (int i = 0; i < system_count; i++) {
           const int jmin = atom_starts.readHost(i);
@@ -1092,6 +1468,13 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
             xptr[j] = 0LL;
             yptr[j] = 0LL;
             zptr[j] = 0LL;
+          }
+          if (force_scale_bits > force_scale_nonoverflow_bits) {
+            for (int j = jmin; j < jmax; j++) {
+              x_ovrf_ptr[j] = 0;
+              y_ovrf_ptr[j] = 0;
+              z_ovrf_ptr[j] = 0;
+            }
           }
         }
       }
@@ -1102,6 +1485,13 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
           xptr[i] = 0LL;
           yptr[i] = 0LL;
           zptr[i] = 0LL;
+        }
+        if (force_scale_bits > force_scale_nonoverflow_bits) {
+          for (int i = imin; i < imax; i++) {
+            x_ovrf_ptr[i] = 0;
+            y_ovrf_ptr[i] = 0;
+            z_ovrf_ptr[i] = 0;
+          }
         }
       }
 #ifdef OMNI_USE_HPC
@@ -1326,20 +1716,30 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   const size_t system_stride = roundUp<size_t>(system_count, warp_size_zu);
-  int_data.resize(2LLU * system_stride);
+  int_data.resize((2LLU * system_stride) + (9LLU * atom_stride));
   atom_counts.setPointer(&int_data, 0LLU, system_count);
   atom_starts.setPointer(&int_data, system_stride, system_count);
   const size_t xfrm_stride = system_count * roundUp<size_t>(9, warp_size_zu);
+  const size_t twosys = 2LLU * system_stride;
   llint_data.resize((9LLU * atom_stride) + xfrm_stride);
   x_coordinates.setPointer(&llint_data,               0LLU, atom_stride);
   y_coordinates.setPointer(&llint_data,        atom_stride, atom_stride);
   z_coordinates.setPointer(&llint_data, 2LLU * atom_stride, atom_stride);
+  x_coordinate_overflow.setPointer(&int_data,                        twosys, atom_stride);
+  y_coordinate_overflow.setPointer(&int_data,          atom_stride + twosys, atom_stride);
+  z_coordinate_overflow.setPointer(&int_data, (2LLU * atom_stride) + twosys, atom_stride);
   x_velocities.setPointer(&llint_data,  3LLU * atom_stride, atom_stride);
   y_velocities.setPointer(&llint_data,  4LLU * atom_stride, atom_stride);
   z_velocities.setPointer(&llint_data,  5LLU * atom_stride, atom_stride);
+  x_velocity_overflow.setPointer(&int_data, (3LLU * atom_stride) + twosys, atom_stride);
+  y_velocity_overflow.setPointer(&int_data, (4LLU * atom_stride) + twosys, atom_stride);
+  z_velocity_overflow.setPointer(&int_data, (5LLU * atom_stride) + twosys, atom_stride);
   x_forces.setPointer(&llint_data,      6LLU * atom_stride, atom_stride);
   y_forces.setPointer(&llint_data,      7LLU * atom_stride, atom_stride);
   z_forces.setPointer(&llint_data,      8LLU * atom_stride, atom_stride);
+  x_force_overflow.setPointer(&int_data, (6LLU * atom_stride) + twosys, atom_stride);
+  y_force_overflow.setPointer(&int_data, (7LLU * atom_stride) + twosys, atom_stride);
+  z_force_overflow.setPointer(&int_data, (8LLU * atom_stride) + twosys, atom_stride);
   box_vectors.setPointer(&llint_data,   9LLU * atom_stride, xfrm_stride);
   double_data.resize(3LLU * xfrm_stride);
   box_space_transforms.setPointer(&double_data,               0LLU, xfrm_stride);

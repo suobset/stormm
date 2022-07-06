@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #endif
 #include "Constants/scaling.h"
+#include "Constants/fixed_precision.h"
 #include "Reporting/error_format.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "hpc_phasespace_synthesis.h"
@@ -13,6 +14,10 @@
 namespace omni {
 namespace synthesis {
 
+using numerics::globalpos_scale_nonoverflow_bits;
+using numerics::velocity_scale_nonoverflow_bits;
+using numerics::force_scale_nonoverflow_bits;
+  
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
 kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const int low_index,
@@ -87,6 +92,11 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
           destination.xcrd[read_pos] = source.xcrd[read_pos];
           destination.ycrd[read_pos] = source.ycrd[read_pos];
           destination.zcrd[read_pos] = source.zcrd[read_pos];
+          if (source.gpos_bits > globalpos_scale_nonoverflow_bits) {
+            destination.xcrd_ovrf[read_pos] = source.xcrd_ovrf[read_pos];
+            destination.ycrd_ovrf[read_pos] = source.ycrd_ovrf[read_pos];
+            destination.zcrd_ovrf[read_pos] = source.zcrd_ovrf[read_pos];
+          }
           read_pos += atom_warps * warp_size_int;
         }
       }
@@ -162,9 +172,15 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
         while (read_pos < atom_read_end) {
           if (material == TrajectoryKind::VELOCITIES) {
             destination.xvel[read_pos] = source.xvel[read_pos];
+            if (source.vel_bits > velocity_scale_nonoverflow_bits) {
+              destination.xvel_ovrf[read_pos] = source.xvel_ovrf[read_pos];              
+            }
           }
           else {
             destination.xfrc[read_pos] = source.xfrc[read_pos];
+            if (source.frc_bits > force_scale_nonoverflow_bits) {
+              destination.xfrc_ovrf[read_pos] = source.xfrc_ovrf[read_pos];              
+            }
           }
           read_pos += pdim_warps * warp_size_int;
         }
@@ -174,9 +190,15 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
         while (read_pos < atom_read_end) {
           if (material == TrajectoryKind::VELOCITIES) {
             destination.yvel[read_pos] = source.yvel[read_pos];
+            if (source.vel_bits > velocity_scale_nonoverflow_bits) {
+              destination.yvel_ovrf[read_pos] = source.yvel_ovrf[read_pos];              
+            }
           }
           else {
             destination.yfrc[read_pos] = source.yfrc[read_pos];
+            if (source.frc_bits > force_scale_nonoverflow_bits) {
+              destination.yfrc_ovrf[read_pos] = source.yfrc_ovrf[read_pos];              
+            }
           }
           read_pos += pdim_warps * warp_size_int;
         }
@@ -186,9 +208,15 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
         while (read_pos < atom_read_end) {
           if (material == TrajectoryKind::VELOCITIES) {
             destination.zvel[read_pos] = source.zvel[read_pos];
+            if (source.vel_bits > velocity_scale_nonoverflow_bits) {
+              destination.zvel_ovrf[read_pos] = source.zvel_ovrf[read_pos];              
+            }
           }
           else {
             destination.zfrc[read_pos] = source.zfrc[read_pos];
+            if (source.frc_bits > force_scale_nonoverflow_bits) {
+              destination.zfrc_ovrf[read_pos] = source.zfrc_ovrf[read_pos];              
+            }
           }
           read_pos += pdim_warps * warp_size_int;
         }
@@ -223,6 +251,11 @@ kPsyInitializeForces(PsSynthesisWriter psyw, const int index) {
     psyw.xfrc[pos] = 0LL;
     psyw.yfrc[pos] = 0LL;
     psyw.zfrc[pos] = 0LL;
+    if (psyw.frc_bits > force_scale_nonoverflow_bits) {
+      psyw.xfrc[pos] = 0;
+      psyw.yfrc[pos] = 0;
+      psyw.zfrc[pos] = 0;
+    }
   }
 }
 
