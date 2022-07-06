@@ -66,7 +66,14 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
       break;
     case PrecisionLevel::DOUBLE:
       {
-        
+        llint workbin;
+        int overflow;
+        splitRealConversion(r * scale_factor, &workbin, &overflow);
+        double dp_reconst = static_cast<double>(workbin) * inv_scale_factor;
+        dp_reconst += static_cast<double>(overflow) * inv_overflow_factor;
+        if (fabs(dp_reconst - r) > tiny) {
+          n_basic_fail++;
+        }
       }
       break;
     }
@@ -110,9 +117,9 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
           splitRealAccumulation(scaled_r, &workbin, &overflow);
           dp_tracker += r;
         }
-        double dp_reconstruct = static_cast<double>(workbin) * inv_scale_factor;
-        dp_reconstruct += static_cast<double>(overflow) * inv_overflow_factor;
-        if (fabs(dp_reconstruct - dp_tracker) > tiny) {
+        double dp_reconst = static_cast<double>(workbin) * inv_scale_factor;
+        dp_reconst += static_cast<double>(overflow) * inv_overflow_factor;
+        if (fabs(dp_reconst - dp_tracker) > tiny) {
           n_inc_fail++;
         }
       }
