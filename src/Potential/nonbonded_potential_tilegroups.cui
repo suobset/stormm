@@ -396,6 +396,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       read_idx -= EXCL_GMEM_OFFSET;
 
       // CHECK
+#if 0
       if (fabsf(t_xfrc) > (TCALC)(1000.0)) {
         const int system_idx = sh_system_indices[absc_import_idx];
         const int atom_offset = poly_nbk.atom_offsets[system_idx];
@@ -416,6 +417,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
                read_idx, t_xfrc, t_yfrc, t_zfrc);
 #  endif
       }
+#endif
       // END CHECK
       
 #  ifdef SPLIT_FORCE_ACCUMULATION

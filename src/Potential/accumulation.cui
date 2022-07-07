@@ -65,6 +65,60 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
     atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
   }
 }
+
+__device__ __forceinline__ void splitForceContribution(const double dval, const int pos,
+                                                       const int vwu_idx, llint* primary,
+                                                       int* overflow) {
+  llint ival;
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    ival = __double2ll_rn(dval - ((double)(spillover) * max_llint_accumulation));
+    atomicAdd(&overflow[pos], spillover);
+  }
+  else {
+    ival = __double2ll_rn(dval);
+  }
+  const llint prim_old = atomicAdd((ullint*)&primary[pos], lliToUlli(ival));
+  const llint prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
+    atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 4);
+  }
+}
+
+__device__ __forceinline__ void splitForceContribution(const float fval, const int pos,
+                                                       const int vwu_idx, int* primary,
+                                                       int* overflow) {
+  int ival;
+  if (fabsf(fval) >= max_int_accumulation_f) {
+    const int spillover = fval / max_int_accumulation_f;
+    ival = __float2int_rn(fval - ((float)(spillover) * max_int_accumulation_f));
+    const int old_ovrf = atomicAdd(&overflow[pos], spillover);
+
+    // CHECK
+    if (pos == 14) {
+      const int new_ovrf = old_ovrf + spillover;
+      printf("Add %2d to position 14 from large force (%14.2f -> %12d) (%2d - %2d)\n",
+             spillover, fval, ival, old_ovrf, new_ovrf);
+    }
+    // END CHECK
+  }
+  else {
+    ival = __float2int_rn(fval);
+  }
+  const int prim_old = atomicAdd(&primary[pos], ival);
+  const int prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    const int old_ovrf = atomicAdd(&overflow[pos], (1 - (2 * (ival < 0))) * 2);
+
+    // CHECK
+    if (pos == 14) {
+      const int contrib = (1 - (2 * (ival < 0))) * 2;
+      const int new_ovrf = old_ovrf + contrib;
+      printf("Add %2d to position 14 by rollover %2d -> %2d\n", contrib, old_ovrf, new_ovrf);
+    }
+    // END CHECK
+  }
+}
 /// \}
 
 /// \brief Convert a floating point number to fixed precision format split between two integer
@@ -141,6 +195,43 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
     atomicAdd(&overflow[pos], ival_y);
   }
 }
+
+__device__ __forceinline__ void addSplitFixedPrecision(const int95_t ival, const int pos,
+                                                       const int vwu_idx, llint* primary,
+                                                       int* overflow) {
+  const llint prim_old = atomicAdd((ullint*)&primary[pos], lliToUlli(ival.x));
+  const llint prim_old_plus_x = prim_old + ival.x;
+  int ival_y = ival.y;
+  ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
+            (1 - (2 * (ival.x < 0))) * 2;    
+  if (ival_y) {
+    atomicAdd(&overflow[pos], ival_y);
+  }
+}
+
+__device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const int pos,
+                                                       const int vwu_idx, int* primary,
+                                                       int* overflow) {
+  const int prim_old = atomicAdd(&primary[pos], ival.x);
+  const int prim_old_plus_x = prim_old + ival.x;
+  int ival_y = ival.y;
+  ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
+            (1 - (2 * (ival.x < 0))) * 2;    
+  if (ival_y) {
+    const int old_ovrf = atomicAdd(&overflow[pos], ival_y);
+
+    // CHECK
+    if (pos == 14 && vwu_idx == 0) {
+      const int new_ovrf = old_ovrf + ival_y;
+      const int roll_contrib = ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
+                               (1 - (2 * (ival.x < 0))) * 2;
+      printf("[ %10d %10d ] => Add %2d to position 14 by ??? %2d -> %2d (roll contrib %2d)\n",
+             ival.x, ival.y, ival_y, old_ovrf, new_ovrf, roll_contrib);
+    }
+    // END CHECK
+    
+  }
+}
 /// \}
 
 /// \brief Combine two fixed precision values, each split across two accumulators.
@@ -178,10 +269,7 @@ __device__ __forceinline__ int2 combineSplitFixedPrecision(const int2 a, const i
 __device__ __forceinline__ int95_t antiCombineSplitFixedPrecision(const int95_t a,
                                                                   const int95_t b) {
   int95_t result = { a.x + b.x, a.y + b.y };
-  if ((b.x > 0LL && result.x < a.x) || b.x < 0LL && result.x > a.x) {
-    result.y += (1 - (2 * (b.x < 0LL))) * 4 * ((b.x > 0LL && result.x < a.x) +
-                                               (b.x < 0LL && result.x > a.x));
-  }
+  result.y += (1 - (2 * (b.x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0LL) * 4;
   result.x = -result.x;
   result.y = -result.y;
   return result;
@@ -189,10 +277,7 @@ __device__ __forceinline__ int95_t antiCombineSplitFixedPrecision(const int95_t 
 
 __device__ __forceinline__ int2 antiCombineSplitFixedPrecision(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
-  if ((b.x > 0 && result.x < a.x) || b.x < 0 && result.x > a.x) {
-    result.y += (1 - (2 * (b.x < 0))) * 2 * ((b.x > 0 && result.x < a.x) +
-                                             (b.x < 0 && result.x > a.x));
-  }
+  result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
   result.x = -result.x;
   result.y = -result.y;
   return result;

@@ -24,6 +24,7 @@ using constants::medium_block_size;
 using constants::small_block_size;
 using data_types::int95_t;
 using math::roundUp;
+using numerics::max_int_accumulation;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
@@ -361,27 +362,27 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define SPLIT_FORCE_ACCUMULATION
 
 #  define COMPUTE_FORCE
-#    define KERNEL_NAME kdValenceForceAccumulation
+#    define KERNEL_NAME kdsValenceForceAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME  
 #    define UPDATE_ATOMS
-#      define KERNEL_NAME kdValenceAtomUpdate
+#      define KERNEL_NAME kdsValenceAtomUpdate
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
 #    undef UPDATE_ATOMS
 #    define COMPUTE_ENERGY
-#      define KERNEL_NAME kdValenceForceEnergyAccumulation
+#      define KERNEL_NAME kdsValenceForceEnergyAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
 #      define UPDATE_ATOMS
-#        define KERNEL_NAME kdValenceEnergyAtomUpdate
+#        define KERNEL_NAME kdsValenceEnergyAtomUpdate
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
 #      undef UPDATE_ATOMS
 #    undef  COMPUTE_ENERGY
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
-#    define KERNEL_NAME kdValenceEnergyAccumulation
+#    define KERNEL_NAME kdsValenceEnergyAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME
 #  undef  COMPUTE_ENERGY
@@ -410,11 +411,11 @@ extern void valenceKernelSetup() {
   cudaFuncSetSharedMemConfig(kfValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
   cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
   cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdValenceAtomUpdate,              cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdValenceEnergyAtomUpdate,        cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdsValenceAtomUpdate,              cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdsValenceEnergyAtomUpdate,        cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdsValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdsValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(kdsValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -438,17 +439,17 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
     case EvaluateForce::YES:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kdValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                                *scw, *gmem_r);
+        kdsValenceForceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl,
+                                                                 *poly_psw, *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kdValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+        kdsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
                                                           *gmem_r);
         break;
       }
       break;
     case EvaluateForce::NO:
-      kdValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
+      kdsValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
                                                          *scw, *gmem_r);
       break;
     }
@@ -461,11 +462,11 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
     // kernel.
     switch (eval_energy) {
     case EvaluateEnergy::YES:
-      kdValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
+      kdsValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
                                                        *gmem_r);
       break;
     case EvaluateEnergy::NO:
-      kdValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+      kdsValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
       break;
     }
     break;
