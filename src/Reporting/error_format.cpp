@@ -92,7 +92,8 @@ std::string terminalFormat(const std::string &message, const char* class_caller,
   // worthwhile (just make a new line).  Take all of that into account when crafting a message to
   // keep text fom wrapping and arranged in a clean block on any given OS.
   const int word_count = words.size();
-  const int width = (width_in > 0) ? width_in : console_dims.ws_col - 1;
+  const int width = (width_in > 0) ? width_in : (console_dims.ws_col > 2) ?
+                                                console_dims.ws_col - 1 : 80;
   std::string parsed_msg;
   switch (style) {
   case RTMessageKind::ERROR:

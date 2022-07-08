@@ -226,8 +226,8 @@ void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
   const llint prim_old = *primary;
   *primary += ival;
   const llint prim_old_plus_ival = prim_old + ival;
-  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
-    *overflow += (1 - (2 * (ival < 0))) * 4;
+  if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
+    *overflow += (1 - (2 * (ival < 0LL))) * 2;
   }
 }
 

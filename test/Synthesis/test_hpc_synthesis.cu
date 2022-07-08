@@ -109,22 +109,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
     frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
     total_restraints += poly_ag.getSystemRestraintPointer(i)->getTotalRestraintCount();
-
-    // CHECK
-    if (i > 0) {
-      continue;
-    }
-    const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
-    for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
-      if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 1.0e-2 ||
-          fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-2 ||
-          fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-2) {
-        printf("Val %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
-               i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
-               devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
-      }
-    }
-    // END CHECK
   }
   const std::string restraint_presence = (total_restraints > 0) ? "with" : "without";
   check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
@@ -360,7 +344,7 @@ int main(const int argc, const char* argv[]) {
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc);
-  PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 42);
+  PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
@@ -407,20 +391,16 @@ int main(const int argc, const char* argv[]) {
   MolecularMechanicsControls mmctrl;
   mmctrl.primeWorkUnitCounters(gpu, poly_ag);
   ScoreCard sc(nsys, 1, 32);
-
-  // CHECK
-  printf("Part A\n");
-  // END CHECK
   
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
   // and 1:4 attenuated interactions.
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::DOUBLE, gpu,
-                         3.5e-6, 2.0e-5, do_tests);
-  checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
-                         ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu, 3.5e-5,
-                         2.0e-4, do_tests);
-  checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
+                         3.5e-6, 2.0e-6, do_tests);
+  checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                         poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu,
+                         3.5e-5, 2.0e-4, do_tests);
+  checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
                          ForceAccumulationMethod::WHOLE, PrecisionLevel::SINGLE, gpu, 3.5e-5,
                          2.0e-4, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
@@ -464,6 +444,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomGraph*> bigger_tops = { &trpi_ag, &dhfr_ag, &alad_ag };
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, dhfr_ps, alad_ps };
   PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
+  PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 34, 40);
   const std::vector<int> big_top_indices = { 0, 1, 2 };
   AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT,
                                  max_vwu_atoms, &timer);
@@ -473,15 +454,11 @@ int main(const int argc, const char* argv[]) {
   big_poly_ag.upload();
   big_poly_se.upload();
   big_poly_ps.upload();
+  big_poly_ps_dbl.upload();
   timer.assignTime(0);
-
-  // CHECK
-  printf("Part B\n");
-  // END CHECK
-
-  checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
-                         big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::DOUBLE, gpu,
-                         3.5e-6, 2.0e-5, do_tests);
+  checkCompilationForces(&big_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
                          big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu,
                          7.5e-5, 3.0e-3, do_tests);
@@ -529,6 +506,8 @@ int main(const int argc, const char* argv[]) {
   const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra };
   const std::vector<int> ligand_tiling = { 0, 1, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0 };
   PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
+  PhaseSpaceSynthesis ligand_poly_ps_dbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 40, 24,
+                                         34, 44);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,
                                     ExceptionResponse::WARN, max_vwu_atoms, &timer);
@@ -538,15 +517,11 @@ int main(const int argc, const char* argv[]) {
   ligand_poly_ag.upload();
   ligand_poly_se.upload();
   ligand_poly_ps.upload();
+  ligand_poly_ps_dbl.upload();
   timer.assignTime(0);
-
-  // CHECK
-  printf("Part C\n");
-  // END CHECK
-
-  checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+  checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.0e-5, do_tests);
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.0e-6, do_tests);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionLevel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);

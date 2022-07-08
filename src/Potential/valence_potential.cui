@@ -882,15 +882,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         j_atom -= EXCL_GMEM_OFFSET;
         k_atom -= EXCL_GMEM_OFFSET;
         l_atom -= EXCL_GMEM_OFFSET;        
-
-        // CHECK
-        if (vwu_idx == 0 && (i_atom == 14 || j_atom == 14 || k_atom == 14 || l_atom == 14)) {
-          const TCALC real_f14 = f14 * poly_psw.inv_frc_scale;
-          printf("Dihe [ %2d %2d %2d %2d ] -> %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f %9.5f\n", i_atom,
-                 j_atom, k_atom, l_atom, fa, fb1, fb2, fc1, fc2, fd, real_f14);
-        }
-        // END CHECK
-        
 #  ifdef SPLIT_FORCE_ACCUMULATION
         const SPLIT_TYPE ifrc_ix = SPLITCONV_FUNC((crabbc.x * fa) + (f14 * ad.x));
         const SPLIT_TYPE ifrc_jx = SPLITCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -913,32 +904,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const SPLIT_TYPE ifrc_iz = SPLITCONV_FUNC((crabbc.z * fa) + (f14 * ad.z));
         const SPLIT_TYPE ifrc_jz = SPLITCONV_FUNC((fb1 * crabbc.z) - (fb2 * crbccd.z));
         const SPLIT_TYPE ifrc_lz = SPLITCONV_FUNC((-fd * crbccd.z) - (f14 * ad.z));
-        addSplitFixedPrecision(ifrc_iz, i_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
-        addSplitFixedPrecision(ifrc_jz, j_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
-        addSplitFixedPrecision(ifrc_lz, l_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
+        addSplitFixedPrecision(ifrc_iz, i_atom, sh_zfrc, sh_zfrc_overflow);
+        addSplitFixedPrecision(ifrc_jz, j_atom, sh_zfrc, sh_zfrc_overflow);
+        addSplitFixedPrecision(ifrc_lz, l_atom, sh_zfrc, sh_zfrc_overflow);
         const SPLIT_TYPE ifrc_ijz = combineSplitFixedPrecision(ifrc_iz, ifrc_jz);
         const SPLIT_TYPE ifrc_kz = antiCombineSplitFixedPrecision(ifrc_ijz, ifrc_lz);
-
-        // CHECK
-#ifdef TCALC_IS_SINGLE
-        if (vwu_idx == 0) {
-          if (i_atom == 14) {
-            printf("Add dihe I %10d %10d\n", ifrc_iz.x, ifrc_iz.y);
-          }
-          else if (j_atom == 14) {
-            printf("Add dihe J %10d %10d\n", ifrc_jz.x, ifrc_jz.y);
-          }
-          else if (k_atom == 14) {
-            printf("Add dihe K %10d %10d\n", ifrc_kz.x, ifrc_kz.y);
-          }
-          else if (l_atom == 14) {
-            printf("Add dihe L %10d %10d\n", ifrc_lz.x, ifrc_lz.y);
-          }
-        }
-#endif
-        // END CHECK
-        
-        addSplitFixedPrecision(ifrc_kz, k_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
+        addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, sh_zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifrc_ix = LLCONV_FUNC((crabbc.x * fa) + (f14 * ad.x));
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -961,27 +932,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(ifrc_jz));
         atomicAdd((ullint*)&sh_zfrc[k_atom], lliToUlli(-(ifrc_iz + ifrc_jz + ifrc_lz)));
         atomicAdd((ullint*)&sh_zfrc[l_atom], lliToUlli(ifrc_lz));
-
-        // CHECK
-#ifdef TCALC_IS_SINGLE
-        if (vwu_idx == 0) {
-          if (i_atom == 14) {
-            printf("Add dihe I %12.1f\n", (crabbc.z * fa) + (f14 * ad.z));
-          }
-          else if (j_atom == 14) {
-            printf("Add dihe J %12.1f\n", (fb1 * crabbc.z) - (fb2 * crbccd.z));
-          }
-          else if (k_atom == 14) {
-            const double dk_force_z = (double)(-(ifrc_iz + ifrc_jz + ifrc_lz));
-            printf("Add dihe K %12.1f\n", dk_force_z);
-          }
-          else if (l_atom == 14) {
-            printf("Add dihe L %12.1f\n", (-fd * crbccd.z) - (f14 * ad.z));
-          }
-        }
-#endif
-        // END CHECK
-        
 #  endif
 #  ifndef UPDATE_ATOMS
         }
@@ -1095,18 +1045,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         i_atom -= EXCL_GMEM_OFFSET;
         j_atom -= EXCL_GMEM_OFFSET;
         k_atom -= EXCL_GMEM_OFFSET;
-
-        // CHECK
-        if (vwu_idx == 0 && (i_atom == 14 || j_atom == 14 || k_atom == 14)) {
-          const TCALC real_dA    = dA * poly_psw.inv_frc_scale;
-          const TCALC real_sqba  = sqba * poly_psw.inv_frc_scale;
-          const TCALC real_sqbc  = sqbc * poly_psw.inv_frc_scale;
-          const TCALC real_mbabc = mbabc * poly_psw.inv_frc_scale;
-          printf("Angl [ %2d %2d %2d ] -> %9.5f %9.5f %9.5f %9.5f %9.5f\n", i_atom,
-                 j_atom, k_atom, real_dA, real_sqba, real_sqbc, real_mbabc, costheta);
-        }
-        // END CHECK
-        
 #  ifdef SPLIT_FORCE_ACCUMULATION
 
         // The accumulation proceeds by computing the opposite of the values for iadf and icdf
@@ -1118,36 +1056,19 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const SPLIT_TYPE iadf_z = SPLITCONV_FUNC((costheta * ba.z * sqba) - (bc.z * mbabc));
         addSplitFixedPrecision(iadf_x, i_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(iadf_y, i_atom, sh_yfrc, sh_yfrc_overflow);
-        addSplitFixedPrecision(iadf_z, i_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
+        addSplitFixedPrecision(iadf_z, i_atom, sh_zfrc, sh_zfrc_overflow);
         const SPLIT_TYPE icdf_x = SPLITCONV_FUNC((costheta * bc.x * sqbc) - (ba.x * mbabc));
         const SPLIT_TYPE icdf_y = SPLITCONV_FUNC((costheta * bc.y * sqbc) - (ba.y * mbabc));
         const SPLIT_TYPE icdf_z = SPLITCONV_FUNC((costheta * bc.z * sqbc) - (ba.z * mbabc));
         addSplitFixedPrecision(icdf_x, k_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(icdf_y, k_atom, sh_yfrc, sh_yfrc_overflow);
-        addSplitFixedPrecision(icdf_z, k_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
+        addSplitFixedPrecision(icdf_z, k_atom, sh_zfrc, sh_zfrc_overflow);
         const SPLIT_TYPE iacdf_x = antiCombineSplitFixedPrecision(iadf_x, icdf_x);
         const SPLIT_TYPE iacdf_y = antiCombineSplitFixedPrecision(iadf_y, icdf_y);
         const SPLIT_TYPE iacdf_z = antiCombineSplitFixedPrecision(iadf_z, icdf_z);
         addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, sh_yfrc_overflow);
-        addSplitFixedPrecision(iacdf_z, j_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
-
-        // CHECK
-#ifdef TCALC_IS_SINGLE
-        if (vwu_idx == 0) {
-          if (i_atom == 14) {
-            printf("Add angl I %10d %10d\n", iadf_z.x, iadf_z.y);
-          }
-          else if (j_atom == 14) {
-            printf("Add angl J %10d %10d\n", iacdf_z.x, iacdf_z.y);
-          }
-          else if (k_atom == 14) {
-            printf("Add angl K %10d %10d\n", icdf_z.x, icdf_z.y);
-          }
-        }
-#endif
-        // END CHECK
-        
+        addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, sh_zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iadf_x = LLCONV_FUNC((bc.x * mbabc) - (costheta * ba.x * sqba));
         const llint iadf_y = LLCONV_FUNC((bc.y * mbabc) - (costheta * ba.y * sqba));
@@ -1164,25 +1085,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         atomicAdd((ullint*)&sh_xfrc[k_atom], lliToUlli(-icdf_x));
         atomicAdd((ullint*)&sh_yfrc[k_atom], lliToUlli(-icdf_y));
         atomicAdd((ullint*)&sh_zfrc[k_atom], lliToUlli(-icdf_z));
-
-        // CHECK
-#ifdef TCALC_IS_SINGLE
-        if (vwu_idx == 0) {
-          if (i_atom == 14) {
-            const double diadf_z = (double)(-iadf_z);
-            printf("Add angl I %12.1lf\n", diadf_z);
-          }
-          else if (j_atom == 14) {
-            const double diacdf_z = (double)(iadf_z + icdf_z);
-            printf("Add angl J %12.1lf\n", diacdf_z);
-          }
-          else if (k_atom == 14) {
-            const double dicdf_z = (double)(-icdf_z);
-            printf("Add angl K %12.1lf\n", dicdf_z);
-          }
-        }
-#endif
-        // END CHECK
 #  endif
 #  ifndef UPDATE_ATOMS
         }
@@ -1273,37 +1175,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC fmag_dz = fmag * dz;
         i_atom -= EXCL_GMEM_OFFSET;
         j_atom -= EXCL_GMEM_OFFSET;
-
-        // CHECK
-        if (vwu_idx == 0 && (i_atom == 14 || j_atom == 14)) {
-          const TCALC real_fmag = fmag * poly_psw.inv_frc_scale;
-          printf("Bond [ %2d %2d ] -> %9.5f\n", i_atom, j_atom, real_fmag);
-        }
-        // END CHECK
-        
 #  ifdef SPLIT_FORCE_ACCUMULATION
         splitForceContribution( fmag_dx, i_atom, sh_xfrc, sh_xfrc_overflow);
         splitForceContribution( fmag_dy, i_atom, sh_yfrc, sh_yfrc_overflow);
-        splitForceContribution( fmag_dz, i_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
+        splitForceContribution( fmag_dz, i_atom, sh_zfrc, sh_zfrc_overflow);
         splitForceContribution(-fmag_dx, j_atom, sh_xfrc, sh_xfrc_overflow);
         splitForceContribution(-fmag_dy, j_atom, sh_yfrc, sh_yfrc_overflow);
-        splitForceContribution(-fmag_dz, j_atom, vwu_idx, sh_zfrc, sh_zfrc_overflow);
-
-        // CHECK
-#ifdef TCALC_IS_SINGLE
-        if (vwu_idx == 0) {
-          if (i_atom == 14) {
-            const int2 i_force_z = convertSplitFixedPrecision(fmag_dz);
-            printf("Add bond I %10d %10d\n", i_force_z.x, i_force_z.y);
-          }
-          else if (j_atom == 14) {
-            const int2 j_force_z = convertSplitFixedPrecision(-fmag_dz);
-            printf("Add bind J %10d %10d\n", j_force_z.x, j_force_z.y);
-          }
-        }
-#endif
-        // END CHECK
-        
+        splitForceContribution(-fmag_dz, j_atom, sh_zfrc, sh_zfrc_overflow);
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
@@ -1314,20 +1192,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         atomicAdd((ullint*)&sh_xfrc[j_atom], lliToUlli(-ifmag_dx));
         atomicAdd((ullint*)&sh_yfrc[j_atom], lliToUlli(-ifmag_dy));
         atomicAdd((ullint*)&sh_zfrc[j_atom], lliToUlli(-ifmag_dz));
-
-        // CHECK
-#ifdef TCALC_IS_SINGLE
-        if (vwu_idx == 0) {
-          if (i_atom == 14) {
-            printf("Add bond I %12.1f\n", fmag_dz);
-          }
-          else if (j_atom == 14) {
-            printf("Add bond J %12.1f\n", -fmag_dz);
-          }
-        }
-#endif
-        // END CHECK
-        
 #  endif
 #  ifndef UPDATE_ATOMS
         // See above for the reason these force accumulations sit within a conditional scope
@@ -2187,15 +2051,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
 #    ifdef TCALC_IS_SINGLE
-
-        // CHECK
-        if (vwu_idx == 0 && rel_pos == 14) {
-          const double result = ((double)(sh_zfrc_overflow[rel_pos]) * max_int_accumulation +
-                                 (double)(sh_zfrc[rel_pos])) * poly_psw.inv_frc_scale;
-          printf("  %10d %10d -> %9.4lf\n", sh_zfrc[rel_pos], sh_zfrc_overflow[rel_pos], result);
-        }
-        // END CHECK
-        
         llint izfrc = __double2ll_rn((double)(sh_zfrc_overflow[rel_pos]) * max_int_accumulation);
         izfrc += sh_zfrc[rel_pos];
 #    else

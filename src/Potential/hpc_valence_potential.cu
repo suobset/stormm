@@ -29,7 +29,6 @@ using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
-using numerics::max_llint_accumulation_ll;
 using symbols::asymptotic_to_one_f;
 using symbols::asymptotic_to_one_lf;
 using symbols::inverse_one_minus_asymptote_f;

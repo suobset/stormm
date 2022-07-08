@@ -21,7 +21,6 @@ using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
-using numerics::max_llint_accumulation_ll;
 using synthesis::small_block_max_imports;
 using synthesis::small_block_max_atoms;
 using synthesis::tile_groups_wu_abstract_length;

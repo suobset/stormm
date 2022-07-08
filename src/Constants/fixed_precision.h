@@ -136,14 +136,20 @@ constexpr int    min_charge_mesh_scale_bits = 24;
 constexpr int    max_charge_mesh_scale_bits = 48;
 /// \}
 
-/// \brief The maximum contribution for signed integer accumulation
+/// \brief The maximum contributions for signed integer accumulation.  There is no long long
+///        integer form of the maximum long long integer accumulation as the number would wrap
+///        the format to become the negative of its intended value.  The long long integer
+///        representation of the maximum int accumulation is present to facilitate conversion to
+///        a unified 64-bit integer, but even that is only reliable on the CPU (the NVIDIA CUDA
+///        compiler seems to take type specifications of long long int as a suggestion, not a
+///        command, and this may relate to thread counts and register pressure as the compiler
+///        tries to optimize a kernel for given launch bounds).
 /// \{
-constexpr llint max_llint_accumulation_ll = (1LL << (llint_bit_count_int - 2));
-constexpr double max_llint_accumulation   = max_llint_accumulation_ll;
-constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 constexpr llint max_int_accumulation_ll = (1LL << (int_bit_count_int - 1));
 constexpr double max_int_accumulation   = max_int_accumulation_ll;
 constexpr float max_int_accumulation_f  = max_int_accumulation;
+constexpr double max_llint_accumulation = max_int_accumulation * max_int_accumulation * 2.0;
+constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 /// \}
 
 /// \brief Translate a string into a known precision level enumeration.
