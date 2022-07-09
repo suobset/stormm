@@ -5,6 +5,7 @@
 #include <cmath>
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
+#include "Math/rounding.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -19,9 +20,8 @@ namespace structure {
 
 using card::Hybrid;
 using data_types::isSignedIntegralScalarType;
+using math::angleVerification;
 using math::crossProduct;
-using symbols::pi_f;
-using symbols::near_to_one_f;
 using topology::UnitCellType;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;

@@ -496,43 +496,7 @@ Tcalc dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const Tcoor
   }
   crossProduct(crabbc, crbccd, scr);
   costheta = (costheta < -value_one) ? -value_one : (costheta > value_one) ? value_one : costheta;
-  if (tcalc_is_double) {
-    return (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) ? acos(costheta) : -acos(costheta);
-  }
-  else {
-    if (std::abs(costheta) >= near_to_one_f) {
-            const Tcalc mg_crabbc = value_one / sqrtf(crabbc[0]*crabbc[0] + crabbc[1]*crabbc[1] +
-                                                crabbc[2]*crabbc[2]);
-      const Tcalc mg_crbccd = value_one / sqrtf(crbccd[0]*crbccd[0] + crbccd[1]*crbccd[1] +
-                                                crbccd[2]*crbccd[2]);
-      const Tcalc nx_abbc = crabbc[0] * mg_crabbc;
-      const Tcalc ny_abbc = crabbc[1] * mg_crabbc;
-      const Tcalc nz_abbc = crabbc[2] * mg_crabbc;
-      const Tcalc nx_bccd = crbccd[0] * mg_crbccd;
-      const Tcalc ny_bccd = crbccd[1] * mg_crbccd;
-      const Tcalc nz_bccd = crbccd[2] * mg_crbccd;
-      Tcalc rdx = nx_bccd - nx_abbc;
-      Tcalc rdy = ny_bccd - ny_abbc;
-      Tcalc rdz = nz_bccd - nz_abbc;
-      Tcalc rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-      if (std::abs(rs) > value_one) {
-        rdx = nx_bccd + nx_abbc;
-        rdy = ny_bccd + ny_abbc;
-        rdz = nz_bccd + nz_abbc;
-        rs = pi_f - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-      }
-      return (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0f) ? rs : -rs;
-    }
-    else {
-      if (scr[0]*bc[0] + scr[1]*bc[1] + scr[2]*bc[2] > 0.0) {
-        return acosf(costheta);
-      }
-      else {
-        return -acosf(costheta);
-      }
-    }
-  }
-  __builtin_unreachable();
+  return angleVerification(costheta, crabbc, crbccd, bc, scr);
 }
 
 } // namespace structure

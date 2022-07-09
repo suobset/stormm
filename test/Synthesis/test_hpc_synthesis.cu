@@ -109,6 +109,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
     // CHECK
+#if 0
     const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
     if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() == 37 && i == 2) {
       for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
@@ -124,6 +125,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
         }
       }
     }
+#endif
     // END CHECK
 
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
@@ -541,11 +543,6 @@ int main(const int argc, const char* argv[]) {
   ligand_poly_ps_dbl.upload();
   ligand_poly_ps_sdbl.upload();
   timer.assignTime(0);
-
-  // CHECK
-  printf("Check the double, 40-bit coordinates\n");
-  // END CHECK
-  
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.0e-6, do_tests);
@@ -564,31 +561,15 @@ int main(const int argc, const char* argv[]) {
                            2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
                            do_tests);
 
-  // CHECK
-  printf("Check the super-double, 72-bit coordinates\n");
-  // END CHECK
-  
+  // Remarkably, the "super-double" representation with ultra-high precision coordinates cannot
+  // get forces any closer than 5.0e-7 kcal/mol-A, due to something that happens in the last bit
+  // of one of the improper dihedral terms.  The geometry is planar, but depending on whether the
+  // final bit is 0 or 1, the angle can change by a much more significant amount, and not even a
+  // guard against the arccos instability will change the outcome.
   checkCompilationForces(&ligand_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionLevel::DOUBLE, gpu, 3.5e-8, 5.0e-7, do_tests);
 
-  // CHECK
-  printf("Check the middle-double, 54-bit coordinates\n");
-  PhaseSpaceSynthesis ligand_poly_ps_mdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 54, 24,
-                                          34, 44);
-  ligand_poly_ps_mdbl.upload();
-  checkCompilationForces(&ligand_poly_ps_mdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-10, 5.0e-10, do_tests);
-  printf("Check another double, 70-bit coordinates\n");
-  PhaseSpaceSynthesis ligand_poly_ps_xdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 70, 24,
-                                          34, 44);
-  ligand_poly_ps_xdbl.upload();
-  checkCompilationForces(&ligand_poly_ps_xdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-10, 5.0e-10, do_tests);
-  // END CHECK
-  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

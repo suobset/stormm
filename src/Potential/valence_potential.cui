@@ -336,9 +336,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                              ((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
                               (crbccd.z * crbccd.z)));
         TCALC3 scr_phi = crossProduct(crabbc, crbccd);
-#ifdef TCALC_IS_SINGLE
         TCALC phi = angleVerification(cos_phi, crabbc, crbccd, bc, scr_phi);
-
+#ifdef TCALC_IS_SINGLE
         // The single-precision floating point representation of PI is not the same as the
         // double-precision floating point representation, so use the fact that single precision
         // calculations use this branch of the code to specify the correct constant for each
@@ -346,10 +345,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         phi += pi_f;
         phi = (phi < (TCALC)(0.0)) ? phi + twopi_f : (phi >= twopi_f) ? phi - twopi_f : phi;
 #else
-        cos_phi = (cos_phi < (TCALC)(-1.0)) ? (TCALC)(-1.0) :
-                                              (cos_phi > (TCALC)(1.0)) ? (TCALC)(1.0) : cos_phi;
-        TCALC phi = ((scr_phi.x * bc.x) + (scr_phi.y * bc.y) + (scr_phi.z * bc.z) > (TCALC)(0.0)) ?
-                    ACOS_FUNC(cos_phi) : -ACOS_FUNC(cos_phi);
         phi += pi;
         phi = (phi < (TCALC)(0.0)) ? phi + twopi : (phi >= twopi) ? phi - twopi : phi;
 #endif
@@ -362,15 +357,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                              ((crcdde.x * crcdde.x) + (crcdde.y * crcdde.y) +
                               (crcdde.z * crcdde.z)));
         TCALC3 scr_psi = crossProduct(crbccd, crcdde);
-#ifdef TCALC_IS_SINGLE
         TCALC psi = angleVerification(cos_psi, crbccd, crcdde, cd, scr_psi);
+#ifdef TCALC_IS_SINGLE
         psi += pi_f;
         psi = (psi < (TCALC)(0.0)) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
 #else
-        cos_psi = (cos_psi < (TCALC)(-1.0)) ? (TCALC)(-1.0) :
-                                              (cos_psi > (TCALC)(1.0)) ? (TCALC)(1.0) : cos_psi;
-        TCALC psi = ((scr_psi.x * cd.x) + (scr_psi.y * cd.y) + (scr_psi.z * cd.z) > (TCALC)(0.0)) ?
-                    ACOS_FUNC(cos_psi) : -ACOS_FUNC(cos_psi);
         psi += pi;
         psi = (psi < (TCALC)(0.0)) ? psi + twopi : (psi >= twopi) ? psi - twopi : psi;
 #endif
@@ -735,14 +726,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                (crabbc.z * crabbc.z)) *
                               ((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
                                (crbccd.z * crbccd.z)));
-#ifdef TCALC_IS_SINGLE
         const TCALC theta = angleVerification(costheta, crabbc, crbccd, bc, scr);
-#else
-        costheta = (costheta < (TCALC)(-1.0)) ?
-                   (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
-        const TCALC theta = ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > (TCALC)(0.0)) ?
-                            ACOS_FUNC(costheta) : -ACOS_FUNC(costheta);
-#endif
         TCALC sangle, sangle_ii, stiffness;
 #ifdef COMPUTE_FORCE
         TCALC stiffness_ii;
@@ -928,28 +912,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const SPLIT_TYPE ifrc_ijz = combineSplitFixedPrecision(ifrc_iz, ifrc_jz);
         const SPLIT_TYPE ifrc_kz = antiCombineSplitFixedPrecision(ifrc_ijz, ifrc_lz);
         addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, sh_zfrc_overflow);
-
-        // CHECK
-#  if 0
-#  ifndef TCALC_IS_SINGLE
-        if (vwu_idx == 2 && ((i_atom == 0 && j_atom == 2 && k_atom == 4 && l_atom == 5) ||
-                             (i_atom == 9 && j_atom == 0 && k_atom == 2 && l_atom == 1) ||
-                             (i_atom == 1 && j_atom == 0 && k_atom == 2 && l_atom == 4) ||
-                             (i_atom == 0 && j_atom == 9 && k_atom == 7 && l_atom == 8))) {
-          const double i_force_z = ((crabbc.z * fa) + (f14 * ad.z)) * poly_psw.inv_frc_scale;
-          const double j_force_z = ((fb1 * crabbc.z) - (fb2 * crbccd.z)) * poly_psw.inv_frc_scale;
-          const double k_force_z = (((TCALC)(ifrc_kz.y) * max_llint_accumulation) +
-                                    (TCALC)(ifrc_kz.x)) * poly_psw.inv_frc_scale;
-          const double l_force_z = ((-fd * crbccd.z) - (f14 * ad.z)) * poly_psw.inv_frc_scale;
-          printf("%2d %2d %2d %2d => %16.12lf %16.12lf\n", i_atom, j_atom, k_atom, l_atom, sangle,
-                 sangle_ii);
-          printf("Dihe %2d %2d %2d %2d : [ %12.8lf %12.8lf %12.8lf %12.8lf ]\n", i_atom, j_atom,
-                 k_atom, l_atom, i_force_z, j_force_z, k_force_z, l_force_z);
-        }
-#  endif
-#  endif
-        // END CHECK
-        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifrc_ix = LLCONV_FUNC((crabbc.x * fa) + (f14 * ad.x));
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -1115,24 +1077,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, sh_zfrc_overflow);
-
-        // CHECK
-#  if 0
-#  ifndef TCALC_IS_SINGLE
-        if (vwu_idx == 2 && (i_atom == 0 || j_atom == 0 || k_atom == 0)) {
-          const TCALC i_force_z = (((TCALC)(iadf_z.y) * max_llint_accumulation) +
-                                   (TCALC)(iadf_z.x)) * poly_psw.inv_frc_scale;
-          const TCALC j_force_z = (((TCALC)(iacdf_z.y) * max_llint_accumulation) +
-                                   (TCALC)(iacdf_z.x)) * poly_psw.inv_frc_scale;
-          const TCALC k_force_z = (((TCALC)(icdf_z.y) * max_llint_accumulation) +
-                                   (TCALC)(icdf_z.x)) * poly_psw.inv_frc_scale;
-          printf("Angl %2d %2d %2d : [ %12.8lf %12.8lf %12.8lf ]\n", i_atom, j_atom, k_atom,
-                 i_force_z, j_force_z, k_force_z);
-        }
-#  endif
-#  endif
-        // END CHECK
-        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iadf_x = LLCONV_FUNC((bc.x * mbabc) - (costheta * ba.x * sqba));
         const llint iadf_y = LLCONV_FUNC((bc.y * mbabc) - (costheta * ba.y * sqba));
@@ -1249,19 +1193,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         splitForceContribution(-fmag_dx, j_atom, sh_xfrc, sh_xfrc_overflow);
         splitForceContribution(-fmag_dy, j_atom, sh_yfrc, sh_yfrc_overflow);
         splitForceContribution(-fmag_dz, j_atom, sh_zfrc, sh_zfrc_overflow);
-
-        // CHECK
-#  if 0
-#  ifndef TCALC_IS_SINGLE
-        if (vwu_idx == 2 && (i_atom == 0 || j_atom == 0)) {
-          const double i_force_z = fmag_dz * poly_psw.inv_frc_scale;
-          const double j_force_z = -fmag_dz * poly_psw.inv_frc_scale;
-          printf("Bond %2d %2d : [ %12.8lf %12.8lf ]\n", i_atom, j_atom, i_force_z, j_force_z);
-        }
-#  endif
-#  endif
-        // END CHECK
-        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
@@ -1384,19 +1315,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         splitForceContribution(-fmag_dx, l_atom, sh_xfrc, sh_xfrc_overflow);
         splitForceContribution(-fmag_dy, l_atom, sh_yfrc, sh_yfrc_overflow);
         splitForceContribution(-fmag_dz, l_atom, sh_zfrc, sh_zfrc_overflow);
-
-        // CHECK
-#  if 0
-#  ifndef TCALC_IS_SINGLE
-        if (vwu_idx == 2 && (i_atom == 0 || l_atom == 0)) {
-          const double i_force_z = fmag_dz * poly_psw.inv_frc_scale;
-          const double l_force_z = -fmag_dz * poly_psw.inv_frc_scale;
-          printf("Infr %2d %2d : [ %12.8lf %12.8lf ]\n", i_atom, l_atom, i_force_z, l_force_z);
-        }
-#  endif
-#  endif
-        // END CHECK
-        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
@@ -1856,14 +1774,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                (crabbc.z * crabbc.z)) *
                               ((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
                                (crbccd.z * crbccd.z)));
-#ifdef TCALC_IS_SINGLE
         TCALC theta = angleVerification(costheta, crabbc, crbccd, bc, scr);
-#else
-        costheta = (costheta < (TCALC)(-1.0)) ?
-                   (TCALC)(-1.0) : (costheta > (TCALC)(1.0)) ? (TCALC)(1.0) : costheta;
-        TCALC theta = ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > (TCALC)(0.0)) ?
-                      ACOS_FUNC(costheta) : -ACOS_FUNC(costheta);
-#endif
         const int2 step_bounds = __ldca(&poly_rk.rbond_step_bounds[kr_param_idx]);
         const TCALC2 mixwt = MIX_FUNC(ctrl.step, step_bounds.x, step_bounds.y);
         const TCALC4 init_r = poly_rk.rdihe_init_r[kr_param_idx];
