@@ -502,8 +502,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC phi_fa  = -invab * phi_isinb2;
         const TCALC phi_fb1 = (mgbc - (mgab * phi_cosb)) * invabc * phi_isinb2;
         const TCALC phi_fb2 = phi_cosc * invbc * phi_isinc2;
-        const TCALC phi_fc1 = (mgbc - (mgcd * phi_cosc)) * invbcd * phi_isinc2;
-        const TCALC phi_fc2 = phi_cosb * invbc * phi_isinb2;
         const TCALC phi_fd  = -invcd * phi_isinc2;
 
         // Psi accumulation: transform the rotational derivatives to cartesian coordinates
@@ -518,8 +516,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC psi_fa  = -invbc * psi_isinb2;
         const TCALC psi_fb1 = (mgcd - (mgbc * psi_cosb)) * invbcd * psi_isinb2;
         const TCALC psi_fb2 = psi_cosc * invcd * psi_isinc2;
-        const TCALC psi_fc1 = (mgcd - (mgde * psi_cosc)) * invcde * psi_isinc2;
-        const TCALC psi_fc2 = psi_cosb * invcd * psi_isinb2;
         const TCALC psi_fd  = -invde * psi_isinc2;
         
         // Accumulate forces on the five atoms, one dimension at a time
@@ -899,8 +895,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC fa = -invab * isinb2;
         const TCALC fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
         const TCALC fb2 = cosc * invbc * isinc2;
-        const TCALC fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
-        const TCALC fc2 = cosb * invbc * isinb2;
         const TCALC fd = -invcd * isinc2;
         i_atom -= EXCL_GMEM_OFFSET;
         j_atom -= EXCL_GMEM_OFFSET;
@@ -934,6 +928,28 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const SPLIT_TYPE ifrc_ijz = combineSplitFixedPrecision(ifrc_iz, ifrc_jz);
         const SPLIT_TYPE ifrc_kz = antiCombineSplitFixedPrecision(ifrc_ijz, ifrc_lz);
         addSplitFixedPrecision(ifrc_kz, k_atom, sh_zfrc, sh_zfrc_overflow);
+
+        // CHECK
+#  if 0
+#  ifndef TCALC_IS_SINGLE
+        if (vwu_idx == 2 && ((i_atom == 0 && j_atom == 2 && k_atom == 4 && l_atom == 5) ||
+                             (i_atom == 9 && j_atom == 0 && k_atom == 2 && l_atom == 1) ||
+                             (i_atom == 1 && j_atom == 0 && k_atom == 2 && l_atom == 4) ||
+                             (i_atom == 0 && j_atom == 9 && k_atom == 7 && l_atom == 8))) {
+          const double i_force_z = ((crabbc.z * fa) + (f14 * ad.z)) * poly_psw.inv_frc_scale;
+          const double j_force_z = ((fb1 * crabbc.z) - (fb2 * crbccd.z)) * poly_psw.inv_frc_scale;
+          const double k_force_z = (((TCALC)(ifrc_kz.y) * max_llint_accumulation) +
+                                    (TCALC)(ifrc_kz.x)) * poly_psw.inv_frc_scale;
+          const double l_force_z = ((-fd * crbccd.z) - (f14 * ad.z)) * poly_psw.inv_frc_scale;
+          printf("%2d %2d %2d %2d => %16.12lf %16.12lf\n", i_atom, j_atom, k_atom, l_atom, sangle,
+                 sangle_ii);
+          printf("Dihe %2d %2d %2d %2d : [ %12.8lf %12.8lf %12.8lf %12.8lf ]\n", i_atom, j_atom,
+                 k_atom, l_atom, i_force_z, j_force_z, k_force_z, l_force_z);
+        }
+#  endif
+#  endif
+        // END CHECK
+        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifrc_ix = LLCONV_FUNC((crabbc.x * fa) + (f14 * ad.x));
         const llint ifrc_jx = LLCONV_FUNC((fb1 * crabbc.x) - (fb2 * crbccd.x));
@@ -1099,6 +1115,24 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         addSplitFixedPrecision(iacdf_x, j_atom, sh_xfrc, sh_xfrc_overflow);
         addSplitFixedPrecision(iacdf_y, j_atom, sh_yfrc, sh_yfrc_overflow);
         addSplitFixedPrecision(iacdf_z, j_atom, sh_zfrc, sh_zfrc_overflow);
+
+        // CHECK
+#  if 0
+#  ifndef TCALC_IS_SINGLE
+        if (vwu_idx == 2 && (i_atom == 0 || j_atom == 0 || k_atom == 0)) {
+          const TCALC i_force_z = (((TCALC)(iadf_z.y) * max_llint_accumulation) +
+                                   (TCALC)(iadf_z.x)) * poly_psw.inv_frc_scale;
+          const TCALC j_force_z = (((TCALC)(iacdf_z.y) * max_llint_accumulation) +
+                                   (TCALC)(iacdf_z.x)) * poly_psw.inv_frc_scale;
+          const TCALC k_force_z = (((TCALC)(icdf_z.y) * max_llint_accumulation) +
+                                   (TCALC)(icdf_z.x)) * poly_psw.inv_frc_scale;
+          printf("Angl %2d %2d %2d : [ %12.8lf %12.8lf %12.8lf ]\n", i_atom, j_atom, k_atom,
+                 i_force_z, j_force_z, k_force_z);
+        }
+#  endif
+#  endif
+        // END CHECK
+        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint iadf_x = LLCONV_FUNC((bc.x * mbabc) - (costheta * ba.x * sqba));
         const llint iadf_y = LLCONV_FUNC((bc.y * mbabc) - (costheta * ba.y * sqba));
@@ -1215,6 +1249,19 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         splitForceContribution(-fmag_dx, j_atom, sh_xfrc, sh_xfrc_overflow);
         splitForceContribution(-fmag_dy, j_atom, sh_yfrc, sh_yfrc_overflow);
         splitForceContribution(-fmag_dz, j_atom, sh_zfrc, sh_zfrc_overflow);
+
+        // CHECK
+#  if 0
+#  ifndef TCALC_IS_SINGLE
+        if (vwu_idx == 2 && (i_atom == 0 || j_atom == 0)) {
+          const double i_force_z = fmag_dz * poly_psw.inv_frc_scale;
+          const double j_force_z = -fmag_dz * poly_psw.inv_frc_scale;
+          printf("Bond %2d %2d : [ %12.8lf %12.8lf ]\n", i_atom, j_atom, i_force_z, j_force_z);
+        }
+#  endif
+#  endif
+        // END CHECK
+        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag_dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag_dy);
@@ -1337,6 +1384,19 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         splitForceContribution(-fmag_dx, l_atom, sh_xfrc, sh_xfrc_overflow);
         splitForceContribution(-fmag_dy, l_atom, sh_yfrc, sh_yfrc_overflow);
         splitForceContribution(-fmag_dz, l_atom, sh_zfrc, sh_zfrc_overflow);
+
+        // CHECK
+#  if 0
+#  ifndef TCALC_IS_SINGLE
+        if (vwu_idx == 2 && (i_atom == 0 || l_atom == 0)) {
+          const double i_force_z = fmag_dz * poly_psw.inv_frc_scale;
+          const double l_force_z = -fmag_dz * poly_psw.inv_frc_scale;
+          printf("Infr %2d %2d : [ %12.8lf %12.8lf ]\n", i_atom, l_atom, i_force_z, l_force_z);
+        }
+#  endif
+#  endif
+        // END CHECK
+        
 #  else // SPLIT_FORCE_ACCUMULATION
         const llint ifmag_dx = LLCONV_FUNC(fmag * dx);
         const llint ifmag_dy = LLCONV_FUNC(fmag * dy);
@@ -1871,8 +1931,6 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const TCALC fa = -invab * isinb2;
         const TCALC fb1 = (mgbc - (mgab * cosb)) * invabc * isinb2;
         const TCALC fb2 = cosc * invbc * isinc2;
-        const TCALC fc1 = (mgbc - (mgcd * cosc)) * invbcd * isinc2;
-        const TCALC fc2 = cosb * invbc * isinb2;
         const TCALC fd = -invcd * isinc2;
         i_atom -= EXCL_GMEM_OFFSET;
         j_atom -= EXCL_GMEM_OFFSET;

@@ -109,26 +109,20 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
     // CHECK
-#if 0
     const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
-    if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() == 82 && i == 1) {
-      for (int j = 31; j < 80; j++) {
-        if (j == 31 || j == 59 || j == 79) {
-          printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
-                 i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
-                 devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
-        }
-      }
+    if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() == 37 && i == 2) {
       for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
         if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 1.0e-7 ||
-            fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-4 ||
-            fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-4) {
-          printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
-                 i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
-                 devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
+            fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-7 ||
+            fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-7) {
+          printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf -> "
+                 "%12.4e %12.4e %12.4e\n", i, j, host_frc[3 * j], host_frc[(3 * j) + 1],
+                 host_frc[(3 * j) + 2], devc_frc[3 * j], devc_frc[(3 * j) + 1],
+                 devc_frc[(3 * j) + 2], host_frc[3 * j] - devc_frc[3 * j],
+                 host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1],
+                 host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]);
         }
       }
-#endif
     }
     // END CHECK
 
@@ -498,7 +492,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationForces(&big_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
-  
+
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
   const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs_iso.top";
@@ -534,7 +528,7 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis ligand_poly_ps_dbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 40, 24,
                                          34, 44);
   PhaseSpaceSynthesis ligand_poly_ps_sdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 72, 24,
-                                          34, 40);
+                                          34, 44);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,
                                     ExceptionResponse::WARN, max_vwu_atoms, &timer);
@@ -547,6 +541,11 @@ int main(const int argc, const char* argv[]) {
   ligand_poly_ps_dbl.upload();
   ligand_poly_ps_sdbl.upload();
   timer.assignTime(0);
+
+  // CHECK
+  printf("Check the double, 40-bit coordinates\n");
+  // END CHECK
+  
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.0e-6, do_tests);
@@ -564,9 +563,31 @@ int main(const int argc, const char* argv[]) {
                            ligand_poly_ag, ligand_poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-4,
                            2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
                            do_tests);
+
+  // CHECK
+  printf("Check the super-double, 72-bit coordinates\n");
+  // END CHECK
+  
   checkCompilationForces(&ligand_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionLevel::DOUBLE, gpu, 3.5e-8, 5.0e-7, do_tests);
+
+  // CHECK
+  printf("Check the middle-double, 54-bit coordinates\n");
+  PhaseSpaceSynthesis ligand_poly_ps_mdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 54, 24,
+                                          34, 44);
+  ligand_poly_ps_mdbl.upload();
+  checkCompilationForces(&ligand_poly_ps_mdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-10, 5.0e-10, do_tests);
+  printf("Check another double, 70-bit coordinates\n");
+  PhaseSpaceSynthesis ligand_poly_ps_xdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 70, 24,
+                                          34, 44);
+  ligand_poly_ps_xdbl.upload();
+  checkCompilationForces(&ligand_poly_ps_xdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-10, 5.0e-10, do_tests);
+  // END CHECK
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

@@ -34,6 +34,7 @@ using symbols::asymptotic_to_one_lf;
 using symbols::inverse_one_minus_asymptote_f;
 using symbols::inverse_one_minus_asymptote_lf;
 using symbols::near_to_one_f;
+using symbols::near_to_one_lf;
 using symbols::pi;
 using symbols::pi_f;
 using symbols::twopi;
@@ -92,6 +93,44 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
   else {
     return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0f) ?
             acosf(costheta) : -acosf(costheta);
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ double angleVerification(const double costheta, const double3 crabbc,
+                                                    const double3 crbccd, const double3 bc,
+                                                    const double3 scr) {
+  if (fabs(costheta) >= near_to_one_lf) {
+
+    // The double-precision arccosine function is also vulnerable to numerical instability near
+    // zero, so planar dihedral angles can still generate divergent forces on the order of 3.0e-7
+    // kcal/mol-A.  Correct this with a similar strategy to the single-precision case.
+    const double mg_crabbc = 1.0 / sqrt((crabbc.x * crabbc.x) + (crabbc.y * crabbc.y) +
+                                        (crabbc.z * crabbc.z));
+    const double mg_crbccd = 1.0 / sqrt((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
+                                        (crbccd.z * crbccd.z));
+    const double nx_abbc = crabbc.x * mg_crabbc;
+    const double ny_abbc = crabbc.y * mg_crabbc;
+    const double nz_abbc = crabbc.z * mg_crabbc;
+    const double nx_bccd = crbccd.x * mg_crbccd;
+    const double ny_bccd = crbccd.y * mg_crbccd;
+    const double nz_bccd = crbccd.z * mg_crbccd;
+    double rdx = nx_bccd - nx_abbc;
+    double rdy = ny_bccd - ny_abbc;
+    double rdz = nz_bccd - nz_abbc;
+    double rs = sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    if (fabs(rs) > 1.0) {
+      rdx = nx_bccd + nx_abbc;
+      rdy = ny_bccd + ny_abbc;
+      rdz = nz_bccd + nz_abbc;
+      rs = pi - sqrt((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
+    }
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0) ? rs : -rs;
+  }
+  else {
+    return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0) ?
+            acos(costheta) : -acos(costheta);
   }
   __builtin_unreachable();
 }

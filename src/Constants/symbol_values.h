@@ -43,19 +43,22 @@ constexpr double hartree_to_kcal = 627.509474;
 ///        nearly the closest value to 1.0 that can be represented in an IEEE-754 format 32-bit
 ///        floating point number (the format can go a couple of bits' worth of precision closer,
 ///        but this is 1 part in about a million).  The second is essential for single-precision
-///        dihedral computations.
+///        dihedral computations to guard against instability in the arccosine function.  A
+///        long-float (double-precision form of the same near-to-one limit is provided to
+///        safeguard double-precision dihedral computations.
 /// \{
 constexpr double asymptotic_to_one_lf = 0.99999904632568359375;
 constexpr float  asymptotic_to_one_f  = (float)asymptotic_to_one_lf;
 constexpr float  near_to_one_f        = 0.99993896484375f;
-/// \}                                                                                              
+constexpr float  near_to_one_lf       = 0.999999992549419403076171875;
+/// \}
 
-/// \brief A value which captures 1 / (1 - asymptotic_to_one), to put a cap on the value of such    
-///        fractions 1 / (1 - x) as x -> 1.                                                         
-/// \{                                                                                              
+/// \brief A value which captures 1 / (1 - asymptotic_to_one), to put a cap on the value of such
+///        fractions 1 / (1 - x) as x -> 1.
+/// \{
 constexpr double inverse_one_minus_asymptote_lf = 1048576.0;
 constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
-/// \}                                  
+/// \}
 
 } // namespace constants
 } // namespace omni
