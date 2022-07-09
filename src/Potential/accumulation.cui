@@ -148,6 +148,7 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const in
 /// Overloaded:
 ///   - Accept int64 / int32 (95-bit accumulation of double-precision floating point numbers)
 ///   - Accept int32 / int32 (63-bit accumulation of single-precision floating point numbers)
+///   - Accept the components of two 95-bit accumulators and return a signle int95_t accumulator
 ///
 /// \param a  The first of two split accumulators to combine
 /// \param b  The second of two split accumulators to combine
@@ -161,6 +162,13 @@ __device__ __forceinline__ int95_t combineSplitFixedPrecision(const int95_t a, c
 __device__ __forceinline__ int2 combineSplitFixedPrecision(const int2 a, const int2 b) {
   int2 result = { a.x + b.x, a.y + b.y };
   result.y += (1 - (2 * (b.x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b.x) >= 0) * 2;
+  return result;
+}
+
+__device__ __forceinline__ int95_t combineSplitFixedPrecision(const llint a_x, const int a_y,
+                                                              const llint b_x, const int b_y) {
+  int95_t result = { a_x + b_x, a_y + b_y };
+  result.y += (1 - (2 * (b_x < 0LL))) * ((a_x ^ result.x) < 0 && (a_x ^ b_x) >= 0LL) * 2;
   return result;
 }
 /// \}

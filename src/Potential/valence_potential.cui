@@ -214,7 +214,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     }
 #endif
     __syncthreads();
-
+    
     // Perform each force-related task in the valence work unit, starting with the most
     // expensive operations and backfilling with less expensive ones.
     pos = threadIdx.x;
@@ -253,12 +253,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);
-        const TCALC3 ab = { (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale };
+        const int95_t ijx_cmb = combineSplitFixedPrecision(jxloc, jxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ijy_cmb = combineSplitFixedPrecision(jyloc, jyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ijz_cmb = combineSplitFixedPrecision(jzloc, jzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC3 ab = { (((TCALC)(ijx_cmb.y) * max_llint_accumulation) + (TCALC)(ijx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ijy_cmb.y) * max_llint_accumulation) + (TCALC)(ijy_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ijz_cmb.y) * max_llint_accumulation) + (TCALC)(ijz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
@@ -271,12 +274,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int kxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[k_atom]);
         const int kyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[k_atom]);
         const int kzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[k_atom]);
-        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jkx_cmb = combineSplitFixedPrecision(kxloc, kxloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jky_cmb = combineSplitFixedPrecision(kyloc, kyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jkz_cmb = combineSplitFixedPrecision(kzloc, kzloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 bc = { (((TCALC)(jkx_cmb.y) * max_llint_accumulation) + (TCALC)(jkx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jky_cmb.y) * max_llint_accumulation) + (TCALC)(jky_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jkz_cmb.y) * max_llint_accumulation) + (TCALC)(jkz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
@@ -289,12 +295,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int lxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[l_atom]);
         const int lyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[l_atom]);
         const int lzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[l_atom]);
-        const TCALC3 cd = { (((TCALC)(lxloc_ovrf - kxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lxloc - kxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lyloc_ovrf - kyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lyloc - kyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lzloc_ovrf - kzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lzloc - kzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t klx_cmb = combineSplitFixedPrecision(lxloc, lxloc_ovrf, -kxloc, -kxloc_ovrf);
+        const int95_t kly_cmb = combineSplitFixedPrecision(lyloc, lyloc_ovrf, -kyloc, -kyloc_ovrf);
+        const int95_t klz_cmb = combineSplitFixedPrecision(lzloc, lzloc_ovrf, -kzloc, -kzloc_ovrf);
+        const TCALC3 cd = { (((TCALC)(klx_cmb.y) * max_llint_accumulation) + (TCALC)(klx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(kly_cmb.y) * max_llint_accumulation) + (TCALC)(kly_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(klz_cmb.y) * max_llint_accumulation) + (TCALC)(klz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint mxloc = __ldca(&gmem_r.xcrd[m_atom]);
         const llint myloc = __ldca(&gmem_r.ycrd[m_atom]);
@@ -307,12 +316,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int mxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[m_atom]);
         const int myloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[m_atom]);
         const int mzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[m_atom]);
-        const TCALC3 de = { (((TCALC)(mxloc_ovrf - lxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(mxloc - lxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(myloc_ovrf - lyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(myloc - lyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(mzloc_ovrf - lzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(mzloc - lzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t lmx_cmb = combineSplitFixedPrecision(mxloc, mxloc_ovrf, -lxloc, -lxloc_ovrf);
+        const int95_t lmy_cmb = combineSplitFixedPrecision(myloc, myloc_ovrf, -lyloc, -lyloc_ovrf);
+        const int95_t lmz_cmb = combineSplitFixedPrecision(mzloc, mzloc_ovrf, -lzloc, -lzloc_ovrf);
+        const TCALC3 de = { (((TCALC)(lmx_cmb.y) * max_llint_accumulation) + (TCALC)(lmx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(lmy_cmb.y) * max_llint_accumulation) + (TCALC)(lmy_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(lmz_cmb.y) * max_llint_accumulation) + (TCALC)(lmz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         
         // Compute the first dihedral angle
@@ -655,12 +667,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);        
-        const TCALC3 ab = { (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale };
+        const int95_t ijx_cmb = combineSplitFixedPrecision(jxloc, jxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ijy_cmb = combineSplitFixedPrecision(jyloc, jyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ijz_cmb = combineSplitFixedPrecision(jzloc, jzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC3 ab = { (((TCALC)(ijx_cmb.y) * max_llint_accumulation) + (TCALC)(ijx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ijy_cmb.y) * max_llint_accumulation) + (TCALC)(ijy_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ijz_cmb.y) * max_llint_accumulation) + (TCALC)(ijz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
@@ -673,12 +688,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int kxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[k_atom]);
         const int kyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[k_atom]);
         const int kzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[k_atom]);
-        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jkx_cmb = combineSplitFixedPrecision(kxloc, kxloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jky_cmb = combineSplitFixedPrecision(kyloc, kyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jkz_cmb = combineSplitFixedPrecision(kzloc, kzloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 bc = { (((TCALC)(jkx_cmb.y) * max_llint_accumulation) + (TCALC)(jkx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jky_cmb.y) * max_llint_accumulation) + (TCALC)(jky_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jkz_cmb.y) * max_llint_accumulation) + (TCALC)(jkz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
@@ -694,18 +712,24 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int lxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[l_atom]);
         const int lyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[l_atom]);
         const int lzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[l_atom]);
-        const TCALC3 cd = { (((TCALC)(lxloc_ovrf - kxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lxloc - kxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lyloc_ovrf - kyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lyloc - kyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lzloc_ovrf - kzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lzloc - kzloc)) * poly_psw.inv_gpos_scale };
-        const TCALC3 ad = { (((TCALC)(lxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lxloc - ixloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lyloc - iyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lzloc - izloc)) * poly_psw.inv_gpos_scale };
+        const int95_t klx_cmb = combineSplitFixedPrecision(lxloc, lxloc_ovrf, -kxloc, -kxloc_ovrf);
+        const int95_t kly_cmb = combineSplitFixedPrecision(lyloc, lyloc_ovrf, -kyloc, -kyloc_ovrf);
+        const int95_t klz_cmb = combineSplitFixedPrecision(lzloc, lzloc_ovrf, -kzloc, -kzloc_ovrf);
+        const TCALC3 cd = { (((TCALC)(klx_cmb.y) * max_llint_accumulation) + (TCALC)(klx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(kly_cmb.y) * max_llint_accumulation) + (TCALC)(kly_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(klz_cmb.y) * max_llint_accumulation) + (TCALC)(klz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
+        const int95_t ilx_cmb = combineSplitFixedPrecision(lxloc, lxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ily_cmb = combineSplitFixedPrecision(lyloc, lyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ilz_cmb = combineSplitFixedPrecision(lzloc, lzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC3 ad = { (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);
@@ -987,12 +1011,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);
-        const TCALC3 ba = { (((TCALC)(ixloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(ixloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(iyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(iyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(izloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(izloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jix_cmb = combineSplitFixedPrecision(ixloc, ixloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jiy_cmb = combineSplitFixedPrecision(iyloc, iyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jiz_cmb = combineSplitFixedPrecision(izloc, izloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 ba = { (((TCALC)(jix_cmb.y) * max_llint_accumulation) + (TCALC)(jix_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jiy_cmb.y) * max_llint_accumulation) + (TCALC)(jiy_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jiz_cmb.y) * max_llint_accumulation) + (TCALC)(jiz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
@@ -1005,12 +1032,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int kxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[k_atom]);
         const int kyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[k_atom]);
         const int kzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[k_atom]);
-        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jkx_cmb = combineSplitFixedPrecision(kxloc, kxloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jky_cmb = combineSplitFixedPrecision(kyloc, kyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jkz_cmb = combineSplitFixedPrecision(kzloc, kzloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 bc = { (((TCALC)(jkx_cmb.y) * max_llint_accumulation) + (TCALC)(jkx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jky_cmb.y) * max_llint_accumulation) + (TCALC)(jky_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jkz_cmb.y) * max_llint_accumulation) + (TCALC)(jkz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const TCALC mgba = (ba.x * ba.x) + (ba.y * ba.y) + (ba.z * ba.z);
         const TCALC mgbc = (bc.x * bc.x) + (bc.y * bc.y) + (bc.z * bc.z);
@@ -1135,12 +1165,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);
-        const TCALC dx = (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale;
-        const TCALC dy = (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale;
-        const TCALC dz = (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale;
+        const int95_t ijx_cmb = combineSplitFixedPrecision(jxloc, jxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ijy_cmb = combineSplitFixedPrecision(jyloc, jyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ijz_cmb = combineSplitFixedPrecision(jzloc, jzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC dx = (((TCALC)(ijx_cmb.y) * max_llint_accumulation) + (TCALC)(ijx_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
+        const TCALC dy = (((TCALC)(ijy_cmb.y) * max_llint_accumulation) + (TCALC)(ijy_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
+        const TCALC dz = (((TCALC)(ijz_cmb.y) * max_llint_accumulation) + (TCALC)(ijz_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
 #endif
         const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
         const TCALC dl = dr - leq;
@@ -1246,12 +1279,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int lxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[l_atom]);
         const int lyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[l_atom]);
         const int lzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[l_atom]);
-        const TCALC dx = (((TCALC)(lxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(lxloc - ixloc)) * poly_psw.inv_gpos_scale;
-        const TCALC dy = (((TCALC)(lyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(lyloc - iyloc)) * poly_psw.inv_gpos_scale;
-        const TCALC dz = (((TCALC)(lzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(lzloc - izloc)) * poly_psw.inv_gpos_scale;
+        const int95_t ilx_cmb = combineSplitFixedPrecision(lxloc, lxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ily_cmb = combineSplitFixedPrecision(lyloc, lyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ilz_cmb = combineSplitFixedPrecision(lzloc, lzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC dx = (((TCALC)(ilx_cmb.y) * max_llint_accumulation) + (TCALC)(ilx_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
+        const TCALC dy = (((TCALC)(ily_cmb.y) * max_llint_accumulation) + (TCALC)(ily_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
+        const TCALC dz = (((TCALC)(ilz_cmb.y) * max_llint_accumulation) + (TCALC)(ilz_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
 #endif
         const int i_ljidx = __ldca(&gmem_r.lj_idx[i_atom]);
         const int l_ljidx = __ldca(&gmem_r.lj_idx[l_atom]);
@@ -1470,12 +1506,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);
-        const TCALC dx = (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale;
-        const TCALC dy = (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale;
-        const TCALC dz = (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                          (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale;
+        const int95_t ijx_cmb = combineSplitFixedPrecision(jxloc, jxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ijy_cmb = combineSplitFixedPrecision(jyloc, jyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ijz_cmb = combineSplitFixedPrecision(jzloc, jzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC dx = (((TCALC)(ijx_cmb.y) * max_llint_accumulation) + (TCALC)(ijx_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
+        const TCALC dy = (((TCALC)(ijy_cmb.y) * max_llint_accumulation) + (TCALC)(ijy_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
+        const TCALC dz = (((TCALC)(ijz_cmb.y) * max_llint_accumulation) + (TCALC)(ijz_cmb.x)) *
+                         poly_psw.inv_gpos_scale;
 #endif
         const TCALC dr = SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
         const TCALC3 rst_eval = restraintDelta(__ldca(&poly_rk.rbond_init_k[kr_param_idx]),
@@ -1557,12 +1596,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);
-        const TCALC3 ba = { (((TCALC)(ixloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(ixloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(iyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(iyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(izloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(izloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jix_cmb = combineSplitFixedPrecision(ixloc, ixloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jiy_cmb = combineSplitFixedPrecision(iyloc, iyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jiz_cmb = combineSplitFixedPrecision(izloc, izloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 ba = { (((TCALC)(jix_cmb.y) * max_llint_accumulation) + (TCALC)(jix_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jiy_cmb.y) * max_llint_accumulation) + (TCALC)(jiy_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jiz_cmb.y) * max_llint_accumulation) + (TCALC)(jiz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
@@ -1575,12 +1617,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int kxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[k_atom]);
         const int kyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[k_atom]);
         const int kzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[k_atom]);
-        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jkx_cmb = combineSplitFixedPrecision(kxloc, kxloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jky_cmb = combineSplitFixedPrecision(kyloc, kyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jkz_cmb = combineSplitFixedPrecision(kzloc, kzloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 bc = { (((TCALC)(jkx_cmb.y) * max_llint_accumulation) + (TCALC)(jkx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jky_cmb.y) * max_llint_accumulation) + (TCALC)(jky_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jkz_cmb.y) * max_llint_accumulation) + (TCALC)(jkz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const TCALC mgba = (ba.x * ba.x) + (ba.y * ba.y) + (ba.z * ba.z);
         const TCALC mgbc = (bc.x * bc.x) + (bc.y * bc.y) + (bc.z * bc.z);
@@ -1691,12 +1736,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int jxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[j_atom]);
         const int jyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[j_atom]);
         const int jzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[j_atom]);
-        const TCALC3 ab = { (((TCALC)(jxloc_ovrf - ixloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jxloc - ixloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(jyloc_ovrf - iyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jyloc - iyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(jzloc_ovrf - izloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(jzloc - izloc)) * poly_psw.inv_gpos_scale };
+        const int95_t ijx_cmb = combineSplitFixedPrecision(jxloc, jxloc_ovrf, -ixloc, -ixloc_ovrf);
+        const int95_t ijy_cmb = combineSplitFixedPrecision(jyloc, jyloc_ovrf, -iyloc, -iyloc_ovrf);
+        const int95_t ijz_cmb = combineSplitFixedPrecision(jzloc, jzloc_ovrf, -izloc, -izloc_ovrf);
+        const TCALC3 ab = { (((TCALC)(ijx_cmb.y) * max_llint_accumulation) + (TCALC)(ijx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ijy_cmb.y) * max_llint_accumulation) + (TCALC)(ijy_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(ijz_cmb.y) * max_llint_accumulation) + (TCALC)(ijz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint kxloc = __ldca(&gmem_r.xcrd[k_atom]);
         const llint kyloc = __ldca(&gmem_r.ycrd[k_atom]);
@@ -1709,12 +1757,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int kxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[k_atom]);
         const int kyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[k_atom]);
         const int kzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[k_atom]);
-        const TCALC3 bc = { (((TCALC)(kxloc_ovrf - jxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kxloc - jxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kyloc_ovrf - jyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kyloc - jyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(kzloc_ovrf - jzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(kzloc - jzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t jkx_cmb = combineSplitFixedPrecision(kxloc, kxloc_ovrf, -jxloc, -jxloc_ovrf);
+        const int95_t jky_cmb = combineSplitFixedPrecision(kyloc, kyloc_ovrf, -jyloc, -jyloc_ovrf);
+        const int95_t jkz_cmb = combineSplitFixedPrecision(kzloc, kzloc_ovrf, -jzloc, -jzloc_ovrf);
+        const TCALC3 bc = { (((TCALC)(jkx_cmb.y) * max_llint_accumulation) + (TCALC)(jkx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jky_cmb.y) * max_llint_accumulation) + (TCALC)(jky_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(jkz_cmb.y) * max_llint_accumulation) + (TCALC)(jkz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         const llint lxloc = __ldca(&gmem_r.xcrd[l_atom]);
         const llint lyloc = __ldca(&gmem_r.ycrd[l_atom]);
@@ -1727,12 +1778,15 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         const int lxloc_ovrf = __ldca(&gmem_r.xcrd_ovrf[l_atom]);
         const int lyloc_ovrf = __ldca(&gmem_r.ycrd_ovrf[l_atom]);
         const int lzloc_ovrf = __ldca(&gmem_r.zcrd_ovrf[l_atom]);
-        const TCALC3 cd = { (((TCALC)(lxloc_ovrf - kxloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lxloc - kxloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lyloc_ovrf - kyloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lyloc - kyloc)) * poly_psw.inv_gpos_scale,
-                            (((TCALC)(lzloc_ovrf - kzloc_ovrf) * max_llint_accumulation) +
-                             (TCALC)(lzloc - kzloc)) * poly_psw.inv_gpos_scale };
+        const int95_t klx_cmb = combineSplitFixedPrecision(lxloc, lxloc_ovrf, -kxloc, -kxloc_ovrf);
+        const int95_t kly_cmb = combineSplitFixedPrecision(lyloc, lyloc_ovrf, -kyloc, -kyloc_ovrf);
+        const int95_t klz_cmb = combineSplitFixedPrecision(lzloc, lzloc_ovrf, -kzloc, -kzloc_ovrf);
+        const TCALC3 cd = { (((TCALC)(klx_cmb.y) * max_llint_accumulation) + (TCALC)(klx_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(kly_cmb.y) * max_llint_accumulation) + (TCALC)(kly_cmb.x)) *
+                            poly_psw.inv_gpos_scale,
+                            (((TCALC)(klz_cmb.y) * max_llint_accumulation) + (TCALC)(klz_cmb.x)) *
+                            poly_psw.inv_gpos_scale };
 #endif
         TCALC3 crabbc = crossProduct(ab, bc);
         TCALC3 crbccd = crossProduct(bc, cd);

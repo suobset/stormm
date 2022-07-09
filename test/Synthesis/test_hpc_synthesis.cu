@@ -76,9 +76,10 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   // Prepare for GPU-based calculations
   const int nsys = poly_ps->getSystemCount();
   std::vector<double> frc_mues(nsys);
-  const std::vector<double> frc_mue_tolerance(nsys, mue_tol);
+  const Approx frc_mue_tolerance = Approx(std::vector<double>(nsys, 0.0)).margin(mue_tol);
+  const Approx frc_max_error_tolerance =
+    Approx(std::vector<double>(nsys, 0.0)).margin(max_error_tol);
   std::vector<double> frc_max_errors(nsys);
-  const std::vector<double> frc_max_error_tolerance(nsys, max_error_tol);
   ScoreCard sc(nsys, 1, 32);
   const TrajectoryKind frcid = TrajectoryKind::FORCES;
 
@@ -106,17 +107,42 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                    *(poly_ag.getSystemRestraintPointer(i)), EvaluateForce::YES, 0);
     const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
+
+    // CHECK
+#if 0
+    const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
+    if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() == 82 && i == 1) {
+      for (int j = 31; j < 80; j++) {
+        if (j == 31 || j == 59 || j == 79) {
+          printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
+                 i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
+                 devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
+        }
+      }
+      for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
+        if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 1.0e-7 ||
+            fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-4 ||
+            fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-4) {
+          printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
+                 i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
+                 devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
+        }
+      }
+#endif
+    }
+    // END CHECK
+
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
     frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
     total_restraints += poly_ag.getSystemRestraintPointer(i)->getTotalRestraintCount();
   }
   const std::string restraint_presence = (total_restraints > 0) ? "with" : "without";
-  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
+  check(frc_mues, RelationalOperator::EQUAL, frc_mue_tolerance, "Forces obtained by the "
         "valence interaction kernel, operating on systems " + restraint_presence + " external " +
         "restraints, exceed the tolerance for mean unsigned errors in their vector components.  "
         "Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
         ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
-  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
+  check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the valence interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
@@ -150,20 +176,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
-    // CHECK
-#if 0
-    for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
-      if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 1.0e-4 ||
-          fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-4 ||
-          fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-4) {
-        printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf\n",
-               i, j, host_frc[3 * j], host_frc[(3 * j) + 1], host_frc[(3 * j) + 2],
-               devc_frc[3 * j], devc_frc[(3 * j) + 1], devc_frc[(3 * j) + 2]);
-      }
-    }
-#endif
-    // END CHECK
-
     // These systems contain some hard clashes, which generate very large forces.  This is good
     // for testing the split force accumulation, but not for discerning values that are truly
     // inaccurate.  Check the forces individually and clean out large values that are within
@@ -179,12 +191,12 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
     frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);    
   }
-  check(frc_mues, RelationalOperator::LESS_THAN, frc_mue_tolerance, "Forces obtained by the "
+  check(frc_mues, RelationalOperator::EQUAL, frc_mue_tolerance, "Forces obtained by the "
         "non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the tolerance for mean unsigned errors in their vector "
         "components.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
         ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
-  check(frc_max_errors, RelationalOperator::LESS_THAN, frc_max_error_tolerance, "Forces obtained "
+  check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
@@ -345,6 +357,7 @@ int main(const int argc, const char* argv[]) {
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc);
   PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
+  PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 40);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
@@ -354,6 +367,7 @@ int main(const int argc, const char* argv[]) {
   poly_se.upload();
   poly_ps.upload();
   poly_ps_dbl.upload();
+  poly_ps_sdbl.upload();
   std::vector<double> gpu_charges = poly_ag.getPartialCharges<double>(HybridTargetLevel::DEVICE);
   int padded_atom_count = 0;
   for (int i = 0; i < nsys; i++) {
@@ -397,7 +411,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::DOUBLE, gpu,
                          3.5e-6, 2.0e-6, do_tests);
-  checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+  checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu,
                          3.5e-5, 2.0e-4, do_tests);
   checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
@@ -409,7 +423,13 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-5, 1.5e-5, 5.0e-6, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
-
+  
+  // Check that super-high precision forms of the coordinates and force accumulation are OK in
+  // double-precision mode.
+  checkCompilationForces(&poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         poly_ag, poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-7, 5.0e-7, do_tests);
+  
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
   const std::string trpi_top_name = topology_base + osc + "trpcage.top";
@@ -445,6 +465,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, dhfr_ps, alad_ps };
   PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
   PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 34, 40);
+  PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 34, 40);
   const std::vector<int> big_top_indices = { 0, 1, 2 };
   AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT,
                                  max_vwu_atoms, &timer);
@@ -455,6 +476,7 @@ int main(const int argc, const char* argv[]) {
   big_poly_se.upload();
   big_poly_ps.upload();
   big_poly_ps_dbl.upload();
+  big_poly_ps_sdbl.upload();
   timer.assignTime(0);
   checkCompilationForces(&big_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
@@ -473,6 +495,9 @@ int main(const int argc, const char* argv[]) {
                            big_poly_ag, big_poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-4, 2.2e-5,
                            9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
                            do_tests);  
+  checkCompilationForces(&big_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
   
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
@@ -508,6 +533,8 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis ligand_poly_ps(ligand_ps_list, ligand_ag_list, ligand_tiling);
   PhaseSpaceSynthesis ligand_poly_ps_dbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 40, 24,
                                          34, 44);
+  PhaseSpaceSynthesis ligand_poly_ps_sdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 72, 24,
+                                          34, 40);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,
                                     ExceptionResponse::WARN, max_vwu_atoms, &timer);
@@ -518,6 +545,7 @@ int main(const int argc, const char* argv[]) {
   ligand_poly_se.upload();
   ligand_poly_ps.upload();
   ligand_poly_ps_dbl.upload();
+  ligand_poly_ps_sdbl.upload();
   timer.assignTime(0);
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
@@ -536,7 +564,10 @@ int main(const int argc, const char* argv[]) {
                            ligand_poly_ag, ligand_poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-4,
                            2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
                            do_tests);
-
+  checkCompilationForces(&ligand_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionLevel::DOUBLE, gpu, 3.5e-8, 5.0e-7, do_tests);
+  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

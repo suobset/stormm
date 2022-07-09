@@ -817,6 +817,7 @@ void PhaseSpaceSynthesis::upload() {
   atom_starts.upload();
   atom_counts.upload();
   llint_data.upload();
+  int_data.upload();
   double_data.upload();
   float_data.upload();
 }
@@ -879,6 +880,7 @@ void PhaseSpaceSynthesis::download() {
   atom_starts.download();
   atom_counts.download();
   llint_data.download();
+  int_data.download();
   double_data.download();
   float_data.download();
 }

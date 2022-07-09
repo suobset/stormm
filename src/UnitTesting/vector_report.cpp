@@ -111,7 +111,7 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
             }
           }
           const NumberFormat scifm = NumberFormat::SCIENTIFIC;
-          if (n_mismatch > 0) {
+          if (n_mismatch > 0 && n_match > 0) {
             result += "The vectors fail to match in " + std::to_string(n_mismatch) +
                       " indices out of " + std::to_string(n_va) + ", with a mean unsigned error "
                       "(among the deviating entries) of " +
@@ -126,16 +126,20 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
             result += "Pearson correlation between the vectors is " +
                       realToString(pearson(dva, dvb), 4) + ".  ";
           }
-          if (n_mismatch < 16) {
+          if (n_mismatch > 0) {
             result += "Mismatched entries:\n";
+            int n_reported = 0;
             const int ndec = realDecimalPlaces(tol);
-            for (int i = 0; i < n_va; i++) {
+            int i = 0;
+            while (n_reported < 16 && n_reported < n_mismatch && i < n_va) {
               if (dva[i] != Approx(dvb[i], ComparisonType::ABSOLUTE, tol)) {
                 result += "    " + realToString(dva[i], ndec + 7, ndec, scifm) +
                           " != " + realToString(dvb[i], ndec + 7, ndec, scifm) +
                           " (error " + realToString(fabs(dvb[i] - dva[i]), ndec + 7, ndec, scifm) +
                           ", entry " + std::to_string(i) + ")\n";
+                n_reported++;
               }
+              i++;
             }
           }
 	}

@@ -71,27 +71,29 @@ using synthesis::tile_groups_wu_abstract_length;
 #undef TCALC
 
 #define TCALC double
+#  define SPLIT_FORCE_ACCUMULATION
 #  define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
 #  define COMPUTE_FORCE
 #    define COMPUTE_ENERGY
-#      define KERNEL_NAME ktgdNonbondedForceEnergy
+#      define KERNEL_NAME ktgdsNonbondedForceEnergy
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
 #    undef COMPUTE_ENERGY
-#    define KERNEL_NAME ktgdNonbondedForce
+#    define KERNEL_NAME ktgdsNonbondedForce
 #      include "nonbonded_potential_tilegroups.cui"
 #    undef KERNEL_NAME
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
-#    define KERNEL_NAME ktgdNonbondedEnergy
+#    define KERNEL_NAME ktgdsNonbondedEnergy
 #      include "nonbonded_potential_tilegroups.cui"
 #    undef KERNEL_NAME
 #  undef COMPUTE_ENERGY
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
+#  undef SPLIT_FORCE_ACCUMULATION
 #undef TCALC
 #undef NONBOND_KERNEL_THREAD_COUNT
 
@@ -100,9 +102,9 @@ extern void nonbondedKernelSetup() {
   cudaFuncSetSharedMemConfig(ktgfNonbondedForce,       cudaSharedMemBankSizeEightByte);
   cudaFuncSetSharedMemConfig(ktgfNonbondedEnergy,      cudaSharedMemBankSizeEightByte);
   cudaFuncSetSharedMemConfig(ktgfNonbondedForceEnergy, cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgdNonbondedForce,       cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgdNonbondedEnergy,      cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgdNonbondedForceEnergy, cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(ktgdsNonbondedForce,       cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(ktgdsNonbondedEnergy,      cudaSharedMemBankSizeEightByte);
+  cudaFuncSetSharedMemConfig(ktgdsNonbondedForceEnergy, cudaSharedMemBankSizeEightByte);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -119,17 +121,17 @@ extern void launchNonbondedTileGroupsDp(const SyNonbondedKit<double> &poly_nbk,
   case EvaluateForce::YES:
     switch (eval_energy) {
     case EvaluateEnergy::YES:
-      ktgdNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                      *gmem_r);
+      ktgdsNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                       *gmem_r);
       break;
     case EvaluateEnergy::NO:
-      ktgdNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+      ktgdsNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
       break;
     }
     break;
   case EvaluateForce::NO:
-    ktgdNonbondedEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                               *gmem_r);
+    ktgdsNonbondedEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                *gmem_r);
     break;
   }
 }

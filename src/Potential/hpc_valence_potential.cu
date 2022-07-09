@@ -443,13 +443,13 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
         break;
       case EvaluateEnergy::NO:
         kdsValenceForceAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                          *gmem_r);
+                                                           *gmem_r);
         break;
       }
       break;
     case EvaluateForce::NO:
       kdsValenceEnergyAccumulation<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                         *scw, *gmem_r);
+                                                          *scw, *gmem_r);
       break;
     }
     break;
@@ -462,7 +462,7 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
     switch (eval_energy) {
     case EvaluateEnergy::YES:
       kdsValenceEnergyAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                       *gmem_r);
+                                                        *gmem_r);
       break;
     case EvaluateEnergy::NO:
       kdsValenceAtomUpdate<<<nblocks, nthreads>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);

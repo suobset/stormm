@@ -99,6 +99,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
           fxval = (TCALC)(ixval);
           __stwb(&gmem_r.xcrd[write_idx], ixval);
+#ifndef TCALC_IS_SINGLE
+          const int ixval_ovrf = __ldcs(&poly_psw.xcrd_ovrf[read_idx]);
+          fxval += (TCALC)(ixval_ovrf) * max_llint_accumulation;
+          __stwb(&gmem_r.xcrd_ovrf[write_idx], ixval_ovrf);
+#endif
         }
         else {
           fxval = (TCALC)(0.0);
@@ -142,6 +147,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
           fyval = (TCALC)(iyval);
           __stwb(&gmem_r.ycrd[write_idx], iyval);
+#ifndef TCALC_IS_SINGLE
+          const int iyval_ovrf = __ldcs(&poly_psw.ycrd_ovrf[read_idx]);
+          fyval += (TCALC)(iyval_ovrf) * max_llint_accumulation;
+          __stwb(&gmem_r.ycrd_ovrf[write_idx], iyval_ovrf);
+#endif
         }
         else {
           fyval = (TCALC)(0.0);
@@ -185,6 +195,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
           fzval = (TCALC)(izval);
           __stwb(&gmem_r.zcrd[write_idx], izval);
+#ifndef TCALC_IS_SINGLE
+          const int izval_ovrf = __ldcs(&poly_psw.zcrd_ovrf[read_idx]);
+          fzval += (TCALC)(izval_ovrf) * max_llint_accumulation;
+          __stwb(&gmem_r.zcrd_ovrf[write_idx], izval_ovrf);
+#endif
         }
         else {
           fzval = (TCALC)(0.0);
@@ -300,15 +315,35 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
                            inv_tile_pts;
       const TCALC tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
                            inv_tile_pts;
-      const llint x_center = LLCONV_FUNC(tx_cog);
-      const llint y_center = LLCONV_FUNC(ty_cog);
-      const llint z_center = LLCONV_FUNC(tz_cog);
       int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
                       ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx +
                       EXCL_GMEM_OFFSET;
-      const TCALC t_xcrd  = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
-      const TCALC t_ycrd  = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
-      const TCALC t_zcrd  = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#ifdef TCALC_IS_SINGLE
+      const llint x_center = LLCONV_FUNC(tx_cog);
+      const llint y_center = LLCONV_FUNC(ty_cog);
+      const llint z_center = LLCONV_FUNC(tz_cog);
+      const TCALC t_xcrd   = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd   = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd   = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#else
+      // Convert the negative values of the center-of-geometry coordinates so that the result
+      // can feed into combineSplitFixedPrecision() (which adds A + B).
+      const int95_t x_center = convertSplitFixedPrecision95(-tx_cog);
+      const int95_t y_center = convertSplitFixedPrecision95(-ty_cog);
+      const int95_t z_center = convertSplitFixedPrecision95(-tz_cog);
+      const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
+      const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
+      const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
+      const int95_t x95_tmp  = combineSplitFixedPrecision(x_atom, x_center);
+      const int95_t y95_tmp  = combineSplitFixedPrecision(y_atom, y_center);
+      const int95_t z95_tmp  = combineSplitFixedPrecision(z_atom, z_center);
+      const TCALC t_xcrd = (((TCALC)(x95_tmp.y) * max_llint_accumulation) +
+                            (TCALC)(x95_tmp.x)) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd = (((TCALC)(y95_tmp.y) * max_llint_accumulation) +
+                            (TCALC)(y95_tmp.x)) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd = (((TCALC)(z95_tmp.y) * max_llint_accumulation) +
+                            (TCALC)(z95_tmp.x)) * poly_psw.inv_gpos_scale;
+#endif
       const int t_ljidx   = gmem_r.lj_idx[read_idx];
       const TCALC t_q     = gmem_r.charges[read_idx];
       const int nljt      = sh_n_lj_types[absc_import_idx];
@@ -394,32 +429,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
 #endif
 #ifdef COMPUTE_FORCE
       read_idx -= EXCL_GMEM_OFFSET;
-
-      // CHECK
-#if 0
-      if (fabsf(t_xfrc) > (TCALC)(1000.0)) {
-        const int system_idx = sh_system_indices[absc_import_idx];
-        const int atom_offset = poly_nbk.atom_offsets[system_idx];
-        int gbl_atom_idx = (warp_lane_idx < tile_length) ?
-                           nbwu_map[1 + absc_import_idx] + tile_lane_idx :
-                           nbwu_map[1 + ordi_import_idx] + tile_lane_idx;
-        const int atom_idx = gbl_atom_idx - atom_offset;
-#  ifdef TCALC_IS_SINGLE
-#    ifdef SPLIT_FORCE_ACCUMULATION        
-        printf("S-S  Atom %4d in system %4d (%4d) : %12.4f %12.4f %12.4f\n", atom_idx, system_idx,
-               read_idx, t_xfrc, t_yfrc, t_zfrc);
-#    else
-        printf("S-W  Atom %4d in system %4d (%4d) : %12.4f %12.4f %12.4f\n", atom_idx, system_idx,
-               read_idx, t_xfrc, t_yfrc, t_zfrc);
-#    endif
-#  else
-        printf("D-S  Atom %4d in system %4d (%4d) : %12.4f %12.4f %12.4f\n", atom_idx, system_idx,
-               read_idx, t_xfrc, t_yfrc, t_zfrc);
-#  endif
-      }
-#endif
-      // END CHECK
-      
 #  ifdef SPLIT_FORCE_ACCUMULATION
       splitForceContribution(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xfrc, sh_xfrc_overflow);
       splitForceContribution(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, sh_yfrc_overflow);
@@ -462,7 +471,12 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
 #    ifdef TCALC_IS_SINGLE
           // Single-precision force accumulation can be split within this kernel, but the global
           // array values are still expected to be contained in a single 64-bit signed integer.
-          // Recombine the split accumulation values here and then store the result.
+          // Recombine the split accumulation values here and then store the result.  While it
+          // seems the logical choice for combining two 32-bit integers into a single 64-bit
+          // value, this method does not work in the valence kernel, apparently because register
+          // pressure forces the compiler to choose a 32-bit signed integer for the eponymous
+          // ixfrc, rather than the correct 64-bit signed integer.  Emulate the valence kernel if
+          // this code path shows any signs of similar behavior.
           llint ixfrc = sh_xfrc_overflow[read_idx];
           ixfrc *= max_int_accumulation_ll;
           ixfrc += (llint)(sh_xfrc[read_idx]);
