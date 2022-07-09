@@ -107,27 +107,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                    *(poly_ag.getSystemRestraintPointer(i)), EvaluateForce::YES, 0);
     const std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     const std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
-
-    // CHECK
-#if 0
-    const AtomGraph *iag_ptr = poly_ag.getSystemTopologyPointer(i);
-    if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() == 37 && i == 2) {
-      for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
-        if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 1.0e-7 ||
-            fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 1.0e-7 ||
-            fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 1.0e-7) {
-          printf("Sys-Atom %4d-%4d : %12.4lf %12.4lf %12.4lf  %12.4lf %12.4lf %12.4lf -> "
-                 "%12.4e %12.4e %12.4e\n", i, j, host_frc[3 * j], host_frc[(3 * j) + 1],
-                 host_frc[(3 * j) + 2], devc_frc[3 * j], devc_frc[(3 * j) + 1],
-                 devc_frc[(3 * j) + 2], host_frc[3 * j] - devc_frc[3 * j],
-                 host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1],
-                 host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]);
-        }
-      }
-    }
-#endif
-    // END CHECK
-
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
     frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
     total_restraints += poly_ag.getSystemRestraintPointer(i)->getTotalRestraintCount();
@@ -171,6 +150,23 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                                                  EvaluateForce::YES, EvaluateForce::YES, 0);
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
+
+    // CHECK
+    if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() <= 60) {
+      for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
+        if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 50.0 ||
+            fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 50.0 ||
+            fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 50.0) {
+          printf("Sys-Atom %4d-%4d :  %12.4lf %12.4lf %12.4lf    %12.4lf %12.4lf %12.4lf -> "
+                 "%12.4e %12.4e %12.4e\n", i, j, host_frc[3 * j], host_frc[(3 * j) + 1],
+                 host_frc[(3 * j) + 2], devc_frc[3 * j], devc_frc[(3 * j) + 1],
+                 devc_frc[(3 * j) + 2], host_frc[3 * j] - devc_frc[3 * j],
+                 host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1],
+                 host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]);
+        }
+      }
+    }
+    // END CHECK
 
     // These systems contain some hard clashes, which generate very large forces.  This is good
     // for testing the split force accumulation, but not for discerning values that are truly
@@ -353,7 +349,7 @@ int main(const int argc, const char* argv[]) {
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc);
   PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
-  PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 40);
+  PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 72);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
@@ -461,7 +457,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<PhaseSpace> bigger_crds = { trpi_ps, dhfr_ps, alad_ps };
   PhaseSpaceSynthesis big_poly_ps(bigger_crds, bigger_tops);
   PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 34, 40);
-  PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 34, 40);
+  PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 34, 72);
   const std::vector<int> big_top_indices = { 0, 1, 2 };
   AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT,
                                  max_vwu_atoms, &timer);
@@ -530,7 +526,7 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis ligand_poly_ps_dbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 40, 24,
                                          34, 44);
   PhaseSpaceSynthesis ligand_poly_ps_sdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 72, 24,
-                                          34, 44);
+                                          34, 72);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
                                     ligand_tiling,
                                     ExceptionResponse::WARN, max_vwu_atoms, &timer);

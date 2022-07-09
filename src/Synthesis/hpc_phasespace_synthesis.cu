@@ -252,9 +252,9 @@ kPsyInitializeForces(PsSynthesisWriter psyw, const int index) {
     psyw.yfrc[pos] = 0LL;
     psyw.zfrc[pos] = 0LL;
     if (psyw.frc_bits > force_scale_nonoverflow_bits) {
-      psyw.xfrc[pos] = 0;
-      psyw.yfrc[pos] = 0;
-      psyw.zfrc[pos] = 0;
+      psyw.xfrc_ovrf[pos] = 0;
+      psyw.yfrc_ovrf[pos] = 0;
+      psyw.zfrc_ovrf[pos] = 0;
     }
   }
 }
