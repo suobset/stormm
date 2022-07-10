@@ -61,7 +61,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     // The instruction set map is read and stored in __shared__ for convenience, and to ensure
     // that it never leaves cache.  The instructions themselves are "streamed," which for purposes
     // of this documentation means read from global, used once, and not cached.  Each block must be
-    // at least vwu_abstract_length + warp_size_int in size.  Currently that is 96 on NVIDIA GOUs
+    // at least vwu_abstract_length + warp_size_int in size.  Currently that is 96 on NVIDIA GPUs
     // and 128 on commodity AMD GPUs.
     if (threadIdx.x < vwu_abstract_length) {
       vwu_map[threadIdx.x] = __ldcv(&poly_vk.vwu_abstracts[(vwu_idx * vwu_abstract_length) +

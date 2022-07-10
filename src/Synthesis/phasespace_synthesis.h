@@ -55,7 +55,8 @@ struct PsSynthesisWriter {
                     int* ycrd_ovrf_in, int* zcrd_ovrf_in, llint* xvel_in, llint* yvel_in,
                     llint* zvel_in, int* xvel_ovrf_in, int* yvel_ovrf_in, int* zvel_ovrf_in,
                     llint* xfrc_in, llint* yfrc_in, llint* zfrc_in, int* xfrc_ovrf_in,
-                    int* yfrc_ovrf_in, int* zfrc_ovrf_in);
+                    int* yfrc_ovrf_in, int* zfrc_ovrf_in, llint* xprv_in, llint* yprv_in,
+                    llint* zprv_in, int* xprv_ovrf_in, int* yprv_ovrf_in, int* zprv_ovrf_in);
 
   /// \brief Copy and move constructors--as with any object containing const members, the move
   ///        assignment operator is implicitly deleted.
@@ -127,6 +128,12 @@ struct PsSynthesisWriter {
   int* xfrc_ovrf;  ///< Discretized Cartesian X force overflow buffers
   int* yfrc_ovrf;  ///< Discretized Cartesian Y force overflow buffers
   int* zfrc_ovrf;  ///< Discretized Cartesian Z force overflow buffers
+  llint* xprv;     ///< Previous Cartesian X positions of particles
+  llint* yprv;     ///< Previous Cartesian Y positions of particles
+  llint* zprv;     ///< Previous Cartesian Z positions of particles
+  int* xprv_ovrf;  ///< Overflow buffers for particles' previous Cartesian X locations
+  int* yprv_ovrf;  ///< Overflow buffers for particles' previous Cartesian Y locations
+  int* zprv_ovrf;  ///< Overflow buffers for particles' previous Cartesian Z locations
 };
 
 /// \brief The reader for a PhaseSpaceSynthesis object, containing all of the data relevant for
@@ -151,7 +158,9 @@ struct PsSynthesisReader {
                     const llint* xvel_in, const llint* yvel_in, const llint* zvel_in,
                     const int* xvel_ovrf_in, const int* yvel_ovrf_in, const int* zvel_ovrf_in,
                     const llint* xfrc_in, const llint* yfrc_in, const llint* zfrc_in,
-                    const int* xfrc_ovrf_in, const int* yfrc_ovrf_in, const int* zfrc_ovrf_in);
+                    const int* xfrc_ovrf_in, const int* yfrc_ovrf_in, const int* zfrc_ovrf_in,
+                    const llint* xprv_in, const llint* yprv_in, const llint* zprv_in,
+                    const int* xprv_ovrf_in, const int* yprv_ovrf_in, const int* zprv_ovrf_in);
 
   PsSynthesisReader(const PsSynthesisWriter &psyw);
   /// \}
@@ -225,6 +234,12 @@ struct PsSynthesisReader {
   const int* xfrc_ovrf;  ///< Discretized Cartesian X force overflow buffers
   const int* yfrc_ovrf;  ///< Discretized Cartesian Y force overflow buffers
   const int* zfrc_ovrf;  ///< Discretized Cartesian Z force overflow buffers
+  const llint* xprv;     ///< Previous Cartesian X positions of particles
+  const llint* yprv;     ///< Previous Cartesian Y positions of particles
+  const llint* zprv;     ///< Previous Cartesian Z positions of particles
+  const int* xprv_ovrf;  ///< Overflow buffers for particles' previous Cartesian X locations
+  const int* yprv_ovrf;  ///< Overflow buffers for particles' previous Cartesian Y locations
+  const int* zprv_ovrf;  ///< Overflow buffers for particles' previous Cartesian Z locations
 };
 
 /// \brief A fixed-precision representation of coordinates, velocities, and forces to manage a set
@@ -569,6 +584,12 @@ private:
   Hybrid<int> x_force_overflow;       ///< Force overflows acting on particles in the X direction
   Hybrid<int> y_force_overflow;       ///< Force overflows acting on particles in the Y direction
   Hybrid<int> z_force_overflow;       ///< Force overflows acting on particles in the Z direction
+  Hybrid<llint> x_prior_coordinates;  ///< Prior Cartesian X coordinates of all particles
+  Hybrid<llint> y_prior_coordinates;  ///< Prior Cartesian Y coordinates of all particles
+  Hybrid<llint> z_prior_coordinates;  ///< Prior Cartesian Z coordinates of all particles
+  Hybrid<int> x_prior_coord_overflow; ///< Prior Cartesian X coordinates of all particles
+  Hybrid<int> y_prior_coord_overflow; ///< Prior Cartesian Y coordinates of all particles
+  Hybrid<int> z_prior_coord_overflow; ///< Prior Cartesian Z coordinates of all particles
   Hybrid<llint> box_vectors;          ///< Scaled real space transformation matrix--moving
                                       ///<   particles between images by adding or subtracting
                                       ///<   multiples of these vectors can be expeditious and
