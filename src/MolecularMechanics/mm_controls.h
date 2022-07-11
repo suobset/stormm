@@ -17,6 +17,7 @@ using card::HybridTargetLevel;
 using namelist::default_dynamics_time_step;
 using namelist::default_rattle_tolerance;
 using namelist::default_minimize_dx0;
+using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
   
@@ -27,8 +28,9 @@ template <typename T> struct MMControlKit {
 
   /// \brief The constructor takes a straight list of values and pointers.  The step number is
   ///        left modifiable so that the object can be re-used over successive time steps.
-  MMControlKit(int step_in, T dt_in, T rattle_tol_in, int* vwu_progress_in, int* nbwu_progress_in,
-               int* pmewu_progress_in);
+  MMControlKit(int step_in, T dt_in, T rattle_tol_in, T initial_step_in, int* vwu_progress_in,
+               int* nbwu_progress_in, int* pmewu_progress_in, int* gtwu_progress_in,
+               int* scwu_progress_in, int* rdwu_progress_in);
 
   /// \brief The usual copy and move constructors for an abstract apply here.  
   /// \{
@@ -36,15 +38,16 @@ template <typename T> struct MMControlKit {
   MMControlKit(MMControlKit &&original) = default;
   /// \}
 
-  int step;             ///< The current simulation step
-  const T dt;           ///< Simulation time step (only valid for dynamics)
-  const T rattle_tol;   ///< Convergence tolerance for bond constraints
-  int* vwu_progress;    ///< Progress counters for valence work units
-  int* nbwu_progress;   ///< Progress counters for non-bonded work units
-  int* pmewu_progress;  ///< Progress counters for PME long-ranged work units
-  int* gtwu_progress;   ///< Progress counters for gathering work units
-  int* scwu_progress;   ///< Progress counters for scattering work units
-  int* rdwu_progress;   ///< Progress counters for reduction work units
+  int step;              ///< The current simulation step
+  const T dt;            ///< Simulation time step (only valid for dynamics)
+  const T rattle_tol;    ///< Convergence tolerance for bond constraints
+  const T initial_step;  ///< Initial step size to be taken in energy minimization
+  int* vwu_progress;     ///< Progress counters for valence work units
+  int* nbwu_progress;    ///< Progress counters for non-bonded work units
+  int* pmewu_progress;   ///< Progress counters for PME long-ranged work units
+  int* gtwu_progress;    ///< Progress counters for gathering work units
+  int* scwu_progress;    ///< Progress counters for scattering work units
+  int* rdwu_progress;    ///< Progress counters for reduction work units
 };
 
 /// \brief A collection of contol data for molecular mechanics simulations, conveying the current
@@ -61,13 +64,14 @@ public:
   ///        namelist-derived control objects don't just get pushed by value to the GPU is that the
   ///        work unit counters need special arrays, which this object manages.
   ///
-  /// \param time_step_in   The desired time step
-  /// \param rattle_tol_in  The desired RATTLE tolerance
-  /// \param user_input     Namelist-derived molecular dynamics or energy minimization controls
+  /// \param time_step_in     The desired time step
+  /// \param rattle_tol_in    The desired RATTLE tolerance (for dynamics)
+  /// \param initial_step_in  The desired initial step (for energy minimization)
+  /// \param user_input       Namelist-derived molecular dynamics or energy minimization controls
   /// \{
   MolecularMechanicsControls(double time_step_in = default_dynamics_time_step,
                              double rattle_tol_in = default_rattle_tolerance,
-                             double initial_step = default_minimize_dx0);
+                             double initial_step_in = default_minimize_dx0);
 
   MolecularMechanicsControls(const DynamicsControls &user_input);
                              
@@ -119,12 +123,14 @@ public:
 #endif
   
 private:
-  int step_number;                ///< The step counter for the simulation
-  double time_step;               ///< Time step of the simulation, units of femtoseconds.  This
-                                  ///<   may be truncated with the precision level of the abstract.
-  double rattle_tol;              ///< Rattle tolerance, again truncated with the precision level
-                                  ///<   of the abstract
-
+  int step_number;      ///< The step counter for the simulation
+  double time_step;     ///< Time step of the simulation, units of femtoseconds.  This may be
+                        ///<   truncated with the precision level of the abstract.
+  double rattle_tol;    ///< Rattle tolerance, again truncated with the precision level of the
+                        ///<   abstract
+  double initial_step;  ///< The initial step length (for all systems, if these controls govern a
+                        ///<   synthesis) to take in energy minimization calculations
+  
   /// Progress counters through valence work units, an array of two times the number of lanes per
   /// warp so that the valence work units kernel can perform resets of elements in this array with
   /// maximum efficiency.  The kernel will work based on the progress counter with index equal to

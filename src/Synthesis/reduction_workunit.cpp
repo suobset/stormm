@@ -39,10 +39,10 @@ int ReductionWorkUnit::getDependencyEnd() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<ReductionWorkUnits> buildReductionWorkUnits(const std::vector<int> &atom_starts,
-                                                        const std::vector<int> &atom_counts,
-                                                        const GpuDetails &gpu,
-                                                        GpuLaunch *launcher) {
+std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &atom_starts,
+                                                       const std::vector<int> &atom_counts,
+                                                       const GpuDetails &gpu,
+                                                       KernelManager *launcher) {
   if (atom_starts.size() != atom_counts.size()) {
     rtErr("Starting indices were provided for the atoms of " + std::to_string(atom_starts.size()) +
           " systems, but atom counts for " + std::to_string(atom_counts.size()) + " systems were "
@@ -52,13 +52,12 @@ std::vector<ReductionWorkUnits> buildReductionWorkUnits(const std::vector<int> &
   
   // Compare the number of systems to the number of streaming multiprocessors on the GPU, when
   // blocks of various sizes are used.
-  for (int block_size = tiny_block_size; block_size < large_block_size; block_size *= 2) {
+  int best_block_size = large_block_size;
+  int best_grid_size = gpu.getSMPCount();
+  for (int block_size = large_block_size; block_size >= tiny_block_size; block_size /= 2) {
 
   }
-
-  // Commit this wisdom to the kernel launch guide
-  launcher->setReductionGridDims(best_block_size, best_grid_size);
 }
 
-}
-}
+} // namespace synthesis
+} // namespace omni

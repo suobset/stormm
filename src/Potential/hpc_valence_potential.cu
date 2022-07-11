@@ -446,7 +446,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 //-------------------------------------------------------------------------------------------------
 extern void valenceKernelSetup() {
-  cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
+  const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
   if (cudaFuncSetSharedMemConfig(kfValenceAtomUpdate, sms_eight) != cudaSuccess) {
     rtErr("Error setting kfValenceAtomUpdate __shared__ memory bank size to eight bytes.",
           "valenceKernelSetup");

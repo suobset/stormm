@@ -9,6 +9,7 @@
 #    include <cuda_runtime.h>
 #  endif
 #endif
+#include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "Constants/fixed_precision.h"
 #include "Potential/energy_enumerators.h"
@@ -18,6 +19,7 @@
 namespace omni {
 namespace card {
 
+using constants::PrecisionModel;
 #ifndef OMNI_USE_HPC
 using data_types::int2;
 #endif
@@ -117,7 +119,7 @@ private:
 ///        block and block counts per launch grid for a specific GPU based on the workload.  This
 ///        object is constructed in a stepwise manner, with each kind of work unit contributing
 ///        new launch specifications.
-class GpuLaunch {
+class KernelManager {
 public:
 
   /// \brief The constructor will fill in values as if this were a single-threaded CPU "launch."
@@ -127,7 +129,7 @@ public:
   ///        variables of this object will therefore be filled by the selectLaunchParameters()
   ///        function wrapped function in a separate library that includes all of the appropriate
   ///        HPC units.
-  GpuLaunch();
+  KernelManager();
 
   /// \brief Get the block and thread counts for the valence kernel.
   ///
@@ -161,7 +163,12 @@ public:
   /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
   ///        setValenceKernelAttributes() above.
-  void setNonbodedKernelAttributes(int thread_limit, int register_count, int shared_usage);
+  void setNonbondedKernelAttributes(int thread_limit, int register_count, int shared_usage);
+
+  /// \brief Set the register, maximum block size, and threads counts for one of the reduction
+  ///        kernels.  Parameter descriptions for this function follow from
+  ///        setValenceKernelAttributes() above.
+  void setReductionKernelAttributes(int thread_limit, int register_count, int shared_usage);
   
 private:
 
@@ -171,15 +178,15 @@ private:
   // low and high 16 bits, respectively, and the maximum amount of __shared__ memory (statically
   // allocated plus dynamically allocatable) is stored in the w member.  Each piece of information
   // is accessible using the appropriate private member functions.
-  int4 valence_kernel_des_dims;   ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   double-precision, energy-only, split accumulation
+  int4 valence_kernel_de_dims;    ///< Optimal dimensions for the valence kernel launch grid with
+                                  ///<   double-precision, energy-only mode
   int4 valence_kernel_dfs_dims;   ///< Optimal dimensions for the valence kernel launch grid with
                                   ///<   double-precision, force-only, split accumulation
   int4 valence_kernel_dfes_dims;  ///< Optimal dimensions for the valence kernel launch grid with
                                   ///<   double-precision, force and energy computations, split
                                   ///<   accumulation
   int4 valence_kernel_fe_dims;    ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   single-precision, energy-only, split accumulation
+                                  ///<   single-precision, energy-only mode
   int4 valence_kernel_ffs_dims;   ///< Optimal dimensions for the valence kernel launch grid with
                                   ///<   single-precision, force-only, split accumulation
   int4 valence_kernel_ffes_dims;  ///< Optimal dimensions for the valence kernel launch grid with
@@ -192,10 +199,24 @@ private:
                                   ///<   accumulation
   int4 nonbond_kernel_de_dims;    ///< Optimal dimensions for the non-bonded kernel launch grid
                                   ///<   with double-precision, energy computations only
-  int4 nonbond_kernel_df_dims;    ///< Optimal dimensions for the non-bonded kernel launch grid
+  int4 nonbond_kernel_dfs_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
                                   ///<   with double-precision, force computations only
-  int4 nonbond_kernel_dfe_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
+  int4 nonbond_kernel_dfes_dims;  ///< Optimal dimensions for the non-bonded kernel launch grid
                                   ///<   with double-precision, force and energy computations
+  int4 nonbond_kernel_fe_dims;    ///< Optimal dimensions for the non-bonded kernel launch grid
+                                  ///<   with single-precision, energy computations only
+  int4 nonbond_kernel_ffs_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
+                                  ///<   with single-precision, force computations only, split
+                                  ///<   force accumulation
+  int4 nonbond_kernel_ffes_dims;  ///< Optimal dimensions for the non-bonded kernel launch grid
+                                  ///<   with single-precision, force and energy computations,
+                                  ///<   split force accumulation
+  int4 nonbond_kernel_ffw_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
+                                  ///<   with single-precision, force computations only, whole
+                                  ///<   64-bit int accumulation
+  int4 nonbond_kernel_ffew_dims;  ///< Optimal dimensions for the non-bonded kernel launch grid
+                                  ///<   with single-precision, force and energy computations,
+                                  ///<   whole 64-bit integer force accumulation
   int4 reduction_kernel_dims;     ///< Optimal dimensions for the reduction kernel launch grid
 
   /// \brief Get the selected number of threads per block for launching a given kernel based on
@@ -237,8 +258,8 @@ private:
   /// \param shared_memory_per_block  The maximum amount of __shared__ memory that each block might
   ///                                 need
   /// \param gpu                      Specific attributes of the GPU chosen at runtime
-  int4 setLaunchDims(int registers_per_thread, int kernel_max_threads, int shared_memory_per_block,
-                     const GpuDetails &gpu);
+  int4 setLaunchDims(int registers_per_thread, int kernel_max_threads,
+                     int shared_memory_per_block, const GpuDetails &gpu);
 };
   
 } // namespace card

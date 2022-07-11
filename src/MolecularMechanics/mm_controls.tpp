@@ -5,10 +5,13 @@ namespace mm {
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 MMControlKit<T>::MMControlKit(const int step_in, const T dt_in, const T rattle_tol_in,
-                              int* vwu_progress_in, int* nbwu_progress_in,
-                              int* pmewu_progress_in) :
-    step{step_in}, dt{dt_in}, rattle_tol{rattle_tol_in}, vwu_progress{vwu_progress_in},
-    nbwu_progress{nbwu_progress_in}, pmewu_progress{pmewu_progress_in}
+                              const T initial_step_in, int* vwu_progress_in, int* nbwu_progress_in,
+                              int* pmewu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
+                              int* rdwu_progress_in) :
+    step{step_in}, dt{dt_in}, rattle_tol{rattle_tol_in}, initial_step{initial_step_in},
+    vwu_progress{vwu_progress_in}, nbwu_progress{nbwu_progress_in},
+    pmewu_progress{pmewu_progress_in}, gtwu_progress{gtwu_progress_in},
+    scwu_progress{gtwu_progress_in}, rdwu_progress{gtwu_progress_in}
 {}
 
 } // namespace mm

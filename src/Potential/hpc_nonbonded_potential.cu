@@ -86,7 +86,7 @@ using synthesis::tile_groups_wu_abstract_length;
 #    undef KERNEL_NAME
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
-#    define KERNEL_NAME ktgdsNonbondedEnergy
+#    define KERNEL_NAME ktgdNonbondedEnergy
 #      include "nonbonded_potential_tilegroups.cui"
 #    undef KERNEL_NAME
 #  undef COMPUTE_ENERGY
@@ -99,12 +99,31 @@ using synthesis::tile_groups_wu_abstract_length;
 
 //-------------------------------------------------------------------------------------------------
 extern void nonbondedKernelSetup() {
-  cudaFuncSetSharedMemConfig(ktgfNonbondedForce,       cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgfNonbondedEnergy,      cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgfNonbondedForceEnergy, cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgdsNonbondedForce,       cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgdsNonbondedEnergy,      cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(ktgdsNonbondedForceEnergy, cudaSharedMemBankSizeEightByte);
+  const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
+  if (cudaFuncSetSharedMemConfig(ktgfNonbondedForce, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfNonbondedForce __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfNonbondedEnergy, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfNonbondedEnergy __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgfNonbondedForceEnergy, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgfNonbondedForceEnergy __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsNonbondedForce, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsNonbondedForce __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdNonbondedEnergy, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdNonbondedEnergy __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(ktgdsNonbondedForceEnergy, sms_eight) != cudaSuccess) {
+    rtErr("Error setting ktgdsNonbondedForceEnergy __shared__ memory bank size to eight bytes.",
+          "nonbondedKernelSetup");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -130,8 +149,8 @@ extern void launchNonbondedTileGroupsDp(const SyNonbondedKit<double> &poly_nbk,
     }
     break;
   case EvaluateForce::NO:
-    ktgdsNonbondedEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                *gmem_r);
+    ktgdNonbondedEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                               *gmem_r);
     break;
   }
 }

@@ -15,6 +15,7 @@ namespace omni {
 namespace energy {
 
 using card::GpuDetails;
+using card::KernelManager;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
 using numerics::ForceAccumulationMethod;
@@ -27,6 +28,13 @@ using synthesis::SyNonbondedKit;
 
 /// \brief Set the __shared__ memory configuration for various nonbonded interaction kernels
 void nonbondedKernelSetup();
+
+/// \brief Obtain information on launch bounds and block-specific requirements for each version of
+///        the non-bonded interactions kernel.  Deposit the results in a developing object that
+///        will later record launch grid dimensions for managing the kernels.
+///
+/// \param wisdom  Object to store the kernel specifications obtained
+void queryNonbondedKernelRequirements(KernelManager *wisdom);
 
 /// \brief Evaluate nonbonded work units based on tile groups.  All of the kernels launched by
 ///        these functions will compute forces, energies, or both, and if forces are computed the

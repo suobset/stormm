@@ -18,6 +18,7 @@ namespace omni {
 namespace energy {
 
 using card::GpuDetails;
+using card::KernelManager;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
 using numerics::ForceAccumulationMethod;
@@ -30,6 +31,13 @@ using synthesis::VwuGoal;
 
 /// \brief Set the __shared__ memory configuration for various valence interaction kernels.
 void valenceKernelSetup();
+
+/// \brief Obtain information on launch bounds and block-specific requirements for each version of
+///        the valence interactions kernel.  Deposit the results in a developing object that will
+///        later record launch grid dimensions for managing the kernels.
+///
+/// \param wisdom  Object to store the kernel specifications obtained
+void queryValenceKernelRequirements(KernelManager *wisdom);
 
 /// \brief Evaluate valence work units and move atoms.
 ///

@@ -93,33 +93,34 @@ std::string GpuDetails::getCardName() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-GpuLaunch::GpuLaunch() :
-  valence_kernel_des_dims{1, 1}, valence_kernel_dfs_dims{1, 1}, valence_kernel_dfes_dims{1, 1},
-  valence_kernel_fes_dims{1, 1}, valence_kernel_ffs_dims{1, 1}, valence_kernel_ffes_dims{1, 1},
-  valence_kernel_few_dims{1, 1}, valence_kernel_ffw_dims{1, 1}, valence_kernel_ffew_dims{1, 1},
-  nonbond_kernel_de_dims{1, 1}, nonbond_kernel_df_dims{1, 1}, nonbond_kernel_dfe_dims{1, 1},
-  reduction_kernel_dims{1, 1}
+KernelManager::KernelManager() :
+    valence_kernel_de_dims{1, 1}, valence_kernel_dfs_dims{1, 1}, valence_kernel_dfes_dims{1, 1},
+    valence_kernel_fe_dims{1, 1}, valence_kernel_ffs_dims{1, 1}, valence_kernel_ffes_dims{1, 1},
+    valence_kernel_ffw_dims{1, 1}, valence_kernel_ffew_dims{1, 1}, nonbond_kernel_de_dims{1, 1},
+    nonbond_kernel_dfs_dims{1, 1}, nonbond_kernel_dfes_dims{1, 1}, nonbond_kernel_fe_dims{1, 1},
+    nonbond_kernel_ffs_dims{1, 1}, nonbond_kernel_ffes_dims{1, 1}, nonbond_kernel_ffw_dims{1, 1},
+    nonbond_kernel_ffew_dims{1, 1}, reduction_kernel_dims{1, 1}
 {}
 
 //-------------------------------------------------------------------------------------------------
-int2 GpuLaunch::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
-                                     const EvaluateEnergy eval_nrg,
-                                     const ForceAccumulationMethod acc_meth) {
+int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
+                                         const EvaluateEnergy eval_nrg,
+                                         const ForceAccumulationMethod acc_meth) const {
   switch (prec) {
   case PrecisionModel::DOUBLE:
     switch (eval_force) {
     case EvaluateForce::YES:
       switch (eval_nrg) {
       case EvaluateEnergy::YES:
-        return { valence_kernel_dfes_dims.getSelectedBlockDim(),
-                 valence_kernel_dfes_dims.getSelectedGridDim() };
+        return { getSelectedBlockDim(valence_kernel_dfes_dims),
+                 getSelectedGridDim(valence_kernel_dfes_dims) };
       case EvaluateEnergy::NO:
-        return { valence_kernel_dfs_dims.getSelectedBlockDim(),
-                 valence_kernel_dfs_dims.getSelectedGridDim() };
+        return { getSelectedBlockDim(valence_kernel_dfs_dims),
+                 getSelectedGridDim(valence_kernel_dfs_dims) };
       }
     case EvaluateForce::NO:
-      return { valence_kernel_des_dims.getSelectedBlockDim(),
-               valence_kernel_des_dims.getSelectedGridDim() };
+      return { getSelectedBlockDim(valence_kernel_de_dims),
+               getSelectedGridDim(valence_kernel_de_dims) };
     }
     break;
   case PrecisionModel::SINGLE:
@@ -129,32 +130,32 @@ int2 GpuLaunch::getValenceKernelDims(const PrecisionModel prec, const EvaluateFo
       case ForceAccumulationMethod::SPLIT:
         switch (eval_nrg) {
         case EvaluateEnergy::YES:
-          return { valence_kernel_ffes_dims.getSelectedBlockDim(),
-                   valence_kernel_ffes_dims.getSelectedGridDim() };
+          return { getSelectedBlockDim(valence_kernel_ffes_dims),
+                   getSelectedGridDim(valence_kernel_ffes_dims) };
         case EvaluateEnergy::NO:
-          return { valence_kernel_ffs_dims.getSelectedBlockDim(),
-                   valence_kernel_ffs_dims.getSelectedGridDim() };
+          return { getSelectedBlockDim(valence_kernel_ffs_dims),
+                   getSelectedGridDim(valence_kernel_ffs_dims) };
         }
         break;
       case ForceAccumulationMethod::WHOLE:
         switch (eval_nrg) {
         case EvaluateEnergy::YES:
-          return { valence_kernel_ffew_dims.getSelectedBlockDim(),
-                   valence_kernel_ffew_dims.getSelectedGridDim() };
+          return { getSelectedBlockDim(valence_kernel_ffew_dims),
+                   getSelectedGridDim(valence_kernel_ffew_dims) };
         case EvaluateEnergy::NO:
-          return { valence_kernel_ffw_dims.getSelectedBlockDim(),
-                   valence_kernel_ffw_dims.getSelectedGridDim() };
+          return { getSelectedBlockDim(valence_kernel_ffw_dims),
+                   getSelectedGridDim(valence_kernel_ffw_dims) };
         }
         break;
       case ForceAccumulationMethod::AUTOMATIC:
         rtErr("Force accumulation cannot be specified as " +
               getForceAccumulationMethodName(ForceAccumulationMethod::AUTOMATIC) + " in kernel "
-              "launch dimension dertermination.", "GpuLaunch", "getValenceKernelDims");
+              "launch dimension dertermination.", "KernelManager", "getValenceKernelDims");
       }
       break;
     case EvaluateForce::NO:
-      return { valence_kernel_fe_dims.getSelectedBlockDim(),
-               valence_kernel_fe_dims.getSelectedGridDim() };
+      return { getSelectedBlockDim(valence_kernel_fe_dims),
+               getSelectedGridDim(valence_kernel_fe_dims) };
     }
     break;
   }
@@ -162,44 +163,63 @@ int2 GpuLaunch::getValenceKernelDims(const PrecisionModel prec, const EvaluateFo
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 GpuLaunch::getNonbondedKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
-                                       const EvaluateEnergy eval_nrg,
-                                       const ForceAccumulationMethod acc_meth) const {
+int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
+                                           const EvaluateForce eval_force,
+                                           const EvaluateEnergy eval_nrg,
+                                           const ForceAccumulationMethod acc_meth) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 GpuLaunch::getReductionKernelDims() const {
+int2 KernelManager::getReductionKernelDims() const {
   return { reduction_kernel_dims.x, reduction_kernel_dims.y };
 }
 
 //-------------------------------------------------------------------------------------------------
-int GpuLaunch::getSelectedBlockDim(const int4 kval) const {
+void KernelManager::setValenceKernelAttributes(const int thread_limit, const int register_count,
+                                               const int shared_usage) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void KernelManager::setNonbondedKernelAttributes(const int thread_limit, const int register_count,
+                                                 const int shared_usage) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+void KernelManager::setReductionKernelAttributes(const int thread_limit, const int register_count,
+                                                 const int shared_usage) {
+
+}
+
+//-------------------------------------------------------------------------------------------------
+int KernelManager::getSelectedBlockDim(const int4 kval) const {
   return kval.x;
 }
 
 //-------------------------------------------------------------------------------------------------
-int GpuLaunch::getSelectedGridDim(const int4 kval) const {
+int KernelManager::getSelectedGridDim(const int4 kval) const {
   return kval.y;
 }
 
 //-------------------------------------------------------------------------------------------------
-int GpuLaunch::getMaximumThreadsPerBlock(const int4 kval) const {
+int KernelManager::getMaximumThreadsPerBlock(const int4 kval) const {
   return (kval.z & 0xffff);
 }
 
 //-------------------------------------------------------------------------------------------------
-int GpuLaunch::getRegistersPerThread(const int4 kval) const {
+int KernelManager::getRegistersPerThread(const int4 kval) const {
   return ((kval.z >> 16) & 0xffff);
 }
 
 //-------------------------------------------------------------------------------------------------
-int GpuLaunch::getMaximumSharedMemoryPerBlock(const int4 kval) const {
+int KernelManager::getMaximumSharedMemoryPerBlock(const int4 kval) const {
   return kval.w;
 }
 
 //-------------------------------------------------------------------------------------------------
-int4 GpuLaunch::setLaunchDims(const int registers_per_thread, const int kernel_max_threads,
-                              const int shared_memory_per_block, const GpuDetails &gpu) {
+int4 KernelManager::setLaunchDims(const int registers_per_thread, const int kernel_max_threads,
+                                  const int shared_memory_per_block, const GpuDetails &gpu) {
 
 }
  
