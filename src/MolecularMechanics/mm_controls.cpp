@@ -9,8 +9,8 @@ using card::HybridKind;
 using topology::UnitCellType;
   
 //-------------------------------------------------------------------------------------------------
-MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in,
-                                                       const double rattle_tol_in) :
+MolecularMechanicsControls::
+MolecularMechanicsControls(const double time_step_in, const double rattle_tol_in) :
   step_number{0}, time_step{time_step_in}, rattle_tol{rattle_tol_in},
   vwu_progress{HybridKind::POINTER, "mm_vwu_counters"},
   nbwu_progress{HybridKind::POINTER, "mm_nbwu_counters"},
@@ -22,6 +22,12 @@ MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in
   pmewu_progress.setPointer(&progress_data, 4 * warp_size_int, 2 * warp_size_int);
 }
 
+//-------------------------------------------------------------------------------------------------
+MolecularMechanicsControls::MolecularMechanicsControls(const DynamicsControls &user_input) :
+{
+
+}
+  
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::
 MolecularMechanicsControls(const MolecularMechanicsControls &original) :
@@ -161,5 +167,10 @@ void MolecularMechanicsControls::download() {
 }
 #endif
 
+//-------------------------------------------------------------------------------------------------
+void MolecularMechanicsControls::allocateProgressCounters() {
+
+}
+  
 } // namespace mm
 } // namespace omni

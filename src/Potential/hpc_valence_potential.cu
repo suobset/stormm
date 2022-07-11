@@ -1,5 +1,6 @@
 // -*-c++-*-
 #include "Accelerator/ptx_macros.h"
+#include "Accelerator/gpu_details.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
@@ -14,6 +15,7 @@
 namespace omni {
 namespace energy {
 
+using card::KernelManager;
 using constants::warp_size_int;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
@@ -444,16 +446,52 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 //-------------------------------------------------------------------------------------------------
 extern void valenceKernelSetup() {
-  cudaFuncSetSharedMemConfig(kfValenceAtomUpdate,              cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kfValenceEnergyAtomUpdate,        cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kfValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdsValenceAtomUpdate,              cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdsValenceEnergyAtomUpdate,        cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdsValenceForceAccumulation,       cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdsValenceEnergyAccumulation,      cudaSharedMemBankSizeEightByte);
-  cudaFuncSetSharedMemConfig(kdsValenceForceEnergyAccumulation, cudaSharedMemBankSizeEightByte);
+  cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
+  if (cudaFuncSetSharedMemConfig(kfValenceAtomUpdate, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceAtomUpdate __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAtomUpdate, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceEnergyAtomUpdate __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceForceAccumulation, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceForceAccumulation __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceEnergyAccumulation, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceEnergyAccumulation __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfValenceForceEnergyAccumulation, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfValenceForceEnergyAccumulation __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceAtomUpdate, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceAtomUpdate __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAtomUpdate, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceEnergyAtomUpdate __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceForceAccumulation, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceForceAccumulation __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceEnergyAccumulation, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceEnergyAccumulation __shared__ memory bank size to eight bytes.",
+          "valenceKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdsValenceForceEnergyAccumulation, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdsValenceForceEnergyAccumulation __shared__ memory bank size to eight "
+          "bytes.", "valenceKernelSetup");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void queryValenceKernelRequirements(KernelManager *wisdom) {
+
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -5,6 +5,7 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Namelists/nml_dynamics.h"
+#include "Namelists/nml_minimize.h"
 #include "Synthesis/atomgraph_synthesis.h"
 
 namespace omni {
@@ -15,6 +16,8 @@ using card::Hybrid;
 using card::HybridTargetLevel;
 using namelist::default_dynamics_time_step;
 using namelist::default_rattle_tolerance;
+using namelist::default_minimize_dx0;
+using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
   
 /// \brief The C-style, always writeable abstract for the MolecularMechanicsControls object.  To
@@ -37,20 +40,39 @@ template <typename T> struct MMControlKit {
   const T dt;           ///< Simulation time step (only valid for dynamics)
   const T rattle_tol;   ///< Convergence tolerance for bond constraints
   int* vwu_progress;    ///< Progress counters for valence work units
-  int* nbwu_progress;   ///< Progress counters for 
-  int* pmewu_progress;  ///<
+  int* nbwu_progress;   ///< Progress counters for non-bonded work units
+  int* pmewu_progress;  ///< Progress counters for PME long-ranged work units
+  int* gtwu_progress;   ///< Progress counters for gathering work units
+  int* scwu_progress;   ///< Progress counters for scattering work units
+  int* rdwu_progress;   ///< Progress counters for reduction work units
 };
 
 /// \brief A collection of contol data for molecular mechanics simulations, conveying the current
 ///        step number, progress counters through various work units, the time step, RATTLE
-///        tolerance, and other critical parameters to guide calculations.
+///        tolerance, and other critical parameters to guide calculations.  This common struct
+///        accommodates both molecular dynamics and molecular mechanics energy minimizations, and
+///        can be created from control objects derived from &dynamics or &minimize namelists.
 class MolecularMechanicsControls {
 public:
 
   /// \brief The constructor can create an empty object with default parameters for the time step
-  ///        and rattle tolerance, or accept user-specified values.
+  ///        and rattle tolerance, accept user-specified values for critical constants, or be
+  ///        built from a namelist-derived object on the CPU.  The reason that those
+  ///        namelist-derived control objects don't just get pushed by value to the GPU is that the
+  ///        work unit counters need special arrays, which this object manages.
+  ///
+  /// \param time_step_in   The desired time step
+  /// \param rattle_tol_in  The desired RATTLE tolerance
+  /// \param user_input     Namelist-derived molecular dynamics or energy minimization controls
+  /// \{
   MolecularMechanicsControls(double time_step_in = default_dynamics_time_step,
-                             double rattle_tol_in = default_rattle_tolerance);
+                             double rattle_tol_in = default_rattle_tolerance,
+                             double initial_step = default_minimize_dx0);
+
+  MolecularMechanicsControls(const DynamicsControls &user_input);
+                             
+  MolecularMechanicsControls(const MinimizeControls &user_input);
+  /// \}
 
   /// \brief The copy constructor handles assignment of internal POINTER-kind Hybrid objects.
   ///
@@ -94,34 +116,44 @@ public:
 
   /// \brief Download the object's contents from the device (useful for debugging)
   void download();
-#else
-                             
 #endif
   
 private:
-  int step_number;             ///< The step counter for the simulation
-  double time_step;            ///< Time step of the simulation, units of femtoseconds.  This may
-                               ///<   be truncated with the precision level of the abstract.
-  double rattle_tol;           ///< Rattle tolerance, again truncated with the precision level of
-                               ///<   the abstract
-  Hybrid<int> vwu_progress;    ///< Progress counters through valence work units, an array of two
-                               ///<   times the number of lanes per warp so that the valence work
-                               ///<   units kernel can perform resets of elements in this array
-                               ///<   with maximum efficiency.  The kernel will work based on the
-                               ///<   progress counter with index equal to the step number modulo
-                               ///<   twice the warp size.  When the step counter is equal to the
-                               ///<   a multiple of the warp size, one of the warps in the first
-                               ///<   block of this kernel will reset counters in array indices
-                               ///<   [ 0, warp size ).  When the step counter is equal to a
-                               ///<   multiple of twice the warp size, one of the warps in this
-                               ///<   kernel will reset the counters in array indices [ warp size,
-                               ///<   2 * warp size ).
-  Hybrid<int> nbwu_progress;   ///< Progress counters for non-bonded work units, arrayed in a
-                               ///<   manner similar to the valence work units.
-  Hybrid<int> pmewu_progress;  ///< Progress counters for long-ranged, mesh-based PME work units,
-                               ///<   arrayed in a manner similar to the valence work units.
-  Hybrid<int> progress_data;   ///< ARRAY-kind Hybrid object targeted by the above POINTER-kind
-                               ///<   Hybrid objects
+  int step_number;                ///< The step counter for the simulation
+  double time_step;               ///< Time step of the simulation, units of femtoseconds.  This
+                                  ///<   may be truncated with the precision level of the abstract.
+  double rattle_tol;              ///< Rattle tolerance, again truncated with the precision level
+                                  ///<   of the abstract
+
+  /// Progress counters through valence work units, an array of two times the number of lanes per
+  /// warp so that the valence work units kernel can perform resets of elements in this array with
+  /// maximum efficiency.  The kernel will work based on the progress counter with index equal to
+  /// the step number modulo twice the warp size.  When the step counter is equal to the a
+  /// multiple of the warp size, one of the warps in the first block of this kernel will reset
+  /// counters in array indices [ 0, warp size ).  When the step counter is equal to a multiple of
+  /// twice the warp size, one of the warps in this kernel will reset the counters in array indices
+  /// [ warp size, 2 * warp size ).
+  Hybrid<int> vwu_progress;
+  
+  /// Progress counters for non-bonded work units, arrayed in a manner like the valence work units
+  Hybrid<int> nbwu_progress;
+
+  /// Progress counters for long-ranged, mesh-based PME work units
+  Hybrid<int> pmewu_progress;
+
+  /// Progress counters for gathering information across each system.
+  Hybrid<int> gather_wu_progress;
+
+  /// Progress counters for scattering gathered information back across each system.
+  Hybrid<int> scatter_wu_progress;
+  
+  /// Progress through all-reduce work units.  While it may seem tedious, these are necessary in
+  /// order to provide a general solution to the problem of accumulating results across an
+  /// arbitrary number of systems with a fixed number of thread blocks.
+  Hybrid<int> all_reduce_wu_progress;
+
+  /// ARRAY-kind Hybrid object targeted by the above POINTER-kind Hybrid objects
+  Hybrid<int> progress_data;
 };
 
 } // namespace mm

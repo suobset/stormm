@@ -92,10 +92,16 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, const i
           destination.xcrd[read_pos] = source.xcrd[read_pos];
           destination.ycrd[read_pos] = source.ycrd[read_pos];
           destination.zcrd[read_pos] = source.zcrd[read_pos];
+          destination.xprv[read_pos] = source.xprv[read_pos];
+          destination.yprv[read_pos] = source.yprv[read_pos];
+          destination.zprv[read_pos] = source.zprv[read_pos];
           if (source.gpos_bits > globalpos_scale_nonoverflow_bits) {
             destination.xcrd_ovrf[read_pos] = source.xcrd_ovrf[read_pos];
             destination.ycrd_ovrf[read_pos] = source.ycrd_ovrf[read_pos];
             destination.zcrd_ovrf[read_pos] = source.zcrd_ovrf[read_pos];
+            destination.xprv_ovrf[read_pos] = source.xprv_ovrf[read_pos];
+            destination.yprv_ovrf[read_pos] = source.yprv_ovrf[read_pos];
+            destination.zprv_ovrf[read_pos] = source.zprv_ovrf[read_pos];
           }
           read_pos += atom_warps * warp_size_int;
         }

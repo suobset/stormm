@@ -2,7 +2,28 @@
 
 #define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
 
-//-------------------------------------------------------------------------------------------------
+/// \brief The valence kernel, a marvel of complexity and maximal use of registers.  When compiling
+///        kernels with the NVIDIA Cuda Compiler (NVCC), it does appear that register pressure can
+///        lead to optimizations where variables declared at long long int are implemented as
+///        int32_t, which led to more roundabout solutions herein.  All valence terms, as well as
+///        restraints, are handled in this kernel.
+///
+/// Pre-processor branches:
+///   - Use single- or double-precision calculations
+///   - Use split (63-bit) or whole-number accumulation (64-bit) in single-precision run mode.
+///     Always use split (95-bit) accumulation in double-precision run mode.
+///   - Compute forces, energies, or both
+///   - Accumulate forces in global accumulators or move particles immediately (in the latter case,
+///     prior force contributions found in global accumulators will contribute to the moves, then
+///     be zeroed--no forces will be contributed back to global accumulators)
+///
+/// \param poly_vk   Valence parameters for all systems, including consensus tables and particle
+///                  indices
+/// \param poly_rk   Restraint parameters for all systems
+/// \param ctrl      Molecular mechanics control information
+/// \param poly_psw  Coordinates, velocities, and forces for all systems
+/// \param scw       Energy tracking object
+/// \param gmem_r    Resources in global memory allocated for exclusive use by each thread block
 __global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, 1)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC2, TCALC4> poly_rk,
             MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,

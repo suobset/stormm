@@ -11,6 +11,7 @@ LIBDIR=lib
 # OMNI C++ source files
 OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Accelerator/gpu_details.cpp \
+		 $(SRCDIR)/Accelerator/select_launch_parameters.cpp \
 		 $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Chemistry/chemical_features.cpp \
 		 $(SRCDIR)/Chemistry/indigo.cpp \
@@ -76,6 +77,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
+		 $(SRCDIR)/Synthesis/reduction_workunit.cpp \
 		 $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/systemcache.cpp \
 		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
@@ -109,6 +111,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 # OMNI C++ header files
 OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Accelerator/gpu_details.h \
+		   $(SRCDIR)/Accelerator/select_launch_parameters.h \
 		   $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemical_features.h \
 		   $(SRCDIR)/Chemistry/indigo.h \
@@ -190,6 +193,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.h \
+	           $(SRCDIR)/Synthesis/reduction_workunit.h \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.h \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.h \
 		   $(SRCDIR)/Synthesis/synthesis_enumerators.h \
@@ -260,6 +264,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 # OMNI C++ object files
 OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Accelerator/gpu_details.o \
+		$(SRCDIR)/Accelerator/select_launch_parameters.o \
 		$(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/Chemistry/chemical_features.o \
 		$(SRCDIR)/Chemistry/indigo.o \
@@ -325,6 +330,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		$(SRCDIR)/Synthesis/nonbonded_workunit.o \
+		$(SRCDIR)/Synthesis/reduction_workunit.o \
 		$(SRCDIR)/Synthesis/static_mask_synthesis.o \
 		$(SRCDIR)/Synthesis/systemcache.o \
 		$(SRCDIR)/Synthesis/valence_workunit.o \

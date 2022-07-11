@@ -1,0 +1,23 @@
+#ifndef OMNI_SELECT_LAUNCH_PARAMETERS_H
+#define OMNI_SELECT_LAUNCH_PARAMETERS_H
+
+#include "gpu_details.h"
+#include "Potential/hpc_valence_potential.cuh"
+#include "Potential/hpc_nonbonded_potential.cuh"
+
+namespace omni {
+namespace card {
+
+/// \brief Given details of the GPU and the set of systems to simulate (the workload), query the
+///        specifications of each version of the compiled kernels to determine the optimal launch
+///        configurations.  Store the results in a KernelManager object as acquired wisdom.
+///        This process amounts to constructing the object in a practical sense, but is done here,
+///        with a free function in a separate implementation file, to allow the KernelManager
+///        object to be reciprocally included in various HPC units to provide launch instructions
+///        without generating circular dependencies.
+KernelManager selectLaunchParameters();
+
+} // namespace card
+} // namespace omni
+
+#endif
