@@ -14,17 +14,8 @@ namespace numerics {
 using constants::ExceptionResponse;
 using constants::int_bit_count_int;
 using constants::llint_bit_count_int;
+using constants::PrecisionModel;
   
-/// \brief Enumerate different available precision models
-enum class PrecisionLevel {
-  SINGLE,       ///< Computations will take place in fp32 or int64 fixed-precision.  This may limit
-                ///<   the upper bound on some fixed-precision bit settings.
-  SINGLE_PLUS,  ///< Computations will take place in fp32 or int64 fixed-precision, with some
-                ///<   enhancements depending on the situation.  This may limit the upper bound on
-                ///<   some fixed-precision bit settings.
-  DOUBLE        ///< Computations will take place in fp64 or int64 fixed-precision
-};
-
 /// \brief Enumerate the choices for carrying out fixed-precision accumulation
 enum class ForceAccumulationMethod {
   SPLIT,     ///< Use split accumulation, stashing the low 32 bits in a locally cached int and the
@@ -152,16 +143,6 @@ constexpr double max_llint_accumulation = max_int_accumulation * max_int_accumul
 constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 /// \}
 
-/// \brief Translate a string into a known precision level enumeration.
-///
-/// \param choice  The named precision level (will be checked for validity)
-PrecisionLevel translatePrecisionLevel(const std::string &choice, ExceptionResponse policy);
-
-/// \brief Get a descriptive string corresponding to each enumerated compute precision level.
-///
-/// \param plevel  The precision level to name
-std::string getPrecisionLevelName(PrecisionLevel plevel);
-
 /// \brief Translate a string specifying a force accumulation method into the numerical code.
 ///
 /// \param method  The string to translate
@@ -216,7 +197,7 @@ void checkEnergyBits(int choice);
 ///
 /// \param choice  The fixed-precision bits for performing charge density accumulation
 /// \param pmdoel  The fixed-precision model, which implies the accumulation range
-void checkChargeMeshBits(int choice, PrecisionLevel pmodel);
+void checkChargeMeshBits(int choice, PrecisionModel pmodel);
 
 /// \brief Convert floating point numbers into fixed-precision representations with two integers.
 ///        This is similar to splitRealAccumulation below, but will set the values rather than

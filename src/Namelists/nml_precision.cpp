@@ -8,6 +8,7 @@ namespace omni {
 namespace namelist {
 
 using constants::CaseSensitivity;
+using constants::translatePrecisionModel;
 using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
@@ -20,7 +21,6 @@ using numerics::checkVelocityBits;
 using numerics::checkForceBits;
 using numerics::checkEnergyBits;
 using numerics::checkChargeMeshBits;
-using numerics::translatePrecisionLevel;
 using parse::NumberFormat;
 using parse::realToString;
   
@@ -34,11 +34,11 @@ PrecisionControls::PrecisionControls(const ExceptionResponse policy_in) :
     energy_scale_bits{default_energy_scale_bits},
     charge_mesh_scale_bits{default_charge_mesh_scale_bits},
     bond_constraint_tol{default_precision_constraint_tol},
-    valence_method{translatePrecisionLevel(std::string(default_precision_valence_method),
+    valence_method{translatePrecisionModel(std::string(default_precision_valence_method),
                                            policy)},
-    nonbonded_method{translatePrecisionLevel(std::string(default_precision_nonbonded_method),
+    nonbonded_method{translatePrecisionModel(std::string(default_precision_nonbonded_method),
                                              policy)},
-    pme_method{translatePrecisionLevel(std::string(default_precision_pme_method), policy)}
+    pme_method{translatePrecisionModel(std::string(default_precision_pme_method), policy)}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -57,9 +57,9 @@ PrecisionControls::PrecisionControls(const TextFile &tf, int *start_line,
   const std::string valence_method_str   = t_nml.getStringValue("valence");
   const std::string nonbonded_method_str = t_nml.getStringValue("nonbonded");
   const std::string pme_method_str = t_nml.getStringValue("pmegrid");
-  valence_method = translatePrecisionLevel(valence_method_str, policy);
-  nonbonded_method = translatePrecisionLevel(nonbonded_method_str, policy);
-  pme_method = translatePrecisionLevel(pme_method_str, policy);
+  valence_method = translatePrecisionModel(valence_method_str, policy);
+  nonbonded_method = translatePrecisionModel(nonbonded_method_str, policy);
+  pme_method = translatePrecisionModel(pme_method_str, policy);
 
   // Validate input
   checkGlobalPositionBits(globalpos_scale_bits);
@@ -107,17 +107,17 @@ double PrecisionControls::getBondConstraintTolerance() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-PrecisionLevel PrecisionControls::getValenceMethod() const {
+PrecisionModel PrecisionControls::getValenceMethod() const {
   return valence_method;
 }
 
 //-------------------------------------------------------------------------------------------------
-PrecisionLevel PrecisionControls::getNonbondedMethod() const {
+PrecisionModel PrecisionControls::getNonbondedMethod() const {
   return nonbonded_method;
 }
 
 //-------------------------------------------------------------------------------------------------
-PrecisionLevel PrecisionControls::getParticleMeshEwaldMethod() const {
+PrecisionModel PrecisionControls::getParticleMeshEwaldMethod() const {
   return pme_method;
 }
 
@@ -164,17 +164,17 @@ void PrecisionControls::setBondConstraintTolerance(const double tol) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void PrecisionControls::setValenceMethod(const PrecisionLevel pmodel) {
+void PrecisionControls::setValenceMethod(const PrecisionModel pmodel) {
   valence_method = pmodel;
 }
 
 //-------------------------------------------------------------------------------------------------
-void PrecisionControls::setNonbondedMethod(const PrecisionLevel pmodel) {
+void PrecisionControls::setNonbondedMethod(const PrecisionModel pmodel) {
   nonbonded_method = pmodel;
 }
 
 //-------------------------------------------------------------------------------------------------
-void PrecisionControls::setParticleMeshEwaldMethod(const PrecisionLevel pmodel) {
+void PrecisionControls::setParticleMeshEwaldMethod(const PrecisionModel pmodel) {
   pme_method = pmodel;
 }
 

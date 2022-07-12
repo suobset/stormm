@@ -11,13 +11,13 @@
 namespace omni {
 namespace namelist {
 
+using constants::PrecisionModel;
 using numerics::default_charge_mesh_scale_bits;
 using numerics::default_energy_scale_bits;
 using numerics::default_force_scale_bits;
 using numerics::default_globalpos_scale_bits;
 using numerics::default_localpos_scale_bits;
 using numerics::default_velocity_scale_bits;
-using numerics::PrecisionLevel;
 
 /// \brief While the bit counts for fixed-precision accumulation and coordinate representations
 ///        are held in the fixed_precision.h header file (see src/Constants/), additional default
@@ -72,13 +72,13 @@ public:
   double getBondConstraintTolerance() const;
   
   /// \brief Get the precision level for valence computations.
-  PrecisionLevel getValenceMethod() const;
+  PrecisionModel getValenceMethod() const;
 
   /// \brief Get the precision level for short-ranged, non-bonded computations.
-  PrecisionLevel getNonbondedMethod() const;
+  PrecisionModel getNonbondedMethod() const;
 
   /// \brief Get the precision level for Particle-Mesh Ewald computations.
-  PrecisionLevel getParticleMeshEwaldMethod() const;
+  PrecisionModel getParticleMeshEwaldMethod() const;
 
   /// \brief Set the global position fixed-precision bits.
   ///
@@ -125,18 +125,18 @@ public:
   /// \brief Set the precision model to use in valence term computations.
   ///
   /// param pmodel  The requested precision model
-  void setValenceMethod(PrecisionLevel pmodel);
+  void setValenceMethod(PrecisionModel pmodel);
 
   /// \brief Set the precision model to use in non-bonded short-ranged pair computations.
   ///
   /// param pmodel  The requested precision model
-  void setNonbondedMethod(PrecisionLevel pmodel);
+  void setNonbondedMethod(PrecisionModel pmodel);
 
   /// \brief Set the precision model to use in Particle Mesh Ewald (charge density accumulation,
   ///        Fast Fourier Transforms, convolution, and force interpolation) computations.
   ///
   /// param pmodel  The requested precision model
-  void setParticleMeshEwaldMethod(PrecisionLevel pmodel);
+  void setParticleMeshEwaldMethod(PrecisionModel pmodel);
 
 private:
   ExceptionResponse policy;        ///< Set the behavior when bad inputs are encountered.  DIE =
@@ -151,9 +151,9 @@ private:
   int energy_scale_bits;           ///< Energy accumulation scaling bits
   int charge_mesh_scale_bits;      ///< Charge mesh accumulation scaling bits
   double bond_constraint_tol;      ///< Tolerance for bond constraints (tol in sander and pmemd)
-  PrecisionLevel valence_method;   ///< Valence term computation precision model
-  PrecisionLevel nonbonded_method; ///< Non-bonded short-ranged computation precision model
-  PrecisionLevel pme_method;       ///< Particle-Mesh Ewald computation precision model
+  PrecisionModel valence_method;   ///< Valence term computation precision model
+  PrecisionModel nonbonded_method; ///< Non-bonded short-ranged computation precision model
+  PrecisionModel pme_method;       ///< Particle-Mesh Ewald computation precision model
 
   /// \brief Validate the bond constraint tolerance.  It cannot be too small, lest calculations
   ///        become unstable.

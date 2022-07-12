@@ -69,7 +69,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                             CacheResource *valence_tb_space, CacheResource *nonbond_tb_space,
                             const AtomGraphSynthesis &poly_ag,
                             const StaticExclusionMaskSynthesis &poly_se,
-                            const ForceAccumulationMethod facc_method, const PrecisionLevel prec,
+                            const ForceAccumulationMethod facc_method, const PrecisionModel prec,
                             const GpuDetails &gpu, const double mue_tol,
                             const double max_error_tol, const TestPriority do_tests) {
 
@@ -87,12 +87,11 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
   switch (prec) {
-  case PrecisionLevel::SINGLE:
-  case PrecisionLevel::SINGLE_PLUS:
+  case PrecisionModel::SINGLE:
     launchValenceSp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::YES,
                     EvaluateEnergy::NO, VwuGoal::ACCUMULATE, facc_method, gpu);
     break;
-  case PrecisionLevel::DOUBLE:
+  case PrecisionModel::DOUBLE:
     launchValenceDp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::YES,
                     EvaluateEnergy::NO, VwuGoal::ACCUMULATE, gpu);    
     break;
@@ -116,24 +115,23 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
         "valence interaction kernel, operating on systems " + restraint_presence + " external " +
         "restraints, exceed the tolerance for mean unsigned errors in their vector components.  "
         "Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the valence interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   
   // Clear forces again.  Compute non-bonded interactions.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
   if (poly_ag.getUnitCellType() == UnitCellType::NONE) {
     switch (prec) {
-    case PrecisionLevel::SINGLE:
-    case PrecisionLevel::SINGLE_PLUS:
+    case PrecisionModel::SINGLE:
       launchNonbondedTileGroupsSp(poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space,
                                   EvaluateForce::YES, EvaluateEnergy::NO, facc_method, gpu);
       break;
-    case PrecisionLevel::DOUBLE:
+    case PrecisionModel::DOUBLE:
       launchNonbondedTileGroupsDp(poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space,
                                   EvaluateForce::YES, EvaluateEnergy::NO, gpu);
       break;
@@ -152,7 +150,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
     // CHECK
-    if (prec == PrecisionLevel::DOUBLE && iag_ptr->getAtomCount() <= 60) {
+    if (prec == PrecisionModel::DOUBLE && iag_ptr->getAtomCount() <= 60) {
       for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
         if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 50.0 ||
             fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 50.0 ||
@@ -187,12 +185,12 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
         "non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the tolerance for mean unsigned errors in their vector "
         "components.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -207,7 +205,7 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                               CacheResource *valence_tb_space, CacheResource *nonbond_tb_space,
                               const AtomGraphSynthesis &poly_ag,
                               const StaticExclusionMaskSynthesis &poly_se,
-                              const PrecisionLevel prec, const GpuDetails &gpu,
+                              const PrecisionModel prec, const GpuDetails &gpu,
                               const double bond_tol, const double angl_tol, const double dihe_tol,
                               const double impr_tol, const double ubrd_tol, const double cimp_tol,
                               const double cmap_tol, const double lj14_tol, const double qq14_tol,
@@ -217,12 +215,11 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
   switch (prec) {
-  case PrecisionLevel::SINGLE:
-  case PrecisionLevel::SINGLE_PLUS:
+  case PrecisionModel::SINGLE:
     launchValenceSp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::NO,
                     EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
     break;
-  case PrecisionLevel::DOUBLE:
+  case PrecisionModel::DOUBLE:
     launchValenceDp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::NO,
                     EvaluateEnergy::YES, VwuGoal::ACCUMULATE, gpu);
     break;
@@ -260,31 +257,31 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
   }
   check(gpu_bond, RelationalOperator::EQUAL, Approx(cpu_bond).margin(bond_tol), "Bond energies "
         "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
-        getPrecisionLevelName(prec) + ".", do_tests);
+        getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_angl, RelationalOperator::EQUAL, Approx(cpu_angl).margin(angl_tol), "Angle energies "
         "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
-        getPrecisionLevelName(prec) + ".", do_tests);
+        getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_dihe, RelationalOperator::EQUAL, Approx(cpu_dihe).margin(dihe_tol), "Proper "
         "dihedral energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_impr, RelationalOperator::EQUAL, Approx(cpu_impr).margin(impr_tol), "Improper "
         "dihedral energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_ubrd, RelationalOperator::EQUAL, Approx(cpu_ubrd).margin(ubrd_tol), "Urey-Bradley "
         "energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_cimp, RelationalOperator::EQUAL, Approx(cpu_cimp).margin(cimp_tol), "CHARMM "
         "improper dihedral energies computed on the CPU and GPU do not agree.  Precision level in "
-        "the calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_cmap, RelationalOperator::EQUAL, Approx(cpu_cmap).margin(cmap_tol), "CMAP "
         "energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_qq14, RelationalOperator::EQUAL, Approx(cpu_qq14).margin(qq14_tol), "Electrostatic "
         "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
   check(gpu_lj14, RelationalOperator::EQUAL, Approx(cpu_lj14).margin(lj14_tol), "Lennard-Jones "
         "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
-        "calculation: " + getPrecisionLevelName(prec) + ".", do_tests);
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -401,26 +398,26 @@ int main(const int argc, const char* argv[]) {
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
   // and 1:4 attenuated interactions.
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
-                         poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::DOUBLE, gpu,
+                         poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::DOUBLE, gpu,
                          3.5e-6, 2.0e-6, do_tests);
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
-                         poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu,
+                         poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
                          3.5e-5, 2.0e-4, do_tests);
   checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
-                         ForceAccumulationMethod::WHOLE, PrecisionLevel::SINGLE, gpu, 3.5e-5,
+                         ForceAccumulationMethod::WHOLE, PrecisionModel::SINGLE, gpu, 3.5e-5,
                          2.0e-4, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
-                           poly_se, PrecisionLevel::DOUBLE, gpu, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                           poly_se, PrecisionModel::DOUBLE, gpu, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
-                           poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-5, 1.5e-5, 5.0e-6, 1.0e-6,
+                           poly_se, PrecisionModel::SINGLE, gpu, 1.5e-5, 1.5e-5, 5.0e-6, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
   
   // Check that super-high precision forms of the coordinates and force accumulation are OK in
   // double-precision mode.
   checkCompilationForces(&poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          poly_ag, poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-7, 5.0e-7, do_tests);
+                         PrecisionModel::DOUBLE, gpu, 3.5e-7, 5.0e-7, do_tests);
   
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -472,24 +469,24 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(0);
   checkCompilationForces(&big_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
+                         PrecisionModel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
-                         big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionLevel::SINGLE, gpu,
+                         big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
                          7.5e-5, 3.0e-3, do_tests);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
-                         big_poly_se, ForceAccumulationMethod::WHOLE, PrecisionLevel::SINGLE, gpu,
+                         big_poly_se, ForceAccumulationMethod::WHOLE, PrecisionModel::SINGLE, gpu,
                          7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           big_poly_ag, big_poly_se, PrecisionLevel::DOUBLE, gpu, 1.0e-6, 1.0e-6,
+                           big_poly_ag, big_poly_se, PrecisionModel::DOUBLE, gpu, 1.0e-6, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                            do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           big_poly_ag, big_poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-4, 2.2e-5,
+                           big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, 1.5e-4, 2.2e-5,
                            9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
                            do_tests);  
   checkCompilationForces(&big_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
+                         PrecisionModel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
@@ -541,19 +538,19 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(0);
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-6, 2.0e-6, do_tests);
+                         PrecisionModel::DOUBLE, gpu, 3.5e-6, 2.0e-6, do_tests);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);
+                         PrecisionModel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::WHOLE,
-                         PrecisionLevel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);
+                         PrecisionModel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           ligand_poly_ag, ligand_poly_se, PrecisionLevel::DOUBLE, gpu, 1.0e-6,
+                           ligand_poly_ag, ligand_poly_se, PrecisionModel::DOUBLE, gpu, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                            do_tests);
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           ligand_poly_ag, ligand_poly_se, PrecisionLevel::SINGLE, gpu, 1.5e-4,
+                           ligand_poly_ag, ligand_poly_se, PrecisionModel::SINGLE, gpu, 1.5e-4,
                            2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
                            do_tests);
 
@@ -564,7 +561,7 @@ int main(const int argc, const char* argv[]) {
   // guard against the arccos instability will change the outcome.
   checkCompilationForces(&ligand_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionLevel::DOUBLE, gpu, 3.5e-8, 5.0e-7, do_tests);
+                         PrecisionModel::DOUBLE, gpu, 3.5e-8, 5.0e-7, do_tests);
 
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

@@ -5,37 +5,8 @@
 namespace omni {
 namespace numerics {
 
+using constants::getPrecisionModelName;
 using parse::strcmpCased;
-  
-//-------------------------------------------------------------------------------------------------
-PrecisionLevel translatePrecisionLevel(const std::string &choice, const ExceptionResponse policy) {
-  if (strcmpCased(choice, std::string("single"))) {
-    return PrecisionLevel::SINGLE;
-  }
-  else if (strcmpCased(choice, std::string("single_plus"))) {
-    return PrecisionLevel::SINGLE_PLUS;
-  }
-  else if (strcmpCased(choice, std::string("double"))) {
-    return PrecisionLevel::DOUBLE;
-  }
-  else {
-    rtErr("Invalid request for precision level " + choice + ".", "translatePrecisionLevel");
-  }
-  __builtin_unreachable();
-}
-  
-//-------------------------------------------------------------------------------------------------
-std::string getPrecisionLevelName(const PrecisionLevel plevel) {
-  switch (plevel) {
-  case PrecisionLevel::SINGLE:
-    return std::string("SINGLE");
-  case PrecisionLevel::SINGLE_PLUS:
-    return std::string("SINGLE_PLUS");
-  case PrecisionLevel::DOUBLE:
-    return std::string("DOUBLE");
-  }
-  __builtin_unreachable();
-}
 
 //-------------------------------------------------------------------------------------------------
 ForceAccumulationMethod translateForceAccumulationMethod(const std::string &choice,
@@ -136,7 +107,7 @@ void checkEnergyBits(const int choice) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void checkChargeMeshBits(const int choice, const PrecisionLevel pmodel) {
+void checkChargeMeshBits(const int choice, const PrecisionModel pmodel) {
   if (choice < min_charge_mesh_scale_bits) {
     rtErr("Charge mesh accumulation must take place with at least " +
           std::to_string(min_charge_mesh_scale_bits) + " bits.  A values of " +
@@ -145,18 +116,17 @@ void checkChargeMeshBits(const int choice, const PrecisionLevel pmodel) {
           "checkChargeMeshBits");
   }
   switch (pmodel) {
-  case PrecisionLevel::SINGLE:
-  case PrecisionLevel::SINGLE_PLUS:
-    if (choice > 29) {
-      rtErr("Charge mesh accumulation in a " + getPrecisionLevelName(pmodel) + " precision model "
+  case PrecisionModel::SINGLE:
+    if (choice > 31) {
+      rtErr("Charge mesh accumulation in a " + getPrecisionModelName(pmodel) + " precision model "
             "will take place with a 32-bit signed integer accumulation grid.  A value of " +
-            std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, 8, 29),
+            std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, 8, 31),
             "checkChargeMeshBits");
     }
     break;
-  case PrecisionLevel::DOUBLE:
+  case PrecisionModel::DOUBLE:
     if (choice > max_charge_mesh_scale_bits) {
-      rtErr("Charge mesh accumulation in a " + getPrecisionLevelName(pmodel) + " precision model "
+      rtErr("Charge mesh accumulation in a " + getPrecisionModelName(pmodel) + " precision model "
             "will take place with a 64-bit signed integer accumulation grid.  A value of " +
             std::to_string(choice) +
             fixedPrecisionRangeErrorMessage(choice, 8, max_charge_mesh_scale_bits),

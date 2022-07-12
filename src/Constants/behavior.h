@@ -2,6 +2,8 @@
 #ifndef OMNI_BEHAVIOR_H
 #define OMNI_BEHAVIOR_H
 
+#include <string>
+
 namespace omni {
 namespace constants {
 
@@ -31,7 +33,17 @@ enum class PrecisionModel {
 enum class CartesianDimension {
   X, Y, Z
 };
-  
+
+/// \brief Translate a string into a known precision level enumeration.
+///
+/// \param choice  The named precision model (will be checked for validity)
+PrecisionModel translatePrecisionModel(const std::string &choice, ExceptionResponse policy);
+
+/// \brief Get a descriptive string corresponding to each enumerated compute precision model.
+///
+/// \param pmodel  The precision model to name
+std::string getPrecisionModelName(PrecisionModel pmodel);
+
 } // namespace constants
 } // namespace omni
 

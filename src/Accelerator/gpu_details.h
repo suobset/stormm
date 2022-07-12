@@ -26,7 +26,8 @@ using data_types::int2;
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
 using numerics::ForceAccumulationMethod;
-using numerics::PrecisionLevel;
+using synthesis::NbwuKind;
+using synthesis::ReductionStage;
 using synthesis::VwuGoal;
 
 /// \brief Detect the amount of GPU memory occupied by a given process to determine whether it is
@@ -139,7 +140,7 @@ public:
   /// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
   ///                    error in this context)
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth) const;
+                            ForceAccumulationMethod acc_meth, VwuGoal purpose) const;
 
   /// \brief Get the block and thread counts for the non-bonded kernel.  Parameters descriptions
   ///        for this function follow from getValenceKernelDims() above.
@@ -154,71 +155,78 @@ public:
   ///        function reports numbers based on this functions input information and some further
   ///        analysis.
   ///
+  /// \param prec            The type of floating point numbers in which the kernel shall work
+  /// \param eval_force      Indication of whether the kernel will evaluate forces on atoms
+  /// \param eval_nrg        Indication of whether to evaluate the energy of the system as a whole
+  /// \param acc_meth        The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce
+  ///                        an error in this context)
   /// \param thread_limit    Maximum number of threads any one block of the kernel can launch with
   /// \param register_count  The number of registers per thread in this kernel
   /// \param shared_usage    The maximum amount of __shared__ memory that the kernel might
   ///                        allocate, per block, in bytes
-  void setValenceKernelAttributes(int thread_limit, int register_count, int shared_usage);
+  void setValenceKernelAttributes(PrecisionModel prec, EvaluateForce eval_force,
+                                  EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                                  VwuGoal purpose, int thread_limit, int register_count,
+                                  int shared_usage);
 
   /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
-  ///        setValenceKernelAttributes() above.
-  void setNonbondedKernelAttributes(int thread_limit, int register_count, int shared_usage);
+  ///        setValenceKernelAttributes() above, with the addition of:
+  ///
+  /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
+  ///              being relevant
+  void setNonbondedKernelAttributes(PrecisionModel prec, EvaluateForce eval_force,
+                                    EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                                    NbwuKind kind, int thread_limit, int register_count,
+                                    int shared_usage);
 
   /// \brief Set the register, maximum block size, and threads counts for one of the reduction
   ///        kernels.  Parameter descriptions for this function follow from
-  ///        setValenceKernelAttributes() above.
-  void setReductionKernelAttributes(int thread_limit, int register_count, int shared_usage);
+  ///        setValenceKernelAttributes() above, with the addition of:
+  ///
+  /// \param process  How far to take the reduction operation
+  void setReductionKernelAttributes(ReductionStage process, int thread_limit, int register_count,
+                                    int shared_usage);
   
 private:
 
-  // In each of the following int4 tuples, the selected number of threads per block is given in
-  // the x member, the number of blocks in the grid is given by the y member, the maximum number
-  // of threads per block and the number of registers per thread are packed into the z member's
-  // low and high 16 bits, respectively, and the maximum amount of __shared__ memory (statically
-  // allocated plus dynamically allocatable) is stored in the w member.  Each piece of information
-  // is accessible using the appropriate private member functions.
-  int4 valence_kernel_de_dims;    ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   double-precision, energy-only mode
-  int4 valence_kernel_dfs_dims;   ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   double-precision, force-only, split accumulation
-  int4 valence_kernel_dfes_dims;  ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   double-precision, force and energy computations, split
-                                  ///<   accumulation
-  int4 valence_kernel_fe_dims;    ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   single-precision, energy-only mode
-  int4 valence_kernel_ffs_dims;   ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   single-precision, force-only, split accumulation
-  int4 valence_kernel_ffes_dims;  ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   single-precision, force and energy computations, split
-                                  ///<   accumulation
-  int4 valence_kernel_ffw_dims;   ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   single-precision, force-only, whole accumulation
-  int4 valence_kernel_ffew_dims;  ///< Optimal dimensions for the valence kernel launch grid with
-                                  ///<   single-precision, force and energy computations, whole
-                                  ///<   accumulation
-  int4 nonbond_kernel_de_dims;    ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with double-precision, energy computations only
-  int4 nonbond_kernel_dfs_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with double-precision, force computations only
-  int4 nonbond_kernel_dfes_dims;  ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with double-precision, force and energy computations
-  int4 nonbond_kernel_fe_dims;    ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with single-precision, energy computations only
-  int4 nonbond_kernel_ffs_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with single-precision, force computations only, split
-                                  ///<   force accumulation
-  int4 nonbond_kernel_ffes_dims;  ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with single-precision, force and energy computations,
-                                  ///<   split force accumulation
-  int4 nonbond_kernel_ffw_dims;   ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with single-precision, force computations only, whole
-                                  ///<   64-bit int accumulation
-  int4 nonbond_kernel_ffew_dims;  ///< Optimal dimensions for the non-bonded kernel launch grid
-                                  ///<   with single-precision, force and energy computations,
-                                  ///<   whole 64-bit integer force accumulation
-  int4 reduction_kernel_dims;     ///< Optimal dimensions for the reduction kernel launch grid
-
+  /// In each of the following int4 tuples, the selected number of threads per block is given in
+  /// the x member, the number of blocks in the grid is given by the y member, the maximum number
+  /// of threads per block and the number of registers per thread are packed into the z member's
+  /// low and high 16 bits, respectively, and the maximum amount of __shared__ memory (statically
+  /// allocated plus dynamically allocatable) is stored in the w member.  Each piece of information
+  /// is accessible using the appropriate private member functions.  A descriptive name for the
+  /// varaiable matches the kernel, followed by a letter code with the following meanings:
+  ///   - { d, f }      The kernel performs calculations in double (d) or float (f) arithmetic
+  ///   - { e, f, fe }  The kernel computes energies (e), forces (f), or both (ef)
+  ///   - { s, w }      The kernel accumulates forces in split integers (s) or whole integers (w)
+  ///   - { m, a }      The kernel moves atoms (m) or accumulates forces or energies (a)
+  /// \{
+  int4 valence_kernel_de_dims;
+  int4 valence_kernel_dfsm_dims;
+  int4 valence_kernel_dfsa_dims;
+  int4 valence_kernel_dfesm_dims;
+  int4 valence_kernel_dfesa_dims;
+  int4 valence_kernel_fe_dims;
+  int4 valence_kernel_ffsm_dims;
+  int4 valence_kernel_ffwm_dims;
+  int4 valence_kernel_ffsa_dims;
+  int4 valence_kernel_ffwa_dims;
+  int4 valence_kernel_ffewm_dims;
+  int4 valence_kernel_ffesm_dims;
+  int4 valence_kernel_ffewa_dims;
+  int4 valence_kernel_ffesa_dims;
+  int4 nonbond_kernel_de_dims;
+  int4 nonbond_kernel_dfs_dims;
+  int4 nonbond_kernel_dfes_dims;
+  int4 nonbond_kernel_fe_dims;
+  int4 nonbond_kernel_ffs_dims;
+  int4 nonbond_kernel_ffw_dims;
+  int4 nonbond_kernel_ffes_dims;
+  int4 nonbond_kernel_ffew_dims;
+  int4 reduction_kernel_dims;
+  /// \}
+  
   /// \brief Get the selected number of threads per block for launching a given kernel based on
   ///        the available GPU.
   ///

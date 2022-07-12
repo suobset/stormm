@@ -1,3 +1,4 @@
+#include "../../src/Constants/behavior.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
@@ -12,6 +13,7 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
+using omni::constants::PrecisionModel;
 using omni::constants::tiny;
 using omni::data_types::llint;
 using omni::data_types::float2;
@@ -38,7 +40,7 @@ using namespace omni::testing;
 //   scale_bits:  The number of bits after the decimal
 //-------------------------------------------------------------------------------------------------
 void testSplitAccumulation(const double llim, const double hlim, const double incr,
-                           const int scale_bits, const PrecisionLevel lvl) {
+                           const int scale_bits, const PrecisionModel lvl) {
   const double scale_factor = pow(2.0, scale_bits);
   const double inv_scale_factor = 1.0 / scale_factor;
   const double inv_overflow_factor = max_llint_accumulation / scale_factor;
@@ -47,8 +49,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
   for (double r = llim; r < hlim; r += incr) {
     const double scaled_r = r * scale_factor;
     switch (lvl) {
-    case PrecisionLevel::SINGLE:
-    case PrecisionLevel::SINGLE_PLUS:
+    case PrecisionModel::SINGLE:
       {
         const llint dp_result = scaled_r;
         float fr = r;
@@ -64,7 +65,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         }
       }
       break;
-    case PrecisionLevel::DOUBLE:
+    case PrecisionModel::DOUBLE:
       {
         llint workbin;
         int overflow;
@@ -84,8 +85,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
   int n_inc_fail = 0;
   for (double r = ellim; r < ehlim; r += eincr) {
     switch (lvl) {
-    case PrecisionLevel::SINGLE:
-    case PrecisionLevel::SINGLE_PLUS:
+    case PrecisionModel::SINGLE:
       {
         llint dp_result = 0LL;
         llint fp_result = 0LL;
@@ -107,7 +107,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         }
       }
       break;
-    case PrecisionLevel::DOUBLE:
+    case PrecisionModel::DOUBLE:
       {
         double dp_tracker = 0.0;
         int overflow = 0;
@@ -130,12 +130,12 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         "recorded converting the range " + realToString(llim, 8, 4) + " : " +
         realToString(hlim, 8, 4) + " to split integer fixed-precision values when sampled with "
         "a " + realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.  Precision "
-        "model: " + getPrecisionLevelName(lvl) + ".");
+        "model: " + getPrecisionModelName(lvl) + ".");
   check(n_inc_fail == 0, "A total of " + std::to_string(n_inc_fail) + " failures were recorded "
         "converting the range " + realToString(ellim, 8, 4) + " : " + realToString(ehlim, 8, 4) +
         " to split integer fixed-precision values by incrementing 9x when sampled with a " +
         realToString(incr, 9, 2, NumberFormat::SCIENTIFIC) + " increment.  Precision model: " +
-        getPrecisionLevelName(lvl) + ".");
+        getPrecisionModelName(lvl) + ".");
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -236,20 +236,20 @@ int main(const int argc, const char* argv[]) {
 
   // Test direct conversion
   section(2);
-  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 26, PrecisionLevel::SINGLE);
-  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
-  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
-  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
-  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
-  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
-  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
-  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 58, PrecisionLevel::DOUBLE);
+  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 26, PrecisionModel::SINGLE);
+  testSplitAccumulation(-48.5, -47.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
+  testSplitAccumulation(-32.5, -31.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
+  testSplitAccumulation( -0.5,   0.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
+  testSplitAccumulation( 31.5,  32.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
+  testSplitAccumulation( 47.5,  48.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
+  testSplitAccumulation(-64.5, -63.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
+  testSplitAccumulation( 63.5,  64.5, 1.0e-5, 58, PrecisionModel::DOUBLE);
 
   // Print results
   printTestSummary(oe.getVerbosity());

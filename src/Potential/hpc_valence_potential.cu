@@ -1,12 +1,14 @@
 // -*-c++-*-
 #include "Accelerator/ptx_macros.h"
 #include "Accelerator/gpu_details.h"
+#include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Math/rounding.h"
+#include "Potential/energy_enumerators.h"
 #include "Synthesis/valence_workunit.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -15,6 +17,7 @@
 namespace omni {
 namespace energy {
 
+using numerics::PrecisionModel;
 using card::KernelManager;
 using constants::warp_size_int;
 using constants::warp_bits;
@@ -25,7 +28,10 @@ using constants::large_block_size;
 using constants::medium_block_size;
 using constants::small_block_size;
 using data_types::int95_t;
+using energy::EvaluateEnergy;
+using energy::EvaluateForce;
 using math::roundUp;
+using numerics::ForceAccumulationMethod;
 using numerics::max_int_accumulation;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
@@ -43,6 +49,8 @@ using symbols::twopi;
 using symbols::twopi_f;
 using symbols::inverse_twopi_f;
 using synthesis::maximum_valence_work_unit_atoms;
+using synthesis::NbwuKind;
+using synthesis::ReductionStage;
 using synthesis::VwuAbstractMap;
 using synthesis::VwuGoal;
 using synthesis::vwu_abstract_length;
@@ -491,7 +499,133 @@ extern void valenceKernelSetup() {
 
 //-------------------------------------------------------------------------------------------------
 extern void queryValenceKernelRequirements(KernelManager *wisdom) {
-
+  cudaFuncAttributes attr;
+  if (cudaFuncGetAttributes(&attr, kfsValenceForceAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfsValenceAtomUpdate) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdate.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::MOVE_PARTICLES, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfsValenceForceEnergyAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceEnergyAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdate.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::MOVE_PARTICLES, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfValenceForceAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfValenceAtomUpdate) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfValenceAtomUpdate.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
+                                     VwuGoal::MOVE_PARTICLES, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfValenceForceEnergyAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfValenceForceEnergyAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfValenceEnergyAtomUpdate) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdate.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                                     VwuGoal::MOVE_PARTICLES, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kfValenceEnergyAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::SINGLE, EvaluateForce::NO,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kdsValenceForceAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                     EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kdsValenceAtomUpdate) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdate.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                     EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::MOVE_PARTICLES, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kdsValenceForceEnergyAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdate.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::MOVE_PARTICLES, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
+  if (cudaFuncGetAttributes(&attr, kdsValenceEnergyAccumulation) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->setValenceKernelAttributes(PrecisionModel::DOUBLE, EvaluateForce::NO,
+                                     EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                     VwuGoal::ACCUMULATE, attr.maxThreadsPerBlock,
+                                     attr.numRegs,
+                                     attr.sharedSizeBytes + attr.maxDynamicSharedSizeBytes);
 }
 
 //-------------------------------------------------------------------------------------------------
