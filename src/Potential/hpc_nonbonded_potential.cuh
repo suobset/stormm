@@ -3,6 +3,7 @@
 #define OMNI_NONBONDED_POTENTIAL_CUH
 
 #include "Accelerator/gpu_details.h"
+#include "Accelerator/kernel_manager.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/static_mask_synthesis.h"

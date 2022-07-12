@@ -11,6 +11,7 @@ LIBDIR=lib
 # OMNI C++ source files
 OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Accelerator/gpu_details.cpp \
+		 $(SRCDIR)/Accelerator/kernel_manager.cpp \
 		 $(SRCDIR)/Accelerator/select_launch_parameters.cpp \
 		 $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Chemistry/chemical_features.cpp \
@@ -112,6 +113,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 # OMNI C++ header files
 OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Accelerator/gpu_details.h \
+		   $(SRCDIR)/Accelerator/kernel_manager.h \
 		   $(SRCDIR)/Accelerator/select_launch_parameters.h \
 		   $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemical_features.h \
@@ -265,6 +267,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 # OMNI C++ object files
 OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Accelerator/gpu_details.o \
+		$(SRCDIR)/Accelerator/kernel_manager.o \
 		$(SRCDIR)/Accelerator/select_launch_parameters.o \
 		$(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/Chemistry/chemical_features.o \

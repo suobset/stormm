@@ -42,7 +42,8 @@ int ReductionWorkUnit::getDependencyEnd() const {
 std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &atom_starts,
                                                        const std::vector<int> &atom_counts,
                                                        const GpuDetails &gpu,
-                                                       KernelManager *launcher) {
+                                                       KernelManager *launcher,
+                                                       const int task_count) {
   if (atom_starts.size() != atom_counts.size()) {
     rtErr("Starting indices were provided for the atoms of " + std::to_string(atom_starts.size()) +
           " systems, but atom counts for " + std::to_string(atom_counts.size()) + " systems were "
@@ -55,8 +56,20 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
   int best_block_size = large_block_size;
   int best_grid_size = gpu.getSMPCount();
   for (int block_size = large_block_size; block_size >= tiny_block_size; block_size /= 2) {
+    int occupied_threads = 0;
+    int free_threads = 0;
+    for (int i = 0; i < nsys; i++) {
 
+      // Each system will be assumed to have a specific number of tasks, which will span all atoms
+      // padded by the warp size.  The best packing of this arrangement yields the best grid
+      // launch dimensions.
+      
+    }
   }
+
+  std::vector<ReductionWorkUnit> result;
+  
+  return result;
 }
 
 } // namespace synthesis

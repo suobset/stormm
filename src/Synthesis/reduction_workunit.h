@@ -4,6 +4,7 @@
 
 #include <vector>
 #include "Accelerator/gpu_details.h"
+#include "Accelerator/kernel_manager.h"
 
 namespace omni {
 namespace synthesis {
@@ -67,11 +68,15 @@ private:
 /// \param atom_counts  Atom counts for all systems in the collection
 /// \param gpu          Details of the selected GPU to be used for calculations
 /// \param launcher     Object to collect wisdom about optimal kernel launch configurations with
-///                     the reduction work unit array chosen to suit the collection of systems
+///                     the work unit array chosen to suit the collection of systems
+/// \param task_count   The number of values to reduce across each system.  A center of geometry
+///                     computation would have three values (X, Y, and Z), whereas a total charge
+///                     summation with a mask would have only one.
 std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &atom_starts,
                                                        const std::vector<int> &atom_counts,
                                                        const GpuDetails &gpu,
-                                                       KernelManager *launcher);
+                                                       KernelManager *launcher,
+                                                       int task_count = 1);
 } // namespace synthesis
 } // namespace omni
 

@@ -3,6 +3,7 @@
 #define OMNI_VALENCE_POTENTIAL_CUH
 
 #include "Accelerator/gpu_details.h"
+#include "Accelerator/kernel_manager.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/omni_vector_types.h"
 #include "MolecularMechanics/mm_controls.h"
