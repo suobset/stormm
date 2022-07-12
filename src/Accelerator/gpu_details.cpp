@@ -94,15 +94,19 @@ std::string GpuDetails::getCardName() const {
 
 //-------------------------------------------------------------------------------------------------
 KernelManager::KernelManager() :
-    valence_kernel_de_dims{1, 1}, valence_kernel_dfsm_dims{1, 1}, valence_kernel_dfsa_dims{1, 1},
-    valence_kernel_dfesm_dims{1, 1}, valence_kernel_dfesa_dims{1, 1}, valence_kernel_fe_dims{1, 1},
-    valence_kernel_ffsm_dims{1, 1}, valence_kernel_ffwm_dims{1, 1}, valence_kernel_ffsa_dims{1, 1},
-    valence_kernel_ffwa_dims{1, 1}, valence_kernel_ffewm_dims{1, 1},
-    valence_kernel_ffesm_dims{1, 1}, valence_kernel_ffewa_dims{1, 1},
-    valence_kernel_ffesa_dims{1, 1}, nonbond_kernel_de_dims{1, 1},
-    nonbond_kernel_dfs_dims{1, 1}, nonbond_kernel_dfes_dims{1, 1}, nonbond_kernel_fe_dims{1, 1},
-    nonbond_kernel_ffs_dims{1, 1}, nonbond_kernel_ffw_dims{1, 1}, nonbond_kernel_ffes_dims{1, 1},
-    nonbond_kernel_ffew_dims{1, 1}, reduction_kernel_dims{1, 1}
+    valence_kernel_de_dims{1, 1, 0, 0}, valence_kernel_dfsm_dims{1, 1, 0, 0},
+    valence_kernel_dfsa_dims{1, 1, 0, 0}, valence_kernel_dfesm_dims{1, 1, 0, 0},
+    valence_kernel_dfesa_dims{1, 1, 0, 0}, valence_kernel_fe_dims{1, 1, 0, 0},
+    valence_kernel_ffsm_dims{1, 1, 0, 0}, valence_kernel_ffwm_dims{1, 1, 0, 0},
+    valence_kernel_ffsa_dims{1, 1, 0, 0}, valence_kernel_ffwa_dims{1, 1, 0, 0},
+    valence_kernel_ffewm_dims{1, 1, 0, 0}, valence_kernel_ffesm_dims{1, 1, 0, 0},
+    valence_kernel_ffewa_dims{1, 1, 0, 0}, valence_kernel_ffesa_dims{1, 1, 0, 0},
+    nonbond_kernel_de_dims{1, 1, 0, 0}, nonbond_kernel_dfs_dims{1, 1, 0, 0},
+    nonbond_kernel_dfes_dims{1, 1, 0, 0}, nonbond_kernel_fe_dims{1, 1, 0, 0},
+    nonbond_kernel_ffs_dims{1, 1, 0, 0}, nonbond_kernel_ffw_dims{1, 1, 0, 0},
+    nonbond_kernel_ffes_dims{1, 1, 0, 0}, nonbond_kernel_ffew_dims{1, 1, 0, 0},
+    reduction_kernel_gt_dims{1, 1, 0, 0}, reduction_kernel_sc_dims{1, 1, 0, 0},
+    reduction_kernel_ar_dims{1, 1, 0, 0}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -211,11 +215,73 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
                                            const EvaluateForce eval_force,
                                            const EvaluateEnergy eval_nrg,
                                            const ForceAccumulationMethod acc_meth) const {
+  switch (prec) {
+  case PrecisionModel::SINGLE:
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      switch (eval_nrg) {
+      case EvaluateEnergy::YES:
+        switch (acc_meth) {
+        case ForceAccumulationMethod::SPLIT:
+          return { getSelectedBlockDim(nonbond_kernel_ffes_dims),
+                   getSelectedGridDim(nonbond_kernel_ffes_dims) };
+        case ForceAccumulationMethod::WHOLE:
+          return { getSelectedBlockDim(nonbond_kernel_ffew_dims),
+                   getSelectedGridDim(nonbond_kernel_ffew_dims) };
+        case ForceAccumulationMethod::AUTOMATIC:
+          break;
+        }
+        break;
+      case EvaluateEnergy::NO:
+        switch (acc_meth) {
+        case ForceAccumulationMethod::SPLIT:
+          return { getSelectedBlockDim(nonbond_kernel_ffs_dims),
+                   getSelectedGridDim(nonbond_kernel_ffs_dims) };
+        case ForceAccumulationMethod::WHOLE:
+          return { getSelectedBlockDim(nonbond_kernel_ffw_dims),
+                   getSelectedGridDim(nonbond_kernel_ffw_dims) };
+        case ForceAccumulationMethod::AUTOMATIC:
+          break;
+        }
+        break;
+      }
+      break;
+    case EvaluateForce::NO:
+      return { getSelectedBlockDim(nonbond_kernel_fe_dims),
+               getSelectedGridDim(nonbond_kernel_fe_dims) };
+    }
+    break;
+  case PrecisionModel::DOUBLE:
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        return { getSelectedBlockDim(nonbond_kernel_dfes_dims),
+                 getSelectedGridDim(nonbond_kernel_dfes_dims) };
+      case EvaluateEnergy::NO:
+        return { getSelectedBlockDim(nonbond_kernel_dfs_dims),
+                 getSelectedGridDim(nonbond_kernel_dfs_dims) };
+      }
+    case EvaluateForce::NO:
+      return { getSelectedBlockDim(nonbond_kernel_de_dims),
+               getSelectedGridDim(nonbond_kernel_de_dims) };
+    }
+    break;
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getReductionKernelDims() const {
-  return { reduction_kernel_dims.x, reduction_kernel_dims.y };
+int2 KernelManager::getReductionKernelDims(const ReductionStage process) const {
+  switch (process) {
+  case ReductionStage::GATHER:
+    return { reduction_kernel_ar_dims.x, reduction_kernel_gt_dims.y };
+  case ReductionStage::SCATTER:
+    return { reduction_kernel_ar_dims.x, reduction_kernel_sc_dims.y };
+  case ReductionStage::ALL_REDUCE:
+    return { reduction_kernel_ar_dims.x, reduction_kernel_ar_dims.y };
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
