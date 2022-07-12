@@ -1,0 +1,79 @@
+// -*-c++-*-
+#ifndef OMNI_REDUCTION_WORKUNIT_H
+#define OMNI_REDUCTION_WORKUNIT_H
+
+#include <vector>
+#include "Accelerator/gpu_details.h"
+
+namespace omni {
+namespace synthesis {
+
+using card::GpuDetails;
+using card::KernelManager;
+
+/// \brief A work unit to describe the manner in which groups of atoms in each structure of a
+///        synthesis come together to contribute to a single result.  Reduction work units serve
+///        one and only one system apiece.  The maximum size of these work units can be specified
+///        when they are created, in a manner analogous to valence or non-bonded work units, but
+///        is not limited by space in the GPU L1 cache so that, for practical optimizations,
+///        gather and scatter operations can be combined into all-reduce operations with a single
+///        kernel launch.
+class ReductionWorkUnit {
+public:
+
+  /// \brief The constructor takes arguments for all members.
+  ReductionWorkUnit(int atom_start_in, int atom_end_in, int result_index_in,
+                    int dependency_start_in, int dependency_end_in);
+
+  /// \brief Get the atom starting index.
+  int getAtomStart() const;
+
+  /// \brief Get the upper limit of atoms in this work unit.
+  int getAtomEnd() const;
+
+  /// \brief Get the index of whatever result array where this work unit will put its result.
+  int getResultIndex() const;
+
+  /// \brief Get the start of dependencies in the result array which pertain to the same system as
+  ///        this reduction work unit.  All reduction work units serving the same system will
+  ///        contribute their gathering results to contiguous elements of whatever result arrays.
+  int getDependencyStart() const;
+
+  /// \brief Get the upper limit of dependencies in the result array which pertain to the same
+  ///        system as this reduction work unit.
+  int getDependencyEnd() const;
+
+private:
+  int atom_start;        ///< Lower limit of atoms in the unified synthesis array which contribute
+                         ///<   to this work unit's reduction operation
+  int atom_end;          ///< Upper limit of atoms in the unified synthesis array which contribute
+                         ///<   to this work unit's reduction operation
+  int result_index;      ///< Index in the accumulation arrays to which results should be written
+                         ///<   (if a reduction across two kernels is needed at all)
+  int dependency_start;  ///< Staring index, in the accumulation arrays, of results from reduction
+                         ///<   work units pertaining to the same system
+  int dependency_end;    ///< Upper bounding index, in the accumulation arrays, of results from
+                         ///<   reduction work units pertaining to the same system
+};
+
+/// \brief Build the reduction (and their components of gathering and scattering) work units for
+///        a series of systems of stated sizes.  Only the starting indices and system sizes are
+///        needed, and only those are provided (rather than the AtomGraphSynthesis itself, from
+///        which these arrays are probably derived), to avoid circular dependencies.
+///
+/// \param atom_starts  Starting indices for atoms of each system in the collection (the length of
+///                     this array will determine the number of systems--provide a vector with a
+///                     single entry of zero to get reduction work units for a single system)
+/// \param atom_counts  Atom counts for all systems in the collection
+/// \param gpu          Details of the selected GPU to be used for calculations
+/// \param launcher     Object to collect wisdom about optimal kernel launch configurations with
+///                     the reduction work unit array chosen to suit the collection of systems
+std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &atom_starts,
+                                                       const std::vector<int> &atom_counts,
+                                                       const GpuDetails &gpu,
+                                                       KernelManager *launcher);
+} // namespace synthesis
+} // namespace omni
+
+#endif
+
