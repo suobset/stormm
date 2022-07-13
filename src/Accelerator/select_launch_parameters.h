@@ -16,7 +16,7 @@ namespace card {
 ///        with a free function in a separate implementation file, to allow the KernelManager
 ///        object to be reciprocally included in various HPC units to provide launch instructions
 ///        without generating circular dependencies.
-KernelManager selectLaunchParameters();
+KernelManager selectLaunchParameters(const GpuDetails &gpu);
 
 } // namespace card
 } // namespace omni

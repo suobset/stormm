@@ -22,6 +22,58 @@ using numerics::ForceAccumulationMethod;
 using synthesis::NbwuKind;
 using synthesis::ReductionStage;
 using synthesis::VwuGoal;
+  
+/// \brief Encapsulate the operations to store and retrieve information about a kernel's format.
+class KernelFormat {
+public:
+
+  /// \brief The constructor lays out a blank object.  Kernel formats are found by querying their
+  ///        specifications with HPC library functions.
+  KernelFormat();
+
+  /// \brief Get the optimal block and grid sizes for kernel launches with the present GPU.
+  int2 getLaunchParameters() const;
+
+  /// \brief Get the register usage of the kernel.
+  int getRegisterUsage() const;
+
+  /// \brief Get the maximum thread count for a single block in the kernel launch.
+  int getBlockSizeLimit() const;
+
+  /// \brief Get the amount of __shared__ memory needed by any one block.
+  int getSharedMemoryRequirement() const;
+
+  /// \brief Set the register usage, block size limit, and shared memory usage for a kernel.
+  ///
+  /// Overloaded:
+  ///   - Provide explicit instructions on whether to consider breaking up the blocks into smaller
+  ///     units
+  ///   - Assume that the largest possible block size is always to be used
+  ///
+  /// \param register_usage_in    Input register usage
+  /// \param block_size_limit_in  Input block size limit
+  /// \param shared_usage_in      Input __shared__ memory usage
+  /// \param block_dimension_in   Preferred block size (this will replace the maximum size, if
+  ///                             provided)
+  /// \param gpu                  Details of the available GPU (likely passed in from a
+  ///                             KernelManager struct containing many KernelFormat objects)
+  /// \{
+  void build(int register_usage_in, int block_size_limit_in, int shared_usage_in,
+             int block_dimension_in, const GpuDetails &gpu);
+
+  void build(int register_usage_in, int block_size_limit_in, int shared_usage_in,
+             const GpuDetails &gpu);
+  /// \}
+  
+private:
+  int block_dimension;         ///< Computed optimal block dimension to use in kernel launches
+  int grid_dimension;          ///< Computed optimal grid size to use in kernel launches
+  int register_usage;          ///< The number of registers needed by each thread of the kernel
+                               ///<   as it is compiled for the current executable
+  int block_size_limit;        ///< The largest block size usable by the kernel launch (exceeding
+                               ///<   this will cause the kernel launch to fail)
+  int shared_usage;            ///< The maximum amount of __shared__ memory needed by each block
+};
 
 /// \brief A class to guide the implementation of GPU kernels, with selected thread counts per
 ///        block and block counts per launch grid for a specific GPU based on the workload.  This
@@ -37,7 +89,10 @@ public:
   ///        variables of this object will therefore be filled by the selectLaunchParameters()
   ///        function wrapped function in a separate library that includes all of the appropriate
   ///        HPC units.
-  KernelManager();
+  ///
+  /// \param gpu_in  Details of the GPU in use (this is relevant, as it will be used to interpret
+  ///                the layout of any kernels)
+  KernelManager(const GpuDetails &gpu);
 
   /// \brief Get the block and thread counts for the valence kernel.
   ///
@@ -99,6 +154,9 @@ public:
   
 private:
 
+  /// The details of the GPU in use are simply copied into this object.
+  GpuDetails gpu;
+  
   /// In each of the following int4 tuples, the selected number of threads per block is given in
   /// the x member, the number of blocks in the grid is given by the y member, the maximum number
   /// of threads per block and the number of registers per thread are packed into the z member's
@@ -111,71 +169,32 @@ private:
   ///   - { s, w }      The kernel accumulates forces in split integers (s) or whole integers (w)
   ///   - { m, a }      The kernel moves atoms (m) or accumulates forces or energies (a)
   /// \{
-  int4 valence_kernel_de_dims;
-  int4 valence_kernel_dfsm_dims;
-  int4 valence_kernel_dfsa_dims;
-  int4 valence_kernel_dfesm_dims;
-  int4 valence_kernel_dfesa_dims;
-  int4 valence_kernel_fe_dims;
-  int4 valence_kernel_ffsm_dims;
-  int4 valence_kernel_ffwm_dims;
-  int4 valence_kernel_ffsa_dims;
-  int4 valence_kernel_ffwa_dims;
-  int4 valence_kernel_ffewm_dims;
-  int4 valence_kernel_ffesm_dims;
-  int4 valence_kernel_ffewa_dims;
-  int4 valence_kernel_ffesa_dims;
-  int4 nonbond_kernel_de_dims;
-  int4 nonbond_kernel_dfs_dims;
-  int4 nonbond_kernel_dfes_dims;
-  int4 nonbond_kernel_fe_dims;
-  int4 nonbond_kernel_ffs_dims;
-  int4 nonbond_kernel_ffw_dims;
-  int4 nonbond_kernel_ffes_dims;
-  int4 nonbond_kernel_ffew_dims;
-  int4 reduction_kernel_gt_dims;
-  int4 reduction_kernel_sc_dims;
-  int4 reduction_kernel_ar_dims;
+  KernelFormat valence_kernel_de_dims;
+  KernelFormat valence_kernel_dfsm_dims;
+  KernelFormat valence_kernel_dfsa_dims;
+  KernelFormat valence_kernel_dfesm_dims;
+  KernelFormat valence_kernel_dfesa_dims;
+  KernelFormat valence_kernel_fe_dims;
+  KernelFormat valence_kernel_ffsm_dims;
+  KernelFormat valence_kernel_ffwm_dims;
+  KernelFormat valence_kernel_ffsa_dims;
+  KernelFormat valence_kernel_ffwa_dims;
+  KernelFormat valence_kernel_ffewm_dims;
+  KernelFormat valence_kernel_ffesm_dims;
+  KernelFormat valence_kernel_ffewa_dims;
+  KernelFormat valence_kernel_ffesa_dims;
+  KernelFormat nonbond_kernel_de_dims;
+  KernelFormat nonbond_kernel_dfs_dims;
+  KernelFormat nonbond_kernel_dfes_dims;
+  KernelFormat nonbond_kernel_fe_dims;
+  KernelFormat nonbond_kernel_ffs_dims;
+  KernelFormat nonbond_kernel_ffw_dims;
+  KernelFormat nonbond_kernel_ffes_dims;
+  KernelFormat nonbond_kernel_ffew_dims;
+  KernelFormat reduction_kernel_gt_dims;
+  KernelFormat reduction_kernel_sc_dims;
+  KernelFormat reduction_kernel_ar_dims;
   /// \}
-  
-  /// \brief Get the selected number of threads per block for launching a given kernel based on
-  ///        the available GPU.
-  ///
-  /// \param kval  Tuple encoding launch parameters for the kernel of interest
-  int getSelectedBlockDim(const int4 kval) const;
-
-  /// \brief Get the selected number of blocks in the launch grid for a given kernel based on the
-  ///        available GPU.
-  ///
-  /// \param kval  Tuple encoding launch parameters for the kernel of interest
-  int getSelectedGridDim(const int4 kval) const;
-
-  /// \brief Get the maximum number of threads per block that the compilation of a given kernel
-  ///        can tolerate.
-  ///
-  /// \param kval  Tuple encoding launch parameters for the kernel of interest
-  int getMaximumThreadsPerBlock(const int4 kval) const;
-
-  /// \brief Get the number of registers required by each thread of a kernel, as it was compiled.
-  ///
-  /// \param kval  Tuple encoding launch parameters for the kernel of interest
-  int getRegistersPerThread(const int4 kval) const;
-
-  /// \brief Get the largest possible amount of __shared__ memory needed by a function.  This may
-  ///        overestimate the true usage, but should be a consideration when selecting the number
-  ///        of blocks to put on each streaming multiprocessor.
-  int getMaximumSharedMemoryPerBlock(const int4 kval) const;
-
-  /// \brief Choose the grid dimension and thread count for a kernel, based on its known register
-  ///        and __shared__ memory usage, maximum threads per block, and the specs of the GPU.
-  ///
-  /// \param kernel_layout   Information on kernel requirements, including register usage (this
-  ///                        number will be updated according to a table hard-coded inside the
-  ///                        function to pad the register requirements as necessary), maximum
-  ///                        threads per block for which the kernel is compiled, and the maximum
-  ///                        amount of __shared__ memory that each block might need
-  /// \param gpu             Specific attributes of the GPU chosen at runtime
-  int2 setLaunchDims(int4 kernel_layout, const GpuDetails &gpu);
 };
 
 } // namespace card

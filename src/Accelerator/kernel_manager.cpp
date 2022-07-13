@@ -1,24 +1,78 @@
 // -*-c++-*-
+#include "Constants/behavior.h"
+#include "Math/vector_ops.h"
 #include "kernel_manager.h"
 
 namespace omni {
 namespace card {
 
+using constants::ExceptionResponse;
+using math::findBin;
+  
 //-------------------------------------------------------------------------------------------------
-KernelManager::KernelManager() :
-    valence_kernel_de_dims{1, 1, 0, 0}, valence_kernel_dfsm_dims{1, 1, 0, 0},
-    valence_kernel_dfsa_dims{1, 1, 0, 0}, valence_kernel_dfesm_dims{1, 1, 0, 0},
-    valence_kernel_dfesa_dims{1, 1, 0, 0}, valence_kernel_fe_dims{1, 1, 0, 0},
-    valence_kernel_ffsm_dims{1, 1, 0, 0}, valence_kernel_ffwm_dims{1, 1, 0, 0},
-    valence_kernel_ffsa_dims{1, 1, 0, 0}, valence_kernel_ffwa_dims{1, 1, 0, 0},
-    valence_kernel_ffewm_dims{1, 1, 0, 0}, valence_kernel_ffesm_dims{1, 1, 0, 0},
-    valence_kernel_ffewa_dims{1, 1, 0, 0}, valence_kernel_ffesa_dims{1, 1, 0, 0},
-    nonbond_kernel_de_dims{1, 1, 0, 0}, nonbond_kernel_dfs_dims{1, 1, 0, 0},
-    nonbond_kernel_dfes_dims{1, 1, 0, 0}, nonbond_kernel_fe_dims{1, 1, 0, 0},
-    nonbond_kernel_ffs_dims{1, 1, 0, 0}, nonbond_kernel_ffw_dims{1, 1, 0, 0},
-    nonbond_kernel_ffes_dims{1, 1, 0, 0}, nonbond_kernel_ffew_dims{1, 1, 0, 0},
-    reduction_kernel_gt_dims{1, 1, 0, 0}, reduction_kernel_sc_dims{1, 1, 0, 0},
-    reduction_kernel_ar_dims{1, 1, 0, 0}
+KernelFormat::KernelFormat() :
+    block_dimension{0}, grid_dimension{0}, register_usage{0}, block_size_limit{0}, shared_usage{0}
+{}
+
+//-------------------------------------------------------------------------------------------------
+int2 KernelFormat::getLaunchParameters() const {
+  return { block_dimension, grid_dimension };
+}
+
+//-------------------------------------------------------------------------------------------------
+int KernelFormat::getRegisterUsage() const {
+  return register_usage;
+}
+
+//-------------------------------------------------------------------------------------------------
+int KernelFormat::getBlockSizeLimit() const {
+  return block_size_limit;
+}
+
+//-------------------------------------------------------------------------------------------------
+int KernelFormat::getSharedMemoryRequirement() const {
+  return shared_usage;
+}
+
+//-------------------------------------------------------------------------------------------------
+void KernelFormat::build(const int register_usage_in, const int block_size_limit_in,
+                         const int shared_usage_in, const int block_dimension_in,
+                         const GpuDetails &gpu) {
+  register_usage = register_usage_in;
+  block_size_limit = block_size_limit_in;
+  shared_usage = shared_usage_in;
+  const int register_file_size = gpu.getRegistersPerSMP();
+  const int gpu_block_size_limit = gpu.getMaxThreadsPerBlock();
+  const int smp_thread_limit = gpu.getMaxThreadsPerSMP();
+  block_dimension = (block_dimension_in == 0) ? block_size_limit : block_dimension_in;
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+  const std::vector<int> register_break_points = {  0, 40, 48, 56, 64, 72, 80, 128, 256 };
+  const std::vector<int> register_warp_counts  = { 48, 40, 36, 32, 28, 24, 16,   8 };
+  const int register_bin = findBin(register_break_points, register_usage, ExceptionResponse::WARN);
+  register_usage = register_break_points[register_bin];
+#  endif
+#endif
+  grid_dimension = register_file_size / (block_dimension * register_usage);
+}
+
+//-------------------------------------------------------------------------------------------------
+void KernelFormat::build(const int register_usage_in, const int block_size_limit_in,
+                         const int shared_usage_in, const GpuDetails &gpu) {
+  build(register_usage_in, block_size_limit_in, shared_usage_in, 0, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+KernelManager::KernelManager(const GpuDetails &gpu_in) :
+    valence_kernel_de_dims{}, valence_kernel_dfsm_dims{}, valence_kernel_dfsa_dims{},
+    valence_kernel_dfesm_dims{}, valence_kernel_dfesa_dims{}, valence_kernel_fe_dims{},
+    valence_kernel_ffsm_dims{}, valence_kernel_ffwm_dims{}, valence_kernel_ffsa_dims{},
+    valence_kernel_ffwa_dims{}, valence_kernel_ffewm_dims{}, valence_kernel_ffesm_dims{},
+    valence_kernel_ffewa_dims{}, valence_kernel_ffesa_dims{}, nonbond_kernel_de_dims{},
+    nonbond_kernel_dfs_dims{}, nonbond_kernel_dfes_dims{}, nonbond_kernel_fe_dims{},
+    nonbond_kernel_ffs_dims{}, nonbond_kernel_ffw_dims{}, nonbond_kernel_ffes_dims{},
+    nonbond_kernel_ffew_dims{}, reduction_kernel_gt_dims{}, reduction_kernel_sc_dims{},
+    reduction_kernel_ar_dims{}, gpu{gpu_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -34,27 +88,22 @@ int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
       case EvaluateEnergy::YES:
         switch (purpose) {
         case VwuGoal::ACCUMULATE:
-          return { getSelectedBlockDim(valence_kernel_dfesa_dims),
-                   getSelectedGridDim(valence_kernel_dfesa_dims) };
+          return valence_kernel_dfesa_dims.getLaunchParameters();
         case VwuGoal::MOVE_PARTICLES:
-          return { getSelectedBlockDim(valence_kernel_dfesm_dims),
-                   getSelectedGridDim(valence_kernel_dfesm_dims) };
+          return valence_kernel_dfesm_dims.getLaunchParameters();
         }
         break;
       case EvaluateEnergy::NO:
         switch (purpose) {
         case VwuGoal::ACCUMULATE:
-          return { getSelectedBlockDim(valence_kernel_dfsa_dims),
-                   getSelectedGridDim(valence_kernel_dfsa_dims) };
+          return valence_kernel_dfsa_dims.getLaunchParameters();
         case VwuGoal::MOVE_PARTICLES:
-          return { getSelectedBlockDim(valence_kernel_dfsm_dims),
-                   getSelectedGridDim(valence_kernel_dfsm_dims) };
+          return valence_kernel_dfsm_dims.getLaunchParameters();
         }
         break;
       }
     case EvaluateForce::NO:
-      return { getSelectedBlockDim(valence_kernel_de_dims),
-               getSelectedGridDim(valence_kernel_de_dims) };
+      return valence_kernel_de_dims.getLaunchParameters();
     }
     break;
   case PrecisionModel::SINGLE:
@@ -66,21 +115,17 @@ int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
         case EvaluateEnergy::YES:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            return { getSelectedBlockDim(valence_kernel_ffesa_dims),
-                     getSelectedGridDim(valence_kernel_ffesa_dims) };
+            return valence_kernel_ffesa_dims.getLaunchParameters();
           case VwuGoal::MOVE_PARTICLES:
-            return { getSelectedBlockDim(valence_kernel_ffesm_dims),
-                     getSelectedGridDim(valence_kernel_ffesm_dims) };
+            return valence_kernel_ffesm_dims.getLaunchParameters();
           }
           break;
         case EvaluateEnergy::NO:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            return { getSelectedBlockDim(valence_kernel_ffsa_dims),
-                     getSelectedGridDim(valence_kernel_ffsa_dims) };
+            return valence_kernel_ffsa_dims.getLaunchParameters();
           case VwuGoal::MOVE_PARTICLES:
-            return { getSelectedBlockDim(valence_kernel_ffsm_dims),
-                     getSelectedGridDim(valence_kernel_ffsm_dims) };
+            return valence_kernel_ffsm_dims.getLaunchParameters();
           }
           break;
         }
@@ -90,21 +135,17 @@ int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
         case EvaluateEnergy::YES:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            return { getSelectedBlockDim(valence_kernel_ffewa_dims),
-                     getSelectedGridDim(valence_kernel_ffewa_dims) };
+            return valence_kernel_ffewa_dims.getLaunchParameters();
           case VwuGoal::MOVE_PARTICLES:
-            return { getSelectedBlockDim(valence_kernel_ffewm_dims),
-                     getSelectedGridDim(valence_kernel_ffewm_dims) };
+            return valence_kernel_ffewm_dims.getLaunchParameters();
           }
           break;
         case EvaluateEnergy::NO:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            return { getSelectedBlockDim(valence_kernel_ffwa_dims),
-                     getSelectedGridDim(valence_kernel_ffwa_dims) };
+            return valence_kernel_ffwa_dims.getLaunchParameters();
           case VwuGoal::MOVE_PARTICLES:
-            return { getSelectedBlockDim(valence_kernel_ffwm_dims),
-                     getSelectedGridDim(valence_kernel_ffwm_dims) };
+            return valence_kernel_ffwm_dims.getLaunchParameters();
           }
           break;
         }
@@ -114,8 +155,7 @@ int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
       }
       break;
     case EvaluateForce::NO:
-      return { getSelectedBlockDim(valence_kernel_fe_dims),
-               getSelectedGridDim(valence_kernel_fe_dims) };
+      return valence_kernel_fe_dims.getLaunchParameters();
     }
     break;
   }
@@ -135,11 +175,9 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
       case EvaluateEnergy::YES:
         switch (acc_meth) {
         case ForceAccumulationMethod::SPLIT:
-          return { getSelectedBlockDim(nonbond_kernel_ffes_dims),
-                   getSelectedGridDim(nonbond_kernel_ffes_dims) };
+          return nonbond_kernel_ffes_dims.getLaunchParameters();
         case ForceAccumulationMethod::WHOLE:
-          return { getSelectedBlockDim(nonbond_kernel_ffew_dims),
-                   getSelectedGridDim(nonbond_kernel_ffew_dims) };
+          return nonbond_kernel_ffew_dims.getLaunchParameters();
         case ForceAccumulationMethod::AUTOMATIC:
           break;
         }
@@ -147,11 +185,9 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
       case EvaluateEnergy::NO:
         switch (acc_meth) {
         case ForceAccumulationMethod::SPLIT:
-          return { getSelectedBlockDim(nonbond_kernel_ffs_dims),
-                   getSelectedGridDim(nonbond_kernel_ffs_dims) };
+          return nonbond_kernel_ffs_dims.getLaunchParameters();
         case ForceAccumulationMethod::WHOLE:
-          return { getSelectedBlockDim(nonbond_kernel_ffw_dims),
-                   getSelectedGridDim(nonbond_kernel_ffw_dims) };
+          return nonbond_kernel_ffw_dims.getLaunchParameters();
         case ForceAccumulationMethod::AUTOMATIC:
           break;
         }
@@ -159,8 +195,7 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
       }
       break;
     case EvaluateForce::NO:
-      return { getSelectedBlockDim(nonbond_kernel_fe_dims),
-               getSelectedGridDim(nonbond_kernel_fe_dims) };
+      return nonbond_kernel_fe_dims.getLaunchParameters();
     }
     break;
   case PrecisionModel::DOUBLE:
@@ -168,15 +203,12 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
     case EvaluateForce::YES:
       switch (eval_nrg) {
       case EvaluateEnergy::YES:
-        return { getSelectedBlockDim(nonbond_kernel_dfes_dims),
-                 getSelectedGridDim(nonbond_kernel_dfes_dims) };
+        return nonbond_kernel_dfes_dims.getLaunchParameters();
       case EvaluateEnergy::NO:
-        return { getSelectedBlockDim(nonbond_kernel_dfs_dims),
-                 getSelectedGridDim(nonbond_kernel_dfs_dims) };
+        return nonbond_kernel_dfs_dims.getLaunchParameters();
       }
     case EvaluateForce::NO:
-      return { getSelectedBlockDim(nonbond_kernel_de_dims),
-               getSelectedGridDim(nonbond_kernel_de_dims) };
+      return nonbond_kernel_de_dims.getLaunchParameters();
     }
     break;
   }
@@ -187,11 +219,11 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec,
 int2 KernelManager::getReductionKernelDims(const ReductionStage process) const {
   switch (process) {
   case ReductionStage::GATHER:
-    return { reduction_kernel_ar_dims.x, reduction_kernel_gt_dims.y };
+    return reduction_kernel_gt_dims.getLaunchParameters();
   case ReductionStage::SCATTER:
-    return { reduction_kernel_ar_dims.x, reduction_kernel_sc_dims.y };
+    return reduction_kernel_sc_dims.getLaunchParameters();
   case ReductionStage::ALL_REDUCE:
-    return { reduction_kernel_ar_dims.x, reduction_kernel_ar_dims.y };
+    return reduction_kernel_ar_dims.getLaunchParameters();
   }
   __builtin_unreachable();
 }
@@ -213,24 +245,20 @@ void KernelManager::setValenceKernelAttributes(const PrecisionModel prec,
         case ForceAccumulationMethod::SPLIT:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            valence_kernel_ffsa_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffsa_dims.w = shared_usage;
+            valence_kernel_ffsa_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            valence_kernel_ffsm_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffsm_dims.w = shared_usage;
+            valence_kernel_ffsm_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           }
           break;
         case ForceAccumulationMethod::WHOLE:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            valence_kernel_ffewa_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffewa_dims.w = shared_usage;
+            valence_kernel_ffewa_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            valence_kernel_ffewm_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffewm_dims.w = shared_usage;
+            valence_kernel_ffewm_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           }
           break;
@@ -243,24 +271,20 @@ void KernelManager::setValenceKernelAttributes(const PrecisionModel prec,
         case ForceAccumulationMethod::SPLIT:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            valence_kernel_ffsa_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffsa_dims.w = shared_usage;
+            valence_kernel_ffsa_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            valence_kernel_ffsm_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffsm_dims.w = shared_usage;
+            valence_kernel_ffsm_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           }
           break;
         case ForceAccumulationMethod::WHOLE:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            valence_kernel_ffwa_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffwa_dims.w = shared_usage;
+            valence_kernel_ffwa_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           case VwuGoal::MOVE_PARTICLES:
-            valence_kernel_ffwm_dims.z = ((register_count << 16) | thread_limit);
-            valence_kernel_ffwm_dims.w = shared_usage;
+            valence_kernel_ffwm_dims.build(register_count, thread_limit, shared_usage, gpu);
             break;
           }
           break;
@@ -271,8 +295,7 @@ void KernelManager::setValenceKernelAttributes(const PrecisionModel prec,
       }
       break;
     case EvaluateForce::NO:
-      valence_kernel_fe_dims.z = ((register_count << 16) | thread_limit);
-      valence_kernel_fe_dims.z = shared_usage;
+      valence_kernel_fe_dims.build(register_count, thread_limit, shared_usage, gpu);
       break;
     }
     break;
@@ -283,32 +306,27 @@ void KernelManager::setValenceKernelAttributes(const PrecisionModel prec,
       case EvaluateEnergy::YES:
         switch (purpose) {
         case VwuGoal::ACCUMULATE:
-          valence_kernel_dfsa_dims.z = ((register_count << 16) | thread_limit);
-          valence_kernel_dfsa_dims.w = shared_usage;
+          valence_kernel_dfsa_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         case VwuGoal::MOVE_PARTICLES:
-          valence_kernel_dfsm_dims.z = ((register_count << 16) | thread_limit);
-          valence_kernel_dfsm_dims.w = shared_usage;
+          valence_kernel_dfsm_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         }
         break;
       case EvaluateEnergy::NO:
         switch (purpose) {
         case VwuGoal::ACCUMULATE:
-          valence_kernel_dfsa_dims.z = ((register_count << 16) | thread_limit);
-          valence_kernel_dfsa_dims.w = shared_usage;
+          valence_kernel_dfsa_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         case VwuGoal::MOVE_PARTICLES:
-          valence_kernel_dfsm_dims.z = ((register_count << 16) | thread_limit);
-          valence_kernel_dfsm_dims.w = shared_usage;
+          valence_kernel_dfsm_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         }
         break;
       }
       break;
     case EvaluateForce::NO:
-      valence_kernel_de_dims.z = ((register_count << 16) | thread_limit);
-      valence_kernel_de_dims.w = shared_usage;
+      valence_kernel_de_dims.build(register_count, thread_limit, shared_usage, gpu);
       break;
     }
     break;
@@ -331,12 +349,10 @@ void KernelManager::setNonbondedKernelAttributes(const PrecisionModel prec,
       case EvaluateEnergy::YES:
         switch (acc_meth) {
         case ForceAccumulationMethod::SPLIT:
-          nonbond_kernel_ffes_dims.z = ((register_count << 16) | thread_limit);
-          nonbond_kernel_ffes_dims.w = shared_usage;
+          nonbond_kernel_ffes_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         case ForceAccumulationMethod::WHOLE:
-          nonbond_kernel_ffew_dims.z = ((register_count << 16) | thread_limit);
-          nonbond_kernel_ffew_dims.w = shared_usage;
+          nonbond_kernel_ffew_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         case ForceAccumulationMethod::AUTOMATIC:
           break;
@@ -345,12 +361,10 @@ void KernelManager::setNonbondedKernelAttributes(const PrecisionModel prec,
       case EvaluateEnergy::NO:
         switch (acc_meth) {
         case ForceAccumulationMethod::SPLIT:
-          nonbond_kernel_ffs_dims.z = ((register_count << 16) | thread_limit);
-          nonbond_kernel_ffs_dims.w = shared_usage;
+          nonbond_kernel_ffs_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         case ForceAccumulationMethod::WHOLE:
-          nonbond_kernel_ffw_dims.z = ((register_count << 16) | thread_limit);
-          nonbond_kernel_ffw_dims.w = shared_usage;
+          nonbond_kernel_ffw_dims.build(register_count, thread_limit, shared_usage, gpu);
           break;
         case ForceAccumulationMethod::AUTOMATIC:
           break;
@@ -359,8 +373,7 @@ void KernelManager::setNonbondedKernelAttributes(const PrecisionModel prec,
       }
       break;
     case EvaluateForce::NO:
-      nonbond_kernel_fe_dims.z = ((register_count << 16) | thread_limit);
-      nonbond_kernel_fe_dims.w = shared_usage;
+      nonbond_kernel_fe_dims.build(register_count, thread_limit, shared_usage, gpu);
       break;
     }
     break;
@@ -369,18 +382,15 @@ void KernelManager::setNonbondedKernelAttributes(const PrecisionModel prec,
     case EvaluateForce::YES:
       switch (eval_nrg) {
       case EvaluateEnergy::YES:
-        nonbond_kernel_dfes_dims.z = ((register_count << 16) | thread_limit);
-        nonbond_kernel_dfes_dims.w = shared_usage;
+        nonbond_kernel_dfes_dims.build(register_count, thread_limit, shared_usage, gpu);
         break;
       case EvaluateEnergy::NO:
-        nonbond_kernel_dfs_dims.z = ((register_count << 16) | thread_limit);
-        nonbond_kernel_dfs_dims.w = shared_usage;
+        nonbond_kernel_dfs_dims.build(register_count, thread_limit, shared_usage, gpu);
         break;
       }
       break;
     case EvaluateForce::NO:
-      nonbond_kernel_de_dims.z = ((register_count << 16) | thread_limit);
-      nonbond_kernel_de_dims.w = shared_usage;
+      nonbond_kernel_de_dims.build(register_count, thread_limit, shared_usage, gpu);
       break;
     }
     break;
@@ -391,45 +401,14 @@ void KernelManager::setNonbondedKernelAttributes(const PrecisionModel prec,
 void KernelManager::setReductionKernelAttributes(const ReductionStage process,
                                                  const int thread_limit, const int register_count,
                                                  const int shared_usage) {
-
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelManager::getSelectedBlockDim(const int4 kval) const {
-  return kval.x;
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelManager::getSelectedGridDim(const int4 kval) const {
-  return kval.y;
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelManager::getMaximumThreadsPerBlock(const int4 kval) const {
-  return (kval.z & 0xffff);
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelManager::getRegistersPerThread(const int4 kval) const {
-  return ((kval.z >> 16) & 0xffff);
-}
-
-//-------------------------------------------------------------------------------------------------
-int KernelManager::getMaximumSharedMemoryPerBlock(const int4 kval) const {
-  return kval.w;
-}
-
-//-------------------------------------------------------------------------------------------------
-int2 KernelManager::setLaunchDims(const int4 kernel_layout, const GpuDetails &gpu) {
-  int block_dim = 1;
-  int grid_dim = 1;
-  const int register_file_size = gpu.getRegistersPerSMP();
-  const int registers_per_thread = ((kernel_layout.z >> 16) & 0xffff);
-  const int gpu_block_size_limit = gpu.getMaxThreadsPerBlock();
-  const int compilation_block_size_limit = (kernel_layout.z & 0xffff);
-  const int smp_thread_limit = gpu.getMaxThreadsPerSMP();
-  
-  return { block_dim, grid_dim };
+  switch (process) {
+  case ReductionStage::GATHER:
+    reduction_kernel_gt_dims.build(register_count, thread_limit, shared_usage, gpu);
+  case ReductionStage::SCATTER:
+    reduction_kernel_sc_dims.build(register_count, thread_limit, shared_usage, gpu);
+  case ReductionStage::ALL_REDUCE:
+    reduction_kernel_ar_dims.build(register_count, thread_limit, shared_usage, gpu);
+  }
 }
 
 } // namespace card
