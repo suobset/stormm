@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "Accelerator/hybrid.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -12,6 +13,7 @@
 namespace omni {
 namespace synthesis {
 
+using card::Hybrid;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
@@ -1089,6 +1091,25 @@ private:
   const RestraintApparatus *ra_pointer;  ///< Restraint apparatus to which this object pertains
 };
 
+/// \brief Calculate the optimal sizes of valence work units based on a series of system sizes.
+///        This will engage some simple heuristics, not examine the actual topologies to optimize
+///        a particular number.
+///
+/// Overloaded:
+///   - Accept a C-style array with the system sizes and a trusted length 
+///   - Accept a Standard Template Library vector of the system sizes
+///   - Accept a Hybrid object with the system sizes
+///
+/// \param atom_counts   The sizes of each system
+/// \param system_count  The number of systems (if a C-style array is provided)
+/// \{
+int calculateValenceWorkUnitSize(const int* atom_counts, int system_count);
+
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts);
+
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts);
+/// \}
+
 /// \brief Build a series of valence work units to cover a topology.
 ///
 /// Overloaded:
@@ -1110,7 +1131,7 @@ std::vector<ValenceWorkUnit>
 buildValenceWorkUnits(ValenceDelegator *vdel,
                       int max_atoms_per_vwu = maximum_valence_work_unit_atoms);
 /// \}
-  
+
 } // namespace topology
 } // namespace omni
 

@@ -377,7 +377,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
 
     // Valence work unit instruction sets and energy accumulation masks
-    total_valence_work_units{0},
+    total_valence_work_units{0}, valence_work_unit_size{vwu_atom_limit},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
     vwu_manipulation_masks{HybridKind::POINTER, "tpsyn_vwu_manip"},
@@ -452,7 +452,15 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   if (timer != nullptr) timer->assignTime(param_cond_timings);
 
   // Create valence work units for all topologies, then load them into the synthesis
-  loadValenceWorkUnits(vwu_atom_limit);
+  if (valence_work_unit_size < 0) {
+    valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts);
+  }
+
+  // CHECK
+  printf("Valence work units are tailored for %4d atoms.\n", valence_work_unit_size);
+  // END CHECK
+  
+  loadValenceWorkUnits(valence_work_unit_size);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 }
 
@@ -3259,6 +3267,11 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
           std::to_string(system_count) + " systems.", "AtomGraphSynthesis", "getPBRadiiSet");
   }
   return pb_radii_sets[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getValenceWorkUnitSize() const {
+  return valence_work_unit_size;
 }
 
 //-------------------------------------------------------------------------------------------------

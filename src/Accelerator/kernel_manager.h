@@ -2,6 +2,8 @@
 #ifndef OMNI_KERNEL_MANAGER_H
 #define OMNI_KERNEL_MANAGER_H
 
+#include <map>
+#include <string>
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/omni_vector_types.h"
@@ -43,6 +45,9 @@ public:
   /// \brief Get the amount of __shared__ memory needed by any one block.
   int getSharedMemoryRequirement() const;
 
+  /// \brief Get the name of this kernel
+  const std::string& getKernelName() const;
+  
   /// \brief Set the register usage, block size limit, and shared memory usage for a kernel.
   ///
   /// Overloaded:
@@ -53,16 +58,19 @@ public:
   /// \param register_usage_in    Input register usage
   /// \param block_size_limit_in  Input block size limit
   /// \param shared_usage_in      Input __shared__ memory usage
-  /// \param block_dimension_in   Preferred block size (this will replace the maximum size, if
-  ///                             provided)
+  /// \param block_mult_in        Preferred block multiplicity (this will place multiple blocks on
+  ///                             each streaming multiprocessor if possible)
+  /// \param block_dimension_in   The requested thread block size, if not the maximum possible
   /// \param gpu                  Details of the available GPU (likely passed in from a
   ///                             KernelManager struct containing many KernelFormat objects)
+  /// \param kernel_name_in       The name of the kernel, for reporting purposes later (optional)
   /// \{
   void build(int register_usage_in, int block_size_limit_in, int shared_usage_in,
-             int block_dimension_in, const GpuDetails &gpu);
+             int block_mult_in, int block_dimension_in, const GpuDetails &gpu,
+             const std::string &kernel_name_in = std::string(""));
 
   void build(int register_usage_in, int block_size_limit_in, int shared_usage_in,
-             const GpuDetails &gpu);
+             const GpuDetails &gpu, const std::string &kernel_name_in = std::string(""));
   /// \}
   
 private:
@@ -73,6 +81,7 @@ private:
   int block_size_limit;        ///< The largest block size usable by the kernel launch (exceeding
                                ///<   this will cause the kernel launch to fail)
   int shared_usage;            ///< The maximum amount of __shared__ memory needed by each block
+  std::string kernel_name;     ///< Name of the kernel, for reporting purposes
 };
 
 /// \brief A class to guide the implementation of GPU kernels, with selected thread counts per
@@ -90,8 +99,8 @@ public:
   ///        function wrapped function in a separate library that includes all of the appropriate
   ///        HPC units.
   ///
-  /// \param gpu_in  Details of the GPU in use (this is relevant, as it will be used to interpret
-  ///                the layout of any kernels)
+  /// \param gpu_in                  Details of the GPU in use (this is relevant, as it will be
+  ///                                used to interpret the layout of any kernels)
   KernelManager(const GpuDetails &gpu);
 
   /// \brief Get the block and thread counts for the valence kernel.
@@ -105,8 +114,11 @@ public:
                             ForceAccumulationMethod acc_meth, VwuGoal purpose) const;
 
   /// \brief Get the block and thread counts for the non-bonded kernel.  Parameters descriptions
-  ///        for this function follow from getValenceKernelDims() above.
-  int2 getNonbondedKernelDims(PrecisionModel prec, EvaluateForce eval_force,
+  ///        for this function follow from getValenceKernelDims() above, with the addition of:
+  ///
+  /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
+  ///              being relevant
+  int2 getNonbondedKernelDims(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth) const;
 
   /// \brief Get the block and thread counts for a reduction kernel.
@@ -114,6 +126,9 @@ public:
   /// \param process  The reduction step to perform
   int2 getReductionKernelDims(ReductionStage process) const;
 
+  /// \brief Get the GPU information for the active GPU.
+  const GpuDetails& getGpu() const;
+  
   /// \brief Set the register, maximum block size, and threads counts for one of the valence
   ///        kernels.  This function complements getValenceKernelDims(), although the other
   ///        function reports numbers based on this functions input information and some further
@@ -128,10 +143,10 @@ public:
   /// \param register_count  The number of registers per thread in this kernel
   /// \param shared_usage    The maximum amount of __shared__ memory that the kernel might
   ///                        allocate, per block, in bytes
-  void setValenceKernelAttributes(PrecisionModel prec, EvaluateForce eval_force,
-                                  EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
-                                  VwuGoal purpose, int thread_limit, int register_count,
-                                  int shared_usage);
+  /// \param block_mult      The requested multiplicity of blocks on each streaming multiprocessor
+  void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
+                            ForceAccumulationMethod acc_meth, VwuGoal purpose, int thread_limit,
+                            int register_count, int shared_usage, int block_mult = 1);
 
   /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
@@ -139,10 +154,10 @@ public:
   ///
   /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
   ///              being relevant
-  void setNonbondedKernelAttributes(PrecisionModel prec, EvaluateForce eval_force,
-                                    EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
-                                    NbwuKind kind, int thread_limit, int register_count,
-                                    int shared_usage);
+  void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
+                              EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                              int thread_limit, int register_count, int shared_usage,
+                              int block_mult = 1);
 
   /// \brief Set the register, maximum block size, and threads counts for one of the reduction
   ///        kernels.  Parameter descriptions for this function follow from
@@ -150,24 +165,23 @@ public:
   ///
   /// \param process  How far to take the reduction operation
   void setReductionKernelAttributes(ReductionStage process, int thread_limit, int register_count,
-                                    int shared_usage);
+                                    int shared_usage, int block_mult = 0);
+
+  /// \brief Print out the kernel launch parameters found for this workload.
+  ///
+  /// \param kernel_name  Name of the kernel for which to print the parameters (if blank, no
+  ///                     kernels' parameters will be printed, and if "ALL" (case-insensitive),
+  ///                     all kernels' parameters will be printed)
+  void printLaunchParameters(const std::string &kernel_name = std::string("")) const;
   
 private:
 
   /// The details of the GPU in use are simply copied into this object.
   GpuDetails gpu;
   
-  /// In each of the following int4 tuples, the selected number of threads per block is given in
-  /// the x member, the number of blocks in the grid is given by the y member, the maximum number
-  /// of threads per block and the number of registers per thread are packed into the z member's
-  /// low and high 16 bits, respectively, and the maximum amount of __shared__ memory (statically
-  /// allocated plus dynamically allocatable) is stored in the w member.  Each piece of information
+  /// Store the resource requirements and selected launch parameters for a variety of kernels.
   /// is accessible using the appropriate private member functions.  A descriptive name for the
   /// varaiable matches the kernel, followed by a letter code with the following meanings:
-  ///   - { d, f }      The kernel performs calculations in double (d) or float (f) arithmetic
-  ///   - { e, f, fe }  The kernel computes energies (e), forces (f), or both (ef)
-  ///   - { s, w }      The kernel accumulates forces in split integers (s) or whole integers (w)
-  ///   - { m, a }      The kernel moves atoms (m) or accumulates forces or energies (a)
   /// \{
   KernelFormat valence_kernel_de_dims;
   KernelFormat valence_kernel_dfsm_dims;
@@ -195,7 +209,46 @@ private:
   KernelFormat reduction_kernel_sc_dims;
   KernelFormat reduction_kernel_ar_dims;
   /// \}
+
+  std::map<std::string, KernelFormat> k_dictionary;
 };
+
+/// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
+///        begins with "vale_" and is then appended with letter codes for different aspects
+///        according to the following system:
+///        - { d, f }      Perform calculations in double (d) or float (f) arithmetic
+///        - { e, f, fe }  Compute energies (e), forces (f), or both (ef)
+///        - { s, w }      Accumulate forces in split integers (s) or whole integers (w)
+///        - { m, a }      Move atoms (m) or accumulate forces or energies (a)
+///
+/// \param prec        The type of floating point numbers in which the kernel shall work
+/// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
+/// \param eval_nrg    Indication of whether to evaluate the energy of the system as a whole
+/// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
+///                    error in this context)
+/// \param purpose     The intended action to take with computed forces
+std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
+                             EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                             VwuGoal purpose);
+
+/// \brief Obtain a unique string identifier for one of the non-bonded kernels.  Each identifier
+///        begins with "nonb_" and is then appended with letter codes for different aspects
+///        according to the following system:
+///        - { d, f }        Perform calculations in double (d) or float (f) arithmetic
+///        - { tg, st, hc }  Use a "tile groups" or "supertiles" strategy for breaking down
+///                          systems with isolated boundary conditions, or a "honeycomb" strategy
+///                          for breaking down systems with periodic boundary conditions.
+///        - { e, f, fe }    Compute energies (e), forces (f), or both (ef)
+///        - { s, w }        Accumulate forces in split integers (s) or whole integers (w)
+///
+/// \param prec        The type of floating point numbers in which the kernel shall work
+/// \param kind        The type of non-bonded work unit to evaluate
+/// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
+/// \param eval_nrg    Indication of whether to evaluate the energy of the system as a whole
+/// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
+///                    error in this context)
+std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
+                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth);
 
 } // namespace card
 } // namespace omni

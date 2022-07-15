@@ -11,6 +11,7 @@ KernelManager selectLaunchParameters(const GpuDetails &gpu) {
   KernelManager result(gpu);
 #ifdef OMNI_USE_HPC
   queryValenceKernelRequirements(&result);
+  queryNonbondedKernelRequirements(&result);
 #endif
   return result;
 }

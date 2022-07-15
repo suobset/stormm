@@ -2378,6 +2378,36 @@ void ValenceWorkUnit::logActivities() {
 }
 
 //-------------------------------------------------------------------------------------------------
+int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count) {
+  int min_inefficiency, best_size;
+  for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms; vs *= 2) {
+    const int unique_atom_coverage = vs - 12;
+    int nvwu_est = 0;
+    int inefficiency = 0;
+    for (int i = 0; i < system_count; i++) {
+      const int tnvwu = (atom_counts[i] + unique_atom_coverage - 1) / unique_atom_coverage;
+      nvwu_est += tnvwu;
+      inefficiency += (tnvwu * vs) - atom_counts[i];
+    }
+    if (vs == minimum_valence_work_unit_atoms || inefficiency < min_inefficiency) {
+      min_inefficiency = inefficiency;
+      best_size = vs;
+    }
+  }
+  return best_size;
+}
+
+//-------------------------------------------------------------------------------------------------
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size());
+}
+
+//-------------------------------------------------------------------------------------------------
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size());
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
                                                    const RestraintApparatus *ra,
                                                    const int max_atoms_per_vwu) {

@@ -6,6 +6,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Synthesis/nonbonded_workunit.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "hpc_nonbonded_potential.cuh"
 
 namespace omni {
@@ -21,6 +22,8 @@ using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
+using numerics::PrecisionModel;
+using synthesis::NbwuKind;
 using synthesis::small_block_max_imports;
 using synthesis::small_block_max_atoms;
 using synthesis::tile_groups_wu_abstract_length;
@@ -127,30 +130,94 @@ extern void nonbondedKernelSetup() {
 }
 
 //-------------------------------------------------------------------------------------------------
+extern void queryNonbondedKernelRequirements(KernelManager *wisdom) {
+
+  // The kernel manager will have information about the GPU to use--look at the work units from
+  // the perspective of overall occupancy on the GPU.
+  cudaFuncAttributes attr;
+  if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForce) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                                 EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForceEnergy) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                                 EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgfNonbondedForce) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                                 EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgfNonbondedForceEnergy) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                                 EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgfNonbondedEnergy) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
+                                 EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForce) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                                 EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForceEnergy) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                                 EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+  if (cudaFuncGetAttributes(&attr, ktgdNonbondedEnergy) != cudaSuccess) {
+    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
+          "queryValenceKernelRequirements");
+  }
+  wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
+                                 EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+}
+  
+//-------------------------------------------------------------------------------------------------
 extern void launchNonbondedTileGroupsDp(const SyNonbondedKit<double> &poly_nbk,
                                         const SeMaskSynthesisReader &poly_ser,
                                         MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
                                         ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
                                         const EvaluateForce eval_force,
-                                        const EvaluateEnergy eval_energy, const GpuDetails &gpu) {
-  const int blocks_multiplier = (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
-  const int nblocks = gpu.getSMPCount() * blocks_multiplier;
-  const int nthreads = 256;
+                                        const EvaluateEnergy eval_energy,
+                                        const KernelManager &launcher) {
+  const int2 bt = launcher.getNonbondedKernelDims(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+                                                  eval_force, eval_energy,
+                                                  ForceAccumulationMethod::SPLIT);
   switch (eval_force) {
   case EvaluateForce::YES:
     switch (eval_energy) {
     case EvaluateEnergy::YES:
-      ktgdsNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                       *gmem_r);
+      ktgdsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                *gmem_r);
       break;
     case EvaluateEnergy::NO:
-      ktgdsNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+      ktgdsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
       break;
     }
     break;
   case EvaluateForce::NO:
-    ktgdNonbondedEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                               *gmem_r);
+    ktgdNonbondedEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
     break;
   }
 }
@@ -161,7 +228,8 @@ extern void launchNonbondedTileGroupsDp(const AtomGraphSynthesis &poly_ag,
                                         MolecularMechanicsControls *mmctrl,
                                         PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
                                         CacheResource *tb_space, const EvaluateForce eval_force,
-                                        const EvaluateEnergy eval_energy, const GpuDetails &gpu) {
+                                        const EvaluateEnergy eval_energy,
+                                        const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(tier);
   const SeMaskSynthesisReader poly_ser = poly_se.data();
@@ -170,7 +238,7 @@ extern void launchNonbondedTileGroupsDp(const AtomGraphSynthesis &poly_ag,
   ScoreCardWriter scw = sc->data(tier);
   CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
   launchNonbondedTileGroupsDp(poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r, eval_force,
-                              eval_energy, gpu);
+                              eval_energy, launcher);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -181,32 +249,32 @@ extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
                                         const EvaluateForce eval_force,
                                         const EvaluateEnergy eval_energy,
                                         const ForceAccumulationMethod force_sum,
-                                        const GpuDetails &gpu) {
-  const int blocks_multiplier = (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
-  const int nblocks = gpu.getSMPCount() * blocks_multiplier;
-  const int nthreads = 256;
+                                        const KernelManager &launcher) {
+  const int2 bt = launcher.getNonbondedKernelDims(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+                                                  eval_force, eval_energy,
+                                                  ForceAccumulationMethod::SPLIT);
   switch (eval_force) {
   case EvaluateForce::YES:
     switch (force_sum) {
     case ForceAccumulationMethod::SPLIT:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        ktgfsNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
-                                                         *scw, *gmem_r);
+        ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                  *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        ktgfsNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+        ktgfsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
     case ForceAccumulationMethod::WHOLE:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        ktgfNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
-                                                        *scw, *gmem_r);
+        ktgfNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                 *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        ktgfNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+        ktgfNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
         break;
       }
       break;
@@ -214,23 +282,22 @@ extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
       if (poly_psw->frc_bits <= 23) {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          ktgfsNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
-                                                           *scw, *gmem_r);
+          ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                    *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          ktgfsNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
-                                                     *gmem_r);
+          ktgfsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
           break;
         }
       }
       else {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
-          ktgfNonbondedForceEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw,
-                                                          *scw, *gmem_r);
+          ktgfNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                   *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          ktgfNonbondedForce<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+          ktgfNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
           break;
         }
       }
@@ -238,8 +305,7 @@ extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
     }
     break;
   case EvaluateForce::NO:
-    ktgfNonbondedEnergy<<<nblocks, nthreads>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                               *gmem_r);
+    ktgfNonbondedEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
     break;
   }
 }
@@ -252,7 +318,7 @@ extern void launchNonbondedTileGroupsSp(const AtomGraphSynthesis &poly_ag,
                                         CacheResource *tb_space, const EvaluateForce eval_force,
                                         const EvaluateEnergy eval_energy,
                                         const ForceAccumulationMethod force_sum,
-                                        const GpuDetails &gpu) {
+                                        const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(tier);
   const SeMaskSynthesisReader poly_ser = poly_se.data();
@@ -261,7 +327,7 @@ extern void launchNonbondedTileGroupsSp(const AtomGraphSynthesis &poly_ag,
   ScoreCardWriter scw = sc->data(tier);
   CacheResourceKit<float> gmem_r = tb_space->spData(tier);
   launchNonbondedTileGroupsSp(poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r, eval_force,
-                              eval_energy, force_sum, gpu);
+                              eval_energy, force_sum, launcher);
 }
 
 } // namespace energy

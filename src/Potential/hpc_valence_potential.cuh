@@ -56,24 +56,24 @@ void launchValenceDp(const SyValenceKit<double> &poly_vk,
                      const SyRestraintKit<double, double2, double4> &poly_rk,
                      MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, VwuGoal purpose, const GpuDetails &gpu);
+                     EvaluateEnergy eval_energy, VwuGoal purpose, const KernelManager &launcher);
 
 void launchValenceDp(const AtomGraphSynthesis &poly_ag, MolecularMechanicsControls *mmctrl,
                      PhaseSpaceSynthesis *poly_ps, ScoreCard *sc, CacheResource *tb_space,
                      EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                     const GpuDetails &gpu);
+                     const KernelManager &launcher);
 
 void launchValenceSp(const SyValenceKit<float> &poly_vk,
                      const SyRestraintKit<float, float2, float4> &poly_rk,
                      MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
                      EvaluateEnergy eval_energy, VwuGoal purpose,
-                     ForceAccumulationMethod force_sum, const GpuDetails &gpu);
-
+                     ForceAccumulationMethod force_sum, const KernelManager &launcher);
+  
 void launchValenceSp(const AtomGraphSynthesis &poly_ag, MolecularMechanicsControls *mmctrl,
                      PhaseSpaceSynthesis *poly_ps, ScoreCard *sc, CacheResource *tb_space,
                      EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                     ForceAccumulationMethod force_sum, const GpuDetails &gpu);
+                     ForceAccumulationMethod force_sum, const KernelManager &launcher);
 /// \}
   
 } // namespace energy

@@ -886,13 +886,13 @@ template <typename T> int findBin(const T* limits, const T value, const int leng
 //-------------------------------------------------------------------------------------------------
 template <typename T> int findBin(const std::vector<T> &limits, const T value,
                                   const ExceptionResponse policy) {
-  return findBin(limits.data(), value, limits.size(), policy);
+  return findBin(limits.data(), value, limits.size() - 1LLU, policy);
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> int findBin(const Hybrid<T> &limits, const T value,
                                   const ExceptionResponse policy) {
-  return findBin(limits.data(), value, limits.size(), policy);
+  return findBin(limits.data(), value, limits.size() - 1LLU, policy);
 }
 
 //-------------------------------------------------------------------------------------------------

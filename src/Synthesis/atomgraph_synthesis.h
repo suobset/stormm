@@ -66,14 +66,12 @@ public:
                      const std::vector<int> &topology_indices_in,
                      const std::vector<int> &restraint_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
-                     int vwu_atom_limit = maximum_valence_work_unit_atoms,
-                     StopWatch *timer_in = nullptr);
+                     int vwu_atom_limit = -1, StopWatch *timer_in = nullptr);
 
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<int> &topology_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
-                     int vwu_atom_limit = maximum_valence_work_unit_atoms,
-                     StopWatch *timer_in = nullptr);
+                     int vwu_atom_limit = -1, StopWatch *timer_in = nullptr);
   /// \}
 
   /// \brief Get the number of unique topologies described by the synthesis
@@ -220,6 +218,10 @@ public:
   template <typename T> std::vector<T> getAtomicMasses(HybridTargetLevel tier, int system_index,
                                                        int low_index, int high_index) const;
   /// \}
+
+  /// \brief Get the maximum size of valence work units.  This will have been either set by the
+  ///        user or tailored by the automated heuristics to produce the best saturation.
+  int getValenceWorkUnitSize() const;
  
   /// \brief Get a minimal kit with double-precision parameter detail for computing valence
   ///        interactions for all systems based on the work units stored in this object.
@@ -270,7 +272,7 @@ public:
   /// \brief Download the object
   void download();
 #endif
-
+  
   /// \brief Construct non-bonded work units for all unique topologies (there are no restraints
   ///        for non-bonded interactions that might distinguish systems with the same topology, as
   ///        was a consideration when developing the valence work units).  Load the instructions
@@ -950,7 +952,8 @@ private:
   // the cached atoms.  Forces are accumulated on all atoms in __shared__ memory and then
   // contributed back to the global arrays.
   int total_valence_work_units;  ///< Total count of valence work units spanning all systems
-
+  int valence_work_unit_size;    ///< Maximum size of the value work units
+  
   /// Instruction sets for the bond work units, storing integers for the low (_L nomenclature) and
   /// high (_H nomeclature) limits of all the types of interactions in a given work unit.  Each
   /// VWU takes a stride of integers from this array.  The length of this stride is not a matter

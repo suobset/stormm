@@ -46,28 +46,30 @@ void launchNonbondedTileGroupsDp(const SyNonbondedKit<double> &poly_nbk,
                                  const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
                                  PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                                  CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
-                                 const EvaluateEnergy eval_energy, const GpuDetails &gpu);
+                                 const EvaluateEnergy eval_energy, const KernelManager &launcher);
 
 void launchNonbondedTileGroupsDp(const AtomGraphSynthesis &poly_ag,
                                  const StaticExclusionMaskSynthesis &poly_se,
                                  MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                                  ScoreCard *sc, CacheResource *tb_space,
                                  const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                                 const GpuDetails &gpu);
+                                 const KernelManager &launcher);
 
 void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
                                  const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
                                  PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                                  CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
                                  const EvaluateEnergy eval_energy,
-                                 const ForceAccumulationMethod force_sum, const GpuDetails &gpu);
+                                 const ForceAccumulationMethod force_sum,
+                                 const KernelManager &launcher);
 
 void launchNonbondedTileGroupsSp(const AtomGraphSynthesis &poly_ag,
                                  const StaticExclusionMaskSynthesis &poly_se,
                                  MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                                  ScoreCard *sc, CacheResource *tb_space,
                                  const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                                 const ForceAccumulationMethod force_sum, const GpuDetails &gpu);
+                                 const ForceAccumulationMethod force_sum,
+                                 const KernelManager &launcher);
 /// \}
 
 } // namespace energy

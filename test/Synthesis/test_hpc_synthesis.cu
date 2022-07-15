@@ -4,6 +4,8 @@
 #include <cusolverDn.h>
 #include <nvml.h>
 #include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/kernel_manager.h"
+#include "../../src/Accelerator/select_launch_parameters.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -70,8 +72,9 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                             const AtomGraphSynthesis &poly_ag,
                             const StaticExclusionMaskSynthesis &poly_se,
                             const ForceAccumulationMethod facc_method, const PrecisionModel prec,
-                            const GpuDetails &gpu, const double mue_tol,
-                            const double max_error_tol, const TestPriority do_tests) {
+                            const GpuDetails &gpu, const KernelManager &launcher,
+                            const double mue_tol, const double max_error_tol,
+                            const TestPriority do_tests) {
 
   // Prepare for GPU-based calculations
   const int nsys = poly_ps->getSystemCount();
@@ -89,11 +92,11 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   switch (prec) {
   case PrecisionModel::SINGLE:
     launchValenceSp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::YES,
-                    EvaluateEnergy::NO, VwuGoal::ACCUMULATE, facc_method, gpu);
+                    EvaluateEnergy::NO, VwuGoal::ACCUMULATE, facc_method, launcher);
     break;
   case PrecisionModel::DOUBLE:
     launchValenceDp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::YES,
-                    EvaluateEnergy::NO, VwuGoal::ACCUMULATE, gpu);    
+                    EvaluateEnergy::NO, VwuGoal::ACCUMULATE, launcher);
     break;
   }
   int total_restraints = 0;
@@ -129,11 +132,11 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     switch (prec) {
     case PrecisionModel::SINGLE:
       launchNonbondedTileGroupsSp(poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space,
-                                  EvaluateForce::YES, EvaluateEnergy::NO, facc_method, gpu);
+                                  EvaluateForce::YES, EvaluateEnergy::NO, facc_method, launcher);
       break;
     case PrecisionModel::DOUBLE:
       launchNonbondedTileGroupsDp(poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space,
-                                  EvaluateForce::YES, EvaluateEnergy::NO, gpu);
+                                  EvaluateForce::YES, EvaluateEnergy::NO, launcher);
       break;
     }
   }
@@ -148,23 +151,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                                                  EvaluateForce::YES, EvaluateForce::YES, 0);
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
-
-    // CHECK
-    if (prec == PrecisionModel::DOUBLE && iag_ptr->getAtomCount() <= 60) {
-      for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
-        if (fabs(host_frc[3 * j] - devc_frc[3 * j]) > 50.0 ||
-            fabs(host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1]) > 50.0 ||
-            fabs(host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]) > 50.0) {
-          printf("Sys-Atom %4d-%4d :  %12.4lf %12.4lf %12.4lf    %12.4lf %12.4lf %12.4lf -> "
-                 "%12.4e %12.4e %12.4e\n", i, j, host_frc[3 * j], host_frc[(3 * j) + 1],
-                 host_frc[(3 * j) + 2], devc_frc[3 * j], devc_frc[(3 * j) + 1],
-                 devc_frc[(3 * j) + 2], host_frc[3 * j] - devc_frc[3 * j],
-                 host_frc[(3 * j) + 1] - devc_frc[(3 * j) + 1],
-                 host_frc[(3 * j) + 2] - devc_frc[(3 * j) + 2]);
-        }
-      }
-    }
-    // END CHECK
 
     // These systems contain some hard clashes, which generate very large forces.  This is good
     // for testing the split force accumulation, but not for discerning values that are truly
@@ -206,10 +192,11 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                               const AtomGraphSynthesis &poly_ag,
                               const StaticExclusionMaskSynthesis &poly_se,
                               const PrecisionModel prec, const GpuDetails &gpu,
-                              const double bond_tol, const double angl_tol, const double dihe_tol,
-                              const double impr_tol, const double ubrd_tol, const double cimp_tol,
-                              const double cmap_tol, const double lj14_tol, const double qq14_tol,
-                              const double rstr_tol, const TestPriority do_tests) {
+                              const KernelManager &launcher, const double bond_tol,
+                              const double angl_tol, const double dihe_tol, const double impr_tol,
+                              const double ubrd_tol, const double cimp_tol, const double cmap_tol,
+                              const double lj14_tol, const double qq14_tol, const double rstr_tol,
+                              const TestPriority do_tests) {
   const int nsys = poly_ps->getSystemCount();
   ScoreCard sc(nsys, 1, 32);
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
@@ -217,11 +204,12 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
   switch (prec) {
   case PrecisionModel::SINGLE:
     launchValenceSp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::NO,
-                    EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT, gpu);
+                    EvaluateEnergy::YES, VwuGoal::ACCUMULATE, ForceAccumulationMethod::SPLIT,
+                    launcher);
     break;
   case PrecisionModel::DOUBLE:
     launchValenceDp(poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::NO,
-                    EvaluateEnergy::YES, VwuGoal::ACCUMULATE, gpu);
+                    EvaluateEnergy::YES, VwuGoal::ACCUMULATE, launcher);
     break;
   }
   sc.download();
@@ -299,17 +287,19 @@ int main(const int argc, const char* argv[]) {
   // Section 2
   section("Topology compilation and staging");
   
-  // Get the GPU specs.  Set of parameters for the work units and launch grids.
+  // Get the GPU specs.  Set of parameters for the work units and launch grids.  Preparing a cache
+  // resource for the largest possible number of valence work unit atoms obviates the need to
+  // worry about resizing it case by case, and does not contribute to cache pollution (individual
+  // blocks' buffers are already padded by the warp size, hence each takes a set number of cache
+  // lines to read).
   HpcConfig gpu_config(ExceptionResponse::WARN);
   std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
   int nblocks = gpu.getSMPCount();
   int nthreads = gpu.getMaxThreadsPerBlock();
-  int max_vwu_atoms = maximum_valence_work_unit_atoms;
   if (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) {
     nblocks *= 2;
     nthreads /= 2;
-    max_vwu_atoms /= 2;
   }
 
   // Configure the relevant kernels for this executable.
@@ -340,13 +330,98 @@ int main(const int argc, const char* argv[]) {
     topology_indices[i] = i;
   }
   AtomGraphSynthesis poly_ag(sysc.getSystemTopologyPointerCC(), topology_indices,
-                             ExceptionResponse::WARN, max_vwu_atoms, &timer);
+                             ExceptionResponse::WARN, -1, &timer);
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(sysc);
   PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
   PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 72);
+  KernelManager launcher = selectLaunchParameters(gpu);
+
+  // CHECK
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::NO,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::NO,
+                                                  ForceAccumulationMethod::WHOLE,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::WHOLE,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::NO,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::MOVE_PARTICLES));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::MOVE_PARTICLES));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::NO,
+                                                  ForceAccumulationMethod::WHOLE,
+                                                  VwuGoal::MOVE_PARTICLES));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::WHOLE,
+                                                  VwuGoal::MOVE_PARTICLES));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE, EvaluateForce::NO,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::WHOLE,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::NO,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::NO,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::MOVE_PARTICLES));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::SPLIT,
+                                                  VwuGoal::MOVE_PARTICLES));
+  launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::DOUBLE, EvaluateForce::NO,
+                                                  EvaluateEnergy::YES,
+                                                  ForceAccumulationMethod::WHOLE,
+                                                  VwuGoal::ACCUMULATE));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::YES, EvaluateEnergy::NO,
+                                                    ForceAccumulationMethod::SPLIT));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::YES, EvaluateEnergy::YES,
+                                                    ForceAccumulationMethod::SPLIT));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::YES, EvaluateEnergy::NO,
+                                                    ForceAccumulationMethod::WHOLE));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::YES, EvaluateEnergy::YES,
+                                                    ForceAccumulationMethod::WHOLE));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::NO, EvaluateEnergy::YES,
+                                                    ForceAccumulationMethod::WHOLE));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::YES, EvaluateEnergy::NO,
+                                                    ForceAccumulationMethod::SPLIT));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::YES, EvaluateEnergy::YES,
+                                                    ForceAccumulationMethod::SPLIT));
+  launcher.printLaunchParameters(nonbondedKernelKey(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+                                                    EvaluateForce::NO, EvaluateEnergy::YES,
+                                                    ForceAccumulationMethod::WHOLE));
+  // END CHECK
+  
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
@@ -389,7 +464,7 @@ int main(const int argc, const char* argv[]) {
         "AtomGraphSynthesis object do not meet expectations.", do_tests);
 
   // Allocate resources for various kernels
-  CacheResource valence_tb_space(nblocks, max_vwu_atoms);
+  CacheResource valence_tb_space(nblocks, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_space(5 * nblocks, small_block_max_atoms);
   MolecularMechanicsControls mmctrl;
   mmctrl.primeWorkUnitCounters(gpu, poly_ag);
@@ -399,25 +474,25 @@ int main(const int argc, const char* argv[]) {
   // and 1:4 attenuated interactions.
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::DOUBLE, gpu,
-                         3.5e-6, 2.0e-6, do_tests);
+                         launcher, 3.5e-6, 2.0e-6, do_tests);
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
-                         3.5e-5, 2.0e-4, do_tests);
+                         launcher, 3.5e-5, 2.0e-4, do_tests);
   checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag, poly_se,
-                         ForceAccumulationMethod::WHOLE, PrecisionModel::SINGLE, gpu, 3.5e-5,
-                         2.0e-4, do_tests);
+                         ForceAccumulationMethod::WHOLE, PrecisionModel::SINGLE, gpu, launcher,
+                         3.5e-5, 2.0e-4, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
-                           poly_se, PrecisionModel::DOUBLE, gpu, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
+                           poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
-                           poly_se, PrecisionModel::SINGLE, gpu, 1.5e-5, 1.5e-5, 5.0e-6, 1.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
+                           poly_se, PrecisionModel::SINGLE, gpu, launcher, 1.5e-5, 1.5e-5, 5.0e-6,
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
   
   // Check that super-high precision forms of the coordinates and force accumulation are OK in
   // double-precision mode.
   checkCompilationForces(&poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          poly_ag, poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionModel::DOUBLE, gpu, 3.5e-7, 5.0e-7, do_tests);
+                         PrecisionModel::DOUBLE, gpu, launcher, 3.5e-7, 5.0e-7, do_tests);
   
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
@@ -456,8 +531,8 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 34, 40);
   PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 34, 72);
   const std::vector<int> big_top_indices = { 0, 1, 2 };
-  AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT,
-                                 max_vwu_atoms, &timer);
+  AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT, -1,
+                                 &timer);
   StaticExclusionMaskSynthesis big_poly_se(big_poly_ag.getTopologyPointers(),
                                            big_poly_ag.getTopologyIndices());
   big_poly_ag.loadNonbondedWorkUnits(big_poly_se);
@@ -469,24 +544,24 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(0);
   checkCompilationForces(&big_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionModel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
+                         PrecisionModel::DOUBLE, gpu, launcher, 3.5e-6, 2.5e-5, do_tests);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
-                         big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
-                         7.5e-5, 3.0e-3, do_tests);
+                         big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE,
+                         gpu, launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
-                         big_poly_se, ForceAccumulationMethod::WHOLE, PrecisionModel::SINGLE, gpu,
-                         7.5e-5, 3.0e-3, do_tests);
+                         big_poly_se, ForceAccumulationMethod::WHOLE, PrecisionModel::SINGLE,
+                         gpu, launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           big_poly_ag, big_poly_se, PrecisionModel::DOUBLE, gpu, 1.0e-6, 1.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                           big_poly_ag, big_poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6,
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                            do_tests);
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, 1.5e-4, 2.2e-5,
-                           9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
-                           do_tests);  
+                           big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, launcher, 1.5e-4,
+                           2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
+                           do_tests);
   checkCompilationForces(&big_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionModel::DOUBLE, gpu, 3.5e-6, 2.5e-5, do_tests);
+                         PrecisionModel::DOUBLE, gpu, launcher, 3.5e-6, 2.5e-5, do_tests);
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
@@ -524,9 +599,8 @@ int main(const int argc, const char* argv[]) {
                                          34, 44);
   PhaseSpaceSynthesis ligand_poly_ps_sdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 72, 24,
                                           34, 72);
-  AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling,
-                                    ligand_tiling,
-                                    ExceptionResponse::WARN, max_vwu_atoms, &timer);
+  AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling, ligand_tiling,
+                                    ExceptionResponse::WARN, -1, &timer);
   StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getTopologyPointers(),
                                               ligand_poly_ag.getTopologyIndices());
   ligand_poly_ag.loadNonbondedWorkUnits(ligand_poly_se);
@@ -538,21 +612,21 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(0);
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionModel::DOUBLE, gpu, 3.5e-6, 2.0e-6, do_tests);
+                         PrecisionModel::DOUBLE, gpu, launcher, 3.5e-6, 2.0e-6, do_tests);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionModel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);
+                         PrecisionModel::SINGLE, gpu, launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::WHOLE,
-                         PrecisionModel::SINGLE, gpu, 7.5e-5, 3.0e-3, do_tests);
+                         PrecisionModel::SINGLE, gpu, launcher, 7.5e-5, 3.0e-3, do_tests);
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           ligand_poly_ag, ligand_poly_se, PrecisionModel::DOUBLE, gpu, 1.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
-                           do_tests);
+                           ligand_poly_ag, ligand_poly_se, PrecisionModel::DOUBLE, gpu, launcher,
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, do_tests);
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
-                           ligand_poly_ag, ligand_poly_se, PrecisionModel::SINGLE, gpu, 1.5e-4,
-                           2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6,
-                           do_tests);
+                           ligand_poly_ag, ligand_poly_se, PrecisionModel::SINGLE, gpu, launcher,
+                           1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4,
+                           1.0e-6, do_tests);
 
   // Remarkably, the "super-double" representation with ultra-high precision coordinates cannot
   // get forces any closer than 5.0e-7 kcal/mol-A, due to something that happens in the last bit
@@ -561,7 +635,7 @@ int main(const int argc, const char* argv[]) {
   // guard against the arccos instability will change the outcome.
   checkCompilationForces(&ligand_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
-                         PrecisionModel::DOUBLE, gpu, 3.5e-8, 5.0e-7, do_tests);
+                         PrecisionModel::DOUBLE, gpu, launcher, 3.5e-8, 5.0e-7, do_tests);
 
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
