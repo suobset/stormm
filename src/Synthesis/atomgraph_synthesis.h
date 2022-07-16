@@ -219,9 +219,16 @@ public:
                                                        int low_index, int high_index) const;
   /// \}
 
+  /// \brief Get the overall number of valence work units needed to account for interactions in
+  ///        all systems.
+  int getValenceWorkUnitCount() const;
+
   /// \brief Get the maximum size of valence work units.  This will have been either set by the
   ///        user or tailored by the automated heuristics to produce the best saturation.
   int getValenceWorkUnitSize() const;
+
+  /// \brief Get the type of non-bonded work required by systems in this synthesis.
+  NbwuKind getNonbondedWorkType() const;
  
   /// \brief Get a minimal kit with double-precision parameter detail for computing valence
   ///        interactions for all systems based on the work units stored in this object.

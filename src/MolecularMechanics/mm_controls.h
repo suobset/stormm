@@ -3,7 +3,9 @@
 #define OMNI_MM_CONTROLS_H
 
 #include "Accelerator/gpu_details.h"
+#include "Accelerator/kernel_manager.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -12,8 +14,10 @@ namespace omni {
 namespace mm {
 
 using card::GpuDetails;
+using card::KernelManager;
 using card::Hybrid;
 using card::HybridTargetLevel;
+using constants::PrecisionModel;
 using namelist::default_dynamics_time_step;
 using namelist::default_rattle_tolerance;
 using namelist::default_minimize_dx0;
@@ -107,8 +111,12 @@ public:
 
   /// \brief Prime the work unit counters based on a particular GPU configuration.
   ///
-  /// \param gpu  Description of the GPU available to the runtime process
-  void primeWorkUnitCounters(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+  /// \param launcher  Object containing launch parameters for all kernels
+  /// \param prec      Precision model for calculations
+  /// \param poly_ag   Compilation of topologies describing the workload (used here for general
+  ///                  descriptors such as the non-bonded work unit type)
+  void primeWorkUnitCounters(const KernelManager &launcher, PrecisionModel prec,
+                             const AtomGraphSynthesis &poly_ag);
 
   /// \brief Increment the step counter, moving the controls to a different progress counter.
   void incrementStep();

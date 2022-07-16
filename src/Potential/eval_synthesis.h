@@ -17,10 +17,6 @@
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
 
-// CHECK
-//#include "Potential/nonbonded_potential.h"
-// END CHECK
-
 namespace omni {
 namespace energy {
   

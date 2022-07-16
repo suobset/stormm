@@ -21,7 +21,8 @@ using synthesis::AtomGraphSynthesis;
 ///        without generating circular dependencies.
 ///
 /// \param gpu      Details of the GPU chosen for running calculations
-KernelManager selectLaunchParameters(const GpuDetails &gpu);
+/// \param poly_ag  Topologies for all systems, offering details of the workload
+KernelManager selectLaunchParameters(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
 
 } // namespace card
 } // namespace omni

@@ -55,22 +55,23 @@ public:
   ///     units
   ///   - Assume that the largest possible block size is always to be used
   ///
-  /// \param register_usage_in    Input register usage
-  /// \param block_size_limit_in  Input block size limit
-  /// \param shared_usage_in      Input __shared__ memory usage
-  /// \param block_mult_in        Preferred block multiplicity (this will place multiple blocks on
-  ///                             each streaming multiprocessor if possible)
-  /// \param block_dimension_in   The requested thread block size, if not the maximum possible
+  /// \param lb_max_threads_per_block  Maximum threads per block, as stated in the launch bounds
+  /// \param lb_min_blocks_per_smp     Minimum blocks per multiprocessor, from the launch bounds
+  /// \param register_usage_in         Input register usage
+  /// \param shared_usage_in           Input __shared__ memory usage
+  /// \param block_subdivision         Preferred block multiplicity (this will compound the input
+  ///                                  minimum number of blocks per multiprocessor)
   /// \param gpu                  Details of the available GPU (likely passed in from a
   ///                             KernelManager struct containing many KernelFormat objects)
   /// \param kernel_name_in       The name of the kernel, for reporting purposes later (optional)
   /// \{
-  void build(int register_usage_in, int block_size_limit_in, int shared_usage_in,
-             int block_mult_in, int block_dimension_in, const GpuDetails &gpu,
+  void build(int lb_max_threads_per_block, int lb_min_blocks_per_smp, int register_usage_in,
+             int shared_usage_in, int block_subdivision, const GpuDetails &gpu,
              const std::string &kernel_name_in = std::string(""));
 
-  void build(int register_usage_in, int block_size_limit_in, int shared_usage_in,
-             const GpuDetails &gpu, const std::string &kernel_name_in = std::string(""));
+  void build(int lb_max_threads_per_block, int lb_min_blocks_per_smp, int register_usage_in,
+             int shared_usage_in, const GpuDetails &gpu,
+             const std::string &kernel_name_in = std::string(""));
   /// \}
   
 private:
@@ -145,8 +146,9 @@ public:
   ///                        allocate, per block, in bytes
   /// \param block_mult      The requested multiplicity of blocks on each streaming multiprocessor
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth, VwuGoal purpose, int thread_limit,
-                            int register_count, int shared_usage, int block_mult = 1);
+                            ForceAccumulationMethod acc_meth, VwuGoal purpose,
+                            int lb_max_threads_per_block, int lb_max_blocks_per_smp,
+                            int register_count, int shared_usage, int block_subdivision = 1);
 
   /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
@@ -156,8 +158,8 @@ public:
   ///              being relevant
   void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
-                              int thread_limit, int register_count, int shared_usage,
-                              int block_mult = 1);
+                              int lb_max_threads_per_block, int lb_max_blocks_per_smp,
+                              int register_count, int shared_usage, int block_subdivision = 1);
 
   /// \brief Set the register, maximum block size, and threads counts for one of the reduction
   ///        kernels.  Parameter descriptions for this function follow from

@@ -33,12 +33,29 @@ using synthesis::VwuGoal;
 /// \brief Set the __shared__ memory configuration for various valence interaction kernels.
 void valenceKernelSetup();
 
+/// \brief Test various subdivisions of a thread block to see whether the workload can be better
+///        distributed.  This is perilous if the kernel allocates significant static __shared__
+///        memory resources per block, but can be advantageous if the systems are small and there
+///        are many to compute.  This assumes that the kernel is compiled with a minimum of one
+///        block per multiprocessor in its launch bounds, and the highest possible thread count
+///        for that one block.  The function returns a tuple containing the best identified
+///        block multiplier and the best corresponding block size, i.e. "split a kernel of 896
+///        maximum threads into 7 blocks of 128."
+///
+/// \param max_threads  The maximum number of threads for which the kernel is compiled
+/// \param smp_count    The number of streaming multiprocessors on the device
+/// \param vwu_size     Maximum size of each valence work unit
+/// \param vwu_count    The total number of valence work units that the kernel will process
+int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, const int vwu_size,
+                                  const int vwu_count);
+
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
 ///        the valence interactions kernel.  Deposit the results in a developing object that will
 ///        later record launch grid dimensions for managing the kernels.
 ///
-/// \param wisdom  Object to store the kernel specifications obtained
-void queryValenceKernelRequirements(KernelManager *wisdom);
+/// \param wisdom   Object to store the kernel specifications obtained
+/// \param poly_ag  A collection of topologies describing the workload
+void queryValenceKernelRequirements(KernelManager *wisdom, const AtomGraphSynthesis &poly_ag);
 
 /// \brief Evaluate valence work units and move atoms.
 ///

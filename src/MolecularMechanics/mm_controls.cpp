@@ -1,13 +1,18 @@
+#include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
-#include "Topology/atomgraph_enumerators.h"
+#include "Potential/energy_enumerators.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "mm_controls.h"
 
 namespace omni {
 namespace mm {
 
 using card::HybridKind;
-using topology::UnitCellType;
-  
+using energy::EvaluateEnergy;
+using energy::EvaluateForce;
+using numerics::ForceAccumulationMethod;
+using synthesis::VwuGoal;
+
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in,
                                                        const double rattle_tol_in,
@@ -148,40 +153,31 @@ MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel t
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolecularMechanicsControls::primeWorkUnitCounters(const GpuDetails &gpu,
+void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &launcher,
+                                                       const PrecisionModel prec,
                                                        const AtomGraphSynthesis &poly_ag) {
-  const int arch_major = gpu.getArchMajor();
-  const int arch_minor = gpu.getArchMinor();
-  int vwu_block_count = gpu.getSMPCount();
-  int pmewu_block_count = gpu.getSMPCount();
-  if (arch_major == 6 && arch_minor == 1) {
-    vwu_block_count *= 2;
-    pmewu_block_count *= 2;
-  }
-  int nbwu_block_count = gpu.getSMPCount();
-  if (poly_ag.getUnitCellType() == UnitCellType::NONE) {
+  const GpuDetails wgpu = launcher.getGpu();
+  const int arch_major = wgpu.getArchMajor();
+  const int arch_minor = wgpu.getArchMinor();
+  const int smp_count = wgpu.getSMPCount();
 
-    // Use four non-bonded blocks per SM on Turing, five on all other NVIDIA architectures
-    if (arch_major == 7 && arch_minor >= 5) { 
-      nbwu_block_count *= 4;
-    }
-    else {
-      nbwu_block_count *= 5;
-    }
-  }
-  else {
-
-    // Use two non-bonded blocks per SM on Turing, three on all other NVIDIA architectures
-    if (arch_major == 7 && arch_minor >= 5) { 
-      nbwu_block_count *= 2;
-    }
-    else {
-      nbwu_block_count *= 3;
-    }
-  }
-  int gtwu_block_count = gpu.getSMPCount();
-  int scwu_block_count = gpu.getSMPCount();
-  int rdwu_block_count = gpu.getSMPCount();
+  // The numbers of blocks that will be launched in each grid are critical for priming the work
+  // unit progress counters.  As such, they (the grid launch size) should be consistent across
+  // different variants of each kernel for a given precision level, even if the exact numbers of
+  // threads per block have to vary based on what each block of that kernel variant is required to
+  // do.  Here, it should suffice to query the launch parameters of just one of the blocks.
+  const int2 vwu_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES, EvaluateEnergy::YES,
+                                                    ForceAccumulationMethod::SPLIT,
+                                                    VwuGoal::ACCUMULATE);
+  const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
+                                                       EvaluateForce::YES, EvaluateEnergy::YES,
+                                                       ForceAccumulationMethod::SPLIT);
+  int vwu_block_count = vwu_lp.x;
+  int nbwu_block_count = nbwu_lp.x;
+  int pmewu_block_count = smp_count;
+  int gtwu_block_count = smp_count;
+  int scwu_block_count = smp_count;
+  int rdwu_block_count = smp_count;
   for (int i = 0; i < twice_warp_size_int; i++) {
     vwu_progress.putHost(vwu_block_count, i);
     nbwu_progress.putHost(nbwu_block_count, i);

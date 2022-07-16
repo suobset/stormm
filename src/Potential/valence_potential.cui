@@ -24,7 +24,7 @@
 /// \param poly_psw  Coordinates, velocities, and forces for all systems
 /// \param scw       Energy tracking object
 /// \param gmem_r    Resources in global memory allocated for exclusive use by each thread block
-__global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, 1)
+__global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, VALENCE_BLOCK_MULTIPLICITY)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC2, TCALC4> poly_rk,
             MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef COMPUTE_ENERGY

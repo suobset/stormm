@@ -139,58 +139,69 @@ extern void queryNonbondedKernelRequirements(KernelManager *wisdom) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
+  const GpuDetails wgpu = wisdom->getGpu();
+  int arch_block_multiplier = (wgpu.getArchMajor() == 7 && wgpu.getArchMinor() >= 5) ? 4 : 5;
   wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                  EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForceEnergy) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                  EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgfNonbondedForce) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                  EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgfNonbondedForceEnergy) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                  EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgfNonbondedEnergy) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
                                  EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForce) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
+  arch_block_multiplier = 3;
   wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                  EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForceEnergy) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                  EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, ktgdNonbondedEnergy) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
                                  EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes, 5);
+                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                                 attr.sharedSizeBytes);
 }
   
 //-------------------------------------------------------------------------------------------------
@@ -250,7 +261,7 @@ extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
                                         const EvaluateEnergy eval_energy,
                                         const ForceAccumulationMethod force_sum,
                                         const KernelManager &launcher) {
-  const int2 bt = launcher.getNonbondedKernelDims(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+  const int2 bt = launcher.getNonbondedKernelDims(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
                                                   eval_force, eval_energy,
                                                   ForceAccumulationMethod::SPLIT);
   switch (eval_force) {

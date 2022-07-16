@@ -7,10 +7,10 @@ using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 
 //-------------------------------------------------------------------------------------------------
-KernelManager selectLaunchParameters(const GpuDetails &gpu) {
+KernelManager selectLaunchParameters(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
   KernelManager result(gpu);
 #ifdef OMNI_USE_HPC
-  queryValenceKernelRequirements(&result);
+  queryValenceKernelRequirements(&result, poly_ag);
   queryNonbondedKernelRequirements(&result);
 #endif
   return result;

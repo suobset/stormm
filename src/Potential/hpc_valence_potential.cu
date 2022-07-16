@@ -276,6 +276,11 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 // Single-precision floating point definitions
 #define TCALC float
+#  if (__CUDA_ARCH__ == 610)
+#    define VALENCE_BLOCK_MULTIPLICITY 2
+#  else
+#    define VALENCE_BLOCK_MULTIPLICITY 1
+#  endif
 #  define TCALC2 float2
 #  define TCALC3 float3
 #  define TCALC4 float4
@@ -371,6 +376,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  undef  COMPUTE_ENERGY
 
 // Clear single-precision floating point definitions
+#  undef VALENCE_BLOCK_MULTIPLICITY
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
@@ -390,8 +396,10 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #define TCALC double
 #  if (__CUDA_ARCH__ == 610)
 #    define VALENCE_KERNEL_THREAD_COUNT small_block_size
+#    define VALENCE_BLOCK_MULTIPLICITY  2
 #  else
 #    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
+#    define VALENCE_BLOCK_MULTIPLICITY  1
 #  endif  
 #  define TCALC2 double2
 #  define TCALC3 double3
@@ -435,6 +443,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 // Clear double-precision floating point definitions
 #  undef VALENCE_KERNEL_THREAD_COUNT
+#  undef VALENCE_BLOCK_MULTIPLICITY
 #  undef TCALC2
 #  undef TCALC3
 #  undef TCALC4
@@ -494,127 +503,173 @@ extern void valenceKernelSetup() {
           "bytes.", "valenceKernelSetup");
   }
 }
-  
+
 //-------------------------------------------------------------------------------------------------
-extern void queryValenceKernelRequirements(KernelManager *wisdom) {
+int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, const int vwu_size,
+                                  const int vwu_count) {
+  const std::vector<int> block_size_options = { 128, 160, 192, 224, 256, 288, 320, 384, 448, 512,
+                                                768, 896, 1024 };
+  const int n_options = block_size_options.size();
+  const double dvwu_count   = static_cast<double>(vwu_count);
+  const double dmax_threads = static_cast<double>(max_threads);
+  double best_eff = 0.0;
+  int best_block_size = max_threads;
+  int best_block_mult = 1;
+  for (size_t i = 0; i < n_options; i++) {
+    const int tmp_bdim = block_size_options[i];
+
+    // In some cases, the valence work unit size can be slightly greater than the thread count
+    // per block, i.e. 1024 atoms and 896 threads in some of the kernels that compute forces and
+    // energies.  However, if the number of atoms is approaching the number of threads per block,
+    // efficiency will already be fairly high.
+    if (vwu_size > tmp_bdim || tmp_bdim > max_threads) {
+      continue;
+    }
+    const int tmp_mult    = (max_threads / tmp_bdim);
+    const int tmp_blocks  = tmp_mult * smp_count;
+    const double tmp_batches = static_cast<double>((vwu_count + tmp_blocks - 1) / tmp_blocks);
+    const double sm_eff  = static_cast<double>(tmp_bdim * tmp_mult) / dmax_threads;
+    const double net_eff = sm_eff * dvwu_count / (tmp_batches * static_cast<double>(tmp_blocks));
+    if (net_eff >= best_eff) {
+      best_eff = net_eff;
+      best_block_size = tmp_bdim;
+      best_block_mult = tmp_mult;
+    }
+  }
+  return { best_block_mult, best_block_size };
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void queryValenceKernelRequirements(KernelManager *wisdom,
+                                           const AtomGraphSynthesis &poly_ag) {
 
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
   cudaFuncAttributes attr;
   const GpuDetails wgpu = wisdom->getGpu();
-  const int block_multiplier = (wgpu.getArchMajor() == 6 && wgpu.getArchMinor() == 1) ? 2 : 1;
+  const int arch_block_multiplier = (wgpu.getArchMajor() == 6 && wgpu.getArchMinor() == 1) ? 2 : 1;
+  const int vwu_size  = poly_ag.getValenceWorkUnitSize();
+  const int vwu_count = poly_ag.getValenceWorkUnitCount();
   if (cudaFuncGetAttributes(&attr, kfsValenceForceAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                                ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfsValenceAtomUpdate) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdate.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                                ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfsValenceForceEnergyAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceForceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                                ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdate.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                                ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfValenceForceAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                                ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfValenceAtomUpdate) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfValenceAtomUpdate.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                                ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfValenceForceEnergyAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfValenceForceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                                ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfValenceEnergyAtomUpdate) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdate.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                                ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kfValenceEnergyAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
+
+  // The energy-only computation allocates much less static __shared__ memory than any of the
+  // force-computing kernel variants.  Take the opportunity to subdivide this block into as many
+  // as eight if there are many small systems to compute.
+  int2 bmult = testValenceKernelSubdivision(attr.maxThreadsPerBlock, wgpu.getSMPCount(),
+                                            vwu_size, vwu_count);
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::NO, EvaluateEnergy::YES,
                                ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kdsValenceForceAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                                ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kdsValenceAtomUpdate) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdate.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                                ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kdsValenceForceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                                ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdate.",
           "queryValenceKernelRequirements");
   }
   wisdom->catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                                ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
   if (cudaFuncGetAttributes(&attr, kdsValenceEnergyAccumulation) != cudaSuccess) {
     rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
+  bmult = testValenceKernelSubdivision(attr.maxThreadsPerBlock, wgpu.getSMPCount(),
+                                       vwu_size, vwu_count);
   wisdom->catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::NO, EvaluateEnergy::YES,
                                ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                               attr.maxThreadsPerBlock, attr.numRegs, attr.sharedSizeBytes,
-                               block_multiplier);
+                               attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
+                               attr.sharedSizeBytes);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -695,7 +750,7 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
                             const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
                             const VwuGoal purpose, const ForceAccumulationMethod force_sum,
                             const KernelManager &launcher) {
-  const int2 bt = launcher.getValenceKernelDims(PrecisionModel::DOUBLE, eval_force, eval_energy,
+  const int2 bt = launcher.getValenceKernelDims(PrecisionModel::SINGLE, eval_force, eval_energy,
                                                 ForceAccumulationMethod::SPLIT, purpose);
   switch (purpose) {
   case VwuGoal::ACCUMULATE:

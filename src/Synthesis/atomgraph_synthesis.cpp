@@ -455,11 +455,6 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   if (valence_work_unit_size < 0) {
     valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts);
   }
-
-  // CHECK
-  printf("Valence work units are tailored for %4d atoms.\n", valence_work_unit_size);
-  // END CHECK
-  
   loadValenceWorkUnits(valence_work_unit_size);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 }
@@ -3270,8 +3265,18 @@ std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getValenceWorkUnitCount() const {
+  return total_valence_work_units;
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getValenceWorkUnitSize() const {
   return valence_work_unit_size;
+}
+
+//-------------------------------------------------------------------------------------------------
+NbwuKind AtomGraphSynthesis::getNonbondedWorkType() const {
+  return nonbonded_work_type;
 }
 
 //-------------------------------------------------------------------------------------------------

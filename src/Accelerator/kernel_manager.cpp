@@ -50,44 +50,35 @@ const std::string& KernelFormat::getKernelName() const {
 }
   
 //-------------------------------------------------------------------------------------------------
-void KernelFormat::build(const int register_usage_in, const int block_size_limit_in,
-                         const int shared_usage_in, const int block_mult_in,
-                         const int block_dimension_in, const GpuDetails &gpu,
+void KernelFormat::build(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
+                         const int register_usage_in, const int shared_usage_in,
+                         const int block_subdivision, const GpuDetails &gpu,
                          const std::string &kernel_name_in) {
-  register_usage = register_usage_in;
-  block_size_limit = block_size_limit_in;
+
+  // Compute the block dimension and the launch grid dimension.
+  block_size_limit = lb_max_threads_per_block;
   shared_usage = shared_usage_in;
   if (kernel_name_in.size() > 0LLU) {
     kernel_name = kernel_name_in;
   }
-  const int register_file_size = gpu.getRegistersPerSMP();
-  const int gpu_block_size_limit = gpu.getMaxThreadsPerBlock();
-  const int smp_thread_limit = gpu.getMaxThreadsPerSMP();
-  block_dimension = (block_dimension_in == 0) ? block_size_limit : block_dimension_in;
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+  block_dimension = (block_size_limit / block_subdivision / warp_size_int) * warp_size_int;
+  grid_dimension = block_subdivision * lb_min_blocks_per_smp * gpu.getSMPCount();
+
+  // Get the register usage (this needs refinement and is unreliable with current cudart function
+  // calls).
+  register_usage = register_usage_in;
   const std::vector<int> register_break_points = {  0, 40, 48, 56, 64, 72, 80, 128, 256 };
   const std::vector<int> register_warp_counts  = { 48, 40, 36, 32, 28, 24, 16,   8 };
   const int register_bin = findBin(register_break_points, register_usage, ExceptionResponse::WARN);
   register_usage = register_warp_counts[register_bin];
-#  endif
-#endif
-  const int shr_cap = gpu.getMaxSharedPerSMP() / shared_usage;
-  if (block_mult_in > shr_cap) {
-    rtErr("In kernel " + kernel_name + ", the maximum __shared__ memory usage exceeds the maximum "
-          "__shared__ memory available per block on GPU " + gpu.getCardName() + ", architecture " +
-          std::to_string(gpu.getArchMajor()) + "." + std::to_string(gpu.getArchMinor()) + ".",
-          "KernelFormat", "build");    
-  }
-  grid_dimension = block_mult_in * gpu.getSMPCount();
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelFormat::build(const int register_usage_in, const int block_size_limit_in,
-                         const int shared_usage_in, const GpuDetails &gpu,
-                         const std::string &kernel_name_in) {
-  build(register_usage_in, block_size_limit_in, shared_usage_in, 1, block_size_limit_in, gpu,
-        kernel_name_in);
+void KernelFormat::build(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
+                         const int register_usage_in, const int shared_usage_in,
+                         const GpuDetails &gpu, const std::string &kernel_name_in) {
+  build(lb_max_threads_per_block, lb_min_blocks_per_smp, register_usage_in, shared_usage_in, 1,
+        gpu, kernel_name_in);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -151,17 +142,17 @@ const GpuDetails& KernelManager::getGpu() const {
 void KernelManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
                                          const ForceAccumulationMethod acc_meth,
-                                         const VwuGoal purpose, const int thread_limit,
-                                         const int register_count, const int shared_usage,
-                                         const int block_mult) {
+                                         const VwuGoal purpose, const int lb_max_threads_per_block,
+                                         const int lb_max_blocks_per_smp, const int register_count,
+                                         const int shared_usage, const int block_subdivision) {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + "  not found in the kernel map.",
           "KernelManager", "getValenceKernelDims");
   }
-  k_dictionary[k_key].build(register_count, thread_limit, shared_usage, block_mult, thread_limit,
-                            gpu);
+  k_dictionary[k_key].build(lb_max_threads_per_block, lb_max_blocks_per_smp, register_count,
+                            shared_usage, block_subdivision, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -169,16 +160,18 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
                                            const EvaluateForce eval_force,
                                            const EvaluateEnergy eval_nrg,
                                            const ForceAccumulationMethod acc_meth,
-                                           const int thread_limit, const int register_count,
-                                           const int shared_usage, const int block_mult) {
+                                           const int lb_max_threads_per_block,
+                                           const int lb_max_blocks_per_smp,
+                                           const int register_count, const int shared_usage,
+                                           const int block_subdivision) {
   const std::string k_key = nonbondedKernelKey(prec, kind, eval_force, eval_nrg, acc_meth);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Non-bonded kernel identifier " + k_key + "  not found in the kernel map.",
           "KernelManager", "getNonbondedKernelDims");
   }
-  k_dictionary[k_key].build(register_count, thread_limit, shared_usage, block_mult, thread_limit,
-                            gpu);
+  k_dictionary[k_key].build(lb_max_threads_per_block, lb_max_blocks_per_smp, register_count,
+                            shared_usage, block_subdivision, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------
