@@ -413,7 +413,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, PrecisionModel::SINGLE, gpu, launcher, 1.5e-5, 1.5e-5, 5.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
-  
+
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
   const std::string trpi_top_name = topology_base + osc + "trpcage.top";
@@ -577,6 +577,65 @@ int main(const int argc, const char* argv[]) {
                            ligand_launcher, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5,
                            6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6, do_tests);
 
+  // CHECK
+  const int n_copies = 100;
+  ligand_tiling.resize(n_copies, 0);
+  PhaseSpaceSynthesis ligand_lpoly_ps(bigger_crds, bigger_tops, ligand_tiling);
+  PhaseSpaceSynthesis ligand_lpoly_ps_dbl(bigger_crds, bigger_tops, ligand_tiling, 40, 24,
+                                          34, 44);
+  AtomGraphSynthesis ligand_lpoly_ag(bigger_tops, ligand_tiling,
+                                     ExceptionResponse::WARN, 96, &timer);
+  StaticExclusionMaskSynthesis ligand_lpoly_se(ligand_lpoly_ag.getTopologyPointers(),
+                                               ligand_lpoly_ag.getTopologyIndices());
+  ligand_lpoly_ag.loadNonbondedWorkUnits(ligand_lpoly_se);
+  KernelManager lligand_launcher = selectLaunchParameters(gpu, ligand_lpoly_ag);
+  mmctrl.primeWorkUnitCounters(lligand_launcher, PrecisionModel::SINGLE, ligand_lpoly_ag);
+  ligand_lpoly_ag.upload();
+  ligand_lpoly_se.upload();
+  ligand_lpoly_ps.upload();
+  ligand_lpoly_ps_dbl.upload();
+  ScoreCard lligand_sc(n_copies, 1, 32);
+  printf("There are %4d valence work units\n", ligand_lpoly_ag.getValenceWorkUnitCount());
+  timer.assignTime(0);
+  lligand_launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE,
+                                                          EvaluateForce::NO, EvaluateEnergy::YES,
+                                                          ForceAccumulationMethod::WHOLE,
+                                                          VwuGoal::ACCUMULATE));
+  lligand_launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE,
+                                                          EvaluateForce::YES, EvaluateEnergy::NO,
+                                                          ForceAccumulationMethod::WHOLE,
+                                                          VwuGoal::ACCUMULATE));
+  const int tenk_timings = timer.addCategory("Run 1k TrpCage");
+  for (int i = 0; i < 1000; i++) {
+    mmctrl.incrementStep();
+    ligand_lpoly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
+    launchValenceSp(ligand_lpoly_ag, &mmctrl, &ligand_lpoly_ps, &lligand_sc, &valence_tb_space,
+                    EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                    ForceAccumulationMethod::SPLIT, lligand_launcher);
+#if 0
+    PhaseSpace devc_result = ligand_lpoly_ps.exportSystem(5240, HybridTargetLevel::DEVICE);
+    PhaseSpaceWriter devc_psw = devc_result.data();
+    printf("Force[ %4d ] = [\n", i);
+    for (int j = 0; j < devc_psw.natom; j += 10) {
+      printf("  %9.4lf  %9.4lf  %9.4lf\n", devc_psw.xfrc[j], devc_psw.yfrc[j], devc_psw.zfrc[j]);
+    }
+    printf("];\n");
+#endif
+    launchNonbondedTileGroupsSp(ligand_lpoly_ag, ligand_lpoly_se, &mmctrl, &ligand_lpoly_ps, &sc,
+                                &nonbond_tb_space, EvaluateForce::YES, EvaluateEnergy::NO,
+                                ForceAccumulationMethod::SPLIT, lligand_launcher);
+  }
+  cudaDeviceSynchronize();
+  timer.assignTime(tenk_timings);  
+#if 0
+  checkCompilationForces(&ligand_lpoly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_lpoly_ag, ligand_lpoly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionModel::SINGLE, gpu, lligand_launcher, 7.5e-5, 3.0e-3, do_tests);
+  const int chk_timings = timer.addCategory("Run 10k check");
+  timer.assignTime(chk_timings);  
+#endif
+  // END CHECK
+  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

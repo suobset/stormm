@@ -52,6 +52,14 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
                                                        int* primary, int* overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
+
+    // While it may seem advantageous to continue accumulating spillover with the result of the
+    // second conditional, or to avoid the conditional that this is a part of by making it
+    // obligatory to compute spillover as the result of fval exceeding the maximum integer
+    // accumulation, this hardly ever happens if the split accumulation is being used in the
+    // proper way.  That yields a slight performance advantage to accumulating the numbers in
+    // this way, with the remote possibility of a third atomicAdd().  Register pressure is
+    // identical with either approach.
     const int spillover = fval / max_int_accumulation_f;
     ival = __float2int_rn(fval - ((float)(spillover) * max_int_accumulation_f));
     atomicAdd(&overflow[pos], spillover);

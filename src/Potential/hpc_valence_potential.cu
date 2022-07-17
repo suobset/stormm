@@ -529,7 +529,21 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
     const int tmp_blocks  = tmp_mult * smp_count;
     const double tmp_batches = static_cast<double>((vwu_count + tmp_blocks - 1) / tmp_blocks);
     const double sm_eff  = static_cast<double>(tmp_bdim * tmp_mult) / dmax_threads;
-    const double net_eff = sm_eff * dvwu_count / (tmp_batches * static_cast<double>(tmp_blocks));
+
+    // The efficiency within an individual valence work unit is estimated as the number of tasks
+    // (five task estimates per atom) divided by the number of threads available to work on them,
+    // cycling until each task can be done by one of the threads.  If there are more tasks than
+    // threads, this implies threads do additional batches of work, and the idle threads in the
+    // final batch are less an dless inefficiency as the workload grows.  The more batches a single
+    // thread performs, the less memory reading ratio is also carries, so the threads' batch count
+    // is given a minor bonus in the estimated score.
+    const int vwu_batches = ((5 * vwu_size) + tmp_bdim - 1) / tmp_bdim;
+    const double vwu_eff = (static_cast<double>(5 * vwu_size) /
+                            static_cast<double>(vwu_batches * tmp_bdim)) *
+                           static_cast<double>(vwu_batches + 5) /
+                           static_cast<double>(vwu_batches + 6);
+    const double net_eff = sm_eff * vwu_eff * dvwu_count / (tmp_batches *
+                                                            static_cast<double>(tmp_blocks));
     if (net_eff >= best_eff) {
       best_eff = net_eff;
       best_block_size = tmp_bdim;
@@ -618,12 +632,6 @@ extern void queryValenceKernelRequirements(KernelManager *wisdom,
     rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
-
-  // The energy-only computation allocates much less static __shared__ memory than any of the
-  // force-computing kernel variants.  Take the opportunity to subdivide this block into as many
-  // as eight if there are many small systems to compute.
-  int2 bmult = testValenceKernelSubdivision(attr.maxThreadsPerBlock, wgpu.getSMPCount(),
-                                            vwu_size, vwu_count);
   wisdom->catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::NO, EvaluateEnergy::YES,
                                ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
                                attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
@@ -664,8 +672,6 @@ extern void queryValenceKernelRequirements(KernelManager *wisdom,
     rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
           "queryValenceKernelRequirements");
   }
-  bmult = testValenceKernelSubdivision(attr.maxThreadsPerBlock, wgpu.getSMPCount(),
-                                       vwu_size, vwu_count);
   wisdom->catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::NO, EvaluateEnergy::YES,
                                ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                                attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,

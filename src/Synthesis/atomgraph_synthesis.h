@@ -60,6 +60,10 @@ public:
   ///                              sets of restraints allow many systems referencing the same
   ///                              topology to evolve on different energy surfaces.
   /// \param policy                Instruction on what to do if questionable input is encountered
+  /// \param vwu_atom_limit        Maximum number of atoms to include in each valence work unit,
+  ///                              taken from user input or a pre-computed value based on known
+  ///                              launch bounds of the kernel that will evaluate the work units
+  /// \param timer_in              Timer to track the wall time of this setup
   /// \{
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<RestraintApparatus*> &restraints_in,
@@ -147,6 +151,14 @@ public:
 
   /// \brief Get the number of unique CMAP surfaces
   int getCmapSurfaceCount() const;
+
+  /// \brief Get the sizes of all individual systems as a const reference to the Hybrid array
+  ///        member variable.
+  const Hybrid<int>& getSystemAtomCounts() const;
+
+  /// \brief Get the starting locations of all individual systems as a const reference to the
+  ///        Hybrid array member variable.
+  const Hybrid<int>& getSystemAtomOffsets() const;
 
   /// \brief Get the unit cell type that will be taken for all systems (TRICLINIC subsumes
   ///        ORTHORHOMBIC in a sort of type promotion)

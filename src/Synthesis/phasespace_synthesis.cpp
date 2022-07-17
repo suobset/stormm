@@ -287,7 +287,7 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
             ".", "PhaseSpaceSynthesis");
     }
   }
-
+  
   // Check validity of barostats: all barostats must be of the same type, but pressures and
   // details of the rescaling may vary between systems
   piston_kind = pistons_in[0].getKind();

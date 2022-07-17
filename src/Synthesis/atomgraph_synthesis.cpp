@@ -3033,7 +3033,7 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
 
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
-
+  
   // Build a list of non-bonded work units from the exclusion mask.  Translate those work units
   // into non-bonded abstracts and instructions.  All work units are assumed to have the same
   // target tile count.
@@ -3207,6 +3207,16 @@ int AtomGraphSynthesis::getCharmmImproperParameterCount() const {
 //-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getCmapSurfaceCount() const {
   return total_cmap_surfaces;
+}
+
+//-------------------------------------------------------------------------------------------------
+const Hybrid<int>& AtomGraphSynthesis::getSystemAtomCounts() const {
+  return atom_counts;
+}
+
+//-------------------------------------------------------------------------------------------------
+const Hybrid<int>& AtomGraphSynthesis::getSystemAtomOffsets() const {
+  return atom_offsets;
 }
 
 //-------------------------------------------------------------------------------------------------

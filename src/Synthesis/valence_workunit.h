@@ -1099,6 +1099,7 @@ private:
 ///   - Accept a C-style array with the system sizes and a trusted length 
 ///   - Accept a Standard Template Library vector of the system sizes
 ///   - Accept a Hybrid object with the system sizes
+///   - Accept launch parameters to inform the choice of work unit size
 ///
 /// \param atom_counts   The sizes of each system
 /// \param system_count  The number of systems (if a C-style array is provided)
@@ -1108,6 +1109,15 @@ int calculateValenceWorkUnitSize(const int* atom_counts, int system_count);
 int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts);
 
 int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts);
+
+int calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int lb_block_dimension,
+                                 int lb_grid_dimension);
+
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int lb_block_dimension,
+                                 int lb_grid_dimension);
+
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int lb_block_dimension,
+                                 int lb_grid_dimension);
 /// \}
 
 /// \brief Build a series of valence work units to cover a topology.

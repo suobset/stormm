@@ -1055,7 +1055,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> nbt_counts_answer = { 12246, 190, 15, 21 };
   const std::vector<size_t> nbwu_counts = { dhfr_nbv.size(), trpi_nbv.size(), lig1_nbv.size(),
                                             lig2_nbv.size() };
-  const std::vector<size_t> nbwu_counts_answer = { 1531LLU, 24LLU, 2LLU, 3LLU };
+  const std::vector<size_t> nbwu_counts_answer = { 766LLU, 24LLU, 2LLU, 3LLU };
   check(nbwu_counts, RelationalOperator::EQUAL, nbwu_counts_answer, "The number of non-bonded "
         "work units obtained for four systems in isolated boundary conditions do not meet "
         "expectations.", do_semk_tests);

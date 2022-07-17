@@ -2408,6 +2408,52 @@ int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts) {
 }
 
 //-------------------------------------------------------------------------------------------------
+int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
+                                 const int lb_block_dimension, const int lb_grid_dimension) {
+  int best_size;
+  double best_efficiency = 0.0;
+  const double dlb_block_dimension = static_cast<double>(lb_block_dimension);
+  for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms; vs *= 2) {
+    const int unique_atom_coverage = vs - 12;
+    int nvwu_est = 0;
+    double occupancy = 0.0;
+    for (int i = 0; i < system_count; i++) {
+      const int tnvwu = (atom_counts[i] + unique_atom_coverage - 1) / unique_atom_coverage;
+      nvwu_est += tnvwu;
+      const int work_est = 5 * unique_atom_coverage;
+      const int vwu_work_batches = (work_est + lb_block_dimension - 1) / lb_block_dimension;
+      occupancy += static_cast<double>(tnvwu) * (static_cast<double>(work_est) /
+                                                 static_cast<double>(vwu_work_batches *
+                                                                     lb_block_dimension));
+    }
+    const double dnvwu_est = static_cast<double>(nvwu_est);
+    occupancy /= dnvwu_est;
+    const int batches = (nvwu_est + lb_grid_dimension - 1) / lb_grid_dimension;
+    const double dslots = static_cast<double>(batches * lb_grid_dimension);
+    const double efficiency = dnvwu_est * occupancy / dslots;
+    if (efficiency > best_efficiency) {
+      best_efficiency = efficiency;
+      best_size = vs;
+    }
+  }
+  return best_size;
+}
+
+//-------------------------------------------------------------------------------------------------
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int lb_block_dimension,
+                                 const int lb_grid_dimension) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), lb_block_dimension,
+                                      lb_grid_dimension);
+}
+
+//-------------------------------------------------------------------------------------------------
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int lb_block_dimension,
+                                 const int lb_grid_dimension) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), lb_block_dimension,
+                                      lb_grid_dimension);
+}
+
+//-------------------------------------------------------------------------------------------------
 std::vector<ValenceWorkUnit> buildValenceWorkUnits(const AtomGraph *ag,
                                                    const RestraintApparatus *ra,
                                                    const int max_atoms_per_vwu) {
