@@ -186,6 +186,26 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
 // uploaded to the device.
 //
 // Arguments:
+//   poly_ps:
+//   mmctrl:
+//   valence_tb_space:
+//   nonbond_tb_space:
+//   poly_ag:
+//   poly_se:
+//   prec:
+//   gpu:
+//   launcher:
+//   bond_tol:
+//   angl_tol:
+//   dihe_tol:
+//   impr_tol:
+//   ubrd_tol:
+//   cimp_tol:
+//   cmap_tol:
+//   lj14_tol:
+//   qq14_tol:
+//   rstr_tol:
+//   do_tests:
 //-------------------------------------------------------------------------------------------------
 void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl,
                               CacheResource *valence_tb_space, CacheResource *nonbond_tb_space,

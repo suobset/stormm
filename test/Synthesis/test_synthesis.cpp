@@ -48,6 +48,7 @@ using omni::data_types::double3;
 using omni::data_types::double4;
 using omni::data_types::ValueWithCounter;
 using omni::diskutil::DrivePathType;
+using omni::diskutil::getBaseName;
 using omni::diskutil::getDrivePathType;
 using omni::diskutil::openOutputFile;
 using omni::diskutil::osSeparator;
@@ -605,6 +606,62 @@ std::vector<std::vector<int>> getAtomForceContributors(const AtomGraph &ag,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check that the non-bonded work units for a system cover all tiles along the diagonal and below
+// it, no more or less.
+//
+// Arguments:
+//   nbwu_vec:  Vector of non-bonded work units
+//   ag:        Topology for the system of interest (this contains the atom count and, if needed,
+//              the file name for error reporting purposes)
+//   do_tests:  Indication that tests should be performed at all
+//-------------------------------------------------------------------------------------------------
+void checkNonbondedWorkUnitCoverage(const std::vector<NonbondedWorkUnit> &nbwu_vec,
+                                    const AtomGraph &ag, const TestPriority do_tests) {
+  const int natom = ag.getAtomCount();
+  const int ntile = (natom + tile_length - 1) / tile_length;
+  std::vector<bool> covered(ntile * ntile, false);
+  const size_t nnbwu = nbwu_vec.size();
+  int nduplicate = 0;
+  for (size_t wu_idx = 0; wu_idx < nnbwu; wu_idx++) {
+    const std::vector<int> abstract = nbwu_vec[wu_idx].getAbstract();
+    std::vector<int> imports(abstract[0]);
+    for (int i = 0; i < abstract[0]; i++) {
+      imports[i] = abstract[i + 1] / tile_length;
+    }
+    const std::vector<uint2> tinsr = nbwu_vec[wu_idx].getTileInstructions();
+
+    // Translate the instruction back to the absolute tile numbers in the system (the absolute
+    // tile number of any atom is the absolute topological atom index number divided by the tile
+    // length).
+    const size_t insr_count = tinsr.size();
+    for (size_t i = 0; i < insr_count; i++) {
+      const int absc_side = imports[(tinsr[i].x & 0xffff) / tile_length];
+      const int ordi_side = imports[((tinsr[i].x >> 16) & 0xffff) / tile_length];
+      const int ao_idx = (absc_side * ntile) + ordi_side;
+      const int oa_idx = (ordi_side * ntile) + absc_side;
+      if (covered[ao_idx] || covered[oa_idx]) {
+        nduplicate++;
+      }
+      covered[ao_idx] = true;
+      covered[oa_idx] = true;
+    }
+  }
+  int nmissing = 0;
+  for (int i = 0; i < ntile; i++) {
+    for (int j = 0; j <= i; j++) {
+      nmissing += (covered[(j * ntile) + i] == false);
+    }
+  }
+  check(nduplicate, RelationalOperator::EQUAL, 0, "Duplicate non-bonded work unit tiles were "
+        "discovered in the topology for " + getBaseName(ag.getFileName()) + ", containing " +
+        std::to_string(natom) + " atoms.  Some interactions would be double-counted.", do_tests);
+  check(nmissing, RelationalOperator::EQUAL, 0, "A total of " + std::to_string(nmissing) +
+        " non-bonded tiles were missing in the work units for the topology described in " +
+        getBaseName(ag.getFileName()) + ", containing " + std::to_string(natom) + " atoms.",
+        do_tests);
+}
+
+//-------------------------------------------------------------------------------------------------
 // Main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -1055,7 +1112,7 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> nbt_counts_answer = { 12246, 190, 15, 21 };
   const std::vector<size_t> nbwu_counts = { dhfr_nbv.size(), trpi_nbv.size(), lig1_nbv.size(),
                                             lig2_nbv.size() };
-  const std::vector<size_t> nbwu_counts_answer = { 766LLU, 24LLU, 2LLU, 3LLU };
+  const std::vector<size_t> nbwu_counts_answer = { 1531LLU, 24LLU, 2LLU, 3LLU };
   check(nbwu_counts, RelationalOperator::EQUAL, nbwu_counts_answer, "The number of non-bonded "
         "work units obtained for four systems in isolated boundary conditions do not meet "
         "expectations.", do_semk_tests);
@@ -1069,7 +1126,11 @@ int main(const int argc, const char* argv[]) {
   }
   check(poly_nbt_count, RelationalOperator::EQUAL, 25345, "The number of non-bonded tiles "
         "obtained for the compiled set of systems does not meet expectations.", do_semk_tests);
-  
+  checkNonbondedWorkUnitCoverage(dhfr_nbv, dhfr_ag, do_semk_tests);
+  checkNonbondedWorkUnitCoverage(trpi_nbv, trpi_ag, do_semk_tests);
+  checkNonbondedWorkUnitCoverage(lig1_nbv, lig1_ag, do_semk_tests);
+  checkNonbondedWorkUnitCoverage(lig2_nbv, lig2_ag, do_semk_tests);
+
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 
