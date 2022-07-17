@@ -578,16 +578,21 @@ int main(const int argc, const char* argv[]) {
                            6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6, do_tests);
 
   // CHECK
-  const int n_copies = 100;
-  ligand_tiling.resize(n_copies, 0);
+#if 0
+  const int n_copies = 63;
+  ligand_tiling.resize(n_copies);
+  for (int i = 0; i < n_copies; i++) {
+    ligand_tiling[i] = 1;
+  }
   PhaseSpaceSynthesis ligand_lpoly_ps(bigger_crds, bigger_tops, ligand_tiling);
   PhaseSpaceSynthesis ligand_lpoly_ps_dbl(bigger_crds, bigger_tops, ligand_tiling, 40, 24,
                                           34, 44);
   AtomGraphSynthesis ligand_lpoly_ag(bigger_tops, ligand_tiling,
-                                     ExceptionResponse::WARN, 96, &timer);
+                                     ExceptionResponse::WARN, 95, &timer);
   StaticExclusionMaskSynthesis ligand_lpoly_se(ligand_lpoly_ag.getTopologyPointers(),
                                                ligand_lpoly_ag.getTopologyIndices());
   ligand_lpoly_ag.loadNonbondedWorkUnits(ligand_lpoly_se);
+  printf("There are %4d valence work units.\n", ligand_lpoly_ag.getValenceWorkUnitCount());
   KernelManager lligand_launcher = selectLaunchParameters(gpu, ligand_lpoly_ag);
   mmctrl.primeWorkUnitCounters(lligand_launcher, PrecisionModel::SINGLE, ligand_lpoly_ag);
   ligand_lpoly_ag.upload();
@@ -595,8 +600,8 @@ int main(const int argc, const char* argv[]) {
   ligand_lpoly_ps.upload();
   ligand_lpoly_ps_dbl.upload();
   ScoreCard lligand_sc(n_copies, 1, 32);
-  printf("There are %4d valence work units\n", ligand_lpoly_ag.getValenceWorkUnitCount());
   timer.assignTime(0);
+#if 0
   lligand_launcher.printLaunchParameters(valenceKernelKey(PrecisionModel::SINGLE,
                                                           EvaluateForce::NO, EvaluateEnergy::YES,
                                                           ForceAccumulationMethod::WHOLE,
@@ -605,8 +610,9 @@ int main(const int argc, const char* argv[]) {
                                                           EvaluateForce::YES, EvaluateEnergy::NO,
                                                           ForceAccumulationMethod::WHOLE,
                                                           VwuGoal::ACCUMULATE));
+#endif
   const int tenk_timings = timer.addCategory("Run 1k TrpCage");
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 10000; i++) {
     mmctrl.incrementStep();
     ligand_lpoly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
     launchValenceSp(ligand_lpoly_ag, &mmctrl, &ligand_lpoly_ps, &lligand_sc, &valence_tb_space,
@@ -620,10 +626,10 @@ int main(const int argc, const char* argv[]) {
       printf("  %9.4lf  %9.4lf  %9.4lf\n", devc_psw.xfrc[j], devc_psw.yfrc[j], devc_psw.zfrc[j]);
     }
     printf("];\n");
-#endif
     launchNonbondedTileGroupsSp(ligand_lpoly_ag, ligand_lpoly_se, &mmctrl, &ligand_lpoly_ps, &sc,
                                 &nonbond_tb_space, EvaluateForce::YES, EvaluateEnergy::NO,
                                 ForceAccumulationMethod::SPLIT, lligand_launcher);
+#endif
   }
   cudaDeviceSynchronize();
   timer.assignTime(tenk_timings);  
@@ -633,6 +639,7 @@ int main(const int argc, const char* argv[]) {
                          PrecisionModel::SINGLE, gpu, lligand_launcher, 7.5e-5, 3.0e-3, do_tests);
   const int chk_timings = timer.addCategory("Run 10k check");
   timer.assignTime(chk_timings);  
+#endif
 #endif
   // END CHECK
   

@@ -2,6 +2,7 @@
 #ifndef OMNI_NONBONDED_WORKUNIT_H
 #define OMNI_NONBONDED_WORKUNIT_H
 
+#include "Math/summation.h"
 #include "Topology/atomgraph.h"
 #include "Potential/static_exclusionmask.h"
 #include "static_mask_synthesis.h"
@@ -13,7 +14,8 @@ namespace synthesis {
 using energy::StaticExclusionMask;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
-  
+using math::sum;
+
 /// \brief The maximum number of imported atoms in a "small" nonbonded block (256 threads)
 constexpr int small_block_max_atoms = 320;
 
@@ -187,7 +189,11 @@ private:
 ///                            additions that this function might make.  Appended and returned.
 /// \param import_coverage     Array of 0's and 1's (an int, rather than boolean, array for
 ///                            versatility in passing to and from this function and for direct
-///                            summation with other integers).  Edited and returned.
+///                            summation with other integers).  Spans all systems but does not
+///                            necessarily align with the atom offsets in the corresponding phase
+///                            space synthesis, topology synthesis, or mask synthesis.  Edited and
+///                            returned.
+/// \param system_tile_starts  Bounds array for systems within the import coverage array
 /// \param import_count        The total number of imported tiles' worth of atoms.  Updated and
 ///                            returned.
 /// \param current_tile_count  The current number of tiles, updarted and returned.
@@ -196,7 +202,8 @@ private:
 /// \param tj                  Tile index of the ordinate atoms (starting atom index divided by
 ///                            tile_length)
 /// \param sysid               System index from which the tiles are derived
-bool addTileToWorkUnitList(int3* tile_list, int* import_coverage, int *import_count,
+bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
+                           const std::vector<int> &system_tile_starts, int *import_count,
                            int *current_tile_count, const int ti, const int tj, const int sysid);
 
 /// \brief Create a list of work units of a consistent size so as to optimize the load balancing

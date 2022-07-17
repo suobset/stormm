@@ -443,25 +443,11 @@ size_t estimateNonbondedWorkUnitCount(const std::vector<int> &atom_counts, const
     const size_t ntile_side = (nbwu_tile == huge_nbwu_tiles) ?
                               (atom_counts[i] + supertile_length - 1) / supertile_length :
                               (atom_counts[i] + tile_length - 1) / tile_length;
-
-    // CHECK
-    if (nsys == 1600 && i == 49) {
-      printf("ntile_side = %4zu\n", ntile_side);
-    }
-    // END CHECK
-    
     result += ntile_side * (ntile_side + 1LLU) / 2LLU;
   }
   if (nbwu_tile == tiny_nbwu_tiles || nbwu_tile == small_nbwu_tiles ||
       nbwu_tile == medium_nbwu_tiles || nbwu_tile == large_nbwu_tiles) {
     const size_t nbwu_tile_zu = static_cast<size_t>(nbwu_tile);
-
-    // CHECK
-    printf("From %4zu total systems...\n", nsys);
-    printf("%8zu total tiles -> %6llu work units of %2d tiles each\n", result,
-           (result + nbwu_tile_zu - 1LLU) / nbwu_tile_zu, nbwu_tile);
-    // END CHECK
-    
     return (result + nbwu_tile_zu - 1LLU) / nbwu_tile_zu;
   }
   else if (nbwu_tile == huge_nbwu_tiles) {
@@ -475,10 +461,12 @@ size_t estimateNonbondedWorkUnitCount(const std::vector<int> &atom_counts, const
 }
 
 //-------------------------------------------------------------------------------------------------
-bool addTileToWorkUnitList(int3* tile_list, int* import_coverage, int *import_count,
+bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
+                           const std::vector<int> &system_tile_starts, int *import_count,
                            int *current_tile_count, const int ti, const int tj, const int sysid) {
   const int c_ic  = *import_count;
-  if (c_ic + 2 - import_coverage[ti] - import_coverage[tj] > small_block_max_imports) {
+  if (c_ic + 2 - import_coverage[ti + system_tile_starts[sysid]] -
+                 import_coverage[tj + system_tile_starts[sysid]] > small_block_max_imports) {
     return false;
   }
   else {
@@ -487,8 +475,8 @@ bool addTileToWorkUnitList(int3* tile_list, int* import_coverage, int *import_co
     tile_list[c_tile].y = tj;
     tile_list[c_tile].z = sysid;
     *import_count = c_ic + 2 - import_coverage[ti] - import_coverage[tj];
-    import_coverage[ti] = 1;
-    import_coverage[tj] = 1;
+    import_coverage[ti + system_tile_starts[sysid]] = 1;
+    import_coverage[tj + system_tile_starts[sysid]] = 1;
     *current_tile_count += 1;
     return true;
   }
@@ -502,10 +490,12 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
   // Determine the optimal overall size for work units.  Given that this process is guided by
   // static (as opposed to forward) exclusion masks, this is a matter of how many atoms are
   // present in all topologies and the number of tiles it would take to cover them all.
-  const int nsys = poly_se.getSystemCount();
-  std::vector<int> atom_counts(nsys);
-  for (int i = 0; i < nsys; i++) {
-    atom_counts[i] = poly_se.getAtomCount(i);
+  const SeMaskSynthesisReader poly_ser = poly_se.data();
+  std::vector<int> atom_counts(poly_ser.nsys);
+  std::vector<int> atom_offsets(poly_ser.nsys);
+  for (int i = 0; i < poly_ser.nsys; i++) {
+    atom_counts[i]  = poly_ser.atom_counts[i];
+    atom_offsets[i] = poly_ser.atom_offsets[i];
   }
     
   // Try work units of eight, sixteen, 32, and 64 tiles before going to the gargantuan,
@@ -515,40 +505,25 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
   const size_t medium_wu_count = estimateNonbondedWorkUnitCount(atom_counts, medium_nbwu_tiles);
   const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, large_nbwu_tiles);
   const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_tiles);
-  if (tiny_wu_count < 128) {
-
-    // CHECK
-    printf("Find %4zu tiny work units.\n", tiny_wu_count);
-    // END CHECK
-    
-    return enumerateNonbondedWorkUnits(poly_se, tiny_nbwu_tiles, tiny_wu_count, atom_counts);
+  if (tiny_wu_count < 2 * kilo) {
+    return enumerateNonbondedWorkUnits(poly_se, tiny_nbwu_tiles, tiny_wu_count, atom_counts,
+                                       atom_offsets);
   }
-  else if (small_wu_count < 256) {
-
-    // CHECK
-    printf("Find %4zu small work units.\n", small_wu_count);
-    // END CHECK
-    
-    return enumerateNonbondedWorkUnits(poly_se, small_nbwu_tiles, small_wu_count, atom_counts);    
+  else if (small_wu_count < 4 * kilo) {
+    return enumerateNonbondedWorkUnits(poly_se, small_nbwu_tiles, small_wu_count, atom_counts,
+                                       atom_offsets);
   }
-  else if (medium_wu_count < 256) {
-
-    // CHECK
-    printf("Find %5zu medium work units.\n", medium_wu_count);
-    // END CHECK
-    
-    return enumerateNonbondedWorkUnits(poly_se, medium_nbwu_tiles, medium_wu_count, atom_counts);
+  else if (medium_wu_count < 16 * kilo) {
+    return enumerateNonbondedWorkUnits(poly_se, medium_nbwu_tiles, medium_wu_count, atom_counts,
+                                       atom_offsets);
   }
-  else if (large_wu_count < mega) {
-
-    // CHECK
-    printf("Find %6zu large work units.\n", large_wu_count);
-    // END CHECK
-    
-    return enumerateNonbondedWorkUnits(poly_se, large_nbwu_tiles, large_wu_count, atom_counts);
+  else if (large_wu_count < 128 * kilo) {
+    return enumerateNonbondedWorkUnits(poly_se, large_nbwu_tiles, large_wu_count, atom_counts,
+                                       atom_offsets);
   }
   else {    
-    return enumerateNonbondedWorkUnits(poly_se, huge_nbwu_tiles, huge_wu_count, atom_counts);
+    return enumerateNonbondedWorkUnits(poly_se, huge_nbwu_tiles, huge_wu_count, atom_counts,
+                                       atom_offsets);
   }
 }
 
@@ -556,25 +531,31 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
 std::vector<NonbondedWorkUnit>
 buildNonbondedWorkUnits(const StaticExclusionMask &se) {
   const std::vector<int> atom_counts = { se.getAtomCount() };
+  const std::vector<int> atom_offsets(1, 0);
   const size_t tiny_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, tiny_nbwu_tiles);
   const size_t small_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, small_nbwu_tiles);
   const size_t medium_wu_count = estimateNonbondedWorkUnitCount(atom_counts, medium_nbwu_tiles);
   const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, large_nbwu_tiles);
   const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_tiles);
-  if (tiny_wu_count < kilo) {
-    return enumerateNonbondedWorkUnits(se, tiny_nbwu_tiles, tiny_wu_count, atom_counts);
+  if (tiny_wu_count < 2 * kilo) {
+    return enumerateNonbondedWorkUnits(se, tiny_nbwu_tiles, tiny_wu_count, atom_counts,
+                                       atom_offsets);
   }
-  else if (small_wu_count < 2 * kilo) {
-    return enumerateNonbondedWorkUnits(se, small_nbwu_tiles, small_wu_count, atom_counts);
+  else if (small_wu_count < 4 * kilo) {
+    return enumerateNonbondedWorkUnits(se, small_nbwu_tiles, small_wu_count, atom_counts,
+                                       atom_offsets);
   }
   else if (medium_wu_count < 16 * kilo) {
-    return enumerateNonbondedWorkUnits(se, medium_nbwu_tiles, medium_wu_count, atom_counts);
+    return enumerateNonbondedWorkUnits(se, medium_nbwu_tiles, medium_wu_count, atom_counts,
+                                       atom_offsets);
   }
   else if (large_wu_count < 128 * kilo) {
-    return enumerateNonbondedWorkUnits(se, large_nbwu_tiles, large_wu_count, atom_counts);
+    return enumerateNonbondedWorkUnits(se, large_nbwu_tiles, large_wu_count, atom_counts,
+                                       atom_offsets);
   }
   else {
-    return enumerateNonbondedWorkUnits(se, huge_nbwu_tiles, huge_wu_count, atom_counts);
+    return enumerateNonbondedWorkUnits(se, huge_nbwu_tiles, huge_wu_count, atom_counts,
+                                       atom_offsets);
   }
   __builtin_unreachable();
 }
