@@ -90,5 +90,10 @@ std::string GpuDetails::getCardName() const {
   return card_name;
 }
 
+//-------------------------------------------------------------------------------------------------
+void GpuDetails::setSMPCount(const int smp_count_in) {
+  smp_count = smp_count_in;
+}
+
 } // namespace card
 } // namespace omni

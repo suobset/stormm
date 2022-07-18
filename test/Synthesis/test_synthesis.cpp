@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "../../src/Accelerator/hybrid.h"
+#include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Chemistry/atommask.h"
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
@@ -12,8 +13,10 @@
 #include "../../src/DataTypes/mixed_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
-#include "../../src/Math/vector_ops.h"
+#include "../../src/Math/rounding.h"
 #include "../../src/Math/sorting.h"
+#include "../../src/Math/summation.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/Namelists/nml_files.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/scorecard.h"
@@ -27,6 +30,7 @@
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Synthesis/nonbonded_workunit.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/reduction_workunit.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/valence_workunit.h"
@@ -40,6 +44,8 @@ using omni::chemistry::ChemicalFeatures;
 using omni::chemistry::MapRotatableGroups;
 using omni::constants::ExceptionResponse;
 using omni::constants::verytiny;
+using omni::constants::tiny;
+using omni::constants::warp_size_int;
 using omni::data_types::int2;
 using omni::data_types::uint2;
 using omni::data_types::uint3;
@@ -53,9 +59,6 @@ using omni::diskutil::getDrivePathType;
 using omni::diskutil::openOutputFile;
 using omni::diskutil::osSeparator;
 using omni::errors::rtWarn;
-using omni::math::readBitFromMask;
-using omni::math::reduceUniqueValues;
-using omni::math::UniqueValueHandling;
 using omni::namelist::FilesControls;
 using omni::parse::TextFile;
 using omni::random::Xoroshiro128pGenerator;
@@ -67,7 +70,9 @@ using omni::restraints::RestraintKit;
 using omni::structure::distance;
 using omni::structure::angle;
 using omni::structure::dihedral_angle;
+using namespace omni::card;
 using namespace omni::energy;
+using namespace omni::math;
 using namespace omni::numerics;
 using namespace omni::synthesis;
 using namespace omni::testing;
@@ -662,6 +667,116 @@ void checkNonbondedWorkUnitCoverage(const std::vector<NonbondedWorkUnit> &nbwu_v
 }
 
 //-------------------------------------------------------------------------------------------------
+// Run a mock reduction by construction work units and then checking the results against a direct,
+// single-threaded approach over the same series of "systems."
+//
+// Arguments:
+//   atom_counts:   Sizes of each system in the collection / mock synthesis
+//   atom_offsets:  Starting indices of each system in the concatenated list
+//   prop_x:        Vector containing individual "atom" readouts, the first of up to three
+//                  properties to reduce across each system
+//   prop_y:        [Optional] Vector containing the second property to reduce across each system
+//   prop_z:        [Optional] Vector containing the third property to reduce across each system
+//-------------------------------------------------------------------------------------------------
+void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &atom_offsets,
+                   const std::vector<double> &prop_x, const std::vector<double> &prop_y = {},
+                   const std::vector<double> &prop_z = {}) {
+
+  // The mock GPU will have 84 streaming multiprocessors.
+  GpuDetails gpu;
+  gpu.setSMPCount(84);
+  const int nprop = 1 + (prop_y.size() == prop_x.size()) + (prop_z.size() == prop_x.size());
+  const std::vector<ReductionWorkUnit> rwu_vec = buildReductionWorkUnits(atom_offsets, atom_counts,
+                                                                         gpu, nprop);
+  const size_t nsys = atom_counts.size();
+  std::vector<double> chksum_x(nsys, 0.0), chksum_y(nsys, 0.0), chksum_z(nsys, 0.0);
+  int max_stash = 0;
+  const size_t nrwu = rwu_vec.size();
+  for (size_t i = 0; i < nrwu; i++) {
+    max_stash = std::max(max_stash, rwu_vec[i].getResultIndex() + 1);
+  }
+  std::vector<double> rwusum_x(max_stash, 0.0), rwusum_y(max_stash, 0.0), rwusum_z(max_stash, 0.0);
+  for (size_t i = 0; i < nsys; i++) {
+    chksum_x[i] = sum<double>(&prop_x[atom_offsets[i]], atom_counts[i]);
+    if (prop_y.size() == prop_x.size()) {
+      chksum_y[i] = sum<double>(&prop_y[atom_offsets[i]], atom_counts[i]);
+    }
+    if (prop_z.size() == prop_x.size()) {
+      chksum_z[i] = sum<double>(&prop_z[atom_offsets[i]], atom_counts[i]);
+    }
+  }
+  for (size_t i = 0; i < nrwu; i++) {
+    const int min_wu_idx = rwu_vec[i].getAtomStart();
+    const int max_wu_idx = rwu_vec[i].getAtomEnd();
+    const int wu_res_idx = rwu_vec[i].getResultIndex();
+    rwusum_x[wu_res_idx] = sum<double>(&prop_x[min_wu_idx], max_wu_idx - min_wu_idx);
+    if (prop_y.size() == prop_x.size()) {
+      rwusum_y[wu_res_idx] = sum<double>(&prop_y[min_wu_idx], max_wu_idx - min_wu_idx);
+    }
+    if (prop_z.size() == prop_x.size()) {
+      rwusum_z[wu_res_idx] = sum<double>(&prop_z[min_wu_idx], max_wu_idx - min_wu_idx);
+    }
+  }
+  std::vector<int2> dep_chk(nsys);
+  std::vector<bool> dep_found(nsys, false);
+  std::vector<double> rwu_result_x(nsys), rwu_result_y(nsys), rwu_result_z(nsys);
+  bool dep_mismatch = false;
+  for (size_t i = 0; i < nrwu; i++) {
+    const int dep_start = rwu_vec[i].getDependencyStart();
+    const int dep_end   = rwu_vec[i].getDependencyEnd();
+    const int sys_idx   = rwu_vec[i].getSystemIndex();
+    if (dep_found[sys_idx]) {
+      dep_mismatch = (dep_mismatch ||
+                      dep_start != dep_chk[sys_idx].x || dep_end != dep_chk[sys_idx].y);
+    }
+    else {
+      dep_found[sys_idx] = true;
+      dep_chk[sys_idx].x = dep_start;
+      dep_chk[sys_idx].y = dep_end;
+    }
+  }
+  for (size_t i = 0; i < nsys; i++) {
+    rwu_result_x[i] = sum<double>(&rwusum_x[dep_chk[i].x], dep_chk[i].y - dep_chk[i].x);
+    if (prop_y.size() == prop_x.size()) {
+      rwu_result_y[i] = sum<double>(&rwusum_y[dep_chk[i].x], dep_chk[i].y - dep_chk[i].x);
+    }
+    if (prop_z.size() == prop_x.size()) {
+      rwu_result_z[i] = sum<double>(&rwusum_z[dep_chk[i].x], dep_chk[i].y - dep_chk[i].x);
+    }
+  }
+  check(dep_mismatch == false, "Dependencies for various reduction work units are inconsistent "
+        "across work units serving the same system in a collection with between " +
+        std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
+        " items per system.");
+  check(rwu_result_x, RelationalOperator::EQUAL, Approx(chksum_x).margin(tiny), "Reduction work "
+        "units did not properly guide the summation of X values in a collection with between " +
+        std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
+        " items per system.");
+  if (prop_y.size() == prop_x.size()) {
+    check(rwu_result_y, RelationalOperator::EQUAL, Approx(chksum_y).margin(tiny), "Reduction work "
+          "units did not properly guide the summation of Y values in a collection with between " +
+          std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
+          " items per system.");
+  }
+  if (prop_z.size() == prop_x.size()) {
+    check(rwu_result_z, RelationalOperator::EQUAL, Approx(chksum_z).margin(tiny), "Reduction work "
+          "units did not properly guide the summation of Z values in a collection with between " +
+          std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
+          " items per system.");
+  }
+
+  // CHECK
+#if 0
+  for (size_t i = 0; i < rwu_vec.size(); i++) {
+    printf("  %8d  %8d  %4d %4d %4d   %4d\n", rwu_vec[i].getAtomStart(), rwu_vec[i].getAtomEnd(),
+           rwu_vec[i].getResultIndex(), rwu_vec[i].getDependencyStart(),
+           rwu_vec[i].getDependencyEnd(), rwu_vec[i].getSystemIndex());
+  }
+#endif
+  // END CHECK
+}
+
+//-------------------------------------------------------------------------------------------------
 // Main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -680,6 +795,12 @@ int main(const int argc, const char* argv[]) {
 
   // Section 4
   section("Static exclusion mask compilation");
+
+  // Section 5
+  section("Non-bonded work unit construction");
+
+  // Section 6
+  section("Reduction work unit construction");
 
   // Test the construction of a systems cache (one possible precursor to a synthesis of
   // coordinates and / or topologies)
@@ -1092,6 +1213,7 @@ int main(const int argc, const char* argv[]) {
   check(mask_mismatches, RelationalOperator::EQUAL, std::vector<int>(system_indices.size(), 0),
         "Exclusions referenced from the compilation of systems do not match those obtained from "
         "the individual systems' static exclusion masks.", do_semk_tests);
+  section(5);
   const std::vector<NonbondedWorkUnit> dhfr_nbv = buildNonbondedWorkUnits(dhfr_se);
   const std::vector<NonbondedWorkUnit> trpi_nbv = buildNonbondedWorkUnits(trpi_se);
   const std::vector<NonbondedWorkUnit> lig1_nbv = buildNonbondedWorkUnits(lig1_se);
@@ -1131,6 +1253,49 @@ int main(const int argc, const char* argv[]) {
   checkNonbondedWorkUnitCoverage(lig1_nbv, lig1_ag, do_semk_tests);
   checkNonbondedWorkUnitCoverage(lig2_nbv, lig2_ag, do_semk_tests);
 
+  // Test reduction work unit construction using a series of dummy vectors as test data
+  section(6);
+  std::vector<int> small_system_counts(100), small_system_offsets(100);
+  int running_total = 0;
+  for (int i = 0; i < 100; i++) {
+    small_system_counts[i]  = 48.0 * (1.5 - my_prng.uniformRandomNumber());
+    small_system_offsets[i] = running_total;
+    running_total += roundUp(small_system_counts[i], warp_size_int);
+  }
+  std::vector<double> small_system_prop_x(running_total);
+  std::vector<double> small_system_prop_y(running_total);
+  std::vector<double> small_system_prop_z(running_total);
+  for (int i = 0; i < running_total; i++) {
+    small_system_prop_x[i] = my_prng.uniformRandomNumber();
+    small_system_prop_y[i] = my_prng.uniformRandomNumber();
+    small_system_prop_z[i] = my_prng.uniformRandomNumber();
+  }
+  testReduction(small_system_counts, small_system_offsets, small_system_prop_x);
+  testReduction(small_system_counts, small_system_offsets, small_system_prop_x,
+                small_system_prop_y);
+  testReduction(small_system_counts, small_system_offsets, small_system_prop_x,
+                small_system_prop_y, small_system_prop_z);
+  std::vector<int> large_system_counts(100), large_system_offsets(100);
+  running_total = 0;
+  for (int i = 0; i < 100; i++) {
+    large_system_counts[i]  = 480.0 * (1.5 - my_prng.uniformRandomNumber());
+    large_system_offsets[i] = running_total;
+    running_total += roundUp(large_system_counts[i], warp_size_int);
+  }
+  std::vector<double> large_system_prop_x(running_total);
+  std::vector<double> large_system_prop_y(running_total);
+  std::vector<double> large_system_prop_z(running_total);
+  for (int i = 0; i < running_total; i++) {
+    large_system_prop_x[i] = my_prng.uniformRandomNumber();
+    large_system_prop_y[i] = my_prng.uniformRandomNumber();
+    large_system_prop_z[i] = my_prng.uniformRandomNumber();
+  }
+  testReduction(large_system_counts, large_system_offsets, large_system_prop_x);
+  testReduction(large_system_counts, large_system_offsets, large_system_prop_x,
+                large_system_prop_y);
+  testReduction(large_system_counts, large_system_offsets, large_system_prop_x,
+                large_system_prop_y, large_system_prop_z);
+  
   // Summary evaluation
   printTestSummary(oe.getVerbosity());
 

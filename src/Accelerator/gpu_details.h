@@ -83,6 +83,12 @@ public:
   /// \brief Get the name of the GPU
   std::string getCardName() const;
 
+  /// \brief Set the number of streaming multiprocessors.  This is useful for experimentation in
+  ///        mock settings, or perhaps running OMNI on GPUs when MiG is engaged.
+  ///
+  /// \param smp_count_in  The number of streaming multiprocessors
+  void setSMPCount(int smp_count_in);
+  
 private:
   bool available;            ///< Flag to indicate whether a GPU is available for the program's use
   bool supported;            ///< Flag to indicate whether OMNI supports this GPU

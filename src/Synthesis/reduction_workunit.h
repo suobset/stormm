@@ -4,13 +4,15 @@
 
 #include <vector>
 #include "Accelerator/gpu_details.h"
-#include "Accelerator/kernel_manager.h"
 
 namespace omni {
 namespace synthesis {
 
 using card::GpuDetails;
-using card::KernelManager;
+
+/// \brief The maximum number of slots into which gathering-related kernels can funnel their
+///        results.
+constexpr int maximum_gathering_results = 1024;
 
 /// \brief A work unit to describe the manner in which groups of atoms in each structure of a
 ///        synthesis come together to contribute to a single result.  Reduction work units serve
@@ -24,7 +26,7 @@ public:
 
   /// \brief The constructor takes arguments for all members.
   ReductionWorkUnit(int atom_start_in, int atom_end_in, int result_index_in,
-                    int dependency_start_in, int dependency_end_in);
+                    int dependency_start_in, int dependency_end_in, int system_index_in);
 
   /// \brief Get the atom starting index.
   int getAtomStart() const;
@@ -44,6 +46,10 @@ public:
   ///        system as this reduction work unit.
   int getDependencyEnd() const;
 
+  /// \brief Get the system to which this reduction work unit pertains (each reduction work unit
+  ///        will serve one and only one system in a synthesis)
+  int getSystemIndex() const;
+
 private:
   int atom_start;        ///< Lower limit of atoms in the unified synthesis array which contribute
                          ///<   to this work unit's reduction operation
@@ -55,6 +61,9 @@ private:
                          ///<   work units pertaining to the same system
   int dependency_end;    ///< Upper bounding index, in the accumulation arrays, of results from
                          ///<   reduction work units pertaining to the same system
+  int system_index;      ///< The system to which the result pertains (this may or may not be
+                         ///<   necessary, given the availability of bounds in atom_start and
+                         ///<   atom_end)
 };
 
 /// \brief Build the reduction (and their components of gathering and scattering) work units for
@@ -62,21 +71,21 @@ private:
 ///        needed, and only those are provided (rather than the AtomGraphSynthesis itself, from
 ///        which these arrays are probably derived), to avoid circular dependencies.
 ///
-/// \param atom_starts  Starting indices for atoms of each system in the collection (the length of
-///                     this array will determine the number of systems--provide a vector with a
-///                     single entry of zero to get reduction work units for a single system)
-/// \param atom_counts  Atom counts for all systems in the collection
-/// \param gpu          Details of the selected GPU to be used for calculations
-/// \param launcher     Object to collect wisdom about optimal kernel launch configurations with
-///                     the work unit array chosen to suit the collection of systems
-/// \param task_count   The number of values to reduce across each system.  A center of geometry
-///                     computation would have three values (X, Y, and Z), whereas a total charge
-///                     summation with a mask would have only one.
+/// \param atom_starts     Starting indices for atoms of each system in the collection (the length
+///                        of this array will determine the number of systems--provide a vector
+///                        with a single entry of zero to get reduction work units for a single
+///                        system)
+/// \param atom_counts     Atom counts for all systems in the collection
+/// \param gpu             Details of the selected GPU to be used for calculations
+/// \param launcher        Object to collect wisdom about optimal kernel launch configurations with
+///                        the work unit array chosen to suit the collection of systems
+/// \param tasks_per_atom  The number of values to reduce across each system.  A center of geometry
+///                        computation would have three values (X, Y, and Z), whereas a total
+///                        charge summation with a mask would have only one.
 std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &atom_starts,
                                                        const std::vector<int> &atom_counts,
                                                        const GpuDetails &gpu,
-                                                       KernelManager *launcher,
-                                                       int task_count = 1);
+                                                       int tasks_per_atom = 1);
 } // namespace synthesis
 } // namespace omni
 
