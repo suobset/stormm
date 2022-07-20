@@ -4,19 +4,25 @@
 #include <nvml.h>
 #include "../../src/Accelerator/hpc_config.cuh"
 #include "../../src/Accelerator/hybrid.h"
+#include "../../src/Accelerator/ptx_macros.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"
+#include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using omni::constants::warp_size_int;
 using omni::constants::ExceptionResponse;
+using omni::data_types::int95_t;
 using omni::data_types::llint;
 using omni::data_types::ullint;
+using omni::numerics::max_int_accumulation;
 using omni::numerics::max_int_accumulation_f;
 using omni::numerics::max_int_accumulation_ll;
+using omni::numerics::max_llint_accumulation;
+using omni::numerics::max_llint_accumulation_f;
 using namespace omni::card;
 using namespace omni::testing;
 
@@ -68,14 +74,13 @@ __global__ void __launch_bounds__(512, 2) kWorkInt64(llint* result) {
 //-------------------------------------------------------------------------------------------------
 // This kernel will accumulate values using split int32 accumulators.
 //-------------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(512, 2) kAddSplit(int* overflow, llint* result) {
-  __shared__ int primary[512], overflow_active[512 / warp_size_int];
+__global__ void __launch_bounds__(512, 2) kAddSplit(llint* result) {
+  __shared__ int primary[512], overflow[512];
   float contrib = (float)(threadIdx.x);
   float incr = 1.3f;
   primary[threadIdx.x] = 0;
   const size_t pos = (blockIdx.x * blockDim.x) + threadIdx.x;
-  overflow[pos] = 0;
-  int* ovrf_ptr = &overflow[blockIdx.x * blockDim.x];
+  overflow[threadIdx.x] = 0;
   for (int i = 0; i < 250000; i++) {
     if (contrib > 57.5f) {
       incr = -1.2f;
@@ -84,21 +89,16 @@ __global__ void __launch_bounds__(512, 2) kAddSplit(int* overflow, llint* result
       incr = 1.3f;
     }
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow_active, ovrf_ptr);
+    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
   }
-  if (overflow_active[threadIdx.x / warp_size_int]) {
-    const llint ovrf_val = overflow[pos];
-    result[pos] = (ovrf_val * max_int_accumulation_ll) + (llint)(primary[threadIdx.x]);
-  }
-  else {
-    result[pos] = (llint)(primary[threadIdx.x]);
-  }
+  const llint ovrf_val = overflow[threadIdx.x];
+  result[pos] = (ovrf_val * max_int_accumulation_ll) + (llint)(primary[threadIdx.x]);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -117,13 +117,13 @@ __global__ void __launch_bounds__(512, 2) kAddUnified(llint* result) {
       incr = 1.3f;
     }
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
     contrib += incr;
-    atomicAdd((ullint*)&primary[threadIdx.x], llitoulli(__float2ll_rn(contrib * 256.0f)));
+    atomicAdd((ullint*)&primary[threadIdx.x], lliToUlli(__float2ll_rn(contrib * 256.0f)));
   }
   result[(blockIdx.x * blockDim.x) + threadIdx.x] = primary[threadIdx.x];
 }
@@ -162,7 +162,7 @@ int main(const int argc, const char* argv[]) {
   
   // Launch each kernel 100x
   for (int i = 0; i < 100; i++) {
-    kAddSplit<<<nblocks, nthreads>>>(devc_overflow, split_ptr);
+    kAddSplit<<<nblocks, nthreads>>>(split_ptr);
   }
   cudaDeviceSynchronize();
   timer.assignTime(1);
@@ -189,7 +189,7 @@ int main(const int argc, const char* argv[]) {
   }
   cudaDeviceSynchronize();
   timer.assignTime(4);  
-  
+    
   // Report the timings
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

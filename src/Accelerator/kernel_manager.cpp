@@ -1,5 +1,6 @@
 // -*-c++-*-
 #include "Constants/behavior.h"
+#include "Constants/hpc_bounds.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #ifdef OMNI_USE_HPC
@@ -14,6 +15,7 @@ namespace card {
 using constants::ExceptionResponse;
 #ifdef OMNI_USE_HPC
 using energy::queryValenceKernelRequirements;
+using energy::queryNonbondedKernelRequirements;
 #endif
 using math::findBin;
 using parse::CaseSensitivity;
@@ -21,8 +23,49 @@ using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
 KernelFormat::KernelFormat() :
-    block_dimension{0}, grid_dimension{0}, register_usage{0}, block_size_limit{0}, shared_usage{0}
+  block_size_limit{1}, shared_usage{0}, block_dimension{1}, grid_dimension{1}, register_usage{0},
+  kernel_name{std::string("")}
 {}
+  
+//-------------------------------------------------------------------------------------------------
+KernelFormat::KernelFormat(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
+                           const int register_usage_in, const int shared_usage_in,
+                           const int block_subdivision, const GpuDetails &gpu,
+                           const std::string &kernel_name_in) :
+    block_size_limit{lb_max_threads_per_block},
+    shared_usage{shared_usage_in},
+    block_dimension{(block_size_limit / block_subdivision / warp_size_int) * warp_size_int},
+    grid_dimension{block_subdivision * lb_min_blocks_per_smp * gpu.getSMPCount()},
+    register_usage{register_usage_in},
+    kernel_name{kernel_name_in}
+{
+  // Refine the register usage (this is unreliable with current cudart function calls, and should
+  // not be trusted even after this step).
+  const std::vector<int> register_break_points = {  0, 40, 48, 56, 64, 72, 80, 128, 256 };
+  const std::vector<int> register_warp_counts  = { 48, 40, 36, 32, 28, 24, 16,   8 };
+  const int register_bin = findBin(register_break_points, register_usage, ExceptionResponse::WARN);
+  register_usage = register_warp_counts[register_bin];
+}
+
+//-------------------------------------------------------------------------------------------------
+KernelFormat::KernelFormat(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
+                           const int register_usage_in, const int shared_usage_in,
+                           const GpuDetails &gpu, const std::string &kernel_name_in) :
+    KernelFormat(lb_max_threads_per_block, lb_min_blocks_per_smp, register_usage_in,
+                 shared_usage_in, 1, gpu, kernel_name_in)
+{}
+
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+//-------------------------------------------------------------------------------------------------
+KernelFormat::KernelFormat(const cudaFuncAttributes &attr, const int lb_min_blocks_per_smp,
+                           const int block_subdivision, const GpuDetails &gpu,
+                           const std::string &kernel_name_in) :
+    KernelFormat(attr.maxThreadsPerBlock, lb_min_blocks_per_smp, attr.numRegs,
+                 attr.sharedSizeBytes, block_subdivision, gpu, kernel_name_in)
+{}
+#  endif
+#endif
 
 //-------------------------------------------------------------------------------------------------
 int2 KernelFormat::getLaunchParameters() const {
@@ -48,51 +91,153 @@ int KernelFormat::getSharedMemoryRequirement() const {
 const std::string& KernelFormat::getKernelName() const {
   return kernel_name;
 }
-  
-//-------------------------------------------------------------------------------------------------
-void KernelFormat::build(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
-                         const int register_usage_in, const int shared_usage_in,
-                         const int block_subdivision, const GpuDetails &gpu,
-                         const std::string &kernel_name_in) {
 
-  // Compute the block dimension and the launch grid dimension.
-  block_size_limit = lb_max_threads_per_block;
-  shared_usage = shared_usage_in;
-  if (kernel_name_in.size() > 0LLU) {
-    kernel_name = kernel_name_in;
+//-------------------------------------------------------------------------------------------------
+KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
+    gpu{gpu_in},
+    valence_block_multiplier{valenceBlockMultiplier(gpu_in)},
+    nonbond_block_multiplier{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType())},
+    k_dictionary{}
+{
+#ifdef OMNI_USE_HPC
+  // Valence kernel entries
+  catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::NO, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       "kdsValenceEnergyAccumulation");
+  catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       "kdsValenceAtomUpdate");
+  catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       "kdsValenceForceAccumulation");
+  catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       "kdsValenceEnergyAtomUpdate");
+  catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       "kdsValenceForceEnergyAccumulation");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::NO, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       "kfsValenceEnergyAccumulation");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       "kfsValenceAtomUpdate");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                       ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
+                       "kfValenceAtomUpdate");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       "kfsValenceForceAccumulation");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                       ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
+                       "kfValenceForceAccumulation");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
+                       "kfValenceEnergyAtomUpdate");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       "kfsValenceEnergyAtomUpdate");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
+                       "kfValenceForceEnergyAccumulation");
+  catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       "kfsValenceForceEnergyAccumulation");
+
+  // Non-bonded kernel entries
+  switch (poly_ag.getUnitCellType()) {
+  case UnitCellType::NONE:
+    catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
+                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           "ktgdNonbondedEnergy");
+    catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                           EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                           "ktgdsNonbondedForce");
+    catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           "ktgdsNonbondedForceEnergy");
+    catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
+                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           "ktgfNonbondedEnergy");
+    catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                           EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                           "ktgfsNonbondedForce");
+    catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                           EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
+                           "ktgfsNonbondedForce");
+    catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           "ktgfsNonbondedForceEnergy");
+    catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
+                           EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                           "ktgfsNonbondedForceEnergy");
+    break;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    break;
   }
-  block_dimension = (block_size_limit / block_subdivision / warp_size_int) * warp_size_int;
-  grid_dimension = block_subdivision * lb_min_blocks_per_smp * gpu.getSMPCount();
-
-  // Get the register usage (this needs refinement and is unreliable with current cudart function
-  // calls).
-  register_usage = register_usage_in;
-  const std::vector<int> register_break_points = {  0, 40, 48, 56, 64, 72, 80, 128, 256 };
-  const std::vector<int> register_warp_counts  = { 48, 40, 36, 32, 28, 24, 16,   8 };
-  const int register_bin = findBin(register_break_points, register_usage, ExceptionResponse::WARN);
-  register_usage = register_warp_counts[register_bin];
+  
+  // Reduction kernel entries
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelFormat::build(const int lb_max_threads_per_block, const int lb_min_blocks_per_smp,
-                         const int register_usage_in, const int shared_usage_in,
-                         const GpuDetails &gpu, const std::string &kernel_name_in) {
-  build(lb_max_threads_per_block, lb_min_blocks_per_smp, register_usage_in, shared_usage_in, 1,
-        gpu, kernel_name_in);
+void KernelManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
+                                         const EvaluateEnergy eval_nrg,
+                                         const ForceAccumulationMethod acc_meth,
+                                         const VwuGoal purpose, const std::string &kernel_name) {
+  const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Valence kernel identifier " + k_key + " already exists in the kernel map.",
+          "KernelManager", "getValenceKernelDims");
+  }
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+  const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
+                                                                 acc_meth, purpose);
+  k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, valence_block_multiplier,
+                                     gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
-KernelManager::KernelManager(const GpuDetails &gpu_in) :
-    valence_kernel_de_dims{}, valence_kernel_dfsm_dims{}, valence_kernel_dfsa_dims{},
-    valence_kernel_dfesm_dims{}, valence_kernel_dfesa_dims{}, valence_kernel_fe_dims{},
-    valence_kernel_ffsm_dims{}, valence_kernel_ffwm_dims{}, valence_kernel_ffsa_dims{},
-    valence_kernel_ffwa_dims{}, valence_kernel_ffewm_dims{}, valence_kernel_ffesm_dims{},
-    valence_kernel_ffewa_dims{}, valence_kernel_ffesa_dims{}, nonbond_kernel_de_dims{},
-    nonbond_kernel_dfs_dims{}, nonbond_kernel_dfes_dims{}, nonbond_kernel_fe_dims{},
-    nonbond_kernel_ffs_dims{}, nonbond_kernel_ffw_dims{}, nonbond_kernel_ffes_dims{},
-    nonbond_kernel_ffew_dims{}, reduction_kernel_gt_dims{}, reduction_kernel_sc_dims{},
-    reduction_kernel_ar_dims{}, gpu{gpu_in}
-{}
+void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const NbwuKind kind,
+                                           const EvaluateForce eval_force,
+                                           const EvaluateEnergy eval_nrg,
+                                           const ForceAccumulationMethod acc_meth,
+                                           const std::string &kernel_name) {
+  const std::string k_key = nonbondedKernelKey(prec, kind, eval_force, eval_nrg, acc_meth);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Non-bonded kernel identifier " + k_key + "  not found in the kernel map.",
+          "KernelManager", "getNonbondedKernelDims");
+  }
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+  const cudaFuncAttributes attr = queryNonbondedKernelRequirements(prec, kind, eval_force,
+                                                                   eval_nrg, acc_meth);
+  k_dictionary[k_key] = KernelFormat(attr, nonbond_block_multiplier, nonbond_block_multiplier,
+                                     gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void KernelManager::catalogReductionKernel(const ReductionStage process,
+                                           const std::string &kernel_name) {
+  switch (process) {
+  case ReductionStage::GATHER:
+  case ReductionStage::SCATTER:
+  case ReductionStage::ALL_REDUCE:
+    break;
+  }
+}
 
 //-------------------------------------------------------------------------------------------------
 int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
@@ -122,73 +267,17 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const Nbwu
 
 //-------------------------------------------------------------------------------------------------
 int2 KernelManager::getReductionKernelDims(const ReductionStage process) const {
-  switch (process) {
-  case ReductionStage::GATHER:
-    return reduction_kernel_gt_dims.getLaunchParameters();
-  case ReductionStage::SCATTER:
-    return reduction_kernel_sc_dims.getLaunchParameters();
-  case ReductionStage::ALL_REDUCE:
-    return reduction_kernel_ar_dims.getLaunchParameters();
+  const std::string k_key = reductionKernelKey(process);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Reduction kernel identifier " + k_key + " was not found in the kernel map.",
+          "KernelManager", "getReductionKernelDims");
   }
-  __builtin_unreachable();
+  return k_dictionary.at(k_key).getLaunchParameters();
 }
 
 //-------------------------------------------------------------------------------------------------
 const GpuDetails& KernelManager::getGpu() const {
   return gpu;
-}
-
-//-------------------------------------------------------------------------------------------------
-void KernelManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
-                                         const EvaluateEnergy eval_nrg,
-                                         const ForceAccumulationMethod acc_meth,
-                                         const VwuGoal purpose, const int lb_max_threads_per_block,
-                                         const int lb_max_blocks_per_smp, const int register_count,
-                                         const int shared_usage, const int block_subdivision) {
-  const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose);
-  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
-  if (it != k_dictionary.end()) {
-    rtErr("Valence kernel identifier " + k_key + "  not found in the kernel map.",
-          "KernelManager", "getValenceKernelDims");
-  }
-  k_dictionary[k_key].build(lb_max_threads_per_block, lb_max_blocks_per_smp, register_count,
-                            shared_usage, block_subdivision, gpu);
-}
-
-//-------------------------------------------------------------------------------------------------
-void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const NbwuKind kind,
-                                           const EvaluateForce eval_force,
-                                           const EvaluateEnergy eval_nrg,
-                                           const ForceAccumulationMethod acc_meth,
-                                           const int lb_max_threads_per_block,
-                                           const int lb_max_blocks_per_smp,
-                                           const int register_count, const int shared_usage,
-                                           const int block_subdivision) {
-  const std::string k_key = nonbondedKernelKey(prec, kind, eval_force, eval_nrg, acc_meth);
-  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
-  if (it != k_dictionary.end()) {
-    rtErr("Non-bonded kernel identifier " + k_key + "  not found in the kernel map.",
-          "KernelManager", "getNonbondedKernelDims");
-  }
-  k_dictionary[k_key].build(lb_max_threads_per_block, lb_max_blocks_per_smp, register_count,
-                            shared_usage, block_subdivision, gpu);
-}
-
-//-------------------------------------------------------------------------------------------------
-void KernelManager::setReductionKernelAttributes(const ReductionStage process,
-                                                 const int thread_limit, const int register_count,
-                                                 const int shared_usage, const int block_mult) {
-  switch (process) {
-  case ReductionStage::GATHER:
-    reduction_kernel_gt_dims.build(register_count, thread_limit, shared_usage, block_mult,
-                                   thread_limit, gpu);
-  case ReductionStage::SCATTER:
-    reduction_kernel_sc_dims.build(register_count, thread_limit, shared_usage, block_mult,
-                                   thread_limit, gpu);
-  case ReductionStage::ALL_REDUCE:
-    reduction_kernel_ar_dims.build(register_count, thread_limit, shared_usage, block_mult,
-                                   thread_limit, gpu);
-  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -208,6 +297,47 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
   const int nreg = k_dictionary.at(k_key).getRegisterUsage();
   printf("  %12.12s :: %4d blocks, %4d threads, %3d registers (%4d SMP, %4d max threads)\n",
          k_key.c_str(), lp.x, lp.y, nreg, gpu.getSMPCount(), mtpb);
+}
+
+//-------------------------------------------------------------------------------------------------
+int valenceBlockMultiplier(const GpuDetails &gpu) {
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+  return (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) ? 2 : 1;
+#  else
+  // Other vendors are not known to make GPUs that have special requirements
+  return 1;
+#  endif
+#else
+  return 1;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell) {
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+  switch (unit_cell) {
+  case UnitCellType::NONE:
+    return (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    return (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 2 : 3;
+  }
+#  else
+  // Other vendors are not known to make GPUs that have special requirements
+  switch (unit_cell) {
+  case UnitCellType::NONE:
+    return 5;
+  case UnitCellType::ORTHORHOMBIC:
+  case UnitCellType::TRICLINIC:
+    return 3;
+  }
+#  endif
+  __builtin_unreachable();
+#else
+  return 1;
+#endif  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -315,6 +445,23 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
     case ForceAccumulationMethod::AUTOMATIC:
       break;
     }
+  }
+  return k_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string reductionKernelKey(const ReductionStage process) {
+  std::string k_key("redc_");
+  switch (process) {
+  case ReductionStage::GATHER:
+    k_key += "gt";
+    break;
+  case ReductionStage::SCATTER:
+    k_key += "sc";
+    break;
+  case ReductionStage::ALL_REDUCE:
+    k_key += "rd";
+    break;
   }
   return k_key;
 }

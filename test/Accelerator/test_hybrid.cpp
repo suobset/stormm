@@ -418,6 +418,18 @@ int main(const int argc, const char* argv[]) {
   check(pattern_sums, RelationalOperator::EQUAL, Approx(pattern_sums_answer).margin(1.0e-6),
         "Hybrid arrays transferred by the object's move constructor into a Standard Template "
         "Library vector via the push_back() method do not retain the correct data.");
+
+  // Test the move assignment operator.
+  Hybrid<double> replicator(4);
+  for (int i = 0; i < 4; i++) {
+    replicator.putHost(static_cast<double>(i) + 0.5, i);
+  }
+  std::vector<Hybrid<double>> rep_four = { replicator, replicator, replicator, replicator };
+  rep_four.erase(rep_four.begin() + 1);
+  rep_four.erase(rep_four.begin() + 1);
+  check(rep_four.size(), RelationalOperator::EQUAL, 2, "The Standard Template Library vector "
+        "erase() method does not work as intended.  This indicates a problem with the Hybrid "
+        "object's move assignment operator.");
   
   // Print a summary of tests run
   printTestSummary(oe.getVerbosity());

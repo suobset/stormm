@@ -1907,7 +1907,7 @@ AtomGraph::AtomGraph(AtomGraph &&original) :
 
 //-------------------------------------------------------------------------------------------------
 AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
-  
+    
   // Guard against self assignment
   if (this == &other) {
     return *this;
@@ -2225,6 +2225,7 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
   double_data = std::move(other.double_data);
   float_data = std::move(other.float_data);
   char4_data = std::move(other.char4_data);
+
   return *this;
 }
 

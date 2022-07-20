@@ -337,6 +337,80 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(const Hybrid<T> &other) {
 }
 
 //-------------------------------------------------------------------------------------------------
+template <typename T> Hybrid<T>& Hybrid<T>::operator=(Hybrid<T> &&other) {
+  
+  // Guard against self-assignment
+  if (label.serial_number == other.label.serial_number) {
+    return *this;
+  }
+
+  // Empty the existing Hybrid object
+  if (kind == HybridKind::ARRAY && allocations > 0) {
+#ifdef OMNI_USE_HPC
+    if (host_data != nullptr || devc_data != nullptr) {
+      deallocate();
+    }
+#else
+    if (host_data != nullptr) {
+      deallocate();
+    }
+#endif
+  }
+  gbl_mem_balance_sheet.unsetEntry(label.serial_number);
+
+  // Retrace the inline initialization to rebuild the Hybrid object in the image of the other.
+  format = other.format;
+  length = other.length;
+  element_size = other.element_size;
+  growth_increment = other.growth_increment;
+  max_capacity = other.max_capacity;
+  pointer_index = other.pointer_index;
+  host_data = other.host_data;
+#ifdef OMNI_USE_HPC
+  devc_data = other.devc_data;
+#endif
+  label = assignLabel(other.label.name);
+  allocations = other.allocations;
+  
+  // Replace this object in the global memory ledger
+  gbl_mem_balance_sheet.setEntry(label.serial_number, kind, label, length, element_size,
+                                 allocations);
+
+  switch (kind) {
+  case HybridKind::ARRAY:
+
+    // Prepare the original for clean destruction
+    switch(other.format) {
+#ifdef OMNI_USE_HPC
+    case HybridFormat::EXPEDITED:
+    case HybridFormat::DECOUPLED:
+      other.host_data = nullptr;
+      other.devc_data = nullptr;
+      break;
+    case HybridFormat::DEVICE_ONLY:
+      other.devc_data = nullptr;
+      break;
+    case HybridFormat::UNIFIED:
+#endif
+    case HybridFormat::HOST_ONLY:
+      other.host_data = nullptr;
+      break;
+    }
+    other.length = 0;
+    other.allocate();
+    break;
+  case HybridKind::POINTER:
+
+    // Not knowing whether the object was POINTER- or ARRAY-kind, the target serial number was
+    // set to an invalid value of -1.  Given that this is a POINTER-kind array, set the target
+    // serial number now.  Executing this logic up in the initializer list would have been dicey.
+    target_serial_number = other.target_serial_number;
+    break;
+  }
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
 template <typename T> HybridKind Hybrid<T>::getKind() const {
   return kind;
 }

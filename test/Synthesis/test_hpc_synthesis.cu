@@ -5,7 +5,6 @@
 #include <nvml.h>
 #include "../../src/Accelerator/hpc_config.cuh"
 #include "../../src/Accelerator/kernel_manager.h"
-#include "../../src/Accelerator/select_launch_parameters.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -186,26 +185,26 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
 // uploaded to the device.
 //
 // Arguments:
-//   poly_ps:
-//   mmctrl:
-//   valence_tb_space:
-//   nonbond_tb_space:
-//   poly_ag:
-//   poly_se:
-//   prec:
-//   gpu:
-//   launcher:
-//   bond_tol:
-//   angl_tol:
-//   dihe_tol:
-//   impr_tol:
-//   ubrd_tol:
-//   cimp_tol:
-//   cmap_tol:
-//   lj14_tol:
-//   qq14_tol:
-//   rstr_tol:
-//   do_tests:
+//   poly_ps:           Coordinates of all systems
+//   mmctrl:            Molecular mechanics control data and progress counters
+//   valence_tb_space:  Thread-block specific L1 scratch space allocations (valence work)
+//   nonbond_tb_space:  Thread-block specific L1 scratch space allocations (non-bonded work)
+//   poly_ag:           Collated topologies and parameters for all systems
+//   poly_se:           Static exclusion masks for all systems
+//   prec:              The precision level at which to operate
+//   gpu:               Details of the GPU chosen for calculations
+//   launcher:          Repository of kernel launch parameters
+//   bond_tol:          Tolerance for bond energy calculations
+//   angl_tol:          Tolerance for angle energy calculations
+//   dihe_tol:          Tolerance for dihedral energy calculations
+//   impr_tol:          Tolerance for CHARMM improper dihedral energy calculations
+//   ubrd_tol:          Tolerance for Urey-Bradley energy calculations
+//   cimp_tol:          Tolerance for CHARMM improper energy calculations
+//   cmap_tol:          Tolerance for CMAP energy calculations
+//   lj14_tol:          Tolerance for Lennard-Jones 1:4 energy calculations
+//   qq14_tol:          Tolerance for electrostatic 1:4 energy calculations
+//   rstr_tol:          Tolerance for restraint energy calculations
+//   do_tests:          Indication that tests should be performed or aborted
 //-------------------------------------------------------------------------------------------------
 void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl,
                               CacheResource *valence_tb_space, CacheResource *nonbond_tb_space,
@@ -357,7 +356,7 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis poly_ps(sysc);
   PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
   PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 72);
-  KernelManager launcher = selectLaunchParameters(gpu, poly_ag);
+  KernelManager launcher(gpu, poly_ag);
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
@@ -476,7 +475,7 @@ int main(const int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis big_poly_se(big_poly_ag.getTopologyPointers(),
                                            big_poly_ag.getTopologyIndices());
   big_poly_ag.loadNonbondedWorkUnits(big_poly_se);
-  KernelManager big_launcher = selectLaunchParameters(gpu, big_poly_ag);
+  KernelManager big_launcher(gpu, big_poly_ag);
   big_poly_ag.upload();
   big_poly_se.upload();
   big_poly_ps.upload();
@@ -557,7 +556,7 @@ int main(const int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getTopologyPointers(),
                                               ligand_poly_ag.getTopologyIndices());
   ligand_poly_ag.loadNonbondedWorkUnits(ligand_poly_se);
-  KernelManager ligand_launcher = selectLaunchParameters(gpu, ligand_poly_ag);
+  KernelManager ligand_launcher(gpu, ligand_poly_ag);
   ligand_poly_ag.upload();
   ligand_poly_se.upload();
   ligand_poly_ps.upload();
@@ -613,7 +612,7 @@ int main(const int argc, const char* argv[]) {
                                                ligand_lpoly_ag.getTopologyIndices());
   ligand_lpoly_ag.loadNonbondedWorkUnits(ligand_lpoly_se);
   printf("There are %4d valence work units.\n", ligand_lpoly_ag.getValenceWorkUnitCount());
-  KernelManager lligand_launcher = selectLaunchParameters(gpu, ligand_lpoly_ag);
+  KernelManager lligand_launcher(gpu, ligand_lpoly_ag);
   mmctrl.primeWorkUnitCounters(lligand_launcher, PrecisionModel::SINGLE, ligand_lpoly_ag);
   ligand_lpoly_ag.upload();
   ligand_lpoly_se.upload();

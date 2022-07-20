@@ -272,7 +272,7 @@ public:
   ///
   /// \param other     The Hybrid object to move (a different name for a better semantic fit in
   ///                  the context of the = sign)
-  Hybrid& operator=(Hybrid &&other) = default;
+  Hybrid& operator=(Hybrid &&other);
   
   /// \brief Get the object kind (pointer or array)
   HybridKind getKind() const;

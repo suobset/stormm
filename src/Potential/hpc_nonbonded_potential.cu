@@ -130,78 +130,97 @@ extern void nonbondedKernelSetup() {
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void queryNonbondedKernelRequirements(KernelManager *wisdom) {
+extern cudaFuncAttributes
+queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
+                                 const EvaluateForce eval_frc, const EvaluateEnergy eval_nrg,
+                                 const ForceAccumulationMethod acc_meth) {
 
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
   cudaFuncAttributes attr;
-  if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForce) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    switch (eval_frc) {
+    case EvaluateForce::YES:
+      switch (eval_nrg) {
+      case EvaluateEnergy::YES:
+        if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForceEnergy) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgdsNonbondedForceEnergy.",
+                "queryNonbondedKernelRequirements");
+        }
+        break;
+      case EvaluateEnergy::NO:
+        if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForce) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgdsNonbondedForce.",
+                "queryNonbondedKernelRequirements");
+        }
+        break;
+      }
+      break;
+    case EvaluateForce::NO:
+      if (cudaFuncGetAttributes(&attr, ktgdNonbondedEnergy) != cudaSuccess) {
+        rtErr("Error obtaining attributes for kernel ktgdNonbondedEnergy.",
+              "queryValenceKernelRequirements");
+      }
+      break;
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    switch (kind) {
+      case NbwuKind::TILE_GROUPS:
+      switch (eval_frc) {
+      case EvaluateForce::YES:
+        switch (eval_nrg) {
+        case EvaluateEnergy::YES:
+          switch (acc_meth) {
+          case ForceAccumulationMethod::SPLIT:
+            if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForceEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfsNonbondedForceEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          case ForceAccumulationMethod::WHOLE:
+            if (cudaFuncGetAttributes(&attr, ktgfNonbondedForceEnergy) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfNonbondedForceEnergy.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        case EvaluateEnergy::NO:
+          switch (acc_meth) {
+          case ForceAccumulationMethod::SPLIT:
+            if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForce) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfsNonbondedForce.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          case ForceAccumulationMethod::WHOLE:
+            if (cudaFuncGetAttributes(&attr, ktgfNonbondedForce) != cudaSuccess) {
+              rtErr("Error obtaining attributes for kernel ktgfNonbondedForce.",
+                    "queryNonbondedKernelRequirements");
+            }
+            break;
+          }
+          break;
+        }
+        break;
+      case EvaluateForce::NO:
+        if (cudaFuncGetAttributes(&attr, ktgfNonbondedEnergy) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgfNonbondedEnergy.",
+                "queryValenceKernelRequirements");
+        }
+        break;
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+      break;
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
+    break;
   }
-  const GpuDetails wgpu = wisdom->getGpu();
-  int arch_block_multiplier = (wgpu.getArchMajor() == 7 && wgpu.getArchMinor() >= 5) ? 4 : 5;
-  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                 EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForceEnergy) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                 EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgfNonbondedForce) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                 EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgfNonbondedForceEnergy) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                 EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgfNonbondedEnergy) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  wisdom->catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
-                                 EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForce) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  arch_block_multiplier = 3;
-  wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                 EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgdsNonbondedForceEnergy) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                 EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
-  if (cudaFuncGetAttributes(&attr, ktgdNonbondedEnergy) != cudaSuccess) {
-    rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
-          "queryValenceKernelRequirements");
-  }
-  wisdom->catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
-                                 EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
-                                 attr.maxThreadsPerBlock, arch_block_multiplier, attr.numRegs,
-                                 attr.sharedSizeBytes);
+  return attr;
 }
   
 //-------------------------------------------------------------------------------------------------

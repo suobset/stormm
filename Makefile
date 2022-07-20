@@ -12,7 +12,6 @@ LIBDIR=lib
 OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Accelerator/gpu_details.cpp \
 		 $(SRCDIR)/Accelerator/kernel_manager.cpp \
-		 $(SRCDIR)/Accelerator/select_launch_parameters.cpp \
 		 $(SRCDIR)/Chemistry/atommask.cpp \
 		 $(SRCDIR)/Chemistry/chemical_features.cpp \
 		 $(SRCDIR)/Chemistry/indigo.cpp \
@@ -114,7 +113,6 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Accelerator/gpu_details.h \
 		   $(SRCDIR)/Accelerator/kernel_manager.h \
-		   $(SRCDIR)/Accelerator/select_launch_parameters.h \
 		   $(SRCDIR)/Chemistry/atommask.h \
 		   $(SRCDIR)/Chemistry/chemical_features.h \
 		   $(SRCDIR)/Chemistry/indigo.h \
@@ -268,7 +266,6 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Accelerator/gpu_details.o \
 		$(SRCDIR)/Accelerator/kernel_manager.o \
-		$(SRCDIR)/Accelerator/select_launch_parameters.o \
 		$(SRCDIR)/Chemistry/atommask.o \
 		$(SRCDIR)/Chemistry/chemical_features.o \
 		$(SRCDIR)/Chemistry/indigo.o \
@@ -432,7 +429,8 @@ OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
 
 # Benchmark programs using omni.cuda
-OMNI_BENCH_CUDA_PROGS = $(BENCHDIR)/bin/accumulate
+OMNI_BENCH_CUDA_PROGS = $(BENCHDIR)/bin/accumulate \
+			$(BENCHDIR)/bin/test_nonperiodic_kernels
 
 # Applications using omni
 OMNI_APPS = $(APPDIR)/bin/conformer.omni \
@@ -688,6 +686,15 @@ $(BENCHDIR)/bin/accumulate : $(LIBDIR)/libomni_cuda.so \
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o $(BENCHDIR)/bin/accumulate \
 	  $(BENCHDIR)/ForceAccumulation/accumulate.cu -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) \
 	  -lomni_cuda
+
+# Target: Benchmarking kernels needed for dynamics in isolated boundary conditions
+$(BENCHDIR)/bin/test_nonperiodic_kernels : $(LIBDIR)/libomni_cuda.so \
+					   $(BENCHDIR)/KernelTesting/test_nonperiodic_kernels.cu
+	@echo "[OMNI]  Building non-periodic kernel benchmark..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) -o \
+	  $(BENCHDIR)/bin/test_nonperiodic_kernels \
+	  $(BENCHDIR)/KernelTesting/test_nonperiodic_kernels.cu -L$(LIBDIR) -I$(SRCDIR) \
+	  $(CUDA_LINKS) -lomni_cuda
 
 # Target: Conformer generation
 $(APPDIR)/bin/conformer.omni : $(LIBDIR)/libomni.so $(APPDIR)/Conf/src/conformer.cpp \

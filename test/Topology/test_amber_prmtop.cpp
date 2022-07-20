@@ -7,7 +7,13 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "test_amber_prmtop.h"
 
-using namespace omni::testing;
+// CHECK
+#include "../../src/Accelerator/hybrid.h"
+#include "../../src/Trajectory/phasespace.h"
+using omni::card::Hybrid;
+using omni::trajectory::PhaseSpace;
+// END CHECK
+
 using omni::constants::tiny;
 using omni::data_types::ulint;
 using omni::data_types::char4;
@@ -21,6 +27,7 @@ using omni::parse::polyNumericVector;
 using omni::parse::stringToChar4;
 using omni::parse::TextFile;
 using omni::parse::operator==;
+using namespace omni::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Enumerated integer analyses of every topology in a list
@@ -661,6 +668,14 @@ int main(const int argc, const char* argv[]) {
   }
   check(dryness_check, "Water models were identified in a Standard Template Library vector of dry "
         "topologies created by the push_back() method.", top_check);
+
+  // Test the move assignment operator by erasing elements from a list of topologies.
+  std::vector<AtomGraph> clones = dry_topologies_pb;
+  clones.erase(clones.begin() + 1);
+  clones.erase(clones.begin() + 1);
+  check(clones.size(), RelationalOperator::EQUAL, 4, "The Standard Template Library erase() "
+        "method does not work as intended.  This may indicate a problem with the AtomGraph move "
+        "assignment operator, or another move assignment operator at a deeper level.", top_check);
   
   // Create a vector of many topologies for subsequent analyses.  This will implicitly test copy
   // and move constructors, as the vector of all topologies will be created based on a product of

@@ -2,11 +2,16 @@
 #ifndef OMNI_VALENCE_POTENTIAL_CUH
 #define OMNI_VALENCE_POTENTIAL_CUH
 
+#ifdef OMNI_USE_CUDA
+#include <cuda_runtime.h>
+#endif
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
+#include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/omni_vector_types.h"
 #include "MolecularMechanics/mm_controls.h"
+#include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
@@ -20,6 +25,7 @@ namespace energy {
 
 using card::GpuDetails;
 using card::KernelManager;
+using constants::PrecisionModel;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
 using numerics::ForceAccumulationMethod;
@@ -49,13 +55,19 @@ void valenceKernelSetup();
 int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, const int vwu_size,
                                   const int vwu_count);
 
-/// \brief Obtain information on launch bounds and block-specific requirements for each version of
-///        the valence interactions kernel.  Deposit the results in a developing object that will
-///        later record launch grid dimensions for managing the kernels.
+/// \brief Obtain information on launch bounds and block-specific requirements for a selected
+///        version of the valence interactions kernel.
 ///
-/// \param wisdom   Object to store the kernel specifications obtained
-/// \param poly_ag  A collection of topologies describing the workload
-void queryValenceKernelRequirements(KernelManager *wisdom, const AtomGraphSynthesis &poly_ag);
+/// \param prec                   Precision model for the selected kernel
+/// \param eval_frc               Select whether to evaluate forces
+/// \param eval_nrg               Select whether to evaluate energies
+/// \param acc_meth               Accumulation method for forces
+/// \param purpose                Indicate whether the kernel shall deposit its accumulated forces
+///                               back into global arrays or use them immediately to move particles
+cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateForce eval_frc,
+                                                  EvaluateEnergy eval_nrg,
+                                                  ForceAccumulationMethod acc_meth,
+                                                  VwuGoal purpose);
 
 /// \brief Evaluate valence work units and move atoms.
 ///

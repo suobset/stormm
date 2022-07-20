@@ -22,7 +22,7 @@ using omni::parse::findStringInVector;
 using omni::topology::UnitCellType;
 using omni::topology::ValenceKit;
 using omni::trajectory::detectCoordinateFileKind;
-
+  
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
     topology_cache{}, coordinates_cache{}, features_cache{}, restraints_cache{},
@@ -58,7 +58,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     }
   }
   n_free_top = topology_cache.size();
-
+  
   // Read all free coordinate sets, using file type detection to filter the list
   int n_free_crd = fcon.getFreeCoordinatesCount();
   std::vector<CoordinateFrame> tmp_coordinates_cache;
@@ -206,8 +206,8 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
     }
   }
   
-  // Test each coordinate set with respect to topologies of the appropriate size.  Evaluate bond
-  // and angle energy, and take the best scoring result as the indicator of which topology
+  // Test each coordinate set with respect to topologies of the appropriate size.  Evaluate
+  // valence term energy, and take the best scoring result as the indicator of which topology
   // describes which coordinate set.  Make new systems based on each coordinate set.
   const int n_unique_sizes = unique_topology_sizes.size();
   ScoreCard sc(1);
@@ -409,12 +409,14 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
   // coordinates (and perhaps velocities, if available) into phase space objects.
   std::vector<std::string> current_topology_holdings;
   current_topology_holdings.reserve(n_free_top);
+  int cache_track = 0;
   for (int i = 0; i < n_free_top; i++) {
     if (topology_in_use[i]) {
       current_topology_holdings.push_back(topology_cache[i].getFileName());
+      cache_track++;
     }
     else {
-      topology_cache.erase(topology_cache.begin() + i);
+      topology_cache.erase(topology_cache.begin() + cache_track);
     }
   }
   for (int i = 0; i < nsys; i++) {
