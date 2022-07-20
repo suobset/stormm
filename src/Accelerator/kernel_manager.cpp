@@ -220,8 +220,7 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
 #  ifdef OMNI_USE_CUDA
   const cudaFuncAttributes attr = queryNonbondedKernelRequirements(prec, kind, eval_force,
                                                                    eval_nrg, acc_meth);
-  k_dictionary[k_key] = KernelFormat(attr, nonbond_block_multiplier, nonbond_block_multiplier,
-                                     gpu, kernel_name);
+  k_dictionary[k_key] = KernelFormat(attr, nonbond_block_multiplier, 1, gpu, kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();
@@ -286,6 +285,9 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
     return;
   }
   if (strcmpCased(k_key, "all", CaseSensitivity::NO)) {
+    for (auto it = k_dictionary.begin(); it != k_dictionary.end(); it++) {
+      printLaunchParameters(it->first);
+    }
     return;
   }
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
