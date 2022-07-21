@@ -213,7 +213,7 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
   const std::string k_key = nonbondedKernelKey(prec, kind, eval_force, eval_nrg, acc_meth);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
-    rtErr("Non-bonded kernel identifier " + k_key + "  not found in the kernel map.",
+    rtErr("Non-bonded kernel identifier " + k_key + " already exists in the kernel map.",
           "KernelManager", "getNonbondedKernelDims");
   }
 #ifdef OMNI_USE_HPC
@@ -404,7 +404,7 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
     k_key += "d";
     break;
   case PrecisionModel::SINGLE:
-    k_key += "s";
+    k_key += "f";
     break;
   }
   switch (kind) {

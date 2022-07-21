@@ -78,7 +78,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
   }
   __syncthreads();
   while (vwu_idx < poly_vk.nvwu) {
-    
+
     // The instruction set map is read and stored in __shared__ for convenience, and to ensure
     // that it never leaves cache.  The instructions themselves are "streamed," which for purposes
     // of this documentation means read from global, used once, and not cached.  Each block must be
@@ -91,7 +91,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       vwu_padded_task_count[threadIdx.x] = devcRoundUp(vwu_task_count[threadIdx.x], warp_size_int);
     }
     __syncthreads();
-    
+        
     // Import atomic coordinates, properties, and (if appropriate) velocities.  This employs all
     // threads of the block, breaking up each set of information at the warp level.
     const int import_llim = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].x;

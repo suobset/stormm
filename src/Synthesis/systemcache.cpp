@@ -412,7 +412,7 @@ SystemCache::SystemCache(const FilesControls &fcon, const ExceptionResponse poli
   int cache_track = 0;
   for (int i = 0; i < n_free_top; i++) {
     if (topology_in_use[i]) {
-      current_topology_holdings.push_back(topology_cache[i].getFileName());
+      current_topology_holdings.push_back(topology_cache[cache_track].getFileName());
       cache_track++;
     }
     else {
