@@ -5,9 +5,11 @@
 #include <nvml.h>
 #include <string>
 #include <vector>
+#include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.cuh"
 #include "../../src/Accelerator/kernel_manager.h"
 #include "../../src/Constants/fixed_precision.h"
+#include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
@@ -25,9 +27,9 @@
 #include "../../src/Synthesis/nonbonded_workunit.h"
 #include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Topology/atomgraph.h"
+#include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/stopwatch.h"
-
 
 using namespace omni::card;
 using namespace omni::constants;
@@ -43,6 +45,13 @@ using namespace omni::synthesis;
 using namespace omni::testing;
 using namespace omni::topology;
 using namespace omni::trajectory;
+
+//-------------------------------------------------------------------------------------------------
+// Constant expressions to guide testing
+//-------------------------------------------------------------------------------------------------
+constexpr int null_kernel_repeats = 25000;
+constexpr int args_kernel_repeats = 25000;
+constexpr int gmem_kernel_repeats = 25000;
 
 //-------------------------------------------------------------------------------------------------
 // Get a SystemCache object containing all topologies and coordinates in a pair of directories.
@@ -207,6 +216,187 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Run a batch of molecules based on a particular folder within the Topologies and Coordinates
+// subdirectories of the OMNI benchmarking suite.
+//
+// Arguments:
+//   batch_name:  Name of the folder
+//   gpu:         Details of the GPU
+//   oe:          Contains the name of the OMNI source directory, and other environment variables
+//   timer:       Object to track the timings
+//-------------------------------------------------------------------------------------------------
+void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEnvironment &oe,
+              StopWatch *timer) {
+  
+  // Read the molecules in this batch
+  const std::vector<std::string> topols = { "Topologies", batch_name, ".*_ff1.*SB.top" };
+  const std::vector<std::string> coords = { "Coordinates", batch_name, ".*_ff1.*SB.inpcrd"};
+  SystemCache sc = directorySweep(topols, coords, oe);
+  MolecularMechanicsControls mmctrl;
+
+  // Loop over the dipeptides one at a time, make syntheses of each of them individually, and
+  // test kernels.
+  const int mol_count = sc.getSystemCount();
+  const std::vector<int> batch_multiplier = { 1, 3, 5, 10, 20 };
+  for (int i = 0; i < mol_count; i++) {
+    AtomGraph *iag_ptr = sc.getSystemTopologyPointer(i);
+    for (int j = 0; j < 5; j++) {
+      const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
+      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
+                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
+                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
+                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+      replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
+                        timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+
+      // Only do double-precision calculations for low replica numbers--this can be strenuous on
+      // many architectures, particularly in the non-bonded kernel.
+      if (ncopy < 10) {
+        replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
+                          timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
+                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+        replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
+                          timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
+                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+      }
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// A kernel that does nothing.  Points its finger but there's no one around.
+//-------------------------------------------------------------------------------------------------
+__global__ void kNothing() {
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test a null kernel, launching blocks of a specified thread count and grid size.
+//
+// Arguments:
+//   block_size:           Thread count of the blocks to launch
+//   block_count_per_smp:  The number of blocks to launch per streaming multiprocessor
+//   gpu:                  Details of the GPU to use in calculations
+//   timer:                Object to collect timings data
+//-------------------------------------------------------------------------------------------------
+void testNullKernel(const int block_size, const int block_count_per_smp, const GpuDetails &gpu,
+                    StopWatch *timer) {
+  const int nblocks = block_count_per_smp * gpu.getSMPCount();
+  const int timings_sect = timer->addCategory("Null Kernel Launch, " + std::to_string(block_size) +
+                                              " x " + std::to_string(block_count_per_smp));
+  timer->assignTime(0);
+  for (int trial = 0; trial < 8; trial++) {
+    for (int i = 0; i < null_kernel_repeats; i++) {
+      kNothing<<<nblocks, block_size>>>();
+    }
+    cudaDeviceSynchronize();
+    timer->assignTime(timings_sect);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// A kernel that takes arguments but still does nothing.
+//-------------------------------------------------------------------------------------------------
+__global__ void kTakeArguments(const ValenceKit<float> vk, const NonbondedKit<float> nbk,
+                               const VirtualSiteKit<float> vsk, const ConstraintKit<float> cnk) {
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test a kernel that accepts arguments (a little more than 1kB worth, if the sizes of various
+// topology abstracts do not change significantly).
+//
+// Arguments:
+//   block_size:           Thread count of the blocks to launch
+//   block_count_per_smp:  The number of blocks to launch per streaming multiprocessor
+//   gpu:                  Details of the GPU to use in calculations
+//   timer:                Object to collect timings data
+//-------------------------------------------------------------------------------------------------
+void testArgumentLoadedKernel(const int block_size, const int block_count_per_smp,
+                              const GpuDetails &gpu, StopWatch *timer) {
+  const int nblocks = block_count_per_smp * gpu.getSMPCount();
+  const int timings_sect = timer->addCategory("Args Kernel Launch, " + std::to_string(block_size) +
+                                              " x " + std::to_string(block_count_per_smp));
+  const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+  AtomGraph ag;
+  ValenceKit<float> ag_vk = ag.getSinglePrecisionValenceKit(devc_tier);
+  NonbondedKit<float> ag_nbk = ag.getSinglePrecisionNonbondedKit(devc_tier);
+  VirtualSiteKit<float> ag_vsk = ag.getSinglePrecisionVirtualSiteKit(devc_tier);
+  ConstraintKit<float> ag_cnk = ag.getSinglePrecisionConstraintKit(devc_tier);
+  timer->assignTime(0);
+  for (int trial = 0; trial < 8; trial++) {
+    for (int i = 0; i < args_kernel_repeats; i++) {
+      kTakeArguments<<<nblocks, block_size>>>(ag_vk, ag_nbk, ag_vsk, ag_cnk);
+    }
+    cudaDeviceSynchronize();
+    timer->assignTime(timings_sect);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// A kernel that runs a lap through global memory.
+//-------------------------------------------------------------------------------------------------
+__global__ void kGmemAccess(int* read_from, int* write_to, int threads_active) {
+  if (threadIdx.x < threads_active) {
+    const int pos = (blockIdx.x * blockDim.x) + threadIdx.x;
+    const int var = read_from[pos];
+    write_to[pos] = var * 2;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test a kernel that takes no arguments and merely reads, then writes elements of global memory.
+// Both reads and writes are cold operations on non-cached addresses.
+//
+// Arguments:
+//   block_size:           Thread count of the blocks to launch
+//   block_count_per_smp:  The number of blocks to launch per streaming multiprocessor
+//   gpu:                  Details of the GPU to use in calculations
+//   timer:                Object to collect timings data
+//-------------------------------------------------------------------------------------------------
+void testGmemKernel(const int block_size, const int block_count_per_smp, const GpuDetails &gpu,
+                    StopWatch *timer) {
+  const int nthreads = gpu.getSMPCount() * block_size * block_count_per_smp;
+  const int nblocks = block_count_per_smp * gpu.getSMPCount();
+  Hybrid<int> read_from(nthreads);
+  Hybrid<int> write_to(nthreads);
+  int* read_ptr = read_from.data();
+  int neg_fac = 1;
+  for (int i = 0; i < nthreads; i++) {
+    read_ptr[i] = neg_fac * i;
+    neg_fac *= -1;
+  }
+  read_from.upload();
+  int* read_devc_ptr = read_from.data(HybridTargetLevel::DEVICE);
+  int* write_devc_ptr = write_to.data(HybridTargetLevel::DEVICE);
+  const int none_timings = timer->addCategory("GMEM Kernel launch, zero warps active");
+  const int half_timings = timer->addCategory("GMEM Kernel launch, half warps active");
+  const int full_timings = timer->addCategory("GMEM Kernel launch, full warps active");
+  timer->assignTime(0);
+  for (int trial = 0; trial < 8; trial++) {
+    for (int i = 0; i < gmem_kernel_repeats; i++) {
+      kGmemAccess<<<nblocks, block_size>>>(read_devc_ptr, write_devc_ptr, 0);
+    }
+    cudaDeviceSynchronize();
+    timer->assignTime(none_timings);
+    for (int i = 0; i < gmem_kernel_repeats; i++) {
+      kGmemAccess<<<nblocks, block_size>>>(read_devc_ptr, write_devc_ptr, block_size / 2);
+    }
+    cudaDeviceSynchronize();
+    timer->assignTime(half_timings);
+    for (int i = 0; i < gmem_kernel_repeats; i++) {
+      kGmemAccess<<<nblocks, block_size>>>(read_devc_ptr, write_devc_ptr, block_size);
+    }
+    cudaDeviceSynchronize();
+    timer->assignTime(full_timings);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -218,87 +408,28 @@ int main(const int argc, const char* argv[]) {
   std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
 
+  // Test some basic kernels to examine the launch latency effects of different characteristics.
+  testNullKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
+  testNullKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
+  testNullKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
+  testNullKernel(large_block_size, 1, gpu, &timer);
+  testArgumentLoadedKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
+  testArgumentLoadedKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
+  testArgumentLoadedKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
+  testArgumentLoadedKernel(large_block_size, 1, gpu, &timer);
+  testGmemKernel(tiny_block_size, large_block_size / tiny_block_size, gpu, &timer);
+  testGmemKernel(small_block_size, large_block_size / small_block_size, gpu, &timer);
+  testGmemKernel(medium_block_size, large_block_size / medium_block_size, gpu, &timer);
+  testGmemKernel(large_block_size, 1, gpu, &timer);
+  
   // Configure the relevant kernels for this executable.
   valenceKernelSetup();
 
-  // Read dipeptides
-  const std::vector<std::string> dipeptide_topols = { "Topologies", "Dipeptides",
-                                                      ".*_ff1.*SB.top" };
-  const std::vector<std::string> dipeptide_coords = { "Coordinates", "Dipeptides",
-                                                      ".*_ff1.*SB.inpcrd"};
-  SystemCache dipeptide_sc = directorySweep(dipeptide_topols, dipeptide_coords, oe);
-  MolecularMechanicsControls mmctrl;
-  
-  // Loop over the dipeptides one at a time, make syntheses of each of them individually, and
-  // test kernels.
-  const int ndipeptides = dipeptide_sc.getSystemCount();
-  const std::vector<int> batch_multiplier = { 1, 3, 5, 10, 20, 40 };
-  for (int i = 0; i < ndipeptides; i++) {
-    AtomGraph *iag_ptr = dipeptide_sc.getSystemTopologyPointer(i);
-    for (int j = 0; j < 6; j++) {
-      const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
-      replicaProcessing(iag_ptr, dipeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, dipeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, dipeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, dipeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
-      
-      // Only do double-precision calculations for low replica numbers--this can be strenuous on
-      // many architectures, particularly in the non-bonded kernel.
-      if (ncopy < 10) {
-        replicaProcessing(iag_ptr, dipeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                          &timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-        replicaProcessing(iag_ptr, dipeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                          &timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      }
-    }
-  }
-
-  // Read dipeptides
-  const std::vector<std::string> tripeptide_topols = { "Topologies", "Tripeptides",
-                                                       ".*_ff1.*SB.top" };
-  const std::vector<std::string> tripeptide_coords = { "Coordinates", "Tripeptides",
-                                                       ".*_ff1.*SB.inpcrd"};
-  SystemCache tripeptide_sc = directorySweep(tripeptide_topols, tripeptide_coords, oe);
-  
-  // Loop over the tripeptides one at a time, make syntheses of each of them individually, and
-  // test kernels.
-  const int ntripeptides = tripeptide_sc.getSystemCount();
-  for (int i = 0; i < ntripeptides; i++) {
-    AtomGraph *iag_ptr = tripeptide_sc.getSystemTopologyPointer(i);
-    for (int j = 0; j < 6; j++) {
-      const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
-      replicaProcessing(iag_ptr, tripeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, tripeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, tripeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
-      replicaProcessing(iag_ptr, tripeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                        &timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
-      if (ncopy < 10) {
-        replicaProcessing(iag_ptr, tripeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                          &timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-        replicaProcessing(iag_ptr, tripeptide_sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
-                          &timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
-      }
-    }
-  }
+  // Run different classes of molecules.  This will stress-test the code as well as provide
+  // performance curves with different sizes of molecules.
+  runBatch("Dipeptides", gpu, oe, &timer);
+  runBatch("Tripeptides", gpu, oe, &timer);
+  runBatch("Tetrapeptides", gpu, oe, &timer);
 
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
