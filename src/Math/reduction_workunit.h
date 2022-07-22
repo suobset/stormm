@@ -30,6 +30,14 @@ public:
   ReductionWorkUnit(int atom_start_in, int atom_end_in, int result_index_in,
                     int dependency_start_in, int dependency_end_in, int system_index_in);
 
+  /// \brief Take all copy and move constructors and assignment operators.
+  /// \{
+  ReductionWorkUnit(const ReductionWorkUnit &original) = default;
+  ReductionWorkUnit(ReductionWorkUnit &&original) = default;
+  ReductionWorkUnit& operator=(const ReductionWorkUnit &other) = default;
+  ReductionWorkUnit& operator=(ReductionWorkUnit &&other) = default;
+  /// \}
+  
   /// \brief Get the atom starting index.
   int getAtomStart() const;
 
@@ -105,8 +113,8 @@ template <typename T> struct ReductionSubstrate {
 
   /// \brief Take the typical copy and move constructors for an abstract with const elements.
   /// \{
-  ReductionSubstrate(const ReductionSubstrate &original);
-  ReductionSubstrate(ReductionSubstrate &&original);
+  ReductionSubstrate(const ReductionSubstrate &original) = default;
+  ReductionSubstrate(ReductionSubstrate &&original) = default;
   /// \}
 
   const int dim;                ///< The number of dimensions to the data involved in the

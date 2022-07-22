@@ -12,65 +12,26 @@ double gatherNormalization(const ReductionSubstrate<T> rsbs, const int start_pos
   // likely handle the squared values of large forces scaled up by, say, 2^72, that is 2^144 extra
   // stress on the number format that is not needed.  If this were ever to go to single-precision,
   // it would be impossible.
-  const bool extended_precision = (rsbs.x_read_ovrf != nullptr);
   double tsum = 0.0;
-  if (extended_precision) {
-    if (rsbs.y_read == nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = ((static_cast<double>(rsbs.x_read_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.x_read)) *
-                          rsbs.inv_fp_scaling;
-        tsum += (dx * dx);
-      }
+  if (rsbs.y_read == nullptr && rsbs.z_read == nullptr) {
+    for (int j = start_pos; j < end_pos; j++) {
+      const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      tsum += (dx * dx);
     }
-    else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = ((static_cast<double>(rsbs.x_read_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.x_read)) *
-                          rsbs.inv_fp_scaling;
-        const double dy = ((static_cast<double>(rsbs.y_read_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.y_read)) *
-                          rsbs.inv_fp_scaling;
-        tsum += (dx * dx) + (dy * dy);
-      }
-    }
-    else {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = ((static_cast<double>(rsbs.x_read_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.x_read)) *
-                          rsbs.inv_fp_scaling;
-        const double dy = ((static_cast<double>(rsbs.y_read_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.y_read)) *
-                          rsbs.inv_fp_scaling;
-        const double dz = ((static_cast<double>(rsbs.z_read_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.z_read)) *
-                          rsbs.inv_fp_scaling;
-        tsum += (dx * dx) + (dy * dy) + (dz * dz);
-      }
+  }
+  else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
+    for (int j = start_pos; j < end_pos; j++) {
+      const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      const double dy = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      tsum += (dx * dx) + (dy * dy);
     }
   }
   else {
-    double tsum = 0.0;
-    if (rsbs.y_read == nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-        tsum += (dx * dx);
-      }
-    }
-    else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-        const double dy = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-        tsum += (dx * dx) + (dy * dy);
-      }
-    }
-    else {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-        const double dy = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-        const double dz = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-        tsum += (dx * dx) + (dy * dy) + (dz * dz);
-      }
+    for (int j = start_pos; j < end_pos; j++) {
+      const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      const double dy = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      const double dz = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      tsum += (dx * dx) + (dy * dy) + (dz * dz);
     }
   }
   return tsum;
@@ -80,34 +41,16 @@ double gatherNormalization(const ReductionSubstrate<T> rsbs, const int start_pos
 template <typename T>
 double3 gatherCenterOnZero(const ReductionSubstrate<T> rsbs, const int start_pos,
                            const int end_pos) {
-  const bool extended_precision = (rsbs.x_read_ovrf != nullptr);
   double tsum_x = 0.0;
   double tsum_y = 0.0;
   double tsum_z = 0.0;
   const int nval = end_pos - start_pos;
-  if (extended_precision) {
-    tsum_x = sum<double>(&rsbs.x_read_ovrf[start_pos], nval);
-    tsum_x *= max_llint_accumulation;
-    tsum_x += sum<double>(&rsbs.x_read[start_pos], nval);
-    if (rsbs.y_read != nullptr) {
-      tsum_y = sum<double>(&rsbs.y_read_ovrf[start_pos], nval);
-      tsum_y *= max_llint_accumulation;
-      tsum_y += sum<double>(&rsbs.y_read[start_pos], nval);
-    }
-    if (rsbs.z_read != nullptr) {
-      tsum_z = sum<double>(&rsbs.z_read_ovrf[start_pos], nval);
-      tsum_z *= max_llint_accumulation;
-      tsum_z += sum<double>(&rsbs.z_read[start_pos], nval);
-    }
+  tsum_x = sum<double>(&rsbs.x_read[start_pos], nval);
+  if (rsbs.y_read != nullptr) {
+    tsum_y = sum<double>(&rsbs.y_read[start_pos], nval);
   }
-  else {
-    tsum_x = sum<double>(&rsbs.x_read[start_pos], nval);
-    if (rsbs.y_read != nullptr) {
-      tsum_y = sum<double>(&rsbs.y_read[start_pos], nval);
-    }
-    if (rsbs.z_read != nullptr) {
-      tsum_z = sum<double>(&rsbs.z_read[start_pos], nval);
-    }
+  if (rsbs.z_read != nullptr) {
+    tsum_z = sum<double>(&rsbs.z_read[start_pos], nval);
   }
   return { -tsum_x, -tsum_y, -tsum_z };
 }
@@ -120,64 +63,29 @@ void scatterNormalization(ReductionSubstrate<T> rsbs, const double tsum, const i
   // When normalizing extended fixed-precision values, it is not necessary to scale them down with
   // whatever fixed-precision scaling factor only to scale them right back up.  Just divide by the
   // magnitude of the vector found earlier.
-  const bool extended_precision = (rsbs.x_read_ovrf != nullptr);
   const double nfactor = 1.0 / sqrt(tsum);
-  if (extended_precision) {
-    if (rsbs.y_read == nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = ((static_cast<double>(rsbs.x_write_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.x_write[j]));
-        splitRealAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
-      }
+  if (rsbs.y_read == nullptr && rsbs.z_read == nullptr) {
+    for (int j = start_pos; j < end_pos; j++) {
+      const double dx = static_cast<double>(rsbs.x_write[j]);
+      rsbs.x_write[j] = static_cast<T>(dx * nfactor);
     }
-    else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = ((static_cast<double>(rsbs.x_write_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.x_write[j]));
-        const double dy = ((static_cast<double>(rsbs.y_write_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.y_write[j]));
-        splitRealAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
-        splitRealAccumulation(dy * nfactor, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
-      }
-    }
-    else {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = ((static_cast<double>(rsbs.x_write_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.x_write[j]));
-        const double dy = ((static_cast<double>(rsbs.y_write_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.y_write[j]));
-        const double dz = ((static_cast<double>(rsbs.z_write_ovrf[j]) *
-                            max_llint_accumulation) + static_cast<double>(rsbs.z_write[j]));
-        splitRealAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
-        splitRealAccumulation(dy * nfactor, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
-        splitRealAccumulation(dz * nfactor, &rsbs.z_write[j], &rsbs.z_write_ovrf[j]);
-      }
+  }
+  else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
+    for (int j = start_pos; j < end_pos; j++) {
+      const double dx = static_cast<double>(rsbs.x_write[j]);
+      const double dy = static_cast<double>(rsbs.y_write[j]);
+      rsbs.x_write[j] = static_cast<T>(dx * nfactor);
+      rsbs.y_write[j] = static_cast<T>(dy * nfactor);
     }
   }
   else {
-    if (rsbs.y_read == nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = static_cast<double>(rsbs.x_write[j]);
-        rsbs.x_write[j] = static_cast<T>(dx * nfactor);
-      }
-    }
-    else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = static_cast<double>(rsbs.x_write[j]);
-        const double dy = static_cast<double>(rsbs.y_write[j]);
-        rsbs.x_write[j] = static_cast<T>(dx * nfactor);
-        rsbs.y_write[j] = static_cast<T>(dy * nfactor);
-      }
-    }
-    else {
-      for (int j = start_pos; j < end_pos; j++) {
-        const double dx = static_cast<double>(rsbs.x_write[j]);
-        const double dy = static_cast<double>(rsbs.y_write[j]);
-        const double dz = static_cast<double>(rsbs.z_write[j]);
-        rsbs.x_write[j] = static_cast<T>(dx * nfactor);
-        rsbs.y_write[j] = static_cast<T>(dy * nfactor);
-        rsbs.z_write[j] = static_cast<T>(dz * nfactor);
-      }
+    for (int j = start_pos; j < end_pos; j++) {
+      const double dx = static_cast<double>(rsbs.x_write[j]);
+      const double dy = static_cast<double>(rsbs.y_write[j]);
+      const double dz = static_cast<double>(rsbs.z_write[j]);
+      rsbs.x_write[j] = static_cast<T>(dx * nfactor);
+      rsbs.y_write[j] = static_cast<T>(dy * nfactor);
+      rsbs.z_write[j] = static_cast<T>(dz * nfactor);
     }
   }
 }
@@ -190,43 +98,22 @@ void scatterCenterOnZero(ReductionSubstrate<T> rsbs, const double tsum_x, const 
 
   // Values entering the calculation of the sum were never scaled down from their fixed-precision
   // values, so there is no need to rescale any fixed-precision representations here.
-  const bool extended_precision = (rsbs.x_read_ovrf != nullptr);
   const double inv_norm = 1.0 / static_cast<double>(natom);
-  if (extended_precision) {
-    const double center_x = tsum_x * inv_norm;
-    for (int j = start_pos; j < end_pos; j++) {
-      splitRealAccumulation(center_x, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
-    }
-    if (rsbs.y_read != nullptr) {
-      const double center_y = tsum_y * inv_norm;
-      for (int j = start_pos; j < end_pos; j++) {
-        splitRealAccumulation(center_y, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
-      }
-    }
-    if (rsbs.z_read != nullptr) {
-      const double center_z = tsum_z * inv_norm;
-      for (int j = start_pos; j < end_pos; j++) {
-        splitRealAccumulation(center_z, &rsbs.z_write[j], &rsbs.z_write_ovrf[j]);
-      }
-    }
+  const T center_x = static_cast<T>(tsum_x * inv_norm);
+  addScalarToVector(&rsbs.x_write[start_pos], end_pos - start_pos, center_x);
+  if (rsbs.y_read != nullptr) {
+    const T center_y = static_cast<T>(tsum_y * inv_norm);
+    addScalarToVector(&rsbs.y_write[start_pos], end_pos - start_pos, center_y);
   }
-  else {
-    const T center_x = static_cast<T>(tsum_x * inv_norm);
-    addScalarToVector(&rsbs.x_write[start_pos], end_pos - start_pos, center_x);
-    if (rsbs.y_read != nullptr) {
-      const T center_y = static_cast<T>(tsum_y * inv_norm);
-      addScalarToVector(&rsbs.y_write[start_pos], end_pos - start_pos, center_y);
-    }
-    if (rsbs.z_read != nullptr) {
-      const T center_z = static_cast<T>(tsum_z * inv_norm);
-      addScalarToVector(&rsbs.z_write[start_pos], end_pos - start_pos, center_z);
-    }
+  if (rsbs.z_read != nullptr) {
+    const T center_z = static_cast<T>(tsum_z * inv_norm);
+    addScalarToVector(&rsbs.z_write[start_pos], end_pos - start_pos, center_z);
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void evalReduction(ReductionSubstrate<T> rsbs, const ReductionKit &redk,
+void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
                    const ReductionStage process, const ReductionGoal purpose) {
 
   // Make the presence of an overflow array for the first data dimension a bellwether for the
@@ -246,17 +133,17 @@ void evalReduction(ReductionSubstrate<T> rsbs, const ReductionKit &redk,
       const int nval       = end_pos - start_pos;
       switch (purpose) {
       case ReductionGoal::NORMALIZE:
-        rsbs.x_buffer[result_pos] = gatherNormalization(rsbs, start_pos, end_pos);
+        rsbs->x_buffer[result_pos] = gatherNormalization(*rsbs, start_pos, end_pos);
         break;
       case ReductionGoal::CENTER_ON_ZERO:
         {
-          const double3 tsum3 = gatherCenterOnZero(rsbs, start_pos, end_pos);
-          rsbs.x_buffer[result_pos] = tsum3.x;
-          if (rsbs.y_read != nullptr) {
-            rsbs.y_buffer[result_pos] = tsum3.y;
+          const double3 tsum3 = gatherCenterOnZero(*rsbs, start_pos, end_pos);
+          rsbs->x_buffer[result_pos] = tsum3.x;
+          if (rsbs->y_read != nullptr) {
+            rsbs->y_buffer[result_pos] = tsum3.y;
           }
-          if (rsbs.z_read != nullptr) {
-            rsbs.z_buffer[result_pos] = tsum3.z;
+          if (rsbs->z_read != nullptr) {
+            rsbs->z_buffer[result_pos] = tsum3.z;
           }
         }
         break;
@@ -276,21 +163,21 @@ void evalReduction(ReductionSubstrate<T> rsbs, const ReductionKit &redk,
       // Branch for different reduction goals.
       switch (purpose) {
       case ReductionGoal::NORMALIZE:
-        scatterNormalization(rsbs, sum<double>(&rsbs.x_buffer[depn_start_pos], depn_nval),
+        scatterNormalization(*rsbs, sum<double>(&rsbs->x_buffer[depn_start_pos], depn_nval),
                              start_pos, end_pos);
         break;
       case ReductionGoal::CENTER_ON_ZERO:
         {
-          const double tsum_x = sum<double>(&rsbs.x_buffer[depn_start_pos], depn_nval);
+          const double tsum_x = sum<double>(&rsbs->x_buffer[depn_start_pos], depn_nval);
           double tsum_y = 0.0;
           double tsum_z = 0.0;
-          if (rsbs.y_read != nullptr) {
-            tsum_y = sum<double>(&rsbs.y_buffer[depn_start_pos], depn_nval);
+          if (rsbs->y_read != nullptr) {
+            tsum_y = sum<double>(&rsbs->y_buffer[depn_start_pos], depn_nval);
           }
-          if (rsbs.z_read != nullptr) {
-            tsum_z = sum<double>(&rsbs.z_buffer[depn_start_pos], depn_nval);
+          if (rsbs->z_read != nullptr) {
+            tsum_z = sum<double>(&rsbs->z_buffer[depn_start_pos], depn_nval);
           }
-          scatterCenterOnZero(rsbs, tsum_x, tsum_y, tsum_z, redk.atom_counts[system_pos],
+          scatterCenterOnZero(*rsbs, tsum_x, tsum_y, tsum_z, redk.atom_counts[system_pos],
                               start_pos, end_pos);
         }
         break;
@@ -306,13 +193,17 @@ void evalReduction(ReductionSubstrate<T> rsbs, const ReductionKit &redk,
         const int system_pos     = redk.rdwu_abstracts[(i * rdwu_abstract_length) + system_id];
         switch (purpose) {
         case ReductionGoal::NORMALIZE:
-          const double tsum = gatherNormalization(rsbs, start_pos, end_pos);
-          scatterNormalization(rsbs, tsum, start_pos, end_pos);
+          {
+            const double tsum = gatherNormalization(*rsbs, start_pos, end_pos);
+            scatterNormalization(*rsbs, tsum, start_pos, end_pos);
+          }
           break;
         case ReductionGoal::CENTER_ON_ZERO:
-          const double3 tsum3 = gatherCenterOnZero(rsbs, start_pos, end_pos);
-          scatterCenterOnZero(rsbs, tsum3.x, tsum3.y, tsum3.z, redk.atom_counts[system_pos],
-                              start_pos, end_pos);
+          {
+            const double3 tsum3 = gatherCenterOnZero(*rsbs, start_pos, end_pos);
+            scatterCenterOnZero(*rsbs, tsum3.x, tsum3.y, tsum3.z, redk.atom_counts[system_pos],
+                                start_pos, end_pos);
+          }
           break;
         }
       }

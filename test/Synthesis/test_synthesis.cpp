@@ -781,14 +781,16 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
     }
   }
   std::vector<double> tmp_gathered_x(nrwu), tmp_gathered_y(nrwu), tmp_gathered_z(nrwu);
-  std::vector<double> mock_ii_x(nrwu), mock_ii_y(nrwu), mock_ii_z(nrwu);
+  std::vector<double> copy_prop_x(prop_x);
+  std::vector<double> copy_prop_y(prop_y);
+  std::vector<double> copy_prop_z(prop_z);
   ReductionKit redk(nrwu, rps, rwu_abstracts.data(), atom_counts.data());
-  const double* y_ptr = (prop_y.size() == prop_x.size()) ? prop_y.data() : nullptr;
-  const double* z_ptr = (prop_z.size() == prop_x.size()) ? prop_z.data() : nullptr;
+  const double* y_ptr = (prop_y.size() == prop_x.size()) ? copy_prop_y.data() : nullptr;
+  const double* z_ptr = (prop_z.size() == prop_x.size()) ? copy_prop_z.data() : nullptr;
   ReductionSubstrate rsbs(prop_x.data(), y_ptr, z_ptr, tmp_gathered_x.data(),
-                          tmp_gathered_y.data(), tmp_gathered_z.data(), mock_ii_x.data(),
-                          mock_ii_y.data(), mock_ii_z.data());
-  
+                          tmp_gathered_y.data(), tmp_gathered_z.data(), copy_prop_x.data(),
+                          copy_prop_y.data(), copy_prop_z.data());
+  evalReduction(&rsbs, redk, ReductionStage::ALL_REDUCE, ReductionGoal::NORMALIZE);
 }
 
 //-------------------------------------------------------------------------------------------------
