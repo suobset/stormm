@@ -25,6 +25,8 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/ForceField/forcefield_element.cpp \
 		 $(SRCDIR)/ForceField/forcefield_enumerators.cpp \
 		 $(SRCDIR)/Math/matrix_ops.cpp \
+		 $(SRCDIR)/Math/reduction.cpp \
+		 $(SRCDIR)/Math/reduction_workunit.cpp \
 		 $(SRCDIR)/Math/rounding.cpp \
 		 $(SRCDIR)/Math/series_ops.cpp \
 		 $(SRCDIR)/Math/statistics.cpp \
@@ -78,7 +80,6 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
-		 $(SRCDIR)/Synthesis/reduction_workunit.cpp \
 		 $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
 		 $(SRCDIR)/Synthesis/systemcache.cpp \
 		 $(SRCDIR)/Synthesis/valence_workunit.cpp \
@@ -134,6 +135,8 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/ForceField/forcefield_enumerators.h \
 		   $(SRCDIR)/Math/matrix.h \
 		   $(SRCDIR)/Math/matrix_ops.h \
+	           $(SRCDIR)/Math/reduction.h \
+	           $(SRCDIR)/Math/reduction_workunit.h \
 		   $(SRCDIR)/Math/rounding.h \
 		   $(SRCDIR)/Math/series_ops.h \
 		   $(SRCDIR)/Math/sorting.h \
@@ -194,7 +197,6 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.h \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.h \
-	           $(SRCDIR)/Synthesis/reduction_workunit.h \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.h \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.h \
 		   $(SRCDIR)/Synthesis/synthesis_enumerators.h \
@@ -232,6 +234,8 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/DataTypes/omni_vector_types.tpp \
 		 $(SRCDIR)/Math/matrix.tpp \
 		 $(SRCDIR)/Math/matrix_ops.tpp \
+		 $(SRCDIR)/Math/reduction.tpp \
+		 $(SRCDIR)/Math/reduction_workunit.tpp \
 		 $(SRCDIR)/Math/rounding.tpp \
 		 $(SRCDIR)/Math/series_ops.tpp \
 		 $(SRCDIR)/Math/summation.tpp \
@@ -279,6 +283,8 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/ForceField/forcefield_element.o \
 		$(SRCDIR)/ForceField/forcefield_enumerators.o \
 		$(SRCDIR)/Math/matrix_ops.o \
+		$(SRCDIR)/Math/reduction.o \
+		$(SRCDIR)/Math/reduction_workunit.o \
 		$(SRCDIR)/Math/rounding.o \
 	        $(SRCDIR)/Math/series_ops.o \
 	        $(SRCDIR)/Math/statistics.o \
@@ -332,7 +338,6 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/Synthesis/atomgraph_synthesis.o \
 		$(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		$(SRCDIR)/Synthesis/nonbonded_workunit.o \
-		$(SRCDIR)/Synthesis/reduction_workunit.o \
 		$(SRCDIR)/Synthesis/static_mask_synthesis.o \
 		$(SRCDIR)/Synthesis/systemcache.o \
 		$(SRCDIR)/Synthesis/valence_workunit.o \

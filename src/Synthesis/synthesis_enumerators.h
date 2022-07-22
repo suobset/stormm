@@ -17,15 +17,6 @@ enum class NbwuKind {
   UNKNOWN       ///< Placeholder for the non-bonded work type until it is properly set
 };
 
-/// \brief Enumerate stages of a reduction operation, which can be taken piecemeal or all at once.
-enum class ReductionStage {
-  GATHER,     ///< Gather information from many particles or other sources.
-  SCATTER,    ///< Scatter the accumulated information (this can also include a secondary gather
-              ///<   on block-wide accumulated results).
-  ALL_REDUCE  ///< Perform the entire reduction in one step, when no intermediate accumulation is
-              ///<   needed.
-};
-
 /// \brief Enumerate the different tasks that this work unit can perform.
 enum class VwuTask {
   BOND = 0,  ///< Harmonic bond interactions

@@ -222,20 +222,6 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
   // all the way to tile_length, or stops at the upper limit of system atoms).
   reduceUniqueValues(&tmp_imports);
   import_count = tmp_imports.size();
-
-  // CHECK
-  if (import_count > 20) {
-    printf("There are %2d imports!  Too many!\n", import_count);
-    for (int i = 0; i < import_count; i++) {
-      const int import_sysidx = static_cast<int>((tmp_imports[i] >> int_bit_count_int) &
-                                                 0x00000000ffffffffLL);
-      printf("Import %2d : System %4d   Tile %4d\n", i, import_sysidx,
-             (static_cast<int>(tmp_imports[i] & 0x00000000ffffffffLL) * tile_length) +
-             ser.atom_offsets[import_sysidx]);
-    }
-  }
-  // END CHECK
-  
   for (int i = 0; i < import_count; i++) {
     import_system_indices[i] = static_cast<int>((tmp_imports[i] >> int_bit_count_int) &
                                                 0x00000000ffffffffLL);

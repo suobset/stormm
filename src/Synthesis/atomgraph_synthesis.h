@@ -1160,6 +1160,11 @@ private:
   /// mask object.  The exclusion masks are not kept as part of this topology synthesis, but
   /// abstracts for the non-bonded work will span it and the associated mask object.  
   Hybrid<uint2> nbwu_instructions;
+
+  /// Abstracts for reduction work units.  There are not a corresponding array of instructions, as
+  /// each reduction work unit takes one abstract and proceeds to perform gather, scatter, or
+  /// all-reduce operations on the stated range of atoms.
+  Hybrid<int> reduction_abstracts;
   
   /// Timings data, for reporting purposes
   StopWatch* timer;

@@ -7,13 +7,6 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "test_amber_prmtop.h"
 
-// CHECK
-#include "../../src/Accelerator/hybrid.h"
-#include "../../src/Trajectory/phasespace.h"
-using omni::card::Hybrid;
-using omni::trajectory::PhaseSpace;
-// END CHECK
-
 using omni::constants::tiny;
 using omni::data_types::ulint;
 using omni::data_types::char4;

@@ -2,11 +2,13 @@
 #ifndef OMNI_REDUCTION_WORKUNIT_H
 #define OMNI_REDUCTION_WORKUNIT_H
 
+#include <cmath>
 #include <vector>
 #include "Accelerator/gpu_details.h"
+#include "DataTypes/common_types.h"
 
 namespace omni {
-namespace synthesis {
+namespace math {
 
 using card::GpuDetails;
 
@@ -50,6 +52,11 @@ public:
   ///        will serve one and only one system in a synthesis)
   int getSystemIndex() const;
 
+  /// \brief Produce an abstract containing all of the information, wrapped in a series of eight
+  ///        integers.  See the enum class RdwuAbstractMap to understand which element represents
+  ///        which value.
+  std::vector<int> getAbstract() const;
+  
 private:
   int atom_start;        ///< Lower limit of atoms in the unified synthesis array which contribute
                          ///<   to this work unit's reduction operation
@@ -64,6 +71,70 @@ private:
   int system_index;      ///< The system to which the result pertains (this may or may not be
                          ///<   necessary, given the availability of bounds in atom_start and
                          ///<   atom_end)
+};
+
+/// \brief Collect pointers to data subject to reduction operations.  Reductions can happen on up
+///        to three data sets at once, with one consistent fixed-precision scaling factor (if
+///        fixed-precision applies).
+template <typename T> struct ReductionSubstrate {
+
+  /// \brief The constructor can take up to three buffers, each with possible overflows to
+  ///        accommodate extended fixed-precision formats.
+  ///
+  /// Overloaded:
+  ///   - Prepare to reduce one array of standard data
+  ///   - Prepare to reduce three arrays of standard data
+  ///   - Accommodate extended fixed-precision formats
+  /// \{
+  ReductionSubstrate(const T* x_read_in, double* x_buffer_in, T* x_write_in,
+                     const int scale_bits_in = 0);
+
+  ReductionSubstrate(const T* x_read_in, const T* y_read_in, const T* z_read_in,
+                     double* x_buffer_in, double* y_buffer_in, double* z_buffer_in, T* x_write_in,
+                     T* y_write_in, T* z_write_in, const int scale_bits_in = 0);
+
+  ReductionSubstrate(const T* x_read_in, const int* x_read_ovrf_in, double* x_buffer_in,
+                     T* x_write_in, int* x_write_ovrf_in, const int scale_bits_in = 0);
+
+  ReductionSubstrate(const T* x_read_in, const int* x_read_ovrf_in, const T* y_read_in,
+                     const int* y_read_ovrf_in, const T* z_read_in, const int* z_read_ovrf_in,
+                     double* x_buffer_in, double* y_buffer_in, double* z_buffer_in, T* x_write_in,
+                     int* x_write_ovrf_in, T* y_write_in, int* y_write_ovrf_in, T* z_write_in,
+                     int* z_write_ovrf_in, const int scale_bits_in = 0);
+  /// \}
+
+  /// \brief Take the typical copy and move constructors for an abstract with const elements.
+  /// \{
+  ReductionSubstrate(const ReductionSubstrate &original);
+  ReductionSubstrate(ReductionSubstrate &&original);
+  /// \}
+
+  const int dim;                ///< The number of dimensions to the data involved in the
+                                ///<   reduction, i.e. X/Y/Z coordinate reduction has dimension 3
+  const int scale_bits;         ///< The number of bits after the decimal in fixed-precision data
+  const double fp_scaling;      ///< Scaling factor for fixed-precision data
+  const double inv_fp_scaling;  ///< Inverse of the scaling factor for fixed-precision data
+  const T* x_read;              ///< Read-only arrays of reducible data for the 1st dimension
+  const T* y_read;              ///< Read-only arrays of reducible data for the 2nd dimension
+  const T* z_read;              ///< Read-only arrays of reducible data for the 3rd dimension
+  const int* x_read_ovrf;       ///< Overflow arrays for extended fixed-precision format in the
+                                ///<   1st dimension of reducible data
+  const int* y_read_ovrf;       ///< Overflow arrays for extended fixed-precision format in the
+                                ///<   2nd dimension of reducible data
+  const int* z_read_ovrf;       ///< Overflow arrays for extended fixed-precision format in the
+                                ///<   3rd dimension of reducible data
+  double* x_buffer;             ///< Buffer for work unit sums along the 1st dimension
+  double* y_buffer;             ///< Buffer for work unit sums along the 2nd dimension
+  double* z_buffer;             ///< Buffer for work unit sums along the 3rd dimension
+  T* x_write;                   ///< Array accepting results of scattering in the 1st dimension
+  T* y_write;                   ///< Array accepting results of scattering in the 2nd dimension
+  T* z_write;                   ///< Array accepting results of scattering in the 3rd dimension
+  int* x_write_ovrf;            ///< Overflow arrays for scatter results in the 1st dimension,
+                                ///<   when extended fixed-precision representations are in effect
+  int* y_write_ovrf;            ///< Overflow arrays for scatter results in the 2nd dimension,
+                                ///<   when extended fixed-precision representations are in effect
+  int* z_write_ovrf;            ///< Overflow arrays for scatter results in the 3rd dimension,
+                                ///<   when extended fixed-precision representations are in effect
 };
 
 /// \brief Build the reduction (and their components of gathering and scattering) work units for
@@ -86,8 +157,11 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
                                                        const std::vector<int> &atom_counts,
                                                        const GpuDetails &gpu,
                                                        int tasks_per_atom = 1);
-} // namespace synthesis
+
+} // namespace math
 } // namespace omni
+
+#include "reduction_workunit.tpp"
 
 #endif
 

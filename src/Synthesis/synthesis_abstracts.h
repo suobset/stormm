@@ -5,6 +5,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "synthesis_enumerators.h"
 
 namespace omni {
 namespace synthesis {
@@ -197,7 +198,7 @@ template <typename T> struct SyNonbondedKit {
   const T* gb_beta;               ///< Generalized born beta parameters (one parameter per atom)
   const T* gb_gamma;              ///< Generalized born gamma parameters (one parameter per atom)
 };
-  
+
 } // namespace synthesis
 } // namespace omni
 

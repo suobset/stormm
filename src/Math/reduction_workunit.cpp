@@ -1,14 +1,11 @@
 #include "Constants/hpc_bounds.h"
-#include "Math/rounding.h"
-#include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "reduction_workunit.h"
+#include "rounding.h"
+#include "vector_ops.h"
 
 namespace omni {
-namespace synthesis {
-
-using math::roundUp;
-using math::maxValue;
+namespace math {
 
 //-------------------------------------------------------------------------------------------------
 ReductionWorkUnit::ReductionWorkUnit(const int atom_start_in, const int atom_end_in,
@@ -47,6 +44,13 @@ int ReductionWorkUnit::getDependencyEnd() const {
 //-------------------------------------------------------------------------------------------------
 int ReductionWorkUnit::getSystemIndex() const {
   return system_index;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> ReductionWorkUnit::getAbstract() const {
+  std::vector<int> result = { atom_start, atom_end, result_index, dependency_start,
+                              dependency_end, system_index, 0, 0 };
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -178,5 +182,5 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
   return result;
 }
 
-} // namespace synthesis
+} // namespace math
 } // namespace omni

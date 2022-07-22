@@ -48,7 +48,6 @@ using symbols::twopi;
 using symbols::twopi_f;
 using symbols::inverse_twopi_f;
 using synthesis::maximum_valence_work_unit_atoms;
-using synthesis::ReductionStage;
 using synthesis::VwuAbstractMap;
 using synthesis::VwuGoal;
 using synthesis::vwu_abstract_length;

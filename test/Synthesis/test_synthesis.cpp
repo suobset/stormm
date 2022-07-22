@@ -13,6 +13,8 @@
 #include "../../src/DataTypes/mixed_types.h"
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/reduction.h"
+#include "../../src/Math/reduction_workunit.h"
 #include "../../src/Math/rounding.h"
 #include "../../src/Math/sorting.h"
 #include "../../src/Math/summation.h"
@@ -30,8 +32,8 @@
 #include "../../src/Structure/local_arrangement.h"
 #include "../../src/Synthesis/nonbonded_workunit.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
-#include "../../src/Synthesis/reduction_workunit.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
+#include "../../src/Synthesis/synthesis_abstracts.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
@@ -765,15 +767,28 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
           " items per system.");
   }
 
-  // CHECK
-#if 0
-  for (size_t i = 0; i < rwu_vec.size(); i++) {
-    printf("  %8d  %8d  %4d %4d %4d   %4d\n", rwu_vec[i].getAtomStart(), rwu_vec[i].getAtomEnd(),
-           rwu_vec[i].getResultIndex(), rwu_vec[i].getDependencyStart(),
-           rwu_vec[i].getDependencyEnd(), rwu_vec[i].getSystemIndex());
+  // Make a more detailed mockup of the reduction work units, closer in implementation to what
+  // will happen on the GPU.
+  std::vector<int> rwu_abstracts(nrwu * rdwu_abstract_length);
+  RdwuPerSystem rps = RdwuPerSystem::ONE;
+  for (int i = 0; i < nrwu; i++) {
+    const std::vector<int> tr_abs = rwu_vec[i].getAbstract();
+    for (int j = 0; j < rdwu_abstract_length; j++) {
+      rwu_abstracts[(rdwu_abstract_length * i) + j] = tr_abs[j];
+    }
+    if (rwu_vec[i].getDependencyEnd() - rwu_vec[i].getDependencyStart() > 1) {
+      rps = RdwuPerSystem::MULTIPLE;
+    }
   }
-#endif
-  // END CHECK
+  std::vector<double> tmp_gathered_x(nrwu), tmp_gathered_y(nrwu), tmp_gathered_z(nrwu);
+  std::vector<double> mock_ii_x(nrwu), mock_ii_y(nrwu), mock_ii_z(nrwu);
+  ReductionKit redk(nrwu, rps, rwu_abstracts.data(), atom_counts.data());
+  const double* y_ptr = (prop_y.size() == prop_x.size()) ? prop_y.data() : nullptr;
+  const double* z_ptr = (prop_z.size() == prop_x.size()) ? prop_z.data() : nullptr;
+  ReductionSubstrate rsbs(prop_x.data(), y_ptr, z_ptr, tmp_gathered_x.data(),
+                          tmp_gathered_y.data(), tmp_gathered_z.data(), mock_ii_x.data(),
+                          mock_ii_y.data(), mock_ii_z.data());
+  
 }
 
 //-------------------------------------------------------------------------------------------------

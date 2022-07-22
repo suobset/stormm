@@ -12,6 +12,7 @@
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Math/reduction.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -30,7 +31,7 @@ using energy::EvaluateEnergy;
 using numerics::ForceAccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::NbwuKind;
-using synthesis::ReductionStage;
+using math::ReductionStage;
 using synthesis::VwuGoal;
 using topology::UnitCellType;
 
