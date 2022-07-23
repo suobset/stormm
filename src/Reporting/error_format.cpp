@@ -169,7 +169,7 @@ std::string terminalFormat(const std::string &message, const char* class_caller,
 
 //-------------------------------------------------------------------------------------------------
 void rtErr(const std::string &message, const char* class_caller, const char* method_caller) {
-  std::string parsed_msg = terminalFormat(message, class_caller, method_caller, 11, 0, 11);
+  const std::string parsed_msg = terminalFormat(message, class_caller, method_caller, 11, 0, 11);
   throw std::runtime_error(parsed_msg);
 }
 
@@ -179,7 +179,7 @@ void rtWarn(const std::string &message, const char* class_caller, const char* me
   if (class_caller != nullptr) {
     ccall += std::string(class_caller);
   }
-  std::string parsed_msg = terminalFormat(message, ccall.c_str(), method_caller, 0, 0, 10);
+  const std::string parsed_msg = terminalFormat(message, ccall.c_str(), method_caller, 0, 0, 10);
   printf("%s\n", parsed_msg.c_str());
 }
 
@@ -189,7 +189,7 @@ void rtAlert(const std::string &message, const char* class_caller, const char* m
   if (class_caller != nullptr) {
     ccall += std::string(class_caller);
   }
-  std::string parsed_msg = terminalFormat(message, ccall.c_str(), method_caller, 0, 0, 8);
+  const std::string parsed_msg = terminalFormat(message, ccall.c_str(), method_caller, 0, 0, 8);
   printf("%s\n", parsed_msg.c_str());
 }
 

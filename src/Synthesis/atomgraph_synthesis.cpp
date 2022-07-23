@@ -16,12 +16,15 @@ namespace omni {
 namespace synthesis {
 
 using card::HybridKind;
-using math::roundUp;
+using math::buildReductionWorkUnits;
 using math::maxAbsoluteDifference;
 using math::maxValue;
 using math::minValue;
 using math::prefixSumInPlace;
 using math::PrefixSumType;
+using math::RdwuAbstractMap;
+using math::rdwu_abstract_length;
+using math::roundUp;
 using math::sum;
 using parse::realToString;
 using restraints::RestraintStage;
@@ -411,6 +414,11 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     nonbonded_work_type{NbwuKind::UNKNOWN},
     nonbonded_abstracts{HybridKind::ARRAY, "tpsyn_nbwu_abstract"},
     nbwu_instructions{HybridKind::ARRAY, "tpsyn_nbwu_insr"},
+
+    // Reduction work units and their abstracts
+    total_reduction_work_units{0},
+    rdwu_per_system{RdwuPerSystem::ONE},
+    reduction_abstracts{HybridKind::ARRAY, "tpsyn_rdwu_abstract"},
     
     // Pointer to the timer used to track time needed for assembling this object.  The timer can
     // also be used to track access and other usage of the object.
@@ -457,6 +465,12 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   }
   loadValenceWorkUnits(valence_work_unit_size);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
+
+  // Create reduction work units for all topologies, then load them into the synthesis.  Like the
+  // process of creating the valence work units, the original array of C++ objects is destroyed
+  // upon completion of this constructor.  The critical information is retained in an array of
+  // abstracts.
+  loadReductionWorkUnits();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3090,6 +3104,36 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
 }
 
 //-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::loadReductionWorkUnits(const GpuDetails &gpu) {
+  const std::vector<int> vatom_offsets = atom_offsets.readHost();
+  const std::vector<int> vatom_counts  = atom_counts.readHost();
+  const std::vector<ReductionWorkUnit> rdwu_vec = buildReductionWorkUnits(vatom_offsets,
+                                                                          vatom_counts, gpu, 3);
+  total_reduction_work_units = rdwu_vec.size();
+  bool multi_wu = false;
+  reduction_abstracts.resize(total_reduction_work_units * rdwu_abstract_length);
+  const int atom_start_pos = static_cast<int>(RdwuAbstractMap::ATOM_START);
+  const int atom_end_pos   = static_cast<int>(RdwuAbstractMap::ATOM_END);
+  const int result_pos     = static_cast<int>(RdwuAbstractMap::RESULT_INDEX);
+  const int depn_start_pos = static_cast<int>(RdwuAbstractMap::DEPN_START);
+  const int depn_end_pos   = static_cast<int>(RdwuAbstractMap::DEPN_END);
+  const int system_pos     = static_cast<int>(RdwuAbstractMap::DEPN_END);
+  int* abstract_ptr = reduction_abstracts.data();
+  for (int i = 0; i < total_reduction_work_units; i++) {
+    const int wu_pos = (rdwu_abstract_length * i);
+    abstract_ptr[wu_pos + atom_start_pos] = rdwu_vec[i].getAtomStart(); 
+    abstract_ptr[wu_pos + atom_end_pos]   = rdwu_vec[i].getAtomEnd(); 
+    abstract_ptr[wu_pos + result_pos]     = rdwu_vec[i].getResultIndex(); 
+    abstract_ptr[wu_pos + depn_start_pos] = rdwu_vec[i].getDependencyStart(); 
+    abstract_ptr[wu_pos + depn_end_pos]   = rdwu_vec[i].getDependencyEnd(); 
+    abstract_ptr[wu_pos + system_pos]     = rdwu_vec[i].getSystemIndex(); 
+    multi_wu = (multi_wu ||
+                (abstract_ptr[wu_pos + depn_end_pos] - abstract_ptr[wu_pos + depn_start_pos] > 1));
+  }
+  rdwu_per_system = (multi_wu) ? RdwuPerSystem::MULTIPLE : RdwuPerSystem::ONE;
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getTopologyCount() const {
   return topology_count;
 }
@@ -3290,6 +3334,21 @@ NbwuKind AtomGraphSynthesis::getNonbondedWorkType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getReductionWorkUnitCount() const {
+  return total_reduction_work_units;
+}
+
+//-------------------------------------------------------------------------------------------------
+RdwuPerSystem AtomGraphSynthesis::getRdwuPerSystem() const {
+  return rdwu_per_system;
+}
+
+//-------------------------------------------------------------------------------------------------
+const Hybrid<int>& AtomGraphSynthesis::getReductionWorkUnitAbstracts() const {
+  return reduction_abstracts;  
+}
+
+//-------------------------------------------------------------------------------------------------
 SyValenceKit<double>
 AtomGraphSynthesis::getDoublePrecisionValenceKit(const HybridTargetLevel tier) const {
   return SyValenceKit<double>(total_valence_work_units, coulomb_constant,
@@ -3481,6 +3540,7 @@ void AtomGraphSynthesis::upload() {
   insr_uint2_data.upload();
   nonbonded_abstracts.upload();
   nbwu_instructions.upload();
+  reduction_abstracts.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3537,6 +3597,7 @@ void AtomGraphSynthesis::download() {
   insr_uint2_data.download();
   nonbonded_abstracts.download();
   nbwu_instructions.download();
+  reduction_abstracts.download();
 }
 #endif
 

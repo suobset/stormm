@@ -3,8 +3,11 @@
 #define OMNI_ATOMGRAPH_SYNTHESIS_H
 
 #include "Accelerator/hybrid.h"
+#include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Math/reduction_enumerators.h"
+#include "Math/reduction_workunit.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/topology_util.h"
@@ -16,9 +19,12 @@
 namespace omni {
 namespace synthesis {
 
+using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::ExceptionResponse;
+using math::RdwuPerSystem;
+using math::ReductionWorkUnit;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
@@ -155,7 +161,7 @@ public:
   /// \brief Get the sizes of all individual systems as a const reference to the Hybrid array
   ///        member variable.
   const Hybrid<int>& getSystemAtomCounts() const;
-
+  
   /// \brief Get the starting locations of all individual systems as a const reference to the
   ///        Hybrid array member variable.
   const Hybrid<int>& getSystemAtomOffsets() const;
@@ -241,7 +247,21 @@ public:
 
   /// \brief Get the type of non-bonded work required by systems in this synthesis.
   NbwuKind getNonbondedWorkType() const;
- 
+
+  /// \brief Get the number of reduction work units spanning all systems.
+  int getReductionWorkUnitCount() const;
+
+  /// \brief Get a qualitative assessment of the number of reduction work units assigned to any
+  ///        one system.
+  RdwuPerSystem getRdwuPerSystem() const;
+
+  /// \brief Get the reduction work unit abstracts (this is not required for valence or non-bonded
+  ///        work units as the abstracts needed for implementing these work units are produced by
+  ///        member functions of this class (see below).  The reduction work, however, is managed
+  ///        by an abstract splicing together elements of this class, PhaseSpaceSynthesis, and a
+  ///        small class allocating temporary storage space.
+  const Hybrid<int>& getReductionWorkUnitAbstracts() const;
+
   /// \brief Get a minimal kit with double-precision parameter detail for computing valence
   ///        interactions for all systems based on the work units stored in this object.
   ///
@@ -1161,6 +1181,16 @@ private:
   /// abstracts for the non-bonded work will span it and the associated mask object.  
   Hybrid<uint2> nbwu_instructions;
 
+  // Reduction work units.  Various processes in molecular mechanics require system-wide
+  // accumulations of particular quantities, and a collection of any number of systems of any size
+  // requires a sophisticated system to make that happen efficiently.  The reduction work units
+  // are an ecumenical solution to all such reductions, but they may need to combine with different
+  // substrates to do a specific process.
+  int total_reduction_work_units;  ///< Number of reduction work units for the entire system
+  RdwuPerSystem rdwu_per_system;   ///< Indication of the type of reduction operations that can
+                                   ///<   be performed: are there just one, or multiple reduction
+                                   ///<   operations to perform per system?
+  
   /// Abstracts for reduction work units.  There are not a corresponding array of instructions, as
   /// each reduction work unit takes one abstract and proceeds to perform gather, scatter, or
   /// all-reduce operations on the stated range of atoms.
@@ -1295,6 +1325,11 @@ private:
   ///
   /// \param vwu_atom_limit  The maximum number of atoms to assign to any one valence work unit
   void loadValenceWorkUnits(int vwu_atom_limit = maximum_valence_work_unit_atoms);
+
+  /// \brief Construct the array of reduction work units.
+  ///
+  /// \param gpu  Details of the GPU to employ in the calculations
+  void loadReductionWorkUnits(const GpuDetails &gpu = null_gpu);
 };
 
 } // namespace synthesis

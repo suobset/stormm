@@ -5,17 +5,15 @@
 #include "Reporting/error_format.h"
 #include "gpu_details.h"
 
-#ifndef OMNI_USE_HPC
 omni::card::GpuDetails null_gpu;
-#endif
 
 namespace omni {
 namespace card {
 
 //-------------------------------------------------------------------------------------------------
 GpuDetails::GpuDetails() :
-    available{false}, supported{false}, arch_major{0}, arch_minor{0}, smp_count{0}, card_ram{0},
-    max_threads_per_block{0}, max_threads_per_smp{0}, max_blocks_per_smp{0},
+    available{false}, supported{false}, arch_major{0}, arch_minor{0}, smp_count{1}, card_ram{0},
+    max_threads_per_block{1}, max_threads_per_smp{1}, max_blocks_per_smp{1},
     max_shared_per_block{0}, max_shared_per_smp{0}, registers_per_block{0}, registers_per_smp{0},
     card_name{std::string("blank_gpu")}
 {}

@@ -2,66 +2,69 @@
 #ifndef OMNI_REDUCTION_H
 #define OMNI_REDUCTION_H
 
+#include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+#include "Synthesis/atomgraph_synthesis.h"
+#include "reduction_enumerators.h"
 #include "reduction_workunit.h"
 
 namespace omni {
 namespace math {
 
+using card::Hybrid;
+using card::HybridTargetLevel;
+using constants::CartesianDimension;
 using math::addScalarToVector;
 using math::sum;
 using numerics::max_llint_accumulation;
 using numerics::splitRealAccumulation;
 using numerics::splitRealConversion;
+using synthesis::AtomGraphSynthesis;
+
+/// \brief Allocate space for reduction operations to store temporary accumulations, bridging the
+///        gap between gathering and scattering operations.
+class ReductionBridge {
+public:
+  /// The constructor allocates space in all three buffers for a set amount of data.
+  ///
+  /// \param n_values  The number of intermediate values to store, most likely determined by the
+  ///                  number of reduction work units
+  ReductionBridge(size_t n_values);
+
+  /// \brief Take the default copy and move constructors as well as assignment operators.
+  /// \{
+  ReductionBridge(const ReductionBridge &original) = default;
+  ReductionBridge(ReductionBridge &&original) = default;
+  ReductionBridge& operator=(const ReductionBridge &original) = default;
+  ReductionBridge& operator=(ReductionBridge &&original) = default;
+  /// \}
   
-/// \brief Define the abstract length for a ReductionWorkUnit's abstract
-constexpr int rdwu_abstract_length = 8;
+  /// Get pointers to one of the buffers.
+  ///
+  /// Overloaded:
+  ///   - Get a const pointer to a const form of this object's data
+  ///   - Get a non-const pointer to a non-const form of this object's data
+  ///
+  /// \param cdim  The "dimension" to obtain a pointer for
+  /// \param tier  Obtain pointers to host or device data
+  /// \{
+  const double* getPointer(CartesianDimension cdim,
+                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double* getPointer(CartesianDimension cdim, HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
 
-/// \brief Enumerate stages of a reduction operation, which can be taken piecemeal or all at once.
-enum class ReductionStage {
-  GATHER,     ///< Gather information from many particles or other sources.
-  SCATTER,    ///< Scatter the accumulated information (this can also include a secondary gather
-              ///<   on block-wide accumulated results).
-  ALL_REDUCE  ///< Perform the entire reduction in one step, when no intermediate accumulation is
-              ///<   needed.
-};
-
-/// \brief Indicate the action to take when scattering the fully gathered sum (which is always a
-///        sum) to the writeable array positions.  If further manipulations are needed, i.e. the
-///        gathered sum is to be multiplied by two and then used as a divisor, those must be done
-///        explicitly on the buffered values at the end of a gathering operation, so that the
-///        scatter can then be applied in a subsequent step.
-enum class ReductionGoal {
-  NORMALIZE,      ///< Compute the norm of the data, whether the norm of the vector of scalar
-                  ///<   values present at all atoms or the norm of the collection of forces
-                  ///<   acting on each atom.
-  CENTER_ON_ZERO  ///< Compute the means of the data in up to three dimensions and subtract these
-                  ///<   means from all values.
-};
-  
-/// \brief Indicate whether parallel reductions can be performed with one work unit per system.
-enum class RdwuPerSystem {
-  ONE,      ///< Each system's gather and scatter operations are performed by a single work unit,
-            ///<   making one-kernel all-reduce possible.
-  MULTIPLE  ///< One or more systems' gather and scatter operations are shared across multiple
-            ///<   work units, forcing separate gather and scatter kernels.
-};
-
-/// \brief Enumerate the features of a reduction work unit abstract, as encoded in the synthesis
-///        of topologies.
-enum class RdwuAbstractMap {
-  ATOM_START,    ///< Absolute starting point of atoms in various (concatenated, in the case of a
-                 ///<   synthesis of many systems) arrays
-  ATOM_END,      ///< Absolute upper limit of atoms to read or write in various arrays
-  RESULT_INDEX,  ///< Location in one or more holding arrays for intermediate results of gathering
-  DEPN_START,    ///< Start of dependencies in one or more holding arrays for making a final
-                 ///<   assembly of the results prior to scattering
-  DEPN_END,      ///< Upper limit of dependencies--if this is only one greater than the start, it
-                 ///<   means that the reduction can be done by a single work unit
-  SYSTEM_ID      ///< Index of the system to which this reduction pertains
+private:
+  Hybrid<double> x_buffer;  ///< Buffer for the first type of data (it could be data pertaining to
+                            ///<   the Cartesian X dimension, or in another setting something like
+                            ///<   the squared magnitude of all forces for Conjugate Gradient
+                            ///<   energy minimization).
+  Hybrid<double> y_buffer;  ///< Buffer for the second type of data
+  Hybrid<double> z_buffer;  ///< Buffer for the third type of data
+  Hybrid<double> storage;   ///< ARRAY-kind Hybrid object targeted by all of the preceding objects
 };
 
 /// \brief Collect the simple components needed to guide reductions across all systems in a
@@ -69,9 +72,19 @@ enum class RdwuAbstractMap {
 ///        work units, the strategy, and the list of work unit abstracts.
 struct ReductionKit {
 
-  /// \brief The constructor takes a straight list of values for all member variables.
+  /// \brief The constructor takes a straight list of values for all member variables, or a
+  ///        combination of familiar objects.
+  ///
+  /// \param poly_ag  Compilation of topologies with reduction work unit counts and abstracts
+  /// \param tier     Level at which to obtain the data arrays (needed for passing to subsequent
+  ///                 getter functions in the topology and coordinate syntheses)
+  /// \{
   ReductionKit(int nrdwu_in, RdwuPerSystem rps_in, const int* rdwu_abstracts_in,
                const int* atom_counts_in);
+
+  ReductionKit(const AtomGraphSynthesis &poly_ag,
+               HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
 
   /// \brief Take the typical copy and move constructors for an abstract with constants.
   /// \{

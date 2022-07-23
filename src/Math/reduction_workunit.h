@@ -16,6 +16,9 @@ using card::GpuDetails;
 ///        results.
 constexpr int maximum_gathering_results = 1024;
 
+/// \brief Define the abstract length for a ReductionWorkUnit's abstract
+constexpr int rdwu_abstract_length = 8;
+
 /// \brief A work unit to describe the manner in which groups of atoms in each structure of a
 ///        synthesis come together to contribute to a single result.  Reduction work units serve
 ///        one and only one system apiece.  The maximum size of these work units can be specified

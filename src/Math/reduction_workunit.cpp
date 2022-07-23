@@ -81,6 +81,10 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
                                   static_cast<double>(tasks_per_atom);
   const double average_tasks = overall_tasks / static_cast<double>(nsys);
   const int n_smp = gpu.getSMPCount();
+
+  // It is assumed that each streaming multiprocessor can accept at least the large block size
+  // worth of threads.  If this assumption is violated, the launch grid will not entirely fit on
+  // the GPU at one time, but that is not, in principle, a problem.
   const int n_reduction_threads = n_smp * large_block_size;
   const int n_reduction_blocks = n_reduction_threads / small_block_size;
   

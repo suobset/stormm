@@ -136,6 +136,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Math/matrix.h \
 		   $(SRCDIR)/Math/matrix_ops.h \
 	           $(SRCDIR)/Math/reduction.h \
+	           $(SRCDIR)/Math/reduction_enumerators.h \
 	           $(SRCDIR)/Math/reduction_workunit.h \
 		   $(SRCDIR)/Math/rounding.h \
 		   $(SRCDIR)/Math/series_ops.h \
