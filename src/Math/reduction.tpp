@@ -19,18 +19,18 @@ double gatherNormalization(const ReductionSubstrate<T> rsbs, const int start_pos
       tsum += (dx * dx);
     }
   }
-  else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
+  else if (rsbs.z_read == nullptr) {
     for (int j = start_pos; j < end_pos; j++) {
       const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-      const double dy = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      const double dy = static_cast<double>(rsbs.y_read[j]) * rsbs.inv_fp_scaling;
       tsum += (dx * dx) + (dy * dy);
     }
   }
   else {
     for (int j = start_pos; j < end_pos; j++) {
       const double dx = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-      const double dy = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
-      const double dz = static_cast<double>(rsbs.x_read[j]) * rsbs.inv_fp_scaling;
+      const double dy = static_cast<double>(rsbs.y_read[j]) * rsbs.inv_fp_scaling;
+      const double dz = static_cast<double>(rsbs.z_read[j]) * rsbs.inv_fp_scaling;
       tsum += (dx * dx) + (dy * dy) + (dz * dz);
     }
   }
@@ -70,7 +70,7 @@ void scatterNormalization(ReductionSubstrate<T> rsbs, const double tsum, const i
       rsbs.x_write[j] = static_cast<T>(dx * nfactor);
     }
   }
-  else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
+  else if (rsbs.z_read == nullptr) {
     for (int j = start_pos; j < end_pos; j++) {
       const double dx = static_cast<double>(rsbs.x_write[j]);
       const double dy = static_cast<double>(rsbs.y_write[j]);
@@ -95,7 +95,7 @@ template <typename T>
 void scatterCenterOnZero(ReductionSubstrate<T> rsbs, const double tsum_x, const double tsum_y,
                          const double tsum_z, const int natom, const int start_pos,
                          const int end_pos) {
-
+  
   // Values entering the calculation of the sum were never scaled down from their fixed-precision
   // values, so there is no need to rescale any fixed-precision representations here.
   const double inv_norm = 1.0 / static_cast<double>(natom);
@@ -128,7 +128,7 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
   case ReductionStage::GATHER:
     for (int i = 0; i < redk.nrdwu; i++) {
       const int start_pos  = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
-      const int end_pos    = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
+      const int end_pos    = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_end_id];
       const int result_pos = redk.rdwu_abstracts[(i * rdwu_abstract_length) + result_id];
       const int nval       = end_pos - start_pos;
       switch (purpose) {
@@ -153,13 +153,13 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
   case ReductionStage::SCATTER:
     for (int i = 0; i < redk.nrdwu; i++) {
       const int start_pos      = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
-      const int end_pos        = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
+      const int end_pos        = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_end_id];
       const int result_pos     = redk.rdwu_abstracts[(i * rdwu_abstract_length) + result_id];
       const int depn_start_pos = redk.rdwu_abstracts[(i * rdwu_abstract_length) + dep_start_id];
       const int depn_end_pos   = redk.rdwu_abstracts[(i * rdwu_abstract_length) + dep_end_id];
       const int depn_nval      = depn_end_pos - depn_start_pos;
       const int system_pos     = redk.rdwu_abstracts[(i * rdwu_abstract_length) + system_id];
-
+      
       // Branch for different reduction goals.
       switch (purpose) {
       case ReductionGoal::NORMALIZE:
@@ -189,7 +189,7 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
     case RdwuPerSystem::ONE:
       for (int i = 0; i < redk.nrdwu; i++) {
         const int start_pos      = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
-        const int end_pos        = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
+        const int end_pos        = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_end_id];
         const int system_pos     = redk.rdwu_abstracts[(i * rdwu_abstract_length) + system_id];
         switch (purpose) {
         case ReductionGoal::NORMALIZE:
@@ -209,8 +209,8 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
       }
       break;
     case RdwuPerSystem::MULTIPLE:
-      evalReduction(rsbs, redk, ReductionStage::GATHER);
-      evalReduction(rsbs, redk, ReductionStage::SCATTER);
+      evalReduction(rsbs, redk, ReductionStage::GATHER, purpose);
+      evalReduction(rsbs, redk, ReductionStage::SCATTER, purpose);
       break;
     }
     break;

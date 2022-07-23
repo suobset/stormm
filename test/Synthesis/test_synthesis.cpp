@@ -683,7 +683,9 @@ void checkNonbondedWorkUnitCoverage(const std::vector<NonbondedWorkUnit> &nbwu_v
 void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &atom_offsets,
                    const std::vector<double> &prop_x, const std::vector<double> &prop_y = {},
                    const std::vector<double> &prop_z = {}) {
-
+  const bool have_y = (prop_y.size() == prop_x.size());
+  const bool have_z = (prop_z.size() == prop_x.size());
+  
   // The mock GPU will have 84 streaming multiprocessors.
   GpuDetails gpu;
   gpu.setSMPCount(84);
@@ -700,10 +702,10 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
   std::vector<double> rwusum_x(max_stash, 0.0), rwusum_y(max_stash, 0.0), rwusum_z(max_stash, 0.0);
   for (size_t i = 0; i < nsys; i++) {
     chksum_x[i] = sum<double>(&prop_x[atom_offsets[i]], atom_counts[i]);
-    if (prop_y.size() == prop_x.size()) {
+    if (have_y) {
       chksum_y[i] = sum<double>(&prop_y[atom_offsets[i]], atom_counts[i]);
     }
-    if (prop_z.size() == prop_x.size()) {
+    if (have_z) {
       chksum_z[i] = sum<double>(&prop_z[atom_offsets[i]], atom_counts[i]);
     }
   }
@@ -712,10 +714,10 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
     const int max_wu_idx = rwu_vec[i].getAtomEnd();
     const int wu_res_idx = rwu_vec[i].getResultIndex();
     rwusum_x[wu_res_idx] = sum<double>(&prop_x[min_wu_idx], max_wu_idx - min_wu_idx);
-    if (prop_y.size() == prop_x.size()) {
+    if (have_y) {
       rwusum_y[wu_res_idx] = sum<double>(&prop_y[min_wu_idx], max_wu_idx - min_wu_idx);
     }
-    if (prop_z.size() == prop_x.size()) {
+    if (have_z) {
       rwusum_z[wu_res_idx] = sum<double>(&prop_z[min_wu_idx], max_wu_idx - min_wu_idx);
     }
   }
@@ -739,10 +741,10 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
   }
   for (size_t i = 0; i < nsys; i++) {
     rwu_result_x[i] = sum<double>(&rwusum_x[dep_chk[i].x], dep_chk[i].y - dep_chk[i].x);
-    if (prop_y.size() == prop_x.size()) {
+    if (have_y) {
       rwu_result_y[i] = sum<double>(&rwusum_y[dep_chk[i].x], dep_chk[i].y - dep_chk[i].x);
     }
-    if (prop_z.size() == prop_x.size()) {
+    if (have_z) {
       rwu_result_z[i] = sum<double>(&rwusum_z[dep_chk[i].x], dep_chk[i].y - dep_chk[i].x);
     }
   }
@@ -754,13 +756,13 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
         "units did not properly guide the summation of X values in a collection with between " +
         std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
         " items per system.");
-  if (prop_y.size() == prop_x.size()) {
+  if (have_y) {
     check(rwu_result_y, RelationalOperator::EQUAL, Approx(chksum_y).margin(tiny), "Reduction work "
           "units did not properly guide the summation of Y values in a collection with between " +
           std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
           " items per system.");
   }
-  if (prop_z.size() == prop_x.size()) {
+  if (have_z) {
     check(rwu_result_z, RelationalOperator::EQUAL, Approx(chksum_z).margin(tiny), "Reduction work "
           "units did not properly guide the summation of Z values in a collection with between " +
           std::to_string(minValue(atom_counts)) + " and " + std::to_string(maxValue(atom_counts)) +
@@ -791,6 +793,81 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
                           tmp_gathered_y.data(), tmp_gathered_z.data(), copy_prop_x.data(),
                           copy_prop_y.data(), copy_prop_z.data());
   evalReduction(&rsbs, redk, ReductionStage::ALL_REDUCE, ReductionGoal::NORMALIZE);
+  std::vector<double> norm_prop_x(prop_x), norm_prop_y(prop_y), norm_prop_z(prop_z);
+  double* norm_xptr = norm_prop_x.data();
+  double* norm_yptr = norm_prop_y.data();
+  double* norm_zptr = norm_prop_z.data();
+  for (int i = 0; i < nsys; i++) {
+    const double xmag = magnitude(&norm_xptr[atom_offsets[i]], atom_counts[i]);
+    const double ymag = (have_y) ? magnitude(&norm_yptr[atom_offsets[i]], atom_counts[i]) : 0.0;
+    const double zmag = (have_z) ? magnitude(&norm_zptr[atom_offsets[i]], atom_counts[i]) : 0.0;
+    const double norm_factor = 1.0 / sqrt((xmag * xmag) + (ymag * ymag) + (zmag * zmag));
+    elementwiseMultiply(&norm_xptr[atom_offsets[i]], atom_counts[i], norm_factor);
+    if (have_y) {
+      elementwiseMultiply(&norm_yptr[atom_offsets[i]], atom_counts[i], norm_factor);
+    }
+    if (have_z) {
+      elementwiseMultiply(&norm_zptr[atom_offsets[i]], atom_counts[i], norm_factor);
+    }
+  }
+  check(norm_prop_x, RelationalOperator::EQUAL, Approx(copy_prop_x).margin(tiny),
+        "Normalization by reduction work units was not accomplished correctly in the first of " +
+        std::to_string(nprop) + " arrays.");
+  if (have_y) {
+    check(norm_prop_y, RelationalOperator::EQUAL, Approx(copy_prop_y).margin(tiny),
+          "Normalization by reduction work units was not accomplished correctly in the second "
+          "of " + std::to_string(nprop) + " arrays.");
+  }
+  if (have_z) {
+    check(norm_prop_z, RelationalOperator::EQUAL, Approx(copy_prop_z).margin(tiny),
+          "Normalization by reduction work units was not accomplished correctly in the third "
+          "of " + std::to_string(nprop) + " arrays.");
+  }
+
+  // Reset the arrays and try reduction for centering on zero.
+  std::vector<double> cent_prop_x(prop_x), cent_prop_y(prop_y), cent_prop_z(prop_z);
+  for (int i = 0; i < nsys; i++) {
+    const int jmin = atom_offsets[i];
+    const int jmax = jmin + atom_counts[i];
+    for (int j = jmin; j < jmax; j++) {
+      copy_prop_x[j] = prop_x[j];
+      if (have_y) {
+        copy_prop_y[j] = prop_y[j];
+      }
+      if (have_z) {
+        copy_prop_z[j] = prop_z[j];
+      }
+    }
+  }
+  evalReduction(&rsbs, redk, ReductionStage::ALL_REDUCE, ReductionGoal::CENTER_ON_ZERO);
+  double* cent_xptr = cent_prop_x.data();
+  double* cent_yptr = cent_prop_y.data();
+  double* cent_zptr = cent_prop_z.data();
+  for (int i = 0; i < nsys; i++) {
+    const double xave = mean(&cent_xptr[atom_offsets[i]], atom_counts[i]);
+    addScalarToVector(&cent_xptr[atom_offsets[i]], atom_counts[i], -xave);
+    if (have_y) {
+      const double yave = mean(&cent_yptr[atom_offsets[i]], atom_counts[i]);
+      addScalarToVector(&cent_yptr[atom_offsets[i]], atom_counts[i], -yave);
+    }
+    if (have_z) {
+      const double zave = mean(&cent_zptr[atom_offsets[i]], atom_counts[i]);
+      addScalarToVector(&cent_zptr[atom_offsets[i]], atom_counts[i], -zave);
+    }
+  }
+  check(cent_prop_x, RelationalOperator::EQUAL, Approx(copy_prop_x).margin(tiny),
+        "Zero-centering by reduction work units was not accomplished correctly in the first of " +
+        std::to_string(nprop) + " arrays.");
+  if (have_y) {
+    check(cent_prop_y, RelationalOperator::EQUAL, Approx(copy_prop_y).margin(tiny),
+          "Zero-centering by reduction work units was not accomplished correctly in the second "
+          "of " + std::to_string(nprop) + " arrays.");
+  }
+  if (have_z) {
+    check(cent_prop_z, RelationalOperator::EQUAL, Approx(copy_prop_z).margin(tiny),
+          "Zero-centering by reduction work units was not accomplished correctly in the third "
+          "of " + std::to_string(nprop) + " arrays.");
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
