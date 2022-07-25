@@ -265,7 +265,8 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getReductionKernelDims(const ReductionStage process) const {
+int2 KernelManager::getReductionKernelDims(const PrecisionModel prec, const ReductionGoal purpose,
+                                           const ReductionStage process) const {
   const std::string k_key = reductionKernelKey(process);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Reduction kernel identifier " + k_key + " was not found in the kernel map.",

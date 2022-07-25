@@ -31,6 +31,7 @@ using energy::EvaluateEnergy;
 using numerics::ForceAccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::NbwuKind;
+using math::ReductionGoal;
 using math::ReductionStage;
 using synthesis::VwuGoal;
 using topology::UnitCellType;
@@ -150,8 +151,12 @@ public:
 
   /// \brief Get the block and thread counts for a reduction kernel.
   ///
+  /// \param prec     The type of floating point numbers represented by the kernel's substrate
+  ///                 (all reductions happenin double-precision real numbers)
+  /// \param purpose  The procedure requested, for which the appropriate kernel shall be found 
   /// \param process  The reduction step to perform
-  int2 getReductionKernelDims(ReductionStage process) const;
+  int2 getReductionKernelDims(PrecisionModel prec, ReductionGoal purpose,
+                              ReductionStage process) const;
 
   /// \brief Get the GPU information for the active GPU.
   const GpuDetails& getGpu() const;

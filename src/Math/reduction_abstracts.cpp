@@ -1,8 +1,11 @@
+#include "Constants/behavior.h"
 #include "reduction_abstracts.h"
 
 namespace omni {
 namespace math {
 
+using constants::CartesianDimension;
+  
 //-------------------------------------------------------------------------------------------------
 ReductionKit::ReductionKit(const int nrdwu_in, const RdwuPerSystem rps_in,
                            const int* rdwu_abstracts_in, const int* atom_counts_in) :
@@ -15,6 +18,28 @@ ReductionKit::ReductionKit(const AtomGraphSynthesis &poly_ag, const HybridTarget
   rps{poly_ag.getRdwuPerSystem()},
   rdwu_abstracts{poly_ag.getReductionWorkUnitAbstracts().data(tier)},
   atom_counts{poly_ag.getSystemAtomCounts().data(tier)}
+{}
+
+//-------------------------------------------------------------------------------------------------
+ConjGradSubstrate::ConjGradSubstrate(PsSynthesisWriter poly_psw, ReductionBridge *rbg,
+                                     const HybridTargetLevel tier) :
+    inv_frc_scale{poly_psw.inv_frc_scale},
+    xfrc{poly_psw.xfrc}, yfrc{poly_psw.yfrc}, zfrc{poly_psw.zfrc},
+    xfrc_ovrf{poly_psw.xfrc_ovrf}, yfrc_ovrf{poly_psw.yfrc_ovrf}, zfrc_ovrf{poly_psw.zfrc_ovrf},
+    xprv{poly_psw.xprv}, yprv{poly_psw.yprv}, zprv{poly_psw.zprv},
+    xprv_ovrf{poly_psw.xprv_ovrf}, yprv_ovrf{poly_psw.yprv_ovrf}, zprv_ovrf{poly_psw.zprv_ovrf},
+    x_cg_temp{poly_psw.xvel}, y_cg_temp{poly_psw.yvel}, z_cg_temp{poly_psw.zvel},
+    x_cg_temp_ovrf{poly_psw.xvel_ovrf},
+    y_cg_temp_ovrf{poly_psw.yvel_ovrf},
+    z_cg_temp_ovrf{poly_psw.zvel_ovrf},
+    gg_buffer{rbg->getPointer(CartesianDimension::X, tier)},
+    dgg_buffer{rbg->getPointer(CartesianDimension::Y, tier)}
+{}
+
+//-------------------------------------------------------------------------------------------------
+ConjGradSubstrate::ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+                                     const HybridTargetLevel tier) :
+    ConjGradSubstrate(poly_ps->data(tier), rbg, tier)
 {}
 
 } // namespace math

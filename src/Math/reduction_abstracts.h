@@ -15,6 +15,7 @@ namespace math {
 using card::HybridTargetLevel;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisWriter;
 
 /// \brief Collect the simple components needed to guide reductions across all systems in a
 ///        topology synthesis (or the corresponding compilation of coordinates): the number of
@@ -121,13 +122,29 @@ struct ConjGradSubstrate {
   /// \brief The constructor takes a PhaseSpaceSynthesis object and a series of double-precision
   ///        allocations.
   ///
-  /// \param poly_ps  Collection of coordinates in fixed-precision representation
-  /// \param rbg      Allocations of double-precision reals to hold transitional sums between
-  ///                 gather and scatter kernels
-  /// \param tier     Get data pointers on the host (the customary default) or on the HPC device
-  ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+  /// Overloaded:
+  ///   - Accept a pointer to a coordinate synthesis object
+  ///   - Accept coordinate synthesis abstract (passed by value)
+  ///
+  /// \param poly_psw  Writeable abstract to a coordinate synthesis
+  /// \param poly_ps   Collection of coordinates in fixed-precision representation
+  /// \param rbg       Allocations of double-precision reals to hold transitional sums between
+  ///                  gather and scatter kernels
+  /// \param tier      Get data pointers on the host (the customary default) or on the HPC device
+  /// \{
+  ConjGradSubstrate(PsSynthesisWriter poly_psw, ReductionBridge *rbg,
                     HybridTargetLevel tier = HybridTargetLevel::HOST);
 
+  ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+
+  /// Inverse force scaling constant.  This value is stored to provide a means for unrolling the
+  /// fixed-precision scaling when computing squared gradients and gradient evolution quantities,
+  /// although the double-precision accumulators are still very unlikely to overflow.
+  const double inv_frc_scale;
+
+  // The data pointers often repurpose arrays in the PhaseSpaceSynthesis object.
   llint* xfrc;          ///< Forces acting on all particles in the Cartesian X direction
   llint* yfrc;          ///< Forces acting on all particles in the Cartesian Y direction
   llint* zfrc;          ///< Forces acting on all particles in the Cartesian Z direction

@@ -1,11 +1,24 @@
 // -*-c++-*-
 #include "Accelerator/ptx_macros.h"
+#include "Constants/fixed_precision.h"
+#include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
+#include "DataTypes/omni_vector_types.h"
 #include "hpc_reduction.cuh"
 
 namespace omni {
 namespace math {
-  
+
+using constants::twice_warp_bits_mask_int;
+using numerics::max_int_accumulation;
+using numerics::max_int_accumulation_f;
+using numerics::max_int_accumulation_ll;
+using numerics::max_llint_accumulation;
+using numerics::max_llint_accumulation_f;
+using data_types::int95_t;
+
+#include "Potential/accumulation.cui"
+
 //-------------------------------------------------------------------------------------------------
 // Perform an accumulation over the conjugate gradient work units' relevant atoms to obtain the
 // sum of squared gradients (gg) and the evolution of the gradient (dgg).
@@ -50,7 +63,7 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
   }
   WARP_REDUCE_DOWN(gg);
   WARP_REDUCE_DOWN(dgg);
-  if (lane_idx == 0) {
+  if ((threadIdx.x & warp_bits_mask_int) == 0) {
     const size_t warp_idx = (threadIdx.x >> warp_bits);
     gg_collector[warp_idx]  =  gg;
     dgg_collector[warp_idx] = dgg;
@@ -80,11 +93,14 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
                         (double)(yfrc[tpos])) * inv_frc_scale;
     const double dfz = (((double)(zfrc_ovrf[tpos]) * max_llint_accumulation) +
                         (double)(zfrc[tpos])) * inv_frc_scale;
+    const double ddx = dfx - dpx;
+    const double ddy = dfy - dpy;
+    const double ddz = dfz - dpz;
     dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfx);
   }
   WARP_REDUCE_DOWN(gg);
   WARP_REDUCE_DOWN(dgg);
-  if (lane_idx == 0) {
+  if ((threadIdx.x & warp_bits_mask_int) == 0) {
     const size_t warp_idx = (threadIdx.x >> warp_bits);
     gg_collector[warp_idx]  =  gg;
     dgg_collector[warp_idx] = dgg;
@@ -109,9 +125,9 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
 //   [x,y,z]prv_ovrf:  Overflow in prior iteration X, Y, or Z forces
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__
-void conjGradScatter(const double gam, const int start_pos, const int end_pos, const llint* xfrc,
-                     const llint* yfrc, const llint* zfrc, const llint* xprv, const llint* yprv,
-                     const llint* zprv) {
+void conjGradScatter(const double gam, const int atom_start_pos, const int atom_end_pos,
+                     llint* xfrc, llint* yfrc, llint* zfrc, llint* xprv, llint* yprv, llint* zprv,
+                     llint* x_cg_temp, llint* y_cg_temp, llint* z_cg_temp) {
   for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
 
     // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
@@ -136,13 +152,12 @@ void conjGradScatter(const double gam, const int start_pos, const int end_pos, c
 }
 
 __device__ __forceinline__
-void conjGradScatter(const double gam, const int start_pos, const int end_pos, const llint* xfrc,
-                     const int* xfrc_ovrf, const llint* yfrc, const int* yfrc_ovrf,
-                     const llint* zfrc, const int* zfrc_ovrf, const llint* xprv,
-                     const int* xprv_ovrf, const llint* yprv, const int* yprv_ovrf,
-                     const llint* zprv, const int* zprv_ovrf, const llint* x_cg_temp,
-                     const int* x_cg_temp_ovrf, const llint* y_cg_temp, const int* y_cg_temp_ovrf,
-                     const llint* z_cg_temp, const int* z_cg_temp_ovrf) {
+void conjGradScatter(const double gam, const int atom_start_pos, const int atom_end_pos,
+                     llint* xfrc, int* xfrc_ovrf, llint* yfrc, int* yfrc_ovrf, llint* zfrc,
+                     int* zfrc_ovrf, llint* xprv, int* xprv_ovrf, llint* yprv, int* yprv_ovrf,
+                     llint* zprv, int* zprv_ovrf, llint* x_cg_temp, int* x_cg_temp_ovrf,
+                     llint* y_cg_temp, int* y_cg_temp_ovrf, llint* z_cg_temp,
+                     int* z_cg_temp_ovrf) {
   for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
     const llint ifx = xfrc[tpos];
     const llint ify = yfrc[tpos];
@@ -183,18 +198,9 @@ void conjGradScatter(const double gam, const int start_pos, const int end_pos, c
   }
 }
 
-// Single-precision floating point conjugate gradient definitions.  The single-precision form
-// still does its accumulation in double-precision, but does not store its data in the extended
-// fixed-precision format which the double-precision forms of the kernels read and write.
-#define KGATHER_NAME     kfgtConjGrad
-#define KSCATTER_NAME    kfscConjGrad
-#define KALLREDUCE_NAME  kfrdConjGrad
-#include "conjugate_gradient.cui"
-#undef KGATHER_NAME
-#undef KSCATTER_NAME
-#undef KALLREDUCE_NAME
-
 // Double-precision floating point conjugate gradient definitions
+#define TCALC            double
+#define TCALC_IS_DOUBLE
 #define KGATHER_NAME     kdgtConjGrad
 #define KSCATTER_NAME    kdscConjGrad
 #define KALLREDUCE_NAME  kdrdConjGrad
@@ -202,6 +208,21 @@ void conjGradScatter(const double gam, const int start_pos, const int end_pos, c
 #undef KGATHER_NAME
 #undef KSCATTER_NAME
 #undef KALLREDUCE_NAME
+#undef TCALC
+#undef TCALC_IS_DOUBLE
+  
+// Single-precision floating point conjugate gradient definitions.  The single-precision form
+// still does its accumulation in double-precision, but does not store its data in the extended
+// fixed-precision format which the double-precision forms of the kernels read and write.
+#define TCALC            float
+#define KGATHER_NAME     kfgtConjGrad
+#define KSCATTER_NAME    kfscConjGrad
+#define KALLREDUCE_NAME  kfrdConjGrad
+#include "conjugate_gradient.cui"
+#undef KGATHER_NAME
+#undef KSCATTER_NAME
+#undef KALLREDUCE_NAME
+#undef TCALC
 
 //-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel prec,
@@ -293,7 +314,8 @@ extern void launchConjugateGradientDp(const ReductionKit redk, ConjGradSubstrate
 //-------------------------------------------------------------------------------------------------
 extern void launchConjugateGradientDp(const AtomGraphSynthesis poly_ag,
                                       PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
-                                      MMControlKit<double> *ctrl, const KernelManager &launcher) {
+                                      MolecularMechanicsControls *mmctrl,
+                                      const KernelManager &launcher) {
   ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
   ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
   MMControlKit<double> ctrl = mmctrl->dpData();
@@ -327,7 +349,7 @@ extern void launchConjugateGradientSp(const AtomGraphSynthesis poly_ag,
   ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
   ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
   MMControlKit<float> ctrl = mmctrl->spData();
-  launchConjugateGradientDp(redk, cgsbs, &ctrl, launcher);
+  launchConjugateGradientSp(redk, cgsbs, &ctrl, launcher);
 }
 
 } // namespace synthesis

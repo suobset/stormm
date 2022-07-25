@@ -377,6 +377,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 
 # OMNI CUDA source files
 OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
+		  $(SRCDIR)/Math/hpc_reduction.cu \
 		  $(SRCDIR)/Potential/hpc_nonbonded_potential.cu \
 		  $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		  $(SRCDIR)/Random/hpc_random.cu \
@@ -386,6 +387,7 @@ OMNI_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		    $(SRCDIR)/Accelerator/hpc_config.cuh \
 		    $(SRCDIR)/Accelerator/ptx_macros.h \
+		    $(SRCDIR)/Math/hpc_reduction.cuh \
 		    $(SRCDIR)/Math/hpc_summation.cuh \
 		    $(SRCDIR)/Potential/hpc_nonbonded_potential.cuh \
 		    $(SRCDIR)/Potential/hpc_valence_potential.cuh \
@@ -394,13 +396,15 @@ OMNI_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
 # OMNI CUDA included files
-OMNI_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/rounding.cui \
+OMNI_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
+			   $(SRCDIR)/Math/rounding.cui \
 			   $(SRCDIR)/Potential/accumulation.cui \
 			   $(SRCDIR)/Potential/nonbonded_potential_tilegroups.cui \
 			   $(SRCDIR)/Potential/valence_potential.cui
 
 # OMNI CUDA object files
 OMNI_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
+		 $(SRCDIR)/Math/hpc_reduction.o \
 		 $(SRCDIR)/Potential/hpc_nonbonded_potential.o \
 		 $(SRCDIR)/Potential/hpc_valence_potential.o \
 		 $(SRCDIR)/Random/hpc_random.o \

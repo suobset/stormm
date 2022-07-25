@@ -1,12 +1,12 @@
 // -*-c++-*-
-#include "hpc_reduction.cuh"
-
-namespace omni {
-namespace synthesis {
 
 //-------------------------------------------------------------------------------------------------
+// Gathering kernel for the conjugate gradient procedure.
+//
+// Arguments:
+//-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(small_block_size, 4)
-KGATHER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ctrl) {
+KGATHER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ctrl) {
 
   // Two small arrays will store the double-precision accumulants for squared force magnitudes
   // and force differential measurements.
@@ -15,7 +15,7 @@ KGATHER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ctr
   __shared__ int sh_gtwu_idx;
 
   const int warp_idx = threadIdx.x >> warp_bits;
-  const int lane_idx = (threadIdx.x & warp_bits_mask);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
   const int nwarps   = blockDim.x >> warp_bits;
   int gtwu_idx = blockIdx.x;
   while (gtwu_idx < redk.nrdwu) {
@@ -76,14 +76,14 @@ KGATHER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ctr
 
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(small_block_size, 4)
-KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ctrl) {
+KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ctrl) {
   __shared__ double sh_gg_total, sh_dgg_total;
-  __shared__ double  gg_accumulator[small_block_size >> warp_bits];
-  __shared__ double dgg_accumulator[small_block_size >> warp_bits];
+  __shared__ double  gg_collector[small_block_size >> warp_bits];
+  __shared__ double dgg_collector[small_block_size >> warp_bits];
   __shared__ int sh_scwu_idx;
 
   const int warp_idx = threadIdx.x >> warp_bits;
-  const int lane_idx = (threadIdx.x & warp_bits_mask);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
   const int nwarps   = blockDim.x >> warp_bits;
   int scwu_idx = blockIdx.x;
   while (scwu_idx < redk.nrdwu) {
@@ -101,19 +101,19 @@ KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ct
     WARP_REDUCE_DOWN(gg);
     WARP_REDUCE_DOWN(dgg);
     if (lane_idx == 0) {
-      gg_accumulator[warp_idx]  = gg;
-      dgg_accumulator[warp_idx] = dgg;
+      gg_collector[warp_idx]  = gg;
+      dgg_collector[warp_idx] = dgg;
     }
     __syncthreads();
     if (warp_idx == 0) {
-      gg = (lane_idx < nwarps) ? gg_accumulator[lane_idx] : 0.0;
+      gg = (lane_idx < nwarps) ? gg_collector[lane_idx] : 0.0;
       WARP_REDUCE_DOWN(gg);
       if (lane_idx == 0) {
         sh_gg_total = gg;
       }
     }
     else if (warp_idx == 1) {
-      dgg = (lane_idx < nwarps) ? dgg_accumulator[lane_idx] : 0.0;
+      dgg = (lane_idx < nwarps) ? dgg_collector[lane_idx] : 0.0;
       WARP_REDUCE_DOWN(dgg);
       if (lane_idx == 0) {
         sh_dgg_total = dgg;
@@ -123,7 +123,7 @@ KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ct
       sh_scwu_idx = atomicAdd(&ctrl.scwu_progress[ctrl.step], 1);
     }
     __syncthreads();
-    const double gam = (ctrl.step >= sd_cycles) ? (sh_total_dgg / sh_total_gg) : 0.0;
+    const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
     for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
 
       // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
@@ -195,20 +195,20 @@ KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ct
 
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(small_block_size, 4)
-KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit ctrl) {
+KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ctrl) {
   __shared__ double sh_gg_total, sh_dgg_total;
-  __shared__ double  gg_accumulator[small_block_size >> warp_bits];
-  __shared__ double dgg_accumulator[small_block_size >> warp_bits];
+  __shared__ double  gg_collector[small_block_size >> warp_bits];
+  __shared__ double dgg_collector[small_block_size >> warp_bits];
   __shared__ int sh_rdwu_idx;
 
   const int warp_idx = threadIdx.x >> warp_bits;
-  const int lane_idx = (threadIdx.x & warp_bits_mask);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
   const int nwarps   = blockDim.x >> warp_bits;
-  int gtwu_idx = blockIdx.x;
-  while (gtwu_idx < redk.nrdwu) {
-    const int wabs_pos       = (gtwu_idx * rdwu_abstract_length);
-    const int start_pos      = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
-    const int end_pos        = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
+  int rdwu_idx = blockIdx.x;
+  while (rdwu_idx < redk.nrdwu) {
+    const int wabs_pos       = (rdwu_idx * rdwu_abstract_length);
+    const int atom_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
+    const int atom_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
     const int depn_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_START)];
     const int depn_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_END)];
 
@@ -217,14 +217,14 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit 
     // units may not be consistent.  The advancement through work units is therefore asynchronous.
     double gg  = 0.0;
     double dgg = 0.0;
-    for (int tpos = start_pos + threadIdx.x; tpos < end_pos; tpos += blockDim.x) {
-      const double dpx = (double)(xprv[tpos]) * inv_frc_scale;
-      const double dpy = (double)(yprv[tpos]) * inv_frc_scale;
-      const double dpz = (double)(zprv[tpos]) * inv_frc_scale;
+    for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
+      const double dpx = (double)(cgsbs.xprv[tpos]) * cgsbs.inv_frc_scale;
+      const double dpy = (double)(cgsbs.yprv[tpos]) * cgsbs.inv_frc_scale;
+      const double dpz = (double)(cgsbs.zprv[tpos]) * cgsbs.inv_frc_scale;
       gg += (dpx * dpx) + (dpy * dpy) + (dpz * dpz);
-      const double dfx = (double)(xfrc[tpos]) * inv_frc_scale;
-      const double dfy = (double)(yfrc[tpos]) * inv_frc_scale;
-      const double dfz = (double)(zfrc[tpos]) * inv_frc_scale;
+      const double dfx = (double)(cgsbs.xfrc[tpos]) * cgsbs.inv_frc_scale;
+      const double dfy = (double)(cgsbs.yfrc[tpos]) * cgsbs.inv_frc_scale;
+      const double dfz = (double)(cgsbs.zfrc[tpos]) * cgsbs.inv_frc_scale;
       const double ddx = dfx - dpx;
       const double ddy = dfy - dpy;
       const double ddz = dfz - dpz;
@@ -239,14 +239,14 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit 
     }
     __syncthreads();
     if (warp_idx == 0) {
-      gg = (lane_idx < nwarps) ? gg_accumulator[lane_idx] : 0.0;
+      gg = (lane_idx < nwarps) ? gg_collector[lane_idx] : 0.0;
       WARP_REDUCE_DOWN(gg);
       if (lane_idx == 0) {
         sh_gg_total = gg;
       }
     }
     else if (warp_idx == 1) {
-      dgg = (lane_idx < nwarps) ? dgg_accumulator[lane_idx] : 0.0;
+      dgg = (lane_idx < nwarps) ? dgg_collector[lane_idx] : 0.0;
       WARP_REDUCE_DOWN(dgg);
       if (lane_idx == 0) {
         sh_dgg_total = dgg;
@@ -256,7 +256,7 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit 
       sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[ctrl.step], 1);
     }
     __syncthreads();
-    const double gam = (ctrl.step >= sd_cycles) ? (sh_total_dgg / sh_total_gg) : 0.0;
+    const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
     for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
 
       // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
@@ -325,6 +325,3 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate<llint> cgsbs, MMControlKit 
     }
   }
 }
-
-} // namespace synthesis
-} // namespace omni

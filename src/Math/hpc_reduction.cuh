@@ -2,6 +2,8 @@
 #ifndef OMNI_HPC_REDUCTION_H
 #define OMNI_HPC_REDUCTION_H
 
+#include "Accelerator/kernel_manager.h"
+#include "MolecularMechanics/mm_controls.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "reduction_abstracts.h"
@@ -11,7 +13,10 @@
 namespace omni {
 namespace math {
 
+using card::KernelManager;
 using constants::PrecisionModel;
+using mm::MolecularMechanicsControls;
+using mm::MMControlKit;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 
@@ -34,7 +39,7 @@ void launchConjugateGradientDp(const ReductionKit redk, ConjGradSubstrate cgsbs,
 
 /// \brief
 void launchConjugateGradientDp(const AtomGraphSynthesis poly_ag, PhaseSpaceSynthesis *poly_ps,
-                               ReductionBridge *rbg, MMControlKit<double> *ctrl,
+                               ReductionBridge *rbg, MolecularMechanicsControls *mmctrl,
                                const KernelManager &launcher);
 
 /// \brief
