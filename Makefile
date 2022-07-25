@@ -26,6 +26,8 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/ForceField/forcefield_enumerators.cpp \
 		 $(SRCDIR)/Math/matrix_ops.cpp \
 		 $(SRCDIR)/Math/reduction.cpp \
+		 $(SRCDIR)/Math/reduction_abstracts.cpp \
+		 $(SRCDIR)/Math/reduction_bridge.cpp \
 		 $(SRCDIR)/Math/reduction_workunit.cpp \
 		 $(SRCDIR)/Math/rounding.cpp \
 		 $(SRCDIR)/Math/series_ops.cpp \
@@ -136,6 +138,8 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		   $(SRCDIR)/Math/matrix.h \
 		   $(SRCDIR)/Math/matrix_ops.h \
 	           $(SRCDIR)/Math/reduction.h \
+	           $(SRCDIR)/Math/reduction_abstracts.h \
+	           $(SRCDIR)/Math/reduction_bridge.h \
 	           $(SRCDIR)/Math/reduction_enumerators.h \
 	           $(SRCDIR)/Math/reduction_workunit.h \
 		   $(SRCDIR)/Math/rounding.h \
@@ -236,7 +240,7 @@ OMNI_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		 $(SRCDIR)/Math/matrix.tpp \
 		 $(SRCDIR)/Math/matrix_ops.tpp \
 		 $(SRCDIR)/Math/reduction.tpp \
-		 $(SRCDIR)/Math/reduction_workunit.tpp \
+		 $(SRCDIR)/Math/reduction_abstracts.tpp \
 		 $(SRCDIR)/Math/rounding.tpp \
 		 $(SRCDIR)/Math/series_ops.tpp \
 		 $(SRCDIR)/Math/summation.tpp \
@@ -285,6 +289,8 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		$(SRCDIR)/ForceField/forcefield_enumerators.o \
 		$(SRCDIR)/Math/matrix_ops.o \
 		$(SRCDIR)/Math/reduction.o \
+		$(SRCDIR)/Math/reduction_abstracts.o \
+		$(SRCDIR)/Math/reduction_bridge.o \
 		$(SRCDIR)/Math/reduction_workunit.o \
 		$(SRCDIR)/Math/rounding.o \
 	        $(SRCDIR)/Math/series_ops.o \

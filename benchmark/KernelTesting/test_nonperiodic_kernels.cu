@@ -105,8 +105,7 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
   std::vector<AtomGraph*> ag_vec(1, ag);
   std::vector<PhaseSpace> ps_vec(1, ps);
   std::vector<int> ag_idx(nrep, 0);
-  AtomGraphSynthesis poly_ag(ag_vec, ag_idx, ExceptionResponse::SILENT,
-                             maximum_valence_work_unit_atoms);
+  AtomGraphSynthesis poly_ag(ag_vec, ag_idx, ExceptionResponse::SILENT, gpu);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_vec, ag_idx);
   StaticExclusionMaskSynthesis poly_se(ag_vec, ag_idx);
   SeMaskSynthesisReader poly_ser = poly_se.data();

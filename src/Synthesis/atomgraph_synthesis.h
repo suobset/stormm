@@ -76,12 +76,12 @@ public:
                      const std::vector<int> &topology_indices_in,
                      const std::vector<int> &restraint_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
-                     int vwu_atom_limit = -1, StopWatch *timer_in = nullptr);
+                     const GpuDetails &gpu = null_gpu, StopWatch *timer_in = nullptr);
 
   AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                      const std::vector<int> &topology_indices_in,
                      ExceptionResponse policy_in = ExceptionResponse::WARN,
-                     int vwu_atom_limit = -1, StopWatch *timer_in = nullptr);
+                     const GpuDetails &gpu = null_gpu, StopWatch *timer_in = nullptr);
   /// \}
 
   /// \brief Get the number of unique topologies described by the synthesis

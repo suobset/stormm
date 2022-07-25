@@ -26,8 +26,8 @@ using topology::VirtualSiteKit;
 constexpr int minimum_valence_work_unit_atoms = 64;
 
 /// \brief The maximum value for the atom limit in a valence work unit--any higher and the amount
-///        of __shared__ memory in a block of 1024 threads might need to be stretched.
-constexpr int maximum_valence_work_unit_atoms = 1024;
+///        of __shared__ memory in a block of 256 threads might need to be stretched.
+constexpr int maximum_valence_work_unit_atoms = 320;
 
 /// \brief The maximum tolerated number of recursive calls to various atom searching functions.
 ///        The halo region needed to determine the correct movement of any given atom cannot chain
@@ -533,6 +533,14 @@ public:
   ///        valence terms as possible.
   ///
   /// \param vdel_in        Valence delegator managing the creation of this valence work unit
+  /// \param tvwu_coverage  Array spanning all atoms in the system to mark whether any one of them
+  ///                       has been included in the valence work unit currently under
+  ///                       construction.  This is distinct from arrays with similar functionality
+  ///                       held by the ValenceDelegator object, which track whether an atom has
+  ///                       been included as an update priority in any valence work unit.  Having
+  ///                       this work-unit specific resource ensures that atoms are not included
+  ///                       multiple times in the import array.  It is cleared after each work
+  ///                       unit's construction so as to not require re-allocation.
   /// \param list_index_in  Index of this unit in a larger list (the unit should remember its own
   ///                       index number, for the purposes of coordinating with other work units)
   /// \param seed_atom_in   The first atom to incorporate into the work unit.  Subsequent atoms
@@ -540,8 +548,8 @@ public:
   ///                       topological indices whereby previous work units left some atoms
   ///                       behind, or jumping forward to the next new molecule.
   /// \param max_atoms_in   The maximum number of atoms to accumulate in the work unit
-  ValenceWorkUnit(ValenceDelegator *vdel_in, int list_index_in, int seed_atom_in,
-                  int max_atoms_in = 768);
+  ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tvwu_coverage, int list_index_in,
+                  int seed_atom_in, int max_atoms_in = maximum_valence_work_unit_atoms);
 
   /// \brief Get the number of atoms currently imported into this work unit.
   int getImportedAtomCount() const;
@@ -1101,8 +1109,10 @@ private:
 ///   - Accept a Hybrid object with the system sizes
 ///   - Accept launch parameters to inform the choice of work unit size
 ///
-/// \param atom_counts   The sizes of each system
-/// \param system_count  The number of systems (if a C-style array is provided)
+/// \param atom_counts     The sizes of each system
+/// \param system_count    The number of systems (if a C-style array is provided)
+/// \param grid_dimension  The number of blocks that will be launched on the GPU (based on the
+///                        number of streaming multiprocessors)
 /// \{
 int calculateValenceWorkUnitSize(const int* atom_counts, int system_count);
 
@@ -1110,14 +1120,11 @@ int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts);
 
 int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts);
 
-int calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int lb_block_dimension,
-                                 int lb_grid_dimension);
+int calculateValenceWorkUnitSize(const int* atom_counts, int system_count, int grid_dimension);
 
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int lb_block_dimension,
-                                 int lb_grid_dimension);
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, int grid_dimension);
 
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int lb_block_dimension,
-                                 int lb_grid_dimension);
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, int grid_dimension);
 /// \}
 
 /// \brief Build a series of valence work units to cover a topology.

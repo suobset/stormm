@@ -4,7 +4,7 @@ namespace math {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, double* x_buffer_in, T* x_write_in,
+GenericRdSubstrate<T>::GenericRdSubstrate(const T* x_read_in, double* x_buffer_in, T* x_write_in,
                                           const int scale_bits_in) :
     dim{1},
     scale_bits{scale_bits_in}, fp_scaling{pow(2.0, scale_bits)}, inv_fp_scaling{1.0 / fp_scaling},
@@ -17,11 +17,10 @@ ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, double* x_buffer_i
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, const T* y_read_in,
+GenericRdSubstrate<T>::GenericRdSubstrate(const T* x_read_in, const T* y_read_in,
                                           const T* z_read_in, double* x_buffer_in,
-                                          double* y_buffer_in, double* z_buffer_in,
-                                          T* x_write_in, T* y_write_in, T* z_write_in,
-                                          const int scale_bits_in) :
+                                          double* y_buffer_in, double* z_buffer_in, T* x_write_in,
+                                          T* y_write_in, T* z_write_in, const int scale_bits_in) :
     dim{1 + (y_read != nullptr) + (z_read != nullptr)},
     scale_bits{scale_bits_in}, fp_scaling{pow(2.0, scale_bits)}, inv_fp_scaling{1.0 / fp_scaling},
     x_read{x_read_in}, y_read{y_read_in}, z_read{z_read_in},
@@ -33,9 +32,9 @@ ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, const T* y_read_in
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, const int* x_read_ovrf_in,
-                                          double* x_buffer_in, T* x_write_in,
-                                          int* x_write_ovrf_in, const int scale_bits_in) :
+GenericRdSubstrate<T>::GenericRdSubstrate(const T* x_read_in, const int* x_read_ovrf_in,
+                                          double* x_buffer_in, T* x_write_in, int* x_write_ovrf_in,
+                                          const int scale_bits_in) :
     dim{1},
     scale_bits{scale_bits_in}, fp_scaling{pow(2.0, scale_bits)}, inv_fp_scaling{1.0 / fp_scaling},
     x_read{x_read_in}, y_read{nullptr}, z_read{nullptr},
@@ -47,7 +46,7 @@ ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, const int* x_read_
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-ReductionSubstrate<T>::ReductionSubstrate(const T* x_read_in, const int* x_read_ovrf_in,
+GenericRdSubstrate<T>::GenericRdSubstrate(const T* x_read_in, const int* x_read_ovrf_in,
                                           const T* y_read_in, const int* y_read_ovrf_in,
                                           const T* z_read_in, const int* z_read_ovrf_in,
                                           double* x_buffer_in, double* y_buffer_in,

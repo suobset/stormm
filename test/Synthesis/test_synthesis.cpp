@@ -14,6 +14,7 @@
 #include "../../src/DataTypes/omni_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/reduction.h"
+#include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_workunit.h"
 #include "../../src/Math/rounding.h"
 #include "../../src/Math/sorting.h"
@@ -789,7 +790,7 @@ void testReduction(const std::vector<int> &atom_counts, const std::vector<int> &
   ReductionKit redk(nrwu, rps, rwu_abstracts.data(), atom_counts.data());
   const double* y_ptr = (prop_y.size() == prop_x.size()) ? copy_prop_y.data() : nullptr;
   const double* z_ptr = (prop_z.size() == prop_x.size()) ? copy_prop_z.data() : nullptr;
-  ReductionSubstrate rsbs(prop_x.data(), y_ptr, z_ptr, tmp_gathered_x.data(),
+  GenericRdSubstrate rsbs(prop_x.data(), y_ptr, z_ptr, tmp_gathered_x.data(),
                           tmp_gathered_y.data(), tmp_gathered_z.data(), copy_prop_x.data(),
                           copy_prop_y.data(), copy_prop_z.data());
   evalReduction(&rsbs, redk, ReductionStage::ALL_REDUCE, ReductionGoal::NORMALIZE);

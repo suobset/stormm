@@ -275,11 +275,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 // Single-precision floating point definitions
 #define TCALC float
-#  if (__CUDA_ARCH__ == 610)
-#    define VALENCE_BLOCK_MULTIPLICITY 2
-#  else
-#    define VALENCE_BLOCK_MULTIPLICITY 1
-#  endif
+#  define VALENCE_BLOCK_MULTIPLICITY 2
 #  define TCALC2 float2
 #  define TCALC3 float3
 #  define TCALC4 float4
@@ -296,13 +292,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
   
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
-#      if (__CUDA_ARCH__ == 610)
-#        define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#      elif (__CUDA_ARCH__ == 600) || (__CUDA_ARCH__ == 700)
-#        define VALENCE_KERNEL_THREAD_COUNT large_block_size
-#      else
-#        define VALENCE_KERNEL_THREAD_COUNT large_block_size
-#      endif
+#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
 #      define KERNEL_NAME kfsValenceForceAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME  
@@ -313,11 +303,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef UPDATE_ATOMS
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #      define COMPUTE_ENERGY
-#        if (__CUDA_ARCH__ == 610)
-#          define VALENCE_KERNEL_THREAD_COUNT 448
-#        else
-#          define VALENCE_KERNEL_THREAD_COUNT 896
-#        endif
+#        define VALENCE_KERNEL_THREAD_COUNT 448
 #        define KERNEL_NAME kfsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
@@ -330,11 +316,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      undef COMPUTE_ENERGY
 #      undef VALENCE_KERNEL_THREAD_COUNT
 #    undef SPLIT_FORCE_ACCUMULATION
-#    if (__CUDA_ARCH__ == 610)
-#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    else
-#      define VALENCE_KERNEL_THREAD_COUNT large_block_size
-#    endif
+#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
 #    define KERNEL_NAME kfValenceForceAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME  
@@ -345,11 +327,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    undef UPDATE_ATOMS
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #    define COMPUTE_ENERGY
-#      if (__CUDA_ARCH__ == 610)
-#        define VALENCE_KERNEL_THREAD_COUNT 448
-#      else
-#        define VALENCE_KERNEL_THREAD_COUNT 896
-#      endif
+#      define VALENCE_KERNEL_THREAD_COUNT 448
 #      define KERNEL_NAME kfValenceForceEnergyAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
@@ -363,11 +341,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #    undef VALENCE_KERNEL_THREAD_COUNT
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
-#    if (__CUDA_ARCH__ == 610)
-#      define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    else
-#      define VALENCE_KERNEL_THREAD_COUNT large_block_size
-#    endif
+#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
 #    define KERNEL_NAME kfValenceEnergyAccumulation
 #      include "valence_potential.cui"
 #    undef KERNEL_NAME
@@ -393,13 +367,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 
 // Double-precision floating point definitions
 #define TCALC double
-#  if (__CUDA_ARCH__ == 610)
-#    define VALENCE_KERNEL_THREAD_COUNT small_block_size
-#    define VALENCE_BLOCK_MULTIPLICITY  2
-#  else
-#    define VALENCE_KERNEL_THREAD_COUNT medium_block_size
-#    define VALENCE_BLOCK_MULTIPLICITY  1
-#  endif  
+#  define VALENCE_KERNEL_THREAD_COUNT small_block_size
+#  define VALENCE_BLOCK_MULTIPLICITY  2
 #  define TCALC2 double2
 #  define TCALC3 double3
 #  define TCALC4 double4
@@ -561,7 +530,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
 
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
-  cudaFuncAttributes attr;
+  cudaFuncAttributes result;
   switch (prec) {
   case PrecisionModel::DOUBLE:
     switch (eval_frc) {
@@ -570,13 +539,13 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
       case EvaluateEnergy::YES:
         switch (purpose) {
         case VwuGoal::ACCUMULATE:
-          if (cudaFuncGetAttributes(&attr, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
+          if (cudaFuncGetAttributes(&result, kdsValenceForceEnergyAccumulation) != cudaSuccess) {
             rtErr("Error obtaining attributes for kernel kdsValenceForceEnergyAccumulation.",
                   "queryValenceKernelRequirements");
           }
           break;
         case VwuGoal::MOVE_PARTICLES:
-          if (cudaFuncGetAttributes(&attr, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
+          if (cudaFuncGetAttributes(&result, kdsValenceEnergyAtomUpdate) != cudaSuccess) {
             rtErr("Error obtaining attributes for kernel kdsValenceEnergyAtomUpdate.",
                   "queryValenceKernelRequirements");
           }
@@ -586,13 +555,13 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
       case EvaluateEnergy::NO:
         switch (purpose) {
         case VwuGoal::ACCUMULATE:
-          if (cudaFuncGetAttributes(&attr, kdsValenceForceAccumulation) != cudaSuccess) {
+          if (cudaFuncGetAttributes(&result, kdsValenceForceAccumulation) != cudaSuccess) {
             rtErr("Error obtaining attributes for kernel kdsValenceForceAccumulation.",
                   "queryValenceKernelRequirements");
           }
           break;
         case VwuGoal::MOVE_PARTICLES:
-          if (cudaFuncGetAttributes(&attr, kdsValenceAtomUpdate) != cudaSuccess) {
+          if (cudaFuncGetAttributes(&result, kdsValenceAtomUpdate) != cudaSuccess) {
             rtErr("Error obtaining attributes for kernel kdsValenceAtomUpdate.",
                   "queryValenceKernelRequirements");
           }
@@ -601,7 +570,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         break;
       }
     case EvaluateForce::NO:
-      if (cudaFuncGetAttributes(&attr, kdsValenceEnergyAccumulation) != cudaSuccess) {
+      if (cudaFuncGetAttributes(&result, kdsValenceEnergyAccumulation) != cudaSuccess) {
         rtErr("Error obtaining attributes for kernel kdsValenceEnergyAccumulation.",
               "queryValenceKernelRequirements");
       }
@@ -617,13 +586,13 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         case ForceAccumulationMethod::SPLIT:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&attr, kfsValenceForceEnergyAccumulation) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulation) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfsValenceForceEnergyAccumulation.",
                     "queryValenceKernelRequirements");
             }
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&attr, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfsValenceEnergyAtomUpdate) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfsValenceEnergyAtomUpdate.",
                     "queryValenceKernelRequirements");
             }
@@ -633,13 +602,13 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         case ForceAccumulationMethod::WHOLE:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&attr, kfValenceForceEnergyAccumulation) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulation) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfValenceForceEnergyAccumulation.",
                     "queryValenceKernelRequirements");
             }
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&attr, kfValenceEnergyAtomUpdate) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfValenceEnergyAtomUpdate) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfValenceEnergyAtomUpdate.",
                     "queryValenceKernelRequirements");
             }
@@ -653,13 +622,13 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         case ForceAccumulationMethod::SPLIT:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&attr, kfsValenceForceAccumulation) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulation) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfsValenceForceAccumulation.",
                     "queryValenceKernelRequirements");
             }
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&attr, kfsValenceAtomUpdate) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfsValenceAtomUpdate) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfsValenceAtomUpdate.",
                     "queryValenceKernelRequirements");
             }
@@ -669,13 +638,13 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         case ForceAccumulationMethod::WHOLE:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
-            if (cudaFuncGetAttributes(&attr, kfValenceForceAccumulation) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfValenceForceAccumulation) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfValenceForceAccumulation.",
                     "queryValenceKernelRequirements");
             }
             break;
           case VwuGoal::MOVE_PARTICLES:
-            if (cudaFuncGetAttributes(&attr, kfValenceAtomUpdate) != cudaSuccess) {
+            if (cudaFuncGetAttributes(&result, kfValenceAtomUpdate) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel kfValenceAtomUpdate.",
                     "queryValenceKernelRequirements");
             }
@@ -687,7 +656,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
       }
       break;
     case EvaluateForce::NO:
-      if (cudaFuncGetAttributes(&attr, kfValenceEnergyAccumulation) != cudaSuccess) {
+      if (cudaFuncGetAttributes(&result, kfValenceEnergyAccumulation) != cudaSuccess) {
         rtErr("Error obtaining attributes for kernel kfValenceEnergyAccumulation.",
               "queryValenceKernelRequirements");
       }
@@ -695,7 +664,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
     }
     break;
   }
-  return attr;
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------

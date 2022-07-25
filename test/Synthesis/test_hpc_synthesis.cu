@@ -349,7 +349,7 @@ int main(const int argc, const char* argv[]) {
     topology_indices[i] = i;
   }
   AtomGraphSynthesis poly_ag(sysc.getSystemTopologyPointerCC(), topology_indices,
-                             ExceptionResponse::WARN, -1, &timer);
+                             ExceptionResponse::WARN, gpu, &timer);
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
@@ -470,7 +470,7 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis big_poly_ps_dbl(bigger_crds, bigger_tops, 36, 24, 34, 40);
   PhaseSpaceSynthesis big_poly_ps_sdbl(bigger_crds, bigger_tops, 72, 24, 34, 72);
   const std::vector<int> big_top_indices = { 0, 1, 2 };
-  AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT, -1,
+  AtomGraphSynthesis big_poly_ag(bigger_tops, big_top_indices, ExceptionResponse::SILENT, gpu,
                                  &timer);
   StaticExclusionMaskSynthesis big_poly_se(big_poly_ag.getTopologyPointers(),
                                            big_poly_ag.getTopologyIndices());
@@ -552,7 +552,7 @@ int main(const int argc, const char* argv[]) {
   PhaseSpaceSynthesis ligand_poly_ps_sdbl(ligand_ps_list, ligand_ag_list, ligand_tiling, 72, 24,
                                           34, 72);
   AtomGraphSynthesis ligand_poly_ag(ligand_ag_list, ligand_ra_list, ligand_tiling, ligand_tiling,
-                                    ExceptionResponse::WARN, -1, &timer);
+                                    ExceptionResponse::WARN, gpu, &timer);
   StaticExclusionMaskSynthesis ligand_poly_se(ligand_poly_ag.getTopologyPointers(),
                                               ligand_poly_ag.getTopologyIndices());
   ligand_poly_ag.loadNonbondedWorkUnits(ligand_poly_se);

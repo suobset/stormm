@@ -43,6 +43,8 @@ template <typename T> struct MMControlKit {
   /// \}
 
   int step;              ///< The current simulation step
+  int sd_cycles;         ///< The number of steepest-descent energy minimization cycles
+  int max_cycles;        ///< The total number of energy minimization cycles or dynamics steps
   const T dt;            ///< Simulation time step (only valid for dynamics)
   const T rattle_tol;    ///< Convergence tolerance for bond constraints
   const T initial_step;  ///< Initial step size to be taken in energy minimization
@@ -132,6 +134,8 @@ public:
   
 private:
   int step_number;      ///< The step counter for the simulation
+  int sd_cycles;        ///< The number of steepest-descent energy minimization cycles
+  int max_cycles;       ///< The total number of energy minimization cycles or dynamics steps
   double time_step;     ///< Time step of the simulation, units of femtoseconds.  This may be
                         ///<   truncated with the precision level of the abstract.
   double rattle_tol;    ///< Rattle tolerance, again truncated with the precision level of the

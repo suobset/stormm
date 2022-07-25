@@ -9,12 +9,6 @@
 #include "Constants/behavior.h"
 #include "gpu_details.h"
 
-/// \brief ***Global*** GPU descriptor that describes no valid GPU.  This is the equivalent of
-///        nullptr for the GpuDetails object, and if passed to various functions that might launch
-///        a CUDA kernel will trigger the corresponding CPU process instead.  An equivalent
-///        expression of this occurs in gpu_details.h if OMNI_USE_HPC is not defined.
-extern omni::card::GpuDetails null_gpu;
-
 namespace omni {
 namespace card {
 

@@ -17,7 +17,7 @@ using synthesis::VwuGoal;
 MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in,
                                                        const double rattle_tol_in,
                                                        const double initial_step_in) :
-  step_number{0}, time_step{time_step_in}, rattle_tol{rattle_tol_in},
+  step_number{0}, sd_cycles{0}, max_cycles{0}, time_step{time_step_in}, rattle_tol{rattle_tol_in},
   initial_step{initial_step_in},
   vwu_progress{HybridKind::POINTER, "mm_vwu_counters"},
   nbwu_progress{HybridKind::POINTER, "mm_nbwu_counters"},
@@ -39,6 +39,7 @@ MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in
 MolecularMechanicsControls::MolecularMechanicsControls(const DynamicsControls &user_input) :
     MolecularMechanicsControls()
 {
+  max_cycles = user_input.getStepCount();
   time_step = user_input.getTimeStep();  
   rattle_tol = user_input.getRattleTolerance();
 }
@@ -47,6 +48,8 @@ MolecularMechanicsControls::MolecularMechanicsControls(const DynamicsControls &u
 MolecularMechanicsControls::MolecularMechanicsControls(const MinimizeControls &user_input) :
     MolecularMechanicsControls()
 {
+  sd_cycles = user_input.getSteepestDescentCycles();
+  max_cycles = user_input.getTotalCycles();
   initial_step = user_input.getInitialStep();
 }
 

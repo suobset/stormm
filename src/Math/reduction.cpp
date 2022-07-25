@@ -5,65 +5,8 @@
 namespace omni {
 namespace math {
 
-using card::HybridKind;
-using math::roundUp;
-
 //-------------------------------------------------------------------------------------------------
-ReductionBridge::ReductionBridge(const size_t n_values) :
-  x_buffer{HybridKind::POINTER, "bridge_xbuff"},
-  y_buffer{HybridKind::POINTER, "bridge_ybuff"},
-  z_buffer{HybridKind::POINTER, "bridge_zbuff"},
-  storage{3LLU * roundUp(n_values, warp_size_zu)}
-{
-  const size_t padded_nval = roundUp(n_values, warp_size_zu);
-  x_buffer.setPointer(&storage,                  0, n_values);
-  y_buffer.setPointer(&storage,        padded_nval, n_values);
-  z_buffer.setPointer(&storage, 2LLU * padded_nval, n_values);
-}
-
-//-------------------------------------------------------------------------------------------------
-const double* ReductionBridge::getPointer(const CartesianDimension cdim,
-                                          const HybridTargetLevel tier) const {
-  switch (cdim) {
-  case CartesianDimension::X:
-    return x_buffer.data(tier);
-  case CartesianDimension::Y:
-    return y_buffer.data(tier);
-  case CartesianDimension::Z:
-    return z_buffer.data(tier);    
-  }
-  __builtin_unreachable();
-}
-  
-//-------------------------------------------------------------------------------------------------
-double* ReductionBridge::getPointer(const CartesianDimension cdim, const HybridTargetLevel tier) {
-  switch (cdim) {
-  case CartesianDimension::X:
-    return x_buffer.data(tier);
-  case CartesianDimension::Y:
-    return y_buffer.data(tier);
-  case CartesianDimension::Z:
-    return z_buffer.data(tier);    
-  }
-  __builtin_unreachable();
-}
-
-//-------------------------------------------------------------------------------------------------
-ReductionKit::ReductionKit(const int nrdwu_in, const RdwuPerSystem rps_in,
-                           const int* rdwu_abstracts_in, const int* atom_counts_in) :
-  nrdwu{nrdwu_in}, rps{rps_in}, rdwu_abstracts{rdwu_abstracts_in}, atom_counts{atom_counts_in}
-{}
-
-//-------------------------------------------------------------------------------------------------
-ReductionKit::ReductionKit(const AtomGraphSynthesis &poly_ag, const HybridTargetLevel tier) :
-  nrdwu{poly_ag.getReductionWorkUnitCount()},
-  rps{poly_ag.getRdwuPerSystem()},
-  rdwu_abstracts{poly_ag.getReductionWorkUnitAbstracts().data(tier)},
-  atom_counts{poly_ag.getSystemAtomCounts().data(tier)}
-{}
-
-//-------------------------------------------------------------------------------------------------
-double gatherNormalization(const ReductionSubstrate<llint> rsbs, const int start_pos,
+double gatherNormalization(const GenericRdSubstrate<llint> rsbs, const int start_pos,
                            const int end_pos) {
 
   // Scale down the values of vector elements if fixed precision is in use (if it is not, the
@@ -136,7 +79,7 @@ double gatherNormalization(const ReductionSubstrate<llint> rsbs, const int start
 }
 
 //-------------------------------------------------------------------------------------------------
-double3 gatherCenterOnZero(const ReductionSubstrate<llint> rsbs, const int start_pos,
+double3 gatherCenterOnZero(const GenericRdSubstrate<llint> rsbs, const int start_pos,
                            const int end_pos) {
   const bool extended_precision = (rsbs.x_read_ovrf != nullptr);
   double tsum_x = 0.0;
@@ -171,7 +114,7 @@ double3 gatherCenterOnZero(const ReductionSubstrate<llint> rsbs, const int start
 }
 
 //-------------------------------------------------------------------------------------------------
-void scatterNormalization(ReductionSubstrate<llint> rsbs, const double tsum, const int start_pos,
+void scatterNormalization(GenericRdSubstrate<llint> rsbs, const double tsum, const int start_pos,
                           const int end_pos) {
 
   // When normalizing extended fixed-precision values, it is not necessary to scale them down with
@@ -240,7 +183,7 @@ void scatterNormalization(ReductionSubstrate<llint> rsbs, const double tsum, con
 }
 
 //-------------------------------------------------------------------------------------------------
-void scatterCenterOnZero(ReductionSubstrate<llint> rsbs, const double tsum_x, const double tsum_y,
+void scatterCenterOnZero(GenericRdSubstrate<llint> rsbs, const double tsum_x, const double tsum_y,
                          const double tsum_z, const int natom, const int start_pos,
                          const int end_pos) {
 

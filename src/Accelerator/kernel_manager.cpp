@@ -304,12 +304,7 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
 //-------------------------------------------------------------------------------------------------
 int valenceBlockMultiplier(const GpuDetails &gpu) {
 #ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
-  return (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) ? 2 : 1;
-#  else
-  // Other vendors are not known to make GPUs that have special requirements
-  return 1;
-#  endif
+  return 2;
 #else
   return 1;
 #endif

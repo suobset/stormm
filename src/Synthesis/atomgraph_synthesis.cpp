@@ -1,3 +1,4 @@
+#include "Constants/hpc_bounds.h"
 #include "Math/rounding.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
@@ -45,7 +46,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
                                        const std::vector<RestraintApparatus*> &restraints_in,
                                        const std::vector<int> &topology_indices_in,
                                        const std::vector<int> &restraint_indices_in,
-                                       const ExceptionResponse policy_in, const int vwu_atom_limit,
+                                       const ExceptionResponse policy_in, const GpuDetails &gpu,
                                        StopWatch *timer_in) :
 
     // Counts spanning all topologies
@@ -380,7 +381,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_constraint_group_params{HybridKind::ARRAY, "tpsynf_cnst_lm"},
 
     // Valence work unit instruction sets and energy accumulation masks
-    total_valence_work_units{0}, valence_work_unit_size{vwu_atom_limit},
+    total_valence_work_units{0}, valence_work_unit_size{maximum_valence_work_unit_atoms},
     vwu_instruction_sets{HybridKind::ARRAY, "tpsyn_vwu_insr_sets"},
     vwu_import_lists{HybridKind::ARRAY, "tpsyn_vwu_imports"},
     vwu_manipulation_masks{HybridKind::POINTER, "tpsyn_vwu_manip"},
@@ -460,9 +461,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   if (timer != nullptr) timer->assignTime(param_cond_timings);
 
   // Create valence work units for all topologies, then load them into the synthesis
-  if (valence_work_unit_size < 0) {
-    valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts);
-  }
+  const int bpsm = large_block_size / small_block_size;
+  valence_work_unit_size = calculateValenceWorkUnitSize(atom_counts, gpu.getSMPCount() * bpsm);
   loadValenceWorkUnits(valence_work_unit_size);
   if (timer != nullptr) timer->assignTime(vwu_creation_timings);
 
@@ -476,11 +476,11 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
                                        const std::vector<int> &topology_indices_in,
-                                       const ExceptionResponse policy_in, const int vwu_atom_limit,
+                                       const ExceptionResponse policy_in, const GpuDetails &gpu,
                                        StopWatch *timer_in) :
     AtomGraphSynthesis(topologies_in, std::vector<RestraintApparatus*>(1, nullptr),
                        topology_indices_in, std::vector<int>(topology_indices_in.size(), 0),
-                       policy_in, vwu_atom_limit, timer_in)
+                       policy_in, gpu, timer_in)
 {}
 
 //-------------------------------------------------------------------------------------------------

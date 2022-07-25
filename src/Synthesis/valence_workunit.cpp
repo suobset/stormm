@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "Constants/hpc_bounds.h"
 #include "Math/statistics.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
@@ -10,6 +11,7 @@
 namespace omni {
 namespace synthesis {
 
+using constants::small_block_size;
 using math::accumulateBitmask;
 using math::DataOrder;
 using math::locateValue;
@@ -253,7 +255,7 @@ ValenceDelegator::findMovementPartners(const int atom_idx,
 std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
                                                      const std::vector<int> &caller_stack) const {
   std::vector<int> result;
-  result.reserve(64);
+  result.reserve(32);
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
@@ -430,12 +432,12 @@ std::vector<int> ValenceDelegator::getUpdateDependencies(const int atom_index) c
   std::vector<int> result;
   std::vector<int> move_req = findMovementPartners(atom_index);
   const size_t nmove = move_req.size();
-  for (size_t j = 0; j < nmove; j++) {
+  for (size_t i = 0; i < nmove; i++) {
 
     // Each of the atoms in move_req will be included in the tmpj vector, so no need to
     // explicitly add the contents of move_req to the list.
-    const std::vector<int> tmpj = findForcePartners(move_req[j]);
-    result.insert(result.end(), tmpj.begin(), tmpj.end());
+    const std::vector<int> tmpi = findForcePartners(move_req[i]);
+    result.insert(result.end(), tmpi.begin(), tmpi.end());
   }
   reduceUniqueValues(&result);
   return result;
@@ -853,8 +855,9 @@ void ValenceDelegator::fillAffectorArrays(const ValenceKit<double> &vk,
 }
   
 //-------------------------------------------------------------------------------------------------
-ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index_in,
-                                 const int seed_atom_in, const int max_atoms_in) :
+ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tvwu_coverage,
+                                 const int list_index_in, const int seed_atom_in,
+                                 const int max_atoms_in) :
     imported_atom_count{0}, moved_atom_count{0}, updated_atom_count{0}, bond_term_count{0},
     angl_term_count{0}, dihe_term_count{0}, ubrd_term_count{0}, cbnd_term_count{0},
     cimp_term_count{0}, cdhe_term_count{0}, cmap_term_count{0}, infr14_term_count{0},
@@ -894,6 +897,9 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
           std::to_string(maximum_valence_work_unit_atoms) + ".  A value of " +
           std::to_string(atom_limit) + err_msg, "ValenceWorkUnit");
   }
+
+  // Shortcut to the data array for this valence work unit's coverage in the topology as a whole
+  int* tvwu_cov_ptr = tvwu_coverage->data();
   
   // Reserve space for atoms
   atom_import_list.reserve(atom_limit);
@@ -937,7 +943,8 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
       std::vector<bool> incl_up_deps(ndeps, false);
       int n_new_atoms = 0;
       for (int j = 0; j < ndeps; j++) {
-        if (vdel_pointer->checkPresence(up_deps[j], list_index) == false) {
+        if (vdel_pointer->checkPresence(up_deps[j], list_index) == false &&
+            tvwu_cov_ptr[up_deps[j]] == 0) {
           n_new_atoms++;
           incl_up_deps[j] = true;
         }
@@ -948,6 +955,7 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
         for (int j = 0; j < ndeps; j++) {
           if (incl_up_deps[j]) {
             addNewAtomImport(up_deps[j]);
+            tvwu_cov_ptr[up_deps[j]] = 1;
           }
         }
         growth_points.push_back(candidate_additions[i]);
@@ -982,6 +990,12 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, const int list_index
         ncandidate = 1;
       }
     }
+  }
+
+  // Erase the coverage for this valence work unit so that the coverage array is clean for the
+  // next valence work unit to use without reallocating.
+  for (int i = 0; i < imported_atom_count; i++) {
+    tvwu_cov_ptr[atom_import_list[i]] = 0;
   }
 }
 
@@ -1860,6 +1874,23 @@ void ValenceWorkUnit::sortAtomSets() {
   // Check the atom import list to ensure that all entries are unique.
   for (int i = 1; i < imported_atom_count; i++) {
     if (atom_import_list[i] == atom_import_list[i - 1]) {
+
+      // CHECK
+      printf("Here are all the atoms:\n");
+      int k = 0;
+      for (int j = 0; j < imported_atom_count; j++) {
+        printf(" %4d", atom_import_list[j]);
+        k++;
+        if (k == 19) {
+          printf("\n");
+          k = 0;
+        }
+      }
+      if (k > 0) {
+        printf("\n");
+      }
+      // END CHECK
+      
       const int ires = ag_pointer->getResidueIndex(atom_import_list[i]);
       rtErr("A duplicate entry is present in the atom import list of work unit " +
             std::to_string(list_index) + " serving topology " + ag_pointer->getFileName() +
@@ -2409,11 +2440,13 @@ int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts) {
 
 //-------------------------------------------------------------------------------------------------
 int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
-                                 const int lb_block_dimension, const int lb_grid_dimension) {
+                                 const int grid_dimension) {
   int best_size;
   double best_efficiency = 0.0;
-  const double dlb_block_dimension = static_cast<double>(lb_block_dimension);
-  for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms; vs *= 2) {
+  const int lb_block_dimension = small_block_size;
+  const double dlb_block_dimension = static_cast<double>(small_block_size);
+  for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms;
+       vs += minimum_valence_work_unit_atoms) {
     const int unique_atom_coverage = vs - 12;
     int nvwu_est = 0;
     double occupancy = 0.0;
@@ -2428,8 +2461,8 @@ int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
     }
     const double dnvwu_est = static_cast<double>(nvwu_est);
     occupancy /= dnvwu_est;
-    const int batches = (nvwu_est + lb_grid_dimension - 1) / lb_grid_dimension;
-    const double dslots = static_cast<double>(batches * lb_grid_dimension);
+    const int batches = (nvwu_est + grid_dimension - 1) / grid_dimension;
+    const double dslots = static_cast<double>(batches * grid_dimension);
     const double efficiency = dnvwu_est * occupancy / dslots;
     if (efficiency > best_efficiency) {
       best_efficiency = efficiency;
@@ -2440,17 +2473,13 @@ int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count,
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int lb_block_dimension,
-                                 const int lb_grid_dimension) {
-  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), lb_block_dimension,
-                                      lb_grid_dimension);
+int calculateValenceWorkUnitSize(const std::vector<int> &atom_counts, const int grid_dimension) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), grid_dimension);
 }
 
 //-------------------------------------------------------------------------------------------------
-int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int lb_block_dimension,
-                                 const int lb_grid_dimension) {
-  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), lb_block_dimension,
-                                      lb_grid_dimension);
+int calculateValenceWorkUnitSize(const Hybrid<int> &atom_counts, const int grid_dimension) {
+  return calculateValenceWorkUnitSize(atom_counts.data(), atom_counts.size(), grid_dimension);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2487,9 +2516,11 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
   // site) can occur before moving atoms.
   const AtomGraph *ag_ptr = vdel->getTopologyPointer();
   const RestraintApparatus *ra_ptr = vdel->getRestraintApparatusPointer();
+  std::vector<int> tvwu_coverage(ag_ptr->getAtomCount(), 0);
   while (vdel->getFirstUnassignedAtom() < ag_ptr->getAtomCount()) {
     const int n_units = result.size();
-    result.emplace_back(vdel, n_units, vdel->getFirstUnassignedAtom(), max_atoms_per_vwu);
+    result.emplace_back(vdel, &tvwu_coverage, n_units, vdel->getFirstUnassignedAtom(),
+                        max_atoms_per_vwu);
   }
   
   // Loop once more over the update list and construct the atom movement list.  The movement list

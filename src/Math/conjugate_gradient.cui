@@ -1,0 +1,329 @@
+// -*-c++-*-
+#include "hpc_reduction.cuh"
+
+namespace omni {
+namespace synthesis {
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(small_block_size, 4)
+KGATHER_NAME(ReductionKit redk, ConjGradKit<llint> cgk, MMControlKit ctrl) {
+
+  // Two small arrays will store the double-precision accumulants for squared force magnitudes
+  // and force differential measurements.
+  __shared__ double gg_collector[small_block_size >> warp_bits];
+  __shared__ double dgg_collector[small_block_size >> warp_bits];
+  __shared__ int sh_gtwu_idx;
+
+  const int warp_idx = threadIdx.x >> warp_bits;
+  const int lane_idx = (threadIdx.x & warp_bits_mask);
+  const int nwarps   = blockDim.x >> warp_bits;
+  int gtwu_idx = blockIdx.x;
+  while (gtwu_idx < redk.nrdwu) {
+    const int wabs_pos   = (gtwu_idx * rdwu_abstract_length);
+    const int start_pos  = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
+    const int end_pos    = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
+    const int result_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::RESULT_INDEX)];
+
+    // A for-loop manages the reading for this work unit, as the per-thread workload is consistent,
+    // whereas a while loop still manages the work unit progression as the sizes of different work
+    // units may not be consistent.  The advancement through work units is therefore asynchronous.
+#ifdef TCALC_IS_DOUBLE
+    conjGradCoreGather(gg_collector, dgg_collector, start_pos, end_pos, cgk.inv_frc_scale,
+                       cgk.xfrc, cgk.xfrc_ovrf, cgk.yfrc, cgk.yfrc_ovrf, cgk.zfrc, cgk.zfrc_ovrf,
+                       cgk.xprv, cgk.xprv_ovrf, cgk.yprv, cgk.yprv_ovrf, cgk.zprv, cgk.zprv_ovrf);
+#else
+    conjGradCoreGather(gg_collector, dgg_collector, start_pos, end_pos, cgk.inv_frc_scale,
+                       cgk.xfrc, cgk.yfrc, cgk.zfrc, cgk.xprv, cgk.yprv, cgk.zprv);
+#endif
+    __syncthreads();
+
+    // The following assumes that small_block_size (256) is no greater than the warp size squared.
+    // This is true even for Intel GPUs, which have 16 lanes per warp.  However, it would break on
+    // a hypothetical GPU with eight lanes per warp.
+    if (warp_idx == 0) {
+      double gg = (lane_idx < nwarps) ? gg_collector[lane_idx] : 0.0;
+      WARP_REDUCE_DOWN(gg);
+      if (lane_idx == 0) {
+        cgk.gg_buffer[result_pos] = gg;
+      }
+    }
+    else if (warp_idx == 1) {
+      double dgg = (lane_idx < nwarps) ? dgg_collector[lane_idx] : 0.0;
+      WARP_REDUCE_DOWN(dgg);
+      if (lane_idx == 0) {
+        cgk.dgg_buffer[result_pos] = dgg;
+      }
+    }
+    else if (warp_idx == 2 && lane_idx == 0) {
+      sh_gtwu_idx = atomicAdd(&ctrl.gtwu_progress[ctrl.step], 1);
+    }
+    __syncthreads();
+    gtwu_idx = sh_gtwu_idx;
+  }
+
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.gtwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.gtwu_progress[threadIdx.x] = gridDim.x;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(small_block_size, 4)
+KSCATTER_NAME(ReductionKit redk, ConjGradKit<llint> cgk, MMControlKit ctrl) {
+  __shared__ double sh_gg_total, sh_dgg_total;
+  __shared__ double  gg_accumulator[small_block_size >> warp_bits];
+  __shared__ double dgg_accumulator[small_block_size >> warp_bits];
+  __shared__ int sh_scwu_idx;
+
+  const int warp_idx = threadIdx.x >> warp_bits;
+  const int lane_idx = (threadIdx.x & warp_bits_mask);
+  const int nwarps   = blockDim.x >> warp_bits;
+  int scwu_idx = blockIdx.x;
+  while (scwu_idx < redk.nrdwu) {
+    const int wabs_pos       = (scwu_idx * rdwu_abstract_length);
+    const int atom_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
+    const int atom_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
+    const int depn_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_START)];
+    const int depn_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_END)];
+    double gg = 0.0;
+    double dgg = 0.0;
+    for (int tpos = depn_start_pos + threadIdx.x; tpos < depn_end_pos; tpos += blockDim.x) {
+      gg  += cgk.gg_buffer[tpos];
+      dgg += cgk.dgg_buffer[tpos];
+    }
+    WARP_REDUCE_DOWN(gg);
+    WARP_REDUCE_DOWN(dgg);
+    if (lane_idx == 0) {
+      gg_accumulator[warp_idx]  = gg;
+      dgg_accumulator[warp_idx] = dgg;
+    }
+    __syncthreads();
+    if (warp_idx == 0) {
+      gg = (lane_idx < nwarps) ? gg_accumulator[lane_idx] : 0.0;
+      WARP_REDUCE_DOWN(gg);
+      if (lane_idx == 0) {
+        sh_gg_total = gg;
+      }
+    }
+    else if (warp_idx == 1) {
+      dgg = (lane_idx < nwarps) ? dgg_accumulator[lane_idx] : 0.0;
+      WARP_REDUCE_DOWN(dgg);
+      if (lane_idx == 0) {
+        sh_dgg_total = dgg;
+      }
+    }
+    else if (warp_idx == 2 && lane_idx == 0) {
+      sh_scwu_idx = atomicAdd(&ctrl.scwu_progress[ctrl.step], 1);
+    }
+    __syncthreads();
+    const double gam = (ctrl.step >= sd_cycles) ? (sh_total_dgg / sh_total_gg) : 0.0;
+    for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
+
+      // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
+      // command will be effective to ensure that the global memory manipulations handled here
+      // are safe for read / write / read access.
+      const llint ifx = cgk.xfrc[tpos];
+      const llint ify = cgk.yfrc[tpos];
+      const llint ifz = cgk.zfrc[tpos];
+      cgk.xprv[tpos] = ifx;
+      cgk.yprv[tpos] = ify;
+      cgk.zprv[tpos] = ifz;
+#ifdef TCALC_IS_DOUBLE
+      const int ifx_ovrf = cgk.xfrc_ovrf[tpos];
+      const int ify_ovrf = cgk.yfrc_ovrf[tpos];
+      const int ifz_ovrf = cgk.zfrc_ovrf[tpos];
+      cgk.xprv_ovrf[tpos] = ifx_ovrf;
+      cgk.yprv_ovrf[tpos] = ify_ovrf;
+      cgk.zprv_ovrf[tpos] = ifz_ovrf;
+      const double  fx_part = ((double)(ifx_ovrf) * max_llint_accumulation) + (double)(ifx);
+      const double cgx_part = ((double)(cgk.x_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
+                              (double)(cgk.x_cg_temp[tpos]);
+      const double  fy_part = ((double)(ify_ovrf) * max_llint_accumulation) + (double)(ify);
+      const double cgy_part = ((double)(cgk.y_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
+                              (double)(cgk.y_cg_temp[tpos]);
+      const double  fz_part = ((double)(ifz_ovrf) * max_llint_accumulation) + (double)(ifz);
+      const double cgz_part = ((double)(cgk.z_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
+                              (double)(cgk.z_cg_temp[tpos]);
+      const int95_t cg_x = convertSplitFixedPrecision95(fx_part + cgx_part);
+      const int95_t cg_y = convertSplitFixedPrecision95(fy_part + cgy_part);
+      const int95_t cg_z = convertSplitFixedPrecision95(fz_part + cgz_part);
+      cgk.x_cg_temp[tpos] = cg_x.x;
+      cgk.y_cg_temp[tpos] = cg_y.x;
+      cgk.z_cg_temp[tpos] = cg_z.x;
+      cgk.xfrc[tpos] = cg_x.x;
+      cgk.yfrc[tpos] = cg_y.x;
+      cgk.zfrc[tpos] = cg_z.x;
+      cgk.x_cg_temp_ovrf[tpos] = cg_x.y;
+      cgk.y_cg_temp_ovrf[tpos] = cg_y.y;
+      cgk.z_cg_temp_ovrf[tpos] = cg_z.y;
+      cgk.xfrc_ovrf[tpos] = cg_x.y;
+      cgk.yfrc_ovrf[tpos] = cg_y.y;
+      cgk.zfrc_ovrf[tpos] = cg_z.y;
+#else
+      const llint cg_x = __double2ll_rn((double)(ifx) + (gam * (double)(cgk.x_cg_temp[tpos])));
+      const llint cg_y = __double2ll_rn((double)(ify) + (gam * (double)(cgk.y_cg_temp[tpos])));
+      const llint cg_z = __double2ll_rn((double)(ifz) + (gam * (double)(cgk.z_cg_temp[tpos])));
+      cgk.x_cg_temp[tpos] = cg_x;
+      cgk.y_cg_temp[tpos] = cg_y;
+      cgk.z_cg_temp[tpos] = cg_z;
+      cgk.xfrc[tpos] = cg_x;
+      cgk.yfrc[tpos] = cg_y;
+      cgk.zfrc[tpos] = cg_z;
+#endif
+    }
+    scwu_idx = sh_scwu_idx;
+  }
+  
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.scwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.scwu_progress[threadIdx.x] = gridDim.x;
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(small_block_size, 4)
+KALLREDUCE_NAME(ReductionKit redk, ConjGradKit<llint> cgk, MMControlKit ctrl) {
+  __shared__ double sh_gg_total, sh_dgg_total;
+  __shared__ double  gg_accumulator[small_block_size >> warp_bits];
+  __shared__ double dgg_accumulator[small_block_size >> warp_bits];
+  __shared__ int sh_rdwu_idx;
+
+  const int warp_idx = threadIdx.x >> warp_bits;
+  const int lane_idx = (threadIdx.x & warp_bits_mask);
+  const int nwarps   = blockDim.x >> warp_bits;
+  int gtwu_idx = blockIdx.x;
+  while (gtwu_idx < redk.nrdwu) {
+    const int wabs_pos       = (gtwu_idx * rdwu_abstract_length);
+    const int start_pos      = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
+    const int end_pos        = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
+    const int depn_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_START)];
+    const int depn_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_END)];
+
+    // A for-loop manages the reading for this work unit, as the per-thread workload is consistent,
+    // whereas a while loop still manages the work unit progression as the sizes of different work
+    // units may not be consistent.  The advancement through work units is therefore asynchronous.
+    double gg  = 0.0;
+    double dgg = 0.0;
+    for (int tpos = start_pos + threadIdx.x; tpos < end_pos; tpos += blockDim.x) {
+      const double dpx = (double)(xprv[tpos]) * inv_frc_scale;
+      const double dpy = (double)(yprv[tpos]) * inv_frc_scale;
+      const double dpz = (double)(zprv[tpos]) * inv_frc_scale;
+      gg += (dpx * dpx) + (dpy * dpy) + (dpz * dpz);
+      const double dfx = (double)(xfrc[tpos]) * inv_frc_scale;
+      const double dfy = (double)(yfrc[tpos]) * inv_frc_scale;
+      const double dfz = (double)(zfrc[tpos]) * inv_frc_scale;
+      const double ddx = dfx - dpx;
+      const double ddy = dfy - dpy;
+      const double ddz = dfz - dpz;
+      dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfx);
+    }
+    WARP_REDUCE_DOWN(gg);
+    WARP_REDUCE_DOWN(dgg);
+    if (lane_idx == 0) {
+      const size_t warp_idx = (threadIdx.x >> warp_bits);
+      gg_collector[warp_idx]  =  gg;
+      dgg_collector[warp_idx] = dgg;
+    }
+    __syncthreads();
+    if (warp_idx == 0) {
+      gg = (lane_idx < nwarps) ? gg_accumulator[lane_idx] : 0.0;
+      WARP_REDUCE_DOWN(gg);
+      if (lane_idx == 0) {
+        sh_gg_total = gg;
+      }
+    }
+    else if (warp_idx == 1) {
+      dgg = (lane_idx < nwarps) ? dgg_accumulator[lane_idx] : 0.0;
+      WARP_REDUCE_DOWN(dgg);
+      if (lane_idx == 0) {
+        sh_dgg_total = dgg;
+      }
+    }
+    else if (warp_idx == 2 && lane_idx == 0) {
+      sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[ctrl.step], 1);
+    }
+    __syncthreads();
+    const double gam = (ctrl.step >= sd_cycles) ? (sh_total_dgg / sh_total_gg) : 0.0;
+    for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
+
+      // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
+      // command will be effective to ensure that the global memory manipulations handled here
+      // are safe for read / write / read access.
+      const llint ifx = cgk.xfrc[tpos];
+      const llint ify = cgk.yfrc[tpos];
+      const llint ifz = cgk.zfrc[tpos];
+      cgk.xprv[tpos] = ifx;
+      cgk.yprv[tpos] = ify;
+      cgk.zprv[tpos] = ifz;
+#ifdef TCALC_IS_DOUBLE
+      const int ifx_ovrf = cgk.xfrc_ovrf[tpos];
+      const int ify_ovrf = cgk.yfrc_ovrf[tpos];
+      const int ifz_ovrf = cgk.zfrc_ovrf[tpos];
+      cgk.xprv_ovrf[tpos] = ifx_ovrf;
+      cgk.yprv_ovrf[tpos] = ify_ovrf;
+      cgk.zprv_ovrf[tpos] = ifz_ovrf;
+      const double  fx_part = ((double)(ifx_ovrf) * max_llint_accumulation) + (double)(ifx);
+      const double cgx_part = ((double)(cgk.x_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
+                              (double)(cgk.x_cg_temp[tpos]);
+      const double  fy_part = ((double)(ify_ovrf) * max_llint_accumulation) + (double)(ify);
+      const double cgy_part = ((double)(cgk.y_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
+                              (double)(cgk.y_cg_temp[tpos]);
+      const double  fz_part = ((double)(ifz_ovrf) * max_llint_accumulation) + (double)(ifz);
+      const double cgz_part = ((double)(cgk.z_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
+                              (double)(cgk.z_cg_temp[tpos]);
+      const int95_t cg_x = convertSplitFixedPrecision95(fx_part + cgx_part);
+      const int95_t cg_y = convertSplitFixedPrecision95(fy_part + cgy_part);
+      const int95_t cg_z = convertSplitFixedPrecision95(fz_part + cgz_part);
+      cgk.x_cg_temp[tpos] = cg_x.x;
+      cgk.y_cg_temp[tpos] = cg_y.x;
+      cgk.z_cg_temp[tpos] = cg_z.x;
+      cgk.xfrc[tpos] = cg_x.x;
+      cgk.yfrc[tpos] = cg_y.x;
+      cgk.zfrc[tpos] = cg_z.x;
+      cgk.x_cg_temp_ovrf[tpos] = cg_x.y;
+      cgk.y_cg_temp_ovrf[tpos] = cg_y.y;
+      cgk.z_cg_temp_ovrf[tpos] = cg_z.y;
+      cgk.xfrc_ovrf[tpos] = cg_x.y;
+      cgk.yfrc_ovrf[tpos] = cg_y.y;
+      cgk.zfrc_ovrf[tpos] = cg_z.y;
+#else
+      const llint cg_x = __double2ll_rn((double)(ifx) + (gam * (double)(cgk.x_cg_temp[tpos])));
+      const llint cg_y = __double2ll_rn((double)(ify) + (gam * (double)(cgk.y_cg_temp[tpos])));
+      const llint cg_z = __double2ll_rn((double)(ifz) + (gam * (double)(cgk.z_cg_temp[tpos])));
+      cgk.x_cg_temp[tpos] = cg_x;
+      cgk.y_cg_temp[tpos] = cg_y;
+      cgk.z_cg_temp[tpos] = cg_z;
+      cgk.xfrc[tpos] = cg_x;
+      cgk.yfrc[tpos] = cg_y;
+      cgk.zfrc[tpos] = cg_z;
+#endif
+    }
+    rdwu_idx = sh_rdwu_idx;
+  }  
+  
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.rdwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.rdwu_progress[threadIdx.x] = gridDim.x;
+    }
+  }
+}
+
+} // namespace synthesis
+} // namespace omni

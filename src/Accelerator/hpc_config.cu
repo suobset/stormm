@@ -10,8 +10,6 @@
 #include "Reporting/error_format.h"
 #include "hpc_config.cuh"
 
-omni::card::GpuDetails null_gpu;
-
 namespace omni {
 namespace card {
 

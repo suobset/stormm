@@ -2,6 +2,7 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Potential/energy_enumerators.h"
@@ -356,7 +357,7 @@ int main(const int argc, const char* argv[]) {
                                              &brbz_ag};
   const std::vector<int> system_ids = { 0, 1, 2, 3, 4, 3, 3, 5, 2, 1, 1, 3, 6, 7, 8 };
   AtomGraphSynthesis poly_ag(all_tops, system_ids, ExceptionResponse::SILENT,
-                             maximum_valence_work_unit_atoms, &timer);
+                             null_gpu, &timer);
   const StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
                                              poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
@@ -502,8 +503,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<PhaseSpace> psn_list = { tiso_ps, brbi_ps, lig1_ps, lig2_ps, dhfr_ps };
   std::vector<int> system_list = { 0, 1, 2, 3, 4, 4, 4, 4, 4, 4 };
   AtomGraphSynthesis poly_agn_rst(agn_list, rsn_list, system_list, system_list,
-                                  ExceptionResponse::SILENT, maximum_valence_work_unit_atoms,
-                                  &timer);
+                                  ExceptionResponse::SILENT, null_gpu, &timer);
   const StaticExclusionMaskSynthesis poly_sen(poly_agn_rst.getTopologyPointers(),
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);

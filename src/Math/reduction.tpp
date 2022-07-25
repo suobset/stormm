@@ -4,7 +4,7 @@ namespace math {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-double gatherNormalization(const ReductionSubstrate<T> rsbs, const int start_pos,
+double gatherNormalization(const GenericRdSubstrate<T> rsbs, const int start_pos,
                            const int end_pos) {
 
   // Scale down the values of vector elements if fixed precision is in use (if it is not, the
@@ -39,7 +39,7 @@ double gatherNormalization(const ReductionSubstrate<T> rsbs, const int start_pos
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-double3 gatherCenterOnZero(const ReductionSubstrate<T> rsbs, const int start_pos,
+double3 gatherCenterOnZero(const GenericRdSubstrate<T> rsbs, const int start_pos,
                            const int end_pos) {
   double tsum_x = 0.0;
   double tsum_y = 0.0;
@@ -57,7 +57,7 @@ double3 gatherCenterOnZero(const ReductionSubstrate<T> rsbs, const int start_pos
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void scatterNormalization(ReductionSubstrate<T> rsbs, const double tsum, const int start_pos,
+void scatterNormalization(GenericRdSubstrate<T> rsbs, const double tsum, const int start_pos,
                           const int end_pos) {
 
   // When normalizing extended fixed-precision values, it is not necessary to scale them down with
@@ -92,7 +92,7 @@ void scatterNormalization(ReductionSubstrate<T> rsbs, const double tsum, const i
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void scatterCenterOnZero(ReductionSubstrate<T> rsbs, const double tsum_x, const double tsum_y,
+void scatterCenterOnZero(GenericRdSubstrate<T> rsbs, const double tsum_x, const double tsum_y,
                          const double tsum_z, const int natom, const int start_pos,
                          const int end_pos) {
   
@@ -113,7 +113,7 @@ void scatterCenterOnZero(ReductionSubstrate<T> rsbs, const double tsum_x, const 
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>
-void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
+void evalReduction(GenericRdSubstrate<T> *rsbs, const ReductionKit &redk,
                    const ReductionStage process, const ReductionGoal purpose) {
 
   // Make the presence of an overflow array for the first data dimension a bellwether for the
@@ -146,6 +146,8 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
             rsbs->z_buffer[result_pos] = tsum3.z;
           }
         }
+        break;
+      case ReductionGoal::CONJUGATE_GRADIENT:
         break;
       }
     }
@@ -181,6 +183,8 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
                               start_pos, end_pos);
         }
         break;
+      case ReductionGoal::CONJUGATE_GRADIENT:
+        break;
       }
     }
     break;
@@ -204,6 +208,8 @@ void evalReduction(ReductionSubstrate<T> *rsbs, const ReductionKit &redk,
             scatterCenterOnZero(*rsbs, tsum3.x, tsum3.y, tsum3.z, redk.atom_counts[system_pos],
                                 start_pos, end_pos);
           }
+          break;
+        case ReductionGoal::CONJUGATE_GRADIENT:
           break;
         }
       }

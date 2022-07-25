@@ -20,11 +20,13 @@ enum class ReductionStage {
 ///        explicitly on the buffered values at the end of a gathering operation, so that the
 ///        scatter can then be applied in a subsequent step.
 enum class ReductionGoal {
-  NORMALIZE,      ///< Compute the norm of the data, whether the norm of the vector of scalar
-                  ///<   values present at all atoms or the norm of the collection of forces
-                  ///<   acting on each atom.
-  CENTER_ON_ZERO  ///< Compute the means of the data in up to three dimensions and subtract these
-                  ///<   means from all values.
+  NORMALIZE,          ///< Compute the norm of the data, whether the norm of the vector of scalar
+                      ///<   values present at all atoms or the norm of the collection of forces
+                      ///<   acting on each atom.
+  CENTER_ON_ZERO,     ///< Compute the means of the data in up to three dimensions and subtract
+                      ///<   these means from all values.
+  CONJUGATE_GRADIENT  ///< Perform a conjugate gradient transformation of the forces acting on all
+                      ///<   particles based on current and prior information.
 };
 
 /// \brief Indicate whether parallel reductions can be performed with one work unit per system.
