@@ -3,7 +3,7 @@
 #define OMNI_REDUCTION_ABSTRACTS_H
 
 #include "Accelerator/hybrid.h"
-#include "Constants/common_types.h"
+#include "DataTypes/common_types.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "reduction_bridge.h"
@@ -124,28 +124,30 @@ struct ConjGradSubstrate {
   /// \param poly_ps  Collection of coordinates in fixed-precision representation
   /// \param rbg      Allocations of double-precision reals to hold transitional sums between
   ///                 gather and scatter kernels
-  ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg);
+  /// \param tier     Get data pointers on the host (the customary default) or on the HPC device
+  ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+                    HybridTargetLevel tier = HybridTargetLevel::HOST);
 
-  llint* xfrc;         ///< Forces acting on all particles in the Cartesian X direction
-  llint* yfrc;
-  llint* zfrc;
-  int* xfrc_ovrf;
-  int* yfrc_ovrf;
-  int* zfrc_ovrf;
-  llint* xprv;
-  llint* yprv;
-  llint* zprv;
-  int* xprv_ovrf;
-  int* yprv_ovrf;
-  int* zprv_ovrf;
-  llint* x_cg_temp;
-  llint* y_cg_temp;
-  llint* z_cg_temp;
-  int* x_cg_temp_ovrf;
-  int* y_cg_temp_ovrf;
-  int* z_cg_temp_ovrf;
-  double* gg_buffer;
-  double* dgg_buffer;
+  llint* xfrc;          ///< Forces acting on all particles in the Cartesian X direction
+  llint* yfrc;          ///< Forces acting on all particles in the Cartesian Y direction
+  llint* zfrc;          ///< Forces acting on all particles in the Cartesian Z direction
+  int* xfrc_ovrf;       ///< Overflow in X forces, when using extended precision models
+  int* yfrc_ovrf;       ///< Overflow in Y forces, when using extended precision models
+  int* zfrc_ovrf;       ///< Overflow in Z forces, when using extended precision models
+  llint* xprv;          ///< Prior forces acting on all particles in the Cartesian X direction
+  llint* yprv;          ///< Prior forces acting on all particles in the Cartesian Y direction
+  llint* zprv;          ///< Prior forces acting on all particles in the Cartesian Z direction
+  int* xprv_ovrf;       ///< Prior overflow in X forces, when using extended precision models
+  int* yprv_ovrf;       ///< Prior overflow in Y forces, when using extended precision models
+  int* zprv_ovrf;       ///< Prior overflow in Z forces, when using extended precision models
+  llint* x_cg_temp;     ///< Mixing components for the X-direction conjugate gradient vector
+  llint* y_cg_temp;     ///< Mixing components for the Y-direction conjugate gradient vector
+  llint* z_cg_temp;     ///< Mixing components for the Z-direction conjugate gradient vector
+  int* x_cg_temp_ovrf;  ///< Overflow for x_cg_temp when using extended precision models
+  int* y_cg_temp_ovrf;  ///< Overflow for y_cg_temp when using extended precision models
+  int* z_cg_temp_ovrf;  ///< Overflow for z_cg_temp when using extended precision models
+  double* gg_buffer;    ///< Squared gradient partial sums
+  double* dgg_buffer;   ///< Gradient evolution partial sums 
 };
 
 } // namespace math

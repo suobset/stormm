@@ -1,12 +1,11 @@
 // -*-c++-*-
 #include "Accelerator/ptx_macros.h"
 #include "Constants/scaling.h"
-#include "Synthesis/phasespace_synthesis.h"
 #include "hpc_reduction.cuh"
 
 namespace omni {
-namespace synthesis {
-
+namespace math {
+  
 //-------------------------------------------------------------------------------------------------
 // Perform an accumulation over the conjugate gradient work units' relevant atoms to obtain the
 // sum of squared gradients (gg) and the evolution of the gradient (dgg).
@@ -184,7 +183,9 @@ void conjGradScatter(const double gam, const int start_pos, const int end_pos, c
   }
 }
 
-// Single-precision floating point conjugate gradient definitions
+// Single-precision floating point conjugate gradient definitions.  The single-precision form
+// still does its accumulation in double-precision, but does not store its data in the extended
+// fixed-precision format which the double-precision forms of the kernels read and write.
 #define KGATHER_NAME     kfgtConjGrad
 #define KSCATTER_NAME    kfscConjGrad
 #define KALLREDUCE_NAME  kfrdConjGrad
@@ -269,12 +270,64 @@ extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel 
   }
   return result;
 }
-                                                           
+
 //-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientDp(const PsSynthesisWriter *poly_psw,
-                                      MMControlKit<double> *ctrl,
+extern void launchConjugateGradientDp(const ReductionKit redk, ConjGradSubstrate cgsbs,
+                                      MMControlKit<double> *ctrl, const KernelManager &launcher) {
+
+  // All conjugate gradient kernels take the same launch parameters.
+  const int2 bt = launcher.getReductionKernelDims(PrecisionModel::DOUBLE,
+                                                  ReductionGoal::CONJUGATE_GRADIENT,
+                                                  ReductionStage::ALL_REDUCE);
+  switch (redk.rps) {
+  case RdwuPerSystem::ONE:
+    kdrdConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    break;
+  case RdwuPerSystem::MULTIPLE:
+    kdgtConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    kdscConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchConjugateGradientDp(const AtomGraphSynthesis poly_ag,
+                                      PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+                                      MMControlKit<double> *ctrl, const KernelManager &launcher) {
+  ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
+  ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
+  MMControlKit<double> ctrl = mmctrl->dpData();
+  launchConjugateGradientDp(redk, cgsbs, &ctrl, launcher);
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchConjugateGradientSp(const ReductionKit redk, ConjGradSubstrate cgsbs,
+                                      MMControlKit<float> *ctrl, const KernelManager &launcher) {
+
+  // All conjugate gradient kernels take the same launch parameters.
+  const int2 bt = launcher.getReductionKernelDims(PrecisionModel::SINGLE,
+                                                  ReductionGoal::CONJUGATE_GRADIENT,
+                                                  ReductionStage::ALL_REDUCE);
+  switch (redk.rps) {
+  case RdwuPerSystem::ONE:
+    kfrdConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    break;
+  case RdwuPerSystem::MULTIPLE:
+    kfgtConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    kfscConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchConjugateGradientSp(const AtomGraphSynthesis poly_ag,
+                                      PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+                                      MolecularMechanicsControls *mmctrl,
                                       const KernelManager &launcher) {
-  
+  ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
+  ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
+  MMControlKit<float> ctrl = mmctrl->spData();
+  launchConjugateGradientDp(redk, cgsbs, &ctrl, launcher);
 }
 
 } // namespace synthesis
