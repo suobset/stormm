@@ -127,7 +127,7 @@ public:
   KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag);
 
   /// \brief Get the architecture-specific block multiplier.  This will run a minimum number of
-  ///        blocks per stremaing multiprocessor on some cards, specifically NVIDIA's GTX 1080-Ti,
+  ///        blocks per streaming multiprocessor on some cards, specifically NVIDIA's GTX 1080-Ti,
   ///        when large blocks cannot use more than 32k registers in all.
   int getArchBlockMultiplier() const;
   

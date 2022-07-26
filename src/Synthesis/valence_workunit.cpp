@@ -916,6 +916,17 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tv
   growth_points.reserve(32);
   candidate_additions.reserve(32);
   int fua_atom = vdel_pointer->getFirstUnassignedAtom();
+
+  // If no atoms have yet been assigned and all atoms of this system will fit within the work
+  // unit's bounds, simply log them all and return.
+  if (fua_atom == 0&& cdk.natom <= atom_limit) {
+    for (int i = 0; i < cdk.natom; i++) {
+      addNewAtomImport(i);
+      addNewAtomUpdate(i);
+    }
+    return;
+  }
+  
   if (fua_atom != seed_atom_in && fua_atom < cdk.natom) {
     candidate_additions.push_back(fua_atom);
   }
@@ -980,9 +991,9 @@ ValenceWorkUnit::ValenceWorkUnit(ValenceDelegator *vdel_in, std::vector<int> *tv
     reduceUniqueValues(&candidate_additions);
     ncandidate = candidate_additions.size();
 
-    // If no candidate molecules have yet been found, try jumping to the first unassigned
-    // atom.  In all likelihood, this will be on another molecule.  That will be the seed for the
-    // next round of additions.
+    // If no candidate molecules have yet been found, try jumping to the first unassigned atom.
+    // In all likelihood, this will be on another molecule within the same topology.  That will
+    // be the seed for the next round of additions.
     if (ncandidate == 0) {
       fua_atom = vdel_pointer->getFirstUnassignedAtom();
       if (fua_atom < cdk.natom) {

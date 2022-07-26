@@ -196,8 +196,7 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
 #  ifdef OMNI_USE_CUDA
   const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
                                                                  acc_meth, purpose);
-  k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, valence_block_multiplier,
-                                     gpu, kernel_name);
+  k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 1, gpu, kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();

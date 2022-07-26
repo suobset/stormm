@@ -34,7 +34,7 @@ cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel prec,
                                                     const ReductionStage process);
 
 /// \brief 
-void launchConjugateGradientDp(const ReductionKit redk, ConjGradSubstrate cgsbs,
+void launchConjugateGradientDp(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
                                MMControlKit<double> *ctrl, const KernelManager &launcher);
 
 /// \brief
@@ -43,7 +43,7 @@ void launchConjugateGradientDp(const AtomGraphSynthesis poly_ag, PhaseSpaceSynth
                                const KernelManager &launcher);
 
 /// \brief
-void launchConjugateGradientSp(const ReductionKit redk, ConjGradSubstrate cgsbs,
+void launchConjugateGradientSp(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
                                MMControlKit<float> *ctrl, const KernelManager &launcher);
 
 /// \brief

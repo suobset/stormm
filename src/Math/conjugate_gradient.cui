@@ -124,60 +124,17 @@ KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ct
     }
     __syncthreads();
     const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
-    for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
-
-      // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
-      // command will be effective to ensure that the global memory manipulations handled here
-      // are safe for read / write / read access.
-      const llint ifx = cgsbs.xfrc[tpos];
-      const llint ify = cgsbs.yfrc[tpos];
-      const llint ifz = cgsbs.zfrc[tpos];
-      cgsbs.xprv[tpos] = ifx;
-      cgsbs.yprv[tpos] = ify;
-      cgsbs.zprv[tpos] = ifz;
 #ifdef TCALC_IS_DOUBLE
-      const int ifx_ovrf = cgsbs.xfrc_ovrf[tpos];
-      const int ify_ovrf = cgsbs.yfrc_ovrf[tpos];
-      const int ifz_ovrf = cgsbs.zfrc_ovrf[tpos];
-      cgsbs.xprv_ovrf[tpos] = ifx_ovrf;
-      cgsbs.yprv_ovrf[tpos] = ify_ovrf;
-      cgsbs.zprv_ovrf[tpos] = ifz_ovrf;
-      const double  fx_part = ((double)(ifx_ovrf) * max_llint_accumulation) + (double)(ifx);
-      const double cgx_part = ((double)(cgsbs.x_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
-                              (double)(cgsbs.x_cg_temp[tpos]);
-      const double  fy_part = ((double)(ify_ovrf) * max_llint_accumulation) + (double)(ify);
-      const double cgy_part = ((double)(cgsbs.y_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
-                              (double)(cgsbs.y_cg_temp[tpos]);
-      const double  fz_part = ((double)(ifz_ovrf) * max_llint_accumulation) + (double)(ifz);
-      const double cgz_part = ((double)(cgsbs.z_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
-                              (double)(cgsbs.z_cg_temp[tpos]);
-      const int95_t cg_x = convertSplitFixedPrecision95(fx_part + cgx_part);
-      const int95_t cg_y = convertSplitFixedPrecision95(fy_part + cgy_part);
-      const int95_t cg_z = convertSplitFixedPrecision95(fz_part + cgz_part);
-      cgsbs.x_cg_temp[tpos] = cg_x.x;
-      cgsbs.y_cg_temp[tpos] = cg_y.x;
-      cgsbs.z_cg_temp[tpos] = cg_z.x;
-      cgsbs.xfrc[tpos] = cg_x.x;
-      cgsbs.yfrc[tpos] = cg_y.x;
-      cgsbs.zfrc[tpos] = cg_z.x;
-      cgsbs.x_cg_temp_ovrf[tpos] = cg_x.y;
-      cgsbs.y_cg_temp_ovrf[tpos] = cg_y.y;
-      cgsbs.z_cg_temp_ovrf[tpos] = cg_z.y;
-      cgsbs.xfrc_ovrf[tpos] = cg_x.y;
-      cgsbs.yfrc_ovrf[tpos] = cg_y.y;
-      cgsbs.zfrc_ovrf[tpos] = cg_z.y;
+    conjGradScatter(gam, atom_start_pos, atom_end_pos, cgsbs.xfrc, cgsbs.xfrc_ovrf, cgsbs.yfrc,
+                    cgsbs.yfrc_ovrf, cgsbs.zfrc, cgsbs.zfrc_ovrf, cgsbs.xprv, cgsbs.xprv_ovrf,
+                    cgsbs.yprv, cgsbs.yprv_ovrf, cgsbs.zprv, cgsbs.zprv_ovrf, cgsbs.x_cg_temp,
+                    cgsbs.x_cg_temp_ovrf, cgsbs.y_cg_temp, cgsbs.y_cg_temp_ovrf, cgsbs.z_cg_temp,
+                    cgsbs.z_cg_temp_ovrf);
 #else
-      const llint cg_x = __double2ll_rn((double)(ifx) + (gam * (double)(cgsbs.x_cg_temp[tpos])));
-      const llint cg_y = __double2ll_rn((double)(ify) + (gam * (double)(cgsbs.y_cg_temp[tpos])));
-      const llint cg_z = __double2ll_rn((double)(ifz) + (gam * (double)(cgsbs.z_cg_temp[tpos])));
-      cgsbs.x_cg_temp[tpos] = cg_x;
-      cgsbs.y_cg_temp[tpos] = cg_y;
-      cgsbs.z_cg_temp[tpos] = cg_z;
-      cgsbs.xfrc[tpos] = cg_x;
-      cgsbs.yfrc[tpos] = cg_y;
-      cgsbs.zfrc[tpos] = cg_z;
+    conjGradScatter(gam, atom_start_pos, atom_end_pos, cgsbs.xfrc, cgsbs.yfrc, cgsbs.zfrc,
+                    cgsbs.xprv, cgsbs.yprv, cgsbs.zprv, cgsbs.x_cg_temp, cgsbs.y_cg_temp,
+                    cgsbs.z_cg_temp);
 #endif
-    }
     scwu_idx = sh_scwu_idx;
   }
   
@@ -209,44 +166,30 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
     const int wabs_pos       = (rdwu_idx * rdwu_abstract_length);
     const int atom_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
     const int atom_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
-    const int depn_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_START)];
-    const int depn_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::DEPN_END)];
 
     // A for-loop manages the reading for this work unit, as the per-thread workload is consistent,
     // whereas a while loop still manages the work unit progression as the sizes of different work
     // units may not be consistent.  The advancement through work units is therefore asynchronous.
-    double gg  = 0.0;
-    double dgg = 0.0;
-    for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
-      const double dpx = (double)(cgsbs.xprv[tpos]) * cgsbs.inv_frc_scale;
-      const double dpy = (double)(cgsbs.yprv[tpos]) * cgsbs.inv_frc_scale;
-      const double dpz = (double)(cgsbs.zprv[tpos]) * cgsbs.inv_frc_scale;
-      gg += (dpx * dpx) + (dpy * dpy) + (dpz * dpz);
-      const double dfx = (double)(cgsbs.xfrc[tpos]) * cgsbs.inv_frc_scale;
-      const double dfy = (double)(cgsbs.yfrc[tpos]) * cgsbs.inv_frc_scale;
-      const double dfz = (double)(cgsbs.zfrc[tpos]) * cgsbs.inv_frc_scale;
-      const double ddx = dfx - dpx;
-      const double ddy = dfy - dpy;
-      const double ddz = dfz - dpz;
-      dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfx);
-    }
-    WARP_REDUCE_DOWN(gg);
-    WARP_REDUCE_DOWN(dgg);
-    if (lane_idx == 0) {
-      const size_t warp_idx = (threadIdx.x >> warp_bits);
-      gg_collector[warp_idx]  =  gg;
-      dgg_collector[warp_idx] = dgg;
-    }
+#ifdef TCALC_IS_DOUBLE
+    conjGradCoreGather(gg_collector, dgg_collector, atom_start_pos, atom_end_pos,
+                       cgsbs.inv_frc_scale, cgsbs.xfrc, cgsbs.xfrc_ovrf, cgsbs.yfrc,
+                       cgsbs.yfrc_ovrf, cgsbs.zfrc, cgsbs.zfrc_ovrf, cgsbs.xprv, cgsbs.xprv_ovrf,
+                       cgsbs.yprv, cgsbs.yprv_ovrf, cgsbs.zprv, cgsbs.zprv_ovrf);
+#else
+    conjGradCoreGather(gg_collector, dgg_collector, atom_start_pos, atom_end_pos,
+                       cgsbs.inv_frc_scale, cgsbs.xfrc, cgsbs.yfrc, cgsbs.zfrc, cgsbs.xprv,
+                       cgsbs.yprv, cgsbs.zprv);
+#endif
     __syncthreads();
     if (warp_idx == 0) {
-      gg = (lane_idx < nwarps) ? gg_collector[lane_idx] : 0.0;
+      double gg = (lane_idx < nwarps) ? gg_collector[lane_idx] : 0.0;
       WARP_REDUCE_DOWN(gg);
       if (lane_idx == 0) {
         sh_gg_total = gg;
       }
     }
     else if (warp_idx == 1) {
-      dgg = (lane_idx < nwarps) ? dgg_collector[lane_idx] : 0.0;
+      double dgg = (lane_idx < nwarps) ? dgg_collector[lane_idx] : 0.0;
       WARP_REDUCE_DOWN(dgg);
       if (lane_idx == 0) {
         sh_dgg_total = dgg;
@@ -257,60 +200,17 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
     }
     __syncthreads();
     const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
-    for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
-
-      // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
-      // command will be effective to ensure that the global memory manipulations handled here
-      // are safe for read / write / read access.
-      const llint ifx = cgsbs.xfrc[tpos];
-      const llint ify = cgsbs.yfrc[tpos];
-      const llint ifz = cgsbs.zfrc[tpos];
-      cgsbs.xprv[tpos] = ifx;
-      cgsbs.yprv[tpos] = ify;
-      cgsbs.zprv[tpos] = ifz;
 #ifdef TCALC_IS_DOUBLE
-      const int ifx_ovrf = cgsbs.xfrc_ovrf[tpos];
-      const int ify_ovrf = cgsbs.yfrc_ovrf[tpos];
-      const int ifz_ovrf = cgsbs.zfrc_ovrf[tpos];
-      cgsbs.xprv_ovrf[tpos] = ifx_ovrf;
-      cgsbs.yprv_ovrf[tpos] = ify_ovrf;
-      cgsbs.zprv_ovrf[tpos] = ifz_ovrf;
-      const double  fx_part = ((double)(ifx_ovrf) * max_llint_accumulation) + (double)(ifx);
-      const double cgx_part = ((double)(cgsbs.x_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
-                              (double)(cgsbs.x_cg_temp[tpos]);
-      const double  fy_part = ((double)(ify_ovrf) * max_llint_accumulation) + (double)(ify);
-      const double cgy_part = ((double)(cgsbs.y_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
-                              (double)(cgsbs.y_cg_temp[tpos]);
-      const double  fz_part = ((double)(ifz_ovrf) * max_llint_accumulation) + (double)(ifz);
-      const double cgz_part = ((double)(cgsbs.z_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
-                              (double)(cgsbs.z_cg_temp[tpos]);
-      const int95_t cg_x = convertSplitFixedPrecision95(fx_part + cgx_part);
-      const int95_t cg_y = convertSplitFixedPrecision95(fy_part + cgy_part);
-      const int95_t cg_z = convertSplitFixedPrecision95(fz_part + cgz_part);
-      cgsbs.x_cg_temp[tpos] = cg_x.x;
-      cgsbs.y_cg_temp[tpos] = cg_y.x;
-      cgsbs.z_cg_temp[tpos] = cg_z.x;
-      cgsbs.xfrc[tpos] = cg_x.x;
-      cgsbs.yfrc[tpos] = cg_y.x;
-      cgsbs.zfrc[tpos] = cg_z.x;
-      cgsbs.x_cg_temp_ovrf[tpos] = cg_x.y;
-      cgsbs.y_cg_temp_ovrf[tpos] = cg_y.y;
-      cgsbs.z_cg_temp_ovrf[tpos] = cg_z.y;
-      cgsbs.xfrc_ovrf[tpos] = cg_x.y;
-      cgsbs.yfrc_ovrf[tpos] = cg_y.y;
-      cgsbs.zfrc_ovrf[tpos] = cg_z.y;
+    conjGradScatter(gam, atom_start_pos, atom_end_pos, cgsbs.xfrc, cgsbs.xfrc_ovrf, cgsbs.yfrc,
+                    cgsbs.yfrc_ovrf, cgsbs.zfrc, cgsbs.zfrc_ovrf, cgsbs.xprv, cgsbs.xprv_ovrf,
+                    cgsbs.yprv, cgsbs.yprv_ovrf, cgsbs.zprv, cgsbs.zprv_ovrf, cgsbs.x_cg_temp,
+                    cgsbs.x_cg_temp_ovrf, cgsbs.y_cg_temp, cgsbs.y_cg_temp_ovrf, cgsbs.z_cg_temp,
+                    cgsbs.z_cg_temp_ovrf);
 #else
-      const llint cg_x = __double2ll_rn((double)(ifx) + (gam * (double)(cgsbs.x_cg_temp[tpos])));
-      const llint cg_y = __double2ll_rn((double)(ify) + (gam * (double)(cgsbs.y_cg_temp[tpos])));
-      const llint cg_z = __double2ll_rn((double)(ifz) + (gam * (double)(cgsbs.z_cg_temp[tpos])));
-      cgsbs.x_cg_temp[tpos] = cg_x;
-      cgsbs.y_cg_temp[tpos] = cg_y;
-      cgsbs.z_cg_temp[tpos] = cg_z;
-      cgsbs.xfrc[tpos] = cg_x;
-      cgsbs.yfrc[tpos] = cg_y;
-      cgsbs.zfrc[tpos] = cg_z;
+    conjGradScatter(gam, atom_start_pos, atom_end_pos, cgsbs.xfrc, cgsbs.yfrc, cgsbs.zfrc,
+                    cgsbs.xprv, cgsbs.yprv, cgsbs.zprv, cgsbs.x_cg_temp, cgsbs.y_cg_temp,
+                    cgsbs.z_cg_temp);
 #endif
-    }
     rdwu_idx = sh_rdwu_idx;
   }  
   

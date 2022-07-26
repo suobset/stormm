@@ -129,10 +129,6 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
                      llint* xfrc, llint* yfrc, llint* zfrc, llint* xprv, llint* yprv, llint* zprv,
                      llint* x_cg_temp, llint* y_cg_temp, llint* z_cg_temp) {
   for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
-
-    // Because each work unit handles an exclusive subset of the atoms, the next __syncthreads()
-    // command will be effective to ensure that the global memory manipulations handled here
-    // are safe for read / write / read access.
     const llint ifx = xfrc[tpos];
     const llint ify = yfrc[tpos];
     const llint ifz = zfrc[tpos];
@@ -293,7 +289,7 @@ extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel 
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientDp(const ReductionKit redk, ConjGradSubstrate cgsbs,
+extern void launchConjugateGradientDp(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
                                       MMControlKit<double> *ctrl, const KernelManager &launcher) {
 
   // All conjugate gradient kernels take the same launch parameters.
@@ -302,11 +298,11 @@ extern void launchConjugateGradientDp(const ReductionKit redk, ConjGradSubstrate
                                                   ReductionStage::ALL_REDUCE);
   switch (redk.rps) {
   case RdwuPerSystem::ONE:
-    kdrdConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    kdrdConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     break;
   case RdwuPerSystem::MULTIPLE:
-    kdgtConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
-    kdscConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    kdgtConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
+    kdscConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     break;
   }
 }
@@ -319,11 +315,11 @@ extern void launchConjugateGradientDp(const AtomGraphSynthesis poly_ag,
   ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
   ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
   MMControlKit<double> ctrl = mmctrl->dpData();
-  launchConjugateGradientDp(redk, cgsbs, &ctrl, launcher);
+  launchConjugateGradientDp(redk, &cgsbs, &ctrl, launcher);
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientSp(const ReductionKit redk, ConjGradSubstrate cgsbs,
+extern void launchConjugateGradientSp(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
                                       MMControlKit<float> *ctrl, const KernelManager &launcher) {
 
   // All conjugate gradient kernels take the same launch parameters.
@@ -332,11 +328,11 @@ extern void launchConjugateGradientSp(const ReductionKit redk, ConjGradSubstrate
                                                   ReductionStage::ALL_REDUCE);
   switch (redk.rps) {
   case RdwuPerSystem::ONE:
-    kfrdConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    kfrdConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     break;
   case RdwuPerSystem::MULTIPLE:
-    kfgtConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
-    kfscConjGrad<<<bt.x, bt.y>>>(redk, cgsbs, *ctrl);
+    kfgtConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
+    kfscConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     break;
   }
 }
@@ -349,7 +345,7 @@ extern void launchConjugateGradientSp(const AtomGraphSynthesis poly_ag,
   ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
   ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
   MMControlKit<float> ctrl = mmctrl->spData();
-  launchConjugateGradientSp(redk, cgsbs, &ctrl, launcher);
+  launchConjugateGradientSp(redk, &cgsbs, &ctrl, launcher);
 }
 
 } // namespace synthesis

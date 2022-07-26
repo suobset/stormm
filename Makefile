@@ -439,7 +439,8 @@ OMNI_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 OMNI_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 		       $(TESTDIR)/bin/test_hpc_hybrid \
 		       $(TESTDIR)/bin/test_hpc_math \
-		       $(TESTDIR)/bin/test_hpc_synthesis
+		       $(TESTDIR)/bin/test_hpc_synthesis \
+		       $(TESTDIR)/bin/test_hpc_minimization
 
 # Benchmark programs using omni
 OMNI_BENCH_PROGS = $(BENCHDIR)/bin/valence
@@ -459,8 +460,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O0 -g
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O3
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
              -gencode arch=compute_61,code=sm_61 \
@@ -687,6 +688,15 @@ $(TESTDIR)/bin/test_hpc_synthesis : $(LIBDIR)/libomni_cuda.so \
 	  -o $(TESTDIR)/bin/test_hpc_synthesis $(TESTDIR)/Synthesis/test_hpc_synthesis.cu \
 	  $(TESTDIR)/Synthesis/assemble_restraints.cpp -L$(LIBDIR) -I$(SRCDIR) $(CUDA_LINKS) \
 	  -lomni_cuda
+
+# Target: HPC molecular system synthesis and associated operations
+$(TESTDIR)/bin/test_hpc_minimization : $(LIBDIR)/libomni_cuda.so \
+				       $(TESTDIR)/MolecularMechanics/test_hpc_minimization.cu
+	@echo "[OMNI]  Building test_hpc_minimization..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
+	  -o $(TESTDIR)/bin/test_hpc_minimization \
+	  $(TESTDIR)/MolecularMechanics/test_hpc_minimization.cu -L$(LIBDIR) -I$(SRCDIR) \
+	  $(CUDA_LINKS) -lomni_cuda
 
 # Target: Benchmarking single, double, and fixed-precision computations of valence forces
 $(BENCHDIR)/bin/valence : $(LIBDIR)/libomni.so \
