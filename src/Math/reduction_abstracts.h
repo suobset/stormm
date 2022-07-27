@@ -165,6 +165,7 @@ struct ConjGradSubstrate {
   int* z_cg_temp_ovrf;  ///< Overflow for z_cg_temp when using extended precision models
   double* gg_buffer;    ///< Squared gradient partial sums
   double* dgg_buffer;   ///< Gradient evolution partial sums 
+  double* msum_buffer;  ///< Squared sums of remixed forces on all atoms
 };
 
 } // namespace math

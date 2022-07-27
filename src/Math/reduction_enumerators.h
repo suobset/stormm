@@ -10,6 +10,8 @@ enum class ReductionStage {
   GATHER,     ///< Gather information from many particles or other sources.
   SCATTER,    ///< Scatter the accumulated information (this can also include a secondary gather
               ///<   on block-wide accumulated results).
+  RESCALE,    ///< Rescale some value, essentially a secondary scattering process that can be done
+              ///<   after some accumulation occurs during the first scattering process.
   ALL_REDUCE  ///< Perform the entire reduction in one step, when no intermediate accumulation is
               ///<   needed.
 };

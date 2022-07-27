@@ -173,8 +173,12 @@ private:
   /// The details of the GPU in use are simply copied into this object.
   GpuDetails gpu;
 
-  /// The architecture-specific block multiplier for valence kernels, essentially a provision for
-  /// NVIDIA GTX 1080-Ti.
+  /// The workload-specific block multiplier for valence kernels.  No provision is needed for
+  /// NVIDIA GTX 1080-Ti, as the blocks will have at least multiplicity 2 on each streaming
+  /// multiprocessor, but the workload may lead to a choice of smaller blocks for higher
+  /// throughput.  The maximum number of threads per streaming multiprocessor caps at 1024 and
+  /// the block multiplicity caps at 4, so no provisions are needed for Turing architectures,
+  /// either. 
   int valence_block_multiplier;
 
   /// The architecture-specific block multiplier for non-bonded kernels, essentially a provision
@@ -184,6 +188,11 @@ private:
   /// of the topology synthesis at hand.
   int nonbond_block_multiplier;
 
+  /// The workload-specific block multiplier for reduction kernels.  Like the valence kernels, the
+  /// thread count per streaming multiprocessor will not go above 1024 (this time out of bandwidth
+  /// limitations), but the block multiplicity (which starts at 4) could be increased.
+  int reduction_block_multiplier;
+  
   /// Store the resource requirements and selected launch parameters for a variety of kernels.
   /// Keys are determined according to the free functions further on in this library.
   std::map<std::string, KernelFormat> k_dictionary;
@@ -220,16 +229,17 @@ private:
   ///
   /// \param process      How far to take the reduction operation
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
-  void catalogReductionKernel(ReductionStage process,
+  void catalogReductionKernel(PrecisionModel prec, ReductionGoal purpose, ReductionStage process,
                               const std::string &kernel_name = std::string(""));
 };
 
-/// \brief Obtain the architecture-specific block multiplier for valence interaction kernels.  In
-///        most cases, this is 1, but when no block may control more than half of the register
-///        space, it is 2.
+/// \brief Obtain the workload-specific block multiplier for valence interaction kernels.  In
+///        most cases, this is 1, but if there are many small jobs or enough atoms, it may rise
+///        to 2.
 ///
-/// \param gpu  Details of the GPU that will perform the calculations
-int valenceBlockMultiplier(const GpuDetails &gpu);
+/// \param gpu      Details of the GPU that will perform the calculations
+/// \param poly_ag  A collection of topologies describing the workload
+int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
 
 /// \brief Obtain the architecture-specific block multiplier for valence interaction kernels.  In
 ///        most cases, this is 1, but when no block may control more than half of the register
@@ -239,6 +249,12 @@ int valenceBlockMultiplier(const GpuDetails &gpu);
 /// \param unit_cell  The unit cell type of the systems to evaluate
 int nonbondedBlockMultiplier(const GpuDetails &gpu, UnitCellType unit_cell);
 
+/// \brief Obtain the workload-specific block multiplier for reduction kernels.
+///
+/// \param gpu      Details of the GPU that will perform the calculations
+/// \param poly_ag  A collection of topologies describing the workload
+int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+  
 /// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
 ///        begins with "vale_" and is then appended with letter codes for different aspects
 ///        according to the following system:
@@ -281,8 +297,11 @@ std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce
 ///        according to the following system:
 ///        - { gt, sc, rd }  Perform a gathering, scattering, or combined all-reduce operation
 ///
+/// \param prec     The type of floating point numbers in which the kernel shall work
+/// \param purpose  The reason for doing the reduction--the purpose of each kernel is unique
 /// \param process  The reduction stage to perform
-std::string reductionKernelKey(const ReductionStage process);
+std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, ReductionStage process);
+
 } // namespace card
 } // namespace omni
 

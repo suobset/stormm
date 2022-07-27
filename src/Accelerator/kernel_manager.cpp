@@ -4,6 +4,7 @@
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #ifdef OMNI_USE_HPC
+#include "Math/hpc_reduction.cuh"
 #include "Potential/hpc_nonbonded_potential.cuh"
 #include "Potential/hpc_valence_potential.cuh"
 #endif
@@ -16,6 +17,7 @@ using constants::ExceptionResponse;
 #ifdef OMNI_USE_HPC
 using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
+using math::queryReductionKernelRequirements;
 #endif
 using math::findBin;
 using parse::CaseSensitivity;
@@ -95,8 +97,9 @@ const std::string& KernelFormat::getKernelName() const {
 //-------------------------------------------------------------------------------------------------
 KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
     gpu{gpu_in},
-    valence_block_multiplier{valenceBlockMultiplier(gpu_in)},
+    valence_block_multiplier{valenceBlockMultiplier(gpu_in, poly_ag)},
     nonbond_block_multiplier{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType())},
+    reduction_block_multiplier{reductionBlockMultiplier(gpu_in, poly_ag)},
     k_dictionary{}
 {
 #ifdef OMNI_USE_HPC
@@ -176,8 +179,24 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
   case UnitCellType::TRICLINIC:
     break;
   }
-  
+
   // Reduction kernel entries
+  catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::GATHER, "kdgtConjGrad");
+  catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::SCATTER, "kdscConjGrad");
+  catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::RESCALE, "kdrsConjGrad");
+  catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::ALL_REDUCE, "kdrdConjGrad");
+  catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::GATHER, "kfgtConjGrad");
+  catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::SCATTER, "kfscConjGrad");
+  catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::RESCALE, "kfrsConjGrad");
+  catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
+                         ReductionStage::ALL_REDUCE, "kfrdConjGrad");
 #endif
 }
 
@@ -190,7 +209,7 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Valence kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "getValenceKernelDims");
+          "KernelManager", "catalogValenceKernel");
   }
 #ifdef OMNI_USE_HPC
 #  ifdef OMNI_USE_CUDA
@@ -213,7 +232,7 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Non-bonded kernel identifier " + k_key + " already exists in the kernel map.",
-          "KernelManager", "getNonbondedKernelDims");
+          "KernelManager", "catalogNonbondedKernel");
   }
 #ifdef OMNI_USE_HPC
 #  ifdef OMNI_USE_CUDA
@@ -227,14 +246,23 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
-void KernelManager::catalogReductionKernel(const ReductionStage process,
+void KernelManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
+                                           const ReductionStage process,
                                            const std::string &kernel_name) {
-  switch (process) {
-  case ReductionStage::GATHER:
-  case ReductionStage::SCATTER:
-  case ReductionStage::ALL_REDUCE:
-    break;
+  const std::string k_key = reductionKernelKey(prec, purpose, process);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Reduction kernel identifier " + k_key + " already exists in the kernel map.",
+          "KernelManager", "catalogReductionKernel");
   }
+#ifdef OMNI_USE_HPC
+#  ifdef OMNI_USE_CUDA
+  const cudaFuncAttributes attr = queryReductionKernelRequirements(prec, purpose, process);
+  k_dictionary[k_key] = KernelFormat(attr, reduction_block_multiplier, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -266,7 +294,7 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const Nbwu
 //-------------------------------------------------------------------------------------------------
 int2 KernelManager::getReductionKernelDims(const PrecisionModel prec, const ReductionGoal purpose,
                                            const ReductionStage process) const {
-  const std::string k_key = reductionKernelKey(process);
+  const std::string k_key = reductionKernelKey(prec, purpose, process);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Reduction kernel identifier " + k_key + " was not found in the kernel map.",
           "KernelManager", "getReductionKernelDims");
@@ -302,9 +330,9 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int valenceBlockMultiplier(const GpuDetails &gpu) {
+int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
 #ifdef OMNI_USE_HPC
-  return 2;
+  return 1;
 #else
   return 1;
 #endif
@@ -335,6 +363,15 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell
 #else
   return 1;
 #endif  
+}
+
+//-------------------------------------------------------------------------------------------------
+int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
+#ifdef OMNI_USE_HPC
+  return 1;
+#else
+  return 1;
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -447,17 +484,37 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string reductionKernelKey(const ReductionStage process) {
+std::string reductionKernelKey(const PrecisionModel prec, const ReductionGoal purpose,
+                               const ReductionStage process) {
   std::string k_key("redc_");
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (purpose) {
+  case ReductionGoal::NORMALIZE:
+  case ReductionGoal::CENTER_ON_ZERO:
+    break;
+  case ReductionGoal::CONJUGATE_GRADIENT:
+    k_key += "cg";
+    break;
+  }
   switch (process) {
   case ReductionStage::GATHER:
-    k_key += "gt";
+    k_key += "_gt";
     break;
   case ReductionStage::SCATTER:
-    k_key += "sc";
+    k_key += "_sc";
+    break;
+  case ReductionStage::RESCALE:
+    k_key += "_rs";
     break;
   case ReductionStage::ALL_REDUCE:
-    k_key += "rd";
+    k_key += "_rd";
     break;
   }
   return k_key;

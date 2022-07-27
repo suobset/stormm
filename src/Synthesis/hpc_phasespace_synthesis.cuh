@@ -27,7 +27,7 @@ using constants::large_block_size;
 ///                     on the device, but could be device-only memory or host-mapped memory)
 /// \param low_index    Lower bound of systems to upload
 /// \param high_index   Upper bound of systems to upload (the range is [low_index, high_index))
-__global__ void __launch_bounds__(large_block_size, 1)
+  __global__ void __launch_bounds__(large_block_size, 1)
 kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, int low_index,
                 int high_index, const TrajectoryKind material);
 
@@ -38,6 +38,13 @@ kSystemTransfer(PsSynthesisWriter destination, PsSynthesisWriter source, int low
 /// \param index  Index of the system to initialize; if negative, all systems will be initialized.
 __global__ void __launch_bounds__(large_block_size, 1)
 kPsyInitializeForces(PsSynthesisWriter psyw, const int index);
+
+/// \brief Initialize critical buffers in the phase space (specifically, prior coordinates and
+///        velocities) which would otherwise not be used in energy minimization calculations.
+///
+/// \param psyw   Writeable abstract for the PhaseSpaceSynthesis
+__global__ void __launch_bounds__(large_block_size, 1)
+kPsyPrimeConjugateGradient(PsSynthesisWriter psyw);
   
 } // namespace synthesis
 } // namespace omni

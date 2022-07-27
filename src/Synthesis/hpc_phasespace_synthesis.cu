@@ -270,5 +270,34 @@ extern void psyInitializeForces(PsSynthesisWriter *psyw, const int index, const 
   kPsyInitializeForces<<<gpu.getSMPCount(), gpu.getMaxThreadsPerBlock()>>>(*psyw, index);
 }
 
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(large_block_size, 1)
+kPsyPrimeConjugateGradient(PsSynthesisWriter psyw) {
+  const int minpos = threadIdx.x + (blockDim.x * blockIdx.x);
+  const int last_system = psyw.system_count - 1;
+  const int maxpos = psyw.atom_starts[last_system] + psyw.atom_counts[last_system];
+  for (int pos = minpos; pos < maxpos; pos += blockDim.x * gridDim.x) {
+    psyw.xprv[pos] = psyw.xfrc[pos];
+    psyw.yprv[pos] = psyw.yfrc[pos];
+    psyw.zprv[pos] = psyw.zfrc[pos];
+    psyw.xvel[pos] = 0LL;
+    psyw.yvel[pos] = 0LL;
+    psyw.zvel[pos] = 0LL;
+    if (psyw.frc_bits > force_scale_nonoverflow_bits) {
+      psyw.xprv_ovrf[pos] = psyw.xfrc_ovrf[pos];
+      psyw.yprv_ovrf[pos] = psyw.yfrc_ovrf[pos];
+      psyw.zprv_ovrf[pos] = psyw.zfrc_ovrf[pos];
+      psyw.xvel_ovrf[pos] = 0;
+      psyw.yvel_ovrf[pos] = 0;
+      psyw.zvel_ovrf[pos] = 0;
+    }
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
+extern void psyPrimeConjugateGradient(PsSynthesisWriter *psyw, const GpuDetails &gpu) {
+  kPsyPrimeConjugateGradient<<<gpu.getSMPCount(), gpu.getMaxThreadsPerBlock()>>>(*psyw);
+}
+  
 } // namespace synthesis
 } // namespace omni

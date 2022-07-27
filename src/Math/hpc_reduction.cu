@@ -125,9 +125,11 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
 //   [x,y,z]prv_ovrf:  Overflow in prior iteration X, Y, or Z forces
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__
-void conjGradScatter(const double gam, const int atom_start_pos, const int atom_end_pos,
-                     llint* xfrc, llint* yfrc, llint* zfrc, llint* xprv, llint* yprv, llint* zprv,
-                     llint* x_cg_temp, llint* y_cg_temp, llint* z_cg_temp) {
+double conjGradScatter(const double gam, double* msum_collector, const int atom_start_pos,
+                       const int atom_end_pos, llint* xfrc, llint* yfrc, llint* zfrc, llint* xprv,
+                       llint* yprv, llint* zprv, llint* x_cg_temp, llint* y_cg_temp,
+                       llint* z_cg_temp) {
+  double msum = 0.0;
   for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
     const llint ifx = xfrc[tpos];
     const llint ify = yfrc[tpos];
@@ -135,9 +137,13 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
     xprv[tpos] = ifx;
     yprv[tpos] = ify;
     zprv[tpos] = ifz;
-    const llint cg_x = __double2ll_rn((double)(ifx) + (gam * (double)(x_cg_temp[tpos])));
-    const llint cg_y = __double2ll_rn((double)(ify) + (gam * (double)(y_cg_temp[tpos])));
-    const llint cg_z = __double2ll_rn((double)(ifz) + (gam * (double)(z_cg_temp[tpos])));
+    const double dfcgx = (double)(ifx) + (gam * (double)(x_cg_temp[tpos]));
+    const double dfcgy = (double)(ify) + (gam * (double)(y_cg_temp[tpos]));
+    const double dfcgz = (double)(ifz) + (gam * (double)(z_cg_temp[tpos]));
+    msum += (dfcgx * dfcgx) + (dfcgy * dfcgy) + (dfcgz * dfcgz);
+    const llint cg_x = __double2ll_rn(dfcgx);
+    const llint cg_y = __double2ll_rn(dfcgy);
+    const llint cg_z = __double2ll_rn(dfcgz);
     x_cg_temp[tpos] = cg_x;
     y_cg_temp[tpos] = cg_y;
     z_cg_temp[tpos] = cg_z;
@@ -145,15 +151,30 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
     yfrc[tpos] = cg_y;
     zfrc[tpos] = cg_z;
   }
+  WARP_REDUCE_DOWN(msum);
+  const int warp_idx = (threadIdx.x >> warp_bits);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+  if (lane_idx == 0) {
+    msum_collector[warp_idx] = msum;
+  }
+  __syncthreads();
+
+  // All warps will copy the final summation over msum so that the correct accumulated value may
+  // be returned on all threads.
+  msum = (lane_idx < (blockDim.x >> warp_bits)) ? msum_collector[lane_idx] : 0.0;
+  WARP_REDUCE_DOWN(msum);
+  msum = SHFL(msum, 0);
+  return msum;
 }
 
 __device__ __forceinline__
-void conjGradScatter(const double gam, const int atom_start_pos, const int atom_end_pos,
-                     llint* xfrc, int* xfrc_ovrf, llint* yfrc, int* yfrc_ovrf, llint* zfrc,
-                     int* zfrc_ovrf, llint* xprv, int* xprv_ovrf, llint* yprv, int* yprv_ovrf,
-                     llint* zprv, int* zprv_ovrf, llint* x_cg_temp, int* x_cg_temp_ovrf,
-                     llint* y_cg_temp, int* y_cg_temp_ovrf, llint* z_cg_temp,
-                     int* z_cg_temp_ovrf) {
+double conjGradScatter(const double gam, double* msum_collector, const int atom_start_pos,
+                       const int atom_end_pos, llint* xfrc, int* xfrc_ovrf, llint* yfrc,
+                       int* yfrc_ovrf, llint* zfrc, int* zfrc_ovrf, llint* xprv, int* xprv_ovrf,
+                       llint* yprv, int* yprv_ovrf, llint* zprv, int* zprv_ovrf, llint* x_cg_temp,
+                       int* x_cg_temp_ovrf, llint* y_cg_temp, int* y_cg_temp_ovrf,
+                       llint* z_cg_temp, int* z_cg_temp_ovrf) {
+  double msum = 0.0;
   for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
     const llint ifx = xfrc[tpos];
     const llint ify = yfrc[tpos];
@@ -176,9 +197,13 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
     const double  fz_part = ((double)(ifz_ovrf) * max_llint_accumulation) + (double)(ifz);
     const double cgz_part = ((double)(z_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
                             (double)(z_cg_temp[tpos]);
-    const int95_t cg_x = convertSplitFixedPrecision95(fx_part + cgx_part);
-    const int95_t cg_y = convertSplitFixedPrecision95(fy_part + cgy_part);
-    const int95_t cg_z = convertSplitFixedPrecision95(fz_part + cgz_part);
+    const double dfcgx = fx_part + cgx_part;
+    const double dfcgy = fy_part + cgy_part;
+    const double dfcgz = fz_part + cgz_part;
+    msum += (dfcgx * dfcgx) + (dfcgy * dfcgy) + (dfcgz * dfcgz);
+    const int95_t cg_x = convertSplitFixedPrecision95(dfcgx);
+    const int95_t cg_y = convertSplitFixedPrecision95(dfcgy);
+    const int95_t cg_z = convertSplitFixedPrecision95(dfcgz);
     x_cg_temp[tpos] = cg_x.x;
     y_cg_temp[tpos] = cg_y.x;
     z_cg_temp[tpos] = cg_z.x;
@@ -192,6 +217,20 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
     yfrc_ovrf[tpos] = cg_y.y;
     zfrc_ovrf[tpos] = cg_z.y;
   }
+  WARP_REDUCE_DOWN(msum);
+  const int warp_idx = (threadIdx.x >> warp_bits);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+  if (lane_idx == 0) {
+    msum_collector[warp_idx] = msum;
+  }
+  __syncthreads();
+
+  // All warps will copy the final summation over msum so that the correct accumulated value may
+  // be returned on all threads.
+  msum = (lane_idx < (blockDim.x >> warp_bits)) ? msum_collector[lane_idx] : 0.0;
+  WARP_REDUCE_DOWN(msum);
+  msum = SHFL(msum, 0);
+  return msum;
 }
 
 // Double-precision floating point conjugate gradient definitions
@@ -200,10 +239,12 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
 #define KGATHER_NAME     kdgtConjGrad
 #define KSCATTER_NAME    kdscConjGrad
 #define KALLREDUCE_NAME  kdrdConjGrad
+#define KRESCALE_NAME    kdrsConjGrad
 #include "conjugate_gradient.cui"
 #undef KGATHER_NAME
 #undef KSCATTER_NAME
 #undef KALLREDUCE_NAME
+#undef KRESCALE_NAME
 #undef TCALC
 #undef TCALC_IS_DOUBLE
   
@@ -214,10 +255,12 @@ void conjGradScatter(const double gam, const int atom_start_pos, const int atom_
 #define KGATHER_NAME     kfgtConjGrad
 #define KSCATTER_NAME    kfscConjGrad
 #define KALLREDUCE_NAME  kfrdConjGrad
+#define KRESCALE_NAME    kfrsConjGrad
 #include "conjugate_gradient.cui"
 #undef KGATHER_NAME
 #undef KSCATTER_NAME
 #undef KALLREDUCE_NAME
+#undef KRESCALE_NAME
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
@@ -242,6 +285,12 @@ extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel 
       case ReductionStage::SCATTER:
         if (cudaFuncGetAttributes(&result, kdscConjGrad) != cudaSuccess) {
           rtErr("Error obtaining attributes for kernel kdscConjGrad.",
+                "queryReductionKernelRequirements");
+        }
+        break;
+      case ReductionStage::RESCALE:
+        if (cudaFuncGetAttributes(&result, kdrsConjGrad) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel kdrsConjGrad.",
                 "queryReductionKernelRequirements");
         }
         break;
@@ -271,6 +320,12 @@ extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel 
       case ReductionStage::SCATTER:
         if (cudaFuncGetAttributes(&result, kfscConjGrad) != cudaSuccess) {
           rtErr("Error obtaining attributes for kernel kfscConjGrad.",
+                "queryReductionKernelRequirements");
+        }
+        break;
+      case ReductionStage::RESCALE:
+        if (cudaFuncGetAttributes(&result, kfrsConjGrad) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel kfrsConjGrad.",
                 "queryReductionKernelRequirements");
         }
         break;
@@ -333,6 +388,7 @@ extern void launchConjugateGradientSp(const ReductionKit &redk, ConjGradSubstrat
   case RdwuPerSystem::MULTIPLE:
     kfgtConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     kfscConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
+    kfrsConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     break;
   }
 }

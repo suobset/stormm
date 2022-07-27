@@ -497,6 +497,7 @@ public:
   ///   - Initialize one or more systems' forces on either the host or the device if OMNI is
   ///     compiled for HPC
   ///
+  /// \param gpu    Details of the GPU in use
   /// \param tier   The level (host or device) at which to initialize forces
   /// \param index  Index of the system of interest within the synthesis--if negative, all systems
   ///               will have their forces initialized
@@ -509,6 +510,20 @@ public:
 #endif
   /// \}
 
+  /// \brief Set the prior positions to the current forces, and initialize velocities to zero, as
+  ///        part of the first step of conjugate gradient optimization.  This primes the system so
+  ///        that the prior coordinates and velocities arrays can hold the prior forces and
+  ///        temporary conjugate gradient memory.
+  ///
+  /// \param gpu    Details of the GPU in use
+  /// \param tier   The level (host or device) at which to initialize vectors
+#ifdef OMNI_USE_HPC
+  void primeConjugateGradient(const GpuDetails &gpu,
+                              HybridTargetLevel tier = HybridTargetLevel::HOST);
+#else
+  void primeConjugateGradient();
+#endif
+  
   /// \brief Print a list of structures to a trajectory file.  Download will be performed when
   ///        calling this function, over the subset of relevant frames and data.
   ///

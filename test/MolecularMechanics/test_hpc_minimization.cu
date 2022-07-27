@@ -166,6 +166,9 @@ int main(const int argc, const char* argv[]) {
     launchValenceSp(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw, &scw, &vale_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     ForceAccumulationMethod::SPLIT, launcher);
+    if (i == 0) {
+      small_poly_ps.primeConjugateGradient(gpu, tier);
+    }
     launchConjugateGradientSp(small_poly_redk, &cgsbs, &ctrl, launcher);
 
     // CHECK
@@ -178,7 +181,6 @@ int main(const int argc, const char* argv[]) {
       evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
                      EvaluateForce::YES, 0);
       const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-
       printf("System %4d:\n", j);
       for (int k = 0; k < chkj_ps.getAtomCount(); k++) {
         printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n", cpu_frc[3 * k],
@@ -187,7 +189,9 @@ int main(const int argc, const char* argv[]) {
       }
       printf("\n");
     }
-    exit(1);
+    if (i == 2) {
+      exit(1);
+    }
     // END CHECK
     
     ctrl.step += 1;

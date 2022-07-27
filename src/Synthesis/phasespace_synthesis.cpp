@@ -1656,6 +1656,70 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
 
 //-------------------------------------------------------------------------------------------------
 #ifdef OMNI_USE_HPC
+void PhaseSpaceSynthesis::primeConjugateGradient(const GpuDetails &gpu,
+                                                 const HybridTargetLevel tier)
+#else
+void PhaseSpaceSynthesis::primeConjugateGradient()
+#endif
+{
+#ifdef OMNI_USE_HPC
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+#endif
+      llint* xfrc_ptr = x_forces.data();
+      llint* yfrc_ptr = y_forces.data();
+      llint* zfrc_ptr = z_forces.data();
+      int* xfrc_ovrf_ptr = x_force_overflow.data();
+      int* yfrc_ovrf_ptr = y_force_overflow.data();
+      int* zfrc_ovrf_ptr = z_force_overflow.data();
+      llint* xprv_ptr = x_forces.data();
+      llint* yprv_ptr = y_forces.data();
+      llint* zprv_ptr = z_forces.data();
+      int* xprv_ovrf_ptr = x_force_overflow.data();
+      int* yprv_ovrf_ptr = y_force_overflow.data();
+      int* zprv_ovrf_ptr = z_force_overflow.data();
+      llint* xvel_ptr = x_velocities.data();
+      llint* yvel_ptr = y_velocities.data();
+      llint* zvel_ptr = z_velocities.data();
+      int* xvel_ovrf_ptr = x_velocity_overflow.data();
+      int* yvel_ovrf_ptr = y_velocity_overflow.data();
+      int* zvel_ovrf_ptr = z_velocity_overflow.data();
+      for (int i = 0; i < system_count; i++) {
+        const int jmin = atom_starts.readHost(i);
+        const int jmax = jmin + atom_counts.readHost(i);
+        for (int j = jmin; j < jmax; j++) {
+          xprv_ptr[j] = xfrc_ptr[j];
+          yprv_ptr[j] = yfrc_ptr[j];
+          zprv_ptr[j] = zfrc_ptr[j];
+          xvel_ptr[j] = 0LL;
+          yvel_ptr[j] = 0LL;
+          zvel_ptr[j] = 0LL;
+          if (force_scale_bits > force_scale_nonoverflow_bits) {
+            xprv_ovrf_ptr[j] = xfrc_ovrf_ptr[j];
+            yprv_ovrf_ptr[j] = yfrc_ovrf_ptr[j];
+            zprv_ovrf_ptr[j] = zfrc_ovrf_ptr[j];
+            xvel_ovrf_ptr[j] = 0;
+            yvel_ovrf_ptr[j] = 0;
+            zvel_ovrf_ptr[j] = 0;
+          }
+        }
+      }      
+#ifdef OMNI_USE_HPC
+    }
+    break;
+  case HybridTargetLevel::DEVICE:
+    {
+      PsSynthesisWriter dptr = data(HybridTargetLevel::DEVICE);
+      psyPrimeConjugateGradient(&dptr, gpu);
+    }
+    break;
+  }
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+#ifdef OMNI_USE_HPC
 void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
                                           const std::string &file_name, const double current_time,
                                           const CoordinateFileKind output_kind,

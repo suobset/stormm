@@ -33,7 +33,8 @@ ConjGradSubstrate::ConjGradSubstrate(PsSynthesisWriter poly_psw, ReductionBridge
     y_cg_temp_ovrf{poly_psw.yvel_ovrf},
     z_cg_temp_ovrf{poly_psw.zvel_ovrf},
     gg_buffer{rbg->getPointer(CartesianDimension::X, tier)},
-    dgg_buffer{rbg->getPointer(CartesianDimension::Y, tier)}
+    dgg_buffer{rbg->getPointer(CartesianDimension::Y, tier)},
+    msum_buffer{rbg->getPointer(CartesianDimension::Z, tier)}
 {}
 
 //-------------------------------------------------------------------------------------------------
