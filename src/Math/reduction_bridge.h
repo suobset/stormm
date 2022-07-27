@@ -22,15 +22,21 @@ public:
   ///                  number of reduction work units
   ReductionBridge(size_t n_values);
 
-  /// \brief Take the default copy and move constructors as well as assignment operators.
+  /// \brief The copy and copy assignment operators must deal with pointer repair.
+  ///
+  /// \param original  The original object to copy or move
+  /// \param other     Another object to copy or move
   /// \{
-  ReductionBridge(const ReductionBridge &original) = default;
+  ReductionBridge(const ReductionBridge &original);
+  ReductionBridge& operator=(const ReductionBridge &original);
   ReductionBridge(ReductionBridge &&original) = default;
-  ReductionBridge& operator=(const ReductionBridge &original) = default;
   ReductionBridge& operator=(ReductionBridge &&original) = default;
   /// \}
 
-  /// Get pointers to one of the buffers.
+  /// \brief Get the number of values that each of the three arrays in this object can store.
+  size_t size() const;
+  
+  /// \brief Get pointers to one of the buffers.
   ///
   /// Overloaded:
   ///   - Get a const pointer to a const form of this object's data

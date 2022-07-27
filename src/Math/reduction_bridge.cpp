@@ -19,6 +19,38 @@ ReductionBridge::ReductionBridge(const size_t n_values) :
 }
 
 //-------------------------------------------------------------------------------------------------
+ReductionBridge::ReductionBridge(const ReductionBridge &original) :
+  x_buffer{original.x_buffer},
+  y_buffer{original.y_buffer},
+  z_buffer{original.z_buffer},
+  storage{original.storage}
+{
+  x_buffer.swapTarget(&storage);
+  y_buffer.swapTarget(&storage);
+  z_buffer.swapTarget(&storage);
+}
+
+//-------------------------------------------------------------------------------------------------
+ReductionBridge& ReductionBridge::operator=(const ReductionBridge &other) {
+  if (this == &other) {
+    return *this;
+  }
+  x_buffer = other.x_buffer;
+  y_buffer = other.y_buffer;
+  z_buffer = other.z_buffer;
+  storage = other.storage;
+  x_buffer.swapTarget(&storage);
+  y_buffer.swapTarget(&storage);
+  z_buffer.swapTarget(&storage);
+  return *this;
+}
+
+//-------------------------------------------------------------------------------------------------
+size_t ReductionBridge::size() const {
+  return x_buffer.size();
+}
+  
+//-------------------------------------------------------------------------------------------------
 const double* ReductionBridge::getPointer(const CartesianDimension cdim,
                                           const HybridTargetLevel tier) const {
   switch (cdim) {

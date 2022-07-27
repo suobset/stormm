@@ -33,6 +33,7 @@ OMNI_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		 $(SRCDIR)/Math/series_ops.cpp \
 		 $(SRCDIR)/Math/statistics.cpp \
 		 $(SRCDIR)/Math/vector_ops.cpp \
+		 $(SRCDIR)/MolecularMechanics/line_minimization.cpp \
 		 $(SRCDIR)/MolecularMechanics/minimization.cpp \
 		 $(SRCDIR)/MolecularMechanics/mm_controls.cpp \
 		 $(SRCDIR)/MolecularMechanics/mm_evaluation.cpp \
@@ -148,6 +149,7 @@ OMNI_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 	           $(SRCDIR)/Math/statistics.h \
 	           $(SRCDIR)/Math/summation.h \
 	           $(SRCDIR)/Math/vector_ops.h \
+		   $(SRCDIR)/MolecularMechanics/line_minimization.h \
 		   $(SRCDIR)/MolecularMechanics/minimization.h \
 		   $(SRCDIR)/MolecularMechanics/mm_controls.h \
 		   $(SRCDIR)/MolecularMechanics/mm_evaluation.h \
@@ -296,6 +298,7 @@ OMNI_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	        $(SRCDIR)/Math/series_ops.o \
 	        $(SRCDIR)/Math/statistics.o \
 	        $(SRCDIR)/Math/vector_ops.o \
+	        $(SRCDIR)/MolecularMechanics/line_minimization.o \
 	        $(SRCDIR)/MolecularMechanics/minimization.o \
 	        $(SRCDIR)/MolecularMechanics/mm_controls.o \
 	        $(SRCDIR)/MolecularMechanics/mm_evaluation.o \
