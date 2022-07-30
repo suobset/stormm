@@ -224,92 +224,49 @@ queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
 }
   
 //-------------------------------------------------------------------------------------------------
-extern void launchNonbondedTileGroupsDp(const SyNonbondedKit<double> &poly_nbk,
-                                        const SeMaskSynthesisReader &poly_ser,
-                                        MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
-                                        ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
-                                        const EvaluateForce eval_force,
-                                        const EvaluateEnergy eval_energy,
-                                        const KernelManager &launcher) {
-  const int2 bt = launcher.getNonbondedKernelDims(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
-                                                  eval_force, eval_energy,
-                                                  ForceAccumulationMethod::SPLIT);
-  switch (eval_force) {
-  case EvaluateForce::YES:
-    switch (eval_energy) {
-    case EvaluateEnergy::YES:
-      ktgdsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                *gmem_r);
+extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+                            const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
+                            PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                            CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                            const EvaluateEnergy eval_energy, const int2 bt) {
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      switch (eval_energy) {
+      case EvaluateEnergy::YES:
+        ktgdsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                  *gmem_r);
+        break;
+      case EvaluateEnergy::NO:
+        ktgdsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+        break;
+      }
       break;
-    case EvaluateEnergy::NO:
-      ktgdsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+    case EvaluateForce::NO:
+      ktgdNonbondedEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
       break;
     }
     break;
-  case EvaluateForce::NO:
-    ktgdNonbondedEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
+  case NbwuKind::SUPERTILES:
+  case NbwuKind::HONEYCOMB:
     break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchNonbondedTileGroupsDp(const AtomGraphSynthesis &poly_ag,
-                                        const StaticExclusionMaskSynthesis &poly_se,
-                                        MolecularMechanicsControls *mmctrl,
-                                        PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
-                                        CacheResource *tb_space, const EvaluateForce eval_force,
-                                        const EvaluateEnergy eval_energy,
-                                        const KernelManager &launcher) {
-  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-  const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(tier);
-  const SeMaskSynthesisReader poly_ser = poly_se.data();
-  MMControlKit<double> ctrl = mmctrl->dpData(tier);
-  PsSynthesisWriter poly_psw = poly_ps->data(tier);
-  ScoreCardWriter scw = sc->data(tier);
-  CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
-  launchNonbondedTileGroupsDp(poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r, eval_force,
-                              eval_energy, launcher);
-}
-
-//-------------------------------------------------------------------------------------------------
-extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
-                                        const SeMaskSynthesisReader &poly_ser,
-                                        MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
-                                        ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
-                                        const EvaluateForce eval_force,
-                                        const EvaluateEnergy eval_energy,
-                                        const ForceAccumulationMethod force_sum,
-                                        const KernelManager &launcher) {
-  const int2 bt = launcher.getNonbondedKernelDims(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
-                                                  eval_force, eval_energy,
-                                                  ForceAccumulationMethod::SPLIT);
-  switch (eval_force) {
-  case EvaluateForce::YES:
-    switch (force_sum) {
-    case ForceAccumulationMethod::SPLIT:
-      switch (eval_energy) {
-      case EvaluateEnergy::YES:
-        ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                  *gmem_r);
-        break;
-      case EvaluateEnergy::NO:
-        ktgfsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
-        break;
-      }
-      break;
-    case ForceAccumulationMethod::WHOLE:
-      switch (eval_energy) {
-      case EvaluateEnergy::YES:
-        ktgfNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                 *gmem_r);
-        break;
-      case EvaluateEnergy::NO:
-        ktgfNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
-        break;
-      }
-      break;
-    case ForceAccumulationMethod::AUTOMATIC:
-      if (poly_psw->frc_bits <= 23) {
+extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+                            const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
+                            PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                            CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                            const EvaluateEnergy eval_energy,
+                            const ForceAccumulationMethod force_sum, const int2 bt) {
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      switch (force_sum) {
+      case ForceAccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
@@ -319,8 +276,8 @@ extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
           ktgfsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
           break;
         }
-      }
-      else {
+        break;
+      case ForceAccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgfNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
@@ -330,34 +287,95 @@ extern void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
           ktgfNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
           break;
         }
+        break;
+      case ForceAccumulationMethod::AUTOMATIC:
+        if (poly_psw->frc_bits <= 23) {
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                      *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgfsNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+            break;
+          }
+        }
+        else {
+          switch (eval_energy) {
+          case EvaluateEnergy::YES:
+            ktgfNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
+                                                     *gmem_r);
+            break;
+          case EvaluateEnergy::NO:
+            ktgfNonbondedForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
+            break;
+          }
+        }
+        break;
       }
+      break;
+    case EvaluateForce::NO:
+      ktgfNonbondedEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
       break;
     }
     break;
-  case EvaluateForce::NO:
-    ktgfNonbondedEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
+  case NbwuKind::SUPERTILES:
+  case NbwuKind::HONEYCOMB:
     break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchNonbondedTileGroupsSp(const AtomGraphSynthesis &poly_ag,
-                                        const StaticExclusionMaskSynthesis &poly_se,
-                                        MolecularMechanicsControls *mmctrl,
-                                        PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
-                                        CacheResource *tb_space, const EvaluateForce eval_force,
-                                        const EvaluateEnergy eval_energy,
-                                        const ForceAccumulationMethod force_sum,
-                                        const KernelManager &launcher) {
+extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                            const StaticExclusionMaskSynthesis &poly_se,
+                            MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                            ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
+                            const EvaluateEnergy eval_energy,
+                            const ForceAccumulationMethod force_sum,
+                            const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-  const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(tier);
-  const SeMaskSynthesisReader poly_ser = poly_se.data();
-  MMControlKit<float> ctrl = mmctrl->spData(tier);
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
-  CacheResourceKit<float> gmem_r = tb_space->spData(tier);
-  launchNonbondedTileGroupsSp(poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r, eval_force,
-                              eval_energy, force_sum, launcher);
+  const SeMaskSynthesisReader poly_ser = poly_se.data();
+  const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
+  const int2 bt = launcher.getNonbondedKernelDims(prec, nb_work_type, eval_force, eval_energy,
+                                                  force_sum);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r,
+                      eval_force, eval_energy, bt);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(tier);
+      MMControlKit<float> ctrl = mmctrl->spData(tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(tier);
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r,
+                      eval_force, eval_energy, force_sum, bt);
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                            const StaticExclusionMaskSynthesis &poly_se,
+                            MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                            ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
+                            const EvaluateEnergy eval_energy, const KernelManager &launcher) {
+  if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
+    launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy,
+                    ForceAccumulationMethod::SPLIT, launcher);
+  }
+  else {
+    launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy,
+                    ForceAccumulationMethod::WHOLE, launcher);
+  }
 }
 
 } // namespace energy

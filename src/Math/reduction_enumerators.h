@@ -42,15 +42,15 @@ enum class RdwuPerSystem {
 /// \brief Enumerate the features of a reduction work unit abstract, as encoded in the synthesis
 ///        of topologies.
 enum class RdwuAbstractMap {
-  ATOM_START,    ///< Absolute starting point of atoms in various (concatenated, in the case of a
-                 ///<   synthesis of many systems) arrays
-  ATOM_END,      ///< Absolute upper limit of atoms to read or write in various arrays
-  RESULT_INDEX,  ///< Location in one or more holding arrays for intermediate results of gathering
-  DEPN_START,    ///< Start of dependencies in one or more holding arrays for making a final
-                 ///<   assembly of the results prior to scattering
-  DEPN_END,      ///< Upper limit of dependencies--if this is only one greater than the start, it
-                 ///<   means that the reduction can be done by a single work unit
-  SYSTEM_ID      ///< Index of the system to which this reduction pertains
+  ATOM_START = 0, ///< Absolute starting point of atoms in various (concatenated, in the case of a
+                  ///<   synthesis of many systems) arrays
+  ATOM_END,       ///< Absolute upper limit of atoms to read or write in various arrays
+  RESULT_INDEX,   ///< Location in one or more holding arrays for intermediate results of gathering
+  DEPN_START,     ///< Start of dependencies in one or more holding arrays for making a final
+                  ///<   assembly of the results prior to scattering
+  DEPN_END,       ///< Upper limit of dependencies--if this is only one greater than the start, it
+                  ///<   means that the reduction can be done by a single work unit
+  SYSTEM_ID       ///< Index of the system to which this reduction pertains
 };
   
 } // namespace math

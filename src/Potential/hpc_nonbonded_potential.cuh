@@ -50,39 +50,62 @@ cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKin
                                                     EvaluateEnergy eval_nrg,
                                                     ForceAccumulationMethod acc_meth);
 
-/// \brief Evaluate nonbonded work units based on tile groups.  All of the kernels launched by
-///        these functions will compute forces, energies, or both, and if forces are computed the
-///        results will be dumped back into global accumulators.  None of the kernel launchers
-///        will move particles.
+/// \brief Evaluate nonbonded work units based on the strategy determined in the topology
+///        synthesis.  All of the kernels launched by these functions will compute forces,
+///        energies, or both, and if forces are computed the results will be dumped back into
+///        global accumulators.  None of the kernel launcher will move particles.
+///
+/// Overloaded:
+///   - Accept abstracts and launch parameters for the specific kernel (this is slightly more
+///     performant by allowing re-use of the abstracts and parameters if they are created at the
+///     start of some loop)
+///   - Accept the original objects and make the necessary abstracts before launching (this is
+///     useful for testing purposes)
+///
+/// \param kind         The type non-bonded work to perform, indicating the kernel to launch
+/// \param poly_nbk     Non-bonded parameters of all systems
+/// \param poly_ag      Compiled topologies of all systems
+/// \param poly_ser     Abstract for the exclusion masks of all systems
+/// \param poly_se      Exclusion masks for the synthesis of topologies
+/// \param ctrl         Abstract for molecular mechanics progress counters and run bounds
+/// \param mmctrl       Progress counters and run bounds
+/// \param poly_psw     Abstract for coordinates and forces of all systems
+/// \param poly_ps      Coordinate and force compilation for all systems
+/// \param scw          Abstract for the energy tracking on all systems
+/// \param sc           Energy tracking for all systems (this must be pre-sized to accommodate the
+///                     entire synthesis)
+/// \param gmem_r       Abstract for thread block specific resources
+/// \param tb_space     Cache resources for the kernel launch
+/// \param eval_force   Whether to evaluate forces
+/// \param eval_energy  Whether to evaluate energies
+/// \param bt           Block and thread counts for the kernel, given the precision and force or
+///                     energy computation requirements (an "abstract" of the KernelManager object)
+/// \param launcher     Contains launch parameters for all kernels in OMNI
 /// \{
-void launchNonbondedTileGroupsDp(const SyNonbondedKit<double> &poly_nbk,
-                                 const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
-                                 PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                                 CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
-                                 const EvaluateEnergy eval_energy, const KernelManager &launcher);
+void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+                     const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
+                     PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                     CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                     const EvaluateEnergy eval_energy, const int2 bt);
 
-void launchNonbondedTileGroupsDp(const AtomGraphSynthesis &poly_ag,
-                                 const StaticExclusionMaskSynthesis &poly_se,
-                                 MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                                 ScoreCard *sc, CacheResource *tb_space,
-                                 const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                                 const KernelManager &launcher);
+void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+                     const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
+                     PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, ForceAccumulationMethod force_sum, const int2 bt);
 
-void launchNonbondedTileGroupsSp(const SyNonbondedKit<float> &poly_nbk,
-                                 const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
-                                 PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                                 CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
-                                 const EvaluateEnergy eval_energy,
-                                 const ForceAccumulationMethod force_sum,
-                                 const KernelManager &launcher);
+void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                     const StaticExclusionMaskSynthesis &poly_se,
+                     MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                     ScoreCard *sc, CacheResource *tb_space, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, ForceAccumulationMethod force_sum,
+                     const KernelManager &launcher);
 
-void launchNonbondedTileGroupsSp(const AtomGraphSynthesis &poly_ag,
-                                 const StaticExclusionMaskSynthesis &poly_se,
-                                 MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                                 ScoreCard *sc, CacheResource *tb_space,
-                                 const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                                 const ForceAccumulationMethod force_sum,
-                                 const KernelManager &launcher);
+void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                     const StaticExclusionMaskSynthesis &poly_se,
+                     MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                     ScoreCard *sc, CacheResource *tb_space, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, const KernelManager &launcher);
 /// \}
 
 } // namespace energy

@@ -18,10 +18,10 @@
 #endif
 
 #ifdef OMNI_USE_HIP
-#define SHFL_DOWN(a, b)  __shfl_down(0xffffffffffffffff, a, b, 64);
-#define SHFL_XOR(a, b)   __shfl_xor(0xffffffffffffffff, a, b, 64);
-#define SHFL_UP(a, b)    __shfl_up(0xffffffffffffffff, a, b, 64);
-#define SHFL(a, b)       __shfl(0xffffffffffffffff, a, b, 64);
+#define SHFL_DOWN(a, b)        __shfl_down(0xffffffffffffffff, a, b, 64);
+#define SHFL_XOR(a, b)         __shfl_xor(0xffffffffffffffff, a, b, 64);
+#define SHFL_UP(a, b)          __shfl_up(0xffffffffffffffff, a, b, 64);
+#define SHFL(a, b)             __shfl(0xffffffffffffffff, a, b, 64);
 
 #define WARP_REDUCE_DOWN(var) {                     \
   var += __shfl_down_sync(0xffffffff, var, 32, 64); \

@@ -219,9 +219,9 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
                                            UnitCellType::NONE, vsk, vk.natom, move_scale,
                                            force_factor);
       evalNonbValeRestMM<Tcoord, Tforce,
-                       Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
-                                              UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp, vk,
-                                              nbk, ser, rar, EvaluateForce::NO, 0, step);
+                         Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                                UnitCellType::NONE, xfrc, yfrc, zfrc, &sc_temp, vk,
+                                                nbk, ser, rar, EvaluateForce::NO, 0, step);
       evec[i + 1] = sc_temp.reportTotalEnergy();
       mvec[i + 1] = mvec[i] + move_scale_factor;
       if (evec[i + 1] < evec[i]) {

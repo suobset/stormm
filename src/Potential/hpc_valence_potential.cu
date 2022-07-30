@@ -668,14 +668,12 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
-                            const SyRestraintKit<double, double2, double4> &poly_rk,
-                            MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
-                            ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
-                            const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                            const VwuGoal purpose, const KernelManager &launcher) {
-  const int2 bt = launcher.getValenceKernelDims(PrecisionModel::DOUBLE, eval_force, eval_energy,
-                                                ForceAccumulationMethod::SPLIT, purpose);
+extern void launchValence(const SyValenceKit<double> &poly_vk,
+                          const SyRestraintKit<double, double2, double4> &poly_rk,
+                          MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                          ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
+                          const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                          const VwuGoal purpose, const int2 bt) {
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
 
@@ -721,32 +719,13 @@ extern void launchValenceDp(const SyValenceKit<double> &poly_vk,
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchValenceDp(const AtomGraphSynthesis &poly_ag, MolecularMechanicsControls *mmctrl,
-                            PhaseSpaceSynthesis *poly_ps, ScoreCard *sc, CacheResource *tb_space,
-                            const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                            const VwuGoal purpose, const KernelManager &launcher) {
-  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-  const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
-  const SyRestraintKit<double,
-                       double2, double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit(tier);
-  MMControlKit<double> ctrl = mmctrl->dpData(tier);
-  PsSynthesisWriter poly_psw = poly_ps->data(tier);
-  ScoreCardWriter scw = sc->data(tier);
-  CacheResourceKit<double> gmem_r = tb_space->dpData(tier); 
-  launchValenceDp(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
-                  purpose, launcher);
-}
-
-//-------------------------------------------------------------------------------------------------
-extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
-                            const SyRestraintKit<float, float2, float4> &poly_rk,
-                            MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
-                            ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
-                            const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                            const VwuGoal purpose, const ForceAccumulationMethod force_sum,
-                            const KernelManager &launcher) {
-  const int2 bt = launcher.getValenceKernelDims(PrecisionModel::SINGLE, eval_force, eval_energy,
-                                                ForceAccumulationMethod::SPLIT, purpose);
+extern void launchValence(const SyValenceKit<float> &poly_vk,
+                          const SyRestraintKit<float, float2, float4> &poly_rk,
+                          MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                          ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
+                          const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                          const VwuGoal purpose, const ForceAccumulationMethod force_sum,
+                          const int2 bt) {
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
     
@@ -870,22 +849,58 @@ extern void launchValenceSp(const SyValenceKit<float> &poly_vk,
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchValenceSp(const AtomGraphSynthesis &poly_ag, MolecularMechanicsControls *mmctrl,
-                            PhaseSpaceSynthesis *poly_ps, ScoreCard *sc, CacheResource *tb_space,
-                            const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                            const VwuGoal purpose, const ForceAccumulationMethod force_sum,
-                            const KernelManager &launcher) {
+extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                          MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                          ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const ForceAccumulationMethod force_sum, const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-  const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
-  const SyRestraintKit<float,
-                       float2, float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit(tier);
-  MMControlKit<float> ctrl = mmctrl->spData(tier);
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
-  CacheResourceKit<float> gmem_r = tb_space->spData(tier);
-  launchValenceSp(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
-                  purpose, force_sum, launcher);
+  const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
+                                                ForceAccumulationMethod::SPLIT, purpose);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
+      const SyRestraintKit<double,
+                           double2,
+                           double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit(tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
+      launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
+                    purpose, bt);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
+      const SyRestraintKit<float,
+                           float2, float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit(tier);
+      MMControlKit<float> ctrl = mmctrl->spData(tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(tier);
+      launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
+                    purpose, force_sum, bt);
+    }
+    break;
+  }
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                          MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                          ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const KernelManager &launcher) {
+  if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
+    launchValence(prec, poly_ag, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy, purpose,
+                  ForceAccumulationMethod::SPLIT, launcher);
+  }
+  else {
+    launchValence(prec, poly_ag, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy, purpose,
+                  ForceAccumulationMethod::WHOLE, launcher);
+  }
+}
+
 } // namespace energy
 } // namespace omni

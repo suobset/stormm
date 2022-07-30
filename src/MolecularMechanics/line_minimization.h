@@ -15,8 +15,9 @@ struct LinMinWriter {
 
   /// \brief The constructor works like any other abstract, taking arguments in the order that
   ///        fills the member variables.
-  LinMinWriter(const int nsys_in, double* move_a_in, double* move_b_in, double* move_c_in,
-               double* nrg_a_in, double* nrg_b_in, double* nrg_c_in, double* nrg_d_in);
+  LinMinWriter(const int nsys_in, double* l_move, double* mfac_a_in, double* mfac_b_in,
+               double* mfac_c_in, double* nrg_a_in, double* nrg_b_in, double* nrg_c_in,
+               double* nrg_d_in);
 
   /// \brief Take the standard copy and move constructors for a struct with const elements.
   /// \{
@@ -26,9 +27,10 @@ struct LinMinWriter {
   
   // Member variables
   const int nsys;  ///< The number of systems subject to their own independent line minimizations
-  double* move_a;  ///< Lengths of the 1st move along each system's line
-  double* move_b;  ///< Lengths of the 2nd move along each system's line
-  double* move_c;  ///< Lengths of the 3rd move along each system's line
+  double* l_move;  ///< Lengths of the moves for each system
+  double* mfac_a;  ///< Move multiplying factors of the 1st move along each system's line
+  double* mfac_b;  ///< Move multiplying factors of the 2nd move along each system's line
+  double* mfac_c;  ///< Move multiplying factors of the 3rd move along each system's line
   double* nrg_a;   ///< Energies obtained for each system at the outset of the cycle
   double* nrg_b;   ///< Energies obtained for each system after the 1st move in the cycle
   double* nrg_c;   ///< Energies obtained for each system after the 2nd move in the cycle
@@ -40,9 +42,9 @@ struct LinMinReader {
 
   /// \brief The constructor works like any other abstract, taking arguments in the order that
   ///        fills the member variables.
-  LinMinReader(const int nsys_in, const double* move_a_in, const double* move_b_in,
-               const double* move_c_in, const double* nrg_a_in, const double* nrg_b_in,
-               const double* nrg_c_in, const double* nrg_d_in);
+  LinMinReader(const int nsys_in, const double* l_move, const double* mfac_a_in,
+               const double* mfac_b_in, const double* mfac_c_in, const double* nrg_a_in,
+               const double* nrg_b_in, const double* nrg_c_in, const double* nrg_d_in);
 
   /// \brief Take the standard copy and move constructors for a struct with const elements.
   /// \{
@@ -52,9 +54,10 @@ struct LinMinReader {
   
   // Member variables
   const int nsys;  ///< The number of systems subject to their own independent line minimizations
-  const double* move_a;  ///< Lengths of the 1st move along each system's line
-  const double* move_b;  ///< Lengths of the 2nd move along each system's line
-  const double* move_c;  ///< Lengths of the 3rd move along each system's line
+  const double* l_move;  ///< Lengths of the moves for each system
+  const double* mfac_a;  ///< Lengths of the 1st move along each system's line
+  const double* mfac_b;  ///< Lengths of the 2nd move along each system's line
+  const double* mfac_c;  ///< Lengths of the 3rd move along each system's line
   const double* nrg_a;   ///< Energies obtained for each system at the outset of the cycle
   const double* nrg_b;   ///< Energies obtained for each system after the 1st move in the cycle
   const double* nrg_c;   ///< Energies obtained for each system after the 2nd move in the cycle
@@ -87,23 +90,41 @@ public:
   /// \brief Get the number of systems
   int getSystemCount() const;
 
-  /// \brief Get the move lengths for one or more systems defining a particular move.
+  /// \brief Get the current move lengths for one or more systems.
   ///
   /// Overloaded:
-  ///   - Get the move lengths of all systems for a particular move.
-  ///   - Get the move length of a particular system and a specified move.
+  ///   - Get the move lengths for all systems for a particular move.
+  ///   - Get the move lengths of a particular system and a specified move.
   ///
-  /// \param move_index    Index of the move (0 to 2)
+  /// \param system_index  Index of the system of interest (if unspecified, the move lengths for
+  ///                      all systems will be returned)
+  /// \param tier          Obtain results from the host or the device
+  std::vector<double> getMoveLength(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  double getMoveLength(int system_index,
+                       HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the movement multipliers for one or more systems defining a particular move.
+  ///        Collectively, the system's particles move such that the magnitude of the displacment
+  ///        vector is the instantaneous move length times the current move scaling factor.  A
+  ///        move length of 0.0001A might be multiplied by factors of 1.0, 1.05, 1.025, and 1.020
+  ///        as the line minimization proceeds along one computed gradient.
+  ///
+  /// Overloaded:
+  ///   - Get the factors of all systems for a particular move.
+  ///   - Get the factors of a particular system and a specified move.
+  ///
+  /// \param move_index    Index of the move (0 to 3)
   /// \param system_index  Index of the system of interest (if unspecified, the move lengths for
   ///                      all systems will be returned)
   /// \param tier          Obtain results from the host or the device
   /// \{
-  std::vector<double> getMoveLength(int move_index,
+  std::vector<double> getMoveFactor(int move_index,
                                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-  double getMoveLength(int move_index, int system_index,
+  double getMoveFactor(int move_index, int system_index,
                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   /// \}
   
+
   /// \brief Get the energies for one or more systems after a particular move.
   ///
   /// Overloaded:
@@ -134,21 +155,24 @@ public:
   /// \}
   
 private:
-  int system_count;         ///< The number of systems and the length of data controlled by each
-                            ///<   of the following POINTER-kind Hybrid objects 
-  Hybrid<double> move_a;    ///< Length of the first move along the gradient
-  Hybrid<double> move_b;    ///< Length of the second move along the gradient
-  Hybrid<double> move_c;    ///< Length of the third move along the gradient
-  Hybrid<double> energy_a;  ///< Energy obtained before the first move along the gradient (at the
-                            ///<   outset of the line minimization cycle)
-  Hybrid<double> energy_b;  ///< Energy obtained after the first move along the gradient
-  Hybrid<double> energy_c;  ///< Energy obtained after the second move along the gradient
-  Hybrid<double> energy_d;  ///< Energy obtained after the third move along the gradient
-  Hybrid<double> storage;   ///< ARRAY-kind Hybrid object targeted by all of the previous objects
+  int system_count;             ///< The number of systems and the length of data controlled by
+                                ///<   each of the following POINTER-kind Hybrid objects
+  Hybrid<double> move_length;   ///< Lengths of the moves to make along the gradient line for each
+                                ///<   system.  Three such steps are made per line minimization,
+                                ///<   with this length evolving incrementally base on the success
+                                ///<   or failure of each step to reduce the energy.
+  Hybrid<double> move_factor_a; ///< Move multiplication factor of the 1st move along the gradient
+  Hybrid<double> move_factor_b; ///< Move multiplication factor of the 2nd move along the gradient
+  Hybrid<double> move_factor_c; ///< Move multiplication factor of the 3rd move along the gradient
+  Hybrid<double> energy_a;      ///< Energy obtained before the first move along the gradient (at
+                                ///<   the outset of the line minimization cycle)
+  Hybrid<double> energy_b;      ///< Energy obtained after the first move along the gradient
+  Hybrid<double> energy_c;      ///< Energy obtained after the second move along the gradient
+  Hybrid<double> energy_d;      ///< Energy obtained after the third move along the gradient
+  Hybrid<double> storage;       ///< ARRAY-kind Hybrid object targeted by all previous objects
 };
 
 } // namespace mm
 } // namespace omni
-
 
 #endif

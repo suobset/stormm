@@ -9,51 +9,54 @@ namespace mm {
 using card::HybridKind;
 using math::roundUp;
 
-//------------------------------------------------------------------------------------------------
-LinMinWriter::LinMinWriter(const int nsys_in, double* move_a_in, double* move_b_in,
-                           double* move_c_in, double* nrg_a_in, double* nrg_b_in,
-                           double* nrg_c_in, double* nrg_d_in) :
-    nsys{nsys_in}, move_a{move_a_in}, move_b{move_b_in}, move_c{move_c_in}, nrg_a{nrg_a_in},
-    nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
+//-------------------------------------------------------------------------------------------------
+LinMinWriter::LinMinWriter(const int nsys_in, double* l_move_in, double* mfac_a_in,
+                           double* mfac_b_in, double* mfac_c_in, double* nrg_a_in,
+                           double* nrg_b_in, double* nrg_c_in, double* nrg_d_in) :
+    nsys{nsys_in}, l_move{l_move_in}, mfac_a{mfac_a_in}, mfac_b{mfac_b_in}, mfac_c{mfac_c_in},
+    nrg_a{nrg_a_in}, nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
 {}
 
-//------------------------------------------------------------------------------------------------
-LinMinReader::LinMinReader(const int nsys_in, const double* move_a_in, const double* move_b_in,
-                           const double* move_c_in, const double* nrg_a_in,
-                           const double* nrg_b_in, const double* nrg_c_in,
+//-------------------------------------------------------------------------------------------------
+LinMinReader::LinMinReader(const int nsys_in, const double* l_move_in, const double* mfac_a_in,
+                           const double* mfac_b_in, const double* mfac_c_in,
+                           const double* nrg_a_in, const double* nrg_b_in, const double* nrg_c_in,
                            const double* nrg_d_in) :
-    nsys{nsys_in}, move_a{move_a_in}, move_b{move_b_in}, move_c{move_c_in}, nrg_a{nrg_a_in},
-    nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
+    nsys{nsys_in}, l_move{l_move_in}, mfac_a{mfac_a_in}, mfac_b{mfac_b_in}, mfac_c{mfac_c_in},
+    nrg_a{nrg_a_in}, nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
 {}
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 LineMinimization::LineMinimization(const int system_count_in) :
   system_count{system_count_in},
-  move_a{HybridKind::POINTER, "linmin_move_a"},
-  move_b{HybridKind::POINTER, "linmin_move_b"},
-  move_c{HybridKind::POINTER, "linmin_move_c"},
+  move_length{HybridKind::POINTER, "linmin_mlen"},
+  move_factor_a{HybridKind::POINTER, "linmin_mfac_a"},
+  move_factor_b{HybridKind::POINTER, "linmin_mfac_b"},
+  move_factor_c{HybridKind::POINTER, "linmin_mfac_c"},
   energy_a{HybridKind::POINTER, "linmin_nrg_a"},
   energy_b{HybridKind::POINTER, "linmin_nrg_b"},
   energy_c{HybridKind::POINTER, "linmin_nrg_c"},
   energy_d{HybridKind::POINTER, "linmin_nrg_d"},
-  storage{static_cast<size_t>(roundUp(system_count, warp_size_int) * 7), "linmin_storage"}
+  storage{static_cast<size_t>(roundUp(system_count, warp_size_int) * 8), "linmin_storage"}
 {
   const size_t padded_nsys = roundUp(system_count, warp_size_int);
-  move_a.setPointer(&storage,                  0, system_count);
-  move_b.setPointer(&storage,        padded_nsys, system_count);
-  move_c.setPointer(&storage, 2LLU * padded_nsys, system_count);
-  energy_a.setPointer(&storage, 3LLU * padded_nsys, system_count);
-  energy_b.setPointer(&storage, 4LLU * padded_nsys, system_count);
-  energy_c.setPointer(&storage, 5LLU * padded_nsys, system_count);
-  energy_d.setPointer(&storage, 6LLU * padded_nsys, system_count);
+  move_length.setPointer(&storage,                    0, system_count);
+  move_factor_a.setPointer(&storage,        padded_nsys, system_count);
+  move_factor_b.setPointer(&storage, 2LLU * padded_nsys, system_count);
+  move_factor_c.setPointer(&storage, 3LLU * padded_nsys, system_count);
+  energy_a.setPointer(&storage, 4LLU * padded_nsys, system_count);
+  energy_b.setPointer(&storage, 5LLU * padded_nsys, system_count);
+  energy_c.setPointer(&storage, 6LLU * padded_nsys, system_count);
+  energy_d.setPointer(&storage, 7LLU * padded_nsys, system_count);
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 LineMinimization::LineMinimization(const LineMinimization &original) :
   system_count{original.system_count},
-  move_a{original.move_a},
-  move_b{original.move_b},
-  move_c{original.move_c},
+  move_length{original.move_length},  
+  move_factor_a{original.move_factor_a},
+  move_factor_b{original.move_factor_b},
+  move_factor_c{original.move_factor_c},
   energy_a{original.energy_a},
   energy_b{original.energy_b},
   energy_c{original.energy_c},
@@ -61,24 +64,26 @@ LineMinimization::LineMinimization(const LineMinimization &original) :
   storage{original.storage}
 {
   // Repair pointers
-  move_a.swapTarget(&storage);
-  move_b.swapTarget(&storage);
-  move_c.swapTarget(&storage);
+  move_length.swapTarget(&storage);
+  move_factor_a.swapTarget(&storage);
+  move_factor_b.swapTarget(&storage);
+  move_factor_c.swapTarget(&storage);
   energy_a.swapTarget(&storage);
   energy_b.swapTarget(&storage);
   energy_c.swapTarget(&storage);
   energy_d.swapTarget(&storage);
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 LineMinimization& LineMinimization::operator=(const LineMinimization &other) {
   if (this == &other) {
     return *this;
   }
   system_count = other.system_count;
-  move_a = std::move(other.move_a);
-  move_b = std::move(other.move_b);
-  move_c = std::move(other.move_c);
+  move_length = std::move(other.move_length);
+  move_factor_a = std::move(other.move_factor_a);
+  move_factor_b = std::move(other.move_factor_b);
+  move_factor_c = std::move(other.move_factor_c);
   energy_a = std::move(other.energy_a);
   energy_b = std::move(other.energy_b);
   energy_c = std::move(other.energy_c);
@@ -86,24 +91,51 @@ LineMinimization& LineMinimization::operator=(const LineMinimization &other) {
   return *this;
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 int LineMinimization::getSystemCount() const {
   return system_count;
 }
 
-//------------------------------------------------------------------------------------------------
-std::vector<double> LineMinimization::getMoveLength(const int move_index,
+//-------------------------------------------------------------------------------------------------
+std::vector<double> LineMinimization::getMoveLength(const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return move_length.readHost();
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    return move_length.readDevice();
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+double LineMinimization::getMoveLength(const int system_index,
+                                       const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return move_length.readHost(system_index);
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    return move_length.readDevice(system_index);
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> LineMinimization::getMoveFactor(const int move_index,
                                                     const HybridTargetLevel tier) const {
   bool problem = false;
   switch (tier) {
   case HybridTargetLevel::HOST:
     switch (move_index) {
     case 0:
-      return move_a.readHost();
+      return move_factor_a.readHost();
     case 1:
-      return move_b.readHost();
+      return move_factor_b.readHost();
     case 2:
-      return move_c.readHost();
+      return move_factor_c.readHost();
     default:
       problem = true;
       break;
@@ -113,11 +145,11 @@ std::vector<double> LineMinimization::getMoveLength(const int move_index,
   case HybridTargetLevel::DEVICE:
     switch (move_index) {
     case 0:
-      return move_a.readDevice();
+      return move_factor_a.readDevice();
     case 1:
-      return move_b.readDevice();
+      return move_factor_b.readDevice();
     case 2:
-      return move_c.readDevice();
+      return move_factor_c.readDevice();
     default:
       problem = true;
       break;
@@ -133,19 +165,19 @@ std::vector<double> LineMinimization::getMoveLength(const int move_index,
   __builtin_unreachable();
 }
 
-//------------------------------------------------------------------------------------------------
-double LineMinimization::getMoveLength(const int move_index, const int system_index,
+//-------------------------------------------------------------------------------------------------
+double LineMinimization::getMoveFactor(const int move_index, const int system_index,
                                        const HybridTargetLevel tier) const {
   bool problem = false;
   switch (tier) {
   case HybridTargetLevel::HOST:
     switch (move_index) {
     case 0:
-      return move_a.readHost(system_index);
+      return move_factor_a.readHost(system_index);
     case 1:
-      return move_b.readHost(system_index);
+      return move_factor_b.readHost(system_index);
     case 2:
-      return move_c.readHost(system_index);
+      return move_factor_c.readHost(system_index);
     default:
       problem = true;
       break;
@@ -155,11 +187,11 @@ double LineMinimization::getMoveLength(const int move_index, const int system_in
   case HybridTargetLevel::DEVICE:
     switch (move_index) {
     case 0:
-      return move_a.readDevice(system_index);
+      return move_factor_a.readDevice(system_index);
     case 1:
-      return move_b.readDevice(system_index);
+      return move_factor_b.readDevice(system_index);
     case 2:
-      return move_c.readDevice(system_index);
+      return move_factor_c.readDevice(system_index);
     default:
       problem = true;
       break;
@@ -175,7 +207,7 @@ double LineMinimization::getMoveLength(const int move_index, const int system_in
   __builtin_unreachable();
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 std::vector<double> LineMinimization::getEnergy(const int move_index,
                                                 const HybridTargetLevel tier) const {
   bool problem = false;
@@ -221,7 +253,7 @@ std::vector<double> LineMinimization::getEnergy(const int move_index,
   __builtin_unreachable();
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 double LineMinimization::getEnergy(const int move_index,
                                    const int system_index, const HybridTargetLevel tier) const {
   bool problem = false;
@@ -267,18 +299,18 @@ double LineMinimization::getEnergy(const int move_index,
   __builtin_unreachable();
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 LinMinReader LineMinimization::data(const HybridTargetLevel tier) const {
-  return LinMinReader(system_count, move_a.data(tier), move_b.data(tier), move_c.data(tier),
-                      energy_a.data(tier), energy_b.data(tier), energy_c.data(tier),
-                      energy_d.data(tier));
+  return LinMinReader(system_count, move_length.data(tier), move_factor_a.data(tier),
+                      move_factor_b.data(tier), move_factor_c.data(tier), energy_a.data(tier),
+                      energy_b.data(tier), energy_c.data(tier), energy_d.data(tier));
 }
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 LinMinWriter LineMinimization::data(const HybridTargetLevel tier) {
-  return LinMinWriter(system_count, move_a.data(tier), move_b.data(tier), move_c.data(tier),
-                      energy_a.data(tier), energy_b.data(tier), energy_c.data(tier),
-                      energy_d.data(tier));
+  return LinMinWriter(system_count, move_length.data(tier), move_factor_a.data(tier),
+                      move_factor_b.data(tier), move_factor_c.data(tier), energy_a.data(tier),
+                      energy_b.data(tier), energy_c.data(tier), energy_d.data(tier));
 }
 
 } // namespace mm

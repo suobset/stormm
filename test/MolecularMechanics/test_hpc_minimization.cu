@@ -146,6 +146,7 @@ int main(const int argc, const char* argv[]) {
   const SeMaskSynthesisReader small_poly_ser = small_poly_se.data(tier);
   const SyRestraintKit<float, float2, float4> small_poly_rk =
     small_poly_ag.getSinglePrecisionRestraintKit(tier);
+  const NbwuKind nb_work_type = small_poly_ag.getNonbondedWorkType();
   MMControlKit<float> ctrl = mmctrl.spData(tier);
   PsSynthesisWriter small_poly_psw = small_poly_ps.data(tier);
   ScoreCardWriter scw = sc.data(tier);
@@ -160,12 +161,12 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(0);
   for (int i = 0; i < mincon.getTotalCycles(); i++) {
     small_poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
-    launchNonbondedTileGroupsSp(small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                                &scw, &nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES,
-                                ForceAccumulationMethod::SPLIT, launcher);
-    launchValenceSp(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw, &scw, &vale_tbk,
-                    EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, launcher);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES,
+                    ForceAccumulationMethod::SPLIT, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  ForceAccumulationMethod::SPLIT, vale_lp);
     if (i == 0) {
       small_poly_ps.primeConjugateGradient(gpu, tier);
     }

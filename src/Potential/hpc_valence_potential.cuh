@@ -76,33 +76,47 @@ cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateF
 ///   - Compute forces, energy, or both
 ///   - Move particles, or instead accumulate forces, energies, or both
 ///
-/// \param poly_vk  Valence parameters based on consensus tables from a topology synthesis
-/// \param poly_ps  Coordinates, velocities, and forces of all systems
-/// \param gmem_x   Exclusive space in global memory arrays reserved for each thread block, to be
-///                 brought into free L1 cache
+/// \param poly_vk      Valence parameters based on consensus tables from a topology synthesis
+/// \param poly_ag      Compiled topologies of all systems
+/// \param poly_psw     Abstract for coordinates and forces of all systems
+/// \param poly_ps      Coordinates, velocities, and forces of all systems
+/// \param gmem_r       Exclusive space in global memory arrays reserved for each thread block, to
+/// \param scw          Abstract for the energy tracking on all systems
+/// \param sc           Energy tracking for all systems (this must be pre-sized to accommodate the
+///                     entire synthesis)
+/// \param ctrl         Abstract for molecular mechanics progress counters and run bounds
+/// \param mmctrl       Progress counters and run bounds
+///                     be brought into free L1 cache
+/// \param tb_space     Cache resources for the kernel launch
+/// \param eval_force   Whether to have forces evaluated
+/// \param eval_energy  Whether to have energy components evaluated
+/// \param purpose      Whether to move particles or accumulate forces and energies
+/// \param bt           Block and thread counts for the kernel launch
+/// \param launcher     General repository for launch parameters of all kernels
 /// \{
-void launchValenceDp(const SyValenceKit<double> &poly_vk,
+void launchValence(const SyValenceKit<double> &poly_vk,
                      const SyRestraintKit<double, double2, double4> &poly_rk,
                      MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, VwuGoal purpose, const KernelManager &launcher);
+                     EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt);
 
-void launchValenceDp(const AtomGraphSynthesis &poly_ag, MolecularMechanicsControls *mmctrl,
-                     PhaseSpaceSynthesis *poly_ps, ScoreCard *sc, CacheResource *tb_space,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                     const KernelManager &launcher);
-
-void launchValenceSp(const SyValenceKit<float> &poly_vk,
-                     const SyRestraintKit<float, float2, float4> &poly_rk,
-                     MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, VwuGoal purpose,
-                     ForceAccumulationMethod force_sum, const KernelManager &launcher);
+void launchValence(const SyValenceKit<float> &poly_vk,
+                   const SyRestraintKit<float, float2, float4> &poly_rk,
+                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                   CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose,
+                   ForceAccumulationMethod force_sum, const int2 bt);
   
-void launchValenceSp(const AtomGraphSynthesis &poly_ag, MolecularMechanicsControls *mmctrl,
-                     PhaseSpaceSynthesis *poly_ps, ScoreCard *sc, CacheResource *tb_space,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
-                     ForceAccumulationMethod force_sum, const KernelManager &launcher);
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
+                   CacheResource *tb_space, EvaluateForce eval_force, EvaluateEnergy eval_energy,
+                   VwuGoal purpose, ForceAccumulationMethod force_sum,
+                   const KernelManager &launcher);
+
+void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
+                   CacheResource *tb_space, EvaluateForce eval_force, EvaluateEnergy eval_energy,
+                   VwuGoal purpose, const KernelManager &launcher);
 /// \}
   
 } // namespace energy
