@@ -289,7 +289,7 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float> &po
         }
         break;
       case ForceAccumulationMethod::AUTOMATIC:
-        if (poly_psw->frc_bits <= 23) {
+        if (poly_psw->frc_bits <= 24) {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,

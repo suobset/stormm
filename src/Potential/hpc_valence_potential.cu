@@ -757,7 +757,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         }
         break;
       case ForceAccumulationMethod::AUTOMATIC:
-        if (poly_psw->frc_bits <= 23) {
+        if (poly_psw->frc_bits <= 24) {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             kfsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
@@ -820,7 +820,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
       }
       break;
     case ForceAccumulationMethod::AUTOMATIC:
-      if (poly_psw->frc_bits <= 23) {
+      if (poly_psw->frc_bits <= 24) {
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,

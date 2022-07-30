@@ -1,16 +1,26 @@
 // -*-c++-*-
 #include "Accelerator/ptx_macros.h"
-#include "Constants/scaling.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
+#include "Constants/scaling.h"
+#include "DataTypes/omni_vector_types.h"
+#include "Potential/energy_enumerators.h"
+#include "Synthesis/synthesis_enumerators.h"
+
 
 namespace omni {
 namespace mm {
 
-using card::GpuDetails;
-using card::KernelManager;
 using constants::verytiny;
-  
+using energy::EvaluateEnergy;
+using energy::EvaluateForce;
+using energy::ScoreCardWriter;
+using mm::MMControlKit;
+using Synthesis::PsSynthesisWriter;
+using synthesis::SeMaskSynthesisReader;
+using synthesis::SyNonbondedKit;
+using Synthesis::SyValenceKit;
+
 #include "../Potential/accumulation.cui"
 
 // Conjugate gradient particle advancement
@@ -61,16 +71,18 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                const StaticExclusionMaskSynthesis &poly_se,
                                PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl,
                                ScoreCard *sc, CacheResource *vale_cache, CacheResource *nonb_cache,
+                               ReductionBridge *rbg, LineMinimization *line_record,
                                const ForceAccumulationMethod acc_meth,
                                const KernelManager &launcher) {
 
   // Obtain abstracts of critical objects, re-using them throughout the inner loop.  Some abstracts
   // are needed by both branches.
-  PsSynthesisWriter poly_psw = poly_ps->data();
-  const SeMaskSynthesisReader poly_ser = poly_se.data();
-  MMControlKit<double> dctrl = mmctrl->dpData();
-  MMControlKit<float>  fctrl = mmctrl->spData();
-  ScoreCardWriter scw = sc->data();
+  const tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(tier);
+  const SeMaskSynthesisReader poly_ser = poly_se.data(tier);
+  MMControlKit<double> dctrl = mmctrl->dpData(tier);
+  MMControlKit<float>  fctrl = mmctrl->spData(tier);
+  ScoreCardWriter scw = sc->data(tier);
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
                                                         ForceAccumulationMethod::SPLIT,
@@ -86,7 +98,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   const int2 nonb_xe_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::NO,
                                                           EvaluateEnergy::YES,
                                                           ForceAccumulationMethod::SPLIT);
-
+  LinMinWriter lmw = line_record->data(tier);
+  const ReductionKit redk(poly_ag, tier);
+  ConjGradSubstrate cgsbs(poly_psw, rbg, tier);
+  
   // Progress through minimization cycles will not be measured with the step counter in the
   // molecular mechanics control object--that will increment at four times the rate in the case
   // of conjugate gradient line minimizations.
@@ -106,6 +121,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &dctrl, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::YES, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
                         nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &vale_tbr, eval_force, eval_energy,
+                      VwuGoal::ACCUMULATE, force_sum, bt);
+        kfConjGradAdvance(poly_psw, redk, scw, lmw, 0);
       }
     }
     break;
@@ -117,8 +135,12 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       CacheResourceKit<float> vale_tbr = vale_cache->spData();
       CacheResourceKit<float> nonb_tbr = nonb_cache->spData();
       for (int i = 0; i < total_steps; i++) {
+        poly_ps->initializeForces()
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &dctrl, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &vale_tbr, eval_force, eval_energy,
+                      VwuGoal::ACCUMULATE, force_sum, bt);
+        kfConjGradAdvance(poly_psw, redk, scw, lmw, 0);
       }
     }
     break;
