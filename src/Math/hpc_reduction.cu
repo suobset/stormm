@@ -4,7 +4,7 @@
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "DataTypes/omni_vector_types.h"
-#include "hpc_reduction.cuh"
+#include "hpc_reduction.h"
 
 namespace omni {
 namespace math {
@@ -344,13 +344,10 @@ extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel 
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientDp(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
-                                      MMControlKit<double> *ctrl, const KernelManager &launcher) {
+extern void launchConjugateGradient(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
+                                    MMControlKit<double> *ctrl, const int2 bt) {
 
   // All conjugate gradient kernels take the same launch parameters.
-  const int2 bt = launcher.getReductionKernelDims(PrecisionModel::DOUBLE,
-                                                  ReductionGoal::CONJUGATE_GRADIENT,
-                                                  ReductionStage::ALL_REDUCE);
   switch (redk.rps) {
   case RdwuPerSystem::ONE:
     kdrdConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
@@ -363,24 +360,10 @@ extern void launchConjugateGradientDp(const ReductionKit &redk, ConjGradSubstrat
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientDp(const AtomGraphSynthesis poly_ag,
-                                      PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
-                                      MolecularMechanicsControls *mmctrl,
-                                      const KernelManager &launcher) {
-  ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
-  ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
-  MMControlKit<double> ctrl = mmctrl->dpData();
-  launchConjugateGradientDp(redk, &cgsbs, &ctrl, launcher);
-}
-
-//-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientSp(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
-                                      MMControlKit<float> *ctrl, const KernelManager &launcher) {
+extern void launchConjugateGradient(const ReductionKit &redk, ConjGradSubstrate *cgsbs,
+                                    MMControlKit<float> *ctrl, const int2 bt) {
 
   // All conjugate gradient kernels take the same launch parameters.
-  const int2 bt = launcher.getReductionKernelDims(PrecisionModel::SINGLE,
-                                                  ReductionGoal::CONJUGATE_GRADIENT,
-                                                  ReductionStage::ALL_REDUCE);
   switch (redk.rps) {
   case RdwuPerSystem::ONE:
     kfrdConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
@@ -394,14 +377,28 @@ extern void launchConjugateGradientSp(const ReductionKit &redk, ConjGradSubstrat
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchConjugateGradientSp(const AtomGraphSynthesis poly_ag,
-                                      PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
-                                      MolecularMechanicsControls *mmctrl,
-                                      const KernelManager &launcher) {
+extern void launchConjugateGradient(const PrecisionModel prec, const AtomGraphSynthesis poly_ag,
+                                    PhaseSpaceSynthesis *poly_ps, ReductionBridge *rbg,
+                                    MolecularMechanicsControls *mmctrl,
+                                    const KernelManager &launcher) {
   ReductionKit redk(poly_ag, HybridTargetLevel::DEVICE);
   ConjGradSubstrate cgsbs(poly_ps, rbg, HybridTargetLevel::DEVICE);
-  MMControlKit<float> ctrl = mmctrl->spData();
-  launchConjugateGradientSp(redk, &cgsbs, &ctrl, launcher);
+  const int2 bt = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
+                                                  ReductionStage::ALL_REDUCE);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      MMControlKit<double> ctrl = mmctrl->dpData();
+      launchConjugateGradient(redk, &cgsbs, &ctrl, bt);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      MMControlKit<float> ctrl = mmctrl->spData();
+      launchConjugateGradient(redk, &cgsbs, &ctrl, bt);
+    }
+    break;
+  }
 }
 
 } // namespace synthesis

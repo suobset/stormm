@@ -6,6 +6,7 @@
 #include "Accelerator/kernel_manager.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "Math/reduction_enumerators.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -18,9 +19,12 @@ using card::KernelManager;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::PrecisionModel;
+using math::ReductionStage;
 using namelist::default_dynamics_time_step;
-using namelist::default_rattle_tolerance;
 using namelist::default_minimize_dx0;
+using namelist::default_minimize_maxcyc;
+using namelist::default_minimize_ncyc;
+using namelist::default_rattle_tolerance;
 using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
@@ -32,9 +36,10 @@ template <typename T> struct MMControlKit {
 
   /// \brief The constructor takes a straight list of values and pointers.  The step number is
   ///        left modifiable so that the object can be re-used over successive time steps.
-  MMControlKit(int step_in, T dt_in, T rattle_tol_in, T initial_step_in, int* vwu_progress_in,
-               int* nbwu_progress_in, int* pmewu_progress_in, int* gtwu_progress_in,
-               int* scwu_progress_in, int* rdwu_progress_in);
+  MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T dt_in, T rattle_tol_in,
+               T initial_step_in, int* vwu_progress_in, int* nbwu_progress_in,
+               int* pmewu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
+               int* rdwu_progress_in);
 
   /// \brief The usual copy and move constructors for an abstract apply here.  
   /// \{
@@ -43,8 +48,8 @@ template <typename T> struct MMControlKit {
   /// \}
 
   int step;              ///< The current simulation step
-  int sd_cycles;         ///< The number of steepest-descent energy minimization cycles
-  int max_cycles;        ///< The total number of energy minimization cycles or dynamics steps
+  const int sd_cycles;   ///< The number of steepest-descent energy minimization cycles
+  const int max_cycles;  ///< The total number of energy minimization cycles or dynamics steps
   const T dt;            ///< Simulation time step (only valid for dynamics)
   const T rattle_tol;    ///< Convergence tolerance for bond constraints
   const T initial_step;  ///< Initial step size to be taken in energy minimization
@@ -77,7 +82,9 @@ public:
   /// \{
   MolecularMechanicsControls(double time_step_in = default_dynamics_time_step,
                              double rattle_tol_in = default_rattle_tolerance,
-                             double initial_step_in = default_minimize_dx0);
+                             double initial_step_in = default_minimize_dx0,
+                             int sd_cycles_in = default_minimize_ncyc,
+                             int max_cycles_in = default_minimize_maxcyc);
 
   MolecularMechanicsControls(const DynamicsControls &user_input);
                              
@@ -99,6 +106,56 @@ public:
   ///
   /// \param original  The object from which to take contents
   MolecularMechanicsControls(MolecularMechanicsControls &&original);
+
+  /// \brief Get the current step number.
+  int getStepNumber() const;
+  
+  /// \brief Get the number of steepest descent minimization cycles.
+  int getSteepestDescentCycles() const;
+  
+  /// \brief Get the total number of minimization steps, or total MD cycles.
+  int getTotalCycles() const;
+
+  /// \brief Get the time step.
+  double getTimeStep() const;
+
+  /// \brief Get the RATTLE tolerance.
+  double getRattleTolerance() const;
+
+  /// \brief Get the initial step for energy minimization.
+  double getInitialMinimizationStep() const;
+
+  /// \brief Get the value of one of the valence work unit progress counters on the host or the
+  ///        HPC device.
+  ///
+  /// \param counter_index  Index of the work unit counter to retrieve
+  /// \param tier           Get the result from the CPU host or the HPC device
+  int getValenceWorkUnitProgress(int counter_index,
+                                 HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the value of one of the non-bonded work unit progress counters on the host or the
+  ///        HPC device.
+  ///
+  /// \param counter_index  Index of the work unit counter to retrieve
+  /// \param tier           Get the result from the CPU host or the HPC device
+  int getNonbondedWorkUnitProgress(int counter_index,
+                                   HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the value of one of the Particle-Mesh Ewald work unit progress counters on the
+  ///        host or the HPC device.
+  ///
+  /// \param counter_index  Index of the work unit counter to retrieve
+  /// \param tier           Get the result from the CPU host or the HPC device
+  int getPmeWorkUnitProgress(int counter_index,
+                             HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+
+  /// \brief Get the value of one of the reduction work unit progress counters on the host or the
+  ///        HPC device.
+  ///
+  /// \param counter_index  Index of the work unit counter to retrieve
+  /// \param tier           Get the result from the CPU host or the HPC device
+  int getReductionWorkUnitProgress(int counter_index, ReductionStage process,
+                                   HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief The move assignment operator looks much like the copy assignment operator.
   ///

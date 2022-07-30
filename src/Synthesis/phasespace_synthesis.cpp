@@ -1656,10 +1656,10 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
 
 //-------------------------------------------------------------------------------------------------
 #ifdef OMNI_USE_HPC
-void PhaseSpaceSynthesis::primeConjugateGradient(const GpuDetails &gpu,
-                                                 const HybridTargetLevel tier)
+void PhaseSpaceSynthesis::primeConjugateGradientCalculation(const GpuDetails &gpu,
+                                                            const HybridTargetLevel tier)
 #else
-void PhaseSpaceSynthesis::primeConjugateGradient()
+void PhaseSpaceSynthesis::primeConjugateGradientCalculation()
 #endif
 {
 #ifdef OMNI_USE_HPC

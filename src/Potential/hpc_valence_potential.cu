@@ -12,7 +12,7 @@
 #include "Synthesis/valence_workunit.h"
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
-#include "hpc_valence_potential.cuh"
+#include "hpc_valence_potential.h"
 
 namespace omni {
 namespace energy {

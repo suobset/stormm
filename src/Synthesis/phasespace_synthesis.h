@@ -518,10 +518,10 @@ public:
   /// \param gpu    Details of the GPU in use
   /// \param tier   The level (host or device) at which to initialize vectors
 #ifdef OMNI_USE_HPC
-  void primeConjugateGradient(const GpuDetails &gpu,
-                              HybridTargetLevel tier = HybridTargetLevel::HOST);
+  void primeConjugateGradientCalculation(const GpuDetails &gpu,
+                                         HybridTargetLevel tier = HybridTargetLevel::HOST);
 #else
-  void primeConjugateGradient();
+  void primeConjugateGradientCalculation();
 #endif
   
   /// \brief Print a list of structures to a trajectory file.  Download will be performed when

@@ -16,9 +16,11 @@ using synthesis::VwuGoal;
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in,
                                                        const double rattle_tol_in,
-                                                       const double initial_step_in) :
-  step_number{0}, sd_cycles{0}, max_cycles{0}, time_step{time_step_in}, rattle_tol{rattle_tol_in},
-  initial_step{initial_step_in},
+                                                       const double initial_step_in,
+                                                       const int sd_cycles_in,
+                                                       const int max_cycles_in) :
+  step_number{0}, sd_cycles{sd_cycles_in}, max_cycles{max_cycles_in}, time_step{time_step_in},
+  rattle_tol{rattle_tol_in}, initial_step{initial_step_in},
   vwu_progress{HybridKind::POINTER, "mm_vwu_counters"},
   nbwu_progress{HybridKind::POINTER, "mm_nbwu_counters"},
   pmewu_progress{HybridKind::POINTER, "mm_pmewu_counters"},
@@ -37,28 +39,27 @@ MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in
 
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const DynamicsControls &user_input) :
-    MolecularMechanicsControls()
-{
-  max_cycles = user_input.getStepCount();
-  time_step = user_input.getTimeStep();  
-  rattle_tol = user_input.getRattleTolerance();
-}
+    MolecularMechanicsControls(user_input.getTimeStep(), user_input.getRattleTolerance(),
+                               default_minimize_dx0, default_minimize_ncyc,
+                               user_input.getStepCount())
+{}
 
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(const MinimizeControls &user_input) :
-    MolecularMechanicsControls()
-{
-  sd_cycles = user_input.getSteepestDescentCycles();
-  max_cycles = user_input.getTotalCycles();
-  initial_step = user_input.getInitialStep();
-}
+    MolecularMechanicsControls(default_dynamics_time_step, default_rattle_tolerance,
+                               user_input.getInitialStep(), user_input.getSteepestDescentCycles(),
+                               user_input.getTotalCycles())
+{}
 
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::
 MolecularMechanicsControls(const MolecularMechanicsControls &original) :
   step_number{original.step_number},
+  sd_cycles{original.sd_cycles},
+  max_cycles{original.max_cycles},
   time_step{original.time_step},
   rattle_tol{original.rattle_tol},
+  initial_step{original.initial_step},
   vwu_progress{original.vwu_progress},
   nbwu_progress{original.nbwu_progress},
   pmewu_progress{original.pmewu_progress},
@@ -84,8 +85,11 @@ MolecularMechanicsControls::operator=(const MolecularMechanicsControls &other) {
     return *this;
   }
   step_number = other.step_number;
+  sd_cycles = other.sd_cycles;
+  max_cycles = other.max_cycles;
   time_step = other.time_step;
   rattle_tol = other.rattle_tol;
+  initial_step = other.initial_step;
   vwu_progress = other.vwu_progress;
   nbwu_progress = other.nbwu_progress;
   pmewu_progress = other.pmewu_progress;
@@ -107,8 +111,11 @@ MolecularMechanicsControls::operator=(const MolecularMechanicsControls &other) {
 //-------------------------------------------------------------------------------------------------
 MolecularMechanicsControls::MolecularMechanicsControls(MolecularMechanicsControls &&original) :
   step_number{original.step_number},
+  sd_cycles{original.sd_cycles},
+  max_cycles{original.max_cycles},
   time_step{original.time_step},
   rattle_tol{original.rattle_tol},
+  initial_step{original.initial_step},
   vwu_progress{std::move(original.vwu_progress)},
   nbwu_progress{std::move(original.nbwu_progress)},
   pmewu_progress{std::move(original.pmewu_progress)},
@@ -127,8 +134,11 @@ MolecularMechanicsControls::operator=(MolecularMechanicsControls &&other) {
     return *this;
   }
   step_number = other.step_number;
+  sd_cycles = other.sd_cycles;
+  max_cycles = other.max_cycles;
   time_step = other.time_step;
   rattle_tol = other.rattle_tol;
+  initial_step = other.initial_step;
   vwu_progress = std::move(other.vwu_progress);
   nbwu_progress = std::move(other.nbwu_progress);
   pmewu_progress = std::move(other.pmewu_progress);
@@ -140,17 +150,126 @@ MolecularMechanicsControls::operator=(MolecularMechanicsControls &&other) {
 }
 
 //-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getStepNumber() const {
+  return step_number;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getSteepestDescentCycles() const {
+  return sd_cycles;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getTotalCycles() const {
+  return max_cycles;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolecularMechanicsControls::getTimeStep() const {
+  return time_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolecularMechanicsControls::getRattleTolerance() const {
+  return rattle_tol;
+}
+
+//-------------------------------------------------------------------------------------------------
+double MolecularMechanicsControls::getInitialMinimizationStep() const {
+  return initial_step;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getValenceWorkUnitProgress(const int counter_index,
+                                                           const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return vwu_progress.readHost(counter_index);    
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    return vwu_progress.readDevice(counter_index);
+    break;
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getNonbondedWorkUnitProgress(const int counter_index,
+                                                             const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return nbwu_progress.readHost(counter_index);    
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    return nbwu_progress.readDevice(counter_index);
+    break;
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getPmeWorkUnitProgress(const int counter_index,
+                                                       const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return pmewu_progress.readHost(counter_index);    
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    return pmewu_progress.readDevice(counter_index);
+    break;
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolecularMechanicsControls::getReductionWorkUnitProgress(const int counter_index,
+                                                             const ReductionStage process,
+                                                             const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    switch (process) {
+    case ReductionStage::GATHER:
+      return gather_wu_progress.readHost(counter_index);
+    case ReductionStage::SCATTER:
+      return scatter_wu_progress.readHost(counter_index);
+    case ReductionStage::ALL_REDUCE:
+      return all_reduce_wu_progress.readHost(counter_index);
+    }
+    break;
+#ifdef OMNI_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    switch (process) {
+    case ReductionStage::GATHER:
+      return gather_wu_progress.readDevice(counter_index);
+    case ReductionStage::SCATTER:
+      return scatter_wu_progress.readDevice(counter_index);
+    case ReductionStage::ALL_REDUCE:
+      return all_reduce_wu_progress.readDevice(counter_index);
+    }
+    break;
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 MMControlKit<double> MolecularMechanicsControls::dpData(const HybridTargetLevel tier) {
-  return MMControlKit<double>(step_number, time_step, rattle_tol, initial_step,
-                              vwu_progress.data(tier), nbwu_progress.data(tier),
+  return MMControlKit<double>(step_number, sd_cycles, max_cycles, time_step, rattle_tol,
+                              initial_step, vwu_progress.data(tier), nbwu_progress.data(tier),
                               pmewu_progress.data(tier), gather_wu_progress.data(tier),
                               scatter_wu_progress.data(tier), all_reduce_wu_progress.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel tier) {
-  return MMControlKit<float>(step_number, time_step, rattle_tol, initial_step,
-                             vwu_progress.data(tier), nbwu_progress.data(tier),
+  return MMControlKit<float>(step_number, sd_cycles, max_cycles, time_step, rattle_tol,
+                             initial_step, vwu_progress.data(tier), nbwu_progress.data(tier),
                              pmewu_progress.data(tier), gather_wu_progress.data(tier),
                              scatter_wu_progress.data(tier), all_reduce_wu_progress.data(tier));
 }

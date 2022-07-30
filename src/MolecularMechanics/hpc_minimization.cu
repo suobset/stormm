@@ -4,22 +4,42 @@
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "DataTypes/omni_vector_types.h"
+#include "Math/hpc_reduction.h"
+#include "Math/reduction_abstracts.h"
+#include "Math/reduction_enumerators.h"
 #include "Potential/energy_enumerators.h"
+#include "Potential/hpc_nonbonded_potential.h"
+#include "Potential/hpc_valence_potential.h"
 #include "Synthesis/synthesis_enumerators.h"
-
+#include "hpc_minimization.h"
 
 namespace omni {
 namespace mm {
 
 using constants::verytiny;
+using data_types::int95_t;
+using energy::CacheResourceKit;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
 using energy::ScoreCardWriter;
+using energy::StateVariable;
+using math::ConjGradSubstrate;
+using math::ReductionGoal;
+using math::ReductionKit;
+using math::ReductionStage;
+using math::RdwuAbstractMap;
+using math::rdwu_abstract_length;
+using mm::LinMinWriter;
 using mm::MMControlKit;
-using Synthesis::PsSynthesisWriter;
+using numerics::max_int_accumulation_f;
+using numerics::max_llint_accumulation;
+using synthesis::NbwuKind;
+using synthesis::PsSynthesisWriter;
 using synthesis::SeMaskSynthesisReader;
 using synthesis::SyNonbondedKit;
-using Synthesis::SyValenceKit;
+using synthesis::SyRestraintKit;
+using synthesis::SyValenceKit;
+using synthesis::VwuGoal;
 
 #include "../Potential/accumulation.cui"
 
@@ -73,11 +93,11 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                ScoreCard *sc, CacheResource *vale_cache, CacheResource *nonb_cache,
                                ReductionBridge *rbg, LineMinimization *line_record,
                                const ForceAccumulationMethod acc_meth,
-                               const KernelManager &launcher) {
+                               const GpuDetails &gpu, const KernelManager &launcher) {
 
   // Obtain abstracts of critical objects, re-using them throughout the inner loop.  Some abstracts
   // are needed by both branches.
-  const tier = HybridTargetLevel::DEVICE;
+  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   const SeMaskSynthesisReader poly_ser = poly_se.data(tier);
   MMControlKit<double> dctrl = mmctrl->dpData(tier);
@@ -98,6 +118,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   const int2 nonb_xe_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::NO,
                                                           EvaluateEnergy::YES,
                                                           ForceAccumulationMethod::SPLIT);
+  const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
+                                                       ReductionStage::ALL_REDUCE);
   LinMinWriter lmw = line_record->data(tier);
   const ReductionKit redk(poly_ag, tier);
   ConjGradSubstrate cgsbs(poly_psw, rbg, tier);
@@ -106,7 +128,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   // molecular mechanics control object--that will increment at four times the rate in the case
   // of conjugate gradient line minimizations.
   const int total_steps = mmctrl->getTotalCycles();
-  mmctrl->primeWorkUnitConters(launcher, prec, poly_ag);
+  mmctrl->primeWorkUnitCounters(launcher, prec, poly_ag);
+  poly_ps->primeConjugateGradientCalculation(gpu, tier);
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
@@ -117,30 +140,32 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       CacheResourceKit<double> vale_tbr = vale_cache->dpData();
       CacheResourceKit<double> nonb_tbr = nonb_cache->dpData();
       for (int i = 0; i < total_steps; i++) {
-        poly_ps->initializeForces()
+        poly_ps->initializeForces(gpu, tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &dctrl, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                        nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &vale_tbr, eval_force, eval_energy,
-                      VwuGoal::ACCUMULATE, force_sum, bt);
-        kfConjGradAdvance(poly_psw, redk, scw, lmw, 0);
+                        EvaluateForce::YES, EvaluateEnergy::YES, nonb_fe_lp);
+        launchValence(poly_vk, poly_rk, &dctrl, &poly_psw, &scw, &vale_tbr, EvaluateForce::YES,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
+        launchConjugateGradient(redk, &cgsbs, &dctrl, redu_lp);
+        kfConjGradAdvance<<<redu_lp.x, redu_lp.y>>>(poly_psw, redk, scw, lmw, 0);
       }
     }
     break;
   case PrecisionModel::SINGLE:
     {
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit();
+      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit();
       const SyRestraintKit<float,
                            float2, float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit();
       CacheResourceKit<float> vale_tbr = vale_cache->spData();
       CacheResourceKit<float> nonb_tbr = nonb_cache->spData();
       for (int i = 0; i < total_steps; i++) {
-        poly_ps->initializeForces()
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &dctrl, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &vale_tbr, eval_force, eval_energy,
-                      VwuGoal::ACCUMULATE, force_sum, bt);
-        kfConjGradAdvance(poly_psw, redk, scw, lmw, 0);
+        poly_ps->initializeForces(gpu, tier);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &fctrl, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_fe_lp);
+        launchValence(poly_vk, poly_rk, &fctrl, &poly_psw, &scw, &vale_tbr, EvaluateForce::YES,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_fe_lp);
+        launchConjugateGradient(redk, &cgsbs, &fctrl, redu_lp);
+        kfConjGradAdvance<<<redu_lp.x, redu_lp.y>>>(poly_psw, redk, scw, lmw, 0);
       }
     }
     break;

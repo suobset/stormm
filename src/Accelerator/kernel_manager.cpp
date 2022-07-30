@@ -4,9 +4,9 @@
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
 #ifdef OMNI_USE_HPC
-#include "Math/hpc_reduction.cuh"
-#include "Potential/hpc_nonbonded_potential.cuh"
-#include "Potential/hpc_valence_potential.cuh"
+#include "Math/hpc_reduction.h"
+#include "Potential/hpc_nonbonded_potential.h"
+#include "Potential/hpc_valence_potential.h"
 #endif
 #include "kernel_manager.h"
 

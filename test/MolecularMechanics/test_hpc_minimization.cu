@@ -7,12 +7,13 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_bridge.h"
-#include "../../src/Math/hpc_reduction.cuh"
+#include "../../src/Math/reduction_enumerators.h"
+#include "../../src/Math/hpc_reduction.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/MolecularMechanics/mm_evaluation.h"
 #include "../../src/Potential/cacheresource.h"
-#include "../../src/Potential/hpc_nonbonded_potential.cuh"
-#include "../../src/Potential/hpc_valence_potential.cuh"
+#include "../../src/Potential/hpc_nonbonded_potential.h"
+#include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -130,6 +131,9 @@ int main(const int argc, const char* argv[]) {
                                                        NbwuKind::TILE_GROUPS, EvaluateForce::YES,
                                                        EvaluateEnergy::YES,
                                                        ForceAccumulationMethod::SPLIT);
+  const int2 redu_lp = launcher.getReductionKernelDims(PrecisionModel::SINGLE,
+                                                       ReductionGoal::CONJUGATE_GRADIENT,
+                                                       ReductionStage::ALL_REDUCE);
   CacheResource valence_tb_reserve(vale_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
 
@@ -168,9 +172,9 @@ int main(const int argc, const char* argv[]) {
                   &scw, &vale_tbk, EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                   ForceAccumulationMethod::SPLIT, vale_lp);
     if (i == 0) {
-      small_poly_ps.primeConjugateGradient(gpu, tier);
+      small_poly_ps.primeConjugateGradientCalculation(gpu, tier);
     }
-    launchConjugateGradientSp(small_poly_redk, &cgsbs, &ctrl, launcher);
+    launchConjugateGradient(small_poly_redk, &cgsbs, &ctrl, redu_lp);
 
     // CHECK
     for (int j = 0; j < 1024; j += 173) {

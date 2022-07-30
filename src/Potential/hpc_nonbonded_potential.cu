@@ -7,7 +7,7 @@
 #include "DataTypes/omni_vector_types.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
-#include "hpc_nonbonded_potential.cuh"
+#include "hpc_nonbonded_potential.h"
 
 namespace omni {
 namespace energy {
