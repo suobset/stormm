@@ -99,6 +99,7 @@ int main(const int argc, const char* argv[]) {
            "test_hpc_minimization");
   }
   std::vector<int> small_mol_id = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 };
+  //std::vector<int> small_mol_id = { 2, 3, 2, 3, 0, 1, 2, 3, 2, 3, 3, 2, 2, 3, 3, 2 };
   small_mol_id.resize(8192);
   for (int i = 0; i < 512; i++) {
     for (int j = 0; j < 16; j++) {
@@ -113,7 +114,7 @@ int main(const int argc, const char* argv[]) {
   
   // Create the minimization instructions
   MinimizeControls mincon;
-  mincon.setTotalCycles(1000);
+  mincon.setTotalCycles(500);
   
   // Create a molecular mechanics control object based on the minimization operations
   MolecularMechanicsControls mmctrl(mincon);
@@ -125,18 +126,36 @@ int main(const int argc, const char* argv[]) {
   KernelManager launcher(gpu, small_poly_ag);
   
   // Lay out GPU cache resources
-  const int2 vale_lp = launcher.getValenceKernelDims(PrecisionModel::SINGLE, EvaluateForce::YES,
-                                                     EvaluateEnergy::YES,
-                                                     ForceAccumulationMethod::SPLIT,
-                                                     VwuGoal::ACCUMULATE);
+#if 0
+  const int2 vale_fe_lp = launcher.getValenceKernelDims(PrecisionModel::SINGLE, EvaluateForce::YES,
+                                                        EvaluateEnergy::YES,
+                                                        ForceAccumulationMethod::SPLIT,
+                                                        VwuGoal::ACCUMULATE);
+  const int2 vale_xe_lp = launcher.getValenceKernelDims(PrecisionModel::SINGLE, EvaluateForce::NO,
+                                                        EvaluateEnergy::YES,
+                                                        ForceAccumulationMethod::SPLIT,
+                                                        VwuGoal::ACCUMULATE);
   const int2 nonb_lp = launcher.getNonbondedKernelDims(PrecisionModel::SINGLE,
-                                                       NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                                                       EvaluateEnergy::YES,
+                                                       NbwuKind::TILE_GROUPS,
+                                                       EvaluateForce::YES, EvaluateEnergy::YES,
                                                        ForceAccumulationMethod::SPLIT);
   const int2 redu_lp = launcher.getReductionKernelDims(PrecisionModel::SINGLE,
                                                        ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
-  CacheResource valence_tb_reserve(vale_lp.x, maximum_valence_work_unit_atoms);
+#endif
+  const int2 vale_fe_lp = { 588, 128 };
+  const int2 vale_xe_lp = { 672, 128 };
+  const int2 nonb_lp    = { 420, 256 };
+  const int2 redu_lp    = { 336, 256 };
+  
+  // CHECK
+  printf("Launch valence (FE) kernel on %4d blocks, %4d threads\n", vale_fe_lp.x, vale_fe_lp.y);
+  printf("Launch valence (xE) kernel on %4d blocks, %4d threads\n", vale_xe_lp.x, vale_xe_lp.y);
+  printf("Launch nonbonded    kernel on %4d blocks, %4d threads\n", nonb_lp.x, nonb_lp.y);
+  printf("Launch reduction    kernel on %4d blocks, %4d threads\n", redu_lp.x, redu_lp.y);
+  // END CHECK
+  
+  CacheResource valence_tb_reserve(vale_fe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
 
   // Upload the synthesis and prime the pumps
@@ -170,10 +189,7 @@ int main(const int argc, const char* argv[]) {
   timer.assignTime(0);
   for (int i = 0; i < mincon.getTotalCycles(); i++) {
 
-    // CHECK
-    for (int j = 0; j < 5; j++) {
-    // END CHECK
-    
+    // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     small_poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
@@ -181,57 +197,15 @@ int main(const int argc, const char* argv[]) {
                     ForceAccumulationMethod::SPLIT, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_lp);
-
-    // CHECK
-    }
-    // END CHECK
-    
+                  ForceAccumulationMethod::SPLIT, vale_fe_lp);
     if (i == 0) {
       small_poly_ps.primeConjugateGradientCalculation(gpu, tier);
     }
     launchConjugateGradient(small_poly_redk, &cgsbs, &ctrl, redu_lp);
 
-    // CHECK
-#if 0
-    for (int j = 2; j < 30; j += 173) {
-      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
-      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      chkj_ps.initializeForces();
-      ScoreCard tmp_sc(1, 1, 32);
-      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
-      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
-                     EvaluateForce::YES, 0);
-      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      const double total_e = tmp_sc.reportTotalEnergy(0);
-      printf("System %4d: (total energy %12.6lf: %12.6lf %12.6lf %12.6lf %12.6lf %12.6lf ...\n"
-             "                                         %12.6lf %12.6lf %12.6lf %12.6lf ...\n"
-             "                                         %12.6lf %12.6lf %12.6lf %12.6lf ...\n", j,
-             total_e, tmp_sc.reportInstantaneousStates(StateVariable::BOND, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::ANGLE, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::CMAP, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::VDW, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, 0),
-             tmp_sc.reportInstantaneousStates(StateVariable::RESTRAINT, 0));
-      printf("\n");
-    }
-#endif
-    // END CHECK
-
+    // Second stage of the cycle: advance once along the line and recompute the energy.
     launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 0, redu_lp);
-
-    // CHECK
-    for (int j = 0; j < 5; j++) {
-    // END CHECK
-    
     ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
@@ -239,34 +213,11 @@ int main(const int argc, const char* argv[]) {
                     ForceAccumulationMethod::SPLIT, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_lp);
+                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
 
-    // CHECK
-    }
-#if 0
-    for (int j = 2; j < 30; j += 173) {
-      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
-      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      chkj_ps.initializeForces();
-      ScoreCard tmp_sc(1, 1, 32);
-      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
-      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
-                     EvaluateForce::YES, 0);
-      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      const double total_e = tmp_sc.reportTotalEnergy(0);
-      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
-      printf("\n");
-    }
-#endif
-    // END CHECK
-
+    // Third stage of the cycle: advance once more along the line and recompute the energy.
     launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 1, redu_lp);
-
-    // CHECK
-    for (int j = 0; j < 5; j++) {
-    // END CHECK
-
     ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
@@ -274,34 +225,12 @@ int main(const int argc, const char* argv[]) {
                     ForceAccumulationMethod::SPLIT, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_lp);
+                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
 
-    // CHECK
-    }
-#if 0
-    for (int j = 2; j < 30; j += 173) {
-      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
-      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      chkj_ps.initializeForces();
-      ScoreCard tmp_sc(1, 1, 32);
-      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
-      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
-                     EvaluateForce::YES, 0);
-      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      const double total_e = tmp_sc.reportTotalEnergy(0);
-      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
-      printf("\n");
-    }
-#endif
-    // END CHECK
-
+    // Final stage of the cycle: advance a final time along the line, recompute the energy, fit
+    // a cubic polynomial to guess the best overall advancement, and place the system there.
     launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 2, redu_lp);
-
-    // CHECK
-    for (int j = 0; j < 5; j++) {
-    // END CHECK
-
     ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
@@ -309,40 +238,20 @@ int main(const int argc, const char* argv[]) {
                     ForceAccumulationMethod::SPLIT, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_lp);
-
-    // CHECK
-    }
-#if 0
-    for (int j = 15; j < 30; j += 173) {
-      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
-      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      chkj_ps.initializeForces();
-      ScoreCard tmp_sc(1, 1, 32);
-      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
-      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
-                     EvaluateForce::YES, 0);
-      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      const double total_e = tmp_sc.reportTotalEnergy(0);
-      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
-      printf("\n");
-    }
-#endif
-    // END CHECK
-
+                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
     launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 3, redu_lp);
+    ctrl.step += 1;
 
     // CHECK
 #if 0
-    ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
                     &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
                     ForceAccumulationMethod::SPLIT, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_lp);
+                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
     for (int j = 15; j < 30; j += 173) {
       PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
       const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
@@ -353,16 +262,10 @@ int main(const int argc, const char* argv[]) {
                      EvaluateForce::YES, 0);
       const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
       const double total_e = tmp_sc.reportTotalEnergy(0);
-      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
-      printf("\n");
-    }
-    if (i == 500) {
-      exit(1);
+      printf("  %12.6lf\n", total_e);
     }
 #endif
     // END CHECK
-
-    ctrl.step += 1;
   }
   cudaDeviceSynchronize();
   timer.assignTime(min_timings);

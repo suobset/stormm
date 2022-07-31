@@ -39,14 +39,27 @@ using synthesis::VwuGoal;
 #include "../Potential/accumulation.cui"
 
 // Conjugate gradient particle advancement
-#define TCALC_IS_DOUBLE
+#define TCALC double
+#  define TCALC_IS_DOUBLE
+#  define SQRT_FUNC sqrt
+#  define LLCONV_FUNC __double2ll_rn
 #  define KERNEL_NAME kdLineAdvance
 #    include "line_movement.cui"
 #  undef KERNEL_NAME
-#undef TCALC_IS_DOUBLE
-#define KERNEL_NAME kfLineAdvance
-#  include "line_movement.cui"
-#undef KERNEL_NAME
+#  undef SQRT_FUNC
+#  undef LLCONV_FUNC
+#  undef TCALC_IS_DOUBLE
+#undef TCALC
+
+#define TCALC float
+#  define SQRT_FUNC sqrtf
+#  define LLCONV_FUNC __float2ll_rn
+#  define KERNEL_NAME kfLineAdvance
+#    include "line_movement.cui"
+#  undef KERNEL_NAME
+#  undef SQRT_FUNC
+#  undef LLCONV_FUNC
+#undef TCALC
 
 //-------------------------------------------------------------------------------------------------
 extern void minimizationKernelSetup() {

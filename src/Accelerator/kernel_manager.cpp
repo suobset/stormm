@@ -332,7 +332,7 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
 //-------------------------------------------------------------------------------------------------
 int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
 #ifdef OMNI_USE_HPC
-  return 1;
+  return 2;
 #else
   return 1;
 #endif
@@ -368,7 +368,7 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell
 //-------------------------------------------------------------------------------------------------
 int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
 #ifdef OMNI_USE_HPC
-  return 1;
+  return 4;
 #else
   return 1;
 #endif
