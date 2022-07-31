@@ -70,6 +70,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
              threadIdx.x <  padded_abstract_length + small_block_max_imports) {
       sh_elec_acc[threadIdx.x - padded_abstract_length] = 0LL;
       sh_vdw_acc[ threadIdx.x - padded_abstract_length] = 0LL;
+      sh_gb_acc[  threadIdx.x - padded_abstract_length] = 0LL;
     }
 #endif
     __syncthreads();
@@ -553,7 +554,40 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       pos += tile_sides_per_warp * warps_per_block;
     }
 #endif
-
+#ifdef COMPUTE_ENERGY
+    pos = threadIdx.x;
+    const int padded_import_count_iii = devcRoundUp(import_count_ii, warp_size_int);
+    while (pos < padded_import_count_iii) {
+      if (pos < import_count_ii) {
+        const int write_idx = (sh_system_indices[pos] * scw.data_stride) +
+                              (int)(StateVariable::ELECTROSTATIC);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
+                  lliToUlli(sh_elec_acc[pos]));
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 2 * padded_import_count_iii) {
+      const int rel_pos = pos - padded_import_count_iii;
+      if (rel_pos < import_count_ii) {
+        const int write_idx = (sh_system_indices[rel_pos] * scw.data_stride) +
+                              (int)(StateVariable::VDW);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
+                  lliToUlli(sh_vdw_acc[rel_pos]));
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 3 * padded_import_count_iii) {
+      const int rel_pos = pos - (2 * padded_import_count_iii);
+      if (rel_pos < import_count_ii) {
+        const int write_idx = (sh_system_indices[rel_pos] * scw.data_stride) +
+                              (int)(StateVariable::GENERALIZED_BORN);
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
+                  lliToUlli(sh_gb_acc[rel_pos]));
+      }
+      pos += blockDim.x;
+    }
+#endif
+    
     // Increment the work unit counter
     __syncthreads();
     if (threadIdx.x == 0) {

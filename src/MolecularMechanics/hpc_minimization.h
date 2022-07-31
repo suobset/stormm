@@ -23,12 +23,13 @@ using card::KernelManager;
 using constants::PrecisionModel;
 using energy::CacheResource;
 using energy::ScoreCard;
+using energy::ScoreCardWriter;
 using math::ReductionBridge;
-using mm::MolecularMechanicsControls;
-using mm::LineMinimization;
+using math::ReductionKit;
 using numerics::ForceAccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
+using synthesis::PsSynthesisWriter;
 using synthesis::StaticExclusionMaskSynthesis;
 
 /// \brief Set the __shared__ memory access size for the conjugate gradient particle advancement
@@ -40,6 +41,28 @@ void minimizationKernelSetup();
 /// \param prec  The precision model of the coordinate object (the particle advancement is always
 ///              performed in double-precision real numbers)
 cudaFuncAttributes queryMinimizationKernelRequirements(const PrecisionModel prec);
+
+/// \brief Launch the line minimization kernel in a standalone capacity.  This function expedites
+///        debugging and provides abstraction of the line movement function for other applications.
+///
+/// \param prec         The precision model in use by the coordinate set (indicates whether the
+///                     extended fixed-precision number format is in use)
+/// \param poly_psw     Coordinates for each system and forces acting on each system
+/// \param redk         Reduction work units to inform the limits of each thread block's activity
+/// \param scw          Read-only access to the current energy of each system
+/// \param lmw          Writeable abstract for a line minimization manager
+/// \param move_number  The number of the move--values of 0 to 3 will lead to different behavior
+/// \param redu_lp      Launch parameters for the kernel (an abstract of the KernelManager object)
+/// \{
+void launchLineAdvance(PrecisionModel prec, PsSynthesisWriter *poly_psw, const ReductionKit &redk,
+                       const ScoreCardWriter &scw, LinMinWriter *lmw, int move_number,
+                       const int2 redu_lp);
+
+void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
+                       const AtomGraphSynthesis &poly_ag, ScoreCard *sc,
+                       LineMinimization *line_record, int move_number,
+                       const KernelManager &launcher);
+/// \}
 
 /// \brief Run energy minimizations of all structures in a synthesis based on user input or other
 ///        data contained in a molecular mechanics control object.

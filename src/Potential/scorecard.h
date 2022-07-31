@@ -3,12 +3,14 @@
 #define OMNI_SCORECARD_H
 
 #include "Constants/fixed_precision.h"
+#include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "energy_enumerators.h"
 
 namespace omni {
 namespace energy {
 
+using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using numerics::default_energy_scale_bits;
@@ -141,22 +143,29 @@ public:
   ///                      contrbution describes
   void contribute(StateVariable var, llint amount, int system_index = 0);
 
-  /// \brief Initialize some or all instantaneous state variable accumulators.  This is for CPU
-  ///        activity; on the GPU, the contributions will occur as part of each energy kernel
-  ///        using pointers.
+  /// \brief Initialize some or all instantaneous state variable accumulators.
   ///
   /// Overloaded:
   ///   - Initialize a single state variable accumulator
   ///   - Initialize a list of state variable accumulators
-  ///   - Initialize all state variable accumulators
+  ///   - Initialize all state variable accumulators in one or more systems
   ///
   /// \param var           The state variable to initialize
   /// \param system_index  Index of the system (among a list of those being tracked) that the
   ///                      contrbution describes
+  /// \param tier          Indicate whether to initialize accumulators on the host or device
+  /// \param gpu           Details of the HPC device in use
   /// \{
-  void initialize(StateVariable var, int system_index = 0);
-  void initialize(const std::vector<StateVariable> &var, int system_index = 0);
-  void initialize(int system_index = 0);
+  void initialize(StateVariable var, int system_index = 0,
+                  HybridTargetLevel tier = HybridTargetLevel::HOST,
+                  const GpuDetails &gpu = null_gpu);
+  void initialize(const std::vector<StateVariable> &var, int system_index = 0,
+                  HybridTargetLevel tier = HybridTargetLevel::HOST,
+                  const GpuDetails &gpu = null_gpu);
+  void initialize(int system_index, HybridTargetLevel tier = HybridTargetLevel::HOST,
+                  const GpuDetails &gpu = null_gpu);
+  void initialize(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                  const GpuDetails &gpu = null_gpu);
   /// \}
   
   /// \brief Add a result to a growing total in one of the instantaneous state variable

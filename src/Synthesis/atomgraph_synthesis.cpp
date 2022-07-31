@@ -3117,7 +3117,7 @@ void AtomGraphSynthesis::loadReductionWorkUnits(const GpuDetails &gpu) {
   const int result_pos     = static_cast<int>(RdwuAbstractMap::RESULT_INDEX);
   const int depn_start_pos = static_cast<int>(RdwuAbstractMap::DEPN_START);
   const int depn_end_pos   = static_cast<int>(RdwuAbstractMap::DEPN_END);
-  const int system_pos     = static_cast<int>(RdwuAbstractMap::DEPN_END);
+  const int system_pos     = static_cast<int>(RdwuAbstractMap::SYSTEM_ID);
   int* abstract_ptr = reduction_abstracts.data();
   for (int i = 0; i < total_reduction_work_units; i++) {
     const int wu_pos = (rdwu_abstract_length * i);

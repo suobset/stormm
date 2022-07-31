@@ -10,61 +10,66 @@ using card::HybridKind;
 using math::roundUp;
 
 //-------------------------------------------------------------------------------------------------
-LinMinWriter::LinMinWriter(const int nsys_in, double* l_move_in, double* mfac_a_in,
-                           double* mfac_b_in, double* mfac_c_in, double* nrg_a_in,
-                           double* nrg_b_in, double* nrg_c_in, double* nrg_d_in) :
-    nsys{nsys_in}, l_move{l_move_in}, mfac_a{mfac_a_in}, mfac_b{mfac_b_in}, mfac_c{mfac_c_in},
-    nrg_a{nrg_a_in}, nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
+LinMinWriter::LinMinWriter(const int nsys_in, double* l_move_in, double* s_move_in,
+                           double* mfac_a_in, double* mfac_b_in, double* mfac_c_in,
+                           double* nrg_a_in, double* nrg_b_in, double* nrg_c_in,
+                           double* nrg_d_in) :
+    nsys{nsys_in}, l_move{l_move_in}, s_move{s_move_in}, mfac_a{mfac_a_in}, mfac_b{mfac_b_in},
+    mfac_c{mfac_c_in}, nrg_a{nrg_a_in}, nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
-LinMinReader::LinMinReader(const int nsys_in, const double* l_move_in, const double* mfac_a_in,
-                           const double* mfac_b_in, const double* mfac_c_in,
-                           const double* nrg_a_in, const double* nrg_b_in, const double* nrg_c_in,
-                           const double* nrg_d_in) :
-    nsys{nsys_in}, l_move{l_move_in}, mfac_a{mfac_a_in}, mfac_b{mfac_b_in}, mfac_c{mfac_c_in},
-    nrg_a{nrg_a_in}, nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
+LinMinReader::LinMinReader(const int nsys_in, const double* l_move_in, const double* s_move_in,
+                           const double* mfac_a_in, const double* mfac_b_in,
+                           const double* mfac_c_in, const double* nrg_a_in, const double* nrg_b_in,
+                           const double* nrg_c_in, const double* nrg_d_in) :
+    nsys{nsys_in}, l_move{l_move_in}, s_move{s_move_in}, mfac_a{mfac_a_in}, mfac_b{mfac_b_in},
+    mfac_c{mfac_c_in}, nrg_a{nrg_a_in}, nrg_b{nrg_b_in}, nrg_c{nrg_c_in}, nrg_d{nrg_d_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 LineMinimization::LineMinimization(const int system_count_in) :
-  system_count{system_count_in},
-  move_length{HybridKind::POINTER, "linmin_mlen"},
-  move_factor_a{HybridKind::POINTER, "linmin_mfac_a"},
-  move_factor_b{HybridKind::POINTER, "linmin_mfac_b"},
-  move_factor_c{HybridKind::POINTER, "linmin_mfac_c"},
-  energy_a{HybridKind::POINTER, "linmin_nrg_a"},
-  energy_b{HybridKind::POINTER, "linmin_nrg_b"},
-  energy_c{HybridKind::POINTER, "linmin_nrg_c"},
-  energy_d{HybridKind::POINTER, "linmin_nrg_d"},
-  storage{static_cast<size_t>(roundUp(system_count, warp_size_int) * 8), "linmin_storage"}
+    system_count{system_count_in},
+    move_length{HybridKind::POINTER, "linmin_mlen"},
+    save_length{HybridKind::POINTER, "linmin_slen"},
+    move_factor_a{HybridKind::POINTER, "linmin_mfac_a"},
+    move_factor_b{HybridKind::POINTER, "linmin_mfac_b"},
+    move_factor_c{HybridKind::POINTER, "linmin_mfac_c"},
+    energy_a{HybridKind::POINTER, "linmin_nrg_a"},
+    energy_b{HybridKind::POINTER, "linmin_nrg_b"},
+    energy_c{HybridKind::POINTER, "linmin_nrg_c"},
+    energy_d{HybridKind::POINTER, "linmin_nrg_d"},
+    storage{static_cast<size_t>(roundUp(system_count, warp_size_int) * 9), "linmin_storage"}
 {
   const size_t padded_nsys = roundUp(system_count, warp_size_int);
   move_length.setPointer(&storage,                    0, system_count);
-  move_factor_a.setPointer(&storage,        padded_nsys, system_count);
-  move_factor_b.setPointer(&storage, 2LLU * padded_nsys, system_count);
-  move_factor_c.setPointer(&storage, 3LLU * padded_nsys, system_count);
-  energy_a.setPointer(&storage, 4LLU * padded_nsys, system_count);
-  energy_b.setPointer(&storage, 5LLU * padded_nsys, system_count);
-  energy_c.setPointer(&storage, 6LLU * padded_nsys, system_count);
-  energy_d.setPointer(&storage, 7LLU * padded_nsys, system_count);
+  save_length.setPointer(&storage,          padded_nsys, system_count);
+  move_factor_a.setPointer(&storage, 2LLU * padded_nsys, system_count);
+  move_factor_b.setPointer(&storage, 3LLU * padded_nsys, system_count);
+  move_factor_c.setPointer(&storage, 4LLU * padded_nsys, system_count);
+  energy_a.setPointer(&storage, 5LLU * padded_nsys, system_count);
+  energy_b.setPointer(&storage, 6LLU * padded_nsys, system_count);
+  energy_c.setPointer(&storage, 7LLU * padded_nsys, system_count);
+  energy_d.setPointer(&storage, 8LLU * padded_nsys, system_count);
 }
 
 //-------------------------------------------------------------------------------------------------
 LineMinimization::LineMinimization(const LineMinimization &original) :
-  system_count{original.system_count},
-  move_length{original.move_length},  
-  move_factor_a{original.move_factor_a},
-  move_factor_b{original.move_factor_b},
-  move_factor_c{original.move_factor_c},
-  energy_a{original.energy_a},
-  energy_b{original.energy_b},
-  energy_c{original.energy_c},
-  energy_d{original.energy_d},
-  storage{original.storage}
+    system_count{original.system_count},
+    move_length{original.move_length},
+    save_length{original.save_length},
+    move_factor_a{original.move_factor_a},
+    move_factor_b{original.move_factor_b},
+    move_factor_c{original.move_factor_c},
+    energy_a{original.energy_a},
+    energy_b{original.energy_b},
+    energy_c{original.energy_c},
+    energy_d{original.energy_d},
+    storage{original.storage}
 {
   // Repair pointers
   move_length.swapTarget(&storage);
+  save_length.swapTarget(&storage);
   move_factor_a.swapTarget(&storage);
   move_factor_b.swapTarget(&storage);
   move_factor_c.swapTarget(&storage);
@@ -81,6 +86,7 @@ LineMinimization& LineMinimization::operator=(const LineMinimization &other) {
   }
   system_count = other.system_count;
   move_length = std::move(other.move_length);
+  save_length = std::move(other.save_length);
   move_factor_a = std::move(other.move_factor_a);
   move_factor_b = std::move(other.move_factor_b);
   move_factor_c = std::move(other.move_factor_c);
@@ -301,17 +307,42 @@ double LineMinimization::getEnergy(const int move_index,
 
 //-------------------------------------------------------------------------------------------------
 LinMinReader LineMinimization::data(const HybridTargetLevel tier) const {
-  return LinMinReader(system_count, move_length.data(tier), move_factor_a.data(tier),
-                      move_factor_b.data(tier), move_factor_c.data(tier), energy_a.data(tier),
-                      energy_b.data(tier), energy_c.data(tier), energy_d.data(tier));
+  return LinMinReader(system_count, move_length.data(tier), save_length.data(tier),
+                      move_factor_a.data(tier), move_factor_b.data(tier), move_factor_c.data(tier),
+                      energy_a.data(tier), energy_b.data(tier), energy_c.data(tier),
+                      energy_d.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 LinMinWriter LineMinimization::data(const HybridTargetLevel tier) {
-  return LinMinWriter(system_count, move_length.data(tier), move_factor_a.data(tier),
-                      move_factor_b.data(tier), move_factor_c.data(tier), energy_a.data(tier),
-                      energy_b.data(tier), energy_c.data(tier), energy_d.data(tier));
+  return LinMinWriter(system_count, move_length.data(tier), save_length.data(tier),
+                      move_factor_a.data(tier), move_factor_b.data(tier), move_factor_c.data(tier),
+                      energy_a.data(tier), energy_b.data(tier), energy_c.data(tier),
+                      energy_d.data(tier));
 }
+
+//-------------------------------------------------------------------------------------------------
+void LineMinimization::primeMoveLengths(const double dx0) {
+  double* l_move_ptr = move_length.data();
+  for (int i = 0; i < system_count; i++) {
+    l_move_ptr[i] = dx0;
+  }
+#ifdef OMNI_USE_HPC
+  move_length.upload();
+#endif
+}
+
+#ifdef OMNI_USE_HPC
+//-------------------------------------------------------------------------------------------------
+void LineMinimization::upload() {
+  storage.upload();
+}
+
+//-------------------------------------------------------------------------------------------------
+void LineMinimization::download() {
+  storage.download();
+}
+#endif
 
 } // namespace mm
 } // namespace omni

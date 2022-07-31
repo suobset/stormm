@@ -9,6 +9,8 @@
 #include "../../src/Math/reduction_bridge.h"
 #include "../../src/Math/reduction_enumerators.h"
 #include "../../src/Math/hpc_reduction.h"
+#include "../../src/MolecularMechanics/hpc_minimization.h"
+#include "../../src/MolecularMechanics/line_minimization.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/MolecularMechanics/mm_evaluation.h"
 #include "../../src/Potential/cacheresource.h"
@@ -97,8 +99,8 @@ int main(const int argc, const char* argv[]) {
            "test_hpc_minimization");
   }
   std::vector<int> small_mol_id = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 };
-  small_mol_id.resize(1024);
-  for (int i = 0; i < 64; i++) {
+  small_mol_id.resize(8192);
+  for (int i = 0; i < 512; i++) {
     for (int j = 0; j < 16; j++) {
       small_mol_id[(16 * i) + j] = small_mol_id[j];
     }
@@ -159,25 +161,40 @@ int main(const int argc, const char* argv[]) {
   ReductionKit small_poly_redk(small_poly_ag, tier);
   ReductionBridge small_poly_rbg(small_poly_ag.getReductionWorkUnitCount());
   ConjGradSubstrate cgsbs(&small_poly_ps, &small_poly_rbg, tier);
+  LineMinimization line_record(small_poly_ag.getSystemCount());
+  line_record.primeMoveLengths(mmctrl.getInitialMinimizationStep());
+  LinMinWriter lmw = line_record.data();
   
   // Run minimizations
   const int min_timings = timer.addCategory("Minimization of small molecules");
   timer.assignTime(0);
   for (int i = 0; i < mincon.getTotalCycles(); i++) {
+
+    // CHECK
+    for (int j = 0; j < 5; j++) {
+    // END CHECK
+    
     small_poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
                     &scw, &nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES,
                     ForceAccumulationMethod::SPLIT, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                   ForceAccumulationMethod::SPLIT, vale_lp);
+
+    // CHECK
+    }
+    // END CHECK
+    
     if (i == 0) {
       small_poly_ps.primeConjugateGradientCalculation(gpu, tier);
     }
     launchConjugateGradient(small_poly_redk, &cgsbs, &ctrl, redu_lp);
 
     // CHECK
-    for (int j = 0; j < 1024; j += 173) {
+#if 0
+    for (int j = 2; j < 30; j += 173) {
       PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
       const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
       chkj_ps.initializeForces();
@@ -186,19 +203,165 @@ int main(const int argc, const char* argv[]) {
       evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
                      EvaluateForce::YES, 0);
       const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      printf("System %4d:\n", j);
-      for (int k = 0; k < chkj_ps.getAtomCount(); k++) {
-        printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n", cpu_frc[3 * k],
-               cpu_frc[(3 * k) + 1], cpu_frc[(3 * k) + 2], gpu_frc[3 * k], gpu_frc[(3 * k) + 1],
-               gpu_frc[(3 * k) + 2]);
-      }
+      const double total_e = tmp_sc.reportTotalEnergy(0);
+      printf("System %4d: (total energy %12.6lf: %12.6lf %12.6lf %12.6lf %12.6lf %12.6lf ...\n"
+             "                                         %12.6lf %12.6lf %12.6lf %12.6lf ...\n"
+             "                                         %12.6lf %12.6lf %12.6lf %12.6lf ...\n", j,
+             total_e, tmp_sc.reportInstantaneousStates(StateVariable::BOND, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::ANGLE, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::CMAP, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::VDW, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, 0),
+             tmp_sc.reportInstantaneousStates(StateVariable::RESTRAINT, 0));
       printf("\n");
     }
-    if (i == 2) {
-      exit(1);
-    }
+#endif
+    // END CHECK
+
+    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 0, redu_lp);
+
+    // CHECK
+    for (int j = 0; j < 5; j++) {
     // END CHECK
     
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
+                    ForceAccumulationMethod::SPLIT, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  ForceAccumulationMethod::SPLIT, vale_lp);
+
+    // CHECK
+    }
+#if 0
+    for (int j = 2; j < 30; j += 173) {
+      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
+      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      chkj_ps.initializeForces();
+      ScoreCard tmp_sc(1, 1, 32);
+      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
+      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
+                     EvaluateForce::YES, 0);
+      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      const double total_e = tmp_sc.reportTotalEnergy(0);
+      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
+      printf("\n");
+    }
+#endif
+    // END CHECK
+
+    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 1, redu_lp);
+
+    // CHECK
+    for (int j = 0; j < 5; j++) {
+    // END CHECK
+
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
+                    ForceAccumulationMethod::SPLIT, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  ForceAccumulationMethod::SPLIT, vale_lp);
+
+    // CHECK
+    }
+#if 0
+    for (int j = 2; j < 30; j += 173) {
+      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
+      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      chkj_ps.initializeForces();
+      ScoreCard tmp_sc(1, 1, 32);
+      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
+      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
+                     EvaluateForce::YES, 0);
+      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      const double total_e = tmp_sc.reportTotalEnergy(0);
+      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
+      printf("\n");
+    }
+#endif
+    // END CHECK
+
+    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 2, redu_lp);
+
+    // CHECK
+    for (int j = 0; j < 5; j++) {
+    // END CHECK
+
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
+                    ForceAccumulationMethod::SPLIT, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  ForceAccumulationMethod::SPLIT, vale_lp);
+
+    // CHECK
+    }
+#if 0
+    for (int j = 15; j < 30; j += 173) {
+      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
+      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      chkj_ps.initializeForces();
+      ScoreCard tmp_sc(1, 1, 32);
+      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
+      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
+                     EvaluateForce::YES, 0);
+      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      const double total_e = tmp_sc.reportTotalEnergy(0);
+      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
+      printf("\n");
+    }
+#endif
+    // END CHECK
+
+    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 3, redu_lp);
+
+    // CHECK
+#if 0
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
+                    ForceAccumulationMethod::SPLIT, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  ForceAccumulationMethod::SPLIT, vale_lp);
+    for (int j = 15; j < 30; j += 173) {
+      PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
+      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      chkj_ps.initializeForces();
+      ScoreCard tmp_sc(1, 1, 32);
+      StaticExclusionMask chkj_se(small_poly_ag.getSystemTopologyPointer(j));
+      evalNonbValeMM(&chkj_ps, &tmp_sc, small_poly_ag.getSystemTopologyPointer(j), chkj_se,
+                     EvaluateForce::YES, 0);
+      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
+      const double total_e = tmp_sc.reportTotalEnergy(0);
+      printf("System %4d: (total energy %12.6lf)\n", j, total_e);
+      printf("\n");
+    }
+    if (i == 500) {
+      exit(1);
+    }
+#endif
+    // END CHECK
+
     ctrl.step += 1;
   }
   cudaDeviceSynchronize();

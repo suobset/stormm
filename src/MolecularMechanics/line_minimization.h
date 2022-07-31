@@ -15,9 +15,9 @@ struct LinMinWriter {
 
   /// \brief The constructor works like any other abstract, taking arguments in the order that
   ///        fills the member variables.
-  LinMinWriter(const int nsys_in, double* l_move, double* mfac_a_in, double* mfac_b_in,
-               double* mfac_c_in, double* nrg_a_in, double* nrg_b_in, double* nrg_c_in,
-               double* nrg_d_in);
+  LinMinWriter(const int nsys_in, double* l_move_in, double* s_move_in, double* mfac_a_in,
+               double* mfac_b_in, double* mfac_c_in, double* nrg_a_in, double* nrg_b_in,
+               double* nrg_c_in, double* nrg_d_in);
 
   /// \brief Take the standard copy and move constructors for a struct with const elements.
   /// \{
@@ -27,7 +27,18 @@ struct LinMinWriter {
   
   // Member variables
   const int nsys;  ///< The number of systems subject to their own independent line minimizations
-  double* l_move;  ///< Lengths of the moves for each system
+  double* l_move;  ///< Lengths of the moves for each system after the initial force and energy
+                   ///<   computation.  The product of this with mfac_a determines the total
+                   ///<   displacement of all atoms in the system.
+  double* s_move;  ///< During the first of three moves along the chosen line, the contents of
+                   ///<   l_move are copied into this vector for each system.  This vector is then
+                   ///<   used as the reference for the baseline move length for the second and
+                   ///<   third moves along the chosen line.  During the third move, the contents
+                   ///<   of s_move will be multiplied by the final move scaling factor and used
+                   ///<   to update l_move in preparation for the next cycle of line minimization.
+                   ///<   This protects against race conditions without forcing work on the CPU,
+                   ///<   such as explicitly swapping pointers to alternating l_move arrays
+                   ///<   between steps.
   double* mfac_a;  ///< Move multiplying factors of the 1st move along each system's line
   double* mfac_b;  ///< Move multiplying factors of the 2nd move along each system's line
   double* mfac_c;  ///< Move multiplying factors of the 3rd move along each system's line
@@ -42,9 +53,10 @@ struct LinMinReader {
 
   /// \brief The constructor works like any other abstract, taking arguments in the order that
   ///        fills the member variables.
-  LinMinReader(const int nsys_in, const double* l_move, const double* mfac_a_in,
-               const double* mfac_b_in, const double* mfac_c_in, const double* nrg_a_in,
-               const double* nrg_b_in, const double* nrg_c_in, const double* nrg_d_in);
+  LinMinReader(const int nsys_in, const double* l_move_in, const double* s_move_in,
+               const double* mfac_a_in, const double* mfac_b_in, const double* mfac_c_in,
+               const double* nrg_a_in, const double* nrg_b_in, const double* nrg_c_in,
+               const double* nrg_d_in);
 
   /// \brief Take the standard copy and move constructors for a struct with const elements.
   /// \{
@@ -54,10 +66,11 @@ struct LinMinReader {
   
   // Member variables
   const int nsys;  ///< The number of systems subject to their own independent line minimizations
-  const double* l_move;  ///< Lengths of the moves for each system
-  const double* mfac_a;  ///< Lengths of the 1st move along each system's line
-  const double* mfac_b;  ///< Lengths of the 2nd move along each system's line
-  const double* mfac_c;  ///< Lengths of the 3rd move along each system's line
+  const double* l_move;  ///< Lengths of the moves for each system in the 1st step
+  const double* s_move;  ///< Lengths of the moves for each system in the 2nd and 3rd steps
+  const double* mfac_a;  ///< Move multiplying factors of the 1st move along each system's line
+  const double* mfac_b;  ///< Move multiplying factors of the 2nd move along each system's line
+  const double* mfac_c;  ///< Move multiplying factors of the 3rd move along each system's line
   const double* nrg_a;   ///< Energies obtained for each system at the outset of the cycle
   const double* nrg_b;   ///< Energies obtained for each system after the 1st move in the cycle
   const double* nrg_c;   ///< Energies obtained for each system after the 2nd move in the cycle
@@ -153,14 +166,40 @@ public:
   LinMinReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   LinMinWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
-  
+
+  /// \brief Prime the initial movement lengths for a series of line minimization cycles using a
+  ///        default or user-specified value.  In the HPC compilation, this function will
+  ///        automatically upload the present move lengths to the device.
+  ///
+  /// \param dx0  The initial movelength length to take
+  void primeMoveLengths(double dx0);
+
+#ifdef OMNI_USE_HPC
+  /// \brief Upload the contents of the object from host to device memory.  This is not necessary
+  ///        except for testing purposes.  Movement lengths set of the host by primeMoveLengths()
+  ///        will be automatically uploaded.
+  void upload();
+
+  /// \brief Download the contents of the object from device memory to the host.  This provides
+  ///        debugging capability.
+  void download();
+#endif
+
 private:
   int system_count;             ///< The number of systems and the length of data controlled by
                                 ///<   each of the following POINTER-kind Hybrid objects
   Hybrid<double> move_length;   ///< Lengths of the moves to make along the gradient line for each
-                                ///<   system.  Three such steps are made per line minimization,
-                                ///<   with this length evolving incrementally base on the success
-                                ///<   or failure of each step to reduce the energy.
+                                ///<   system in the first move.  Three such steps are made per
+                                ///<   line minimization, with this base length, but to allow
+                                ///<   updates without race conditions its values for each system
+                                ///<   are stored in the following move_save array during the 1st
+                                ///<   step.  The 2nd and 3rd steps pull the values from move_save
+                                ///<   and the 3rd step stores the updated value of the baseline
+                                ///<   move in back in move_length.  These baseline move lengths
+                                ///<   evolve incrementally based on the success or failure of
+                                ///<   each step to reduce the energy.
+  Hybrid<double> save_length;   ///< Baseline lengths of moves along the gradient line, a holding
+                                ///<   array to avoid race conditions
   Hybrid<double> move_factor_a; ///< Move multiplication factor of the 1st move along the gradient
   Hybrid<double> move_factor_b; ///< Move multiplication factor of the 2nd move along the gradient
   Hybrid<double> move_factor_c; ///< Move multiplication factor of the 3rd move along the gradient
