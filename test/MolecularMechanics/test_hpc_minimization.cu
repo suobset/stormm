@@ -57,7 +57,7 @@ using namespace omni::trajectory;
 //-------------------------------------------------------------------------------------------------
 bool checkConsistency(const PhaseSpaceSynthesis &poly_ps, const AtomGraphSynthesis &poly_ag,
                       const std::string &err_msg, const double c_limit, const double f_limit,
-                      const int step_no) {
+                      const int step_no, const bool warned) {
   int n_coord_mismatch = 0;
   int n_force_mismatch = 0;
   int n_syscrd_mismatch = 0;
@@ -176,7 +176,7 @@ int main(const int argc, const char* argv[]) {
   //const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   std::vector<int> small_mol_id = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 };
   small_mol_id.resize(8192);
-  for (int i = 0; i < 512; i++) {
+  for (int i = 0; i < small_mol_id.size() / 16; i++) {
     for (int j = 0; j < 16; j++) {
       small_mol_id[(16 * i) + j] = small_mol_id[j];
     }
@@ -215,6 +215,14 @@ int main(const int argc, const char* argv[]) {
   CacheResource valence_tb_reserve(vale_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
 
+  // CHECK
+#if 0
+  printf("Launch valence   kernel on %4d blocks, %4d threads per block.\n", vale_lp.x, vale_lp.y);
+  printf("Launch nonbonded kernel on %4d blocks, %4d threads per block.\n", nonb_lp.x, nonb_lp.y);
+  printf("Launch reduction kernel on %4d blocks, %4d threads per block.\n", redu_lp.x, redu_lp.y);
+#endif
+  // END CHECK
+  
   // Upload the synthesis and prime the pumps
   small_poly_ag.upload();
   small_poly_ps.upload();
@@ -239,8 +247,8 @@ int main(const int argc, const char* argv[]) {
   ConjGradSubstrate cgsbs(&small_poly_ps, &small_poly_rbg, tier);
   LineMinimization line_record(small_poly_ag.getSystemCount());
   line_record.primeMoveLengths(mmctrl.getInitialMinimizationStep());
-  LinMinWriter lmw = line_record.data();
-  
+  LinMinWriter lmw = line_record.data(tier);
+
   // Run minimizations
   const int min_timings = timer.addCategory("Minimization of small molecules");
   timer.assignTime(0);
@@ -254,109 +262,6 @@ int main(const int argc, const char* argv[]) {
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                   vale_lp);
-
-    // Download and check the forces for each system to verify consistency.  If the forces are
-    // consistent enough, set them to be exactly consistent, and do the same with the coordinates,
-    // to avoid miniscule roundoff errors that could otherwis creep in over hundreds of steps.
-    small_poly_ps.download();
-    if (checkConsistency(small_poly_ps, small_poly_ag, "Force computation", 5.0e-7, 5.0e-7, i)) {
-      //mandateForceEquality(&small_poly_ps, small_poly_ag);
-    }
-    small_poly_ps.upload();
-    
-    // CHECK
-    if (i == 48) {
-      int k = 0;
-      for (int j = 0; j < 512; j++) {
-        printf(" %12.6lf %12.6lf", sc.reportTotalEnergy((j * 16) + 2, HybridTargetLevel::DEVICE),
-               sc.reportTotalEnergy((j * 16) + 6, HybridTargetLevel::DEVICE));
-        k++;
-        if (k == 8) {
-          k = 0;
-          printf("\n");
-        }
-      }
-    }
-    // END CHECK
-    
-    if (i == 0) {
-      small_poly_ps.primeConjugateGradientCalculation(gpu, tier);
-    }
-    launchConjugateGradient(small_poly_redk, &cgsbs, &ctrl, redu_lp);
-
-    // Download and check the conjugate gradient transformation.
-    small_poly_ps.download();
-    if (checkConsistency(small_poly_ps, small_poly_ag, "Conjugate gradient transformation",
-                         5.0e-7, 5.0e-7, i)) {
-      //mandateForceEquality(&small_poly_ps, small_poly_ag);
-    }
-    small_poly_ps.upload();
-
-    // Second stage of the cycle: advance once along the line and recompute the energy.
-    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
-                      &lmw, 0, redu_lp);
-    ctrl.step += 1;
-    sc.initialize(HybridTargetLevel::DEVICE, gpu);
-    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
-                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  vale_lp);
-
-    // Download and check the particle advancement.
-    small_poly_ps.download();
-    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance I", 1.0e5, 5.0e-7, i)) {
-      //mandateForceEquality(&small_poly_ps, small_poly_ag);
-    }
-    small_poly_ps.upload();
-
-    // Third stage of the cycle: advance once more along the line and recompute the energy.
-    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
-                      &lmw, 1, redu_lp);
-    ctrl.step += 1;
-    sc.initialize(HybridTargetLevel::DEVICE, gpu);
-    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
-                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  vale_lp);
-
-    // Download and check the particle advancement.
-    small_poly_ps.download();
-    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance II", 1.0e5, 5.0e-7, i)) {
-      //mandateForceEquality(&small_poly_ps, small_poly_ag);
-    }
-    small_poly_ps.upload();
-
-    // Final stage of the cycle: advance a final time along the line, recompute the energy, fit
-    // a cubic polynomial to guess the best overall advancement, and place the system there.
-    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
-                      &lmw, 2, redu_lp);
-    ctrl.step += 1;
-    sc.initialize(HybridTargetLevel::DEVICE, gpu);
-    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
-                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  vale_lp);
-
-    // Download and check the particle advancement.
-    small_poly_ps.download();
-    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance III", 1.0e5, 5.0e-7, i)) {
-      //mandateForceEquality(&small_poly_ps, small_poly_ag);
-    }
-    small_poly_ps.upload();
-
-    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
-                      &lmw, 3, redu_lp);
-    ctrl.step += 1;
-
-    // Download and check the particle advancement.
-    small_poly_ps.download();
-    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance IV", 1.0e5, 5.0e-7, i)) {
-      //mandateForceEquality(&small_poly_ps, small_poly_ag);
-    }
-    small_poly_ps.upload();
 
     // CHECK
 #if 0
@@ -380,6 +285,107 @@ int main(const int argc, const char* argv[]) {
     }
 #endif
     // END CHECK
+
+    // Download and check the forces for each system to verify consistency.  If the forces are
+    // consistent enough, set them to be exactly consistent, and do the same with the coordinates,
+    // to avoid miniscule roundoff errors that could otherwis creep in over hundreds of steps.
+#if 0
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Force computation", 5.0e-7, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+#endif
+
+    // Perform the conjugate gradient transformation
+    if (i == 0) {
+      small_poly_ps.primeConjugateGradientCalculation(gpu, tier);
+    }
+    launchConjugateGradient(small_poly_redk, &cgsbs, &ctrl, redu_lp);
+
+    // Download and check the conjugate gradient transformation.
+#if 0
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Conjugate gradient transformation",
+                         5.0e-7, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+#endif
+    
+    // Second stage of the cycle: advance once along the line and recompute the energy.
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 0, redu_lp);
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  vale_lp);
+
+    // Download and check the particle advancement.
+#if 0
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance I", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+#endif
+    
+    // Third stage of the cycle: advance once more along the line and recompute the energy.
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 1, redu_lp);
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  vale_lp);
+
+    // Download and check the particle advancement.
+#if 0
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance II", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+#endif
+    
+    // Final stage of the cycle: advance a final time along the line, recompute the energy, fit
+    // a cubic polynomial to guess the best overall advancement, and place the system there.
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 2, redu_lp);
+    ctrl.step += 1;
+    sc.initialize(HybridTargetLevel::DEVICE, gpu);
+    launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+    launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
+                  &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                  vale_lp);
+
+    // Download and check the particle advancement.
+#if 0
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance III", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+#endif
+    
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
+                      &lmw, 3, redu_lp);
+    ctrl.step += 1;
+
+    // Download and check the particle advancement.
+#if 0
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance IV", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+#endif
   }
   cudaDeviceSynchronize();
   timer.assignTime(min_timings);

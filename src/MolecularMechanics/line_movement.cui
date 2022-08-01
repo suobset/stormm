@@ -107,8 +107,6 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
       }
     }
     else if (move_number == 1) {
-
-      // lmw.mfac_a[wu_sysid] will be 1.0 by construction.
       if (threadIdx.x == 0) {
         if (sh_current_nrg < lmw.nrg_a[wu_sysid]) {
           move_factor = (TCALC)(1.05) - ((TCALC)(0.01) * (TCALC)(move_number));
@@ -139,7 +137,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
       // energies must be read to solve a system of four equations for a cubic spline and thus
       // derive the optimal move along the gradient.  This thread block must contain at least
       // four warps to make this work.
-      if (lane_idx == 0) {
+      if (lane_idx == 0 && warp_idx < 4) {
         TCALC x;
         if (warp_idx == 0) {
           sh_evec[0] = lmw.nrg_a[wu_sysid];
@@ -180,6 +178,22 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
       }
       __syncthreads();
 
+      // CHECK
+#if 0
+      if (threadIdx.x == 0) {
+        printf("WU %4d amat = [ %12.6lf %12.6lf %12.6lf %12.6lf\n"
+               "                 %12.6lf %12.6lf %12.6lf %12.6lf\n"
+               "                 %12.6lf %12.6lf %12.6lf %12.6lf\n"
+               "                 %12.6lf %12.6lf %12.6lf %12.6lf ];\n", wu_idx,
+               amat_inva[0], amat_inva[4], amat_inva[ 8], amat_inva[12], 
+               amat_inva[1], amat_inva[5], amat_inva[ 9], amat_inva[13], 
+               amat_inva[2], amat_inva[6], amat_inva[10], amat_inva[14], 
+               amat_inva[3], amat_inva[7], amat_inva[11], amat_inva[15]);
+      }
+      __syncthreads();
+#endif
+      // END CHECK
+      
       // Perform Gauss-Jordan elimination on the A matrix and the identity matrix to obtain the
       // inverse matrix.  To expedite this, read the combined matrices into the first eight
       // threads and make row swaps explicit.  This requires at least eight threads per warp, but
@@ -315,7 +329,20 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 
     // Broadcast the movement factor to all threads.
     if (threadIdx.x == 0) {
-      sh_move_factor = move_factor;      
+      sh_move_factor = move_factor;
+
+      // CHECK
+#if 0
+      if (move_number == 3 && (wu_idx < 16 || wu_idx >= 272)) {
+        printf("WU %4d move_factor = %12.8lf [ %12.6lf %12.6lf %12.6lf %12.6lf\n"
+               "                                     %12.6lf %12.6lf %12.6lf %12.6lf\n"
+               "                                     %12.6lf %12.6lf %12.6lf %12.6lf ];\n",
+               wu_idx, move_factor, sh_evec[0], sh_evec[1], sh_evec[2], sh_evec[3],
+               sh_mvec[0], sh_mvec[1], sh_mvec[2], sh_mvec[3], abcd_coefs[0], abcd_coefs[1],
+               abcd_coefs[2], abcd_coefs[3]);
+      }
+#endif
+      // END CHECK
     }
     __syncthreads();
     move_factor = sh_move_factor;

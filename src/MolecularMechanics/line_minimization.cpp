@@ -42,7 +42,7 @@ LineMinimization::LineMinimization(const int system_count_in) :
     storage{static_cast<size_t>(roundUp(system_count, warp_size_int) * 9), "linmin_storage"}
 {
   const size_t padded_nsys = roundUp(system_count, warp_size_int);
-  move_length.setPointer(&storage,                    0, system_count);
+  move_length.setPointer(&storage,                 0LLU, system_count);
   save_length.setPointer(&storage,          padded_nsys, system_count);
   move_factor_a.setPointer(&storage, 2LLU * padded_nsys, system_count);
   move_factor_b.setPointer(&storage, 3LLU * padded_nsys, system_count);
@@ -85,15 +85,28 @@ LineMinimization& LineMinimization::operator=(const LineMinimization &other) {
     return *this;
   }
   system_count = other.system_count;
-  move_length = std::move(other.move_length);
-  save_length = std::move(other.save_length);
-  move_factor_a = std::move(other.move_factor_a);
-  move_factor_b = std::move(other.move_factor_b);
-  move_factor_c = std::move(other.move_factor_c);
-  energy_a = std::move(other.energy_a);
-  energy_b = std::move(other.energy_b);
-  energy_c = std::move(other.energy_c);
-  energy_d = std::move(other.energy_d);
+  move_length = other.move_length;
+  save_length = other.save_length;
+  move_factor_a = other.move_factor_a;
+  move_factor_b = other.move_factor_b;
+  move_factor_c = other.move_factor_c;
+  energy_a = other.energy_a;
+  energy_b = other.energy_b;
+  energy_c = other.energy_c;
+  energy_d = other.energy_d;
+  storage = other.storage;
+
+  // Repair pointers
+  move_length.swapTarget(&storage);
+  save_length.swapTarget(&storage);
+  move_factor_a.swapTarget(&storage);
+  move_factor_b.swapTarget(&storage);
+  move_factor_c.swapTarget(&storage);
+  energy_a.swapTarget(&storage);
+  energy_b.swapTarget(&storage);
+  energy_c.swapTarget(&storage);
+  energy_d.swapTarget(&storage);
+
   return *this;
 }
 
