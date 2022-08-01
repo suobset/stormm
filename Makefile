@@ -469,8 +469,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O0 -g
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O3
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
 CUDA_DEFINES = -DOMNI_USE_HPC -DOMNI_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
              -gencode arch=compute_61,code=sm_61 \

@@ -10,6 +10,7 @@ namespace mm {
 using card::HybridKind;
 using energy::EvaluateEnergy;
 using energy::EvaluateForce;
+using math::ReductionGoal;
 using numerics::ForceAccumulationMethod;
 using synthesis::VwuGoal;
 
@@ -294,12 +295,15 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                        EvaluateForce::YES, EvaluateEnergy::YES,
                                                        ForceAccumulationMethod::SPLIT);
+  const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
+                                                       ReductionStage::ALL_REDUCE);
+
   int vwu_block_count = vwu_lp.x;
   int nbwu_block_count = nbwu_lp.x;
   int pmewu_block_count = smp_count;
-  int gtwu_block_count = smp_count;
-  int scwu_block_count = smp_count;
-  int rdwu_block_count = smp_count;
+  int gtwu_block_count = rdwu_lp.x;
+  int scwu_block_count = rdwu_lp.x;
+  int rdwu_block_count = rdwu_lp.x;
   for (int i = 0; i < twice_warp_size_int; i++) {
     vwu_progress.putHost(vwu_block_count, i);
     nbwu_progress.putHost(nbwu_block_count, i);

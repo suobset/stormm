@@ -43,6 +43,81 @@ using namespace omni::topology;
 using namespace omni::trajectory;
 
 //-------------------------------------------------------------------------------------------------
+// Check that all forces on equivalent systems are equal, to within a reasonable tolerance.  It is
+// assumed that systems described by the same topology are identical--no restraints, or at least
+// no unique restraints, are present.
+//
+// Arguments:
+//   poly_ps:  Compilation of coordinates and forces
+//   poly_ag:  Compilation of topologies for all systems
+//   err_msg:  Error to display if forces between equivalent systems do not match up
+//   c_limit:  Tolerance for coordinates to disagree before being deemed inconsistent
+//   f_limit:  Tolerance for forces to disagree before being deemed inconsistent
+//   step_no:  Number of the minimization step
+//-------------------------------------------------------------------------------------------------
+bool checkConsistency(const PhaseSpaceSynthesis &poly_ps, const AtomGraphSynthesis &poly_ag,
+                      const std::string &err_msg, const double c_limit, const double f_limit,
+                      const int step_no) {
+  int n_coord_mismatch = 0;
+  int n_force_mismatch = 0;
+  int n_syscrd_mismatch = 0;
+  int n_sysfrc_mismatch = 0;
+  PsSynthesisReader poly_psr = poly_ps.data();
+  const std::vector<int> ag_indices = poly_ag.getTopologyIndices();
+  std::vector<bool> covered(poly_psr.system_count, false);
+  std::vector<bool> syscrd_ok(poly_psr.system_count, true);
+  std::vector<bool> sysfrc_ok(poly_psr.system_count, true);
+  for (int i = 0; i < poly_psr.system_count; i++) {
+    if (covered[i]) {
+      continue;
+    }
+    covered[i] = true;
+    const int iag_no = ag_indices[i];
+    for (int j = i + 1; j < poly_psr.system_count; j++) {
+      if (covered[j] == false && ag_indices[j] == iag_no) {
+        covered[j] = true;
+        int itrack = poly_psr.atom_starts[i];
+        const int jtrack_lim = poly_psr.atom_starts[j] + poly_psr.atom_counts[j];
+        for (int jtrack = poly_psr.atom_starts[j]; jtrack < jtrack_lim; jtrack++) {
+          if (fabs(poly_psr.xcrd[itrack] - poly_psr.xcrd[jtrack]) > f_limit ||
+              fabs(poly_psr.ycrd[itrack] - poly_psr.ycrd[jtrack]) > f_limit ||
+              fabs(poly_psr.zcrd[itrack] - poly_psr.zcrd[jtrack]) > f_limit) {
+            n_coord_mismatch++;
+            if (syscrd_ok[j]) {
+              n_syscrd_mismatch++;
+              syscrd_ok[j] = false;
+            }
+          }
+          if (fabs(poly_psr.xfrc[itrack] - poly_psr.xfrc[jtrack]) > f_limit ||
+              fabs(poly_psr.yfrc[itrack] - poly_psr.yfrc[jtrack]) > f_limit ||
+              fabs(poly_psr.zfrc[itrack] - poly_psr.zfrc[jtrack]) > f_limit) {
+            n_force_mismatch++;
+            if (sysfrc_ok[j]) {
+              n_sysfrc_mismatch++;
+              sysfrc_ok[j] = false;
+            }
+          }
+          itrack++;
+        }
+      }
+    }
+  }
+  if (n_coord_mismatch > 0) {
+    rtWarn("A total of " + std::to_string(n_coord_mismatch) + " atoms' coordinates were "
+           "inconsistent among the first instance of a system and subsequent replicas with the "
+           "same topology.  In all, " + std::to_string(n_syscrd_mismatch) + " systems displayed "
+           "errors.  Checked at: " + err_msg + ", step " + std::to_string(step_no) + ".");
+  }
+  if (n_force_mismatch > 0) {
+    rtWarn("A total of " + std::to_string(n_force_mismatch) + " atoms' forces were inconsistent "
+           "among the first instance of a system and subsequent replicas with the same topology.  "
+           "In all, " + std::to_string(n_sysfrc_mismatch) + " systems displayed errors.  Checked "
+           "at: " + err_msg + ", step " + std::to_string(step_no) + ".");
+  }
+  return (n_coord_mismatch == 0 && n_force_mismatch == 0);
+}
+
+//-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
 int main(const int argc, const char* argv[]) {
@@ -98,8 +173,8 @@ int main(const int argc, const char* argv[]) {
            oe.getOmniSourcePath() + ", for validity.  Subsequent tests will be skipped.",
            "test_hpc_minimization");
   }
+  //const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   std::vector<int> small_mol_id = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 };
-  //std::vector<int> small_mol_id = { 2, 3, 2, 3, 0, 1, 2, 3, 2, 3, 3, 2, 2, 3, 3, 2 };
   small_mol_id.resize(8192);
   for (int i = 0; i < 512; i++) {
     for (int j = 0; j < 16; j++) {
@@ -110,7 +185,7 @@ int main(const int argc, const char* argv[]) {
                                    &timer);
   StaticExclusionMaskSynthesis small_poly_se(small_poly_ag.getTopologyPointers(), small_mol_id);
   small_poly_ag.loadNonbondedWorkUnits(small_poly_se);
-  PhaseSpaceSynthesis small_poly_ps(small_mol_ps, small_mol_ag_ptr, small_mol_id);
+  PhaseSpaceSynthesis small_poly_ps(small_mol_ps, small_mol_ag_ptr, small_mol_id, 40, 24, 40, 40);
   
   // Create the minimization instructions
   MinimizeControls mincon;
@@ -126,57 +201,39 @@ int main(const int argc, const char* argv[]) {
   KernelManager launcher(gpu, small_poly_ag);
   
   // Lay out GPU cache resources
-#if 0
-  const int2 vale_fe_lp = launcher.getValenceKernelDims(PrecisionModel::SINGLE, EvaluateForce::YES,
-                                                        EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
-                                                        VwuGoal::ACCUMULATE);
-  const int2 vale_xe_lp = launcher.getValenceKernelDims(PrecisionModel::SINGLE, EvaluateForce::NO,
-                                                        EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
-                                                        VwuGoal::ACCUMULATE);
-  const int2 nonb_lp = launcher.getNonbondedKernelDims(PrecisionModel::SINGLE,
+  const int2 vale_lp = launcher.getValenceKernelDims(PrecisionModel::DOUBLE, EvaluateForce::YES,
+                                                     EvaluateEnergy::YES,
+                                                     ForceAccumulationMethod::SPLIT,
+                                                     VwuGoal::ACCUMULATE);
+  const int2 nonb_lp = launcher.getNonbondedKernelDims(PrecisionModel::DOUBLE,
                                                        NbwuKind::TILE_GROUPS,
                                                        EvaluateForce::YES, EvaluateEnergy::YES,
                                                        ForceAccumulationMethod::SPLIT);
-  const int2 redu_lp = launcher.getReductionKernelDims(PrecisionModel::SINGLE,
+  const int2 redu_lp = launcher.getReductionKernelDims(PrecisionModel::DOUBLE,
                                                        ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
-#endif
-  const int2 vale_fe_lp = { 588, 128 };
-  const int2 vale_xe_lp = { 672, 128 };
-  const int2 nonb_lp    = { 420, 256 };
-  const int2 redu_lp    = { 336, 256 };
-  
-  // CHECK
-  printf("Launch valence (FE) kernel on %4d blocks, %4d threads\n", vale_fe_lp.x, vale_fe_lp.y);
-  printf("Launch valence (xE) kernel on %4d blocks, %4d threads\n", vale_xe_lp.x, vale_xe_lp.y);
-  printf("Launch nonbonded    kernel on %4d blocks, %4d threads\n", nonb_lp.x, nonb_lp.y);
-  printf("Launch reduction    kernel on %4d blocks, %4d threads\n", redu_lp.x, redu_lp.y);
-  // END CHECK
-  
-  CacheResource valence_tb_reserve(vale_fe_lp.x, maximum_valence_work_unit_atoms);
+  CacheResource valence_tb_reserve(vale_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
 
   // Upload the synthesis and prime the pumps
   small_poly_ag.upload();
   small_poly_ps.upload();
   small_poly_se.upload();
-  mmctrl.primeWorkUnitCounters(launcher, PrecisionModel::SINGLE, small_poly_ag);
+  mmctrl.primeWorkUnitCounters(launcher, PrecisionModel::DOUBLE, small_poly_ag);
   
   // Obtain the appropriate abstracts
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-  const SyValenceKit<float> small_poly_vk = small_poly_ag.getSinglePrecisionValenceKit(tier);
-  const SyNonbondedKit<float> small_poly_nbk = small_poly_ag.getSinglePrecisionNonbondedKit(tier);
+  const SyValenceKit<double> small_poly_vk = small_poly_ag.getDoublePrecisionValenceKit(tier);
+  const SyNonbondedKit<double> small_poly_nbk = small_poly_ag.getDoublePrecisionNonbondedKit(tier);
   const SeMaskSynthesisReader small_poly_ser = small_poly_se.data(tier);
-  const SyRestraintKit<float, float2, float4> small_poly_rk =
-    small_poly_ag.getSinglePrecisionRestraintKit(tier);
+  const SyRestraintKit<double, double2, double4> small_poly_rk =
+    small_poly_ag.getDoublePrecisionRestraintKit(tier);
   const NbwuKind nb_work_type = small_poly_ag.getNonbondedWorkType();
-  MMControlKit<float> ctrl = mmctrl.spData(tier);
+  MMControlKit<double> ctrl = mmctrl.dpData(tier);
   PsSynthesisWriter small_poly_psw = small_poly_ps.data(tier);
   ScoreCardWriter scw = sc.data(tier);
-  CacheResourceKit vale_tbk = valence_tb_reserve.spData(tier);
-  CacheResourceKit nonb_tbk = nonbond_tb_reserve.spData(tier);
+  CacheResourceKit vale_tbk = valence_tb_reserve.dpData(tier);
+  CacheResourceKit nonb_tbk = nonbond_tb_reserve.dpData(tier);
   ReductionKit small_poly_redk(small_poly_ag, tier);
   ReductionBridge small_poly_rbg(small_poly_ag.getReductionWorkUnitCount());
   ConjGradSubstrate cgsbs(&small_poly_ps, &small_poly_rbg, tier);
@@ -193,65 +250,122 @@ int main(const int argc, const char* argv[]) {
     small_poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES,
-                    ForceAccumulationMethod::SPLIT, nonb_lp);
+                    &scw, &nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_fe_lp);
+                  vale_lp);
+
+    // Download and check the forces for each system to verify consistency.  If the forces are
+    // consistent enough, set them to be exactly consistent, and do the same with the coordinates,
+    // to avoid miniscule roundoff errors that could otherwis creep in over hundreds of steps.
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Force computation", 5.0e-7, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+    
+    // CHECK
+    if (i == 48) {
+      int k = 0;
+      for (int j = 0; j < 512; j++) {
+        printf(" %12.6lf %12.6lf", sc.reportTotalEnergy((j * 16) + 2, HybridTargetLevel::DEVICE),
+               sc.reportTotalEnergy((j * 16) + 6, HybridTargetLevel::DEVICE));
+        k++;
+        if (k == 8) {
+          k = 0;
+          printf("\n");
+        }
+      }
+    }
+    // END CHECK
+    
     if (i == 0) {
       small_poly_ps.primeConjugateGradientCalculation(gpu, tier);
     }
     launchConjugateGradient(small_poly_redk, &cgsbs, &ctrl, redu_lp);
 
+    // Download and check the conjugate gradient transformation.
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Conjugate gradient transformation",
+                         5.0e-7, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+
     // Second stage of the cycle: advance once along the line and recompute the energy.
-    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 0, redu_lp);
     ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
-                    ForceAccumulationMethod::SPLIT, nonb_lp);
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                  vale_lp);
+
+    // Download and check the particle advancement.
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance I", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
 
     // Third stage of the cycle: advance once more along the line and recompute the energy.
-    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 1, redu_lp);
     ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
-                    ForceAccumulationMethod::SPLIT, nonb_lp);
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                  vale_lp);
+
+    // Download and check the particle advancement.
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance II", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
 
     // Final stage of the cycle: advance a final time along the line, recompute the energy, fit
     // a cubic polynomial to guess the best overall advancement, and place the system there.
-    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 2, redu_lp);
     ctrl.step += 1;
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
-                    ForceAccumulationMethod::SPLIT, nonb_lp);
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
-    launchLineAdvance(PrecisionModel::SINGLE, &small_poly_psw, small_poly_redk, scw,
+                  vale_lp);
+
+    // Download and check the particle advancement.
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance III", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
+
+    launchLineAdvance(PrecisionModel::DOUBLE, &small_poly_psw, small_poly_redk, scw,
                       &lmw, 3, redu_lp);
     ctrl.step += 1;
+
+    // Download and check the particle advancement.
+    small_poly_ps.download();
+    if (checkConsistency(small_poly_ps, small_poly_ag, "Particle advance IV", 1.0e5, 5.0e-7, i)) {
+      //mandateForceEquality(&small_poly_ps, small_poly_ag);
+    }
+    small_poly_ps.upload();
 
     // CHECK
 #if 0
     sc.initialize(HybridTargetLevel::DEVICE, gpu);
     launchNonbonded(nb_work_type, small_poly_nbk, small_poly_ser, &ctrl, &small_poly_psw,
-                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES,
-                    ForceAccumulationMethod::SPLIT, nonb_lp);
+                    &scw, &nonb_tbk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
     launchValence(small_poly_vk, small_poly_rk, &ctrl, &small_poly_psw,
                   &scw, &vale_tbk, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                  ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                  vale_lp);
     for (int j = 15; j < 30; j += 173) {
       PhaseSpace chkj_ps = small_poly_ps.exportSystem(j, HybridTargetLevel::DEVICE);
       const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
@@ -276,6 +390,6 @@ int main(const int argc, const char* argv[]) {
     timer.printResults();
   }
   printTestSummary(oe.getVerbosity());
-
+  
   return 0;
 }

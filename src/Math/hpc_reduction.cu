@@ -59,7 +59,7 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
     const double ddx = dfx - dpx;
     const double ddy = dfy - dpy;
     const double ddz = dfz - dpz;
-    dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfx);
+    dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfz);
   }
   WARP_REDUCE_DOWN(gg);
   WARP_REDUCE_DOWN(dgg);
@@ -96,7 +96,7 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
     const double ddx = dfx - dpx;
     const double ddy = dfy - dpy;
     const double ddz = dfz - dpz;
-    dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfx);
+    dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfz);
   }
   WARP_REDUCE_DOWN(gg);
   WARP_REDUCE_DOWN(dgg);

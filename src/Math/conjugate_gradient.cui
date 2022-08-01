@@ -56,7 +56,8 @@ KGATHER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ctr
       }
     }
     else if (warp_idx == 2 && lane_idx == 0) {
-      sh_gtwu_idx = atomicAdd(&ctrl.gtwu_progress[ctrl.step], 1);
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      sh_gtwu_idx = atomicAdd(&ctrl.gtwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();
     gtwu_idx = sh_gtwu_idx;
@@ -121,7 +122,8 @@ KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ct
       }
     }
     else if (warp_idx == 2 && lane_idx == 0) {
-      sh_scwu_idx = atomicAdd(&ctrl.scwu_progress[ctrl.step], 1);
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      sh_scwu_idx = atomicAdd(&ctrl.scwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();
     const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
@@ -201,7 +203,8 @@ KRESCALE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ct
       }
     }
     else if (warp_idx == 1 && lane_idx == 0) {
-      sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[ctrl.step], 1);
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();
     const double inv_factor = 1.0 / (sqrt(sh_msum_total) * cgsbs.inv_frc_scale);
@@ -293,7 +296,8 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
       }
     }
     else if (warp_idx == 2 && lane_idx == 0) {
-      sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[ctrl.step], 1);
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();
     const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
@@ -340,9 +344,9 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
       cgsbs.yfrc[tpos] = norm_fy;
       cgsbs.zfrc[tpos] = norm_fz;
 #endif
-    }    
+    }
     rdwu_idx = sh_rdwu_idx;
-  }  
+  }
   
   // Set the block counters for future iterations of this kernel
   if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
