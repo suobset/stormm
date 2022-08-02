@@ -49,8 +49,8 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
   // The movement of particles can be made by striding over work units, but these actions are so
   // consistent between work units and so short that the blocks can stride through them
   // sequentially rather than is asynchronous fashion.
-  //for (int wu_idx = wu_assign_start; wu_idx < wu_assign_end; wu_idx++) {
-  for (int wu_idx = blockIdx.x; wu_idx < redk.nrdwu; wu_idx += gridDim.x) {
+  for (int wu_idx = wu_assign_start; wu_idx < wu_assign_end; wu_idx++) {
+  //for (int wu_idx = blockIdx.x; wu_idx < redk.nrdwu; wu_idx += gridDim.x) {
     int abstract_value;
 
     // Pluck important limits from the reduction work unit abstract

@@ -215,7 +215,27 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
 #  ifdef OMNI_USE_CUDA
   const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
                                                                  acc_meth, purpose);
+#if 0
   k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 1, gpu, kernel_name);
+#endif
+
+  // CHECK
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 2, gpu, kernel_name);
+    break;
+  case PrecisionModel::SINGLE:
+    switch (eval_force) {
+    case EvaluateForce::YES:
+      k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 2, gpu, kernel_name);
+      break;
+    case EvaluateForce::NO:
+      k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 4, gpu, kernel_name);
+      break;
+    }
+  }
+  // END CHECK
+
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();

@@ -377,7 +377,8 @@ int main(const int argc, const char* argv[]) {
   CacheResource valence_tb_space(8 * nblocks, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_space(5 * nblocks, small_block_max_atoms);
   MolecularMechanicsControls mmctrl;
-  mmctrl.primeWorkUnitCounters(launcher, PrecisionModel::DOUBLE, poly_ag);
+  mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::DOUBLE, poly_ag);
   ScoreCard sc(nsys, 1, 32);
   
   // Launch the valence evaluation kernel for small systems with only bonds, angles, dihedrals,
@@ -396,7 +397,8 @@ int main(const int argc, const char* argv[]) {
                          PrecisionModel::DOUBLE, gpu, launcher, 3.5e-7, 5.0e-7, do_tests);
   
   // Reconfigure the launch coordination for single-precision calculations
-  mmctrl.primeWorkUnitCounters(launcher, PrecisionModel::SINGLE, poly_ag);
+  mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::SINGLE, poly_ag);
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                          poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
                          launcher, 3.5e-5, 2.0e-4, do_tests);
@@ -457,7 +459,8 @@ int main(const int argc, const char* argv[]) {
   big_poly_ps_sdbl.upload();
 
   // Reconfigure the work unit progress counters and launch double-precision calculations
-  mmctrl.primeWorkUnitCounters(big_launcher, PrecisionModel::DOUBLE, big_poly_ag);
+  mmctrl.primeWorkUnitCounters(big_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::DOUBLE, big_poly_ag);
   checkCompilationForces(&big_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionModel::DOUBLE, gpu, big_launcher, 3.5e-6, 2.5e-5, do_tests);
@@ -470,7 +473,8 @@ int main(const int argc, const char* argv[]) {
                          PrecisionModel::DOUBLE, gpu, big_launcher, 3.5e-6, 2.5e-5, do_tests);
 
   // Reconfigure again and launch single-precision calculations on the "big" systems
-  mmctrl.primeWorkUnitCounters(big_launcher, PrecisionModel::SINGLE, big_poly_ag);
+  mmctrl.primeWorkUnitCounters(big_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::SINGLE, big_poly_ag);
   checkCompilationForces(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, big_poly_ag,
                          big_poly_se, ForceAccumulationMethod::SPLIT, PrecisionModel::SINGLE,
                          gpu, big_launcher, 7.5e-5, 3.0e-3, do_tests);
@@ -539,7 +543,8 @@ int main(const int argc, const char* argv[]) {
 
   // Reconfigure the progress counters for the large array of ligand systems and launch
   // double-precision calculations.
-  mmctrl.primeWorkUnitCounters(ligand_launcher, PrecisionModel::DOUBLE, ligand_poly_ag);
+  mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::DOUBLE, ligand_poly_ag);
   checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-6, 2.0e-6, do_tests);
@@ -558,7 +563,8 @@ int main(const int argc, const char* argv[]) {
                          PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-8, 5.0e-7, do_tests);
 
   // Reconfigure one final time and perform single-precision calculations on the ligands
-  mmctrl.primeWorkUnitCounters(ligand_launcher, PrecisionModel::SINGLE, ligand_poly_ag);
+  mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::SINGLE, ligand_poly_ag);
   checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
                          PrecisionModel::SINGLE, gpu, ligand_launcher, 7.5e-5, 3.0e-3, do_tests);

@@ -17,7 +17,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
   __shared__ TCALC sh_tile_ycog[small_block_max_imports];
   __shared__ TCALC sh_tile_zcog[small_block_max_imports];
   __shared__ TCALC sh_tile_tpts[small_block_max_imports];
+#ifdef COMPUTE_ENERGY
   __shared__ int sh_system_indices[small_block_max_imports];
+#endif
   __shared__ int sh_n_lj_types[small_block_max_imports];
   __shared__ int sh_ljabc_offsets[small_block_max_imports];
 #ifdef COMPUTE_FORCE
@@ -279,7 +281,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         // Any of the five warps could do this, but have this one do it for beetter load balancing.
         if (tile_lane_idx == 0) {
           const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
+#ifdef COMPUTE_ENERGY
           sh_system_indices[rel_pos] = system_idx;
+#endif
           sh_ljabc_offsets[rel_pos] = poly_nbk.ljabc_offsets[system_idx];
         }
       }

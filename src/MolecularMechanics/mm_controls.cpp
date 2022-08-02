@@ -1,6 +1,5 @@
 #include "Constants/fixed_precision.h"
 #include "Constants/scaling.h"
-#include "Potential/energy_enumerators.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "mm_controls.h"
 
@@ -8,8 +7,6 @@ namespace omni {
 namespace mm {
 
 using card::HybridKind;
-using energy::EvaluateEnergy;
-using energy::EvaluateForce;
 using math::ReductionGoal;
 using numerics::ForceAccumulationMethod;
 using synthesis::VwuGoal;
@@ -277,6 +274,8 @@ MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel t
 
 //-------------------------------------------------------------------------------------------------
 void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &launcher,
+                                                       const EvaluateForce eval_frc,
+                                                       const EvaluateEnergy eval_nrg,
                                                        const PrecisionModel prec,
                                                        const AtomGraphSynthesis &poly_ag) {
   const GpuDetails wgpu = launcher.getGpu();
@@ -289,11 +288,11 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
   // different variants of each kernel for a given precision level, even if the exact numbers of
   // threads per block have to vary based on what each block of that kernel variant is required to
   // do.  Here, it should suffice to query the launch parameters of just one of the blocks.
-  const int2 vwu_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES, EvaluateEnergy::YES,
+  const int2 vwu_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg,
                                                     ForceAccumulationMethod::SPLIT,
                                                     VwuGoal::ACCUMULATE);
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
-                                                       EvaluateForce::YES, EvaluateEnergy::YES,
+                                                       eval_frc, eval_nrg,
                                                        ForceAccumulationMethod::SPLIT);
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);

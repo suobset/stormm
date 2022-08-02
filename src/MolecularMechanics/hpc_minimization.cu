@@ -103,7 +103,11 @@ extern void launchLineAdvance(const PrecisionModel prec, PsSynthesisWriter *poly
     kdLineAdvance<<<redu_lp.x, redu_lp.y>>>(*poly_psw, redk, scw, *lmw, move_number);
     break;
   case PrecisionModel::SINGLE:
-    kfLineAdvance<<<redu_lp.x, redu_lp.y>>>(*poly_psw, redk, scw, *lmw, move_number);
+
+    // The single-precision form of this kernel was found to risk instabilities.  Only the
+    // double-precision form will be used for now, even though it increases the small-molecule
+    // minimization wall time by ~6%.
+    kdLineAdvance<<<redu_lp.x, redu_lp.y>>>(*poly_psw, redk, scw, *lmw, move_number);
     break;
   }
 }
@@ -165,7 +169,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   // molecular mechanics control object--that will increment at four times the rate in the case
   // of conjugate gradient line minimizations.
   const int total_steps = mmctrl->getTotalCycles();
-  mmctrl->primeWorkUnitCounters(launcher, prec, poly_ag);
+  mmctrl->primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES, prec, poly_ag);
   poly_ps->primeConjugateGradientCalculation(gpu, tier);
   switch (prec) {
   case PrecisionModel::DOUBLE:

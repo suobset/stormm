@@ -6,6 +6,7 @@
 #include "Accelerator/kernel_manager.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "Potential/energy_enumerators.h"
 #include "Math/reduction_enumerators.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
@@ -19,6 +20,8 @@ using card::KernelManager;
 using card::Hybrid;
 using card::HybridTargetLevel;
 using constants::PrecisionModel;
+using energy::EvaluateEnergy;
+using energy::EvaluateForce;
 using math::ReductionStage;
 using namelist::default_dynamics_time_step;
 using namelist::default_minimize_dx0;
@@ -171,10 +174,15 @@ public:
   /// \brief Prime the work unit counters based on a particular GPU configuration.
   ///
   /// \param launcher  Object containing launch parameters for all kernels
+  /// \param eval_frc  Indicate whether forces are to be evaluated--some kernels allocate different
+  ///                  numbers of blocks in the launch grid if forces are not required.
+  /// \param eval_nrg  Indicate whether energy is to be evaluated--some kernels allocate different
+  ///                  numbers of blocks in the launch grid if the energy is not required.
   /// \param prec      Precision model for calculations
   /// \param poly_ag   Compilation of topologies describing the workload (used here for general
   ///                  descriptors such as the non-bonded work unit type)
-  void primeWorkUnitCounters(const KernelManager &launcher, PrecisionModel prec,
+  void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
+                             EvaluateEnergy eval_nrg, PrecisionModel prec,
                              const AtomGraphSynthesis &poly_ag);
 
   /// \brief Increment the step counter, moving the controls to a different progress counter.
