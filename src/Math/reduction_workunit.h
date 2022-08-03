@@ -16,7 +16,8 @@ using card::GpuDetails;
 ///        results.
 constexpr int maximum_gathering_results = 1024;
 
-/// \brief Define the abstract length for a ReductionWorkUnit's abstract
+/// \brief Define the abstract length for a ReductionWorkUnit's abstract.  This must be a multiple
+///        of 2, and less than the warp width (as small as 16 on Intel GPUs).
 constexpr int rdwu_abstract_length = 8;
 
 /// \brief A work unit to describe the manner in which groups of atoms in each structure of a

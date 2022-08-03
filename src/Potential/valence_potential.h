@@ -3,6 +3,7 @@
 #define OMNI_VALENCE_POTENTIAL_H
 
 #include <cmath>
+#include "Constants/hpc_bounds.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"

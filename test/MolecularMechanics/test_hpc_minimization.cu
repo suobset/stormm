@@ -125,11 +125,6 @@ bool checkConsistency(const PhaseSpaceSynthesis &poly_ps, const AtomGraphSynthes
 //   poly_ag:  Compilation of topologies for all systems
 //-------------------------------------------------------------------------------------------------
 void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &poly_ag) {
-
-  // CHECK
-  return;
-  // END CHECK
-  
   PsSynthesisWriter poly_psr = poly_ps->data();
   const std::vector<int> ag_indices = poly_ag.getTopologyIndices();
   std::vector<bool> covered(poly_psr.system_count, false);

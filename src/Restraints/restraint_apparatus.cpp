@@ -1,3 +1,4 @@
+#include "Constants/hpc_bounds.h"
 #include "DataTypes/omni_vector_types.h"
 #include "Math/rounding.h"
 #include "Reporting/error_format.h"

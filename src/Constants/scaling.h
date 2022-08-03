@@ -29,41 +29,6 @@ constexpr float tiny_f = tiny;
 constexpr double verytiny = 1.0e-12;
 constexpr float verytiny_f = verytiny;
 
-/// \brief The warp size can be given in many number formats to minimize type conversions during
-///        compute-intensive processes
-/// \{
-#ifdef OMNI_USE_HIP
-constexpr size_t warp_size_zu = 64;
-constexpr int warp_size_int = 64;
-constexpr unsigned long int warp_size_lu = 64LU;
-constexpr long long int warp_size_lld = 64LL;
-constexpr unsigned long long int warp_size_llu = 64LLU;
-constexpr int warp_bits = 6;
-#else
-constexpr size_t warp_size_zu = 32;
-constexpr int warp_size_int = 32;
-constexpr unsigned long int warp_size_lu = 32LU;
-constexpr long long int warp_size_lld = 32LL;
-constexpr unsigned long long int warp_size_llu = 32LLU;
-constexpr int warp_bits = 5;
-#endif
-constexpr size_t twice_warp_size_zu = 2LLU * warp_size_zu;
-constexpr int twice_warp_size_int = 2 * warp_size_int;
-constexpr unsigned long int twice_warp_size_lu = 2LU * warp_size_lu;
-constexpr long long int twice_warp_size_lld = 2LL * warp_size_lld;
-constexpr unsigned long long int twice_warp_size_llu = 2LLU * warp_size_llu;
-constexpr size_t warp_bits_mask_zu = warp_size_zu - 1LLU;
-constexpr int warp_bits_mask_int = warp_size_int - 1;
-constexpr unsigned long int warp_bits_mask_lu = warp_size_lu - 1LU;
-constexpr long long int warp_bits_mask_lld = warp_size_lld - 1LL;
-constexpr long long int warp_bits_mask_llu = warp_size_llu - 1LLU;
-constexpr size_t twice_warp_bits_mask_zu = warp_bits_mask_zu + warp_size_zu;
-constexpr int twice_warp_bits_mask_int = warp_bits_mask_int + warp_size_int;
-constexpr unsigned long int twice_warp_bits_mask_lu = warp_bits_mask_lu + warp_size_lu;
-constexpr long long int twice_warp_bits_mask_lld = warp_bits_mask_lld + warp_size_lld;
-constexpr unsigned long long int twice_warp_bits_mask_llu = warp_bits_mask_llu + warp_size_llu;
-/// \}
-
 /// \brief Sizes of important data types
 /// \{
 constexpr int int_byte_count_int = sizeof(int);
@@ -92,22 +57,6 @@ constexpr size_t ushort_bit_count_zu = ushort_byte_count_zu * 8LLU;
 } // namespace omni
 
 namespace omni {
-using constants::warp_size_zu;
-using constants::warp_size_int;
-using constants::warp_size_lu;
-using constants::warp_size_lld;
-using constants::warp_size_llu;
-using constants::twice_warp_size_zu;
-using constants::twice_warp_size_int;
-using constants::twice_warp_size_lu;
-using constants::twice_warp_size_lld;
-using constants::twice_warp_size_llu;
-using constants::warp_bits;
-using constants::warp_bits_mask_zu;
-using constants::warp_bits_mask_int;
-using constants::warp_bits_mask_lu;
-using constants::warp_bits_mask_lld;
-using constants::warp_bits_mask_llu;
 using constants::int_byte_count_int;
 using constants::int_bit_count_int;
 using constants::uint_byte_count_int;

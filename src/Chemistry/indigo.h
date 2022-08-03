@@ -4,7 +4,6 @@
 
 #include <map>
 #include "Accelerator/hybrid.h"
-#include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/mixed_types.h"
 #include "Topology/atomgraph.h"
@@ -283,7 +282,8 @@ public:
   /// \param charge_value  Cull states bearing this net charge with sub-optimal energies
   /// \param score_delta   Threshold at which to cull non-optimal states (default 3187 implies an
   ///                      energy difference of 10 kcal/mol)
-  int cullHigherEnergyStatesByCharge(int charge_value, int score_delta = default_indigo_energy_gap);
+  int cullHigherEnergyStatesByCharge(int charge_value,
+                                     int score_delta = default_indigo_energy_gap);
   
 private:
   int center_count;               ///< The number of atoms in this fragment

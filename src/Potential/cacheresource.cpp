@@ -1,3 +1,4 @@
+#include "Constants/hpc_bounds.h"
 #include "Math/rounding.h"
 #include "cacheresource.h"
 

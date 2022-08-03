@@ -4,16 +4,17 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
             LinMinWriter lmw, int move_number) {
   __shared__ TCALC sh_current_nrg, sh_move_factor;
   __shared__ TCALC amat_inva[32], sh_evec[4], sh_mvec[4], abcd_coefs[4];
-  
-  // Designate three threads in each warp to find the limits of the current work unit and the
+
+  const int warp_idx = (threadIdx.x >> warp_bits);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+
+  // Designate five threads in each warp to find the limits of the current work unit and the
   // system that the work unit is describing.  The reduction work unit list is thus repurposed
   // to indicate the correct movement factor to apply to a given atom.  One system may have been
   // very successful for its past few moves, and thus have a total movement factor up around 1.0A
   // (split amongst all atoms in proportion to the net force acting on all of them), whereas
   // another system might have been settling into a minimum and have a movement factor of around
   // 0.01A.
-  const int warp_idx = (threadIdx.x >> warp_bits);
-  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
   const int rdwu_abstract_slot = ((lane_idx == 0) * (int)(RdwuAbstractMap::ATOM_START)) +
                                  ((lane_idx == 1) * (int)(RdwuAbstractMap::ATOM_END)) +
                                  ((lane_idx == 2) * (int)(RdwuAbstractMap::RESULT_INDEX)) +
@@ -38,19 +39,14 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
   int wu_assign_start, wu_assign_end;
   if (blockIdx.x < plus_one_blocks) {
     wu_assign_start = blockIdx.x * wu_per_block;
-    wu_assign_end = wu_assign_start + wu_per_block;    
+    wu_assign_end = wu_assign_start + wu_per_block;
   }
   else {
     wu_assign_start = (plus_one_blocks * wu_per_block) +
                       ((blockIdx.x - plus_one_blocks) * (wu_per_block - 1));
     wu_assign_end = wu_assign_start + wu_per_block - 1;
   }
-  
-  // The movement of particles can be made by striding over work units, but these actions are so
-  // consistent between work units and so short that the blocks can stride through them
-  // sequentially rather than is asynchronous fashion.
   for (int wu_idx = wu_assign_start; wu_idx < wu_assign_end; wu_idx++) {
-  //for (int wu_idx = blockIdx.x; wu_idx < redk.nrdwu; wu_idx += gridDim.x) {
     int abstract_value;
 
     // Pluck important limits from the reduction work unit abstract
@@ -177,22 +173,6 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
         amat_inva[warp_idx + 28] = (warp_idx == 3);
       }
       __syncthreads();
-
-      // CHECK
-#if 0
-      if (threadIdx.x == 0) {
-        printf("WU %4d amat = [ %12.6lf %12.6lf %12.6lf %12.6lf\n"
-               "                 %12.6lf %12.6lf %12.6lf %12.6lf\n"
-               "                 %12.6lf %12.6lf %12.6lf %12.6lf\n"
-               "                 %12.6lf %12.6lf %12.6lf %12.6lf ];\n", wu_idx,
-               amat_inva[0], amat_inva[4], amat_inva[ 8], amat_inva[12], 
-               amat_inva[1], amat_inva[5], amat_inva[ 9], amat_inva[13], 
-               amat_inva[2], amat_inva[6], amat_inva[10], amat_inva[14], 
-               amat_inva[3], amat_inva[7], amat_inva[11], amat_inva[15]);
-      }
-      __syncthreads();
-#endif
-      // END CHECK
       
       // Perform Gauss-Jordan elimination on the A matrix and the identity matrix to obtain the
       // inverse matrix.  To expedite this, read the combined matrices into the first eight
@@ -330,23 +310,10 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
     // Broadcast the movement factor to all threads.
     if (threadIdx.x == 0) {
       sh_move_factor = move_factor;
-
-      // CHECK
-#if 0
-      if (move_number == 3 && (wu_idx < 16 || wu_idx >= 272)) {
-        printf("WU %4d move_factor = %12.8lf [ %12.6lf %12.6lf %12.6lf %12.6lf\n"
-               "                                     %12.6lf %12.6lf %12.6lf %12.6lf\n"
-               "                                     %12.6lf %12.6lf %12.6lf %12.6lf ];\n",
-               wu_idx, move_factor, sh_evec[0], sh_evec[1], sh_evec[2], sh_evec[3],
-               sh_mvec[0], sh_mvec[1], sh_mvec[2], sh_mvec[3], abcd_coefs[0], abcd_coefs[1],
-               abcd_coefs[2], abcd_coefs[3]);
-      }
-#endif
-      // END CHECK
     }
     __syncthreads();
     move_factor = sh_move_factor;
-
+    
     // Apply the move to the particles
     if (fabs(move_factor) > constants::verytiny) {
       move_factor *= poly_psw.inv_frc_scale * poly_psw.gpos_scale;

@@ -4,6 +4,7 @@
 #  include <cuda_runtime.h>
 #  endif
 #endif
+#include "Constants/hpc_bounds.h"
 #include "Constants/fixed_precision.h"
 #include "FileManagement/file_listing.h"
 #include "Math/rounding.h"

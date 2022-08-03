@@ -1,5 +1,6 @@
 #include <algorithm>
 #include "Constants/scaling.h"
+#include "Constants/hpc_bounds.h"
 #include "DataTypes/mixed_types.h"
 #include "Math/rounding.h"
 #include "Math/series_ops.h"

@@ -1,3 +1,4 @@
+#include "Constants/hpc_bounds.h"
 #include "reduction_bridge.h"
 
 namespace omni {

@@ -1,3 +1,4 @@
+#include "Constants/hpc_bounds.h"
 #include "Math/rounding.h"
 #include "static_mask_synthesis.h"
 

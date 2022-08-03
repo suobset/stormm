@@ -2,7 +2,6 @@
 #include "Accelerator/ptx_macros.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
-#include "Constants/scaling.h"
 #include "DataTypes/omni_vector_types.h"
 #include "hpc_reduction.h"
 

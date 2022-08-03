@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 #include "Constants/behavior.h"
-#include "Constants/scaling.h"
+#include "Constants/hpc_bounds.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/omni_vector_types.h"
