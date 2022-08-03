@@ -20,6 +20,7 @@ using math::prefixSumInPlace;
 using math::PrefixSumType;
 using math::reduceUniqueValues;
 using math::roundUp;
+using math::sum;
 using parse::char4ToString;
 using topology::extractBoundedListEntries;
 using topology::markAffectorAtoms;
@@ -2417,6 +2418,58 @@ void ValenceWorkUnit::logActivities() {
   storeVirtualSiteInstructions();
   storeSettleGroupInstructions();
   storeConstraintGroupInstructions();
+}
+
+//-------------------------------------------------------------------------------------------------
+int optValenceKernelSubdivision(const int* atom_counts, const int n_systems,
+                                const PrecisionModel prec, const EvaluateForce eval_frc,
+                                const GpuDetails &gpu) {
+  const int nsmp = gpu.getSMPCount();
+  const int total_atoms = sum<int>(atom_counts, n_systems);
+  if (n_systems > 16 * nsmp) {
+
+    // A very large number of systems, each of which will hae their own valence work unit, will
+    // probably be best served by a subdivision of some sort.  Check the average atom count to
+    // ensure that it is not too great.
+    const int ave_atom_count = total_atoms / n_systems;
+    if (ave_atom_count >= maximum_valence_work_unit_atoms / 2) {
+      return 2;
+    }
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      return 2;
+    case PrecisionModel::SINGLE:
+      switch (eval_frc) {
+      case EvaluateForce::YES:
+        return 2;
+      case EvaluateForce::NO:
+        return 4;
+      }
+    }
+  }
+  else {
+
+    // A very large number of atoms may still encourage further subdivision of the work units.
+    if (total_atoms > nsmp * 3 * maximum_valence_work_unit_atoms) {
+      return 2;
+    }
+    else {
+      return 1;
+    }
+  }
+  __builtin_unreachable;
+}
+
+//-------------------------------------------------------------------------------------------------
+int optValenceKernelSubdivision(const std::vector<int> &atom_counts, const PrecisionModel prec,
+                                const EvaluateForce eval_frc, const GpuDetails &gpu) {
+  return optValenceKernelSubdivision(atom_counts.data(), atom_counts.size(), prec, eval_frc, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, const PrecisionModel prec,
+                                const EvaluateForce eval_frc, const GpuDetails &gpu) {
+  return optValenceKernelSubdivision(atom_counts.data(), atom_counts.size(), prec, eval_frc, gpu);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -516,6 +516,10 @@ int main(const int argc, const char* argv[]) {
   HpcConfig gpu_config(ExceptionResponse::WARN);
   const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
+
+  // Kernel __shared__ memory configuration
+  reductionKernelSetup();
+  minimizationKernelSetup();
   
   // Section 1
   section("Minimize a collection of drug molecules and dipeptides");

@@ -38,27 +38,24 @@ using synthesis::VwuGoal;
 
 #include "../Potential/accumulation.cui"
 
-// Conjugate gradient particle advancement
+// Conjugate gradient particle advancement: both single- and double-precision kernels do
+// calculations in double-precision, but the double-precision form of the kernel respects the
+// extended fixed-precision format.
 #define TCALC double
+#define FABS_FUNC fabs
+#define SQRT_FUNC sqrt
+#define LLCONV_FUNC __double2ll_rn
 #  define TCALC_IS_DOUBLE
-#  define SQRT_FUNC sqrt
-#  define LLCONV_FUNC __double2ll_rn
-#  define KERNEL_NAME kdLineAdvance
-#    include "line_movement.cui"
-#  undef KERNEL_NAME
-#  undef SQRT_FUNC
-#  undef LLCONV_FUNC
+#    define KERNEL_NAME kdLineAdvance
+#      include "line_movement.cui"
+#    undef KERNEL_NAME
 #  undef TCALC_IS_DOUBLE
-#undef TCALC
-
-#define TCALC float
-#  define SQRT_FUNC sqrtf
-#  define LLCONV_FUNC __float2ll_rn
 #  define KERNEL_NAME kfLineAdvance
 #    include "line_movement.cui"
 #  undef KERNEL_NAME
-#  undef SQRT_FUNC
-#  undef LLCONV_FUNC
+#undef FABS_FUNC
+#undef SQRT_FUNC
+#undef LLCONV_FUNC
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
@@ -66,10 +63,6 @@ extern void minimizationKernelSetup() {
   const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
   if (cudaFuncSetSharedMemConfig(kdLineAdvance, sms_eight) != cudaSuccess) {
     rtErr("Error setting kdLineAdvance __shared__ memory bank size to eight bytes.",
-          "minimizationKernelSetup");
-  }
-  if (cudaFuncSetSharedMemConfig(kfLineAdvance, sms_eight) != cudaSuccess) {
-    rtErr("Error setting kfLineAdvance __shared__ memory bank size to eight bytes.",
           "minimizationKernelSetup");
   }
 }
@@ -103,11 +96,7 @@ extern void launchLineAdvance(const PrecisionModel prec, PsSynthesisWriter *poly
     kdLineAdvance<<<redu_lp.x, redu_lp.y>>>(*poly_psw, redk, scw, *lmw, move_number);
     break;
   case PrecisionModel::SINGLE:
-
-    // The single-precision form of this kernel was found to risk instabilities.  Only the
-    // double-precision form will be used for now, even though it increases the small-molecule
-    // minimization wall time by ~6%.
-    kdLineAdvance<<<redu_lp.x, redu_lp.y>>>(*poly_psw, redk, scw, *lmw, move_number);
+    kfLineAdvance<<<redu_lp.x, redu_lp.y>>>(*poly_psw, redk, scw, *lmw, move_number);
     break;
   }
 }

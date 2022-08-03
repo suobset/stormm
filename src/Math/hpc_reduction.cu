@@ -263,6 +263,43 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
+extern void reductionKernelSetup() {
+  const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
+  if (cudaFuncSetSharedMemConfig(kdgtConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdgtConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdscConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdscConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdrsConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdrsConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kdrdConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdrdConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfgtConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfgtConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfscConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfscConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfrsConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfrsConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfrdConjGrad, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kfrdConjGrad __shared__ memory bank size to eight bytes.",
+          "reductionKernelSetup");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes queryReductionKernelRequirements(const PrecisionModel prec,
                                                            const ReductionGoal purpose,
                                                            const ReductionStage process) {

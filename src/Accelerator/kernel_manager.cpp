@@ -5,6 +5,7 @@
 #include "Parsing/parse.h"
 #ifdef OMNI_USE_HPC
 #include "Math/hpc_reduction.h"
+#include "Math/reduction_workunit.h"
 #include "Potential/hpc_nonbonded_potential.h"
 #include "Potential/hpc_valence_potential.h"
 #endif
@@ -18,6 +19,8 @@ using constants::ExceptionResponse;
 using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 using math::queryReductionKernelRequirements;
+using math::optReductionKernelSubdivision;
+using synthesis::optValenceKernelSubdivision;
 #endif
 using math::findBin;
 using parse::CaseSensitivity;
@@ -104,48 +107,60 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
 {
 #ifdef OMNI_USE_HPC
   // Valence kernel entries
+  const int valence_d_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
+                                                        PrecisionModel::DOUBLE,
+                                                        EvaluateForce::YES, gpu_in);
+  const int valence_fxe_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
+                                                          PrecisionModel::SINGLE,
+                                                          EvaluateForce::NO, gpu_in);
+  const int valence_ffx_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
+                                                          PrecisionModel::SINGLE,
+                                                          EvaluateForce::YES, gpu_in);
+  const int valence_ffe_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
+                                                          PrecisionModel::SINGLE,
+                                                          EvaluateForce::YES, gpu_in);
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::NO, EvaluateEnergy::YES,
                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                       "kdsValenceEnergyAccumulation");
+                       valence_d_div, "kdsValenceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                        ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                       "kdsValenceAtomUpdate");
+                       valence_d_div, "kdsValenceAtomUpdate");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                       "kdsValenceForceAccumulation");
+                       valence_d_div, "kdsValenceForceAccumulation");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                        ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                       "kdsValenceEnergyAtomUpdate");
+                       valence_d_div, "kdsValenceEnergyAtomUpdate");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                       "kdsValenceForceEnergyAccumulation");
+                       valence_d_div, "kdsValenceForceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::NO, EvaluateEnergy::YES,
                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                       "kfsValenceEnergyAccumulation");
+                       valence_fxe_div, "kfsValenceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                        ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                       "kfsValenceAtomUpdate");
+                       valence_ffx_div, "kfsValenceAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                        ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
-                       "kfValenceAtomUpdate");
+                       valence_ffx_div, "kfValenceAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                       "kfsValenceForceAccumulation");
+                       valence_ffx_div, "kfsValenceForceAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
-                       "kfValenceForceAccumulation");
+                       valence_ffx_div, "kfValenceForceAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                        ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
-                       "kfValenceEnergyAtomUpdate");
+                       valence_ffe_div, "kfValenceEnergyAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                        ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
-                       "kfsValenceEnergyAtomUpdate");
+                       valence_ffe_div, "kfsValenceEnergyAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
-                       "kfValenceForceEnergyAccumulation");
+                       valence_ffe_div, "kfValenceForceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
-                       "kfsValenceForceEnergyAccumulation");
+                       valence_ffe_div, "kfsValenceForceEnergyAccumulation");
 
   // Non-bonded kernel entries
   switch (poly_ag.getUnitCellType()) {
@@ -181,22 +196,23 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
   }
 
   // Reduction kernel entries
+  const int reduction_div = optReductionKernelSubdivision(poly_ag.getSystemAtomCounts(), gpu_in);
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::GATHER, "kdgtConjGrad");
+                         ReductionStage::GATHER, reduction_div, "kdgtConjGrad");
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::SCATTER, "kdscConjGrad");
+                         ReductionStage::SCATTER, reduction_div, "kdscConjGrad");
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::RESCALE, "kdrsConjGrad");
+                         ReductionStage::RESCALE, reduction_div, "kdrsConjGrad");
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::ALL_REDUCE, "kdrdConjGrad");
+                         ReductionStage::ALL_REDUCE, reduction_div, "kdrdConjGrad");
   catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::GATHER, "kfgtConjGrad");
+                         ReductionStage::GATHER, reduction_div, "kfgtConjGrad");
   catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::SCATTER, "kfscConjGrad");
+                         ReductionStage::SCATTER, reduction_div, "kfscConjGrad");
   catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::RESCALE, "kfrsConjGrad");
+                         ReductionStage::RESCALE, reduction_div, "kfrsConjGrad");
   catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
-                         ReductionStage::ALL_REDUCE, "kfrdConjGrad");
+                         ReductionStage::ALL_REDUCE, reduction_div, "kfrdConjGrad");
 #endif
 }
 
@@ -204,7 +220,8 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
 void KernelManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
                                          const ForceAccumulationMethod acc_meth,
-                                         const VwuGoal purpose, const std::string &kernel_name) {
+                                         const VwuGoal purpose, const int subdivision,
+                                         const std::string &kernel_name) {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
@@ -215,27 +232,8 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
 #  ifdef OMNI_USE_CUDA
   const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
                                                                  acc_meth, purpose);
-#if 0
-  k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 1, gpu, kernel_name);
-#endif
-
-  // CHECK
-  switch (prec) {
-  case PrecisionModel::DOUBLE:
-    k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 2, gpu, kernel_name);
-    break;
-  case PrecisionModel::SINGLE:
-    switch (eval_force) {
-    case EvaluateForce::YES:
-      k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 2, gpu, kernel_name);
-      break;
-    case EvaluateForce::NO:
-      k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, 4, gpu, kernel_name);
-      break;
-    }
-  }
-  // END CHECK
-
+  k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, subdivision, gpu,
+                                     kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();
@@ -267,7 +265,7 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
 
 //-------------------------------------------------------------------------------------------------
 void KernelManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
-                                           const ReductionStage process,
+                                           const ReductionStage process, const int subdivision,
                                            const std::string &kernel_name) {
   const std::string k_key = reductionKernelKey(prec, purpose, process);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
@@ -278,7 +276,8 @@ void KernelManager::catalogReductionKernel(const PrecisionModel prec, const Redu
 #ifdef OMNI_USE_HPC
 #  ifdef OMNI_USE_CUDA
   const cudaFuncAttributes attr = queryReductionKernelRequirements(prec, purpose, process);
-  k_dictionary[k_key] = KernelFormat(attr, reduction_block_multiplier, 1, gpu, kernel_name);
+  k_dictionary[k_key] = KernelFormat(attr, reduction_block_multiplier, subdivision, gpu,
+                                     kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();

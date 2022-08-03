@@ -207,9 +207,10 @@ private:
   /// \param eval_nrg     Indication of whether to evaluate the energy of the system as a whole
   /// \param acc_meth     The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce
   ///                     an error in this context)
+  /// \param subdivision  Number of times that the basic valence kernel should be subdivided
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth, VwuGoal purpose,
+                            ForceAccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
                             const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
@@ -227,10 +228,13 @@ private:
   ///        kernels.  Parameter descriptions for this function follow from
   ///        setValenceKernelAttributes() above, with the addition of:
   ///
+  /// \param prec         The precision model to expect in the coordinate arrays
+  /// \param purpose      Reason for doing the reduction, i.e. conjugate gradient transformation
   /// \param process      How far to take the reduction operation
+  /// \param subdivision  Number of times that the basic reduction kernel should be subdivided
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogReductionKernel(PrecisionModel prec, ReductionGoal purpose, ReductionStage process,
-                              const std::string &kernel_name = std::string(""));
+                              int subdivision, const std::string &kernel_name = std::string(""));
 };
 
 /// \brief Obtain the workload-specific block multiplier for valence interaction kernels.  In

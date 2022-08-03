@@ -20,6 +20,10 @@ using mm::MMControlKit;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 
+/// \brief Set the __shared__ memory configuration of various reduction kernels to accommodate
+///        eight-byte words.
+void reductionKernelSetup();
+  
 /// \brief Obtain the kernel function attributes for one of the reduction kernels.
 ///
 /// \param prec     The precision level at which coordinates and forces are stored--accumulations

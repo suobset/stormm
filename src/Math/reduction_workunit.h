@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <vector>
+#include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
 #include "DataTypes/common_types.h"
 
@@ -11,7 +12,8 @@ namespace omni {
 namespace math {
 
 using card::GpuDetails;
-
+using card::Hybrid;
+  
 /// \brief The maximum number of slots into which gathering-related kernels can funnel their
 ///        results.
 constexpr int maximum_gathering_results = 1024;
@@ -84,6 +86,24 @@ private:
                          ///<   necessary, given the availability of bounds in atom_start and
                          ///<   atom_end)
 };
+
+/// \brief Find the optimal subdivision of various reduction kernel blocks given a series of
+///        system sizes.  The reduction kernels have a maximum thread count of small_block_size
+///        (256, see Constants/hpc_bounds.h) and are divisible up to two times.
+///
+/// Overloaded:
+///   - Provide the system sizes as a C-style array with a trusted length.
+///   - Provide the system sizes as a Standard Template Library vector.
+///   - Provide the system sizes as a Hybrid object (host data will be valid).
+///
+/// \param atom_counts  The numbers of atoms in each system
+/// \param n_systems    Number of systems (if a C-style array of the atom counts is provided)
+/// \param gpu          Details of the GPU to use in calculations
+/// \{
+int optReductionKernelSubdivision(const int* atom_counts, int n_systems, const GpuDetails &gpu);
+int optReductionKernelSubdivision(const std::vector<int> &atom_counts, const GpuDetails &gpu);
+int optReductionKernelSubdivision(const Hybrid<int> &atom_counts, const GpuDetails &gpu);
+/// \}
 
 /// \brief Build the reduction (and their components of gathering and scattering) work units for
 ///        a series of systems of stated sizes.  Only the starting indices and system sizes are

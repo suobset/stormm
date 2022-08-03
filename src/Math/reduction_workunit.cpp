@@ -2,6 +2,7 @@
 #include "Reporting/error_format.h"
 #include "reduction_workunit.h"
 #include "rounding.h"
+#include "summation.h"
 #include "vector_ops.h"
 
 namespace omni {
@@ -51,6 +52,33 @@ std::vector<int> ReductionWorkUnit::getAbstract() const {
   std::vector<int> result = { atom_start, atom_end, result_index, dependency_start,
                               dependency_end, system_index, 0, 0 };
   return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+int optReductionKernelSubdivision(const int* atom_counts, const int n_systems,
+                                  const GpuDetails &gpu) {
+  const int nsmp = gpu.getSMPCount();
+  if (n_systems > nsmp * 16) {
+    return 2;
+  }
+  const int total_atoms = sum<int>(atom_counts, n_systems);
+  if (total_atoms > nsmp * 16 * 256) {
+    return 2;
+  }
+  else {
+    return 1;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int optReductionKernelSubdivision(const std::vector<int> &atom_counts, const GpuDetails &gpu) {
+  return optReductionKernelSubdivision(atom_counts.data(), atom_counts.size(), gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+int optReductionKernelSubdivision(const Hybrid<int> &atom_counts, const GpuDetails &gpu) {
+  return optReductionKernelSubdivision(atom_counts.data(), atom_counts.size(), gpu);
 }
 
 //-------------------------------------------------------------------------------------------------

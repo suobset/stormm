@@ -261,8 +261,20 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
   const int warp_idx = threadIdx.x >> warp_bits;
   const int lane_idx = (threadIdx.x & warp_bits_mask_int);
   const int nwarps   = blockDim.x >> warp_bits;
-  int rdwu_idx = blockIdx.x;
-  while (rdwu_idx < redk.nrdwu) {
+  const int wu_per_block = (redk.nrdwu + gridDim.x - 1) / gridDim.x;
+  const int plus_one_blocks = gridDim.x - ((gridDim.x * wu_per_block) - redk.nrdwu);
+  int wu_assign_start, wu_assign_end;
+  if (blockIdx.x < plus_one_blocks) {
+    wu_assign_start = blockIdx.x * wu_per_block;
+    wu_assign_end = wu_assign_start + wu_per_block;
+  }
+  else {
+    wu_assign_start = (plus_one_blocks * wu_per_block) +
+                      ((blockIdx.x - plus_one_blocks) * (wu_per_block - 1));
+    wu_assign_end = wu_assign_start + wu_per_block - 1;
+  }
+
+  for (int rdwu_idx = wu_assign_start; rdwu_idx < wu_assign_end; rdwu_idx++) {
     const int wabs_pos       = (rdwu_idx * rdwu_abstract_length);
     const int atom_start_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_START)];
     const int atom_end_pos   = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::ATOM_END)];
@@ -294,10 +306,6 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
       if (lane_idx == 0) {
         sh_dgg_total = dgg;
       }
-    }
-    else if (warp_idx == 2 && lane_idx == 0) {
-      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
-      sh_rdwu_idx = atomicAdd(&ctrl.rdwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();
     const double gam = (ctrl.step >= ctrl.sd_cycles) ? (sh_dgg_total / sh_gg_total) : 0.0;
@@ -345,17 +353,9 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
       cgsbs.zfrc[tpos] = norm_fz;
 #endif
     }
-    rdwu_idx = sh_rdwu_idx;
-  }
-  
-  // Set the block counters for future iterations of this kernel
-  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
-    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
-    if (step_modulus == 0) {
-      ctrl.rdwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
-    }
-    if (step_modulus == warp_size_int) {
-      ctrl.rdwu_progress[threadIdx.x] = gridDim.x;
-    }
+
+    // No synthcronization is needed here, as all threads will have their marching orders from
+    // the msum derived from values in the msum_collector array, which will not be altered again
+    // until after passing another __syncthreads().
   }
 }

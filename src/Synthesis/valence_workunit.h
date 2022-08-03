@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 #include "Accelerator/hybrid.h"
+#include "Accelerator/gpu_details.h"
+#include "Constants/behavior.h"
+#include "Potential/energy_enumerators.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -13,7 +16,11 @@
 namespace omni {
 namespace synthesis {
 
+using card::GpuDetails;
 using card::Hybrid;
+using constants::PrecisionModel;
+using energy::EvaluateForce;
+using energy::EvaluateEnergy;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
@@ -1098,6 +1105,31 @@ private:
   const AtomGraph *ag_pointer;           ///< The topology to which this object pertains
   const RestraintApparatus *ra_pointer;  ///< Restraint apparatus to which this object pertains
 };
+
+/// \brief Optimize the valence kernel subdivision.  Single-precision kernels involving force
+///        computation, as well as all double-precision kernels, can be subdivided up two times.
+///        Single-precision kernels involving only energy computations can be subdivide up to
+///        four times.
+///
+/// Overloaded:
+///   - Provide the system sizes as a C-style array with a trusted length.
+///   - Provide the system sizes as a Standard Template Library vector.
+///   - Provide the system sizes as a Hybrid object (host data will be valid).
+///
+/// \param atom_counts  The numbers of atoms in each system
+/// \param n_systems    Number of systems (if a C-style array of the atom counts is provided)
+/// \param prec         Precision model for the kernel of interest
+/// \param eval_frc     Indicate whether the kernel of interest will evaluate forces
+/// \param gpu          Details of the GPU to use in calculations
+/// \{
+int optValenceKernelSubdivision(const int* atom_counts, int n_systems, PrecisionModel prec,
+                                EvaluateForce eval_frc, const GpuDetails &gpu);
+
+int optValenceKernelSubdivision(const std::vector<int> &atom_counts, PrecisionModel prec,
+                                EvaluateForce eval_frc, const GpuDetails &gpu);
+
+int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, PrecisionModel prec,
+                                EvaluateForce eval_frc, const GpuDetails &gpu);
 
 /// \brief Calculate the optimal sizes of valence work units based on a series of system sizes.
 ///        This will engage some simple heuristics, not examine the actual topologies to optimize

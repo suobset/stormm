@@ -193,10 +193,10 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
           my_column[3] = (TCALC)(0.0);
         }
         for (int i = 0; i < 4; i++) {
-          TCALC maxval = fabs(my_column[i]);
+          TCALC maxval = FABS_FUNC(my_column[i]);
           int maxpos = i;
           for (int j = i + 1; j < 4; j++) {
-            const TCALC abmcj = fabs(my_column[j]);
+            const TCALC abmcj = FABS_FUNC(my_column[j]);
             if (abmcj > maxval) {
               maxval = abmcj;
               maxpos = j;
@@ -315,7 +315,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
     move_factor = sh_move_factor;
     
     // Apply the move to the particles
-    if (fabs(move_factor) > constants::verytiny) {
+    if (FABS_FUNC(move_factor) > constants::verytiny) {
       move_factor *= poly_psw.inv_frc_scale * poly_psw.gpos_scale;
       if (move_number == 0) {
         move_factor *= lmw.l_move[wu_sysid];
