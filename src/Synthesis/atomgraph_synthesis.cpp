@@ -3334,6 +3334,11 @@ NbwuKind AtomGraphSynthesis::getNonbondedWorkType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getNonbondedWorkUnitCount() const {
+  return total_nonbonded_work_units;
+}
+
+//-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getReductionWorkUnitCount() const {
   return total_reduction_work_units;
 }

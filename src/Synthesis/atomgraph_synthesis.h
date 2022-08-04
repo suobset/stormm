@@ -248,6 +248,9 @@ public:
   /// \brief Get the type of non-bonded work required by systems in this synthesis.
   NbwuKind getNonbondedWorkType() const;
 
+  /// \brief Get the number of non-bonded work units serving systems in this synthesis.
+  int getNonbondedWorkUnitCount() const;
+
   /// \brief Get the number of reduction work units spanning all systems.
   int getReductionWorkUnitCount() const;
 

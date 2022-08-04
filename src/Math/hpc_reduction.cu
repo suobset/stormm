@@ -391,6 +391,7 @@ extern void launchConjugateGradient(const ReductionKit &redk, ConjGradSubstrate 
   case RdwuPerSystem::MULTIPLE:
     kdgtConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     kdscConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
+    kdrsConjGrad<<<bt.x, bt.y>>>(redk, *cgsbs, *ctrl);
     break;
   }
 }

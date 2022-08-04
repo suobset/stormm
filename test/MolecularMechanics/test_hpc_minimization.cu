@@ -8,6 +8,7 @@
 #include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_bridge.h"
 #include "../../src/Math/reduction_enumerators.h"
+#include "../../src/Math/rounding.h"
 #include "../../src/Math/hpc_reduction.h"
 #include "../../src/MolecularMechanics/hpc_minimization.h"
 #include "../../src/MolecularMechanics/line_minimization.h"
@@ -153,6 +154,25 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 //-------------------------------------------------------------------------------------------------
 // Perform energy minimization with meticulous checks to ensure that the process is consistent and
 // reproducible.
+//
+// Arguments:
+//   ag_ptr_vec:          Vector of pointers to unique topologies for systems in ps_vec
+//   ps_vec:              Coordinates for all systems, to be replicated in the resulting synthesis
+//   mol_id_vec:          Indication of how to replicate various structures described in ps_vec
+//   gpu:                 Details of the GPU available
+//   do_tests:            Indicate whether tests are possible to run
+//   prec:                Precision model for arithmetic and fixed-precision representations
+//   gpos_bits:           Fixed-precision bits after the decimal in the positional representation
+//   frc_bits:            Fixed-precision bits after the decimal in force accumulation
+//   maxcyc:              Maximum number of minimization cycles
+//   enforce_same_track:  Flag to have the systems explicitly set to keep on the same track if
+//                        they start to diverge very slightly
+//   check_mm:            Flag to have molecular mechanics energies and forces of the final states
+//                        checked
+//   frc_tol:             Tolerance for force comparisons
+//   nrg_tol:             Tolerance for energy comparisons
+//   test_name:           Name given to the collection of tests 
+//   timer:               Optional profiling tool, if of interest for a brief performance check
 //-------------------------------------------------------------------------------------------------
 void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                       const std::vector<PhaseSpace> &ps_vec, const std::vector<int> &mol_id_vec,
@@ -160,8 +180,9 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                       const PrecisionModel prec = PrecisionModel::DOUBLE, const int gpos_bits = 40,
                       const int frc_bits = 40, const int maxcyc = 500,
                       const bool enforce_same_track = true, const bool check_mm = true,
-                      StopWatch *timer = nullptr) {
-  AtomGraphSynthesis poly_ag(ag_ptr_vec, mol_id_vec, ExceptionResponse::WARN, gpu, timer);
+                      const double frc_tol = 1.0e-6, const double nrg_tol = 1.0e-6,
+                      const std::string &test_name = std::string(""), StopWatch *timer = nullptr) {
+  AtomGraphSynthesis poly_ag(ag_ptr_vec, mol_id_vec, ExceptionResponse::SILENT, gpu, timer);
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(), mol_id_vec);
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_ptr_vec, mol_id_vec, gpos_bits, 24, 40, frc_bits);
@@ -169,6 +190,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   // Create the minimization instructions
   MinimizeControls mincon;
   mincon.setTotalCycles(maxcyc);
+  mincon.setSteepestDescentCycles(maxcyc / 10);
   
   // Create separate molecular mechanics control objects based on the minimization operations
   // for each of the ways that the valence kernel gets subdivided. 
@@ -200,17 +222,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   CacheResource valence_fe_tb_reserve(vale_fe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource valence_xe_tb_reserve(vale_xe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
-
-  // CHECK
-  printf("Launch valence (FE) kernel on %4d blocks, %4d threads per block.\n", vale_fe_lp.x,
-         vale_fe_lp.y);
-  printf("Launch valence ( E) kernel on %4d blocks, %4d threads per block.\n", vale_xe_lp.x,
-         vale_xe_lp.y);
-  printf("Launch nonbonded    kernel on %4d blocks, %4d threads per block.\n", nonb_lp.x,
-         nonb_lp.y);
-  printf("Launch reduction    kernel on %4d blocks, %4d threads per block.\n", redu_lp.x,
-         redu_lp.y);
-  // END CHECK
   
   // Upload the synthesis and prime the pumps
   poly_ag.upload();
@@ -252,16 +263,32 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   LinMinWriter lmw = line_record.data(devc);
 
   // Run minimizations
-  const int meta_timings = (timer == nullptr) ?
-                           0 : timer->addCategory("Minimization of small molecules");
+  const int meta_timings = (timer == nullptr) ? 0 : timer->addCategory(test_name);
   if (timer != nullptr) {
     timer->assignTime(0);
   }
-  std::vector<double> cpu_total_e(mincon.getTotalCycles(), 0.0);
-  std::vector<double> gpu_total_e(mincon.getTotalCycles(), 0.0);
-  std::vector<double> force_mue(mincon.getTotalCycles(), 0.0);
+  const int n_mm_sample = roundUp(mincon.getTotalCycles(), 32) / 32;
+  std::vector<double> cpu_total_e(n_mm_sample, 0.0);
+  std::vector<double> gpu_total_e(n_mm_sample, 0.0);
+  std::vector<double> force_mue(n_mm_sample, 0.0);
   int consistency_failures = 0;
   for (int i = 0; i < mincon.getTotalCycles(); i++) {
+
+    // CHECK
+#if 0
+    if (prec == PrecisionModel::SINGLE) {
+      for (int j = 0; j < 20; j++) {
+        launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
+                      EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                      ForceAccumulationMethod::SPLIT, vale_fe_lp);
+        launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw,
+                        &f_nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES,
+                        ForceAccumulationMethod::SPLIT, nonb_lp);
+        f_ctrl_fe.step += 1;
+      }
+    }
+#endif
+    // END CHECK
     
     // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     poly_ps.initializeForces(gpu, devc);
@@ -288,19 +315,22 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     // Check the forces computed for a couple of systems.  This is somewhat redundant, but serves
     // as a sanity check in case other aspects of the energy minimization show problems.
     const int jlim = (check_mm) ? (3 * i) + 1 : 3 * i;
-    for (int j = 3 * i; j < jlim; j++) {
-      const int jmod = j % poly_ag.getSystemCount();
-      PhaseSpace chkj_ps = poly_ps.exportSystem(jmod, devc);
-      const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      chkj_ps.initializeForces();
-      ScoreCard tmp_sc(1, 1, 32);
-      StaticExclusionMask chkj_se(poly_ag.getSystemTopologyPointer(jmod));
-      evalNonbValeMM(&chkj_ps, &tmp_sc, poly_ag.getSystemTopologyPointer(jmod), chkj_se,
-                     EvaluateForce::YES, 0);
-      const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(TrajectoryKind::FORCES);
-      cpu_total_e[i] = tmp_sc.reportTotalEnergy(0);
-      gpu_total_e[i] = sc.reportTotalEnergy(jmod, devc);
-      force_mue[i] = meanUnsignedError(cpu_frc, gpu_frc);
+    if ((i & 0x1f) == 0) {
+      const TrajectoryKind tforce = TrajectoryKind::FORCES; 
+      for (int j = 3 * i; j < jlim; j++) {
+        const int jmod = j % poly_ag.getSystemCount();
+        PhaseSpace chkj_ps = poly_ps.exportSystem(jmod, devc);
+        const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
+        chkj_ps.initializeForces();
+        ScoreCard tmp_sc(1, 1, 32);
+        StaticExclusionMask chkj_se(poly_ag.getSystemTopologyPointer(jmod));
+        evalNonbValeMM(&chkj_ps, &tmp_sc, poly_ag.getSystemTopologyPointer(jmod), chkj_se,
+                       EvaluateForce::YES, 0);
+        const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
+        cpu_total_e[i / 32] = tmp_sc.reportTotalEnergy(0);
+        gpu_total_e[i / 32] = sc.reportTotalEnergy(jmod, devc);
+        force_mue[i / 32] = meanUnsignedError(cpu_frc, gpu_frc);
+      }
     }
     
     // Download and check the forces for each system to verify consistency.  If the forces are
@@ -364,7 +394,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       f_ctrl_xe.step += 1;
       break;
     }
-    
+
     // Download and check the particle advancement.
     if (enforce_same_track) {
       poly_ps.download();
@@ -398,7 +428,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       f_ctrl_xe.step += 1;
       break;
     }
-    
+
     // Download and check the particle advancement.
     if (enforce_same_track) {
       poly_ps.download();
@@ -471,14 +501,16 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   }
   if (check_mm) {
     const int ave_atom_count = poly_ag.getAtomCount() / poly_ag.getSystemCount();
-    const double etol = (prec == PrecisionModel::DOUBLE) ? 5.0e-7 : 5.0e-4;
-    check(cpu_total_e, RelationalOperator::EQUAL, Approx(gpu_total_e).margin(etol), "Energies of "
-          "relaxed structures did not agree.  Average structure size: " +
-          std::to_string(ave_atom_count) + ".", do_tests);
+    check(cpu_total_e, RelationalOperator::EQUAL, Approx(gpu_total_e).margin(nrg_tol),
+          "Energies of relaxed structures did not agree.  Average structure size: " +
+          std::to_string(ave_atom_count) + ".  Precision level: " + getPrecisionModelName(prec) +
+          ".  Test name: " + test_name + ".", do_tests);
     check(force_mue, RelationalOperator::EQUAL,
-          Approx(std::vector<double>(mincon.getTotalCycles(), 0.0)).margin(1.0e-6), "Snapshots of "
-          "forces taken during energy minimization on the GPU do not agree with their CPU-derived "
-          "counterparts.", do_tests);
+          Approx(std::vector<double>(n_mm_sample, 0.0)).margin(frc_tol), "Snapshots of forces "
+          "taken during energy minimization on the GPU do not agree with their CPU-derived "
+          "counterparts.  Average structure size: " + std::to_string(ave_atom_count) +
+          ".  Precision level: " + getPrecisionModelName(prec) + ".  Test name: " + test_name +
+          ".", do_tests);
   }
   
   // Verify that the energies for all systems meet the expected values
@@ -488,23 +520,72 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   for (int i = 0; i < nsys; i++) {
     
   }
-       
-  // CHECK
-  printf("final_e = [\n");
-  int j = 0;
-  for (size_t i = 0; i < mol_id_vec.size(); i++) {
-    printf("  %12.8lf", final_e[i]);
-    j++;
-    if (j == 16) {
-      printf("\n");
-      j = 0;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Read a series of topologies and coordinate files, then process them into a tiled array of
+// structures for energy minimization.
+//
+// Arguments:
+//   top_names:  Names of topology files to seek out and read
+//   crd_names:  Names of coordinate files to seek out and read
+//   tile_list:  Indices of structures to add to the synthesis
+//   n_tiles:    The number of times to repeat the tile list when making the synthesis
+//   test_name:  Name given to this group of tests
+//   oe:         Contains the name of the OMNI source path from shell variables
+//   gpu:        Details of the GPU in use
+//   timer:      Time tracking object for optional performance analysis
+//-------------------------------------------------------------------------------------------------
+void testCompilation(const std::vector<std::string> &top_names,
+                     const std::vector<std::string> &crd_names, const std::vector<int> tile_list,
+                     const int n_tiles, const double frc_tol, const double nrg_tol,
+                     const TestEnvironment &oe, const GpuDetails &gpu,
+                     const std::string &test_name, StopWatch *timer) {
+  const int mol_count = top_names.size();
+  if (crd_names.size() != top_names.size()) {
+    rtErr("A total of " + std::to_string(top_names.size()) + " topologies and " +
+          std::to_string(crd_names.size()) + " coordinate files were provided.  The counts must "
+          "match.", "test_hpc_minimization", "testCompilation");
+  }
+  bool files_exist = true;
+  for (int i = 0; i < mol_count; i++) {
+    files_exist = (getDrivePathType(top_names[i]) == DrivePathType::FILE &&
+                   getDrivePathType(crd_names[i]) == DrivePathType::FILE && files_exist);
+  }
+  std::vector<AtomGraph> mol_ag;
+  std::vector<AtomGraph*> mol_ag_ptr;
+  std::vector<PhaseSpace> mol_ps;
+  if (files_exist) {
+    mol_ag.reserve(mol_count);
+    mol_ps.reserve(mol_count);
+    mol_ag_ptr.resize(mol_count);
+    for (int i = 0; i < mol_count; i++) {
+      mol_ag.emplace_back(top_names[i], ExceptionResponse::SILENT);
+      mol_ps.emplace_back(crd_names[i]);
+      mol_ag_ptr[i] = &mol_ag[i];
     }
   }
-  if (j > 0) {
-    printf("\n");
+  else {
+    mol_ag.resize(mol_count);
+    mol_ag.resize(mol_count);
+    rtWarn("Topology and coordinate files for a number of small molecules and dipeptides were not "
+           "found.  Check the ${OMNI_SOURCE} environment variable, currently set to " +
+           oe.getOmniSourcePath() + ", for validity.  Subsequent tests will be skipped.",
+           "test_hpc_minimization");
   }
-  printf("];\n");
-  // END CHECK
+  const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
+  const int tlen = tile_list.size();
+  const int total_mol = tlen * n_tiles;
+  std::vector<int> mol_id(total_mol);
+  for (int i = 0; i < n_tiles; i++) {
+    for (int j = 0; j < tlen; j++) {
+      mol_id[(tlen * i) + j] = tile_list[j];
+    }
+  }
+  metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, PrecisionModel::DOUBLE, 40, 40, 100,
+                   false, true, frc_tol, nrg_tol, test_name + " (fp64)", timer);
+  metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, PrecisionModel::SINGLE, 28, 24, 500,
+                   false, true, 10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -536,52 +617,33 @@ int main(const int argc, const char* argv[]) {
   const std::string lig1_crd_name = base_crd_name + osc + "stereo_L1.inpcrd";
   const std::string lig2_top_name = base_top_name + osc + "symmetry_L1.top";
   const std::string lig2_crd_name = base_crd_name + osc + "symmetry_L1.inpcrd";
-  const std::vector<std::string> all_top = { alad_top_name, brbz_top_name, lig1_top_name,
+  const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
+  const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
+  const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
+  const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
+  const std::vector<std::string> lig_top = { alad_top_name, brbz_top_name, lig1_top_name,
                                              lig2_top_name };
-  const std::vector<std::string> all_crd = { alad_crd_name, brbz_crd_name, lig1_crd_name,
+  const std::vector<std::string> lig_crd = { alad_crd_name, brbz_crd_name, lig1_crd_name,
                                              lig2_crd_name };
-  const int small_mol_count = all_top.size();
-  bool files_exist = true;
-  for (int i = 0; i < small_mol_count; i++) {
-    files_exist = (getDrivePathType(all_top[i]) == DrivePathType::FILE &&
-                   getDrivePathType(all_crd[i]) == DrivePathType::FILE && files_exist);
-  }
-  std::vector<AtomGraph> small_mol_ag;
-  std::vector<AtomGraph*> small_mol_ag_ptr;
-  std::vector<PhaseSpace> small_mol_ps;
-  if (files_exist) {
-    small_mol_ag.reserve(small_mol_count);
-    small_mol_ps.reserve(small_mol_count);
-    small_mol_ag_ptr.resize(small_mol_count);
-    for (int i = 0; i < small_mol_count; i++) {
-      small_mol_ag.emplace_back(all_top[i], ExceptionResponse::SILENT);
-      small_mol_ps.emplace_back(all_crd[i]);
-      small_mol_ag_ptr[i] = &small_mol_ag[i];
-    }
-  }
-  else {
-    small_mol_ag.resize(small_mol_count);
-    small_mol_ag.resize(small_mol_count);
-    rtWarn("Topology and coordinate files for a number of small molecules and dipeptides were not "
-           "found.  Check the ${OMNI_SOURCE} environment variable, currently set to " +
-           oe.getOmniSourcePath() + ", for validity.  Subsequent tests will be skipped.",
-           "test_hpc_minimization");
-  }
-  const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  std::vector<int> small_mol_id = { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 };
-  small_mol_id.resize(8192);
-  for (int i = 0; i < small_mol_id.size() / 16; i++) {
-    for (int j = 0; j < 16; j++) {
-      small_mol_id[(16 * i) + j] = small_mol_id[j];
-    }
-  }
-#if 0
-  metaMinimization(small_mol_ag_ptr, small_mol_ps, small_mol_id, gpu, do_tests,
-                   PrecisionModel::DOUBLE);
-#endif
-  metaMinimization(small_mol_ag_ptr, small_mol_ps, small_mol_id, gpu, do_tests,
-                   PrecisionModel::SINGLE, 28, 24, 500, false, false, &timer);
-  
+  const std::vector<std::string> pro_top = { trpi_top_name, dhfr_top_name };
+  const std::vector<std::string> pro_crd = { trpi_crd_name, dhfr_crd_name };
+
+  // Run small molecule tests
+  testCompilation(lig_top, lig_crd, { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 },
+                  256, 1.0e-5, 1.0e-5, oe, gpu, "Small molecules", &timer);
+
+  // Run tests on small proteins
+  testCompilation(pro_top, pro_crd, { 0, 1, 0, 1, 1, 1, 0, 0 }, 3, 1.0e-5, 1.0e-3, oe, gpu,
+                  "Folded proteins", &timer);
+
+  // Run tests on small proteins
+  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 16, 1.0e-5, 6.0e-5, oe, gpu,
+                  "Trp-cage only", &timer);
+
+  // Run tests on small proteins
+  testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
+                  "DHFR only", &timer);
+
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

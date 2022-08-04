@@ -12,8 +12,8 @@ MMControlKit<T>::MMControlKit(const int step_in, const int sd_cycles_in, const i
     step{step_in}, sd_cycles{sd_cycles_in}, max_cycles{max_cycles_in}, dt{dt_in},
     rattle_tol{rattle_tol_in}, initial_step{initial_step_in}, vwu_progress{vwu_progress_in},
     nbwu_progress{nbwu_progress_in}, pmewu_progress{pmewu_progress_in},
-    gtwu_progress{gtwu_progress_in}, scwu_progress{gtwu_progress_in},
-    rdwu_progress{gtwu_progress_in}
+    gtwu_progress{gtwu_progress_in}, scwu_progress{scwu_progress_in},
+    rdwu_progress{rdwu_progress_in}
 {}
 
 } // namespace mm
