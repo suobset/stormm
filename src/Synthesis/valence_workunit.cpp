@@ -2457,7 +2457,7 @@ int optValenceKernelSubdivision(const int* atom_counts, const int n_systems,
       return 1;
     }
   }
-  __builtin_unreachable;
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

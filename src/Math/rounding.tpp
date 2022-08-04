@@ -14,7 +14,7 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
                         const Tcalc* bc, const Tcalc* scr) {
   const size_t tcalc_ct = std::type_index(typeid(Tcalc)).hash_code();
   if (tcalc_ct == double_type_index) {
-    if (fabs(costheta) >= near_to_one_lf) {
+    if (std::abs(costheta) >= near_to_one_lf) {
 
       // The Tcalcing-point representation of costheta is numerically ill-conditioned.  Compute
       // the distance from atom I to the plane of atoms J, K, and L to get the angle by the
@@ -47,7 +47,7 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
     }
   }
   else {
-    if (fabsf(costheta) >= near_to_one_f) {
+    if (std::abs(costheta) >= near_to_one_f) {
 
       // The Tcalcing-point representation of costheta is numerically ill-conditioned.  Compute
       // the distance from atom I to the plane of atoms J, K, and L to get the angle by the
