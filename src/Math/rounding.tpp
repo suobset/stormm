@@ -66,7 +66,7 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
       Tcalc rdy = ny_bccd - ny_abbc;
       Tcalc rdz = nz_bccd - nz_abbc;
       Tcalc rs = sqrtf((rdx * rdx) + (rdy * rdy) + (rdz * rdz));
-      if (fabsf(rs) > 1.0f) {
+      if (std::abs(rs) > 1.0f) {
         rdx = nx_bccd + nx_abbc;
         rdy = ny_bccd + ny_abbc;
         rdz = nz_bccd + nz_abbc;
