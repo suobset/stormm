@@ -4,14 +4,14 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::diskutil::osSeparator;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::errors::rtWarn;
-using omni::constants::ExceptionResponse;
-using omni::parse::separateText;
-using namespace omni::namelist;
-using namespace omni::testing;
+using stormm::diskutil::osSeparator;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::errors::rtWarn;
+using stormm::constants::ExceptionResponse;
+using stormm::parse::separateText;
+using namespace stormm::namelist;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // This function will wrap the creation of the &lisa namelist.  In practice, most namelists should
@@ -131,7 +131,7 @@ int main(const int argc, const char* argv[]) {
 
   // Try reading a namelist from an example file
   section(2);
-  const std::string namelist_file = oe.getOmniSourcePath() + osSeparator() + "test" +
+  const std::string namelist_file = oe.getStormmSourcePath() + osSeparator() + "test" +
     osSeparator() + "Parsing" + osSeparator() + "simpsons.txt";
   const bool file_exists = (getDrivePathType(namelist_file) == DrivePathType::FILE);
   const TestPriority file_check = (file_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -143,7 +143,7 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("The file " + namelist_file + " was not found and is critical to many subsequent "
-           "tests.  Make sure that the $OMNI_SOURCE environment variable is set properly, to the "
+           "tests.  Make sure that the $STORMM_SOURCE environment variable is set properly, to the "
            "source tree where src/ and test/ subdirectories can be found.  Subsequent tests that "
            "rely on this file will be skipped.", "test_input");
   }

@@ -1,6 +1,6 @@
 // -*-c++-*-
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -40,4 +40,4 @@ template <typename T> T ScoreCard::getInverseEnergyScalingFactor() const {
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

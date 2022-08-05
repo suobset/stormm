@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_VIRTUAL_SITE_PLACEMENT_H
-#define OMNI_VIRTUAL_SITE_PLACEMENT_H
+#ifndef STORMM_VIRTUAL_SITE_PLACEMENT_H
+#define STORMM_VIRTUAL_SITE_PLACEMENT_H
 
 #include <cmath>
 #include "Math/vector_ops.h"
@@ -11,7 +11,7 @@
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using math::dot;
@@ -110,7 +110,7 @@ void transmitVirtualSiteForces(PhaseSpace psw, VirtualSiteKit<Tcalc> vsk);
 /// \}
   
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #include "virtual_site_handling.tpp"
 

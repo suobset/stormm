@@ -2,7 +2,7 @@
 #include "Constants/scaling.h"
 #include "rounding.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using constants::mega;
@@ -77,4 +77,4 @@ size_t getPaddedMemorySize(const size_t length, const size_t growth_increment,
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

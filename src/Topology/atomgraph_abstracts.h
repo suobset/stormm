@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_ATOMGRAPH_ABSTRACTS_H
-#define OMNI_ATOMGRAPH_ABSTRACTS_H
+#ifndef STORMM_ATOMGRAPH_ABSTRACTS_H
+#define STORMM_ATOMGRAPH_ABSTRACTS_H
 
 #include "atomgraph_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 /// \brief Unguarded struct to store the ingredients of a single Urey-Bradley interaction
@@ -498,7 +498,7 @@ template <typename T> struct ConstraintKit {
 };
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #include "atomgraph_abstracts.tpp"
 

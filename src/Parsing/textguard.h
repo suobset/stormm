@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_TEXTGUARD_H
-#define OMNI_TEXTGUARD_H
+#ifndef STORMM_TEXTGUARD_H
+#define STORMM_TEXTGUARD_H
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 /// \brief An enumerator for whether a text feature must take place on a single line or can span
@@ -60,6 +60,6 @@ private:
 };
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm
 
 #endif

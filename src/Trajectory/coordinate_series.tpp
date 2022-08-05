@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using numerics::default_trajpos_scale_bits;
@@ -285,7 +285,7 @@ CoordinateSeries<T>::getInterlacedCoordinates(const int frame_index, const int l
       }
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
       const size_t llim = (fidx_zu * natom_zu) + static_cast<size_t>(low_index);
@@ -354,7 +354,7 @@ std::vector<double> CoordinateSeries<T>::getBoxSpaceTransform(const int frame_in
   case HybridTargetLevel::HOST:
     return box_space_transforms.readHost(read_start, 9);
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return box_space_transforms.readDevice(read_start, 9);
     break;
@@ -372,7 +372,7 @@ std::vector<double> CoordinateSeries<T>::getInverseTransform(const int frame_ind
   case HybridTargetLevel::HOST:
     return inverse_transforms.readHost(read_start, 9);
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return inverse_transforms.readDevice(read_start, 9);
     break;
@@ -390,7 +390,7 @@ std::vector<double> CoordinateSeries<T>::getBoxDimensions(const int frame_index,
   case HybridTargetLevel::HOST:
     return box_dimensions.readHost(read_start, 6);
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return box_dimensions.readDevice(read_start, 6);
     break;
@@ -443,7 +443,7 @@ CoordinateFrame CoordinateSeries<T>::exportFrame(const int frame_index,
       }
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
       const std::vector<T> tmp_xcrd = x_coordinates.readDevice(frame_offset, natom_zu);
@@ -536,7 +536,7 @@ void CoordinateSeries<T>::exportToFile(const std::string &file_name, const Coord
   foutp.close();
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 template <typename T> void CoordinateSeries<T>::upload() {
   x_coordinates.upload();
@@ -1068,4 +1068,4 @@ CoordinateSeries<Tnew> changeCoordinateSeriesType(const CoordinateSeries<Torig> 
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

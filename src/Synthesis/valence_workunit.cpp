@@ -8,7 +8,7 @@
 #include "Topology/topology_util.h"
 #include "valence_workunit.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using constants::small_block_size;
@@ -2608,4 +2608,4 @@ std::vector<ValenceWorkUnit> buildValenceWorkUnits(ValenceDelegator *vdel,
 }
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

@@ -1,7 +1,7 @@
 #include <algorithm>
 #include "static_exclusionmask.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using topology::NonbondedKit;
@@ -339,7 +339,7 @@ const StaticExclusionMaskReader StaticExclusionMask::data(const HybridTargetLeve
                                    all_masks.data(tier));
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void StaticExclusionMask::upload() {
   all_masks.upload();
@@ -380,4 +380,4 @@ bool StaticExclusionMask::testExclusion(const int atom_i, const int atom_j) cons
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

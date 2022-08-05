@@ -1,5 +1,5 @@
 #include "../../src/Constants/behavior.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/forward_exclusionmask.h"
@@ -11,22 +11,22 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::int2;
-using omni::constants::ExceptionResponse;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getBaseName;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::topology::AtomGraph;
-using omni::topology::NonbondedKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::TrajectoryKind;
-using namespace omni::energy;
-using namespace omni::testing;
+using stormm::int2;
+using stormm::constants::ExceptionResponse;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getBaseName;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::topology::AtomGraph;
+using stormm::topology::NonbondedKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::PhaseSpace;
+using stormm::trajectory::TrajectoryKind;
+using namespace stormm::energy;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Loop over all exclusions in a given array based on the supplied bounds.  Check for non-reflexive
@@ -76,9 +76,9 @@ int main(const int argc, const char* argv[]) {
 
   // Locate topologies and coordinate files
   const char osc = osSeparator();
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string base_ptl_name = oe.getOmniSourcePath() + osc + "test" + osc + "Potential";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_ptl_name = oe.getStormmSourcePath() + osc + "test" + osc + "Potential";
   const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
   const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string trpw_top_name = base_top_name + osc + "trpcage_in_water.top";
@@ -103,8 +103,8 @@ int main(const int argc, const char* argv[]) {
   if (systems_exist == false) {
     rtWarn("Files for the Trp-cage miniprotein, the DHFR globular protein (with CHARMM potential "
            "details), alanine dipeptide, and scorpion toxin were not found.  These files should "
-           "befound in the ${OMNI_SOURCE}/test/Topology and ${OMNI_SOURCE}/test/Trajectory "
-           "directories.  Check the $OMNI_SOURCE environment variable.  A number of tests will be "
+           "befound in the ${STORMM_SOURCE}/test/Topology and ${STORMM_SOURCE}/test/Trajectory "
+           "directories.  Check the $STORMM_SOURCE environment variable.  A number of tests will be "
            "skipped.", "test_neighbor_list");
   }
   AtomGraph trpi_ag, trpw_ag, dhfr_ag, alad_ag, ahec_ag;

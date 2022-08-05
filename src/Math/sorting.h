@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_SORTING_H
-#define OMNI_SORTING_H
+#ifndef STORMM_SORTING_H
+#define STORMM_SORTING_H
 
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 /// \brief Enumerate the directions that a sort can go.
@@ -24,6 +24,6 @@ enum class UniqueValueHandling {
 };
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #endif

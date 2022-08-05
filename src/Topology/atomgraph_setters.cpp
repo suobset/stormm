@@ -8,7 +8,7 @@
 #include "UnitTesting/unit_test_enumerators.h"
 #include "atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using parse::CaseSensitivity;
@@ -595,7 +595,7 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
     break;
   case AtomicRadiusSet::PARSE:
 
-    // The only use of Parse radii is PB calculations, which are currently not supported in OMNI.
+    // The only use of Parse radii is PB calculations, which are currently not supported in STORMM.
     // Nonetheless, the radius set is included for completeness.  Just make sure that no one is
     // using it for Generalized Born calculations.
     switch (gb_style) {
@@ -1081,4 +1081,4 @@ void AtomGraph::setWaterResidueName(const std::string &new_name) {
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

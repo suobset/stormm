@@ -1,6 +1,6 @@
 #include "namelist_enumerations.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 //-------------------------------------------------------------------------------------------------
@@ -36,4 +36,4 @@ std::string getInputStatusString(const InputStatus stt) {
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

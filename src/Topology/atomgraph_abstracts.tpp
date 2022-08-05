@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace topology {
 
 //-------------------------------------------------------------------------------------------------
@@ -157,4 +157,4 @@ ConstraintKit<T>::ConstraintKit(const int nsettle_in, const int nsett_param_in,
 {}
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

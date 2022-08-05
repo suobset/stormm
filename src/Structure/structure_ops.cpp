@@ -1,7 +1,7 @@
 #include "Topology/topology_util.h"
 #include "structure_ops.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using topology::ChemicalDetailsKit;
@@ -111,4 +111,4 @@ double3 molecularTorque(const double* xcrd, const double* ycrd, const double* zc
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

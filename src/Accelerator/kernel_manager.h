@@ -1,17 +1,17 @@
 // -*-c++-*-
-#ifndef OMNI_KERNEL_MANAGER_H
-#define OMNI_KERNEL_MANAGER_H
+#ifndef STORMM_KERNEL_MANAGER_H
+#define STORMM_KERNEL_MANAGER_H
 
 #include <map>
 #include <string>
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
 #    include <cuda_runtime.h>
 #  endif
 #endif
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/synthesis_enumerators.h"
@@ -19,11 +19,11 @@
 #include "Topology/atomgraph_enumerators.h"
 #include "gpu_details.h"
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 using constants::PrecisionModel;
-#ifndef OMNI_USE_HPC
+#ifndef STORMM_USE_HPC
 using data_types::int2;
 #endif
 using energy::EvaluateForce;
@@ -70,8 +70,8 @@ public:
                int shared_usage_in, const GpuDetails &gpu,
                const std::string &kernel_name_in = std::string(""));
 
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
   KernelFormat(const cudaFuncAttributes &attr, int lb_min_blocks_per_smp, int block_subdivision,
                const GpuDetails &gpu, const std::string &kernel_name_in = std::string(""));
 #  endif
@@ -307,6 +307,6 @@ std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce
 std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, ReductionStage process);
 
 } // namespace card
-} // namespace omni
+} // namespace stormm
 
 #endif

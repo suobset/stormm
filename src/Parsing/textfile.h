@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_TEXTFILE_H
-#define OMNI_TEXTFILE_H
+#ifndef STORMM_TEXTFILE_H
+#define STORMM_TEXTFILE_H
 
 #include <string>
 #include <vector>
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 /// \brief Many searches in TextFile objects will begin at a particular line.  If the query is not
@@ -128,6 +128,6 @@ private:
 };
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,5 +1,5 @@
 #include "../../src/Constants/behavior.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/energy_enumerators.h"
@@ -13,35 +13,35 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::llint;
-using omni::llint_type_index;
-using omni::double2;
-using omni::int2;
-using omni::int3;
-using omni::constants::ExceptionResponse;
-using omni::data_types::getOmniScalarTypeName;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::energy::StateVariable;
-using omni::energy::StaticExclusionMask;
-using omni::errors::rtWarn;
-using omni::parse::char4ToString;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::topology::amber_coulomb_constant;
-using omni::topology::AtomGraph;
-using omni::topology::AtomicRadiusSet;
-using omni::topology::ImplicitSolventModel;
-using omni::topology::ImplicitSolventKit;
-using omni::topology::NonbondedKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::PhaseSpaceWriter;
-using omni::trajectory::TrajectoryKind;
-using namespace omni::energy;
-using namespace omni::testing;
-using namespace omni::generalized_born_defaults;
+using stormm::llint;
+using stormm::llint_type_index;
+using stormm::double2;
+using stormm::int2;
+using stormm::int3;
+using stormm::constants::ExceptionResponse;
+using stormm::data_types::getStormmScalarTypeName;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::energy::StateVariable;
+using stormm::energy::StaticExclusionMask;
+using stormm::errors::rtWarn;
+using stormm::parse::char4ToString;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::topology::amber_coulomb_constant;
+using stormm::topology::AtomGraph;
+using stormm::topology::AtomicRadiusSet;
+using stormm::topology::ImplicitSolventModel;
+using stormm::topology::ImplicitSolventKit;
+using stormm::topology::NonbondedKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::PhaseSpace;
+using stormm::trajectory::PhaseSpaceWriter;
+using stormm::trajectory::TrajectoryKind;
+using namespace stormm::energy;
+using namespace stormm::testing;
+using namespace stormm::generalized_born_defaults;
 
 //-------------------------------------------------------------------------------------------------
 // Compute forces on selected atoms using a finite difference scheme.
@@ -139,8 +139,8 @@ void testNBPrecisionModel(const NonbondedKit<Tcalc> nbk, const ImplicitSolventKi
   const std::vector<double> gb_result = gb_frame.getInterlacedCoordinates();
   check(gb_result, RelationalOperator::EQUAL, Approx(gb_ref_frc).margin(tol),
         "Generalized Born forces do not agree with the reference when computed in " +
-        getOmniScalarTypeName<Tcalc>() + " with " + getOmniScalarTypeName<Tcoord>() +
-        " coordinates and " + getOmniScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+        getStormmScalarTypeName<Tcalc>() + " with " + getStormmScalarTypeName<Tcoord>() +
+        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -171,9 +171,9 @@ int main(const int argc, const char* argv[]) {
   
   // Locate topologies and coordinate files
   const char osc = osSeparator();
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string base_ptl_name = oe.getOmniSourcePath() + osc + "test" + osc + "Potential";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_ptl_name = oe.getStormmSourcePath() + osc + "test" + osc + "Potential";
   const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
   const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
@@ -189,8 +189,8 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_tests = (systems_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (systems_exist == false) {
     rtWarn("Files for the Trp-cage miniprotein, DHFR globular protein, and alanine dipeptide were "
-           "not found.  These files should be found in the ${OMNI_SOURCE}/test/Topology and "
-           "${OMNI_SOURCE}/test/Trajectory directories.  Check the $OMNI_SOURCE environment "
+           "not found.  These files should be found in the ${STORMM_SOURCE}/test/Topology and "
+           "${STORMM_SOURCE}/test/Trajectory directories.  Check the $STORMM_SOURCE environment "
            "variable.  A number of tests will be skipped.", "test_generalized_born");
   }
   const std::string trpi_snapshot(base_ptl_name + osc + "trpcage_gb_forces.m");
@@ -202,7 +202,7 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_snaps = (snaps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snaps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("Snapshot files for the Trp-cage miniprotein, DHFR globular protein, and alanine "
-           "dipeptide were not found.  These should be found in the ${OMNI_SOURCE}/test/Potential "
+           "dipeptide were not found.  These should be found in the ${STORMM_SOURCE}/test/Potential "
            "directory.  Some tests will be skipped.", "test_generalized_born");
   }
 
@@ -508,7 +508,7 @@ int main(const int argc, const char* argv[]) {
                             systems_exist);
   if (getDrivePathType(trpcage_traj) != DrivePathType::FILE) {
     rtWarn("A trajectory of Trp-cage conformations (isolated boundary conditions) was not found "
-           "in " + trpcage_traj + ".  Check the ${OMNI_SOURCE} environment variable for "
+           "in " + trpcage_traj + ".  Check the ${STORMM_SOURCE} environment variable for "
            "validity.  Subsequent tests will be skipped.", "test_generalized_born");
   }
   const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;

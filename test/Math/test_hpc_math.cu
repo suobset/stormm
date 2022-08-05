@@ -11,32 +11,32 @@
 #include "../../src/Random/hpc_random.cuh"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::ExceptionResponse;
-using omni::constants::tiny;
-using omni::constants::large_block_size;
-using omni::constants::warp_bits_mask_int;
-using omni::card::HpcConfig;
-using omni::card::Hybrid;
-using omni::card::HybridFormat;
-using omni::card::HybridTargetLevel;
-using omni::card::GpuDetails;
-using omni::data_types::llint;
-using omni::data_types::ullint;
-using omni::data_types::ullint2;
-using omni::data_types::ullint4;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::hpc_random::max_xo_long_jumps;
-using omni::hpc_random::seedXoroshiro128p;
-using omni::hpc_random::seedXoshiro256pp;
-using omni::random::Ran2Generator;
-using omni::random::Xoroshiro128pGenerator;
-using omni::random::Xoshiro256ppGenerator;
-using namespace omni::math;
-using namespace omni::hpc_math;
-using namespace omni::testing;
+using stormm::constants::ExceptionResponse;
+using stormm::constants::tiny;
+using stormm::constants::large_block_size;
+using stormm::constants::warp_bits_mask_int;
+using stormm::card::HpcConfig;
+using stormm::card::Hybrid;
+using stormm::card::HybridFormat;
+using stormm::card::HybridTargetLevel;
+using stormm::card::GpuDetails;
+using stormm::data_types::llint;
+using stormm::data_types::ullint;
+using stormm::data_types::ullint2;
+using stormm::data_types::ullint4;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::hpc_random::max_xo_long_jumps;
+using stormm::hpc_random::seedXoroshiro128p;
+using stormm::hpc_random::seedXoshiro256pp;
+using stormm::random::Ran2Generator;
+using stormm::random::Xoroshiro128pGenerator;
+using stormm::random::Xoshiro256ppGenerator;
+using namespace stormm::math;
+using namespace stormm::hpc_math;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Load a vector of random numbers using a CPU-based Ran2 generator.
@@ -109,7 +109,7 @@ kEvalXoroshiro128p(ullint2* state_vector, const int n_generators, const int2* sa
       max_iter = tmp_sample.y;
     }
   }
-#ifdef OMNI_USE_HIP
+#ifdef STORMM_USE_HIP
   const int init_shfl_stride = 32;
 #else
   const int init_shfl_stride = 16;
@@ -187,7 +187,7 @@ kEvalXoshiro256pp(ullint4* state_vector, const int n_generators, const int2* sam
       max_iter = tmp_sample.y;
     }
   }
-#ifdef OMNI_USE_HIP
+#ifdef STORMM_USE_HIP
   const int init_shfl_stride = 32;
 #else
   const int init_shfl_stride = 16;

@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_MATRIX_H
-#define OMNI_MATRIX_H
+#ifndef STORMM_MATRIX_H
+#define STORMM_MATRIX_H
 
 #include "Accelerator/hybrid.h"
 #include "Random/random.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::default_hpc_format;
@@ -116,7 +116,7 @@ public:
   /// \param tag_in   A note to help identify the column pointer
   Hybrid<T> colptr(size_t col_idx, const char* tag_in = nullptr);
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload the matrix to the device
   void upload();
 
@@ -129,7 +129,7 @@ private:
   size_t n_cols_pr;           ///< Number of columns
   size_t n_elem_pr;           ///< Total number of elements
   Hybrid<T> contents;         ///< The main, contiguous memory array for column-major data
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   Hybrid<T> transfer_buffer;  ///< Buffer with space allocated equal to the size of one column
                               ///<   for sparse or scattered data exchange between the host and
                               ///<   the device.
@@ -141,7 +141,7 @@ private:
 };
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "matrix.tpp"
 

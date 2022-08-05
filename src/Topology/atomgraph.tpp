@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace topology {
 
 //-------------------------------------------------------------------------------------------------
@@ -491,4 +491,4 @@ template <typename T> T AtomGraph::getGBScreeningFactor(const int index) const {
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

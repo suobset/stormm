@@ -14,16 +14,16 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using namespace omni::diskutil;
-using namespace omni::energy;
-using namespace omni::errors;
-using namespace omni::mm;
-using namespace omni::modeling;
-using namespace omni::namelist;
-using namespace omni::parse;
-using namespace omni::topology;
-using namespace omni::trajectory;
-using namespace omni::testing;
+using namespace stormm::diskutil;
+using namespace stormm::energy;
+using namespace stormm::errors;
+using namespace stormm::mm;
+using namespace stormm::modeling;
+using namespace stormm::namelist;
+using namespace stormm::parse;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 
@@ -41,9 +41,9 @@ int main(const int argc, const char* argv[]) {
 
   // Load a series of topologies, then modify them a bit at a time
   const char osc = osSeparator();
-  const std::string topology_home   = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string trajectory_home = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string chemistry_home  = oe.getOmniSourcePath() + osc + "test" + osc + "Chemistry";
+  const std::string topology_home   = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string trajectory_home = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string chemistry_home  = oe.getStormmSourcePath() + osc + "test" + osc + "Chemistry";
   const std::string  mol1_top_name  = topology_home + osc + "stereo_L1.top";
   const std::string  mol2_top_name  = topology_home + osc + "stereo_L1_vs.top";
   const std::string  mol3_top_name  = topology_home + osc + "symmetry_L1.top";
@@ -79,7 +79,7 @@ int main(const int argc, const char* argv[]) {
   if (files_exist == false) {
     rtWarn("Files for various small molecule structures in " + topology_home + ", " +
            trajectory_home + ", and " + chemistry_home + " were not found.  Check the "
-           "${OMNI_SOURCE} environment variable, currently set to " + oe.getOmniSourcePath() +
+           "${STORMM_SOURCE} environment variable, currently set to " + oe.getStormmSourcePath() +
            ", for validity.  Tests will be skipped.", "test_topology_mods");
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;

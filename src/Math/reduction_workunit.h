@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_REDUCTION_WORKUNIT_H
-#define OMNI_REDUCTION_WORKUNIT_H
+#ifndef STORMM_REDUCTION_WORKUNIT_H
+#define STORMM_REDUCTION_WORKUNIT_H
 
 #include <cmath>
 #include <vector>
@@ -8,7 +8,7 @@
 #include "Accelerator/gpu_details.h"
 #include "DataTypes/common_types.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::GpuDetails;
@@ -127,7 +127,7 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
                                                        int tasks_per_atom = 1);
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #endif
 

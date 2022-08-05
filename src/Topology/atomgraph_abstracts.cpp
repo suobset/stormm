@@ -1,7 +1,7 @@
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "atomgraph_abstracts.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 //-------------------------------------------------------------------------------------------------
@@ -20,4 +20,4 @@ ChemicalDetailsKit::ChemicalDetailsKit(const int natom_in, const int nres_in, co
 {}
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

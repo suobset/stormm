@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_BEHAVIOR_H
-#define OMNI_BEHAVIOR_H
+#ifndef STORMM_BEHAVIOR_H
+#define STORMM_BEHAVIOR_H
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace constants {
 
 /// \brief Enumerate the ways in which the code can respond to an exception under a variety of
@@ -45,6 +45,6 @@ PrecisionModel translatePrecisionModel(const std::string &choice, ExceptionRespo
 std::string getPrecisionModelName(PrecisionModel pmodel);
 
 } // namespace constants
-} // namespace omni
+} // namespace stormm
 
 #endif

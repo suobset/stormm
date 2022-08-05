@@ -2,7 +2,7 @@
 #include "Math/vector_ops.h"
 #include "nonbonded_workunit.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using constants::kilo;
@@ -547,4 +547,4 @@ buildNonbondedWorkUnits(const StaticExclusionMask &se) {
 }
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

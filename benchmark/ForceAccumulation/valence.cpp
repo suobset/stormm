@@ -16,31 +16,31 @@
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::ExceptionResponse;
-using omni::numerics::default_globalpos_scale_lf;
-using omni::numerics::default_globalpos_scale_f;
-using omni::numerics::default_inverse_globalpos_scale_lf;
-using omni::numerics::default_inverse_globalpos_scale_f;
-using omni::data_types::double_type_index;
-using omni::data_types::double3;
-using omni::data_types::float2;
-using omni::data_types::float3;
-using omni::data_types::llint;
-using omni::data_types::llint3;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::energy::EvaluateForce;
-using omni::energy::ScoreCard;
-using omni::errors::terminalFormat;
-using omni::parse::PolyNumeric;
-using omni::random::Xoshiro256ppGenerator;
-using omni::topology::AtomGraph;
-using omni::topology::ValenceKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::TrajectoryKind;
-using namespace omni::testing;
+using stormm::constants::ExceptionResponse;
+using stormm::numerics::default_globalpos_scale_lf;
+using stormm::numerics::default_globalpos_scale_f;
+using stormm::numerics::default_inverse_globalpos_scale_lf;
+using stormm::numerics::default_inverse_globalpos_scale_f;
+using stormm::data_types::double_type_index;
+using stormm::data_types::double3;
+using stormm::data_types::float2;
+using stormm::data_types::float3;
+using stormm::data_types::llint;
+using stormm::data_types::llint3;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::energy::EvaluateForce;
+using stormm::energy::ScoreCard;
+using stormm::errors::terminalFormat;
+using stormm::parse::PolyNumeric;
+using stormm::random::Xoshiro256ppGenerator;
+using stormm::topology::AtomGraph;
+using stormm::topology::ValenceKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::PhaseSpace;
+using stormm::trajectory::TrajectoryKind;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Compute the force between two particles given a set of harmonic bond parameters.
@@ -258,9 +258,9 @@ int main(int argc, char* argv[]) {
   
   // Read topology
   const char osc = osSeparator();
-  const std::string topology_home = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string topology_home = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string trpcage_top = topology_home + osc + "trpcage.top";
-  const std::string coordinate_home = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string coordinate_home = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string trpcage_crd = coordinate_home + osc + "trpcage.inpcrd";
   AtomGraph trpcage_ag;
   PhaseSpace trpcage_ps;

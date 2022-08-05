@@ -2,7 +2,7 @@
 #include "Parsing/parse.h"
 #include "atomgraph_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using parse::strcmpCased;
@@ -448,4 +448,4 @@ std::string getVirtualSiteFrameName(const VirtualSiteKind vsf) {
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

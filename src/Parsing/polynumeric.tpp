@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ template <typename T> std::vector<PolyNumeric> polyNumericVector(const std::vect
             "should have found the special overloaded case.", "polyNumericVector");
     }
     else {
-      rtErr("Data type " + getOmniHpcVectorTypeName<T>() + " cannot be converted into "
+      rtErr("Data type " + getStormmHpcVectorTypeName<T>() + " cannot be converted into "
             "PolyNumeric.  Use a scalar type or char4.", "polyNumericVector");
     }
   }
@@ -62,4 +62,4 @@ template <typename T> std::vector<PolyNumeric> polyNumericVector(const std::vect
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

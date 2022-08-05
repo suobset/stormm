@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NONBONDED_POTENTIAL_CUH
-#define OMNI_NONBONDED_POTENTIAL_CUH
+#ifndef STORMM_NONBONDED_POTENTIAL_CUH
+#define STORMM_NONBONDED_POTENTIAL_CUH
 
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
@@ -15,7 +15,7 @@
 #include "energy_enumerators.h"
 #include "scorecard.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
@@ -80,7 +80,7 @@ cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKin
 /// \param eval_energy  Whether to evaluate energies
 /// \param bt           Block and thread counts for the kernel, given the precision and force or
 ///                     energy computation requirements (an "abstract" of the KernelManager object)
-/// \param launcher     Contains launch parameters for all kernels in OMNI
+/// \param launcher     Contains launch parameters for all kernels in STORMM
 /// \{
 void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
@@ -109,6 +109,6 @@ void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
 /// \}
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #endif

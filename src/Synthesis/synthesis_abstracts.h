@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_SYNTHESIS_ABSTRACTS_H
-#define OMNI_SYNTHESIS_ABSTRACTS_H
+#ifndef STORMM_SYNTHESIS_ABSTRACTS_H
+#define STORMM_SYNTHESIS_ABSTRACTS_H
 
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "synthesis_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using topology::UnitCellType;
@@ -200,7 +200,7 @@ template <typename T> struct SyNonbondedKit {
 };
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #include "synthesis_abstracts.tpp"
 

@@ -3,7 +3,7 @@
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/hpc_reduction.h"
 #include "Math/reduction_abstracts.h"
 #include "Math/reduction_enumerators.h"
@@ -13,7 +13,7 @@
 #include "Synthesis/synthesis_enumerators.h"
 #include "hpc_minimization.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using constants::verytiny;
@@ -283,4 +283,4 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 }
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm

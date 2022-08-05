@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_FFT_H
-#define OMNI_FFT_H
+#ifndef STORMM_FFT_H
+#define STORMM_FFT_H
 
 #include "Accelerator/hybrid.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 /// \brief Object for managing an FFT, equivalent in some sense to FFTW-wisdom.
@@ -40,7 +40,7 @@ template <typename T> void fftButterfly2(T* data, int fstride, const FFTConfig &
 template <typename T> void r2c_dft(T* data, T* buffer, int length);
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "fft.tpp"
 

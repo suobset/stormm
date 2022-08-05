@@ -6,7 +6,7 @@
 #include "error_format.h"
 #include "FileManagement/file_listing.h"
 
-namespace omni {
+namespace stormm {
 namespace errors {
 
 //-------------------------------------------------------------------------------------------------
@@ -194,4 +194,4 @@ void rtAlert(const std::string &message, const char* class_caller, const char* m
 }
 
 } // namespace errors
-} // namespace omni
+} // namespace stormm

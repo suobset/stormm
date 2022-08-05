@@ -7,7 +7,7 @@
 #include "Reporting/error_format.h"
 #include "random.h"
 
-namespace omni {
+namespace stormm {
 namespace random {
 
 using parse::PolyNumeric;
@@ -403,4 +403,4 @@ void Xoshiro256ppGenerator::fastForward(ullint4 stride) {
 }
 
 } // namespace random
-} // namespace omni
+} // namespace stormm

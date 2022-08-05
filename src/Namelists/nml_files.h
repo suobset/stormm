@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NML_RST_H
-#define OMNI_NML_RST_H
+#ifndef STORMM_NML_RST_H
+#define STORMM_NML_RST_H
 
 #include <string>
 #include <vector>
@@ -9,7 +9,7 @@
 #include "Parsing/textfile.h"
 #include "Trajectory/trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using trajectory::CoordinateFileKind;
@@ -31,7 +31,7 @@ constexpr char default_filecon_chkcrd_type[] = "AMBER_ASCII_RST";
 /// \}
 
 /// \brief Object to encapsulate a system, a coupled set of coordinates and a single topology.
-///        This can be used to enforce conf.omni to read certain coordinates in the context of a
+///        This can be used to enforce conf.stormm to read certain coordinates in the context of a
 ///        particular topology, even when other viable topologies might be available.
 class MoleculeSystem {
 public:
@@ -483,6 +483,6 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                             ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

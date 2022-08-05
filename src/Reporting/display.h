@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_DISPLAY_H
-#define OMNI_DISPLAY_H
+#ifndef STORMM_DISPLAY_H
+#define STORMM_DISPLAY_H
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace display {
 
 /// \brief Print a horizontal bar of --- across the screen, using a corner of the developer's
@@ -14,6 +14,6 @@ void terminalHorizontalRule(const std::string &left_corner = std::string("+"),
                             int width = 0);
 
 } // namespace display
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,18 +1,18 @@
 // -*-c++-*-
-#ifndef OMNI_NML_RANDOM_H
-#define OMNI_NML_RANDOM_H
+#ifndef STORMM_NML_RANDOM_H
+#define STORMM_NML_RANDOM_H
 
 #include "Parsing/textfile.h"
 #include "input.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 /// \brief Default values for molecular dynamics
 /// \{
 constexpr int default_random_seed    = 30965871;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 constexpr int default_random_streams = 1048576;
 #else
 constexpr int default_random_streams = 1;
@@ -25,7 +25,7 @@ constexpr int default_random_warmup  = 96;
 ///        encapsualtors, this object can take input file data as part of its construction, or
 ///        by a series of setters.  Validation of each piece of data is handled as it appears
 ///        either in the contructor or via setters.  Getter functions dispense the internal
-///        information to any application using OMNI libraries.
+///        information to any application using STORMM libraries.
 class RandomControls {
 public:
 
@@ -105,7 +105,7 @@ private:
   
 /// \brief Produce a namelist for specifying random number generation protocols.  This subsumes the
 ///        igseed keyword found in the &cntrl namelist of the Amber sander program, and much more.
-///        OMNI random number streams created by any GPU can be reproduced exactly on the CPU.
+///        STORMM random number streams created by any GPU can be reproduced exactly on the CPU.
 ///
 /// \param tf          Input text file to scan immediately after the namelist has been created
 /// \param start_line  Line at which to begin scanning the input file for the namelist (this
@@ -124,6 +124,6 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
 void validateRandomSeed(int igseed, int *warmup_cycles);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

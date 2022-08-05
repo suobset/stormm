@@ -6,7 +6,7 @@
 #include "file_listing.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace diskutil {
 
 using errors::rtErr;
@@ -286,7 +286,7 @@ std::vector<std::string> listFilesInPath(const std::string &regexp_path, SearchS
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string findOmniPath(const std::string &path, const std::string &extension) {
+std::string findStormmPath(const std::string &path, const std::string &extension) {
   const std::string abs_path = pathIsAbsolute(path) ? path : makePathAbsolute(path);
   const std::vector<std::string> pieces = separatePath(abs_path);
   const int n_piece = pieces.size();
@@ -307,9 +307,9 @@ std::string findOmniPath(const std::string &path, const std::string &extension) 
     partial_path += pieces[i];
   }
 
-  // If this point is reached, a good guess as to ${OMNI_HOME} could not be made 
+  // If this point is reached, a good guess as to ${STORMM_HOME} could not be made 
   return std::string("");
 }
 
 } // namespace diskutil
-} // namespace omni
+} // namespace stormm

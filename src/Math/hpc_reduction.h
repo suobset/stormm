@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_REDUCTION_H
-#define OMNI_HPC_REDUCTION_H
+#ifndef STORMM_HPC_REDUCTION_H
+#define STORMM_HPC_REDUCTION_H
 
 #include "Accelerator/kernel_manager.h"
 #include "MolecularMechanics/mm_controls.h"
@@ -10,7 +10,7 @@
 #include "reduction_bridge.h"
 #include "reduction_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::KernelManager;
@@ -66,7 +66,7 @@ void launchConjugateGradient(PrecisionModel prec, const AtomGraphSynthesis poly_
                              MolecularMechanicsControls *mmctrl, const KernelManager &launcher);
 /// \}
 
-} // synthesis
-} // omni
+} // namespace synthesis
+} // namespace stormm
 
 #endif

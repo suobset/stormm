@@ -1,7 +1,7 @@
-#ifndef OMNI_TOPOLOGY_LIMITS_H
-#define OMNI_TOPOLOGY_LIMITS_H
+#ifndef STORMM_TOPOLOGY_LIMITS_H
+#define STORMM_TOPOLOGY_LIMITS_H
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 /// \brief Check an atom index against the available content, reporting an error if the bounds are
@@ -112,6 +112,6 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
                        const int* m_atoms = nullptr);
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #endif

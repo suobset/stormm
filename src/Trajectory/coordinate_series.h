@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_COORDINATE_SERIES_H
-#define OMNI_COORDINATE_SERIES_H
+#ifndef STORMM_COORDINATE_SERIES_H
+#define STORMM_COORDINATE_SERIES_H
 
 #include "Accelerator/hybrid.h"
 #include "Constants/fixed_precision.h"
@@ -13,7 +13,7 @@
 #include "phasespace.h"
 #include "trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using card::Hybrid;
@@ -206,7 +206,7 @@ public:
   ///        result should be interpreted as a 3x3 matrix in column-major format.
   ///
   /// \param frame_index  The frame for which to extract the transformation matrix
-  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if STORMM is compiled to run on a GPU)
   std::vector<double> getBoxSpaceTransform(int frame_index,
                                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
@@ -214,14 +214,14 @@ public:
   ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
   ///
   /// \param frame_index  The frame for which to extract the transformation matrix
-  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if STORMM is compiled to run on a GPU)
   std::vector<double> getInverseTransform(int frame_index,
                                           HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get the box dimensions in their pure form for a particular frame.
   ///
   /// \param frame_index  The frame for which to extract the transformation matrix
-  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if STORMM is compiled to run on a GPU)
   std::vector<double> getBoxDimensions(int frame_index,
                                        HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
@@ -230,7 +230,7 @@ public:
   ///        double-precision format.
   ///
   /// \param frame_index  The frame to extract
-  /// \param tier         Level at which to retrieve data (if OMNI is compiled to run on a GPU)
+  /// \param tier         Level at which to retrieve data (if STORMM is compiled to run on a GPU)
   CoordinateFrame exportFrame(int frame_index,
                               HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
@@ -243,13 +243,13 @@ public:
   /// \param expectation   The condition in which the output file is expected to be found
   /// \param low_index     The first frame index to export
   /// \param high_index    The upper limit of frame indices to export
-  /// \param tier          Level at which to retrieve data (if OMNI is compiled to run on a GPU)
+  /// \param tier          Level at which to retrieve data (if STORMM is compiled to run on a GPU)
   void exportToFile(const std::string &file_name,
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN, int low_index = 0,
                     int high_index = 0, HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload all information
   void upload();
 
@@ -455,7 +455,7 @@ CoordinateSeries<Tnew> changeCoordinateSeriesType(const CoordinateSeries<Torig> 
                                                   int globalpos_scale_bits_in);
   
 } // namespace trajectory 
-} // namespace omni
+} // namespace stormm
 
 #include "coordinate_series.tpp"
 

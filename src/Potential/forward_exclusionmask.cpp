@@ -2,7 +2,7 @@
 #include "Parsing/parse.h"
 #include "forward_exclusionmask.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using parse::char4ToString;
@@ -385,4 +385,4 @@ bool ForwardExclusionMask::testExclusion(const int atom_i, const int atom_j) con
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

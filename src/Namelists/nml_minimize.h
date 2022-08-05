@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_NML_MINIMIZE_H
-#define OMNI_NML_MINIMIZE_H
+#ifndef STORMM_NML_MINIMIZE_H
+#define STORMM_NML_MINIMIZE_H
 
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
 #include "input.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 /// \brief Default values for energy minimization
@@ -25,7 +25,7 @@ constexpr double default_minimize_drms       = 0.0001;
 ///        encapsualtors, this object can take input file data as part of its construction, or
 ///        by a series of setters.  Validation of each piece of data is handled as it appears
 ///        either in the contructor or via setters.  Getter functions dispense the internal
-///        information to any application using OMNI libraries.
+///        information to any application using STORMM libraries.
 class MinimizeControls {
 public:
 
@@ -178,6 +178,6 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
                                ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

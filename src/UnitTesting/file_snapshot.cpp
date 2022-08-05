@@ -7,16 +7,16 @@
 #include <vector>
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/vector_ops.h"
 #include "Parsing/ascii_numbers.h"
 #include "file_snapshot.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
-using data_types::getOmniScalarTypeName;
-using data_types::getOmniHpcVectorTypeName;
+using data_types::getStormmScalarTypeName;
+using data_types::getStormmHpcVectorTypeName;
 using parse::printNumberSeries;
 using parse::readNumberSeries;
 using parse::separateText;
@@ -64,7 +64,7 @@ std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &lab
               else {
                 data_format = NumberFormat::SCIENTIFIC;
               }
-              tname = getOmniScalarTypeName<double>();
+              tname = getStormmScalarTypeName<double>();
             }
             else if (snapshot_info[i + 1] == "INTEGER" ||
                      snapshot_info[i + 1] == "UNSIGNED_INTEGER" ||
@@ -75,23 +75,23 @@ std::vector<PolyNumeric> readSnapshot(const TextFile &tf, const std::string &lab
               problem = (snapshot_info[i + 4] != "}" || problem);
               if (snapshot_info[i + 1] == "INTEGER") {
                 data_format = NumberFormat::INTEGER;
-                tname = getOmniScalarTypeName<int>();
+                tname = getStormmScalarTypeName<int>();
               }
               else if (snapshot_info[i + 1] == "UNSIGNED_INTEGER") {
                 data_format = NumberFormat::UNSIGNED_INTEGER;
-                tname = getOmniScalarTypeName<uint>();
+                tname = getStormmScalarTypeName<uint>();
               }
               else if (snapshot_info[i + 1] == "LONG_LONG_INTEGER") {
                 data_format = NumberFormat::LONG_LONG_INTEGER;
-                tname = getOmniScalarTypeName<llint>();
+                tname = getStormmScalarTypeName<llint>();
               }
               else if (snapshot_info[i + 1] == "UNSIGNED_LONG_LONG_INTEGER"){
                 data_format = NumberFormat::UNSIGNED_LONG_LONG_INTEGER;
-                tname = getOmniScalarTypeName<ullint>();
+                tname = getStormmScalarTypeName<ullint>();
               }
 	      else {
                 data_format = NumberFormat::CHAR4;
-                tname = getOmniHpcVectorTypeName<char4>();
+                tname = getStormmHpcVectorTypeName<char4>();
 	      }
             }
             else {
@@ -193,7 +193,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
                            fabs(log10(abs_maxv)) : 2;
       width = n_digits + 7;
       digits_after_decimal = n_digits - 1;
-      name_of_the_type = getOmniScalarTypeName<double>();
+      name_of_the_type = getStormmScalarTypeName<double>();
     }
     break;
   case NumberFormat::STANDARD_REAL:
@@ -204,7 +204,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
       const int digits_before_decimal = (fabs(maxv) > 1.0) ?
                                         ceil(fabs(log10(fabs(maxv)))) + 0.01 : 1;
       width = digits_before_decimal + digits_after_decimal + 3;
-      name_of_the_type = getOmniScalarTypeName<double>();
+      name_of_the_type = getStormmScalarTypeName<double>();
     }
     break;
   case NumberFormat::INTEGER:
@@ -215,7 +215,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
                            ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
       width = n_digits + 2 + (minValue(icontent) < 0);
       digits_after_decimal = 0;
-      name_of_the_type = getOmniScalarTypeName<int>();
+      name_of_the_type = getStormmScalarTypeName<int>();
     }
     break;
   case NumberFormat::LONG_LONG_INTEGER:
@@ -226,7 +226,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
                            ceil(fabs(log10(fabs(static_cast<double>(maxv) * 1.1)))) + 0.01 : 2;
       width = n_digits + 2 + (minValue(icontent) < 0);
       digits_after_decimal = 0;
-      name_of_the_type = getOmniScalarTypeName<llint>();
+      name_of_the_type = getStormmScalarTypeName<llint>();
     } 
     break;
   case NumberFormat::UNSIGNED_INTEGER:
@@ -237,7 +237,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
                            ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
       width = n_digits + 1;
       digits_after_decimal = 0;
-      name_of_the_type = getOmniScalarTypeName<uint>();
+      name_of_the_type = getStormmScalarTypeName<uint>();
     }
     break;
   case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
@@ -248,11 +248,11 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
                            ceil(fabs(log10(fabs(static_cast<double>(maxv))))) + 0.01 : 2;
       width = n_digits + 1;
       digits_after_decimal = 0;
-      name_of_the_type = getOmniScalarTypeName<ullint>();
+      name_of_the_type = getStormmScalarTypeName<ullint>();
     }
     break;
   case NumberFormat::CHAR4:
-    name_of_the_type = getOmniHpcVectorTypeName<char4>();
+    name_of_the_type = getStormmHpcVectorTypeName<char4>();
     width = 5;
     break;
   }
@@ -300,7 +300,7 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
   // Print the data, in sections if the vector contains HPC vector tuple types.  Pad the content
   // with zeros in the event that it would print an inconsistent number of values on the last line,
   // so that Matlab and Octave can read the data as a variable and reshape it to a vector just as
-  // it was in the Omni program's memory.
+  // it was in the STORMM program's memory.
   foutp.write(buffer.data(), strlen(buffer.data()));
   const std::string var_label = (label.size() > 0) ? label : "data";
   sprintf(buffer.data(), "%s = [\n", var_label.c_str());
@@ -330,4 +330,4 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

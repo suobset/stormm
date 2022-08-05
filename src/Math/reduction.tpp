@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -224,4 +224,4 @@ void evalReduction(GenericRdSubstrate<T> *rsbs, const ReductionKit &redk,
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

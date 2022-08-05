@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_FILE_UTIL_H
-#define OMNI_FILE_UTIL_H
+#ifndef STORMM_FILE_UTIL_H
+#define STORMM_FILE_UTIL_H
 
 #include <fstream>
 #include <iostream>
 #include <string>
 #include "Constants/behavior.h"
 
-namespace omni {
+namespace stormm {
 namespace diskutil {
 
 using constants::ExceptionResponse;
@@ -48,6 +48,6 @@ std::ofstream openOutputFile(const std::string &filename,
 int removeFile(const std::string &filename, ExceptionResponse policy = ExceptionResponse::WARN);
 
 } // namespace diskutil
-} // namespace omni
+} // namespace stormm
 
 #endif

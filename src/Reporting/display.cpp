@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include "display.h"
 
-namespace omni {
+namespace stormm {
 namespace display {
 
 //-------------------------------------------------------------------------------------------------
@@ -20,4 +20,4 @@ void terminalHorizontalRule(const std::string &left_corner, const std::string &r
 }
 
 } // namespace display
-} // namespace omni
+} // namespace stormm

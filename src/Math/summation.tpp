@@ -1,9 +1,9 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 using data_types::isScalarType;
-using data_types::getOmniScalarTypeName;
+using data_types::getStormmScalarTypeName;
 
 //-------------------------------------------------------------------------------------------------
 template <typename TSum, typename TBase>
@@ -31,10 +31,10 @@ void prefixSumInPlace(std::vector<TBase> *v, const PrefixSumType style, const ch
   }
   if (llsum != Approx(sum, ComparisonType::RELATIVE, constants::tiny)) {
     const std::string tsum_name = isScalarType<TSum>() ?
-                                  getOmniScalarTypeName<TSum>() :
+                                  getStormmScalarTypeName<TSum>() :
                                   std::string(std::type_index(typeid(TSum)).name());
     const std::string tbase_name = isScalarType<TBase>() ?
-                                   getOmniScalarTypeName<TBase>() :
+                                   getStormmScalarTypeName<TBase>() :
                                    std::string(std::type_index(typeid(TBase)).name());
     const std::string callfunc = (caller == nullptr) ? "" : ".  Called by " + std::string(caller);
     rtErr("Overflow of numerical format.  Summation of a " + std::to_string(n_elements) +
@@ -112,7 +112,7 @@ TSum sumTuple2(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
       total.y += static_cast<TSum>(hbptr[i].y);
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     rtErr("Device summation is not yet implemented.", "sumTuple2");
 #endif
@@ -159,7 +159,7 @@ TSum sumTuple3(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
       total.z += static_cast<TSum>(hbptr[i].z);
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     rtErr("Device summation is not yet implemented.", "sumTuple3");
 #endif
@@ -209,7 +209,7 @@ TSum sumTuple4(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
       total.w += static_cast<TSum>(hbptr[i].w);
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     rtErr("Device summation is not yet implemented.", "sumTuple4");
 #endif
@@ -218,4 +218,4 @@ TSum sumTuple4(const Hybrid<TBase> &hb, const HybridTargetLevel tier) {
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_MATRIX_OPS_H
-#define OMNI_MATRIX_OPS_H
+#ifndef STORMM_MATRIX_OPS_H
+#define STORMM_MATRIX_OPS_H
 
 #include <algorithm>
 #include <cmath>
@@ -14,7 +14,7 @@
 #include "UnitTesting/file_snapshot.h"
 #include "matrix.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using constants::ExceptionResponse;
@@ -242,7 +242,7 @@ void printMatrix(const HpcMatrix<T> &matrix, const std::string &varname,
 /// \}
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "matrix_ops.tpp"
 

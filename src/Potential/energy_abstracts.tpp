@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -28,4 +28,4 @@ ImplicitSolventRecipe<T>::ImplicitSolventRecipe(const ImplicitSolventKit<T> &isk
 {}
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

@@ -3,7 +3,7 @@
 #include "Parsing/parse.h"
 #include "forcefield_element.h"
 
-namespace omni {
+namespace stormm {
 namespace modeling {
 
 using parse::uppercase;
@@ -1399,4 +1399,4 @@ void ForceFieldElement::apply(AtomGraph *ag, const ExceptionResponse policy) con
 }
 
 } // namespace modeling
-} // namespace omni
+} // namespace stormm

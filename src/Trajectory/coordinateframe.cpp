@@ -7,7 +7,7 @@
 #include "coordinateframe.h"
 #include "trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using constants::CartesianDimension;
@@ -437,7 +437,7 @@ CoordinateFrame::getInterlacedCoordinates(const int low_index, const int high_in
       }
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
       const std::vector<double> xval = x_coordinates.readDevice(low_index, high_index);
@@ -460,7 +460,7 @@ std::vector<double> CoordinateFrame::getBoxSpaceTransform(const HybridTargetLeve
   switch (tier) {
   case HybridTargetLevel::HOST:
     return box_space_transform.readHost();
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return box_space_transform.readDevice();
 #endif
@@ -473,7 +473,7 @@ std::vector<double> CoordinateFrame::getInverseTransform(const HybridTargetLevel
   switch (tier) {
   case HybridTargetLevel::HOST:
     return inverse_transform.readHost();
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return inverse_transform.readDevice();
 #endif
@@ -486,7 +486,7 @@ std::vector<double> CoordinateFrame::getBoxDimensions(const HybridTargetLevel ti
   switch (tier) {
   case HybridTargetLevel::HOST:
     return box_dimensions.readHost();
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return box_dimensions.readDevice();
 #endif
@@ -540,7 +540,7 @@ void CoordinateFrame::allocate() {
   box_dimensions.setPointer(&storage,     (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void CoordinateFrame::upload() {
   storage.upload();
@@ -725,4 +725,4 @@ std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const in
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

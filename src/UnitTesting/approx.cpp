@@ -1,7 +1,7 @@
 #include <cmath>
 #include "approx.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 //-------------------------------------------------------------------------------------------------
@@ -189,4 +189,4 @@ bool operator<=(const Approx &cr, const double d) {
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

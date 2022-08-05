@@ -2,7 +2,7 @@
 #include "Math/rounding.h"
 #include "static_mask_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
@@ -218,7 +218,7 @@ SeMaskSynthesisReader StaticExclusionMaskSynthesis::data(const HybridTargetLevel
                                tile_map_indices.data(tier), all_masks.data(tier));
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void StaticExclusionMaskSynthesis::upload() {
   atom_counts.upload();
@@ -241,4 +241,4 @@ void StaticExclusionMaskSynthesis::download() {
 #endif
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

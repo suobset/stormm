@@ -3,7 +3,7 @@
 #include "Reporting/error_format.h"
 #include "line_minimization.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using card::HybridKind;
@@ -120,7 +120,7 @@ std::vector<double> LineMinimization::getMoveLength(const HybridTargetLevel tier
   switch (tier) {
   case HybridTargetLevel::HOST:
     return move_length.readHost();
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return move_length.readDevice();
 #endif
@@ -134,7 +134,7 @@ double LineMinimization::getMoveLength(const int system_index,
   switch (tier) {
   case HybridTargetLevel::HOST:
     return move_length.readHost(system_index);
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return move_length.readDevice(system_index);
 #endif
@@ -160,7 +160,7 @@ std::vector<double> LineMinimization::getMoveFactor(const int move_index,
       break;
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (move_index) {
     case 0:
@@ -202,7 +202,7 @@ double LineMinimization::getMoveFactor(const int move_index, const int system_in
       break;
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (move_index) {
     case 0:
@@ -246,7 +246,7 @@ std::vector<double> LineMinimization::getEnergy(const int move_index,
       break;
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (move_index) {
     case 0:
@@ -292,7 +292,7 @@ double LineMinimization::getEnergy(const int move_index,
       break;
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (move_index) {
     case 0:
@@ -340,12 +340,12 @@ void LineMinimization::primeMoveLengths(const double dx0) {
   for (int i = 0; i < system_count; i++) {
     l_move_ptr[i] = dx0;
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   move_length.upload();
 #endif
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void LineMinimization::upload() {
   storage.upload();
@@ -358,4 +358,4 @@ void LineMinimization::download() {
 #endif
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm

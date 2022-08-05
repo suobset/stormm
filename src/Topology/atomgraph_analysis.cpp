@@ -7,7 +7,7 @@
 #include "atomgraph_analysis.h"
 #include "atomgraph_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using math::findBin;
@@ -698,4 +698,4 @@ std::vector<int> selectRotatingAtoms(const AtomGraph *ag, const int atom_i, cons
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

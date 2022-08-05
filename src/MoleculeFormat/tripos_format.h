@@ -1,5 +1,5 @@
-#ifndef OMNI_TRIPOS_FORMAT_H
-#define OMNI_TRIPOS_FORMAT_H
+#ifndef STORMM_TRIPOS_FORMAT_H
+#define STORMM_TRIPOS_FORMAT_H
 
 #include <string>
 #include "Topology/atomgraph.h"

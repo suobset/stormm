@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NML_FFMORPH_H
-#define OMNI_NML_FFMORPH_H
+#ifndef STORMM_NML_FFMORPH_H
+#define STORMM_NML_FFMORPH_H
 
 #include "Constants/behavior.h"
 #include "ForceField/forcefield_element.h"
@@ -9,7 +9,7 @@
 #include "input.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using modeling::ForceFieldElement;
@@ -99,6 +99,6 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
                               const ExceptionResponse policy);
   
 } // namespace namelist
-} // namespave omni
+} // namespace stormm
 
 #endif

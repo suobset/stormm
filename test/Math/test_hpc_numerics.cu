@@ -1,8 +1,8 @@
 // -*-c++-*-
 #include "../../src/UnitTesting/unit_test.h"
 
-using namespace omni::numerics;
-using namespace omni::testing;
+using namespace stormm::numerics;
+using namespace stormm::testing;
 
 #include "../../src/Potential/accumulation.i"
 

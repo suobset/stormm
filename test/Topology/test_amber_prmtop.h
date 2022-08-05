@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_TEST_AMBER_PRMTOP_H
-#define OMNI_TEST_AMBER_PRMTOP_H
+#ifndef STORMM_TEST_AMBER_PRMTOP_H
+#define STORMM_TEST_AMBER_PRMTOP_H
 
 #include <vector>
 #include "../../src/Constants/scaling.h"
@@ -10,7 +10,7 @@
 #include "../../src/Topology/atomgraph_analysis.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
 
-using namespace omni::topology;
+using namespace stormm::topology;
 
 //-------------------------------------------------------------------------------------------------
 // Enumerated real-valued analyses of every topology in a list

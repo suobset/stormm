@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_THERMOSTAT_H
-#define OMNI_THERMOSTAT_H
+#ifndef STORMM_THERMOSTAT_H
+#define STORMM_THERMOSTAT_H
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 /// \brief Enumerate the various thermostats available for simulations
@@ -39,6 +39,6 @@ private:
 std::string getThermostatName(ThermostatKind kind);
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

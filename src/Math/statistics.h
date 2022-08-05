@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_STATISTICS_H
-#define OMNI_STATISTICS_H
+#ifndef STORMM_STATISTICS_H
+#define STORMM_STATISTICS_H
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 /// \brief Enumerate various statistical methods for computing the variance of a sequence of
@@ -74,6 +74,6 @@ double running_coefficient_of_variation(double sum_of_squares, double sum_of_val
 double running_normalized_rmsd(double sum_of_squares, double sum_of_values, int sample_count);
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #endif

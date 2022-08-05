@@ -1,15 +1,15 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_CONFIG_CUH
-#define OMNI_HPC_CONFIG_CUH
+#ifndef STORMM_HPC_CONFIG_CUH
+#define STORMM_HPC_CONFIG_CUH
 
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 #include <cusolverDn.h>
 #include "cublas_v2.h"
 #endif
 #include "Constants/behavior.h"
 #include "gpu_details.h"
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 using constants::ExceptionResponse;
@@ -20,14 +20,14 @@ class HpcConfig {
 public:
   
   /// \brief Constructor for an HpcConfig object.  One such object should be present in any given
-  ///        OMNI executable.
+  ///        STORMM executable.
   HpcConfig(ExceptionResponse policy = ExceptionResponse::DIE);
 
   /// \brief Destructor encapsulates HPC shutdown protocols
   ~HpcConfig();
 
   /// \brief Return the total number of GPUs in the server or workstation, whether they are
-  ///        supported by OMNI or not, whether they are available or not
+  ///        supported by STORMM or not, whether they are available or not
   int getOverallGpuCount() const;
 
   /// \brief Return the count of available and supported GPUs in the server or workstation
@@ -62,13 +62,13 @@ private:
   cusolverDnHandle_t cusolver_handle; ///< The cuSolver handle, initialized during construction
 };
 
-/// \brief Return a list of all viable GPUs which will support OMNI's code and are not occupied
+/// \brief Return a list of all viable GPUs which will support STORMM's code and are not occupied
 ///        with some other activity.
 ///
 /// \param policy  The behavior to take if no viable GPUs are found
 const std::vector<GpuDetails> queryGpuStats(ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace card
-} // namespace omni
+} // namespace stormm
 
 #endif

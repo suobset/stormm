@@ -32,20 +32,20 @@
 #include "../../src/UnitTesting/stopwatch.h"
 #include "assemble_restraints.h"
 
-using namespace omni::card;
-using namespace omni::constants;
-using namespace omni::errors;
-using namespace omni::diskutil;
-using namespace omni::energy;
-using namespace omni::math;
-using namespace omni::mm;
-using namespace omni::numerics;
-using namespace omni::parse;
-using namespace omni::restraints;
-using namespace omni::synthesis;
-using namespace omni::testing;
-using namespace omni::topology;
-using namespace omni::trajectory;
+using namespace stormm::card;
+using namespace stormm::constants;
+using namespace stormm::errors;
+using namespace stormm::diskutil;
+using namespace stormm::energy;
+using namespace stormm::math;
+using namespace stormm::mm;
+using namespace stormm::numerics;
+using namespace stormm::parse;
+using namespace stormm::restraints;
+using namespace stormm::synthesis;
+using namespace stormm::testing;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Compute forces due to valence interactions acting on a series of systems using topology and
@@ -301,9 +301,9 @@ int main(const int argc, const char* argv[]) {
   // Collect coordinates and topologies
   const char osc = osSeparator();
   std::string buffer("&files\n  -p ");
-  buffer += oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" + osc + "topol" + osc +
+  buffer += oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" + osc + "topol" + osc +
             ".*.top\n  -c ";
-  buffer += oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" + osc + "coord" + osc +
+  buffer += oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" + osc + "coord" + osc +
             ".*.inpcrd\n&end\n";
   const TextFile tf(buffer, TextOrigin::RAM);
   int start_line = 0;
@@ -410,11 +410,11 @@ int main(const int argc, const char* argv[]) {
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
 
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
-  const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string topology_base = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string trpi_top_name = topology_base + osc + "trpcage.top";
   const std::string dhfr_top_name = topology_base + osc + "dhfr_cmap.top";
   const std::string alad_top_name = topology_base + osc + "ala_dipeptide.top";
-  const std::string coordinate_base = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string coordinate_base = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string trpi_crd_name = coordinate_base + osc + "trpcage.inpcrd";
   const std::string dhfr_crd_name = coordinate_base + osc + "dhfr_cmap.inpcrd";
   const std::string alad_crd_name = coordinate_base + osc + "ala_dipeptide.inpcrd";  
@@ -436,7 +436,7 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Files for several systems in implicit solvent were not found.  Check the "
-           "${OMNI_SOURCE} environment variable for validity.  Subsequent tests will be skipped.");
+           "${STORMM_SOURCE} environment variable for validity.  Subsequent tests will be skipped.");
   }
 
   // Read some larger topologies, with CHARMM CMAP and other force field terms

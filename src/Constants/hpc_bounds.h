@@ -1,16 +1,16 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_BOUNDS_H
-#define OMNI_HPC_BOUNDS_H
+#ifndef STORMM_HPC_BOUNDS_H
+#define STORMM_HPC_BOUNDS_H
 
 #include "DataTypes/common_types.h"
 
-namespace omni {
+namespace stormm {
 namespace constants {
 
 /// \brief The warp size can be given in many number formats to minimize type conversions during
 ///        compute-intensive processes
 /// \{
-#ifdef OMNI_USE_HIP
+#ifdef STORMM_USE_HIP
 constexpr size_t warp_size_zu = 64;
 constexpr int warp_size_int = 64;
 constexpr unsigned long int warp_size_lu = 64LU;
@@ -73,10 +73,10 @@ constexpr int large_block_warps  = (large_block_size >> warp_bits);
 /// \}
   
 } // namespace constants
-} // namespace omni
+} // namespace stormm
 
 // Share the major block bounds
-namespace omni {
+namespace stormm {
 using constants::warp_size_zu;
 using constants::warp_size_int;
 using constants::warp_size_lu;

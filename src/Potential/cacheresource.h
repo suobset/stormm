@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_CACHERESOURCE_H
-#define OMNI_CACHERESOURCE_H
+#ifndef STORMM_CACHERESOURCE_H
+#define STORMM_CACHERESOURCE_H
 
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::Hybrid;
@@ -130,7 +130,7 @@ private:
 };
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #include "cacheresource.tpp"
 

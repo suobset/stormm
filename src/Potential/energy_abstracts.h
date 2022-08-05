@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_ENERGY_ABSTRACTS_H
-#define OMNI_ENERGY_ABSTRACTS_H
+#ifndef STORMM_ENERGY_ABSTRACTS_H
+#define STORMM_ENERGY_ABSTRACTS_H
 
 #include "Constants/generalized_born.h"
 #include "Topology/atomgraph_abstracts.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using generalized_born_defaults::NeckGeneralizedBornKit;
@@ -52,7 +52,7 @@ template <typename T> struct ImplicitSolventRecipe {
 };
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #include "energy_abstracts.tpp"
 

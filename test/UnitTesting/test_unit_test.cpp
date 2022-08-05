@@ -1,4 +1,4 @@
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_util.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
@@ -8,13 +8,13 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/Random/random.h"
 
-using omni::data_types::int4;
-using omni::diskutil::osSeparator;
-using omni::diskutil::PrintSituation;
-using omni::errors::rtWarn;
-using omni::parse::polyNumericVector;
-using omni::random::Ran2Generator;
-using namespace omni::testing;
+using stormm::data_types::int4;
+using stormm::diskutil::osSeparator;
+using stormm::diskutil::PrintSituation;
+using stormm::errors::rtWarn;
+using stormm::parse::polyNumericVector;
+using stormm::random::Ran2Generator;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 
@@ -115,7 +115,7 @@ int main(const int argc, const char* argv[]) {
                                                                 TestPriority::ABORT;
   if (snp_tests == TestPriority::ABORT) {
     rtWarn("The temporary directory " + oe.getTemporaryDirectoryPath() + " is not writeable and "
-           "will therefore not support some subsequent tests.  Make sure that the $OMNI_TMPDIR "
+           "will therefore not support some subsequent tests.  Make sure that the $STORMM_TMPDIR "
            "environment variable is set to a directory where you have write permissions.",
            "test_unit_test");
   }

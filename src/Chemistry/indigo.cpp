@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "Constants/symbol_values.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
@@ -13,7 +13,7 @@
 #include "indigo.h"
 #include "periodic_table.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 using card::HybridKind;
@@ -1810,4 +1810,4 @@ double IndigoTable::addToGroundState(const IndigoAtomCenter &ac, const int state
 }
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm

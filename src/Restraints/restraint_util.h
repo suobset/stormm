@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_RESTRAINT_UTIL_H
-#define OMNI_RESTRAINT_UTIL_H
+#ifndef STORMM_RESTRAINT_UTIL_H
+#define STORMM_RESTRAINT_UTIL_H
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 /// \brief Compute critical elements of the restraining potential: its difference from the target
@@ -34,7 +34,7 @@ template <typename T>
 Vec2<T> computeRestraintMixture(int step_number, int init_step, int final_step);
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm
 
 #include "restraint_util.tpp"
 

@@ -9,7 +9,7 @@
 #include "Reporting/error_format.h"
 #include "stopwatch.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using math::sum;
@@ -294,4 +294,4 @@ int StopWatch::validateCategoryName(const std::string &query,
 }
   
 } // namespace testing
-} // namespace omni
+} // namespace stormm

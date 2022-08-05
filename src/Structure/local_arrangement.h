@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_LOCAL_ARRANGEMENT_H
-#define OMNI_LOCAL_ARRANGEMENT_H
+#ifndef STORMM_LOCAL_ARRANGEMENT_H
+#define STORMM_LOCAL_ARRANGEMENT_H
 
 #include <cmath>
 #include "Constants/symbol_values.h"
@@ -15,7 +15,7 @@
 #include "Trajectory/phasespace.h"
 #include "structure_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using card::Hybrid;
@@ -162,7 +162,7 @@ double dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const Phas
 /// \}
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #include "local_arrangement.tpp"
 

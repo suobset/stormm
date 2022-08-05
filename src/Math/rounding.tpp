@@ -1,6 +1,6 @@
 // -*-c++-*-
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -83,4 +83,4 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

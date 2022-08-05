@@ -1,7 +1,7 @@
 #include "rmsd.h"
 #include "structure_utils.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
   
 //-------------------------------------------------------------------------------------------------
@@ -69,4 +69,4 @@ double rmsd(const CoordinateFrame &cf_a, const CoordinateFrame &cf_b, const Atom
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

@@ -4,7 +4,7 @@
 #include "atommask.h"
 #include "znumber.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 using card::HybridKind;
@@ -1113,4 +1113,4 @@ std::vector<uint> AtomMask::parseMask(const std::vector<int> &scope_levels, int 
 }
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm

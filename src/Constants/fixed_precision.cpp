@@ -2,7 +2,7 @@
 #include "Reporting/error_format.h"
 #include "fixed_precision.h"
 
-namespace omni {
+namespace stormm {
 namespace numerics {
 
 using constants::getPrecisionModelName;
@@ -202,4 +202,4 @@ void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
 }
 
 } // namespace numerics
-} // namespace omni
+} // namespace stormm

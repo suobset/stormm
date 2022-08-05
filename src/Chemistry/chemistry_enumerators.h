@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_CHEMISTRY_ENUMERATORS_H
-#define OMNI_CHEMISTRY_ENUMERATORS_H
+#ifndef STORMM_CHEMISTRY_ENUMERATORS_H
+#define STORMM_CHEMISTRY_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 /// \brief Enumerate the chiral orientations of a center with four unique bonded groups
@@ -42,7 +42,7 @@ enum class RotatorCriterion {
 };
   
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm
 
 #endif
 

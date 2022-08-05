@@ -1,7 +1,7 @@
 #include "global_manipulation.h"
 #include "structure_utils.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using topology::UnitCellType;
@@ -108,4 +108,4 @@ void translateCoordinates(PhaseSpace *ps, const AtomGraph &ag, const double xmov
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

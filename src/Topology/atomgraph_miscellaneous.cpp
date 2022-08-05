@@ -3,7 +3,7 @@
 #include <climits>
 #include "atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 //-------------------------------------------------------------------------------------------------
@@ -44,4 +44,4 @@ std::vector<char4> AtomGraph::matchOverflowResidueName(const std::string &query)
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

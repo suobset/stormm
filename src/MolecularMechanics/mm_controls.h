@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_MM_CONTROLS_H
-#define OMNI_MM_CONTROLS_H
+#ifndef STORMM_MM_CONTROLS_H
+#define STORMM_MM_CONTROLS_H
 
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
@@ -12,7 +12,7 @@
 #include "Namelists/nml_minimize.h"
 #include "Synthesis/atomgraph_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using card::GpuDetails;
@@ -188,7 +188,7 @@ public:
   /// \brief Increment the step counter, moving the controls to a different progress counter.
   void incrementStep();
   
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload the object's contents to the device (needed so that CPU-primed work unit
   ///        counters can go into effect)
   void upload();
@@ -240,7 +240,7 @@ private:
 };
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm
 
 #include "mm_controls.tpp"
 

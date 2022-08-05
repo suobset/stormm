@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_PERIODIC_TABLE_H
-#define OMNI_PERIODIC_TABLE_H
+#ifndef STORMM_PERIODIC_TABLE_H
+#define STORMM_PERIODIC_TABLE_H
 
 #include <array>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 constexpr int element_maximum_count = 96;
@@ -174,6 +174,6 @@ constexpr std::array<int, element_maximum_count + 1> elemental_groups = {
 };
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_NML_CONFORMER_H
-#define OMNI_NML_CONFORMER_H
+#ifndef STORMM_NML_CONFORMER_H
+#define STORMM_NML_CONFORMER_H
 
 #include "Constants/behavior.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_element.h"
 #include "Parsing/textfile.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
@@ -149,6 +149,6 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
                                 ExceptionResponse policy);
   
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

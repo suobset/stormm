@@ -1,5 +1,5 @@
 #include "Constants/symbol_values.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Restraints/bounded_restraint.h"
 #include "Structure/local_arrangement.h"
 #include "Topology/atomgraph_abstracts.h"
@@ -8,7 +8,7 @@
 #include "restraint_apparatus.h"
 #include "restraint_builder.h"
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 using chemistry::ChemicalFeatures;
@@ -340,4 +340,4 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const CoordinateFrameReader &cf
 }
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm

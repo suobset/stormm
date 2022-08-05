@@ -1,17 +1,17 @@
 // -*-c++-*-
-#ifndef OMNI_PARSE_H
-#define OMNI_PARSE_H
+#ifndef STORMM_PARSE_H
+#define STORMM_PARSE_H
 
 #include <vector>
 #include <string>
 #include "Constants/behavior.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "polynumeric.h"
 #include "textfile.h"
 #include "textguard.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 using constants::ExceptionResponse;
@@ -386,6 +386,6 @@ std::vector<double> vectorStrtod(const std::vector<std::string> &sv,
                                  ExceptionResponse policy = ExceptionResponse::DIE);
   
 } // namespace parse
-} // namespace omni
+} // namespace stormm
 
 #endif

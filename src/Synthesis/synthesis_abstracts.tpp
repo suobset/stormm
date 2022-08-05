@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 //-------------------------------------------------------------------------------------------------
@@ -94,4 +94,4 @@ SyNonbondedKit<T>::SyNonbondedKit(const int nsys_in, const UnitCellType unit_cel
 {}
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

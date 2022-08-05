@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_PHASE_SPACE_SYNTHESIS_H
-#define OMNI_HPC_PHASE_SPACE_SYNTHESIS_H
+#ifndef STORMM_HPC_PHASE_SPACE_SYNTHESIS_H
+#define STORMM_HPC_PHASE_SPACE_SYNTHESIS_H
 
 #include "Accelerator/gpu_details.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "phasespace_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::GpuDetails;
@@ -45,6 +45,6 @@ void psyInitializeForces(PsSynthesisWriter *psyw, int index, const GpuDetails &g
 void psyPrimeConjugateGradient(PsSynthesisWriter *psyw, const GpuDetails &gpu);
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #endif

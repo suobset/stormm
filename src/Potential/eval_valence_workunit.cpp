@@ -3,7 +3,7 @@
 #include "eval_valence_workunit.h"
 #include "valence_potential.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using math::crossProduct;
@@ -817,4 +817,4 @@ void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const Restr
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

@@ -1,18 +1,18 @@
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Random/random.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Trajectory/coordinateframe.h"
 #include "assemble_restraints.h"
 
-#ifndef OMNI_USE_HPC
-using omni::data_types::double3;
+#ifndef STORMM_USE_HPC
+using stormm::data_types::double3;
 #endif
-using omni::random::Xoroshiro128pGenerator;
-using omni::restraints::BoundedRestraint;
-using omni::topology::AtomGraph;
-using omni::topology::ValenceKit;
-using omni::trajectory::CoordinateFrameReader;
-using omni::trajectory::PhaseSpace;
+using stormm::random::Xoroshiro128pGenerator;
+using stormm::restraints::BoundedRestraint;
+using stormm::topology::AtomGraph;
+using stormm::topology::ValenceKit;
+using stormm::trajectory::CoordinateFrameReader;
+using stormm::trajectory::PhaseSpace;
 
 //-------------------------------------------------------------------------------------------------
 // Create a collection of positional, distance, angle, and dihedral restraints acting on a system

@@ -3,7 +3,7 @@
 #include "textfile.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
@@ -149,4 +149,4 @@ void TextFile::linesFromString(const std::string &text_in) {
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

@@ -3,7 +3,7 @@
 #include "hpc_random.cuh"
 #include "random.h"
 
-namespace omni {
+namespace stormm {
 namespace hpc_random {
 
 using card::HybridFormat;
@@ -248,4 +248,4 @@ extern void seedXoshiro256pp(Hybrid<ullint4> *state_vector, const int igseed,
 }
 
 } // namespace hpc_random
-} // namespace omni
+} // namespace stormm

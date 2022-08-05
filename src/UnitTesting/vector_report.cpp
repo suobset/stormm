@@ -5,7 +5,7 @@
 #include "vector_report.h"
 #include "approx.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using math::maxValue;
@@ -154,4 +154,4 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

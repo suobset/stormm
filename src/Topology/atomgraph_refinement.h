@@ -1,15 +1,15 @@
 // -*-c++-*-
-#ifndef OMNI_AG_REFINEMENT_H
-#define OMNI_AG_REFINEMENT_H
+#ifndef STORMM_AG_REFINEMENT_H
+#define STORMM_AG_REFINEMENT_H
 
 #include <string>
 #include <vector>
 #include "Constants/behavior.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"
 #include "atomgraph_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using constants::ExceptionResponse;
@@ -426,7 +426,7 @@ struct AttenuatedPair {
 ///                               -1, so sprinkle charge increments among the charges to make that
 ///                               come out to the value that was intended.  If the system has a
 ///                               value of 0.5837e, then something fundamental may be wrong, but
-///                               either way it's not something that OMNI is prepared to redress.
+///                               either way it's not something that STORMM is prepared to redress.
 /// \param charge_discretization  The increment with which to discretize charges
 /// \param file_name              Optional name of the topology file whose charges are being
 ///                               smoothed.  Leave blank if this is not about a particular
@@ -799,6 +799,6 @@ SettleParm getSettleParameters(int ox_idx, int h1_idx, int h2_idx,
                                const std::vector<double> &angl_equilibria);
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #endif

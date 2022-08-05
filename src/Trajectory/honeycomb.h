@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_HONEYCOMB_H
-#define OMNI_HONEYCOMB_H
+#ifndef STORMM_HONEYCOMB_H
+#define STORMM_HONEYCOMB_H
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 constexpr float default_scaling_resolution = (float)33554432.0;
@@ -117,6 +117,6 @@ private:
 };
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

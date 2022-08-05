@@ -20,31 +20,31 @@
 #include "../../src/UnitTesting/approx.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::chemistry::ChemicalFeatures;
-using omni::chemistry::MapRotatableGroups;
-using omni::chemistry::RotatorGroup;
-using omni::constants::tiny;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::math::computeBoxTransform;
-using omni::energy::evaluateBondTerms;
-using omni::energy::evaluateAngleTerms;
-using omni::energy::ScoreCard;
-using omni::structure::rotateCoordinates;
-using omni::structure::rmsd;
-using omni::structure::RmsdMethod;
-using omni::topology::AtomGraph;
-using omni::topology::ChemicalDetailsKit;
-using omni::topology::UnitCellType;
-using omni::topology::ValenceKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::CoordinateFrame;
-using omni::trajectory::CoordinateFrameReader;
-using omni::trajectory::PhaseSpace;
-using namespace omni::structure;
-using namespace omni::testing;
+using stormm::chemistry::ChemicalFeatures;
+using stormm::chemistry::MapRotatableGroups;
+using stormm::chemistry::RotatorGroup;
+using stormm::constants::tiny;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::math::computeBoxTransform;
+using stormm::energy::evaluateBondTerms;
+using stormm::energy::evaluateAngleTerms;
+using stormm::energy::ScoreCard;
+using stormm::structure::rotateCoordinates;
+using stormm::structure::rmsd;
+using stormm::structure::RmsdMethod;
+using stormm::topology::AtomGraph;
+using stormm::topology::ChemicalDetailsKit;
+using stormm::topology::UnitCellType;
+using stormm::topology::ValenceKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::CoordinateFrame;
+using stormm::trajectory::CoordinateFrameReader;
+using stormm::trajectory::PhaseSpace;
+using namespace stormm::structure;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Check rotatable bonds throughout a structure.  If the topology supplied pertains to a system
@@ -85,7 +85,7 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   int rcpos = 0;
   for (int i = 0; i < nrt; i++) {
     rotateAboutBond(&rotation_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
-                    rt_grp[i].rotatable_atoms, 2.0 * omni::symbols::pi / 3.0);
+                    rt_grp[i].rotatable_atoms, 2.0 * stormm::symbols::pi / 3.0);
 
     // Record the positions of atoms in the first molecule
     for (int j = cdk.mol_limits[0]; j < cdk.mol_limits[1]; j++) {
@@ -105,19 +105,19 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
 
     // Reverse the rotation
     rotateAboutBond(&rotation_copy, rt_grp[i].root_atom, rt_grp[i].pivot_atom,
-                    rt_grp[i].rotatable_atoms, -2.0 * omni::symbols::pi / 3.0);
+                    rt_grp[i].rotatable_atoms, -2.0 * stormm::symbols::pi / 3.0);
 
     // Check that the molecule was returned to its original state
     repos_dev[i] = rmsd(ps, rotation_copy, ag, RmsdMethod::ALIGN_GEOM, cdk.mol_limits[0],
                         cdk.mol_limits[1]);
   }
   const char osc = osSeparator();
-  const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
+  const std::string base_iso_path = oe.getStormmSourcePath() + osc + "test" + osc + "Structure";
   const std::string rcrd_snapshot = base_iso_path + osc + "rotated_coords.m";
   const bool snps_exist = (getDrivePathType(rcrd_snapshot) == DrivePathType::FILE);
   if (snps_exist == false && oe.takeSnapshot() == SnapshotOperation::COMPARE) {
-    rtWarn("The snapshot file " + rcrd_snapshot + " was not found.  Check the ${OMNI_SOURCE} "
-           "environment variable, currently set to " + oe.getOmniSourcePath() + ", for validity.  "
+    rtWarn("The snapshot file " + rcrd_snapshot + " was not found.  Check the ${STORMM_SOURCE} "
+           "environment variable, currently set to " + oe.getStormmSourcePath() + ", for validity.  "
            "Subsequent tests will be skipped.", "test_isomerization");
   }
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -195,12 +195,12 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
                         cdk.mol_limits[1]);
   }
   const char osc = osSeparator();
-  const std::string base_iso_path = oe.getOmniSourcePath() + osc + "test" + osc + "Structure";
+  const std::string base_iso_path = oe.getStormmSourcePath() + osc + "test" + osc + "Structure";
   const std::string invcrd_snapshot = base_iso_path + osc + "inverted_coords.m";
   const bool snps_exist = (getDrivePathType(invcrd_snapshot) == DrivePathType::FILE);
   if (snps_exist == false && oe.takeSnapshot() == SnapshotOperation::COMPARE) {
-    rtWarn("The snapshot file " + invcrd_snapshot + " was not found.  Check the ${OMNI_SOURCE} "
-           "environment variable, currently set to " + oe.getOmniSourcePath() + ", for validity.  "
+    rtWarn("The snapshot file " + invcrd_snapshot + " was not found.  Check the ${STORMM_SOURCE} "
+           "environment variable, currently set to " + oe.getStormmSourcePath() + ", for validity.  "
            "Subsequent tests will be skipped.", "test_isomerization");
   }
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -235,8 +235,8 @@ int main(const int argc, const char* argv[]) {
   
   // Get a handful of realistic systems
   const char osc = osSeparator();
-  const std::string base_top_path = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_path = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_path = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_path = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string drug_top_path = base_top_path + osc + "drug_example.top";
   const std::string drug_crd_path = base_crd_path + osc + "drug_example.inpcrd";
   const std::string lig1_top_path = base_top_path + osc + "stereo_L1.top";
@@ -255,7 +255,7 @@ int main(const int argc, const char* argv[]) {
                             getDrivePathType(trpc_crd_path) == DrivePathType::FILE);
   if (files_exist == false) {
     rtWarn("Files for various drug molecules and a miniprotein were not found.  Check the "
-           "$OMNI_SOURCE environment variable to ensure that " + drug_top_path + " and " +
+           "$STORMM_SOURCE environment variable to ensure that " + drug_top_path + " and " +
            drug_crd_path + " become valid paths.  Some tests will be skipped",
            "test_local_arrangement");
   }
@@ -315,7 +315,7 @@ int main(const int argc, const char* argv[]) {
   strfa.zcrd[6] = -1.0;
   CoordinateFrame starfish_b(starfish_a);
   CoordinateFrameWriter strfb = starfish_b.data();
-  rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.0, 0.0, omni::symbols::pi / 4.0, 0,
+  rotateCoordinates(strfb.xcrd, strfb.ycrd, strfb.zcrd, 0.0, 0.0, stormm::symbols::pi / 4.0, 0,
                     strfb.natom);
   double rms_no_align = rmsd<double, double>(strfa.xcrd, strfa.ycrd, strfa.zcrd, strfb.xcrd,
                                              strfb.ycrd, strfb.zcrd, nullptr,

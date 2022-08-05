@@ -6,7 +6,7 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/valence_workunit.h"
@@ -14,7 +14,7 @@
 #include "Topology/atomgraph_enumerators.h"
 #include "hpc_valence_potential.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
@@ -903,4 +903,4 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

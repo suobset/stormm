@@ -1,7 +1,7 @@
 #include <cmath>
 #include "statistics.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -68,4 +68,4 @@ double running_normalized_rmsd(const double sum_of_squares, const double sum_of_
 }
 
 } // namepsace math
-} // namespace omni
+} // namespace stormm

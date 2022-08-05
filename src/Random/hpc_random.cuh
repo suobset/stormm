@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_RANDOM_CUH
-#define OMNI_HPC_RANDOM_CUH
+#ifndef STORMM_HPC_RANDOM_CUH
+#define STORMM_HPC_RANDOM_CUH
 
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 
-namespace omni {
+namespace stormm {
 namespace hpc_random {
 
 using card::GpuDetails;
@@ -68,6 +68,6 @@ kSeedXoshiro256pp(ullint4* state_vector, const int n_seeds, const int n_generato
 void seedXoshiro256pp(Hybrid<ullint4> *state_vector, int igseed, const GpuDetails &gpu);
 
 } // namespace hpc_random
-} // namespace omni
+} // namespace stormm
 
 #endif

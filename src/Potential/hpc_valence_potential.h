@@ -1,15 +1,15 @@
 // -*-c++-*-
-#ifndef OMNI_VALENCE_POTENTIAL_CUH
-#define OMNI_VALENCE_POTENTIAL_CUH
+#ifndef STORMM_VALENCE_POTENTIAL_CUH
+#define STORMM_VALENCE_POTENTIAL_CUH
 
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 #include <cuda_runtime.h>
 #endif
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
@@ -20,7 +20,7 @@
 #include "energy_enumerators.h"
 #include "scorecard.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
@@ -120,6 +120,6 @@ void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
 /// \}
   
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #endif

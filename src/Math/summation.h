@@ -1,14 +1,14 @@
 // -*-c++-*-
-#ifndef OMNI_SUMMATION_H
-#define OMNI_SUMMATION_H
+#ifndef STORMM_SUMMATION_H
+#define STORMM_SUMMATION_H
 
 #include <vector>
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "UnitTesting/approx.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::Hybrid;
@@ -91,7 +91,7 @@ TSum sumTuple4(const Hybrid<TBase> &hb, const HybridTargetLevel tier = HybridTar
 /// \}
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "summation.tpp"
 

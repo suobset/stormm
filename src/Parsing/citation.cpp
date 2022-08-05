@@ -1,6 +1,6 @@
 #include "citation.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
@@ -87,4 +87,4 @@ void Citation::addDoI(const std::string &part_a, const std::string &part_b) {
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

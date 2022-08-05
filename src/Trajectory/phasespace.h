@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_PHASE_SPACE_H
-#define OMNI_PHASE_SPACE_H
+#ifndef STORMM_PHASE_SPACE_H
+#define STORMM_PHASE_SPACE_H
 
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
@@ -8,7 +8,7 @@
 #include "trajectory_enumerators.h"
 #include "write_frame.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using card::Hybrid;
@@ -255,13 +255,13 @@ public:
   /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The
   ///        result should be interpreted as a 3x3 matrix in column-major format.
   ///
-  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)
   std::vector<double> getBoxSpaceTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get the transformation matrix to take coordinates from fractional space back into
   ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
   ///
-  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)
   std::vector<double> getInverseTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get a pointer to the ARRAY-kind Hybrid object that holds the actual data.  Needed by
@@ -292,7 +292,7 @@ public:
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_INPCRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN) const;
   
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload all information
   void upload();
 
@@ -376,6 +376,6 @@ private:
 UnitCellType determineUnitCellTypeByShape(const double* inv_ptr);
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

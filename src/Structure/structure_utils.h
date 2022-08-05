@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_STRUCTURE_UTILS_H
-#define OMNI_STRUCTURE_UTILS_H
+#ifndef STORMM_STRUCTURE_UTILS_H
+#define STORMM_STRUCTURE_UTILS_H
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 /// \brief Check the supplied bounds for a partial scan or update of coordinates.
@@ -15,6 +15,6 @@ void coordinateBoundsCheck(const int lower_limit, const int upper_limit, const i
                            const char* caller = nullptr);
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #endif

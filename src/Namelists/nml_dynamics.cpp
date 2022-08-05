@@ -3,7 +3,7 @@
 #include "namelist_element.h"
 #include "nml_dynamics.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using parse::realToString;
@@ -124,4 +124,4 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

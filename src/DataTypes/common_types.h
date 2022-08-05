@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_COMMON_TYPES_H
-#define OMNI_COMMON_TYPES_H
+#ifndef STORMM_COMMON_TYPES_H
+#define STORMM_COMMON_TYPES_H
 
 #include <string>
 #include <typeinfo>
@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace data_types {
 
 /// \brief Integral type casts
@@ -50,14 +50,14 @@ template <typename T> bool isUnsignedIntegralScalarType();
 template <typename T> bool isFloatingPointScalarType();
 
 /// \brief Produce a platform-independent name by which to identify one of the scalar data types.
-template <typename T> std::string getOmniScalarTypeName();
+template <typename T> std::string getStormmScalarTypeName();
   
 } // namespace data_types
-} // namespace omni
+} // namespace stormm
 
 #include "common_types.tpp"
 
-namespace omni {
+namespace stormm {
 using data_types::ulint;
 using data_types::ulong;
 using data_types::llint;
@@ -74,6 +74,6 @@ using data_types::ullint_type_index;
 using data_types::short_type_index;
 using data_types::ushort_type_index;
 using data_types::bool_type_index;
-} // namespace omni
+} // namespace stormm
 
 #endif

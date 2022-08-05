@@ -1,10 +1,10 @@
 // -*-c++-*-
 
-using omni::math::sum;
-using omni::math::mean;
-using omni::math::maxAbsValue;
-using omni::constants::tiny;
-using omni::topology::BondTerm;
+using stormm::math::sum;
+using stormm::math::mean;
+using stormm::math::maxAbsValue;
+using stormm::constants::tiny;
+using stormm::topology::BondTerm;
 
 //-------------------------------------------------------------------------------------------------
 template <typename T>

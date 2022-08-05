@@ -5,7 +5,7 @@
 #include "Reporting/error_format.h"
 #include "topology_util.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using math::findBin;
@@ -32,4 +32,4 @@ std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetai
 }
   
 } // namespace topology
-} // namespace omni
+} // namespace stormm

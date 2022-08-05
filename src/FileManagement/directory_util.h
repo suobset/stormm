@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_DIRECTORIES_H
-#define OMNI_DIRECTORIES_H
+#ifndef STORMM_DIRECTORIES_H
+#define STORMM_DIRECTORIES_H
 
 #include <sstream>
 #include <sys/stat.h>
@@ -13,7 +13,7 @@
 #include <vector>
 #include "Constants/behavior.h"
 
-namespace omni {
+namespace stormm {
 namespace diskutil {
 
 using constants::ExceptionResponse;
@@ -30,7 +30,7 @@ int localMkdir(const char* path, const mode_t mode);
 /// \param path  The full path of the directory to create
 /// \param mode  Mode for creation (default 0755, octal representation giving the user write
 ///              permissions and all others read and execute permissions)
-std::vector<std::string> omniMkdir(const std::string &path, const mode_t mode = 0755);
+std::vector<std::string> stormmMkdir(const std::string &path, const mode_t mode = 0755);
 
 /// \brief Wrapper for various rmdir() functions on different operating systems
 ///
@@ -41,7 +41,7 @@ int localRmdir(const char* path);
 ///
 /// \param path      The full path of the directory to create
 /// \param protocol  Response that will be elicited by a failure of the wrapped rmdir command
-void omniRmdir(const std::string &path, ExceptionResponse protocol = ExceptionResponse::WARN);
+void stormmRmdir(const std::string &path, ExceptionResponse protocol = ExceptionResponse::WARN);
 
 /// \brief Clear a set of directories by recursivelyissuing rmdir commands.  This routine begins by
 ///        trying to order the results in such a way as, so long as each directory is only filled
@@ -50,7 +50,7 @@ void omniRmdir(const std::string &path, ExceptionResponse protocol = ExceptionRe
 ///
 /// \param paths     The list of directory paths to (attempt to) remove
 /// \param protocol  Indication of what to do in the event of an exception
-void omniBatchRmdir(const std::vector<std::string> &paths,
+void stormmBatchRmdir(const std::vector<std::string> &paths,
                     ExceptionResponse protocol = ExceptionResponse::WARN);
 
 }

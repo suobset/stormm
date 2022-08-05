@@ -489,7 +489,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
 #    else
           // Double-precision split force accumulation is intendede to extend the fixed-precision
           // format and cannot be combined back into a single integral number, ever.  Combine
-          // the results into an int95_t (see Constants/omni_vector_types.h) and contribute that
+          // the results into an int95_t (see Constants/stormm_vector_types.h) and contribute that
           // to the paired global accumulator arrays.
           int95_t ixfrc = { sh_xfrc[read_idx], sh_xfrc_overflow[read_idx] };
           addSplitFixedPrecision(ixfrc, write_idx, poly_psw.xfrc, poly_psw.xfrc_ovrf);

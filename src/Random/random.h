@@ -1,14 +1,14 @@
 // -*-c++-*-
-#ifndef OMNI_RANDOM_H
-#define OMNI_RANDOM_H
+#ifndef STORMM_RANDOM_H
+#define STORMM_RANDOM_H
 
 #include "Accelerator/hybrid.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 
-namespace omni {
+namespace stormm {
 namespace random {
 
 using card::Hybrid;
@@ -328,7 +328,7 @@ private:
 };
 
 } // namespace random
-} // namespace omni
+} // namespace stormm
 
 #include "random.tpp"
 

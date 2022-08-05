@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_STRUCTURE_RMSD_H
-#define OMNI_STRUCTURE_RMSD_H
+#ifndef STORMM_STRUCTURE_RMSD_H
+#define STORMM_STRUCTURE_RMSD_H
 
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
@@ -13,7 +13,7 @@
 #include "Trajectory/phasespace.h"
 #include "structure_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using data_types::isSignedIntegralScalarType;
@@ -121,7 +121,7 @@ Tcalc rmsd(const CoordinateSeries<Tcoord> &cs, const size_t frame_a, const size_
 /// \}
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #include "rmsd.tpp"
 

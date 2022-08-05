@@ -10,19 +10,19 @@
 #include "../../../src/UnitTesting/stopwatch.h"
 #include "../../../src/UnitTesting/unit_test.h"
 
-using omni::chemistry::MapRotatableGroups;
-using omni::energy::ScoreCard;
-using omni::mm::minimize;
-using omni::namelist::AppName;
-using omni::namelist::MinimizeControls;
-using omni::namelist::UserSettings;
-using omni::restraints::RestraintApparatus;
-using omni::synthesis::PhaseSpaceSynthesis;
-using omni::synthesis::SystemCache;
-using omni::testing::StopWatch;
-using omni::topology::UnitCellType;
-using omni::trajectory::PhaseSpace;
-using omni::restraints::RestraintApparatus;
+using stormm::chemistry::MapRotatableGroups;
+using stormm::energy::ScoreCard;
+using stormm::mm::minimize;
+using stormm::namelist::AppName;
+using stormm::namelist::MinimizeControls;
+using stormm::namelist::UserSettings;
+using stormm::restraints::RestraintApparatus;
+using stormm::synthesis::PhaseSpaceSynthesis;
+using stormm::synthesis::SystemCache;
+using stormm::testing::StopWatch;
+using stormm::topology::UnitCellType;
+using stormm::trajectory::PhaseSpace;
+using stormm::restraints::RestraintApparatus;
 
 //-------------------------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {

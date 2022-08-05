@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_MINIMIZATION_H
-#define OMNI_MINIMIZATION_H
+#ifndef STORMM_MINIMIZATION_H
+#define STORMM_MINIMIZATION_H
 
 #include <cmath>
 #include "Constants/fixed_precision.h"
@@ -19,7 +19,7 @@
 #include "Trajectory/phasespace.h"
 #include "mm_evaluation.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using data_types::isSignedIntegralScalarType;
@@ -155,7 +155,7 @@ ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
 /// \}
   
 } // namespace mm
-} // namespace omni
+} // namespace stormm
 
 #include "minimization.tpp"
 

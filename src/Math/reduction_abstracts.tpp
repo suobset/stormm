@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -63,4 +63,4 @@ GenericRdSubstrate<T>::GenericRdSubstrate(const T* x_read_in, const int* x_read_
 {}
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

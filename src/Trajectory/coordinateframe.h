@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_COORDINATE_FRAME_H
-#define OMNI_COORDINATE_FRAME_H
+#ifndef STORMM_COORDINATE_FRAME_H
+#define STORMM_COORDINATE_FRAME_H
 
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
@@ -8,7 +8,7 @@
 #include "Topology/atomgraph.h"
 #include "phasespace.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using card::Hybrid;
@@ -201,13 +201,13 @@ public:
   /// \brief Get the transformation matrix to take coordinates into box (fractional) space.  The
   ///        result should be interpreted as a 3x3 matrix in column-major format.
   ///
-  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)
   std::vector<double> getBoxSpaceTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get the transformation matrix to take coordinates from fractional space back into
   ///        real space.  The result should be interpreted as a 3x3 matrix in column-major format.
   ///
-  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)
+  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)
   std::vector<double> getInverseTransform(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get the box dimensions in their pure form.  Holding the box dimensions and the
@@ -216,7 +216,7 @@ public:
   ///        having to continuously extract box dimensions from transformation matrices each time
   ///        the box needs to be resized (beyond isotropic scaling, this is not a trivial process).
   ///
-  /// \param tier  Level at which to retrieve the data (if OMNI is compiled to run on a GPU)  
+  /// \param tier  Level at which to retrieve the data (if STORMM is compiled to run on a GPU)  
   std::vector<double> getBoxDimensions(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Export the contents of this coordinate series to a trajectory, restart, or
@@ -231,7 +231,7 @@ public:
                     CoordinateFileKind output_kind = CoordinateFileKind::AMBER_CRD,
                     PrintSituation expectation = PrintSituation::UNKNOWN) const;
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload all information
   void upload();
 
@@ -329,7 +329,7 @@ std::vector<CoordinateFrame> getAllFrames(const std::string &file_name, const in
 /// \}
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif
 

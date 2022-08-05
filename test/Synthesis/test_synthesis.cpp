@@ -11,7 +11,7 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/mixed_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/reduction.h"
 #include "../../src/Math/reduction_abstracts.h"
@@ -42,45 +42,45 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::chemistry::AtomMask;
-using omni::chemistry::ChemicalFeatures;
-using omni::chemistry::MapRotatableGroups;
-using omni::constants::ExceptionResponse;
-using omni::constants::verytiny;
-using omni::constants::tiny;
-using omni::constants::warp_size_int;
-using omni::data_types::int2;
-using omni::data_types::uint2;
-using omni::data_types::uint3;
-using omni::data_types::double2;
-using omni::data_types::double3;
-using omni::data_types::double4;
-using omni::data_types::ValueWithCounter;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getBaseName;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::openOutputFile;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::namelist::FilesControls;
-using omni::parse::TextFile;
-using omni::random::Xoroshiro128pGenerator;
-using omni::restraints::applyHydrogenBondPreventors;
-using omni::restraints::applyPositionalRestraints;
-using omni::restraints::BoundedRestraint;
-using omni::restraints::RestraintApparatus;
-using omni::restraints::RestraintKit;
-using omni::structure::distance;
-using omni::structure::angle;
-using omni::structure::dihedral_angle;
-using namespace omni::card;
-using namespace omni::energy;
-using namespace omni::math;
-using namespace omni::numerics;
-using namespace omni::synthesis;
-using namespace omni::testing;
-using namespace omni::topology;
-using namespace omni::trajectory;
+using stormm::chemistry::AtomMask;
+using stormm::chemistry::ChemicalFeatures;
+using stormm::chemistry::MapRotatableGroups;
+using stormm::constants::ExceptionResponse;
+using stormm::constants::verytiny;
+using stormm::constants::tiny;
+using stormm::constants::warp_size_int;
+using stormm::data_types::int2;
+using stormm::data_types::uint2;
+using stormm::data_types::uint3;
+using stormm::data_types::double2;
+using stormm::data_types::double3;
+using stormm::data_types::double4;
+using stormm::data_types::ValueWithCounter;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getBaseName;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::openOutputFile;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::namelist::FilesControls;
+using stormm::parse::TextFile;
+using stormm::random::Xoroshiro128pGenerator;
+using stormm::restraints::applyHydrogenBondPreventors;
+using stormm::restraints::applyPositionalRestraints;
+using stormm::restraints::BoundedRestraint;
+using stormm::restraints::RestraintApparatus;
+using stormm::restraints::RestraintKit;
+using stormm::structure::distance;
+using stormm::structure::angle;
+using stormm::structure::dihedral_angle;
+using namespace stormm::card;
+using namespace stormm::energy;
+using namespace stormm::math;
+using namespace stormm::numerics;
+using namespace stormm::synthesis;
+using namespace stormm::testing;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Check the coverage of a simple task form a ValenceWorkUnit.
@@ -124,7 +124,7 @@ bool checkNaiveDistance(const int i, const int j, const CoordinateFrameReader &c
   const double reim_dist  = distance(i, j, cfr);
   const double naive_dist = distance<double, double>(i, j, cfr.xcrd, cfr.ycrd, cfr.zcrd, nullptr,
                                                      nullptr, UnitCellType::NONE);
-  return (fabs(reim_dist - naive_dist) < omni::constants::tiny);
+  return (fabs(reim_dist - naive_dist) < stormm::constants::tiny);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -142,7 +142,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                             getDrivePathType(crd_name) == DrivePathType::FILE);
   if (files_exist == false) {
     rtWarn("The topology and input coordinates for a critical system appear to be missing.  Check "
-           "the ${OMNI_SOURCE} variable (currently " + oe.getOmniSourcePath() + ") to make sure "
+           "the ${STORMM_SOURCE} variable (currently " + oe.getStormmSourcePath() + ") to make sure "
            "that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -177,7 +177,7 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                                   (0.1 * (0.5 - my_prng->uniformRandomNumber()));
         if (orig_angle > 0.1 && orig_angle < 3.0) {
           mol_rstr.emplace_back(i, j, i - 2, &ag, 2.3, 0.9, 0.0, orig_angle - 0.05,
-                                orig_angle + 0.02, omni::symbols::pi - omni::constants::tiny);
+                                orig_angle + 0.02, stormm::symbols::pi - stormm::constants::tiny);
         }
       }
       if (checkNaiveDistance(i, i - 1, cfr) && checkNaiveDistance(j, i - 1, cfr) &&
@@ -908,9 +908,9 @@ int main(const int argc, const char* argv[]) {
     std::ofstream foutp = openOutputFile(mdin_name, PrintSituation::OVERWRITE, "Prepare a brief "
                                          "input file for testing the SystemCache machinery.");
     std::string buffer("&files\n  -p ");
-    buffer += oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" + osc + "topol" + osc +
+    buffer += oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" + osc + "topol" + osc +
               ".*.top\n  -c ";
-    buffer += oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" + osc + "coord" + osc +
+    buffer += oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" + osc + "coord" + osc +
               ".*.inpcrd\n&end\n";
     foutp.write(buffer.c_str(), buffer.size());
     foutp.close();
@@ -928,7 +928,7 @@ int main(const int argc, const char* argv[]) {
   const int nsys = sysc.getSystemCount();
   check(nsys, RelationalOperator::EQUAL, 16, "The number of systems detected with regular "
         "expression searching did not meet expectations.  This may indicate a problem with the "
-        "${OMNI_SOURCE} environment variable that did not show up in test program setup.",
+        "${STORMM_SOURCE} environment variable that did not show up in test program setup.",
         test_sysc);
   const std::vector<AtomGraph*> ag_ptr = sysc.getSystemTopologyPointer();
   const std::vector<PhaseSpace*> ps_ptr = sysc.getCoordinatePointer();
@@ -958,8 +958,8 @@ int main(const int argc, const char* argv[]) {
   
   // Create some topologies and coordinate sets.
   Xoroshiro128pGenerator my_prng(oe.getRandomSeed());
-  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
   const std::string tip3p_top_name = base_top_name + osc + "tip3p.top";
   const std::string tip4p_crd_name = base_crd_name + osc + "tip4p.inpcrd";
@@ -985,8 +985,8 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("The topology and coordinate files for the TIP3P and TIP4P water boxes as well as the "
-           "Trp-cage miniprotein in water must be available in ${OMNI_SOURCE}/test/ "
-           "subdirectories Topology and Trajectory, respectively.  Check the $OMNI_SOURCE "
+           "Trp-cage miniprotein in water must be available in ${STORMM_SOURCE}/test/ "
+           "subdirectories Topology and Trajectory, respectively.  Check the $STORMM_SOURCE "
            "environment variable to make sure that it is set properly.  A number of tests will "
            "be skipped.", "test_phase_space_synthesis");
   }
@@ -1044,11 +1044,11 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> scale_bits_result = { psynth_w.gpos_bits, psynth_w.lpos_bits,
                                                psynth_w.vel_bits, psynth_w.frc_bits };
   check(scaling_result, RelationalOperator::EQUAL,
-        Approx(scaling_answer, ComparisonType::RELATIVE, omni::constants::verytiny),
+        Approx(scaling_answer, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Double-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
         "not meet expectations.");
   check(scaling_result_f, RelationalOperator::EQUAL,
-        Approx(scaling_answer, ComparisonType::RELATIVE, omni::constants::verytiny),
+        Approx(scaling_answer, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Single-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
         "not meet expectations.");
   check(scale_bits_result, RelationalOperator::EQUAL, scale_bits_answer, "Fixed-precision bit "
@@ -1077,11 +1077,11 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> scale_bits_result2 = { psynth_w2.gpos_bits, psynth_w2.lpos_bits,
                                                 psynth_w2.vel_bits, psynth_w2.frc_bits };
   check(scaling_result2, RelationalOperator::EQUAL,
-        Approx(scaling_answer2, ComparisonType::RELATIVE, omni::constants::verytiny),
+        Approx(scaling_answer2, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Double-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
         "not meet expectations.");
   check(scaling_result2_f, RelationalOperator::EQUAL,
-        Approx(scaling_answer2, ComparisonType::RELATIVE, omni::constants::verytiny),
+        Approx(scaling_answer2, ComparisonType::RELATIVE, stormm::constants::verytiny),
         "Single-precision scaling constants found in the PhaseSpaceSynthesis object's writer do "
         "not meet expectations.");
   check(scale_bits_result2, RelationalOperator::EQUAL, scale_bits_answer2, "Fixed-precision bit "
@@ -1247,7 +1247,7 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Files for additional systems in isolated boundary conditions were not found.  Check "
-           "the ${OMNI_SOURCE} environment variable.  Subsequent tests involving these files "
+           "the ${STORMM_SOURCE} environment variable.  Subsequent tests involving these files "
            "will be skipped.", "test_synthesis");
   }
   const TestPriority do_semk_tests = (semk_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;

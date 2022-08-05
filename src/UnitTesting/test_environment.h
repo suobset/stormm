@@ -1,16 +1,16 @@
 // -*-c++-*-
-#ifndef OMNI_TEST_ENVIRONMENT_H
-#define OMNI_TEST_ENVIRONMENT_H
+#ifndef STORMM_TEST_ENVIRONMENT_H
+#define STORMM_TEST_ENVIRONMENT_H
 
 #include <string>
 #include <vector>
 #include "unit_test_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 /// \brief Object for parsing and storing environment as well as command-line input relevant to
-///        unit testing (Test Driven Development) in OMNI.  Environment variables will be sought,
+///        unit testing (Test Driven Development) in STORMM.  Environment variables will be sought,
 ///        but command-line inputs addressing the same information will take precedence.
 class TestEnvironment {
 public:
@@ -29,7 +29,7 @@ public:
                   TmpdirStatus tmpdir_required = TmpdirStatus::NOT_REQUIRED);
 
   /// \brief Destructor for the TestEnvironment object must delete the temporary directory if it
-  ///        was created by the constructor.  This can only be done after OMNI removes files in
+  ///        was created by the constructor.  This can only be done after STORMM removes files in
   ///        the temporary directory known to have been created by the program itself.  The actual
   ///        directory removal is accomplished by a syscall to /bin/rmdir, which will not delete a
   ///        directory with contents still in it.  In this way, the temporary directory can be
@@ -48,11 +48,11 @@ public:
   ///        to any random number generator object at the developer's discretion.
   int getRandomSeed() const;
 
-  /// \brief Get the OMNI home (test executable and installed library) path.
-  std::string getOmniHomePath() const;
+  /// \brief Get the STORMM home (test executable and installed library) path.
+  std::string getStormmHomePath() const;
 
-  /// \brief Get the OMNI source root path.
-  std::string getOmniSourcePath() const;
+  /// \brief Get the STORMM source root path.
+  std::string getStormmSourcePath() const;
 
   /// \brief Get the temporary directory path that the test environment can use to store files.
   std::string getTemporaryDirectoryPath() const;
@@ -75,7 +75,7 @@ public:
   /// \brief Catalog that a file has been created by the program.  This function will not actually
   ///        check that the file was created by code recently executed; it just serves as a way to
   ///        accumulate a list of files that should be regarded as the property of whatever program
-  ///        using the OMNI TestEnvironment object.  The program will, however, detect whether an
+  ///        using the STORMM TestEnvironment object.  The program will, however, detect whether an
   ///        absolute path is in use and make the path absolute if not.
   ///
   /// \param path  Name of the file of interest
@@ -111,11 +111,11 @@ private:
   /// if that is desirable)
   int random_seed;
 
-  /// OMNI installation home path
-  std::string omni_home_path;
+  /// STORMM installation home path
+  std::string stormm_home_path;
 
-  /// OMNI source code path
-  std::string omni_source_path;
+  /// STORMM source code path
+  std::string stormm_source_path;
 
   /// Path to temporary work directory (this will be created if not currently available when the
   /// object is constructed, then destroyed by the object's destructor)
@@ -152,6 +152,6 @@ private:
 };
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -4,7 +4,7 @@
 #include "DataTypes/common_types.h"
 #include "hpc_scorecard.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -63,4 +63,4 @@ void launchScoreCardInitialization(const std::vector<StateVariable> &var, const 
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

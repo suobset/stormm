@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_VALENCE_POTENTIAL_H
-#define OMNI_VALENCE_POTENTIAL_H
+#ifndef STORMM_VALENCE_POTENTIAL_H
+#define STORMM_VALENCE_POTENTIAL_H
 
 #include <cmath>
 #include "Constants/hpc_bounds.h"
@@ -21,7 +21,7 @@
 #include "energy_enumerators.h"
 #include "scorecard.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using data_types::isSignedIntegralScalarType;
@@ -806,7 +806,7 @@ Tcalc evalDiheRestraint(int i_atom, int j_atom, int k_atom, int l_atom, int step
 /// \brief Evaluate flat-bottom bimodal harmonic restraints of the form used in Amber's sander and
 ///        pmemd programs for NMR annealing calculations.  Time dependence of the restraints is
 ///        recognized, although there is not the same diversity of time evolution functions in
-///        OMNI.
+///        STORMM.
 ///
 /// Overloaded:
 ///   - Evaluate based on a PhaseSpace object, with the option to compute and store forces
@@ -874,7 +874,7 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
 /// \}
   
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #include "valence_potential.tpp"
 

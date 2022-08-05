@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
@@ -261,4 +261,4 @@ void flipChiralCenter(CoordinateSeriesWriter<Tcoord> csw, const int frame_index,
 }
   
 } // namespace structure
-} // namespace omni
+} // namespace stormm

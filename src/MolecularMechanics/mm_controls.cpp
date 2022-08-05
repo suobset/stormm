@@ -3,7 +3,7 @@
 #include "Synthesis/synthesis_enumerators.h"
 #include "mm_controls.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using card::HybridKind;
@@ -184,7 +184,7 @@ int MolecularMechanicsControls::getValenceWorkUnitProgress(const int counter_ind
   case HybridTargetLevel::HOST:
     return vwu_progress.readHost(counter_index);    
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return vwu_progress.readDevice(counter_index);
     break;
@@ -200,7 +200,7 @@ int MolecularMechanicsControls::getNonbondedWorkUnitProgress(const int counter_i
   case HybridTargetLevel::HOST:
     return nbwu_progress.readHost(counter_index);    
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return nbwu_progress.readDevice(counter_index);
     break;
@@ -216,7 +216,7 @@ int MolecularMechanicsControls::getPmeWorkUnitProgress(const int counter_index,
   case HybridTargetLevel::HOST:
     return pmewu_progress.readHost(counter_index);    
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return pmewu_progress.readDevice(counter_index);
     break;
@@ -240,7 +240,7 @@ int MolecularMechanicsControls::getReductionWorkUnitProgress(const int counter_i
       return all_reduce_wu_progress.readHost(counter_index);
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (process) {
     case ReductionStage::GATHER:
@@ -311,7 +311,7 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
     scatter_wu_progress.putHost(scwu_block_count, i);
     all_reduce_wu_progress.putHost(rdwu_block_count, i);
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   upload();
 #endif
 }
@@ -321,7 +321,7 @@ void MolecularMechanicsControls::incrementStep() {
   step_number += 1;
 }
   
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void MolecularMechanicsControls::upload() {
   progress_data.upload();
@@ -334,4 +334,4 @@ void MolecularMechanicsControls::download() {
 #endif
   
 } // namespace mm
-} // namespace omni
+} // namespace stormm

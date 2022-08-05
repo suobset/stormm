@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_SYMBOLS_H
-#define OMNI_SYMBOLS_H
+#ifndef STORMM_SYMBOLS_H
+#define STORMM_SYMBOLS_H
 
-namespace omni {
+namespace stormm {
 namespace symbols {
 
 /// \brief Pi and related quantities, represented in values that can be stored exactly in
@@ -61,6 +61,6 @@ constexpr float  inverse_one_minus_asymptote_f = (float)1048576.0;
 /// \}
 
 } // namespace constants
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,7 +1,7 @@
 #include "Constants/behavior.h"
 #include "reduction_abstracts.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using constants::CartesianDimension;
@@ -44,4 +44,4 @@ ConjGradSubstrate::ConjGradSubstrate(PhaseSpaceSynthesis *poly_ps, ReductionBrid
 {}
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

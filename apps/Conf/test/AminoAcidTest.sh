@@ -2,22 +2,22 @@
 
 cat > cgen.in << EOF
 &files
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
-  -sys { -p ${OMNI_SOURCE}/test/Namelists/topol/gly_arg.top
-         -c ${OMNI_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
+  -sys { -p ${STORMM_SOURCE}/test/Namelists/topol/gly_arg.top
+         -c ${STORMM_SOURCE}/test/Namelists/coord/gly_arg.inpcrd }
 &end
 
 &conformer
@@ -29,4 +29,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-valgrind ${OMNI_HOME}/apps/bin/conformer.omni -i cgen.in -warn
+valgrind ${STORMM_HOME}/apps/bin/conformer.omni -i cgen.in -warn

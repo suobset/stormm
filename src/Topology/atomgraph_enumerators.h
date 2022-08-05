@@ -1,18 +1,18 @@
 // -*-c++-*-
-#ifndef OMNI_ATOMGRAPH_ENUMERATORS_H
-#define OMNI_ATOMGRAPH_ENUMERATORS_H
+#ifndef STORMM_ATOMGRAPH_ENUMERATORS_H
+#define STORMM_ATOMGRAPH_ENUMERATORS_H
 
 #include "Constants/behavior.h"
 #include "Parsing/citation.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using constants::CaseSensitivity;
 using constants::ExceptionResponse;
 using parse::Citation;
 
-/// \brief Enumerate different kinds of topologies that OMNI will read.  Each comes with its own
+/// \brief Enumerate different kinds of topologies that STORMM will read.  Each comes with its own
 ///        defaults for Coulomb's constant and the default 1:4 screening factors.
 enum class TopologyKind {
   AMBER,    ///< Amber format, Coulomb's constant C = 332.05221729, van-der Waals screening 2.0,
@@ -215,7 +215,7 @@ std::string getUnitCellTypeName(UnitCellType uc);
 std::string getImplicitSolventModelName(ImplicitSolventModel ism);
 
 /// \brief Translate the numerical input for the implicit solvent model into one of the recognized
-///        models available in OMNI.  This serves as the validator to the implicit solvent model
+///        models available in STORMM.  This serves as the validator to the implicit solvent model
 ///        in the SolventControls object.
 ///
 /// \param igb_val  Numerical value of the implicit solvent model, as read from the parent namelist
@@ -252,6 +252,6 @@ Citation getWaterModelCitation(WaterModel wm);
 std::string getVirtualSiteFrameName(VirtualSiteKind vsf);
   
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #endif

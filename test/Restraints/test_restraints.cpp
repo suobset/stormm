@@ -1,7 +1,7 @@
 #include <vector>
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/polynumeric.h"
@@ -20,34 +20,34 @@
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::ExceptionResponse;
-using omni::constants::tiny;
-using omni::data_types::char4;
-using omni::data_types::double2;
-using omni::data_types::double4;
-using omni::data_types::float2;
-using omni::data_types::float4;
-using omni::data_types::llint;
-using omni::data_types::getOmniScalarTypeName;
-using omni::diskutil::osSeparator;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::energy::ScoreCard;
-using omni::energy::StateVariable;
-using omni::energy::EvaluateForce;
-using omni::energy::evaluateRestraints;
-using omni::errors::rtWarn;
-using omni::parse::separateText;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::random::Xoshiro256ppGenerator;
-using omni::structure::distance;
-using omni::structure::angle;
-using omni::structure::dihedral_angle;
-using omni::topology::AtomGraph;
-using namespace omni::trajectory;
-using namespace omni::restraints;
-using namespace omni::testing;
+using stormm::constants::ExceptionResponse;
+using stormm::constants::tiny;
+using stormm::data_types::char4;
+using stormm::data_types::double2;
+using stormm::data_types::double4;
+using stormm::data_types::float2;
+using stormm::data_types::float4;
+using stormm::data_types::llint;
+using stormm::data_types::getStormmScalarTypeName;
+using stormm::diskutil::osSeparator;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::energy::ScoreCard;
+using stormm::energy::StateVariable;
+using stormm::energy::EvaluateForce;
+using stormm::energy::evaluateRestraints;
+using stormm::errors::rtWarn;
+using stormm::parse::separateText;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::random::Xoshiro256ppGenerator;
+using stormm::structure::distance;
+using stormm::structure::angle;
+using stormm::structure::dihedral_angle;
+using stormm::topology::AtomGraph;
+using namespace stormm::trajectory;
+using namespace stormm::restraints;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Perform finite difference calculations of the energy and force contributions for a set of
@@ -183,14 +183,14 @@ void testPrecModel(const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rak,
                               (rak.nangl > 0) ? 3 : (rak.ndihe > 0) ? 4 : -1;
   check(result_e, RelationalOperator::EQUAL, Approx(e_target).margin(e_tol), "Energy calculated "
         "due to restraints of order " + std::to_string(restraint_order) + " fails to meet the "
-        "target value when calculated in " + getOmniScalarTypeName<Tcalc>() + " with coordinates "
-        "in " + getOmniScalarTypeName<Tcoord>() + " and forces in " +
-        getOmniScalarTypeName<Tforce>() + ".", do_tests);
+        "target value when calculated in " + getStormmScalarTypeName<Tcalc>() + " with coordinates "
+        "in " + getStormmScalarTypeName<Tcoord>() + " and forces in " +
+        getStormmScalarTypeName<Tforce>() + ".", do_tests);
   check(result_forces, RelationalOperator::EQUAL, Approx(frc_target).margin(f_tol),
         "Forces calculated due to restraints of order " + std::to_string(restraint_order) +
-        " fail to meet the target value when calculated in " + getOmniScalarTypeName<Tcalc>() +
-        " with coordinates in " + getOmniScalarTypeName<Tcoord>() + " and forces in " +
-        getOmniScalarTypeName<Tforce>() + ".", do_tests);
+        " fail to meet the target value when calculated in " + getStormmScalarTypeName<Tcalc>() +
+        " with coordinates in " + getStormmScalarTypeName<Tcoord>() + " and forces in " +
+        getStormmScalarTypeName<Tforce>() + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -296,9 +296,9 @@ int main(const int argc, const char* argv[]) {
   // its features, to guide motion during dynamics or energy minimizations.
   section(1);
   const char osc = osSeparator();
-  const std::string topology_base = oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" +
+  const std::string topology_base = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
                                     osc + "topol";
-  const std::string coordinate_base = oe.getOmniSourcePath() + osc + "test" + osc + "Namelists" +
+  const std::string coordinate_base = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists" +
                                       osc + "coord";
   const std::string gly_tyr_top_name = topology_base + osc + "gly_tyr.top";
   const std::string gly_tyr_crd_name = coordinate_base + osc + "gly_tyr.inpcrd";
@@ -309,7 +309,7 @@ int main(const int argc, const char* argv[]) {
                              getDrivePathType(gly_lys_top_name) == DrivePathType::FILE &&
                              getDrivePathType(gly_lys_crd_name) == DrivePathType::FILE);
   const TestPriority do_tests = (input_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  const std::string snp_name = oe.getOmniSourcePath() + osc + "test" + osc + "Restraints" + osc +
+  const std::string snp_name = oe.getStormmSourcePath() + osc + "test" + osc + "Restraints" + osc +
                                "rst_output.m";
   const bool snp_exists = (getDrivePathType(snp_name) == DrivePathType::FILE);
   const TestPriority do_snps = (snp_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;

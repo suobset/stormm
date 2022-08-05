@@ -1,6 +1,6 @@
 #include "nonbonded_potential.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
   
 //-------------------------------------------------------------------------------------------------
@@ -154,4 +154,4 @@ double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionM
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

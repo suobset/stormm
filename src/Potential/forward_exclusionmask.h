@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_FORWARD_EXCLUSIONMASK_H
-#define OMNI_FORWARD_EXCLUSIONMASK_H
+#ifndef STORMM_FORWARD_EXCLUSIONMASK_H
+#define STORMM_FORWARD_EXCLUSIONMASK_H
 
 #include "Accelerator/hybrid.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::Hybrid;
@@ -136,7 +136,7 @@ private:
   /// hard to imagine a solvent molecule with such characteristics.  A situation where exclusion
   /// mapping is thoroughly scrambled and one atom bonds to eight neighbors, which each bond to
   /// eight of their own neighbors, which each bond to eight more of their own neighbors, could
-  /// break the scheme.  But OMNI will just refuse to simulate that system.
+  /// break the scheme.  But STORMM will just refuse to simulate that system.
   Hybrid<uint2> primary_masks;
 
   /// Secondary exclusion masks.  If this array is needed at all, which will be extremely rare in

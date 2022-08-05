@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_PHASESPACE_SYNTHESIS_H
-#define OMNI_PHASESPACE_SYNTHESIS_H
+#ifndef STORMM_PHASESPACE_SYNTHESIS_H
+#define STORMM_PHASESPACE_SYNTHESIS_H
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 #include "Accelerator/gpu_details.h"
 #endif
 #include "Accelerator/hybrid.h"
@@ -16,10 +16,10 @@
 #include "Trajectory/trajectory_enumerators.h"
 #include "systemcache.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 using card::GpuDetails;
 #endif
 using card::Hybrid;
@@ -381,7 +381,7 @@ public:
   PsSynthesisWriter data(HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
   
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Get a special writer which allows the device to read and write to host-mapped data.
   ///        This form of the writer can be used in kernel calls that streamline download and
   ///        upload of specific systems within the PhaseSpaceSynthesis with the launch latency
@@ -493,8 +493,8 @@ public:
   ///        eponymous function in the PhaseSpace object.
   ///
   /// Overloaded:
-  ///   - Initialize one or more systems' forces on the host if OMNI is compiled for CPU only
-  ///   - Initialize one or more systems' forces on either the host or the device if OMNI is
+  ///   - Initialize one or more systems' forces on the host if STORMM is compiled for CPU only
+  ///   - Initialize one or more systems' forces on either the host or the device if STORMM is
   ///     compiled for HPC
   ///
   /// \param gpu    Details of the GPU in use
@@ -502,7 +502,7 @@ public:
   /// \param index  Index of the system of interest within the synthesis--if negative, all systems
   ///               will have their forces initialized
   /// \{
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   void initializeForces(const GpuDetails &gpu, HybridTargetLevel tier = HybridTargetLevel::HOST,
                         int index = -1);
 #else
@@ -517,7 +517,7 @@ public:
   ///
   /// \param gpu    Details of the GPU in use
   /// \param tier   The level (host or device) at which to initialize vectors
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   void primeConjugateGradientCalculation(const GpuDetails &gpu,
                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
 #else
@@ -533,7 +533,7 @@ public:
   /// \param output_kind     The type of trajectory file to write
   /// \param expectation     The state that the output trajectory file is expected to be found in
   /// \param gpu             Specs of the GPU in use for the calculation (HPC mode only)
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   void printTrajectory(const std::vector<int> &system_indices, const std::string &file_name,
                        double current_time, CoordinateFileKind output_kind,
                        PrintSituation expectation, const GpuDetails &gpu);
@@ -654,6 +654,6 @@ private:
 };
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

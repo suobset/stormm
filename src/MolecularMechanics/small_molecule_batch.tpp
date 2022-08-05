@@ -2,7 +2,7 @@
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 //-------------------------------------------------------------------------------------------------
@@ -153,4 +153,4 @@ template <typename T> void minimizeSmallMoleculeBatch<T>(PhaseSpaceSynthesis *ps
 }
   
 } // namespace mm
-} // namespace omni
+} // namespace stormm

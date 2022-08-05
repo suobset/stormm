@@ -9,7 +9,7 @@
 #include "amber_prmtop_util.h"
 #include "atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using math::addScalarToVector;
@@ -1254,4 +1254,4 @@ void AtomGraph::buildFromPrmtop(const std::string &file_name, const ExceptionRes
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

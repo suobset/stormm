@@ -1,17 +1,17 @@
 // -*-c++-*-
-#ifndef OMNI_APPROX_H
-#define OMNI_APPROX_H
+#ifndef STORMM_APPROX_H
+#define STORMM_APPROX_H
 
 #include <cmath>
 #include <string>
 #include <vector>
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Reporting/error_format.h"
 #include "unit_test_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using data_types::isScalarType;
@@ -180,7 +180,7 @@ template <typename T> bool operator<=(const Approx &cr, const std::vector<T> &tv
 
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #include "approx.tpp"
 

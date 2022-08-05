@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_SUMMATION_HPC_H
-#define OMNI_SUMMATION_HPC_H
+#ifndef STORMM_SUMMATION_HPC_H
+#define STORMM_SUMMATION_HPC_H
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -11,7 +11,7 @@
 #include "Math/summation.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace hpc_math {
 
 using card::Hybrid;
@@ -33,7 +33,7 @@ kSumVector(const TBase* vdata, const size_t length, TSum* result) {
   for (size_t pos = (blockIdx.x * blockDim.x) + threadIdx.x; pos < length; pos += ginc) {
     thread_sum += static_cast<TSum>(vdata[pos]);
   }
-#if OMNI_USE_HIP
+#if STORMM_USE_HIP
   thread_sum += SHFL_DOWN(thread_sum, 32);
 #endif
   thread_sum += SHFL_DOWN(thread_sum, 16);
@@ -54,7 +54,7 @@ kSumVector(const TBase* vdata, const size_t length, TSum* result) {
     // an extra one down here.  A check on the warp index is still needed to avoid overrunning
     // the warp_sums array.
     thread_sum = (lane_idx < (large_block_size >> warp_bits)) ? warp_sums[lane_idx] : (TSum)(0);
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
     thread_sum += SHFL_DOWN(thread_sum, 16);
 #endif
     thread_sum += SHFL_DOWN(thread_sum,  8);
@@ -151,7 +151,7 @@ kSumVectorTuple2(const TBase* vdata, const size_t length, TSum* result) {
     thread_sum.x += vdpos.x;
     thread_sum.y += vdpos.y;
   }
-#if OMNI_USE_HIP
+#if STORMM_USE_HIP
   thread_sum.x += SHFL_DOWN(thread_sum.x, 32);
   thread_sum.y += SHFL_DOWN(thread_sum.y, 32);
 #endif
@@ -186,7 +186,7 @@ kSumVectorTuple2(const TBase* vdata, const size_t length, TSum* result) {
       thread_sum.x = (TSum)(0);
       thread_sum.y = (TSum)(0);
     }
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
     thread_sum.x += SHFL_DOWN(thread_sum.x, 16);
     thread_sum.y += SHFL_DOWN(thread_sum.y, 16);
 #endif
@@ -292,7 +292,7 @@ kSumVectorTuple3(const TBase* vdata, const size_t length, TSum* result) {
     thread_sum.y += vdpos.y;
     thread_sum.z += vdpos.z;
   }
-#if OMNI_USE_HIP
+#if STORMM_USE_HIP
   thread_sum.x += SHFL_DOWN(thread_sum.x, 32);
   thread_sum.y += SHFL_DOWN(thread_sum.y, 32);
   thread_sum.z += SHFL_DOWN(thread_sum.z, 32);
@@ -336,7 +336,7 @@ kSumVectorTuple3(const TBase* vdata, const size_t length, TSum* result) {
       thread_sum.y = (TSum)(0);
       thread_sum.z = (TSum)(0);
     }
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
     thread_sum.x += SHFL_DOWN(thread_sum.x, 16);
     thread_sum.y += SHFL_DOWN(thread_sum.y, 16);
     thread_sum.z += SHFL_DOWN(thread_sum.z, 16);
@@ -449,7 +449,7 @@ kSumVectorTuple4(const TBase* vdata, const size_t length, TSum* result) {
     thread_sum.z += vdpos.z;
     thread_sum.w += vdpos.w;
   }
-#if OMNI_USE_HIP
+#if STORMM_USE_HIP
   thread_sum.x += SHFL_DOWN(thread_sum.x, 32);
   thread_sum.y += SHFL_DOWN(thread_sum.y, 32);
   thread_sum.z += SHFL_DOWN(thread_sum.z, 32);
@@ -502,7 +502,7 @@ kSumVectorTuple4(const TBase* vdata, const size_t length, TSum* result) {
       thread_sum.z = (TSum)(0);
       thread_sum.w = (TSum)(0);
     }
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
     thread_sum.x += SHFL_DOWN(thread_sum.x, 16);
     thread_sum.y += SHFL_DOWN(thread_sum.y, 16);
     thread_sum.z += SHFL_DOWN(thread_sum.z, 16);
@@ -605,6 +605,6 @@ TSum sumTuple4(const Hybrid<TBase> &hb, Hybrid<TSum> *buffer, const GpuDetails &
 }
 
 } // namespace hpc_math
-} // namespace omni
+} // namespace stormm
 
 #endif

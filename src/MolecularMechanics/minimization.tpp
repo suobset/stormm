@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace mm {
 
 //-------------------------------------------------------------------------------------------------
@@ -297,4 +297,4 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
 }
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm

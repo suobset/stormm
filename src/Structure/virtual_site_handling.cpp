@@ -3,7 +3,7 @@
 #include "local_arrangement.h"
 #include "virtual_site_handling.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using math::dot;
@@ -56,4 +56,4 @@ void transmitVirtualSiteForces(PhaseSpace *ps, const AtomGraph *ag) {
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

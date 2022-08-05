@@ -1,6 +1,6 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Parsing/parse.h"
@@ -17,43 +17,43 @@
 #include "../../src/Trajectory/trajectory_enumerators.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::small;
-using omni::constants::tiny;
-using omni::data_types::double2;
-using omni::data_types::double3;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::energy::EvaluateForce;
-using omni::energy::evaluateNonbondedEnergy;
-using omni::energy::ScoreCard;
-using omni::energy::StaticExclusionMask;
-using omni::errors::rtWarn;
-using omni::math::computeBoxTransform;
-using omni::random::Xoshiro256ppGenerator;
-using omni::math::angleBetweenVectors;
-using omni::math::crossProduct;
-using omni::math::dot;
-using omni::math::magnitude;
-using omni::math::maxAbsValue;
-using omni::math::maxValue;
-using omni::math::matrixVectorMultiply;
-using omni::math::minValue;
-using omni::math::normalize;
-using omni::math::perpendicularComponent;
-using omni::math::pointPlaneDistance;
-using omni::math::sum;
-using omni::symbols::pi;
-using omni::topology::AtomGraph;
-using omni::topology::listVirtualSiteFrameTypes;
-using omni::topology::UnitCellType;
-using omni::topology::VirtualSiteKind;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::CoordinateFrame;
-using omni::trajectory::CoordinateFrameWriter;
-using omni::trajectory::TrajectoryKind;
-using namespace omni::structure;
-using namespace omni::testing;
+using stormm::constants::small;
+using stormm::constants::tiny;
+using stormm::data_types::double2;
+using stormm::data_types::double3;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::energy::EvaluateForce;
+using stormm::energy::evaluateNonbondedEnergy;
+using stormm::energy::ScoreCard;
+using stormm::energy::StaticExclusionMask;
+using stormm::errors::rtWarn;
+using stormm::math::computeBoxTransform;
+using stormm::random::Xoshiro256ppGenerator;
+using stormm::math::angleBetweenVectors;
+using stormm::math::crossProduct;
+using stormm::math::dot;
+using stormm::math::magnitude;
+using stormm::math::maxAbsValue;
+using stormm::math::maxValue;
+using stormm::math::matrixVectorMultiply;
+using stormm::math::minValue;
+using stormm::math::normalize;
+using stormm::math::perpendicularComponent;
+using stormm::math::pointPlaneDistance;
+using stormm::math::sum;
+using stormm::symbols::pi;
+using stormm::topology::AtomGraph;
+using stormm::topology::listVirtualSiteFrameTypes;
+using stormm::topology::UnitCellType;
+using stormm::topology::VirtualSiteKind;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::CoordinateFrame;
+using stormm::trajectory::CoordinateFrameWriter;
+using stormm::trajectory::TrajectoryKind;
+using namespace stormm::structure;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Scramble the positions of virtual sites in a system.  Scatter frame atoms between box images
@@ -433,8 +433,8 @@ int main(const int argc, const char* argv[]) {
 
   // Get a realistic system
   const char osc = osSeparator();
-  const std::string base_top_path = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_path = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_path = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_path = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string drug_top_path = base_top_path + osc + "drug_example.top";
   const std::string drug_crd_path = base_crd_path + osc + "drug_example.inpcrd";
   const bool files_exist = (getDrivePathType(drug_top_path) == DrivePathType::FILE &&
@@ -445,7 +445,7 @@ int main(const int argc, const char* argv[]) {
                                             CoordinateFrame();
   if (files_exist == false) {
     rtWarn("Files for a drug molecule, in water and inside a periodic box, were not found.  Check "
-           "the $OMNI_SOURCE environment variable to ensure that " + drug_top_path + " and " +
+           "the $STORMM_SOURCE environment variable to ensure that " + drug_top_path + " and " +
            drug_crd_path + " become valid paths.  Some tests will be skipped",
            "test_local_arrangement");
   }

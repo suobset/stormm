@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace errors {
 
 /// \brief Enumerate the kinds of errors and tabular information that might be printed to the
@@ -59,12 +59,12 @@ void rtAlert(const std::string &message, const char* class_caller = nullptr,
              const char* method_caller = nullptr);
 
 } // namespace errors
-} // namespace omni
+} // namespace stormm
 
-namespace omni {
+namespace stormm {
   using errors::rtErr;
   using errors::rtWarn;
   using errors::rtAlert;
-} // namespace omni
+} // namespace stormm
 
 #endif

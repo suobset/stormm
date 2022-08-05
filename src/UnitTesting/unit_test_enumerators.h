@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_UNIT_TEST_ENUMERATORS_H
-#define OMNI_UNIT_TEST_ENUMERATORS_H
+#ifndef STORMM_UNIT_TEST_ENUMERATORS_H
+#define STORMM_UNIT_TEST_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 /// \brief Enumerate the types of comparisons to make between two numbers
@@ -65,6 +65,6 @@ enum class TmpdirStatus {
 };
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #endif

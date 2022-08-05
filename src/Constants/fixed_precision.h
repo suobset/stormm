@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_FIXED_PRECISION_H
-#define OMNI_FIXED_PRECISION_H
+#ifndef STORMM_FIXED_PRECISION_H
+#define STORMM_FIXED_PRECISION_H
 
 #include <cmath>
 #include <string>
@@ -8,7 +8,7 @@
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 
-namespace omni {
+namespace stormm {
 namespace numerics {
 
 using constants::ExceptionResponse;
@@ -237,6 +237,6 @@ void splitRealAccumulation(const double fval, llint *primary, int *overflow);
 /// \}
 
 } // namespace numerics
-} // namespace omni
+} // namespace stormm
 
 #endif

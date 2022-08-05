@@ -1,16 +1,16 @@
 // -*-c++-*-
-#ifndef OMNI_POLYNUMERIC_H
-#define OMNI_POLYNUMERIC_H
+#ifndef STORMM_POLYNUMERIC_H
+#define STORMM_POLYNUMERIC_H
 
 #include <vector>
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
-using data_types::getOmniHpcVectorTypeName;
+using data_types::getStormmHpcVectorTypeName;
 using data_types::isFloatingPointScalarType;
 using data_types::isHpcVectorType;
 using data_types::isScalarType;
@@ -101,7 +101,7 @@ PolyNumeric extractFormattedNumber(const char* a, NumberFormat cform, int read_b
                                    int len = 0);
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm
 
 #include "polynumeric.tpp"
 

@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace data_types {
 
 //-------------------------------------------------------------------------------------------------
@@ -32,7 +32,7 @@ template <typename T> bool isFloatingPointScalarType() {
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> std::string getOmniScalarTypeName() {
+template <typename T> std::string getStormmScalarTypeName() {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == int_type_index) return "int";
   else if (ct == uint_type_index) return "unsigned_int";
@@ -48,10 +48,10 @@ template <typename T> std::string getOmniScalarTypeName() {
   else if (ct == bool_type_index) return "bool";
   else {
     rtErr("Data type " + std::string(std::type_index(typeid(T)).name()) + " is not a recognized "
-          "scalar type.", "getOmniScalarTypeName");
+          "scalar type.", "getStormmScalarTypeName");
   }
   __builtin_unreachable();
 }
 
 } // namespace data_types
-} // namespace omni
+} // namespace stormm

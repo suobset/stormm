@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
@@ -285,4 +285,4 @@ Tcalc rmsd(const CoordinateSeries<Tcoord> &cs, const int frame_a, const int fram
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

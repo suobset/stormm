@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace random {
 
 //-------------------------------------------------------------------------------------------------
@@ -294,4 +294,4 @@ void RandomNumberMill<T>::initializeBank(const RandomNumberKind init_kind) {
 }
 
 } // namespace random
-} // namespace omni
+} // namespace stormm

@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 using parse::NumberFormat;
@@ -1180,4 +1180,4 @@ std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx
 }
   
 } // namespace math
-} // namespace omni
+} // namespace stormm

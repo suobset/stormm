@@ -2,7 +2,7 @@
 #include "namelist_element.h"
 #include "nml_ffmorph.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using parse::stringToChar4;
@@ -671,4 +671,4 @@ NamelistEmulator ffmorphInput(const TextFile &tf, int *start_line, bool *found,
 }
   
 } // namespace namelist 
-} // namespace omni
+} // namespace stormm

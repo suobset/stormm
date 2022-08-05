@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -1174,4 +1174,4 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
 }
   
 } // namespace energy
-} // namespace omni
+} // namespace stormm

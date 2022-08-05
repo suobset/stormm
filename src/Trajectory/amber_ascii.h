@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_AMBER_ASCII_H
-#define OMNI_AMBER_ASCII_H
+#ifndef STORMM_AMBER_ASCII_H
+#define STORMM_AMBER_ASCII_H
 
 #include "Constants/behavior.h"
 #include "Accelerator/hybrid.h"
@@ -8,7 +8,7 @@
 #include "Parsing/textfile.h"
 #include "coordinateframe.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using constants::ExceptionResponse;
@@ -127,6 +127,6 @@ void readAmberCrdFormat(const TextFile &tf, CoordinateFrameWriter *cfw, int fram
 /// \}
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

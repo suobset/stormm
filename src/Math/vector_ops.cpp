@@ -1,6 +1,6 @@
 #include "vector_ops.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -148,4 +148,4 @@ int readBitFromMask(const std::vector<ushort> &va, const size_t pos) {
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

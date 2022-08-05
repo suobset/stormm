@@ -1,7 +1,7 @@
-#ifndef OMNI_PTX_MACROS_H
-#define OMNI_PTX_MACROS_H
+#ifndef STORMM_PTX_MACROS_H
+#define STORMM_PTX_MACROS_H
 
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 #define SHFL_DOWN(a, b)  __shfl_down_sync(0xffffffff, a, b, 32);
 #define SHFL_XOR(a, b)   __shfl_xor_sync(0xffffffff, a, b, 32);
 #define SHFL_UP(a, b)    __shfl_up_sync(0xffffffff, a, b, 32);
@@ -17,7 +17,7 @@
 
 #endif
 
-#ifdef OMNI_USE_HIP
+#ifdef STORMM_USE_HIP
 #define SHFL_DOWN(a, b)        __shfl_down(0xffffffffffffffff, a, b, 64);
 #define SHFL_XOR(a, b)         __shfl_xor(0xffffffffffffffff, a, b, 64);
 #define SHFL_UP(a, b)          __shfl_up(0xffffffffffffffff, a, b, 64);

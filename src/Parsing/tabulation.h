@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_TABULATION_H
-#define OMNI_TABULATION_H
+#ifndef STORMM_TABULATION_H
+#define STORMM_TABULATION_H
 
 #include <string>
 #include <vector>
 #include "polynumeric.h"
 #include "Math/sorting.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 using math::SortDirection;
@@ -85,6 +85,6 @@ void printTable(const std::vector<std::string> &headings,
                 SortDirection sorting_direction = SortDirection::AUTOMATIC);
 
 } // namspace parse
-} // namespace omni
+} // namespace stormm
 
 #endif

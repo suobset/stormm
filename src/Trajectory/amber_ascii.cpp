@@ -7,7 +7,7 @@
 #include "Parsing/ascii_numbers.h"
 #include "amber_ascii.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using math::computeBoxTransform;
@@ -281,4 +281,4 @@ void readAmberCrdFormat(const TextFile &tf, CoordinateFrameWriter *cfw, const in
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

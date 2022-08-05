@@ -3,7 +3,7 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/vector_ops.h"
@@ -13,22 +13,22 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
-using omni::constants::PrecisionModel;
-using omni::constants::tiny;
-using omni::data_types::llint;
-using omni::data_types::float2;
-using omni::data_types::int95_t;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::random::Ran2Generator;
-using omni::symbols::pi;
-using namespace omni::math;
-using namespace omni::numerics;
-using namespace omni::testing;
+using stormm::constants::PrecisionModel;
+using stormm::constants::tiny;
+using stormm::data_types::llint;
+using stormm::data_types::float2;
+using stormm::data_types::int95_t;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::random::Ran2Generator;
+using stormm::symbols::pi;
+using namespace stormm::math;
+using namespace stormm::numerics;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Test the split accumulation method over a segment of the number line.

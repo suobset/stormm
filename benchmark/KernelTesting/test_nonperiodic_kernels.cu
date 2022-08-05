@@ -31,20 +31,20 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/stopwatch.h"
 
-using namespace omni::card;
-using namespace omni::constants;
-using namespace omni::errors;
-using namespace omni::diskutil;
-using namespace omni::energy;
-using namespace omni::math;
-using namespace omni::mm;
-using namespace omni::numerics;
-using namespace omni::parse;
-using namespace omni::restraints;
-using namespace omni::synthesis;
-using namespace omni::testing;
-using namespace omni::topology;
-using namespace omni::trajectory;
+using namespace stormm::card;
+using namespace stormm::constants;
+using namespace stormm::errors;
+using namespace stormm::diskutil;
+using namespace stormm::energy;
+using namespace stormm::math;
+using namespace stormm::mm;
+using namespace stormm::numerics;
+using namespace stormm::parse;
+using namespace stormm::restraints;
+using namespace stormm::synthesis;
+using namespace stormm::testing;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Constant expressions to guide testing
@@ -59,7 +59,7 @@ constexpr int gmem_kernel_repeats = 25000;
 // Arguments:
 //   topol_path:  A series of strings that will be joined into the topology directory name
 //   coord_path:  A series of strings that will be joined into the coordinate directory name
-//   oe:          Contains critical shell variables such as the $OMNI source path where the
+//   oe:          Contains critical shell variables such as the $STORMM source path where the
 //                named directories are expected to reside
 //-------------------------------------------------------------------------------------------------
 SystemCache directorySweep(const std::vector<std::string> &topol_path,
@@ -68,12 +68,12 @@ SystemCache directorySweep(const std::vector<std::string> &topol_path,
   // Collect coordinates and topologies
   const char osc = osSeparator();
   std::string buffer("&files\n  -p ");
-  buffer += oe.getOmniSourcePath() + osc + "benchmark";
+  buffer += oe.getStormmSourcePath() + osc + "benchmark";
   for (size_t i = 0; i < topol_path.size(); i++) {
     buffer += osc + topol_path[i];
   }
   buffer += "\n  -c ";
-  buffer += oe.getOmniSourcePath() + osc + "benchmark";
+  buffer += oe.getStormmSourcePath() + osc + "benchmark";
   for (size_t i = 0; i < topol_path.size(); i++) {
     buffer += osc + coord_path[i];
   }
@@ -216,12 +216,12 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
 
 //-------------------------------------------------------------------------------------------------
 // Run a batch of molecules based on a particular folder within the Topologies and Coordinates
-// subdirectories of the OMNI benchmarking suite.
+// subdirectories of the STORMM benchmarking suite.
 //
 // Arguments:
 //   batch_name:  Name of the folder
 //   gpu:         Details of the GPU
-//   oe:          Contains the name of the OMNI source directory, and other environment variables
+//   oe:          Contains the name of the STORMM source directory, and other environment variables
 //   timer:       Object to track the timings
 //-------------------------------------------------------------------------------------------------
 void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEnvironment &oe,

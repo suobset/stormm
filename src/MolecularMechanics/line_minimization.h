@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_LINE_MINIMIZATION_H
-#define OMNI_LINE_MINIMIZATION_H
+#ifndef STORMM_LINE_MINIMIZATION_H
+#define STORMM_LINE_MINIMIZATION_H
 
 #include "Accelerator/hybrid.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using card::Hybrid;
@@ -174,7 +174,7 @@ public:
   /// \param dx0  The initial movelength length to take
   void primeMoveLengths(double dx0);
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload the contents of the object from host to device memory.  This is not necessary
   ///        except for testing purposes.  Movement lengths set of the host by primeMoveLengths()
   ///        will be automatically uploaded.
@@ -212,6 +212,6 @@ private:
 };
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm
 
 #endif

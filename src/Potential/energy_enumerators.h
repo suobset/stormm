@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_ENERGY_ENUMERATORS_H
-#define OMNI_ENERGY_ENUMERATORS_H
+#ifndef STORMM_ENERGY_ENUMERATORS_H
+#define STORMM_ENERGY_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 /// \brief Enumerate the choices on whether to evaluate the energy... yes or no.  CPU functions
@@ -28,7 +28,7 @@ enum class DihedralStyle {
   COSINE, HARMONIC
 };
 
-/// \brief Enumerate all state variables that OMNI will track.  This must always increment by one
+/// \brief Enumerate all state variables that STORMM will track.  This must always increment by one
 ///        from one enumeration to the next, start at zero, and always end with ALL_STATES.
 enum class StateVariable {
   BOND = 0,               ///< Harmonic bond stretching energy
@@ -70,6 +70,6 @@ enum class StateVariable {
 };
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #endif

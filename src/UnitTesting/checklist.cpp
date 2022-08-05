@@ -5,7 +5,7 @@
 #include "Reporting/error_format.h"
 #include "checklist.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using errors::RTMessageKind;
@@ -336,4 +336,4 @@ void CheckList::printSummary(const TestVerbosity verbosity) const {
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

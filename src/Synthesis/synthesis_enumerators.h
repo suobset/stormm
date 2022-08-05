@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_SYNTHESIS_ENUMERATORS_H
-#define OMNI_SYNTHESIS_ENUMERATORS_H
+#ifndef STORMM_SYNTHESIS_ENUMERATORS_H
+#define STORMM_SYNTHESIS_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
   
 /// \brief Enumerate the different kinds of non-bonded work.  All-to-all calculations for systems
@@ -99,6 +99,6 @@ enum class VwuGoal {
 };
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #endif

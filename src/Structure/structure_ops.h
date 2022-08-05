@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_STRUCTURE_OPS_H
-#define OMNI_STRUCTURE_OPS_H
+#ifndef STORMM_STRUCTURE_OPS_H
+#define STORMM_STRUCTURE_OPS_H
 
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using topology::AtomGraph;
@@ -85,6 +85,6 @@ double3 molecularTorque(const double* xcrd, const double* ycrd, const double* zc
 
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #endif

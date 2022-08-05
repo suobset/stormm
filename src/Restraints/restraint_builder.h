@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef	OMNI_RESTRAINT_BUILDER_H
-#define	OMNI_RESTRAINT_BUILDER_H
+#ifndef	STORMM_RESTRAINT_BUILDER_H
+#define	STORMM_RESTRAINT_BUILDER_H
 
 #include <vector>
 #include "Chemistry/atommask.h"
 #include "bounded_restraint.h"
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 using chemistry::AtomMask;
@@ -231,6 +231,6 @@ applyHydrogenBondPreventors(const AtomGraph *ag, const CoordinateFrameReader &cf
 /// \}
   
 } // namespace restraints
-} // namespace omni
+} // namespace stormm
 
 #endif

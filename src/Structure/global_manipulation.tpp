@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using topology::UnitCellType;
@@ -112,4 +112,4 @@ void translateCoordinates(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const Tcalc 
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

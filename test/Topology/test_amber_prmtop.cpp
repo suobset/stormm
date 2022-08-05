@@ -1,5 +1,5 @@
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Reporting/error_format.h"
@@ -7,20 +7,20 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "test_amber_prmtop.h"
 
-using omni::constants::tiny;
-using omni::data_types::ulint;
-using omni::data_types::char4;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getBaseName;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::math::sum;
-using omni::parse::polyNumericVector;
-using omni::parse::stringToChar4;
-using omni::parse::TextFile;
-using omni::parse::operator==;
-using namespace omni::testing;
+using stormm::constants::tiny;
+using stormm::data_types::ulint;
+using stormm::data_types::char4;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getBaseName;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::math::sum;
+using stormm::parse::polyNumericVector;
+using stormm::parse::stringToChar4;
+using stormm::parse::TextFile;
+using stormm::parse::operator==;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Enumerated integer analyses of every topology in a list
@@ -456,7 +456,7 @@ int main(const int argc, const char* argv[]) {
   
   // Read many topologies.  Test one of them as an indicator whether they are all available.
   const char osc = osSeparator();
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string tip3p_top_name = base_top_name + osc + "tip3p.top";
   const std::string tip4p_top_name = base_top_name + osc + "tip4p.top";
   const std::string tip4p_error_top_name = base_top_name + osc + "tip4p_error.top";
@@ -513,14 +513,14 @@ int main(const int argc, const char* argv[]) {
     ala_dipeptide.buildFromPrmtop(ala_dipeptide_top_name, policy);
   }
   else {
-    const std::string omnisrc_base_name(std::string("${OMNI_SOURCE}") + osc + "test" + osc +
+    const std::string stormmsrc_base_name(std::string("${STORMM_SOURCE}") + osc + "test" + osc +
                                         "Topology");
     rtWarn("One or more topologies required by subsequent tests were not found.  Check the "
-           "$OMNI_SOURCE environment variable to make sure it indicates the location of the OMNI "
+           "$STORMM_SOURCE environment variable to make sure it indicates the location of the STORMM "
            "source tree, with src/ and test/ as subdirectories.  This test program will skip "
            "nearly all tests until files such as " + getBaseName(tip3p_top_name) + ", " +
            getBaseName(tip4p_top_name) + ", and " + getBaseName(brbz_vs_top_name) +
-           "can be found in directory " + omnisrc_base_name + ".", "test_amber_prmtop");
+           "can be found in directory " + stormmsrc_base_name + ".", "test_amber_prmtop");
   }
   const bool snapshots_exist =
     (getDrivePathType(base_top_name + osc + "tip3p_atoms.m") == DrivePathType::FILE &&
@@ -528,13 +528,13 @@ int main(const int argc, const char* argv[]) {
      getDrivePathType(base_top_name + osc + "ala_charges.m") == DrivePathType::FILE);
   const TestPriority snap_check = (snapshots_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snapshots_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
-    const std::string omnisrc_base_name(std::string("${OMNI_SOURCE}") + osc + "test" + osc +
+    const std::string stormmsrc_base_name(std::string("${STORMM_SOURCE}") + osc + "test" + osc +
                                         "Topology");
-    rtWarn("Snapshot required by subsequent tests were not found.  Check the $OMNI_SOURCE "
+    rtWarn("Snapshot required by subsequent tests were not found.  Check the $STORMM_SOURCE "
            "environment variable.  Some subsequent tests will be skipped until the files " +
            base_top_name + osc + "tip3p_atoms.m," + base_top_name + osc + "trpcage_details.m," +
            " and " + base_top_name + osc + "ala_charges.m can be found in directory " +
-           omnisrc_base_name + ".", "test_amber_prmtop");
+           stormmsrc_base_name + ".", "test_amber_prmtop");
   }
 
   // Check various atomic details

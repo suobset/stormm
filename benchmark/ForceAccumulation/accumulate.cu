@@ -9,22 +9,22 @@
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::warp_size_int;
-using omni::constants::ExceptionResponse;
-using omni::data_types::int95_t;
-using omni::data_types::llint;
-using omni::data_types::ullint;
-using omni::numerics::max_int_accumulation;
-using omni::numerics::max_int_accumulation_f;
-using omni::numerics::max_int_accumulation_ll;
-using omni::numerics::max_llint_accumulation;
-using omni::numerics::max_llint_accumulation_f;
-using namespace omni::card;
-using namespace omni::testing;
+using stormm::constants::warp_size_int;
+using stormm::constants::ExceptionResponse;
+using stormm::data_types::int95_t;
+using stormm::data_types::llint;
+using stormm::data_types::ullint;
+using stormm::numerics::max_int_accumulation;
+using stormm::numerics::max_int_accumulation_f;
+using stormm::numerics::max_int_accumulation_ll;
+using stormm::numerics::max_llint_accumulation;
+using stormm::numerics::max_llint_accumulation_f;
+using namespace stormm::card;
+using namespace stormm::testing;
 
 // Copy the inline __device__ functions
 #include "../../src/Potential/accumulation.cui"

@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace generalized_born_defaults {
 
 //-------------------------------------------------------------------------------------------------
@@ -12,4 +12,4 @@ NeckGeneralizedBornKit<T>::NeckGeneralizedBornKit(const int table_size_in, const
 {}
 
 } // namespace generalized_born_defaults
-} // namespace omni
+} // namespace stormm

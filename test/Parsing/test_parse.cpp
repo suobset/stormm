@@ -5,15 +5,15 @@
 #include "../../src/Topology/amber_prmtop_util.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::errors::rtWarn;
-using omni::math::sum;
-using omni::diskutil::osSeparator;
-using omni::topology::amberPrmtopData;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::errors::rtWarn;
+using stormm::math::sum;
+using stormm::diskutil::osSeparator;
+using stormm::topology::amberPrmtopData;
 
-using namespace omni::parse;
-using namespace omni::testing;
+using namespace stormm::parse;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 
@@ -41,18 +41,18 @@ int main(const int argc, const char* argv[]) {
 
   // Test the TextFile object and its features
   section(1);
-  const std::string something_path = oe.getOmniSourcePath() + osSeparator() + "test" +
+  const std::string something_path = oe.getStormmSourcePath() + osSeparator() + "test" +
                                      osSeparator() + "Parsing" + osSeparator() + "something.txt";
   const bool sfile_exists = (getDrivePathType(something_path) == DrivePathType::FILE);
   const TextFile tf = (sfile_exists) ? TextFile(something_path) : TextFile();
   if (sfile_exists == false) {
-    rtWarn("Text file " + something_path + " was not found.  Make sure that the $OMNI_SOURCE "
+    rtWarn("Text file " + something_path + " was not found.  Make sure that the $STORMM_SOURCE "
            "environment variable is set to the root of the source tree, where src/ and test/ "
            "subdirectories can be found.  Many subsequent tests will be skipped until this file "
            "is available.", "test_parse");
   }
   const TestPriority sfile_check = (sfile_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  check(tf.getFileName(), RelationalOperator::EQUAL, oe.getOmniSourcePath() + osSeparator() +
+  check(tf.getFileName(), RelationalOperator::EQUAL, oe.getStormmSourcePath() + osSeparator() +
         "test" + osSeparator() + "Parsing" + osSeparator() + "something.txt", "Text file name was "
         "not properly identified.", sfile_check);
   check(tf.getLineCount(), RelationalOperator::EQUAL, 40, "TextFile object records an incorrect "
@@ -196,11 +196,11 @@ int main(const int argc, const char* argv[]) {
 
   // Test formatted column data reading: starting with integers
   section(5);
-  const std::string spsh_path = oe.getOmniSourcePath() + osSeparator() + "test" + osSeparator() +
+  const std::string spsh_path = oe.getStormmSourcePath() + osSeparator() + "test" + osSeparator() +
                                 "Parsing" + osSeparator() + "formatted_numbers.txt";
   const bool pfile_exists = (getDrivePathType(spsh_path) == DrivePathType::FILE);
   if (pfile_exists == false) {
-    rtWarn("Data file " + spsh_path + " was not found.  Make sure that the $OMNI_SOURCE "
+    rtWarn("Data file " + spsh_path + " was not found.  Make sure that the $STORMM_SOURCE "
            "environment variable is set to the root of the source tree, where src/ and test/ "
            "subdirectories can be found.  Many subsequent tests will be skipped until this file "
            "is available.", "test_parse");

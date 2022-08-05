@@ -5,9 +5,9 @@
 #include "Reporting/error_format.h"
 #include "gpu_details.h"
 
-omni::card::GpuDetails null_gpu;
+stormm::card::GpuDetails null_gpu;
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 //-------------------------------------------------------------------------------------------------
@@ -94,4 +94,4 @@ void GpuDetails::setSMPCount(const int smp_count_in) {
 }
 
 } // namespace card
-} // namespace omni
+} // namespace stormm

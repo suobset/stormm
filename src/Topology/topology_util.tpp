@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace topology {
 
 //-------------------------------------------------------------------------------------------------
@@ -116,7 +116,7 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
     case HybridTargetLevel::HOST:
       tmpv = sp_item.readHost(low_index, high_index - low_index);
       break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       tmpv = sp_item.readDevice(low_index, high_index - low_index);
       break;
@@ -130,7 +130,7 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
     case HybridTargetLevel::HOST:
       tmpv = item.readHost(low_index, high_index - low_index);
       break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       tmpv = item.readDevice(low_index, high_index - low_index);
       break;
@@ -140,10 +140,10 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
   }
   else {
     if (isScalarType<T>()) {
-      rtErr("Data is not available in type " + getOmniScalarTypeName<T>() + ".", caller, method);
+      rtErr("Data is not available in type " + getStormmScalarTypeName<T>() + ".", caller, method);
     }
     else if (isHpcVectorType<T>()) {
-      rtErr("Data is not available in type " + getOmniHpcVectorTypeName<T>() + ".", caller,
+      rtErr("Data is not available in type " + getStormmHpcVectorTypeName<T>() + ".", caller,
             method);
     }
     else {
@@ -155,4 +155,4 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

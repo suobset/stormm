@@ -1,10 +1,10 @@
 #include "Constants/hpc_bounds.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 #include "Reporting/error_format.h"
 #include "restraint_apparatus.h"
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 using card::HybridKind;
@@ -1152,4 +1152,4 @@ createBlankRestraintApparatus(const std::vector<AtomGraph*> ags) {
 }
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm

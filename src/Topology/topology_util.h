@@ -1,25 +1,25 @@
 // -*-c++-*-
-#ifndef OMNI_TOPOLOGY_BOUNDS_CHECKS_H
-#define OMNI_TOPOLOGY_BOUNDS_CHECKS_H
+#ifndef STORMM_TOPOLOGY_BOUNDS_CHECKS_H
+#define STORMM_TOPOLOGY_BOUNDS_CHECKS_H
 
 #include <string>
 #include <vector>
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/sorting.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "atomgraph_abstracts.h"
 #include "topology_limits.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
-using data_types::getOmniScalarTypeName;
-using data_types::getOmniHpcVectorTypeName;
+using data_types::getStormmScalarTypeName;
+using data_types::getStormmHpcVectorTypeName;
 using data_types::isScalarType;
 using data_types::isHpcVectorType;
 using math::UniqueValueHandling;
@@ -86,7 +86,7 @@ std::vector<T> getRealParameters(const Hybrid<double> &item, const Hybrid<float>
 std::string writeAtomList(const std::vector<int> &atom_list, const ChemicalDetailsKit &cdk);
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #include "topology_util.tpp"
 

@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_STATIC_MASK_SYNTHESIS_H
-#define OMNI_STATIC_MASK_SYNTHESIS_H
+#ifndef STORMM_STATIC_MASK_SYNTHESIS_H
+#define STORMM_STATIC_MASK_SYNTHESIS_H
 
 #include "Accelerator/hybrid.h"
 #include "Potential/static_exclusionmask.h"
 #include "Topology/atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::Hybrid;
@@ -100,7 +100,7 @@ public:
   /// \brief Get the abstract for this static exclusion mask synthesis.
   SeMaskSynthesisReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload the exclusion mask synthesis to the GPU device.
   void upload();
 
@@ -158,6 +158,6 @@ private:
 };
   
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #endif

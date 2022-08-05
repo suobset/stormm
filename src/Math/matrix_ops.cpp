@@ -1,6 +1,6 @@
 #include "matrix_ops.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -57,4 +57,4 @@ void checkArraySizeToMatrixRank(const size_t actual_rank, const size_t rank, con
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace testing {
 
 //-------------------------------------------------------------------------------------------------
@@ -245,4 +245,4 @@ template <typename T> bool operator<=(const Approx &cr, const std::vector<T> &tv
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

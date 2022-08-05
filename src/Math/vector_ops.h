@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_VECTOR_OPS_H
-#define OMNI_VECTOR_OPS_H
+#ifndef STORMM_VECTOR_OPS_H
+#define STORMM_VECTOR_OPS_H
 
 #include <algorithm>
 #include <cmath>
@@ -11,14 +11,14 @@
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/mixed_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
 #include "sorting.h"
 #include "statistics.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::Hybrid;
@@ -651,7 +651,7 @@ template <typename T>
 std::vector<T> tileVector(const std::vector<T> &va, const std::vector<int> &tidx);
   
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "vector_ops.tpp"
 

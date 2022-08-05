@@ -1,20 +1,20 @@
 // -*-c++-*-
-#ifndef OMNI_VECTOR_TYPES_H
-#define OMNI_VECTOR_TYPES_H
+#ifndef STORMM_VECTOR_TYPES_H
+#define STORMM_VECTOR_TYPES_H
 
 #include <cstddef>
 #include <typeinfo>
 #include <typeindex>
 #include <vector>
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 #include <vector_types.h>
 #endif
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace data_types {
 
-#ifndef OMNI_USE_HPC
+#ifndef STORMM_USE_HPC
 // If CUDA is not defined, then some of the CUDA POD vector types will need to be delineated in
 // order to run the program in CPU code.
 struct int2 {
@@ -255,7 +255,7 @@ template <typename T> bool isFloatingPointHpcVectorType();
 template <typename T> int getHpcVectorTypeSize();
 
 /// \brief Produce a platform-independent name by which to identify one of the scalar data types.
-template <typename T> std::string getOmniHpcVectorTypeName();
+template <typename T> std::string getStormmHpcVectorTypeName();
 
 /// \brief A mixed tuple for 95-bit integer accumulation.  This is the proper way to take
 ///        double-precision floating point arithmetic into fixed precision format with minimal
@@ -339,15 +339,15 @@ template <typename T> std::vector<float4> vtConv4f(const std::vector<T> &rhs);
 /// \}
 
 } // namespace data_types
-} // namespace omni
+} // namespace stormm
 
-#include "omni_vector_types.tpp"
+#include "stormm_vector_types.tpp"
 
-namespace omni {
+namespace stormm {
 
-// Make the HPC vectorized tuple types available through Omni namespaces, if they were defined
+// Make the HPC vectorized tuple types available through STORMM namespaces, if they were defined
 // without an overarching HPC library.
-#ifndef OMNI_USE_HPC
+#ifndef STORMM_USE_HPC
 using data_types::int2;
 using data_types::int3;
 using data_types::int4;
@@ -388,7 +388,7 @@ using data_types::ullint2;
 using data_types::ullint3;
 using data_types::ullint4;
 
-// Make type index identifiers available in all Omni namespaces
+// Make type index identifiers available in all STORMM namespaces
 using data_types::int2_type_index;
 using data_types::int3_type_index;
 using data_types::int4_type_index;
@@ -434,6 +434,6 @@ using data_types::vtConv2f;
 using data_types::vtConv3f;
 using data_types::vtConv4f;
 
-} // namespace omni
+} // namespace stormm
 
 #endif

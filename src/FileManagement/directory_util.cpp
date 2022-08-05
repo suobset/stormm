@@ -1,10 +1,10 @@
 #include <algorithm>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Reporting/error_format.h"
 #include "directory_util.h"
 #include "file_listing.h"
 
-namespace omni {
+namespace stormm {
 namespace diskutil {
 
 using errors::rtErr;
@@ -19,7 +19,7 @@ int localMkdir(const char* path, const mode_t mode) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<std::string> omniMkdir(const std::string &path, const mode_t mode) {
+std::vector<std::string> stormmMkdir(const std::string &path, const mode_t mode) {
 
   // Keep a list of directories created on the path to (and including) the one of interest
   std::vector<std::string> dirs_created;
@@ -36,13 +36,13 @@ std::vector<std::string> omniMkdir(const std::string &path, const mode_t mode) {
     switch(getDrivePathType(partial_path)) {
     case DrivePathType::FILE:
       rtErr("The directory " + path + " could not be created because " + partial_path +
-            " is a file.", "omniMkdir");
+            " is a file.", "stormmMkdir");
     case DrivePathType::DIRECTORY:
       break;
     case DrivePathType::REGEXP:
       if (localMkdir(partial_path.c_str(), mode) != 0) {
         rtErr("The directory " + path + " could not be created because " + partial_path +
-              " could not be created.", "omniMkdir");
+              " could not be created.", "stormmMkdir");
       }
       dirs_created.push_back(partial_path);
       break;
@@ -61,7 +61,7 @@ int localRmdir(const char* path) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void omniRmdir(const std::string &path, const ExceptionResponse protocol) {
+void stormmRmdir(const std::string &path, const ExceptionResponse protocol) {
 
   // Detect a leading slash to see if the regular expression contains an absolute path
   const char sep_char = osSeparator();
@@ -71,9 +71,9 @@ void omniRmdir(const std::string &path, const ExceptionResponse protocol) {
     if (localRmdir(path.c_str()) != 0) {
       switch (protocol) {
       case ExceptionResponse::DIE:
-        rtErr("The directory " + path + " could not be removed.", "omniRmdir");
+        rtErr("The directory " + path + " could not be removed.", "stormmRmdir");
       case ExceptionResponse::WARN:
-        rtWarn("The directory " + path + " could not be removed.", "omniRmdir");
+        rtWarn("The directory " + path + " could not be removed.", "stormmRmdir");
 	break;
       case ExceptionResponse::SILENT:
 	break;
@@ -83,9 +83,9 @@ void omniRmdir(const std::string &path, const ExceptionResponse protocol) {
   case DrivePathType::FILE:
     switch (protocol) {
     case ExceptionResponse::DIE:
-      rtErr("The directory " + path + " is, in fact, a file.", "omniRmdir");
+      rtErr("The directory " + path + " is, in fact, a file.", "stormmRmdir");
     case ExceptionResponse::WARN:
-      rtWarn("The directory " + path + " is a file and will not be removed.", "omniRmdir");
+      rtWarn("The directory " + path + " is a file and will not be removed.", "stormmRmdir");
       break;
     case ExceptionResponse::SILENT:
       break;
@@ -94,9 +94,9 @@ void omniRmdir(const std::string &path, const ExceptionResponse protocol) {
   case DrivePathType::REGEXP:
     switch (protocol) {
     case ExceptionResponse::DIE:
-      rtErr("Directory " + path + " cannot be removed because it does not exist.", "omniRmdir");
+      rtErr("Directory " + path + " cannot be removed because it does not exist.", "stormmRmdir");
     case ExceptionResponse::WARN:
-      rtWarn("Directory " + path + " cannot be removed because it does not exist.", "omniRmdir");
+      rtWarn("Directory " + path + " cannot be removed because it does not exist.", "stormmRmdir");
       break;
     case ExceptionResponse::SILENT:
       break;
@@ -106,7 +106,7 @@ void omniRmdir(const std::string &path, const ExceptionResponse protocol) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void omniBatchRmdir(const std::vector<std::string> &paths, const ExceptionResponse protocol) {
+void stormmBatchRmdir(const std::vector<std::string> &paths, const ExceptionResponse protocol) {
 
   // Organize the list if possible.  The longest, deepest paths should go first, followed by
   // shorter ones.
@@ -127,9 +127,9 @@ void omniBatchRmdir(const std::vector<std::string> &paths, const ExceptionRespon
 
   // Now start removing directories
   for (int i = 0; i < n_paths; i++) {
-    omniRmdir(ordered_paths[i], protocol);
+    stormmRmdir(ordered_paths[i], protocol);
   }
 }
 
 } // namespace diskutil
-} // namespace omni
+} // namespace stormm

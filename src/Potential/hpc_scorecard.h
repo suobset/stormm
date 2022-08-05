@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_SCORECARD_H
-#define OMNI_HPC_SCORECARD_H
+#ifndef STORMM_HPC_SCORECARD_H
+#define STORMM_HPC_SCORECARD_H
 
 #include <vector>
 #include "Accelerator/gpu_details.h"
 #include "energy_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
@@ -31,6 +31,6 @@ void launchScoreCardInitialization(const std::vector<StateVariable> &var, int sy
 /// \}
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #endif

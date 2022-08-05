@@ -14,26 +14,26 @@
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::small;
-using omni::data_types::llint;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::diskutil::PrintSituation;
-using omni::errors::rtWarn;
-using omni::math::computeBoxTransform;
-using omni::math::elementwiseDivide;
-using omni::math::elementwiseMultiply;
-using omni::math::extractBoxDimensions;
-using omni::math::mean;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::random::Xoroshiro128pGenerator;
-using omni::random::Ran2Generator;
-using omni::symbols::pi;
-using omni::topology::UnitCellType;
-using namespace omni::testing;
-using namespace omni::trajectory;
+using stormm::constants::small;
+using stormm::data_types::llint;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::diskutil::PrintSituation;
+using stormm::errors::rtWarn;
+using stormm::math::computeBoxTransform;
+using stormm::math::elementwiseDivide;
+using stormm::math::elementwiseMultiply;
+using stormm::math::extractBoxDimensions;
+using stormm::math::mean;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::random::Xoroshiro128pGenerator;
+using stormm::random::Ran2Generator;
+using stormm::symbols::pi;
+using stormm::topology::UnitCellType;
+using namespace stormm::testing;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // A function that creates a PhaseSpace object filled with random coordinates normally distributed
@@ -89,7 +89,7 @@ int main(const int argc, const char* argv[]) {
   // Test (delayed) file reading for an input coordinate set
   section(1);
   const char osc = osSeparator();
-  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string tip3p_crd_name = base_crd_name + osc + "tip3p.inpcrd";
   const bool tip3p_exists = (getDrivePathType(tip3p_crd_name) == DrivePathType::FILE);
   const TestPriority do_tip3p = (tip3p_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -347,7 +347,7 @@ int main(const int argc, const char* argv[]) {
   const std::string trpcage_traj_name = base_crd_name + osc + "trpcage.crd";
   const bool traj_exists = (getDrivePathType(trpcage_traj_name) == DrivePathType::FILE);
   if (traj_exists == false) {
-    rtWarn("A trajectory of Trp-cage coordinates was not found.  Check ${OMNI_SOURCE} to ensure "
+    rtWarn("A trajectory of Trp-cage coordinates was not found.  Check ${STORMM_SOURCE} to ensure "
            "that " + trpcage_traj_name + " becomes a valid path.", "test_amber_coordinates");
   }
   const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -405,13 +405,13 @@ int main(const int argc, const char* argv[]) {
   // Report missing files
   if (missing_files) {
     rtWarn("One or more coordinate and topology files required by this test program were not "
-           "found, causing some tests to be skipped.  Make sure that the $OMNI_SOURCE environment "
+           "found, causing some tests to be skipped.  Make sure that the $STORMM_SOURCE environment "
            "variable is set to the root directory with src/ and test/ subdirectories, then re-run "
            "the tests to ensure that the libraries are working as intended.", "test_phasespace");
   }
   if (snps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("One or more of the snapshot files required by this test program were not found, "
-           "causing some tests to be skipped.  Make sure that the $OMNI_SOURCE environment "
+           "causing some tests to be skipped.  Make sure that the $STORMM_SOURCE environment "
            "variable is set to the root directory with src/ and test/ subdirectories.  If this "
            "error was encountered without also triggering a warning about the actual topology and "
            "coordinate files, the installation may be corrupted.", "test_phasespace");
@@ -502,8 +502,8 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_stereo = (stereo_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (stereo_exists == false) {
     rtWarn("Coordinate files for a highly stereo-isomerized ligand, " + stereo_crd_name + " and " +
-           stereo_trj_name + " were not found.  Check the ${OMNI_SOURCE} variable, currently set "
-           "to " + oe.getOmniSourcePath() + " to make sure it is valid.  Subsequent tests will be "
+           stereo_trj_name + " were not found.  Check the ${STORMM_SOURCE} variable, currently set "
+           "to " + oe.getStormmSourcePath() + " to make sure it is valid.  Subsequent tests will be "
            "skipped.", "test_amber_coordinates");
   }
   const CoordinateFrame stro_cf = (stereo_exists) ? CoordinateFrame(stereo_crd_name) :
@@ -594,13 +594,13 @@ int main(const int argc, const char* argv[]) {
   const CoordinateSeries<llint> tip5p_cs_64(tip5p_cs, 24);
   const CoordinateFrame frame9_int64 = tip5p_cs_64.exportFrame(9);
   check(tip5p_cs_64.getInterlacedCoordinates<double>(9), RelationalOperator::EQUAL,
-        Approx(tip5p_cs.getInterlacedCoordinates<double>(9)).margin(omni::constants::tiny),
+        Approx(tip5p_cs.getInterlacedCoordinates<double>(9)).margin(stormm::constants::tiny),
         "A CoordinateSeries constructed from another of a lower fixed precision representation "
         "does not preserve the correct information.", do_tip5p);
   Xoroshiro128pGenerator xrs_crd(1984232);
   CoordinateSeries<double> tip5p_cs_dbl(tip5p_cs);
   CoordinateSeriesWriter<double> tip5p_csw = tip5p_cs_dbl.data();
-  const size_t padded_natom_zu = roundUp<size_t>(tip5p_csw.natom, omni::constants::warp_size_zu);
+  const size_t padded_natom_zu = roundUp<size_t>(tip5p_csw.natom, stormm::constants::warp_size_zu);
   for (size_t i = 0; i < tip5p_csw.nframe; i++) {
     for (size_t j = 0; j < tip5p_csw.natom; j++) {
       const size_t atom_idx = (padded_natom_zu * i) + j;

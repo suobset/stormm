@@ -4,14 +4,14 @@
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "hybrid.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "DataTypes/common_types.h"
 #include "Reporting/error_format.h"
 #include "hybrid.h"
 
-omni::card::Ledger gbl_mem_balance_sheet;
+stormm::card::Ledger gbl_mem_balance_sheet;
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 using errors::rtErr;
@@ -150,7 +150,7 @@ void Ledger::logMemory(const size_t capacity, const size_t element_size, const H
 
   // Log contribution in the pooled categories
   switch (fmt) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
     total_expedited += contribution;
     break;
@@ -298,4 +298,4 @@ void Ledger::printMemoryProfile(const int n_display, const llint display_thresho
 }
 
 } // namespace card
-} // namespace omni
+} // namespace stormm

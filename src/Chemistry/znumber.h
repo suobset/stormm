@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_ZNUMBER_H
-#define OMNI_ZNUMBER_H
+#ifndef STORMM_ZNUMBER_H
+#define STORMM_ZNUMBER_H
 
 #include <vector>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 /// \brief Obtain atomic Z-numbers for a list of atoms, assuming that the masses follow the
@@ -32,7 +32,7 @@ std::vector<char2> zNumberToSymbol(const std::vector<int> &atomic_numbers);
 std::vector<int> symbolToZNumber(const std::vector<char2> &atomic_symbols);
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm
 
 #endif
 

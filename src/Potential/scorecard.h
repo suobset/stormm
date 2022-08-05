@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_SCORECARD_H
-#define OMNI_SCORECARD_H
+#ifndef STORMM_SCORECARD_H
+#define STORMM_SCORECARD_H
 
 #include "Constants/fixed_precision.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "energy_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::GpuDetails;
@@ -107,10 +107,10 @@ public:
   template <typename T> T getInverseEnergyScalingFactor() const;
   /// \}
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload data to the device (this could be useful in situations where the CPU is
   ///        required to compute additional energy terms, or other energy quantities are being
-  ///        brought in from some module outside the typical OMNI molecular mechanics routines).
+  ///        brought in from some module outside the typical STORMM molecular mechanics routines).
   void upload();
 
   /// \brief Download all data from the device (each of the report(...) functions below will call
@@ -326,7 +326,7 @@ private:
 };
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #include "scorecard.tpp"
 

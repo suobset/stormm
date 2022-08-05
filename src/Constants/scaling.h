@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_SCALING_H
-#define OMNI_SCALING_H
+#ifndef STORMM_SCALING_H
+#define STORMM_SCALING_H
 
 #include "DataTypes/common_types.h"
 
-namespace omni {
+namespace stormm {
 namespace constants {
 
 /// \brief Teh convenient, round number is 1024, not 1000.
@@ -54,9 +54,9 @@ constexpr size_t ushort_bit_count_zu = ushort_byte_count_zu * 8LLU;
 /// \}
 
 } // namespace constants
-} // namespace omni
+} // namespace stormm
 
-namespace omni {
+namespace stormm {
 using constants::int_byte_count_int;
 using constants::int_bit_count_int;
 using constants::uint_byte_count_int;
@@ -73,6 +73,6 @@ using constants::ullint_byte_count_zu;
 using constants::ullint_bit_count_zu;
 using constants::ushort_byte_count_zu;
 using constants::ushort_bit_count_zu;
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,17 +1,17 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_STATUS
-#define OMNI_HPC_STATUS
+#ifndef STORMM_HPC_STATUS
+#define STORMM_HPC_STATUS
 
 #include <vector>
 #include <string>
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
 #    include <cuda_runtime.h>
 #  endif
 #endif
 #include "Constants/scaling.h"
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 /// \brief Detect the amount of GPU memory occupied by a given process to determine whether it is
@@ -33,8 +33,8 @@ public:
   /// \param dev_index  Index of the GPU in a longer list produced by the CUDA runtime library
   /// \{
   GpuDetails();
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
   GpuDetails(const cudaDeviceProp &devprop, int dev_index);
 #  endif
 #endif
@@ -84,14 +84,14 @@ public:
   std::string getCardName() const;
 
   /// \brief Set the number of streaming multiprocessors.  This is useful for experimentation in
-  ///        mock settings, or perhaps running OMNI on GPUs when MiG is engaged.
+  ///        mock settings, or perhaps running STORMM on GPUs when MiG is engaged.
   ///
   /// \param smp_count_in  The number of streaming multiprocessors
   void setSMPCount(int smp_count_in);
   
 private:
   bool available;            ///< Flag to indicate whether a GPU is available for the program's use
-  bool supported;            ///< Flag to indicate whether OMNI supports this GPU
+  bool supported;            ///< Flag to indicate whether STORMM supports this GPU
   int arch_major;            ///< Major architecture numbers for each GPU
   int arch_minor;            ///< Minor architecture numbers for each GPU
   int smp_count;             ///< Number of streaming multiprocessors in each GPU
@@ -107,12 +107,12 @@ private:
 };
   
 } // namespace card
-} // namespace omni
+} // namespace stormm
 
 /// \brief ***Global*** GPU descriptor that describes no valid GPU.  This is the equivalent of
 ///        nullptr for the GpuDetails object, and if passed to various functions that might launch
 ///        a CUDA kernel will trigger the corresponding CPU process instead.  An equivalent
-///        expression of this occurs in hpc_config.cuh if OMNI_USE_HPC is defined.
-extern omni::card::GpuDetails null_gpu;
+///        expression of this occurs in hpc_config.cuh if STORMM_USE_HPC is defined.
+extern stormm::card::GpuDetails null_gpu;
 
 #endif

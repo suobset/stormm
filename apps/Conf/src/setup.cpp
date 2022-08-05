@@ -14,23 +14,23 @@
 namespace conf_app {
 namespace setup {
 
-using omni::chemistry::ChemicalFeatures;
-using omni::chemistry::ChiralInversionProtocol;
-using omni::chemistry::MapRotatableGroups;
-using omni::chemistry::RotatorGroup;
-using omni::constants::warp_size_int;
-using omni::math::roundUp;
-using omni::namelist::ConformerControls;
-using omni::structure::rmsd;
-using omni::structure::RmsdMethod;
-using omni::structure::rotateAboutBond;
-using omni::topology::AtomGraph;
-using omni::topology::ChemicalDetailsKit;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::CoordinateFrame;
-using omni::trajectory::CoordinateFrameReader;
-using omni::trajectory::CoordinateSeries;
-using omni::trajectory::CoordinateSeriesWriter;
+using stormm::chemistry::ChemicalFeatures;
+using stormm::chemistry::ChiralInversionProtocol;
+using stormm::chemistry::MapRotatableGroups;
+using stormm::chemistry::RotatorGroup;
+using stormm::constants::warp_size_int;
+using stormm::math::roundUp;
+using stormm::namelist::ConformerControls;
+using stormm::structure::rmsd;
+using stormm::structure::RmsdMethod;
+using stormm::structure::rotateAboutBond;
+using stormm::topology::AtomGraph;
+using stormm::topology::ChemicalDetailsKit;
+using stormm::trajectory::PhaseSpace;
+using stormm::trajectory::CoordinateFrame;
+using stormm::trajectory::CoordinateFrameReader;
+using stormm::trajectory::CoordinateSeries;
+using stormm::trajectory::CoordinateSeriesWriter;
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &sc,
@@ -127,7 +127,7 @@ PhaseSpaceSynthesis expandConformers(const UserSettings &ui, const SystemCache &
     for (int j = 0; j < ncases; j++) {
       for (int k = 0; k < nrot_bond; k++) {
         for (int m = 0; m < nbond_rotations; m++) {
-          const double rval = static_cast<double>(m) * omni::symbols::twopi /
+          const double rval = static_cast<double>(m) * stormm::symbols::twopi /
                               static_cast<double>(nbond_rotations);
           rotateAboutBond(cseries_w, fc, rotatable_groups[k].root_atom,
                           rotatable_groups[k].pivot_atom, rotatable_groups[k].rotatable_atoms,

@@ -13,7 +13,7 @@
 #include "UnitTesting/approx.h"
 #include "atomgraph_refinement.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using chemistry::massToZNumber;
@@ -1359,7 +1359,7 @@ VirtualSiteTable listVirtualSites(const int expected_vsite_count,
 
         // In the Amber code, this becomes a "type II" (frame index 0 or 2) virtual site,
         // applicable to carbonyl oxygen lone pairs or sigma holes on halo-organic compounds,
-        // respectively.  OMNI will approximate those frames with the appropriate GROMACS frame
+        // respectively.  STORMM will approximate those frames with the appropriate GROMACS frame
         // types: fixed-distance, two-atom frames (halogen sigma hole case) and fixed angle and
         // distance, three-atom frames (carbonyl lone pair case).  The GROMACS types are better
         // suited for most situations and more easily understood.
@@ -2808,4 +2808,4 @@ SettleParm getSettleParameters(const int ox_idx, const int h1_idx, const int h2_
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

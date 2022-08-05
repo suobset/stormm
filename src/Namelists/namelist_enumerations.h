@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_NAMELIST_ENUMERATIONS_H
-#define OMNI_NAMELIST_ENUMERATIONS_H
+#ifndef STORMM_NAMELIST_ENUMERATIONS_H
+#define STORMM_NAMELIST_ENUMERATIONS_H
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 /// \brief Enumerator to describe all types of namelist variables
@@ -59,6 +59,6 @@ std::string getNamelistTypeName(NamelistType param_type);
 std::string getInputStatusString(InputStatus stt);
   
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

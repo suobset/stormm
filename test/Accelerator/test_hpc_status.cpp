@@ -7,11 +7,11 @@
 #include "../../src/Random/random.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::tiny;
-using omni::constants::ExceptionResponse;
-using omni::random::Ran2Generator;
-using namespace omni::card;
-using namespace omni::testing;
+using stormm::constants::tiny;
+using stormm::constants::ExceptionResponse;
+using stormm::random::Ran2Generator;
+using namespace stormm::card;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 

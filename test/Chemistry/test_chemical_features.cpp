@@ -2,7 +2,7 @@
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/symbol_values.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
@@ -13,26 +13,26 @@
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::chemistry::ChiralOrientation;
-using omni::constants::ExceptionResponse;
-using omni::symbols::amber_ancient_bioq;
-using omni::data_types::int2;
-using omni::data_types::char4;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::parse::polyNumericVector;
-using omni::parse::NumberFormat;
-using omni::parse::operator!=;
-using omni::parse::operator==;
-using omni::topology::AtomGraph;
-using omni::topology::ChemicalDetailsKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::PhaseSpace;
+using stormm::chemistry::ChiralOrientation;
+using stormm::constants::ExceptionResponse;
+using stormm::symbols::amber_ancient_bioq;
+using stormm::data_types::int2;
+using stormm::data_types::char4;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::parse::polyNumericVector;
+using stormm::parse::NumberFormat;
+using stormm::parse::operator!=;
+using stormm::parse::operator==;
+using stormm::topology::AtomGraph;
+using stormm::topology::ChemicalDetailsKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::PhaseSpace;
 
-using namespace omni::chemistry;
-using namespace omni::testing;
+using namespace stormm::chemistry;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 
@@ -42,12 +42,12 @@ int main(const int argc, const char* argv[]) {
 
   // Test the existence of topology and coordinate files
   const char osc = osSeparator();
-  const std::string base_chem_name = oe.getOmniSourcePath() + osc + "test" + osc + "Chemistry";
-  const std::string base_nml_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Namelists";
+  const std::string base_chem_name = oe.getStormmSourcePath() + osc + "test" + osc + "Chemistry";
+  const std::string base_nml_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists";
   const std::string base_nmlp_name = base_nml_name + osc + "topol";
   const std::string base_nmlc_name = base_nml_name + osc + "coord";
-  const std::string base_top_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
 
   // Ligands with an eight-membered ring that will avoid anti-aromaticity by puckering
   const std::string mol1_top_name  = base_chem_name + osc + "lig1_c8h8.top";
@@ -96,8 +96,8 @@ int main(const int argc, const char* argv[]) {
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (files_exist == false) {
-    rtWarn("Some required files were not found.  Check the ${OMNI_SOURCE} environment variable, "
-           "currently set to " + oe.getOmniSourcePath() + ", for validity.  Subsequent tests will "
+    rtWarn("Some required files were not found.  Check the ${STORMM_SOURCE} environment variable, "
+           "currently set to " + oe.getStormmSourcePath() + ", for validity.  Subsequent tests will "
            "be skipped.", "test_chemical_features");
   }
   std::vector<AtomGraph> sys_ag(nsys);
@@ -213,7 +213,7 @@ int main(const int argc, const char* argv[]) {
   if (snps_exist == false) {
     rtWarn("Snapshot files " + fc_name + ", " + bo_name + ", and " + ro_name + " must be "
            "accessible in order to check formal charge and bond order calculations, "
-           "respectively.  Check the ${OMNI_SOURCE} environment variable for validity.  "
+           "respectively.  Check the ${STORMM_SOURCE} environment variable for validity.  "
            "Subsequent tests will be skipped.", "test_chemical_features");
   }
   bool ch_unwritten = true;
@@ -302,7 +302,7 @@ int main(const int argc, const char* argv[]) {
   }
   if (rings_exist == false) {
     rtWarn("Topologies and coordinates for polycyclic test molecules, i.e. " + ring_top_names[0] +
-           " and " + ring_crd_names[0] + ", were not found.  Check the ${OMNI_SOURCE} environment "
+           " and " + ring_crd_names[0] + ", were not found.  Check the ${STORMM_SOURCE} environment "
            "variable for validity.  Subsequent tests will be skipped.", "test_chemical_features");
   }
   std::vector<AtomGraph> ring_ag(nring_mols);

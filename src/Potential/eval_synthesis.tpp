@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -845,4 +845,4 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

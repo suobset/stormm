@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_CHEMICAL_FEATURES_H
-#define OMNI_CHEMICAL_FEATURES_H
+#ifndef STORMM_CHEMICAL_FEATURES_H
+#define STORMM_CHEMICAL_FEATURES_H
 
 #include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
@@ -9,7 +9,7 @@
 #include "UnitTesting/stopwatch.h"
 #include "chemistry_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 using card::Hybrid;
@@ -197,7 +197,7 @@ public:
   ChemicalFeatures& operator=(ChemicalFeatures &&other);
   /// \}
   
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload data to the GPU.
   void upload();
 #endif
@@ -731,6 +731,6 @@ int getChiralOrientation(const CoordinateFrameReader &cfr, int center_atom, int 
                          int branch_a_atom, int branch_c_atom, int branch_d_atom);
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm
 
 #endif

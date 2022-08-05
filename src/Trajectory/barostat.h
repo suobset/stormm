@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_BAROSTAT_H
-#define OMNI_BAROSTAT_H
+#ifndef STORMM_BAROSTAT_H
+#define STORMM_BAROSTAT_H
 
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 /// \brief Enumerate the available barostat types
@@ -38,6 +38,6 @@ private:
 std::string getBarostatName(BarostatKind kind);
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

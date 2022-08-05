@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 //-------------------------------------------------------------------------------------------------
@@ -72,4 +72,4 @@ Vec2<T> computeRestraintMixture(const int step_number, const int init_step, cons
 }
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm

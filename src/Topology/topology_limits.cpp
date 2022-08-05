@@ -2,7 +2,7 @@
 #include "Math/summation.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using math::prefixSumInPlace;
@@ -125,4 +125,4 @@ void markAffectorAtoms(std::vector<int> *affector_bounds, std::vector<int> *affe
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

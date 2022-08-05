@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -1785,4 +1785,4 @@ double evaluateRestraints(const RestraintKit<Tcalc, Tcalc2, Tcalc4> rar,
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

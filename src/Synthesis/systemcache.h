@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_SYSTEM_PREP_H
-#define OMNI_SYSTEM_PREP_H
+#ifndef STORMM_SYSTEM_PREP_H
+#define STORMM_SYSTEM_PREP_H
 
 #include <vector>
 #include "Chemistry/chemical_features.h"
@@ -16,7 +16,7 @@
 #include "Trajectory/trajectory_enumerators.h"
 #include "UnitTesting/stopwatch.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using chemistry::ChemicalFeatures;
@@ -36,7 +36,7 @@ using trajectory::CoordinateFrameWriter;
 using trajectory::detectCoordinateFileKind;
 
 /// \brief Simple but central struct to store the primitive form of the collection of systems that
-///        most OMNI applications will work with.  There are topologies, coordinate sets, and a
+///        most STORMM applications will work with.  There are topologies, coordinate sets, and a
 ///        list of indices to indicate how they mix and match.  This object exists on the CPU and
 ///        in host memory only, but the topology and coordinate contents have CUDA-capable memory
 ///        components.
@@ -346,6 +346,6 @@ private:
 };
   
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #endif

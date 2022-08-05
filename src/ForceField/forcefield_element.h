@@ -1,15 +1,15 @@
 // -*-c++-*-
-#ifndef OMNI_FORCEFIELD_ELEMENT_H
-#define OMNI_FORCEFIELD_ELEMENT_H
+#ifndef STORMM_FORCEFIELD_ELEMENT_H
+#define STORMM_FORCEFIELD_ELEMENT_H
 
 #include <vector>
 #include "Constants/behavior.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "forcefield_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace modeling {
 
 using constants::ExceptionResponse;
@@ -246,6 +246,6 @@ private:
 };
   
 } // namespace modeling
-} // namespace omni
+} // namespace stormm
 
 #endif

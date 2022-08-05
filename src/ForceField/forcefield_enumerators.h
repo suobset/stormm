@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_FORCEFIELD_ENUMERATORS_H
-#define OMNI_FORCEFIELD_ENUMERATORS_H
+#ifndef STORMM_FORCEFIELD_ENUMERATORS_H
+#define STORMM_FORCEFIELD_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace modeling {
 
 /// \brief List the possible force field terms, from valence interactions to van-der Waals
@@ -39,6 +39,6 @@ enum class ParameterKind {
 std::string getParameterKindName(ParameterKind kind);
   
 } // namespace modeling
-} // namespace omni
+} // namespace stormm
 
 #endif

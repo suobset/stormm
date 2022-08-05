@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_USER_SETTINGS_H
-#define OMNI_USER_SETTINGS_H
+#ifndef STORMM_USER_SETTINGS_H
+#define STORMM_USER_SETTINGS_H
 
 #include "Constants/behavior.h"
 #include "Namelists/nml_dynamics.h"
@@ -16,7 +16,7 @@
 #include "Trajectory/trajectory_enumerators.h"
 #include "nml_conformer.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
@@ -32,19 +32,19 @@ using topology::ImplicitSolventModel;
 using trajectory::CoordinateFrame;
 using trajectory::CoordinateFileKind;
 
-/// \brief Default input settings for conformer.omni
+/// \brief Default input settings for conformer.stormm
 /// \{
 constexpr char default_conformer_input_file[] = "cgen.in";
 /// \}
 
-/// \brief Enumerate the various apps using OMNI libraries, and which use this UserSettings object
+/// \brief Enumerate the various apps using STORMM libraries, and which use this UserSettings object
 ///        as a way to collect common namelists and other command line input.  This enumerator
 ///        makes it possible to tailor the contents of UserSettings to a specific application, and
 ///        to tune the behavior in response to particular inputs.
 enum class AppName {
-  CONFORMER,  ///< The OMNI conformer generator
-  DYNAMICS,   ///< The OMNI molecular dynamics program
-  FFREFINE    ///< The OMNI force field refinement tool
+  CONFORMER,  ///< The STORMM conformer generator
+  DYNAMICS,   ///< The STORMM molecular dynamics program
+  FFREFINE    ///< The STORMM force field refinement tool
 };
   
 /// \brief Object to hold general user input data, including file names or regular expressions for
@@ -109,6 +109,6 @@ private:
 };
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

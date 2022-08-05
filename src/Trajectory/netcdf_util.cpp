@@ -2,7 +2,7 @@
 #include "FileManagement/file_listing.h"
 #include "netcdf_util.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using diskutil::DrivePathType;
@@ -160,4 +160,4 @@ void ncdfEndDefinitions(const int ncid, const std::string &activity) {
 }
   
 } // namespace trajectory
-} // namepace omni
+} // namespace stormm

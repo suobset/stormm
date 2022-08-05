@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_VECTOR_REPORT_H
-#define OMNI_VECTOR_REPORT_H
+#ifndef STORMM_VECTOR_REPORT_H
+#define STORMM_VECTOR_REPORT_H
 
 #include <vector>
 #include "Parsing/polynumeric.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using parse::NumberFormat;
@@ -24,6 +24,6 @@ std::string vectorAlignmentReport(const std::vector<PolyNumeric> &va,
                                   double tol);
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #endif

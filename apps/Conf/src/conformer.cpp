@@ -6,12 +6,12 @@
 #include "../../../src/UnitTesting/unit_test.h"
 #include "setup.h"
 
-using omni::chemistry::MapRotatableGroups;
-using omni::namelist::AppName;
-using omni::namelist::UserSettings;
-using omni::testing::StopWatch;
-using omni::synthesis::PhaseSpaceSynthesis;
-using omni::synthesis::SystemCache;
+using stormm::chemistry::MapRotatableGroups;
+using stormm::namelist::AppName;
+using stormm::namelist::UserSettings;
+using stormm::testing::StopWatch;
+using stormm::synthesis::PhaseSpaceSynthesis;
+using stormm::synthesis::SystemCache;
 using conf_app::setup::expandConformers;
 
 //-------------------------------------------------------------------------------------------------

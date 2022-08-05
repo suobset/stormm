@@ -9,7 +9,7 @@
 #include "Reporting/error_format.h"
 #include "user_settings.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -99,7 +99,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     rtErr("The " + descriptor + " input file " + input_file + " was not found or could not be "
           "read.", "UserSettings");
   }
-  TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for OMNI executable", "UserSettings");
+  TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for STORMM executable", "UserSettings");
   int start_line = 0;
   file_io_input = FilesControls(inp_tf, &start_line, policy);
   start_line = 0;
@@ -120,7 +120,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   case AppName::CONFORMER:
     if (has_dynamics_nml) {
       rtWarn("A &dynamics namelist was detected in the input, but content will be ignored by "
-             "this program.  The dynamics.omni application will make use of such input.",
+             "this program.  The dynamics.stormm application will make use of such input.",
              "UserSettings");
     }
     break;
@@ -128,7 +128,7 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
   case AppName::FFREFINE:
     if (has_conformer_nml) {
       rtWarn("A &conformer namelist was detected in the input, but content will be ignored by "
-             "this program.  The conformer.omni application will make use of such input.",
+             "this program.  The conformer.stormm application will make use of such input.",
              "UserSettings");
     }
     break;
@@ -202,4 +202,4 @@ ConformerControls UserSettings::getConformerNamelistInfo() const {
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

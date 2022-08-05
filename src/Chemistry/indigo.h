@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_INDIGO_H
-#define OMNI_INDIGO_H
+#ifndef STORMM_INDIGO_H
+#define STORMM_INDIGO_H
 
 #include <map>
 #include "Accelerator/hybrid.h"
@@ -8,14 +8,14 @@
 #include "DataTypes/mixed_types.h"
 #include "Topology/atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
 using topology::AtomGraph;
 
-/// \brief The range of formal charges that OMNI will handle.  This is well beyond the range of 
+/// \brief The range of formal charges that STORMM will handle.  This is well beyond the range of 
 ///        formal charges that can exist on bio-organic molecules.
 /// \{
 constexpr int minimum_formal_charge = -8;
@@ -428,6 +428,6 @@ private:
 };
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm
 
 #endif

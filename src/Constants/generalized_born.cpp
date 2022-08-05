@@ -1,6 +1,6 @@
 #include "generalized_born.h"
 
-namespace omni {
+namespace stormm {
 namespace generalized_born_defaults {
 
 //-------------------------------------------------------------------------------------------------
@@ -148,7 +148,7 @@ NeckGeneralizedBornTable::NeckGeneralizedBornTable() :
   sp_neck_max_value.putHost(std::vector<float>(val_buffer.begin(), val_buffer.end()));
 
   // Upload data to the device, if applicable
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   neck_max_separation.upload();
   neck_max_value.upload();
   sp_neck_max_separation.upload();
@@ -183,7 +183,7 @@ NeckGeneralizedBornTable::NeckGeneralizedBornTable(const int table_size_in,
   sp_neck_max_value.putHost(std::vector<float>(max_val_in.begin(), max_val_in.end()));
 
   // Upload data to the device, if applicable
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   neck_max_separation.upload();
   neck_max_value.upload();
   sp_neck_max_separation.upload();
@@ -223,4 +223,4 @@ NeckGeneralizedBornTable::getSinglePrecisionAbstract(const HybridTargetLevel tie
 }
 
 } // namespace generalized_born_defaults
-} // namespace omni
+} // namespace stormm

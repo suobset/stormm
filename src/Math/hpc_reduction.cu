@@ -2,10 +2,10 @@
 #include "Accelerator/ptx_macros.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "hpc_reduction.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using constants::twice_warp_bits_mask_int;
@@ -499,4 +499,4 @@ extern void launchConjugateGradient(const PrecisionModel prec, const AtomGraphSy
 }
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

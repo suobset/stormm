@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_GENERALIZED_BORN_H
-#define OMNI_GENERALIZED_BORN_H
+#ifndef STORMM_GENERALIZED_BORN_H
+#define STORMM_GENERALIZED_BORN_H
 
 #include "Accelerator/hybrid.h"
 
-namespace omni {
+namespace stormm {
 namespace generalized_born_defaults {
 
 using card::Hybrid;
@@ -194,7 +194,7 @@ private:
 };
 
 } // namespace generalized_born_defaults
-} // namespace omni
+} // namespace stormm
 
 #include "generalized_born.tpp"
 

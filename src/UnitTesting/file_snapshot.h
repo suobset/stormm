@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_FILE_SHAPSHOT_H
-#define OMNI_FILE_SHAPSHOT_H
+#ifndef STORMM_FILE_SHAPSHOT_H
+#define STORMM_FILE_SHAPSHOT_H
 
 #include "FileManagement/file_util.h"
 #include "Parsing/parse.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using diskutil::PrintSituation;
@@ -49,6 +49,6 @@ void writeSnapshot(const std::string &filename, const std::vector<PolyNumeric> &
                    const PrintSituation expectation);
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,23 +1,23 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_PHASE_SPACE_SYNTHESIS_CUH
-#define OMNI_HPC_PHASE_SPACE_SYNTHESIS_CUH
+#ifndef STORMM_HPC_PHASE_SPACE_SYNTHESIS_CUH
+#define STORMM_HPC_PHASE_SPACE_SYNTHESIS_CUH
 
 #include <vector>
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
 #include "Constants/hpc_bounds.h"
 #include "phasespace_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using constants::large_block_size;
 
 /// \brief Transfer a subset of system coordinates (and perhaps box dimensions) data from specific
 ///        systems within a PhaseSpaceSynthesis object betwee the host and the accelerator device.
-///        PhaseSpaceSynthesis is a central object within OMNI and can be huge (multiple gigabytes
+///        PhaseSpaceSynthesis is a central object within STORMM and can be huge (multiple gigabytes
 ///        worth of coordinate, velocity, and force data.  As such, it deserves a dedicated kernel
 ///        for managing data transfer to and from the host.
 ///
@@ -47,6 +47,6 @@ __global__ void __launch_bounds__(large_block_size, 1)
 kPsyPrimeConjugateGradient(PsSynthesisWriter psyw);
   
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #endif

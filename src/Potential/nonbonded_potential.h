@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NONBONDED_POTENTIAL_H
-#define OMNI_NONBONDED_POTENTIAL_H
+#ifndef STORMM_NONBONDED_POTENTIAL_H
+#define STORMM_NONBONDED_POTENTIAL_H
 
 #include "Constants/generalized_born.h"
 #include "DataTypes/common_types.h"
@@ -14,7 +14,7 @@
 #include "energy_abstracts.h"
 #include "energy_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using data_types::isSignedIntegralScalarType;
@@ -219,7 +219,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
 /// \}
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #include "nonbonded_potential.tpp"
 

@@ -5,7 +5,7 @@
 #include "ascii_numbers.h"
 #include "parse.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
@@ -1173,4 +1173,4 @@ std::vector<double> vectorStrtod(const std::vector<std::string> &sv,
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

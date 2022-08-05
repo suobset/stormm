@@ -1,15 +1,15 @@
 #include "../../src/Accelerator/hybrid.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Math/summation.h"
 #include "../../src/Random/random.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::data_types::int4;
-using omni::data_types::ushort2;
-using omni::math::sum;
-using omni::random::Ran2Generator;
-using namespace omni::card;
-using namespace omni::testing;
+using stormm::data_types::int4;
+using stormm::data_types::ushort2;
+using stormm::math::sum;
+using stormm::random::Ran2Generator;
+using namespace stormm::card;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Check to see if two vectors of int4 tuples match in every element for a specified number of

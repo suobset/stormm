@@ -2,7 +2,7 @@
 #include "Reporting/error_format.h"
 #include "ascii_numbers.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------

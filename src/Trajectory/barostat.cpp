@@ -1,6 +1,6 @@
 #include "barostat.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 //-------------------------------------------------------------------------------------------------
@@ -32,4 +32,4 @@ std::string getBarostatName(const BarostatKind kind) {
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_AMBMASK_H
-#define OMNI_AMBMASK_H
+#ifndef STORMM_AMBMASK_H
+#define STORMM_AMBMASK_H
 
 #include <string>
 #include <vector>
@@ -10,7 +10,7 @@
 #include "Trajectory/phasespace.h"
 #include "chemical_features.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 using parse::WildCardKind;
@@ -306,6 +306,6 @@ private:
 };
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm
 
 #endif

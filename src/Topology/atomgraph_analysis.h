@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_ATOMGRAPH_ANALYSIS_H
-#define OMNI_ATOMGRAPH_ANALYSIS_H
+#ifndef STORMM_ATOMGRAPH_ANALYSIS_H
+#define STORMM_ATOMGRAPH_ANALYSIS_H
 
 #include <vector>
 #include "atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 /// \brief Apply a series of checks to identify the water model in use within a topology.  If there
@@ -76,6 +76,6 @@ std::vector<int> selectRotatingAtoms(const AtomGraph *ag, int atom_i, int atom_j
 
   
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #endif

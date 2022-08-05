@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_UNIT_TEST_H
-#define OMNI_UNIT_TEST_H
+#ifndef STORMM_UNIT_TEST_H
+#define STORMM_UNIT_TEST_H
 
 #include <cmath>
 #include <cstdlib>
@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
 #include "Math/summation.h"
@@ -46,7 +46,7 @@
 ///                       test, or skip a test altogether if it is not going to be feasible.
 ///                       (This must be a TestPriority enumeration type value.)
 #define CHECK_THROWS_SOFT(test_code, error_message, priority) {\
-  if (priority == omni::testing::TestPriority::ABORT) {\
+  if (priority == stormm::testing::TestPriority::ABORT) {\
     check(true, error_message, priority);\
   }\
   else {\
@@ -61,7 +61,7 @@
   }\
 }
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using errors::rtErr;
@@ -234,11 +234,11 @@ void printTestSummary(TestVerbosity tv);
 std::string getRelationalOperatorString(RelationalOperator ro);
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 /// \brief ***Global*** instance of the checklist, analogous to the Ledger gbl_mem_balance_sheet
 ///        for tracking Hybrid array allocations (see src/Accelerator/hybrid.h)
-extern omni::testing::CheckList gbl_test_results;
+extern stormm::testing::CheckList gbl_test_results;
 
 #include "unit_test.tpp"
 

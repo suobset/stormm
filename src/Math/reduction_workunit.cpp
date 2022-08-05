@@ -5,7 +5,7 @@
 #include "summation.h"
 #include "vector_ops.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -215,4 +215,4 @@ std::vector<ReductionWorkUnit> buildReductionWorkUnits(const std::vector<int> &a
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

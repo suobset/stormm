@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_ASCII_NUMBERS_H
-#define OMNI_ASCII_NUMBERS_H
+#ifndef STORMM_ASCII_NUMBERS_H
+#define STORMM_ASCII_NUMBERS_H
 
 #include <cmath>
 #include <cstdlib>
@@ -11,7 +11,7 @@
 #include <vector>
 #include "parse.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 /// \brief Print a series of formatted numbers for a fixed-column output.  This function will

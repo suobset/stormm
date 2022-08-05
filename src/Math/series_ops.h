@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_SET_OPS_H
-#define OMNI_SET_OPS_H
+#ifndef STORMM_SET_OPS_H
+#define STORMM_SET_OPS_H
 
 #include <vector>
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::Hybrid;
@@ -84,7 +84,7 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
 /// \}
   
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "series_ops.tpp"
 

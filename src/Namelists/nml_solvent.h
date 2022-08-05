@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NML_SOLVENT_H
-#define OMNI_NML_SOLVENT_H
+#ifndef STORMM_NML_SOLVENT_H
+#define STORMM_NML_SOLVENT_H
 
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
@@ -8,7 +8,7 @@
 #include "input.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
@@ -157,6 +157,6 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line, bool *found,
                               ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

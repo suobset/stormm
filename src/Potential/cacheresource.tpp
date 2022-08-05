@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -19,4 +19,4 @@ CacheResourceKit<T>::CacheResourceKit(const int max_blocks_in, const int max_ato
 {}
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

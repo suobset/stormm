@@ -7,7 +7,7 @@
 #include "Reporting/error_format.h"
 #include "atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using card::HybridTargetLevel;
@@ -2230,4 +2230,4 @@ AtomGraph& AtomGraph::operator=(AtomGraph &&other) {
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

@@ -13,7 +13,7 @@
 #include "nonbonded_workunit.h"
 #include "synthesis_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
@@ -3490,7 +3490,7 @@ AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier)
                                sp_gb_gamma_parameters.data(tier));
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::upload() {
   int_system_data.upload();
@@ -3607,4 +3607,4 @@ void AtomGraphSynthesis::download() {
 #endif
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

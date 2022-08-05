@@ -1,6 +1,6 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/energy_enumerators.h"
@@ -15,30 +15,30 @@
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::double2;
-using omni::int2;
-using omni::int3;
-using omni::constants::ExceptionResponse;
-using omni::data_types::llint;
-using omni::data_types::llint_type_index;
-using omni::data_types::getOmniScalarTypeName;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::energy::StateVariable;
-using omni::energy::StaticExclusionMask;
-using omni::errors::rtWarn;
-using omni::parse::char4ToString;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::topology::AtomGraph;
-using omni::topology::NonbondedKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::CoordinateSeries;
-using omni::trajectory::TrajectoryKind;
-using namespace omni::energy;
-using namespace omni::testing;
+using stormm::double2;
+using stormm::int2;
+using stormm::int3;
+using stormm::constants::ExceptionResponse;
+using stormm::data_types::llint;
+using stormm::data_types::llint_type_index;
+using stormm::data_types::getStormmScalarTypeName;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::energy::StateVariable;
+using stormm::energy::StaticExclusionMask;
+using stormm::errors::rtWarn;
+using stormm::parse::char4ToString;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::topology::AtomGraph;
+using stormm::topology::NonbondedKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::PhaseSpace;
+using stormm::trajectory::CoordinateSeries;
+using stormm::trajectory::TrajectoryKind;
+using namespace stormm::energy;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Check that the sending atom exclusion masks match the receiving atom masks for each tile of
@@ -174,12 +174,12 @@ void testNBPrecisionModel(const NonbondedKit<Tcalc>nbk, const StaticExclusionMas
   const std::vector<double> vdw_result = vdw_frame.getInterlacedCoordinates();
   check(elec_result, RelationalOperator::EQUAL, Approx(elec_ref_frc).margin(tol),
         "Electrostatic forces do not agree with the reference when computed in " +
-        getOmniScalarTypeName<Tcalc>() + " with " + getOmniScalarTypeName<Tcoord>() +
-        " coordinates and " + getOmniScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+        getStormmScalarTypeName<Tcalc>() + " with " + getStormmScalarTypeName<Tcoord>() +
+        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.", do_tests);
   check(vdw_result, RelationalOperator::EQUAL, Approx(vdw_ref_frc).margin(tol),
         "van-der Waals forces do not agree with the reference when computed in " +
-        getOmniScalarTypeName<Tcalc>() + " with " + getOmniScalarTypeName<Tcoord>() +
-        " coordinates and " + getOmniScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+        getStormmScalarTypeName<Tcalc>() + " with " + getStormmScalarTypeName<Tcoord>() +
+        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -218,9 +218,9 @@ int main(const int argc, const char* argv[]) {
 
   // Locate topologies and coordinate files
   const char osc = osSeparator();
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string base_ptl_name = oe.getOmniSourcePath() + osc + "test" + osc + "Potential";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_ptl_name = oe.getStormmSourcePath() + osc + "test" + osc + "Potential";
   const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
   const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
@@ -243,8 +243,8 @@ int main(const int argc, const char* argv[]) {
   if (systems_exist == false) {
     rtWarn("Files for the Trp-cage miniprotein (with and without water), the DHFR globular "
            "protein (with CHARMM potential details), and alanine dipeptide (with ff19SB) were not "
-           "found.  These files should be found in the ${OMNI_SOURCE}/test/Topology and "
-           "${OMNI_SOURCE}/test/Trajectory directories.  Check the $OMNI_SOURCE environment "
+           "found.  These files should be found in the ${STORMM_SOURCE}/test/Topology and "
+           "${STORMM_SOURCE}/test/Trajectory directories.  Check the $STORMM_SOURCE environment "
            "variable.  A number of tests will be skipped.", "test_nonbonded_evaluation");
   }
 
@@ -322,9 +322,9 @@ int main(const int argc, const char* argv[]) {
   if (snps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("Snapshot files " + trpi_snapshot + ", " + dhfr_snapshot + ", and " + alad_snapshot +
            " were not found.  These files contain reference forces for checking the valence "
-           "energy derivative calculations.  Check that the ${OMNI_SOURCE} environment variable "
+           "energy derivative calculations.  Check that the ${STORMM_SOURCE} environment variable "
            "is set properly so that these snapshot files may be found in "
-           "${OMNI_SOURCE}/test/Potential/.  Subsequent tests will be skipped until these "
+           "${STORMM_SOURCE}/test/Potential/.  Subsequent tests will be skipped until these "
            "reference files are available.", "test_nonbonded_evaluation");
   }
 
@@ -631,7 +631,7 @@ int main(const int argc, const char* argv[]) {
                             systems_exist);
   if (getDrivePathType(trpcage_traj) != DrivePathType::FILE) {
     rtWarn("A trajectory of Trp-cage conformations (isolated boundary conditions) was not found "
-           "in " + trpcage_traj	+ ".  Check the ${OMNI_SOURCE} environment variable for "
+           "in " + trpcage_traj	+ ".  Check the ${STORMM_SOURCE} environment variable for "
            "validity.  Subsequent tests will be skipped.", "test_generalized_born");
   }
   const TestPriority do_traj_tests = (traj_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;

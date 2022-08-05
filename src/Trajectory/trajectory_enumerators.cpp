@@ -6,7 +6,7 @@
 #include "Reporting/error_format.h"
 #include "trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using parse::NumberFormat;
@@ -210,4 +210,4 @@ std::string getAncdfVariableName(const AncdfVariable key) {
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

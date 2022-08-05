@@ -4,7 +4,7 @@
 #include "namelist_element.h"
 #include "nml_restraint.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using structure::imageValue;
@@ -458,7 +458,7 @@ BoundedRestraint RestraintControls::getRestraint(const AtomGraph *ag) const {
 NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                                 const ExceptionResponse policy) {
   NamelistEmulator t_nml("restraint", CaseSensitivity::AUTOMATIC, policy,
-                         "Replicates the Amber NMR restraint namelist within OMNI.");
+                         "Replicates the Amber NMR restraint namelist within STORMM.");
   t_nml.addKeyword(NamelistElement("iat1", NamelistType::INTEGER, "MISSING"));
   t_nml.addKeyword(NamelistElement("iat2", NamelistType::INTEGER, "MISSING"));
   t_nml.addKeyword(NamelistElement("iat3", NamelistType::INTEGER, "MISSING"));
@@ -559,4 +559,4 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

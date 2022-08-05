@@ -13,19 +13,19 @@
 #include "unit_test.h"
 
 //-------------------------------------------------------------------------------------------------
-omni::testing::CheckList gbl_test_results;
+stormm::testing::CheckList gbl_test_results;
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using constants::ExceptionResponse;
 using diskutil::DrivePathType;
-using diskutil::findOmniPath;
+using diskutil::findStormmPath;
 using diskutil::getDrivePathType;
 using diskutil::makePathAbsolute;
-using diskutil::omniMkdir;
-using diskutil::omniBatchRmdir;
-using diskutil::omniRmdir;
+using diskutil::stormmMkdir;
+using diskutil::stormmBatchRmdir;
+using diskutil::stormmRmdir;
 using diskutil::openOutputFile;
 using diskutil::osSeparator;
 using diskutil::removeFile;
@@ -565,5 +565,5 @@ std::string getRelationalOperatorString(const RelationalOperator ro) {
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 

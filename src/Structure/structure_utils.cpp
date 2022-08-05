@@ -2,7 +2,7 @@
 #include "Reporting/error_format.h"
 #include "structure_utils.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
   
 //-------------------------------------------------------------------------------------------------
@@ -16,4 +16,4 @@ void coordinateBoundsCheck(const int lower_limit, const int upper_limit, const i
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_MDL_FILE_H
-#define OMNI_MDL_FILE_H
+#ifndef STORMM_MDL_FILE_H
+#define STORMM_MDL_FILE_H
 
 #include <string>
 #include <vector>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using parse::TextFile;
@@ -152,6 +152,6 @@ std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 				  const std::vector<MolObjBond> &rhs);
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #endif

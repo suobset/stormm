@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_NAMELIST_ELEMENT_H
-#define OMNI_NAMELIST_ELEMENT_H
+#ifndef STORMM_NAMELIST_ELEMENT_H
+#define STORMM_NAMELIST_ELEMENT_H
 
 #include <string>
 #include <vector>
 #include "Constants/behavior.h"
 #include "namelist_enumerations.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::ExceptionResponse;
@@ -312,6 +312,6 @@ private:
 };
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

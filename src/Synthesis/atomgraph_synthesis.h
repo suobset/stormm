@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_ATOMGRAPH_SYNTHESIS_H
-#define OMNI_ATOMGRAPH_SYNTHESIS_H
+#ifndef STORMM_ATOMGRAPH_SYNTHESIS_H
+#define STORMM_ATOMGRAPH_SYNTHESIS_H
 
 #include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction_enumerators.h"
 #include "Math/reduction_workunit.h"
 #include "Restraints/restraint_apparatus.h"
@@ -16,7 +16,7 @@
 #include "synthesis_abstracts.h"
 #include "valence_workunit.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::GpuDetails;
@@ -307,7 +307,7 @@ public:
   SyNonbondedKit<float>
   getSinglePrecisionNonbondedKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload the object
   void upload();
 
@@ -1336,7 +1336,7 @@ private:
 };
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #include "atomgraph_synthesis.tpp"
 

@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_NML_DYNAMICS_H
-#define OMNI_NML_DYNAMICS_H
+#ifndef STORMM_NML_DYNAMICS_H
+#define STORMM_NML_DYNAMICS_H
 
 #include "Parsing/textfile.h"
 #include "input.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 /// \brief Default values for molecular dynamics
@@ -22,7 +22,7 @@ constexpr double minimum_rattle_tolerance = 1.0e-9;
 ///        encapsualtors, this object can take input file data as part of its construction, or
 ///        by a series of setters.  Validation of each piece of data is handled as it appears
 ///        either in the contructor or via setters.  Getter functions dispense the internal
-///        information to any application using OMNI libraries.
+///        information to any application using STORMM libraries.
 class DynamicsControls {
 public:
 
@@ -98,6 +98,6 @@ NamelistEmulator dynamicsInput(const TextFile &tf, int *start_line, bool *found,
                                ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -4,7 +4,7 @@
 #include "netcdf_util.h"
 #include "trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 //-------------------------------------------------------------------------------------------------
@@ -150,8 +150,8 @@ void AmberNetcdf::AmberNetcdf(const std::string &filename_in, const CoordinateFi
   ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "title", title_in, "writing title");
   ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "application", application_in,
                          "writing application");
-  ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "library", "OMNI", "writing library");
-  ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "library_version", omni_version,
+  ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "library", "STORMM", "writing library");
+  ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "library_version", stormm_version,
                          "writing library version");
   ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "conventions", "AMBER", "writing conventions");
   ncdfPlaceAttributeText(netcdf_id, NC_GLOBAL, "convention_version", "1.0",
@@ -184,4 +184,4 @@ void AmberNetcdf::close() {
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

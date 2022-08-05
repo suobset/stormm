@@ -2,7 +2,7 @@
 #include "znumber.h"
 #include "periodic_table.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
 
 using testing::Approx;
@@ -40,7 +40,7 @@ char2 zNumberToSymbol(const int atomic_number) {
   }
   else if (atomic_number > element_maximum_count) {
     rtWarn("Atomic number " + std::to_string(atomic_number) + " is beyond the scope of "
-           "stable elements covered by OMNI and will be indicated by symbol XX.",
+           "stable elements covered by STORMM and will be indicated by symbol XX.",
            "zNumberToSymbol");      
   }
   return elemental_symbols[atomic_number];
@@ -81,4 +81,4 @@ std::vector<int> symbolToZNumber(const std::vector<char2> &atomic_symbols) {
 }
   
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm

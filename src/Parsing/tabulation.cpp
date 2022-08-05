@@ -5,7 +5,7 @@
 #include "parse.h"
 #include "tabulation.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 using math::sum;
@@ -402,4 +402,4 @@ void printTable(const std::vector<std::string> &headings,
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

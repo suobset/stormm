@@ -7,16 +7,16 @@
 #include "Parsing/polynumeric.h"
 #include "test_environment.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 using diskutil::DrivePathType;
-using diskutil::findOmniPath;
+using diskutil::findStormmPath;
 using diskutil::getDrivePathType;
 using diskutil::makePathAbsolute;
-using diskutil::omniMkdir;
-using diskutil::omniBatchRmdir;
-using diskutil::omniRmdir;
+using diskutil::stormmMkdir;
+using diskutil::stormmBatchRmdir;
+using diskutil::stormmRmdir;
 using diskutil::openOutputFile;
 using diskutil::osSeparator;
 using diskutil::removeFile;
@@ -30,8 +30,8 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     verbose_level{TestVerbosity::COMPACT},
     general_tolerance{1.0e-4},
     random_seed{827493},
-    omni_home_path{""},
-    omni_source_path{""},
+    stormm_home_path{""},
+    stormm_source_path{""},
     tmpdir_path{""},
     tmpdir_created{false},
     tmpdir_writeable{true},
@@ -101,17 +101,17 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       i++;
       cli_vbs = true;
     }
-    else if (i < argc - 1 && (strcmp(argv_uppercased.c_str(),  "-OMNIHOME") == 0 ||
-                              strcmp(argv_uppercased.c_str(), "-OMNI_HOME") == 0)) {
-      omni_home_path = std::string(argv[i + 1]);
+    else if (i < argc - 1 && (strcmp(argv_uppercased.c_str(),  "-STORMMHOME") == 0 ||
+                              strcmp(argv_uppercased.c_str(), "-STORMM_HOME") == 0)) {
+      stormm_home_path = std::string(argv[i + 1]);
       i++;
       cli_ohm = true;
     }
-    else if (i < argc - 1 && (strcmp(argv_uppercased.c_str(),     "-OMNISRC") == 0 ||
-                              strcmp(argv_uppercased.c_str(),    "-OMNI_SRC") == 0 ||
-                              strcmp(argv_uppercased.c_str(),  "-OMNISOURCE") == 0 ||
-                              strcmp(argv_uppercased.c_str(), "-OMNI_SOURCE") == 0)) {
-      omni_source_path = std::string(argv[i + 1]);
+    else if (i < argc - 1 && (strcmp(argv_uppercased.c_str(),     "-STORMMSRC") == 0 ||
+                              strcmp(argv_uppercased.c_str(),    "-STORMM_SRC") == 0 ||
+                              strcmp(argv_uppercased.c_str(),  "-STORMMSOURCE") == 0 ||
+                              strcmp(argv_uppercased.c_str(), "-STORMM_SOURCE") == 0)) {
+      stormm_source_path = std::string(argv[i + 1]);
       i++;
       cli_osc = true;
     }
@@ -142,12 +142,12 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
   }
 
   // Seek environment variables, if there are no command-line arguments to supersede them
-  char* vbs_char = std::getenv("OMNI_VERBOSE");
-  char* tol_char = std::getenv("OMNI_TEST_TOL");
-  char* rng_char = std::getenv("OMNI_PRNG_SEED");
-  char* dir_char = std::getenv("OMNI_TMPDIR");
-  char* ohm_char = std::getenv("OMNI_HOME");
-  char* osc_char = std::getenv("OMNI_SOURCE");
+  char* vbs_char = std::getenv("STORMM_VERBOSE");
+  char* tol_char = std::getenv("STORMM_TEST_TOL");
+  char* rng_char = std::getenv("STORMM_PRNG_SEED");
+  char* dir_char = std::getenv("STORMM_TMPDIR");
+  char* ohm_char = std::getenv("STORMM_HOME");
+  char* osc_char = std::getenv("STORMM_SOURCE");
   std::string vbs_str = (vbs_char == nullptr) ? "" : std::string(vbs_char);
   std::string tol_str = (tol_char == nullptr) ? "" : std::string(tol_char);
   std::string rng_str = (rng_char == nullptr) ? "" : std::string(rng_char);
@@ -165,7 +165,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       verbose_level = TestVerbosity::FAILURE_ONLY;
     }
     else {
-      rtWarn("Invalid setting for environment variable OMNI_VERBOSE (" + vbs_str + ").  The "
+      rtWarn("Invalid setting for environment variable STORMM_VERBOSE (" + vbs_str + ").  The "
              "default value of COMPACT will be taken instead.");
     }
   }
@@ -176,7 +176,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       general_tolerance = strtod(tol_str.c_str(), nullptr);
     }
     else {
-      rtWarn("Invalid setting for environment variable OMNI_TEST_TOL (" + tol_str + ").  The "
+      rtWarn("Invalid setting for environment variable STORMM_TEST_TOL (" + tol_str + ").  The "
              "default value of 1.0e-4 will be used instead.");
     }
   }
@@ -185,7 +185,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       random_seed = strtol(tol_str.c_str(), nullptr, 10);
     }
     else {
-      rtWarn("Invalid integer format for environment variable OMNI_PRNG_SEED (" + rng_str +
+      rtWarn("Invalid integer format for environment variable STORMM_PRNG_SEED (" + rng_str +
              ").  The default value of 827493 will be taken instead.", "TestEnvironment");
     }
   }
@@ -193,17 +193,17 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     tmpdir_path = dir_str;
   }
   if (cli_ohm == false && ohm_str.size() > 0) {
-    omni_home_path = ohm_str;
+    stormm_home_path = ohm_str;
   }
   if (cli_osc == false && osc_str.size() > 0) {
-    omni_source_path = osc_str;
+    stormm_source_path = osc_str;
   }
 
-  // ${OMNI_HOME} needs to be understood from the command line or the environment.  The default is
+  // ${STORMM_HOME} needs to be understood from the command line or the environment.  The default is
   // a last-ditch effort to infer it from the current working directory or the executable path.
   char tmp_c[512];
   const std::string exe_path(argv[0]);
-  if (omni_home_path.size() == 0 || omni_source_path.size() == 0) {
+  if (stormm_home_path.size() == 0 || stormm_source_path.size() == 0) {
 #if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
     if (GetCurrentDirectory(512, tmp_c) == nullptr) {
       rtErr("Encountered getcwd() error during initialization.", "TestEnvironment.");
@@ -214,10 +214,10 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     }
 #endif
   }
-  if (omni_home_path.size() == 0) {
+  if (stormm_home_path.size() == 0) {
     switch (verbose_level) {
     case TestVerbosity::FULL:
-      rtWarn("${OMNI_HOME} is not set in the shell environment.  Define this variable for best "
+      rtWarn("${STORMM_HOME} is not set in the shell environment.  Define this variable for best "
              "results.", "TestEnvironment");
       break;
     case TestVerbosity::COMPACT:
@@ -226,15 +226,15 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     }
     const std::string known_program = std::string("test") + osSeparator() + "bin" + osSeparator() +
       "test_hybrid";
-    omni_home_path = findOmniPath(exe_path, known_program);
-    if (omni_home_path.size() == 0) {
-      omni_home_path = findOmniPath(std::string(tmp_c) + osSeparator() + exe_path, known_program);
+    stormm_home_path = findStormmPath(exe_path, known_program);
+    if (stormm_home_path.size() == 0) {
+      stormm_home_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path, known_program);
     }
-    if (omni_home_path.size() > 0) {
+    if (stormm_home_path.size() > 0) {
       switch (verbose_level) {
       case TestVerbosity::FULL:
       case TestVerbosity::COMPACT:
-        rtAlert("${OMNI_HOME} is taken to be " + omni_home_path, "TestEnvironment");
+        rtAlert("${STORMM_HOME} is taken to be " + stormm_home_path, "TestEnvironment");
         break;
       case TestVerbosity::FAILURE_ONLY:
         break;
@@ -242,11 +242,11 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     }
   }
 
-  // Also try to find ${OMNI_SOURCE}
-  if (omni_source_path.size() == 0) {
+  // Also try to find ${STORMM_SOURCE}
+  if (stormm_source_path.size() == 0) {
     switch (verbose_level) {
     case TestVerbosity::FULL:
-      rtWarn("${OMNI_SOURCE} is not set in the shell environment.  Define this variable for best "
+      rtWarn("${STORMM_SOURCE} is not set in the shell environment.  Define this variable for best "
              "results.", "TestEnvironment");
       break;
     case TestVerbosity::COMPACT:
@@ -255,15 +255,15 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     }
     const std::string known_code = std::string("test") + osSeparator() + "Parsing" +
       osSeparator() + "test_parse.cpp";
-    omni_source_path = findOmniPath(exe_path, known_code);
-    if (omni_source_path.size() == 0) {
-      omni_source_path = findOmniPath(std::string(tmp_c) + osSeparator() + exe_path, known_code);
+    stormm_source_path = findStormmPath(exe_path, known_code);
+    if (stormm_source_path.size() == 0) {
+      stormm_source_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path, known_code);
     }
-    if (omni_source_path.size() > 0) {
+    if (stormm_source_path.size() > 0) {
       switch (verbose_level) {
       case TestVerbosity::FULL:
       case TestVerbosity::COMPACT:
-        rtAlert("${OMNI_SOURCE} is taken to be " + omni_source_path, "TestEnvironment");
+        rtAlert("${STORMM_SOURCE} is taken to be " + stormm_source_path, "TestEnvironment");
         break;
       case TestVerbosity::FAILURE_ONLY:
         break;
@@ -271,10 +271,10 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     }
   }
 
-  // Finally, find ${OMNI_TMPDIR}
+  // Finally, find ${STORMM_TMPDIR}
   bool tmpdir_defined = (tmpdir_path.size() > 0);
   if (tmpdir_path.size() == 0) {
-    tmpdir_path = omni_source_path + osSeparator() + "tmp";
+    tmpdir_path = stormm_source_path + osSeparator() + "tmp";
   }
 
   // Create the temporary directory for these tests
@@ -283,10 +283,10 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
   case DrivePathType::FILE:
     if (tmpdir_required == TmpdirStatus::REQUIRED) {
       const std::string advice = (tmpdir_defined) ?
-        std::string("  Define OMNI_TMPDIR in the environment or specify "
+        std::string("  Define STORMM_TMPDIR in the environment or specify "
                     "-tmpdir in the arguments list to this executable.") :
         std::string("");
-      rtWarn("OMNI temporary directory path " + tmpdir_path + " already exists and is a file." +
+      rtWarn("STORMM temporary directory path " + tmpdir_path + " already exists and is a file." +
              advice, "TestEnvironment");
     }
     tmpdir_writeable = false;
@@ -302,7 +302,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       }
       catch (std::runtime_error) {
         if (tmpdir_required == TmpdirStatus::REQUIRED) {
-          rtWarn("OMNI temporary directory path " + tmpdir_path + " is not writeable.  Bad "
+          rtWarn("STORMM temporary directory path " + tmpdir_path + " is not writeable.  Bad "
                  "permissions are likely to blame.", "TestEnvironment.");
         }
         tmpdir_writeable = false;
@@ -315,7 +315,7 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
   case DrivePathType::REGEXP:
     try {
       tmpdir_created = true;
-      directories_created = omniMkdir(tmpdir_path);
+      directories_created = stormmMkdir(tmpdir_path);
       std::reverse(directories_created.begin(), directories_created.end());
     }
     catch (std::runtime_error) {
@@ -346,7 +346,7 @@ TestEnvironment::~TestEnvironment() {
 
   // Remove the temporary directory and any others created along the way
   const int n_dirs = directories_created.size();
-  omniBatchRmdir(directories_created);
+  stormmBatchRmdir(directories_created);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -365,13 +365,13 @@ int TestEnvironment::getRandomSeed() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string TestEnvironment::getOmniHomePath() const {
-  return omni_home_path;
+std::string TestEnvironment::getStormmHomePath() const {
+  return stormm_home_path;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string TestEnvironment::getOmniSourcePath() const {
-  return omni_source_path;
+std::string TestEnvironment::getStormmSourcePath() const {
+  return stormm_source_path;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -454,4 +454,4 @@ void TestEnvironment::logDirectoryCreated(const std::vector<std::string> &paths)
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

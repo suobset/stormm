@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_NAMELIST_EMULATOR_H
-#define OMNI_NAMELIST_EMULATOR_H
+#ifndef STORMM_NAMELIST_EMULATOR_H
+#define STORMM_NAMELIST_EMULATOR_H
 
 #include <string>
 #include <vector>
 #include "Constants/behavior.h"
 #include "namelist_element.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -180,7 +180,7 @@ public:
 
   /// \brief Assign values to elements of each particular NamelistType.  These overloaded functions
   ///        can be called from anywhere, but constructors making control objects for programs
-  ///        using the OMNI libraries are the ideal place to use them.  They in turn call the
+  ///        using the STORMM libraries are the ideal place to use them.  They in turn call the
   ///        set(...)Value member functions of the target NamelistElement object in the
   ///        NamelistEmulator.  Returns 1 if the given value was successfully assigned to the
   ///        label or 0 if not.
@@ -290,6 +290,6 @@ private:
 };
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

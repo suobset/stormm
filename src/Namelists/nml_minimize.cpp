@@ -4,7 +4,7 @@
 #include "namelist_element.h"
 #include "nml_minimize.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -361,4 +361,4 @@ NamelistEmulator minimizeInput(const TextFile &tf, int *start_line, bool *found,
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

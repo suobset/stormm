@@ -3,7 +3,7 @@
 #include "Synthesis/synthesis_abstracts.h"
 #include "eval_syvalence_workunit.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using math::crossProduct;
@@ -17,4 +17,4 @@ using synthesis::SyValenceKit;
 //-------------------------------------------------------------------------------------------------
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace synthesis {
   
 //-------------------------------------------------------------------------------------------------
@@ -21,4 +21,4 @@ std::vector<T> AtomGraphSynthesis::getAtomicMasses(const HybridTargetLevel tier)
 }
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

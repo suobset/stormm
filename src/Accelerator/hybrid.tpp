@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace card {
 
 //-------------------------------------------------------------------------------------------------
@@ -13,7 +13,7 @@ template <typename T> Hybrid<T>::Hybrid(const size_t length_in, const char* tag_
     max_capacity{(length == 0 ? growth_increment : roundUp<size_t>(length, growth_increment))},
     pointer_index{0},
     host_data{nullptr},
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     devc_data{nullptr},
 #endif
     label{assignLabel(tag_in)},
@@ -40,7 +40,7 @@ template <typename T> Hybrid<T>::Hybrid(const std::vector<T> &S_in, const char* 
                                         const HybridFormat format_in) :
     Hybrid(S_in.size(), tag_in, format_in)
 {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   switch (format) {
   case HybridFormat::EXPEDITED:
   case HybridFormat::DECOUPLED:
@@ -93,7 +93,7 @@ template <typename T> Hybrid<T>::Hybrid(const Hybrid<T> &original) :
   max_capacity{original.max_capacity},
   pointer_index{original.pointer_index},
   host_data{nullptr},
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   devc_data{nullptr},
 #endif
   label{assignLabel(original.label.name)},
@@ -112,7 +112,7 @@ template <typename T> Hybrid<T>::Hybrid(const Hybrid<T> &original) :
     // Allocate and copy memory from the original
     allocate();
     switch(format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridFormat::EXPEDITED:
     case HybridFormat::DECOUPLED:
       memcpy(host_data, original.host_data, length * sizeof(T));
@@ -139,7 +139,7 @@ template <typename T> Hybrid<T>::Hybrid(const Hybrid<T> &original) :
     target_serial_number = original.getTargetSerialNumber();
     allocations = original.getAllocations();
     switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridFormat::EXPEDITED:
     case HybridFormat::DECOUPLED:
     case HybridFormat::UNIFIED:
@@ -181,7 +181,7 @@ template <typename T> Hybrid<T>::Hybrid(Hybrid<T> &&original) :
   max_capacity{original.max_capacity},
   pointer_index{original.pointer_index},
   host_data{original.host_data},
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   devc_data{original.devc_data},
 #endif
   label{assignLabel(original.label.name)},
@@ -204,7 +204,7 @@ template <typename T> Hybrid<T>::Hybrid(Hybrid<T> &&original) :
 
     // Prepare the original for clean destruction
     switch(original.format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridFormat::EXPEDITED:
     case HybridFormat::DECOUPLED:
       original.host_data = nullptr;
@@ -242,7 +242,7 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(const Hybrid<T> &other) {
 
   // Empty the existing Hybrid object
   if (kind == HybridKind::ARRAY && allocations > 0) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     if (host_data != nullptr || devc_data != nullptr) {
       deallocate();
     }
@@ -276,7 +276,7 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(const Hybrid<T> &other) {
     // Allocate and copy memory from the other
     allocate();
     switch(format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridFormat::EXPEDITED:
     case HybridFormat::DECOUPLED:
       memcpy(host_data, other.host_data, length * sizeof(T));
@@ -303,7 +303,7 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(const Hybrid<T> &other) {
     target_serial_number = other.getTargetSerialNumber();
     allocations = other.getAllocations();
     switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridFormat::EXPEDITED:
     case HybridFormat::DECOUPLED:
     case HybridFormat::UNIFIED:
@@ -346,7 +346,7 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(Hybrid<T> &&other) {
 
   // Empty the existing Hybrid object
   if (kind == HybridKind::ARRAY && allocations > 0) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     if (host_data != nullptr || devc_data != nullptr) {
       deallocate();
     }
@@ -366,7 +366,7 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(Hybrid<T> &&other) {
   max_capacity = other.max_capacity;
   pointer_index = other.pointer_index;
   host_data = other.host_data;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   devc_data = other.devc_data;
 #endif
   label = assignLabel(other.label.name);
@@ -381,7 +381,7 @@ template <typename T> Hybrid<T>& Hybrid<T>::operator=(Hybrid<T> &&other) {
 
     // Prepare the original for clean destruction
     switch(other.format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridFormat::EXPEDITED:
     case HybridFormat::DECOUPLED:
       other.host_data = nullptr;
@@ -476,7 +476,7 @@ template <typename T> bool Hybrid<T>::verifyTarget() const {
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> const T* Hybrid<T>::data(const HybridTargetLevel tier) const {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     return host_data;
@@ -491,7 +491,7 @@ template <typename T> const T* Hybrid<T>::data(const HybridTargetLevel tier) con
 
 //-------------------------------------------------------------------------------------------------
 template <typename T> T* Hybrid<T>::data(const HybridTargetLevel tier) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     return host_data;
@@ -621,7 +621,7 @@ size_t Hybrid<T>::putHost(Hybrid<T> *target, const std::vector<T> &values, const
   return offset + padded_count;
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 template <typename T> void Hybrid<T>::upload(const size_t start_pos, const size_t length_copy) {
   const size_t n_copy = (length_copy == 0) ? length - start_pos : length_copy;
@@ -874,7 +874,7 @@ void Hybrid<T>::setPointer(Hybrid<T> *target, const size_t position, const size_
 
   // Set the host and device data pointers as appropriate
   switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
   case HybridFormat::DECOUPLED:
   case HybridFormat::UNIFIED:
@@ -966,7 +966,7 @@ const Hybrid<T> Hybrid<T>::getPointer(const size_t position, const size_t new_le
 
   // Set the host and device data pointers as appropriate
   switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
   case HybridFormat::DECOUPLED:
   case HybridFormat::UNIFIED:
@@ -1026,7 +1026,7 @@ template <typename T> void Hybrid<T>::allocate() {
 
   // No memory should currently be allocated
   assert (host_data == nullptr);
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   assert (devc_data == nullptr);
 #endif
 
@@ -1034,7 +1034,7 @@ template <typename T> void Hybrid<T>::allocate() {
   std::string errmsg = std::to_string(length) + " x " + std::to_string(sizeof(T)) +
                        " bytes in Hybrid object " + std::string(label.name) + ".";
   switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
     if (cudaMalloc((void **)&devc_data, max_capacity * sizeof(T)) != cudaSuccess) {
       rtErr("cudaMalloc unsuccessful for " + errmsg, "Hybrid", "allocate");
@@ -1103,7 +1103,7 @@ template <typename T> void Hybrid<T>::deallocate() {
 
   // Memory should currently be allocated
   switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
   case HybridFormat::DECOUPLED:
     assert (devc_data != nullptr);
@@ -1125,7 +1125,7 @@ template <typename T> void Hybrid<T>::deallocate() {
 
   // If no memory is currently allocated, do nothing
   switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
     if (cudaFreeHost(host_data) != cudaSuccess) {
       rtErr("cudaFreeHost failed in object " + std::string(label.name) + ".", "Hybrid",
@@ -1170,7 +1170,7 @@ template <typename T> void Hybrid<T>::deallocate() {
 
   // Set data pointers to NULL
   host_data = nullptr;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   devc_data = nullptr;
 #endif
 
@@ -1197,7 +1197,7 @@ void Hybrid<T>::reallocate(const size_t new_length, const size_t new_capacity) {
     memcpy(host_data_buffer, host_data, overlap * sizeof(T));
   }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   T* devc_data_buffer;
   if (format != HybridFormat::UNIFIED && overlap != 0) {
     if (cudaMalloc((void **)&devc_data_buffer, overlap * sizeof(T)) != cudaSuccess) {
@@ -1239,7 +1239,7 @@ void Hybrid<T>::reallocate(const size_t new_length, const size_t new_capacity) {
     memcpy(host_data, host_data_buffer, overlap * sizeof(T));
     delete[] host_data_buffer;
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   if (format != HybridFormat::UNIFIED && overlap != 0) {
     if (cudaMemcpy(devc_data, devc_data_buffer, overlap * sizeof(T), cudaMemcpyDeviceToDevice) !=
       cudaSuccess) {
@@ -1272,7 +1272,7 @@ template <typename T> HybridLabel Hybrid<T>::assignLabel(const char* tag) {
     strcpy(hlbl.name, tag);
   }
   switch (format) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridFormat::EXPEDITED:
     hlbl.format = expedited_code;
     break;
@@ -1302,4 +1302,4 @@ template <typename T> HybridLabel Hybrid<T>::assignLabel(const char* tag) {
 }
 
 } // namespace card
-} // namespace omni
+} // namespace stormm

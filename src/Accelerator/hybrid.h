@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_HYBRID_H
-#define OMNI_HYBRID_H
+#ifndef STORMM_HYBRID_H
+#define STORMM_HYBRID_H
 
 #include <cstdio>
 #include <cstring>
@@ -9,19 +9,19 @@
 #include <typeinfo>
 #include <typeindex>
 #include <vector>
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
 #include <cuda_runtime.h>
 #  endif
 #endif
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 using constants::mega;
@@ -52,7 +52,7 @@ enum class HybridKind {
 
 /// \brief Available formats for Hybrid data arrays.
 enum class HybridFormat {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   EXPEDITED,   ///< The default, best general-purpose format for side-by-side data on the host and
                ///<   device: pinned (page-locked) memory on the host and a separate array on the
                ///<   GPU.  40% higher upload and download bandwidth than DECOUPLED memory with the
@@ -69,7 +69,7 @@ enum class HybridFormat {
   HOST_ONLY    ///< A new[] allocated array when CUDA or HIP is not used in the compilation
 #endif
 };
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 constexpr HybridFormat default_hpc_format = HybridFormat::EXPEDITED;
 #else
 constexpr HybridFormat default_hpc_format = HybridFormat::HOST_ONLY;
@@ -78,7 +78,7 @@ constexpr HybridFormat default_hpc_format = HybridFormat::HOST_ONLY;
 /// \brief Two levels to which the pointers might go, depending on whether an HPC language is
 ///        compiled
 enum class HybridTargetLevel {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   HOST, DEVICE
 #else
   HOST
@@ -365,7 +365,7 @@ public:
   size_t putHost(Hybrid<T> *target, const std::vector<T> &values, size_t offset = 0,
                  size_t padding = 0, size_t count = 0);
   /// \}
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Copy data from the host to the device, if necessary and if possible
   void upload(size_t start_pos = 0, size_t length_copy = 0);
 
@@ -503,7 +503,7 @@ private:
   T* host_data;
 
   /// Data allocated on the device by cudaMalloc() or (in pinned fashion) with cudaHostAlloc()
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   T* devc_data;
 #endif
 
@@ -542,12 +542,12 @@ private:
 };
 
 } // namespace card
-} // namespace omni
+} // namespace stormm
 
 /// \brief ***Global*** memory Ledger instance that Hybrid allocate / deallocate functions will
 ///        reference.  While this should be the only instance a programmer needs, it is feasible
 ///        to create additional Ledger objects for some other purpose. 
-extern omni::card::Ledger gbl_mem_balance_sheet;
+extern stormm::card::Ledger gbl_mem_balance_sheet;
 
 #include "hybrid.tpp"
 

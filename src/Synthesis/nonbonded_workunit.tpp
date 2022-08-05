@@ -1,5 +1,5 @@
 //-*-c++-*-
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 //-------------------------------------------------------------------------------------------------
@@ -137,4 +137,4 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
 }
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

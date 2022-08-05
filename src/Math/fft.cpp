@@ -1,9 +1,9 @@
 #include "fft.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
   
 } // namespace math
-} // namespace omni
+} // namespace stormm

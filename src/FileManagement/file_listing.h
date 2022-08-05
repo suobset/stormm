@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_FILE_LISTING_H
-#define OMNI_FILE_LISTING_H
+#ifndef STORMM_FILE_LISTING_H
+#define STORMM_FILE_LISTING_H
 
 #include <vector>
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace diskutil {
 
 /// \brief Enumerate the possible types of directory search (this is equivalent to whether there is
@@ -102,15 +102,15 @@ void splitPath(const std::string &path, std::string *before, std::string *after)
 /// \param r_option     Option to use recursion or not
 std::vector<std::string> listFilesInPath(const std::string &regexp_path, SearchStyle r_option);
 
-/// \brief Try to find the OMNI home or source directories based on a hypothetical path.  A known
-///        file within the desired OMNI directory is provided to help identify the correct root.
+/// \brief Try to find the STORMM home or source directories based on a hypothetical path.  A known
+///        file within the desired STORMM directory is provided to help identify the correct root.
 ///
-/// \param path       The path that may contain clues as to the OMNI home directory
+/// \param path       The path that may contain clues as to the STORMM home directory
 /// \param extension  Name of the file that must be found in some partial path when that partial
 ///                   path is the correct root
-std::string findOmniPath(const std::string &path, const std::string &extension);
+std::string findStormmPath(const std::string &path, const std::string &extension);
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm
 
 #endif

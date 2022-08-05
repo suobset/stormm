@@ -1,6 +1,6 @@
 #include "minimization.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using energy::EvaluateForce;
@@ -55,4 +55,4 @@ ScoreCard minimize(PhaseSpaceWriter psw, const ValenceKit<double> &vk,
 }
   
 } // namespace mm
-} // namespace omni
+} // namespace stormm

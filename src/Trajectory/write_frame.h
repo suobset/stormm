@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_WRITE_FRAME_H
-#define OMNI_WRITE_FRAME_H
+#ifndef STORMM_WRITE_FRAME_H
+#define STORMM_WRITE_FRAME_H
 
 #include <string>
 #include <vector>
@@ -8,7 +8,7 @@
 #include "Topology/atomgraph_enumerators.h"
 #include "trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using diskutil::PrintSituation;
@@ -72,6 +72,6 @@ void writeFrame(std::ofstream *foutp, const std::string &filename, CoordinateFil
 /// \}
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

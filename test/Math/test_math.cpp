@@ -2,7 +2,7 @@
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix.h"
 #include "../../src/Math/matrix_ops.h"
@@ -15,26 +15,26 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/file_snapshot.h"
 
-using omni::double3;
-using omni::ulint;
-using omni::ullint;
-using omni::ullint2;
-using omni::constants::tiny;
-using omni::card::Hybrid;
-using omni::card::HybridTargetLevel;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::parse::TextFile;
-using omni::parse::polyNumericVector;
-using omni::random::Ran2Generator;
-using omni::random::Xoroshiro128pGenerator;
-using omni::random::RandomNumberMill;
-using omni::random::Xoshiro256ppGenerator;
-using omni::symbols::pi;
-using namespace omni::math;
-using namespace omni::testing;
+using stormm::double3;
+using stormm::ulint;
+using stormm::ullint;
+using stormm::ullint2;
+using stormm::constants::tiny;
+using stormm::card::Hybrid;
+using stormm::card::HybridTargetLevel;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::parse::TextFile;
+using stormm::parse::polyNumericVector;
+using stormm::random::Ran2Generator;
+using stormm::random::Xoroshiro128pGenerator;
+using stormm::random::RandomNumberMill;
+using stormm::random::Xoshiro256ppGenerator;
+using stormm::symbols::pi;
+using namespace stormm::math;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Produce a series of random numbers from a generator based on an initial state and some
@@ -232,16 +232,16 @@ int main(const int argc, const char* argv[]) {
         "value of a normal distribution of random numbers is incorrect.");
 
   // Additional checks, using the file reference system
-  const std::string randoms_snp = oe.getOmniHomePath() + osSeparator() + "test" + osSeparator() +
+  const std::string randoms_snp = oe.getStormmHomePath() + osSeparator() + "test" + osSeparator() +
                                   "Math" + osSeparator() + "randoms.m";
   TestPriority snp_found = (getDrivePathType(randoms_snp) == DrivePathType::FILE) ?
                            TestPriority::CRITICAL : TestPriority::ABORT;
   if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
-    rtWarn("Snapshot file " + randoms_snp + " was not found.  Check the $OMNI_SOURCE environment "
+    rtWarn("Snapshot file " + randoms_snp + " was not found.  Check the $STORMM_SOURCE environment "
            "variable and make sure it indicates the root source directory where src/ and test/ "
            "can be found.  Some subsequent tests will be skipped.", "test_math");
   }
-  snapshot(oe.getOmniHomePath() + osSeparator() + "test" + osSeparator() + "Math" + osSeparator() +
+  snapshot(oe.getStormmHomePath() + osSeparator() + "test" + osSeparator() + "Math" + osSeparator() +
            "randoms.m", polyNumericVector(result_c), "rngvec", 1.0e-4, "Series of random numbers "
            "created by the ran2 method does not conform to expectations.", oe.takeSnapshot(),
            1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE, snp_found);
@@ -368,12 +368,12 @@ int main(const int argc, const char* argv[]) {
   }
 
   // Check that the GEMM matrix multiplication snapshot file exists
-  const std::string matrices_snp = oe.getOmniSourcePath() + osSeparator() + "test" +
+  const std::string matrices_snp = oe.getStormmSourcePath() + osSeparator() + "test" +
                                    osSeparator() + "Math" + osSeparator() + "matrices.m";
   snp_found = (getDrivePathType(matrices_snp) == DrivePathType::FILE) ? TestPriority::CRITICAL :
                                                                         TestPriority::ABORT;
   if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
-    rtWarn("The snapshot file " + matrices_snp + "was not found.  Make sure that the $OMNI_SOURCE "
+    rtWarn("The snapshot file " + matrices_snp + "was not found.  Make sure that the $STORMM_SOURCE "
            "environment variable is set to the root soruce directory, where src/ and test/ "
            "subdirectories can be found.  A number of subsequent tests will be skipped.",
            "test_math");
@@ -417,7 +417,7 @@ int main(const int argc, const char* argv[]) {
 
   // Create a positive-definite matrix, then compute its eigenvalues and eigenvectors (this is
   // better accomplished by a routine like BLAS dsyevd, as it is more than just real and symmetric,
-  // but the slower jacobi routine is all OMNI has got without real BLAS compiled).
+  // but the slower jacobi routine is all STORMM has got without real BLAS compiled).
   const size_t rank = 8;
   Hybrid<double> base_matrix(rank * rank);
   Hybrid<double> posdef_matrix(rank * rank);

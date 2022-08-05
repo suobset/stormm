@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_TOPOLOGY_H
-#define OMNI_TOPOLOGY_H
+#ifndef STORMM_TOPOLOGY_H
+#define STORMM_TOPOLOGY_H
 
 #include <cmath>
 #include <vector>
@@ -9,14 +9,14 @@
 #include "Constants/hpc_bounds.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Parsing/citation.h"
 #include "atomgraph_abstracts.h"
 #include "atomgraph_enumerators.h"
 #include "atomgraph_refinement.h"
 #include "topology_limits.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using constants::ExceptionResponse;
@@ -922,7 +922,7 @@ public:
   ConstraintKit<float>
   getSinglePrecisionConstraintKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Push all data to the device
   void upload();
 
@@ -1640,7 +1640,7 @@ private:
 };
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #include "atomgraph.tpp"
 

@@ -1,7 +1,7 @@
 #include <vector>
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -23,23 +23,23 @@
 #include "../../src/UnitTesting/unit_test.h"
 #include "assemble_restraints.h"
 
-using omni::constants::ExceptionResponse;
-using omni::constants::verytiny;
-using omni::data_types::double2;
-using omni::data_types::double3;
-using omni::data_types::double4;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::random::Xoroshiro128pGenerator;
-using omni::restraints::BoundedRestraint;
-using omni::restraints::RestraintApparatus;
-using namespace omni::energy;
-using namespace omni::synthesis;
-using namespace omni::topology;
-using namespace omni::trajectory;
-using namespace omni::testing;
+using stormm::constants::ExceptionResponse;
+using stormm::constants::verytiny;
+using stormm::data_types::double2;
+using stormm::data_types::double3;
+using stormm::data_types::double4;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::random::Xoroshiro128pGenerator;
+using stormm::restraints::BoundedRestraint;
+using stormm::restraints::RestraintApparatus;
+using namespace stormm::energy;
+using namespace stormm::synthesis;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Simple enumerator to call for non-bonded computations based on a topology synthesis.
@@ -309,7 +309,7 @@ int main(const int argc, const char* argv[]) {
   // Create some vectors of random numbers, then upload them and test what happens when perturbing
   // atomic coordinates by these numbers.
   const char osc = osSeparator();
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
   const std::string tip3p_top_name = base_top_name + osc + "tip3p.top";
   const std::string tip4p_top_name = base_top_name + osc + "tip4p.top";
   const std::string trpcage_top_name = base_top_name + osc + "trpcage_in_water.top";
@@ -341,8 +341,8 @@ int main(const int argc, const char* argv[]) {
   else {
     rtWarn("The topology files for the TIP3P and TIP4P water boxes as well as two versions of the "
            "solvated Trp-cage miniprotein, ubiquitin, and two drug molecules must be available in "
-           "${OMNI_SOURCE}/test/ subdirectories Topology and Trajectory, respectively.  Check the "
-           "$OMNI_SOURCE environment variable to make sure that it is set properly.  A number of "
+           "${STORMM_SOURCE}/test/ subdirectories Topology and Trajectory, respectively.  Check the "
+           "$STORMM_SOURCE environment variable to make sure that it is set properly.  A number of "
            "tests will be skipped.", "test_atomgraph_synthesis");
   }
 
@@ -385,7 +385,7 @@ int main(const int argc, const char* argv[]) {
   section(2);
   PhaseSpace tip3p_ps, tip4p_ps, trpcage_ps, trpcage2_ps, trpcage3_ps, nbfix_ps, ubiquitin_ps;
   PhaseSpace drug_ps, brbz_ps;
-  const std::string base_crd_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_crd_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string tip3p_crd_name     = base_crd_name + osc + "tip3p.inpcrd";
   const std::string tip4p_crd_name     = base_crd_name + osc + "tip4p.inpcrd";
   const std::string trpcage_crd_name   = base_crd_name + osc + "trpcage_in_water.inpcrd";
@@ -408,15 +408,15 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Coordinates for the periodic systems needed to accompany the first AtomGraphSynthesis "
-           "were not found.  Check the installation and the ${OMNI_SOURCE} environment variable.  "
+           "were not found.  Check the installation and the ${STORMM_SOURCE} environment variable.  "
            "Subsequent tests will be skipped.\n");
   }
   const TestPriority do_per_eval = (coords_exist && files_exist) ? TestPriority::CRITICAL :
                                                                    TestPriority::ABORT;
   
-  const std::string base_pept_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Namelist" +
+  const std::string base_pept_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Namelist" +
                                          osc + "topol";
-  const std::string base_pept_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Namelist" +
+  const std::string base_pept_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Namelist" +
                                          osc + "coord";
   const std::string brbz_vs_top_name = base_top_name + osc + "bromobenzene_vs.top";
   const std::string brbz_vs_crd_name = base_crd_name + osc + "bromobenzene_vs.inpcrd";
@@ -487,7 +487,7 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Files corresponding to various systems in isolated boundary conditions were not "
-           "found.  Check the ${OMNI_SOURCE} environment variable.  The necessary directories "
+           "found.  Check the ${STORMM_SOURCE} environment variable.  The necessary directories "
            "are the same as for other files needed by this test program.  Subsequent tests will "
            "be skipped.", "test_atomgraph_synthesis");
   }

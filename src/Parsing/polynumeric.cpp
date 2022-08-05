@@ -1,13 +1,13 @@
 #include <cstring>
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "polynumeric.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
-using data_types::getOmniScalarTypeName;
-using data_types::getOmniHpcVectorTypeName;
+using data_types::getStormmScalarTypeName;
+using data_types::getStormmHpcVectorTypeName;
 
 //-------------------------------------------------------------------------------------------------
 std::vector<double> doubleFromPolyNumeric(const std::vector<PolyNumeric> &values) {
@@ -89,17 +89,17 @@ std::string nameNumericalType(NumberFormat cform) {
   switch (cform) {
   case NumberFormat::SCIENTIFIC:
   case NumberFormat::STANDARD_REAL:
-    return getOmniScalarTypeName<double>();
+    return getStormmScalarTypeName<double>();
   case NumberFormat::INTEGER:
-    return getOmniScalarTypeName<int>();
+    return getStormmScalarTypeName<int>();
   case NumberFormat::LONG_LONG_INTEGER:
-    return getOmniScalarTypeName<llint>();
+    return getStormmScalarTypeName<llint>();
   case NumberFormat::UNSIGNED_INTEGER:
-    return getOmniScalarTypeName<ulint>();
+    return getStormmScalarTypeName<ulint>();
   case NumberFormat::UNSIGNED_LONG_LONG_INTEGER:
-    return getOmniScalarTypeName<ullint>();
+    return getStormmScalarTypeName<ullint>();
   case NumberFormat::CHAR4:
-    return getOmniHpcVectorTypeName<char4>();
+    return getStormmHpcVectorTypeName<char4>();
   }
   __builtin_unreachable();
 }
@@ -178,4 +178,4 @@ PolyNumeric extractFormattedNumber(const char* a, const NumberFormat cform, cons
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

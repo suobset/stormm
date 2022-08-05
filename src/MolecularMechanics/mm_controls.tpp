@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace mm {
 
 //-------------------------------------------------------------------------------------------------
@@ -17,4 +17,4 @@ MMControlKit<T>::MMControlKit(const int step_in, const int sd_cycles_in, const i
 {}
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm

@@ -1,14 +1,14 @@
 // -*-c++-*-
-#ifndef OMNI_NMR_RESTRAINT_H
-#define OMNI_NMR_RESTRAINT_H
+#ifndef STORMM_NMR_RESTRAINT_H
+#define STORMM_NMR_RESTRAINT_H
 
 #include <string>
 #include "Chemistry/chemical_features.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Trajectory/coordinateframe.h"
 #include "Topology/atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 using chemistry::ChemicalFeatures;
@@ -389,6 +389,6 @@ private:
 };
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm
 
 #endif

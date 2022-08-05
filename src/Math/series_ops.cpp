@@ -1,9 +1,9 @@
 #include <algorithm>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "series_ops.h"
 #include "vector_ops.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -60,4 +60,4 @@ std::vector<int> getSubsetIndexPattern(const std::vector<int> &x_subset, int *n_
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

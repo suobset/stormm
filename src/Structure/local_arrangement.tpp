@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
@@ -500,4 +500,4 @@ Tcalc dihedral_angle(int atom_i, int atom_j, int atom_k, int atom_l, const Tcoor
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

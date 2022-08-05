@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
@@ -902,4 +902,4 @@ void transmitVirtualSiteForces(PhaseSpaceWriter psw, const VirtualSiteKit<Tcalc>
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

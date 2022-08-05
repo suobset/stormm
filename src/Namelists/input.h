@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_INPUT_H
-#define OMNI_INPUT_H
+#ifndef STORMM_INPUT_H
+#define STORMM_INPUT_H
 
 #include <string>
 #include <vector>
@@ -9,7 +9,7 @@
 #include "Parsing/textguard.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using parse::TextFile;
@@ -28,7 +28,7 @@ std::string padNamelistTuples(const char* text, const int n_char);
 /// \brief Prepare a list of std::strings representing a sequence of delimited text strings
 ///        found in a TextFile object.  Contiguous blocks of quoted or commented text represent a
 ///        single such text string, and the quotation (" (...) ", ' (...) ') or comment character
-///        options (#, !, %, //, /* (...) */ ) for OMNI namelists are hard-coded herein.  In this
+///        options (#, !, %, //, /* (...) */ ) for STORMM namelists are hard-coded herein.  In this
 ///        notation (...) is not a reserved character sequence but indicates that the quote or
 ///        comment feature can span multiple lines.  Other special characters '[', '{', '(', ')',
 ///        '}', and ']', representing the limits of argument tuples, will be padded with
@@ -76,6 +76,6 @@ int readNamelist(const TextFile &tf, NamelistEmulator *nml, int start_line = 0,
                  bool *found = nullptr);
   
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

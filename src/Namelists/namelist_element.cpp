@@ -4,7 +4,7 @@
 #include "Reporting/error_format.h"
 #include "namelist_element.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using parse::countDelimiters;
@@ -773,4 +773,4 @@ void NamelistElement::resizeBuffer() {
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

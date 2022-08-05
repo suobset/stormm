@@ -4,7 +4,7 @@
 #include "Trajectory/trajectory_enumerators.h"
 #include "nml_files.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -654,7 +654,7 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
                             const std::vector<SubkeyRequirement> &sys_keyword_reqs,
                             const ExceptionResponse policy) {
   NamelistEmulator t_nml("files", CaseSensitivity::AUTOMATIC, policy, "Collects file names for "
-                         "OMNI programs, offloading work that would otherwise require "
+                         "STORMM programs, offloading work that would otherwise require "
                          "command-line arguments.");
   t_nml.addKeyword(NamelistElement("-p", NamelistType::STRING,
                                    std::string(default_filecon_topology_name),
@@ -736,4 +736,4 @@ NamelistEmulator filesInput(const TextFile &tf, int *start_line,
 }
   
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

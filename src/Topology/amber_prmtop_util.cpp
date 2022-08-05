@@ -1,10 +1,10 @@
 #include <cstring>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"
 #include "Parsing/ascii_numbers.h"
 #include "amber_prmtop_util.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using parse::CaseSensitivity;
@@ -366,4 +366,4 @@ std::vector<char4> c4AmberPrmtopData(const TextFile &tf, const int start_line,
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_AMBER_PMRTOP_UTIL_H
-#define OMNI_AMBER_PMRTOP_UTIL_H
+#ifndef STORMM_AMBER_PMRTOP_UTIL_H
+#define STORMM_AMBER_PMRTOP_UTIL_H
 
 #include "Parsing/citation.h"
 #include "Parsing/textfile.h"
 #include "Parsing/polynumeric.h"
 #include "atomgraph_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using parse::Citation;
@@ -116,6 +116,6 @@ std::vector<char4> c4AmberPrmtopData(const TextFile &tf, int start_line, int cou
                                      int required_count, int possible_count = -1);
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #endif

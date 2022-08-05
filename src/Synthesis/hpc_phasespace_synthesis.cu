@@ -1,6 +1,6 @@
 // -*-c++-*-
 #include <vector>
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
@@ -11,7 +11,7 @@
 #include "hpc_phasespace_synthesis.h"
 #include "hpc_phasespace_synthesis.cuh"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using numerics::globalpos_scale_nonoverflow_bits;
@@ -300,4 +300,4 @@ extern void psyPrimeConjugateGradient(PsSynthesisWriter *psyw, const GpuDetails 
 }
   
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

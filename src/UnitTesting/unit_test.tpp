@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace testing {
 
 //-------------------------------------------------------------------------------------------------
@@ -362,4 +362,4 @@ CheckResult check(const std::vector<T1> &lhs, const RelationalOperator relations
 }
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm

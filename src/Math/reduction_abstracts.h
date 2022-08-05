@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_REDUCTION_ABSTRACTS_H
-#define OMNI_REDUCTION_ABSTRACTS_H
+#ifndef STORMM_REDUCTION_ABSTRACTS_H
+#define STORMM_REDUCTION_ABSTRACTS_H
 
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
@@ -9,7 +9,7 @@
 #include "reduction_bridge.h"
 #include "reduction_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::HybridTargetLevel;
@@ -169,7 +169,7 @@ struct ConjGradSubstrate {
 };
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "reduction_abstracts.tpp"
 

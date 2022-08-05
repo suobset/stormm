@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_ROUNDING_H
-#define OMNI_ROUNDING_H
+#ifndef STORMM_ROUNDING_H
+#define STORMM_ROUNDING_H
 
 #include <cmath>
 #include <vector>
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using symbols::pi;
@@ -65,7 +65,7 @@ Tcalc angleVerification(const Tcalc costheta, const Tcalc* crabbc, const Tcalc* 
                         const Tcalc* bc, const Tcalc* scr);
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "rounding.tpp"
 

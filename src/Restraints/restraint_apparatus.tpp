@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 //-------------------------------------------------------------------------------------------------
@@ -50,4 +50,4 @@ RestraintKit<T, T2, T4>::RestraintKit(const int total_rst_in, const int nposn_in
 {}
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm

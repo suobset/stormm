@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_VALENCE_WORKUNIT_H
-#define OMNI_VALENCE_WORKUNIT_H
+#ifndef STORMM_VALENCE_WORKUNIT_H
+#define STORMM_VALENCE_WORKUNIT_H
 
 #include <string>
 #include <vector>
@@ -13,7 +13,7 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "synthesis_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::GpuDetails;
@@ -1182,6 +1182,6 @@ buildValenceWorkUnits(ValenceDelegator *vdel,
 /// \}
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm
 
 #endif

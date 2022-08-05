@@ -2,7 +2,7 @@
 #include "Reporting/error_format.h"
 #include "behavior.h"
 
-namespace omni {
+namespace stormm {
 namespace constants {
 
 using parse::strcmpCased;
@@ -33,4 +33,4 @@ std::string getPrecisionModelName(const PrecisionModel plevel) {
 }
 
 } // namespace constants
-} // namespace omni
+} // namespace stormm

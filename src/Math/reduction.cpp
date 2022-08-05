@@ -2,7 +2,7 @@
 #include "Math/rounding.h"
 #include "reduction.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -224,4 +224,4 @@ void scatterCenterOnZero(GenericRdSubstrate<llint> rsbs, const double tsum_x, co
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

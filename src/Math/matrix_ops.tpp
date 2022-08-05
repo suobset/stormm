@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -682,5 +682,5 @@ void printMatrix(const HpcMatrix<T> &matrix, const std::string &varname,
   printMatrix(matrix.memptr(), matrix.n_rows, matrix.n_cols, varname, file_name, expectation);
 }
 
-} // namespace omni
-} // namespace omni
+} // namespace stormm
+} // namespace stormm

@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NONBONDED_WORKUNIT_H
-#define OMNI_NONBONDED_WORKUNIT_H
+#ifndef STORMM_NONBONDED_WORKUNIT_H
+#define STORMM_NONBONDED_WORKUNIT_H
 
 #include "Math/summation.h"
 #include "Topology/atomgraph.h"
@@ -8,7 +8,7 @@
 #include "static_mask_synthesis.h"
 #include "synthesis_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using energy::StaticExclusionMask;
@@ -235,7 +235,7 @@ std::vector<NonbondedWorkUnit> buildNonbondedWorkUnits(const StaticExclusionMask
 /// \}
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm
 
 #include "nonbonded_workunit.tpp"
 

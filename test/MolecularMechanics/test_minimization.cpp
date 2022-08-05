@@ -19,17 +19,17 @@
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using namespace omni::chemistry;
-using namespace omni::diskutil;
-using namespace omni::energy;
-using namespace omni::errors;
-using namespace omni::mm;
-using namespace omni::namelist;
-using namespace omni::restraints;
-using namespace omni::structure;
-using namespace omni::testing;
-using namespace omni::topology;
-using namespace omni::trajectory;
+using namespace stormm::chemistry;
+using namespace stormm::diskutil;
+using namespace stormm::energy;
+using namespace stormm::errors;
+using namespace stormm::mm;
+using namespace stormm::namelist;
+using namespace stormm::restraints;
+using namespace stormm::structure;
+using namespace stormm::testing;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Test that each atom of the molecule is in a local minimum with respect to displacement in the
@@ -117,8 +117,8 @@ int main(const int argc, const char* argv[]) {
 
   // Read files
   const char osc = osSeparator();
-  const std::string base_top_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string alad_top_name = base_top_name + osc + "ala_dipeptide.top";
   const std::string alad_crd_name = base_crd_name + osc + "ala_dipeptide.inpcrd";
   const std::string brbz_top_name = base_top_name + osc + "bromobenzene.top";
@@ -135,7 +135,7 @@ int main(const int argc, const char* argv[]) {
   }
   if (files_exist == false) {
     rtWarn("Topology and coordinate files must be available for tests to proceed.  Check the "
-           "${OMNI_SOURCE} environment variable, currently set to " + oe.getOmniSourcePath() +
+           "${STORMM_SOURCE} environment variable, currently set to " + oe.getStormmSourcePath() +
            ", to verify that it is valid.  Subsequent tests will be skipped.",
            "test_minimization");
   }

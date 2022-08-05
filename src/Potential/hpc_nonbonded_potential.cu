@@ -4,12 +4,12 @@
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "hpc_nonbonded_potential.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using constants::warp_size_int;
@@ -379,4 +379,4 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

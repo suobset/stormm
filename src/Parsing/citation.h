@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_CITATION_H
-#define OMNI_CITATION_H
+#ifndef STORMM_CITATION_H
+#define STORMM_CITATION_H
 
 #include <string>
 #include <vector>
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 /// \brief A means for numbering and tracking citations or other documented sources of information
@@ -108,7 +108,7 @@ private:
 };
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm
 
 #endif
 

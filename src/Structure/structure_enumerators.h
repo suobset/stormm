@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_STRUCTURE_ENUMERATORS_H
-#define OMNI_STRUCTURE_ENUMERATORS_H
+#ifndef STORMM_STRUCTURE_ENUMERATORS_H
+#define STORMM_STRUCTURE_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace structure {
   
 /// \brief There are two typical ways of re-imaging particles.
@@ -27,6 +27,6 @@ enum class RmsdMethod {
 };
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #endif

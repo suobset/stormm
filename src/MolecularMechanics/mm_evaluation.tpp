@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace mm {
 
 //-------------------------------------------------------------------------------------------------
@@ -80,4 +80,4 @@ void evalNonbValeRestMM(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, 
 }
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm

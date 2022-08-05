@@ -1,10 +1,10 @@
 // -*-c++-*-
-#ifndef OMNI_AMBER_NETCDF_H
-#define OMNI_AMBER_NETCDF_H
+#ifndef STORMM_AMBER_NETCDF_H
+#define STORMM_AMBER_NETCDF_H
 
 #include <netcdf.h>
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 class AmberNetcdf {
@@ -51,7 +51,7 @@ private:
 };
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif
 

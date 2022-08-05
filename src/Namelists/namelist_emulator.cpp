@@ -6,7 +6,7 @@
 #include "Reporting/error_format.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using errors::RTMessageKind;
@@ -840,4 +840,4 @@ void NamelistEmulator::verifyEstablishment(const std::string &keyword_query, con
 }
   
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

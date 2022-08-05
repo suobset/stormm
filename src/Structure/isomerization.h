@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_ISOMERIZATION_H
-#define OMNI_ISOMERIZATION_H
+#ifndef STORMM_ISOMERIZATION_H
+#define STORMM_ISOMERIZATION_H
 
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
@@ -12,7 +12,7 @@
 #include "Trajectory/phasespace.h"
 #include "Synthesis/phasespace_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using chemistry::ChiralInversionProtocol;
@@ -181,7 +181,7 @@ void flipChiralCenter(CoordinateSeriesWriter<Tcoord> csw, int frame_index, int c
 /// \}
   
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #include "isomerization.tpp"
 

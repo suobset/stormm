@@ -2,7 +2,7 @@
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Topology/atomgraph.h"
@@ -10,24 +10,24 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::card::HybridTargetLevel;
-using omni::data_types::uint;
-using omni::data_types::char4;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::parse::operator==;
-using omni::topology::AtomGraph;
-using omni::topology::ChemicalDetailsKit;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::CoordinateFrame;
-using omni::trajectory::PhaseSpace;
+using stormm::card::HybridTargetLevel;
+using stormm::data_types::uint;
+using stormm::data_types::char4;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::parse::operator==;
+using stormm::topology::AtomGraph;
+using stormm::topology::ChemicalDetailsKit;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::CoordinateFrame;
+using stormm::trajectory::PhaseSpace;
 
-using namespace omni::chemistry;
-using namespace omni::testing;
+using namespace stormm::chemistry;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 
@@ -60,9 +60,9 @@ int main(const int argc, const char* argv[]) {
   AtomGraph trpcage;
   CoordinateFrame trpcage_crd;
   const char osc = osSeparator();
-  const std::string trpcage_top_name = oe.getOmniSourcePath() + osc + "test" +  osc + "Topology" +
+  const std::string trpcage_top_name = oe.getStormmSourcePath() + osc + "test" +  osc + "Topology" +
                                        osc + "trpcage_in_water.top";
-  const std::string trpcage_crd_name = oe.getOmniSourcePath() + osc + "test" +  osc +
+  const std::string trpcage_crd_name = oe.getStormmSourcePath() + osc + "test" +  osc +
                                        "Trajectory" + osc + "trpcage_in_water.inpcrd";
   const bool trpcage_exists = (getDrivePathType(trpcage_top_name) == DrivePathType::FILE &&
                                getDrivePathType(trpcage_crd_name) == DrivePathType::FILE);
@@ -74,7 +74,7 @@ int main(const int argc, const char* argv[]) {
   else {
     rtWarn("Atom masks refer to a specific topology, but either or both of the files " +
            trpcage_top_name + " and " + trpcage_crd_name + " were not found.  Check the "
-           "$OMNI_SOURCE environment variable to ensure that it is set to the OMNI root directory "
+           "$STORMM_SOURCE environment variable to ensure that it is set to the STORMM root directory "
            "where src/ and test/ subdirectories can be found.  Some subsequent tests will be "
            "skipped.", "test_atommask");
   }
@@ -90,14 +90,14 @@ int main(const int argc, const char* argv[]) {
     mask_a_answer[i] = 1;
   }
   const std::vector<uint> mavec = mask_a.getRawMask();
-  const std::string trpcage_mask_snp = oe.getOmniSourcePath() + osc + "test" + osc + "Chemistry" +
+  const std::string trpcage_mask_snp = oe.getStormmSourcePath() + osc + "test" + osc + "Chemistry" +
                                        osc + "trpcage_mask_image.m";
   const bool trp_snap_exist = (getDrivePathType(trpcage_mask_snp) == DrivePathType::FILE);
   if (trp_snap_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("The snapshot file " + trpcage_mask_snp + ", needed for snapshot tests on some mask "
            "results, could not be found.  If this occurred without also triggering a warning on "
            "files for the Trp-cage system itself, the installation may be corrupted.  Check the "
-           "${OMNI_SOURCE} environment variable to ensure that it is set to the OMNI root "
+           "${STORMM_SOURCE} environment variable to ensure that it is set to the STORMM root "
            "directory where src/ and test/ subdirectories can be found.  Some tests will be "
            "skipped.", "test_atommask");
   }
@@ -461,16 +461,16 @@ int main(const int argc, const char* argv[]) {
   // Probe the chemical features
   AtomGraph trpi_ag, drug_ag;
   PhaseSpace trpi_ps, drug_ps;
-  const std::string trpi_top_name = oe.getOmniSourcePath() + osc + "test" +  osc + "Topology" +
+  const std::string trpi_top_name = oe.getStormmSourcePath() + osc + "test" +  osc + "Topology" +
                                     osc + "trpcage.top";
-  const std::string trpi_crd_name = oe.getOmniSourcePath() + osc + "test" +  osc +
+  const std::string trpi_crd_name = oe.getStormmSourcePath() + osc + "test" +  osc +
                                     "Trajectory" + osc + "trpcage.inpcrd";
   const bool trpi_exists = (getDrivePathType(trpi_top_name) == DrivePathType::FILE &&
                             getDrivePathType(trpi_crd_name) == DrivePathType::FILE);
   const TestPriority do_trpi = (trpi_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
-  const std::string drug_top_name = oe.getOmniSourcePath() + osc + "test" +  osc + "Topology" +
+  const std::string drug_top_name = oe.getStormmSourcePath() + osc + "test" +  osc + "Topology" +
                                     osc + "drug_example.top";
-  const std::string drug_crd_name = oe.getOmniSourcePath() + osc + "test" +  osc +
+  const std::string drug_crd_name = oe.getStormmSourcePath() + osc + "test" +  osc +
                                     "Trajectory" + osc + "drug_example.inpcrd";
   const bool drug_exists = (getDrivePathType(drug_top_name) == DrivePathType::FILE &&
                             getDrivePathType(drug_crd_name) == DrivePathType::FILE);
@@ -492,7 +492,7 @@ int main(const int argc, const char* argv[]) {
   }
   if (missing_files) {
     rtWarn("Additional topology and coordinate files needed by other tests were not found.  Check "
-           "the $OMNI_SOURCE environment variable.  Some subsequent tests will be skipped.",
+           "the $STORMM_SOURCE environment variable.  Some subsequent tests will be skipped.",
            "test_atommask");
   }
 

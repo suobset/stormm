@@ -6,7 +6,7 @@
 #include "bounded_restraint.h"
 #include "restraint_util.h"
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 using chemistry::AtomMask;
@@ -718,4 +718,4 @@ void BoundedRestraint::checkDisplacementLimits(double4 *rval) {
 }
 
 } // namespace restraints
-} // namespace omni
+} // namespace stormm

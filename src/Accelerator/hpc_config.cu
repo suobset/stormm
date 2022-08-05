@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 #include <cuda.h>
 #include <curand_kernel.h>
 #include <nvml.h>
@@ -10,10 +10,10 @@
 #include "Reporting/error_format.h"
 #include "hpc_config.cuh"
 
-namespace omni {
+namespace stormm {
 namespace card {
 
-#ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_CUDA
 //-------------------------------------------------------------------------------------------------
 GpuDetails::GpuDetails(const cudaDeviceProp &dev_prop, const int dev_index) :
     available{true},
@@ -270,4 +270,4 @@ cusolverDnHandle_t HpcConfig::getCuSolverHandle() const {
 #endif
 
 } // namespace card
-} // namespace omni
+} // namespace stormm

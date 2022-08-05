@@ -1,9 +1,9 @@
 // -*-c++-*-
-#ifndef OMNI_EVAL_SYNTHESIS_H
-#define OMNI_EVAL_SYNTHESIS_H
+#ifndef STORMM_EVAL_SYNTHESIS_H
+#define STORMM_EVAL_SYNTHESIS_H
 
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "Math/vector_ops.h"
 #include "Potential/eval_valence_workunit.h"
 #include "Potential/scorecard.h"
@@ -17,7 +17,7 @@
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
   
 using math::readBitFromMask;
@@ -117,7 +117,7 @@ void evalSyNonbondedEnergy(const AtomGraphSynthesis &poly_ag,
                            EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #include "eval_synthesis.tpp"
 

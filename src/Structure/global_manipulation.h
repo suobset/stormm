@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_GLOBAL_MANIPULATION_H
-#define OMNI_GLOBAL_MANIPULATION_H
+#ifndef STORMM_GLOBAL_MANIPULATION_H
+#define STORMM_GLOBAL_MANIPULATION_H
 
 #include <vector>
 #include "DataTypes/common_types.h"
@@ -10,7 +10,7 @@
 #include "Trajectory/phasespace.h"
 #include "virtual_site_handling.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using data_types::isSignedIntegralScalarType;
@@ -120,7 +120,7 @@ void translateCoordinates(PhaseSpace *ps, const AtomGraph &ag, double xmove, dou
 /// \}
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm
 
 #include "global_manipulation.tpp"
 

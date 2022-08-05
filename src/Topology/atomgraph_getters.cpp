@@ -7,7 +7,7 @@
 #include "atomgraph.h"
 #include "topology_util.h"
 
-namespace omni {
+namespace stormm {
 namespace topology {
 
 using card::HybridTargetLevel;
@@ -908,4 +908,4 @@ AtomGraph::getSinglePrecisionConstraintKit(const HybridTargetLevel tier) const {
 }
 
 } // namespace topology
-} // namespace omni
+} // namespace stormm

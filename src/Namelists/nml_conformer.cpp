@@ -3,7 +3,7 @@
 #include "Reporting/error_format.h"
 #include "nml_conformer.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -238,7 +238,7 @@ void ConformerControls::validateStateCounts() {
 NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found,
                                 const ExceptionResponse policy) {
   NamelistEmulator t_nml("conformer", CaseSensitivity::AUTOMATIC, policy,
-                         "Collects instructions for conformer sampling in OMNI.");
+                         "Collects instructions for conformer sampling in STORMM.");
   t_nml.addKeyword(NamelistElement("commonmask", NamelistType::STRING, std::string("")));
   t_nml.addKeyword(NamelistElement("anchor_conf", NamelistType::STRING, std::string("")));
   t_nml.addKeyword(NamelistElement("sample_chirality", NamelistType::STRING,
@@ -290,4 +290,4 @@ NamelistEmulator conformerInput(const TextFile &tf, int *start_line, bool *found
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

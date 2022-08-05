@@ -1,13 +1,13 @@
 // -*-c++-*-
-#ifndef OMNI_SIMPLE_EXCLUSIONMASK_H
-#define OMNI_SIMPLE_EXCLUSIONMASK_H
+#ifndef STORMM_SIMPLE_EXCLUSIONMASK_H
+#define STORMM_SIMPLE_EXCLUSIONMASK_H
 
 #include <vector>
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "Topology/atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::Hybrid;
@@ -140,7 +140,7 @@ public:
   /// \brief Get the abstract for this exclusion mask object
   const StaticExclusionMaskReader data(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   /// \brief Upload the object's information to the GPU device
   void upload();
 
@@ -188,6 +188,6 @@ private:
 };
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #endif

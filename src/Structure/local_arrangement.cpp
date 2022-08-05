@@ -5,7 +5,7 @@
 #include "Trajectory/coordinateframe.h"
 #include "local_arrangement.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 using math::crossProduct;
@@ -77,4 +77,4 @@ double dihedral_angle(const int atom_i, const int atom_j, const int atom_k, cons
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

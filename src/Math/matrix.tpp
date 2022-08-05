@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 //-------------------------------------------------------------------------------------------------
@@ -12,7 +12,7 @@ HpcMatrix<T>::HpcMatrix(const char* tag_in, const HybridFormat format_in) :
     n_cols_pr{0},
     n_elem_pr{0},
     contents{0, tag_in},
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     transfer_buffer{0, "matrix_buffer", HybridFormat::EXPEDITED},
     devc_data{contents.data(HybridTargetLevel::DEVICE)},
 #endif
@@ -31,7 +31,7 @@ HpcMatrix<T>::HpcMatrix(const size_t rows_in , const size_t cols_in, const char*
     n_cols_pr{cols_in},
     n_elem_pr{rows_in * cols_in},
     contents{n_elem_pr, tag_in},
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     transfer_buffer{rows_in, "matrix_buffer", HybridFormat::EXPEDITED},
     devc_data{contents.data(HybridTargetLevel::DEVICE)},
 #endif
@@ -90,7 +90,7 @@ HpcMatrix<T>::HpcMatrix(const size_t rows_in , const size_t cols_in,
     n_cols_pr{cols_in},
     n_elem_pr{rows_in * cols_in},
     contents{n_elem_pr, tag_in},
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     transfer_buffer{rows_in, "matrix_buffer", HybridFormat::EXPEDITED},
     devc_data{contents.data(HybridTargetLevel::DEVICE)},
 #endif
@@ -189,7 +189,7 @@ T HpcMatrix<T>::operator()(const size_t row_idx, const size_t col_idx,
     rtErr("Request for column " + std::to_string(col_idx) + " is out of bounds for a matrix of " +
           std::to_string(n_cols_pr) + " columns.", "HpcMatrix");
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     return contents.readHost((col_idx * n_rows_pr) + row_idx);
@@ -208,7 +208,7 @@ T HpcMatrix<T>::atHost(const size_t row_idx, const size_t col_idx) {
   return host_data[(col_idx * n_rows_pr) + row_idx];
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 T HpcMatrix<T>::atDevice(const size_t row_idx, const size_t col_idx) {
@@ -228,7 +228,7 @@ Hybrid<T> HpcMatrix<T>::colptr(const size_t col_idx, const char* tag_in) {
   return hptr;
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 template <typename T>
 void HpcMatrix<T>::upload() {
@@ -243,4 +243,4 @@ void HpcMatrix<T>::download() {
 #endif
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

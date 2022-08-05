@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_SEARCH_DOX_H
-#define OMNI_SEARCH_DOX_H
+#ifndef STORMM_SEARCH_DOX_H
+#define STORMM_SEARCH_DOX_H
 
 #include <vector>
 #include <string>
 
-namespace omni {
+namespace stormm {
 namespace docs {
 
 using parse::TextFileReader;
@@ -123,7 +123,7 @@ std::vector<CppScope> findCppScopes(const TextFileReader &tfr);
 /// \param filename     File to search  
 ObjectIdentifier searchFileForObject(const std::string &object_name, const std::string &filename);
 
-/// \brief Search for an object in the entire OMNI source code tree.
+/// \brief Search for an object in the entire STORMM source code tree.
 ///
 /// \param object_name    Name of the object (a function or struct) to search for
 /// \param member_name    Name of a struct's member variable or a function's argument
@@ -132,7 +132,7 @@ void searchObject(const std::string &object_name,  const std::string &member_nam
                   ObjectReportType report_format = ObjectReportType::FULL);
 
 } // namespace docs
-} // namespace omni
+} // namespace stormm
 
 
 #endif

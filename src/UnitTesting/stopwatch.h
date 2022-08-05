@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_BENCHMARK_TEST_H
-#define OMNI_BENCHMARK_TEST_H
+#ifndef STORMM_BENCHMARK_TEST_H
+#define STORMM_BENCHMARK_TEST_H
 
 #include <string>
 #include <vector>
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 /// \brief Object for managing calls to the C-standard function gettimeofday(), calculating deltas
@@ -185,6 +185,6 @@ private:
 };
   
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #endif

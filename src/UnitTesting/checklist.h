@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_CHECKLIST_H
-#define OMNI_CHECKLIST_H
+#ifndef STORMM_CHECKLIST_H
+#define STORMM_CHECKLIST_H
 
 #include <string>
 #include <vector>
 #include "unit_test_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace testing {
 
 /// \brief Object for storing a series of test results, with labels
@@ -92,6 +92,6 @@ private:
 };
 
 } // namespace testing
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -4,7 +4,7 @@
 #include "local_arrangement.h"
 #include "structure_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
@@ -218,4 +218,4 @@ void flipChiralCenter(PhaseSpaceSynthesis *psynth, const int system_index, const
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

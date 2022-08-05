@@ -3,7 +3,7 @@
 #include "file_listing.h"
 #include "Reporting/error_format.h"
 
-namespace omni {
+namespace stormm {
 namespace diskutil {
 
 /// \brief Open a file for output writing.  This encapsulates error messages in the event that
@@ -86,7 +86,7 @@ int removeFile(const std::string &filename, const ExceptionResponse policy) {
     case ExceptionResponse::DIE:
       rtErr(filename + " is a directory.", "removeFile");
     case ExceptionResponse::WARN:
-      rtWarn(filename + " is a directory.  Use omniRmdir() to remove it.", "removeFile");
+      rtWarn(filename + " is a directory.  Use stormmRmdir() to remove it.", "removeFile");
       break;
     case ExceptionResponse::SILENT:
       break;
@@ -120,4 +120,4 @@ int removeFile(const std::string &filename, const ExceptionResponse policy) {
 }
 
 } // namespace diskutil
-} // namespace omni
+} // namespace stormm

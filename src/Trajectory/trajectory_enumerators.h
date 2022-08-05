@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_TRAJECTORY_ENUMERATORS_H
-#define OMNI_TRAJECTORY_ENUMERATORS_H
+#ifndef STORMM_TRAJECTORY_ENUMERATORS_H
+#define STORMM_TRAJECTORY_ENUMERATORS_H
 
 #include <string>
 #include "FileManagement/file_util.h"
 #include "Parsing/textfile.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using diskutil::DataFormat;
@@ -89,6 +89,6 @@ CoordinateFileKind detectCoordinateFileKind(const TextFile &tf);
 std::string getCoordinateFileKindName(AncdfVariable key);
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm
 
 #endif

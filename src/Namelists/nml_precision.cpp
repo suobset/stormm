@@ -4,7 +4,7 @@
 #include "namelist_element.h"
 #include "nml_precision.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -250,4 +250,4 @@ NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

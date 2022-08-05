@@ -1,6 +1,6 @@
 #include "thermostat.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 //-------------------------------------------------------------------------------------------------
@@ -34,4 +34,4 @@ std::string getThermostatName(const ThermostatKind kind) {
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

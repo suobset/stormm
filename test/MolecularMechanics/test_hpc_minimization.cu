@@ -31,17 +31,17 @@
 #include "../../src/UnitTesting/test_environment.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using namespace omni::card;
-using namespace omni::constants;
-using namespace omni::diskutil;
-using namespace omni::energy;
-using namespace omni::errors;
-using namespace omni::math;
-using namespace omni::mm;
-using namespace omni::synthesis;
-using namespace omni::testing;
-using namespace omni::topology;
-using namespace omni::trajectory;
+using namespace stormm::card;
+using namespace stormm::constants;
+using namespace stormm::diskutil;
+using namespace stormm::energy;
+using namespace stormm::errors;
+using namespace stormm::math;
+using namespace stormm::mm;
+using namespace stormm::synthesis;
+using namespace stormm::testing;
+using namespace stormm::topology;
+using namespace stormm::trajectory;
 
 //-------------------------------------------------------------------------------------------------
 // Check that all forces on equivalent systems are equal, to within a reasonable tolerance.  It is
@@ -161,7 +161,7 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 //   mol_id_vec:          Indication of how to replicate various structures described in ps_vec
 //   gpu:                 Details of the GPU available
 //   do_tests:            Indicate whether tests are possible to run
-//   oe:                  Contains the name of the OMNI source path from shell variables as well
+//   oe:                  Contains the name of the STORMM source path from shell variables as well
 //                        as information on whether to write snapshot files or do the comparisons
 //   psnap:               Instructions as to whether to begin printing a new snapshot file or
 //                        append to an existing one, if snapshots are to be written
@@ -510,8 +510,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   if (check_mm) {
     const bool snap_exists = (getDrivePathType(snap_name) == DrivePathType::FILE);
     if (snap_exists == false) {
-      rtWarn("The snapshot file " + snap_name + " could not be found.  Check the ${OMNI_SOURCE} "
-             "environment variable, currently set to " + oe.getOmniSourcePath() + ", for "
+      rtWarn("The snapshot file " + snap_name + " could not be found.  Check the ${STORMM_SOURCE} "
+             "environment variable, currently set to " + oe.getStormmSourcePath() + ", for "
              "validity.  Subsequent tests will be skipped.", "test_hpc_minimization");
     }
     const TestPriority do_snps = (snap_exists &&
@@ -536,7 +536,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 //   tile_list:  Indices of structures to add to the synthesis
 //   n_tiles:    The number of times to repeat the tile list when making the synthesis
 //   test_name:  Name given to this group of tests
-//   oe:         Contains the name of the OMNI source path from shell variables
+//   oe:         Contains the name of the STORMM source path from shell variables
 //   gpu:        Details of the GPU in use
 //   test_name:  Name given to this test 
 //   psnap:      Instructions as to whether to begin printing a new snapshot file or append to an
@@ -578,8 +578,8 @@ void testCompilation(const std::vector<std::string> &top_names,
     mol_ag.resize(mol_count);
     mol_ag.resize(mol_count);
     rtWarn("Topology and coordinate files for a number of small molecules and dipeptides were not "
-           "found.  Check the ${OMNI_SOURCE} environment variable, currently set to " +
-           oe.getOmniSourcePath() + ", for validity.  Subsequent tests will be skipped.",
+           "found.  Check the ${STORMM_SOURCE} environment variable, currently set to " +
+           oe.getStormmSourcePath() + ", for validity.  Subsequent tests will be skipped.",
            "test_hpc_minimization");
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -624,8 +624,8 @@ int main(const int argc, const char* argv[]) {
 
   // Read small molecules and compile them into a synthesis
   const char osc = osSeparator();
-  const std::string base_top_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name  = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_top_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name  = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
   const std::string alad_top_name = base_top_name + osc + "ala_dipeptide.top";
   const std::string alad_crd_name = base_crd_name + osc + "ala_dipeptide.inpcrd";
   const std::string brbz_top_name = base_top_name + osc + "bromobenzene_iso.top";
@@ -644,7 +644,7 @@ int main(const int argc, const char* argv[]) {
                                              lig2_crd_name };
   const std::vector<std::string> pro_top = { trpi_top_name, dhfr_top_name };
   const std::vector<std::string> pro_crd = { trpi_crd_name, dhfr_crd_name };
-  const std::string snap_name = oe.getOmniSourcePath() + osc + "test" + osc +
+  const std::string snap_name = oe.getStormmSourcePath() + osc + "test" + osc +
                                 "MolecularMechanics" + osc + "min_energy.m";
   
   // Run small molecule tests

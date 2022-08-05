@@ -2,7 +2,7 @@
 #include "Math/rounding.h"
 #include "cacheresource.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using card::HybridKind;
@@ -229,4 +229,4 @@ void CacheResource::repairPointers() {
 }
   
 } // namespace energy
-} // namespace omni
+} // namespace stormm

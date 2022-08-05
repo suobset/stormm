@@ -10,10 +10,10 @@
 namespace conf_app {
 namespace setup {
 
-using omni::namelist::UserSettings;
-using omni::synthesis::PhaseSpaceSynthesis;
-using omni::synthesis::SystemCache;
-using omni::testing::StopWatch;
+using stormm::namelist::UserSettings;
+using stormm::synthesis::PhaseSpaceSynthesis;
+using stormm::synthesis::SystemCache;
+using stormm::testing::StopWatch;
 
 /// \brief Enumerate coarse-grained conformer sampling approaches: full if the combinatorial
 ///        permutations are few enough, randomized without replacement if the combinatorial

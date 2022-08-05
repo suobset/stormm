@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_REDUCTION_ENUMERATORS_H
-#define OMNI_REDUCTION_ENUMERATORS_H
+#ifndef STORMM_REDUCTION_ENUMERATORS_H
+#define STORMM_REDUCTION_ENUMERATORS_H
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 /// \brief Enumerate stages of a reduction operation, which can be taken piecemeal or all at once.
@@ -54,6 +54,6 @@ enum class RdwuAbstractMap {
 };
   
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #endif

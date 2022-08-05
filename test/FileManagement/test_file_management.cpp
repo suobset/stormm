@@ -7,9 +7,9 @@
 #include "../../src/FileManagement/file_util.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::errors::rtWarn;
-using namespace omni::diskutil;
-using namespace omni::testing;
+using stormm::errors::rtWarn;
+using namespace stormm::diskutil;
+using namespace stormm::testing;
 
 int main(const int argc, const char* argv[]) {
 
@@ -34,7 +34,7 @@ int main(const int argc, const char* argv[]) {
 
   // Test the directory and regular expression search features
   section(1);
-  const std::string base_dir = oe.getOmniSourcePath() + osc + "test" + osc + "FileManagement";
+  const std::string base_dir = oe.getStormmSourcePath() + osc + "test" + osc + "FileManagement";
   const std::string xm_dir = base_dir + osc + "example";
   TestPriority xm_priority = (getDrivePathType(xm_dir) == DrivePathType::DIRECTORY) ?
                              TestPriority::CRITICAL : TestPriority::ABORT;
@@ -60,7 +60,7 @@ int main(const int argc, const char* argv[]) {
                                                                       TestPriority::ABORT;
   if (tmpdir_priority == TestPriority::ABORT) {
     rtWarn("An unwriteable temporary directory implies that some of the subsequent tests must be "
-           "skipped.  Check the $OMNI_TMPDIR environment variable and set it to a directory where "
+           "skipped.  Check the $STORMM_TMPDIR environment variable and set it to a directory where "
            "you have write permissions.", "test_file_management");
   }
   std::string new_folder = oe.getTemporaryDirectoryPath() + osc + "trial";
@@ -74,9 +74,9 @@ int main(const int argc, const char* argv[]) {
     // This effort, appending the lists of created directories to a list for removal later,
     // could be accomplished by dumping them on the test environment stack for automatic removal
     // at the end of the program, but I want to test the directory removal explicitly.
-    std::vector<std::string> additions = omniMkdir(new_folder);
+    std::vector<std::string> additions = stormmMkdir(new_folder);
     my_folders.insert(my_folders.end(), additions.begin(), additions.end());
-    additions = omniMkdir(nested_folder);
+    additions = stormmMkdir(nested_folder);
     my_folders.insert(my_folders.end(), additions.begin(), additions.end());
   }
   check(getDrivePathType(new_folder) == DrivePathType::DIRECTORY, "Failed to create a folder "
@@ -157,22 +157,22 @@ int main(const int argc, const char* argv[]) {
   // Test directory cleanup
   section(5);
   if (nested_dir_works == CheckResult::SUCCESS) {
-    omniBatchRmdir(my_folders);
+    stormmBatchRmdir(my_folders);
   }
   check(getDrivePathType(nested_folder) == DrivePathType::REGEXP, "The nested directory " +
         nested_folder + " was not removed.", tmpdir_priority);
   check(getDrivePathType(new_folder) == DrivePathType::REGEXP, "The directory " +
         new_folder + " was not removed.", tmpdir_priority);
-  CHECK_THROWS_SOFT(omniRmdir(nested_folder, ExceptionResponse::DIE), "Attempted to remove a "
+  CHECK_THROWS_SOFT(stormmRmdir(nested_folder, ExceptionResponse::DIE), "Attempted to remove a "
                     "directory that should no longer exist.", tmpdir_priority);
 
   // Test one more thing: create a very deep directory, then scramble the directories to remove
-  // along its path to ensure that omniBatchRmdir can still take care of them.
+  // along its path to ensure that stormmBatchRmdir can still take care of them.
   section(2);
   const std::string super_nested_folder = nested_folder + osc + "a" + osc + "z" + osc + "tbn";
   if (oe.getTemporaryDirectoryAccess()) {
-    omniMkdir(new_folder);
-    my_folders = omniMkdir(super_nested_folder);
+    stormmMkdir(new_folder);
+    my_folders = stormmMkdir(super_nested_folder);
   }
   check(my_folders.size(), RelationalOperator::EQUAL, 5, "The number of new directories needed "
 	"to create " + super_nested_folder + " within " + new_folder + " is incorrect.",
@@ -182,8 +182,8 @@ int main(const int argc, const char* argv[]) {
     std::swap(my_folders[0], my_folders[4]);
     std::swap(my_folders[1], my_folders[3]);
     std::swap(my_folders[2], my_folders[0]);
-    omniBatchRmdir(my_folders);
-    omniRmdir(new_folder);
+    stormmBatchRmdir(my_folders);
+    stormmRmdir(new_folder);
   }
   check(getDrivePathType(new_folder) == DrivePathType::REGEXP, "The directory " +
         new_folder + " was not removed after creating a deep nested folder within it and "

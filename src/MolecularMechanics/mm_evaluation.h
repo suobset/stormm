@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_MM_EVALUATION_H
-#define OMNI_MM_EVALUATION_H
+#ifndef STORMM_MM_EVALUATION_H
+#define STORMM_MM_EVALUATION_H
 
 #include "Potential/energy_enumerators.h"
 #include "Potential/nonbonded_potential.h"
@@ -14,7 +14,7 @@
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using energy::EvaluateForce;
@@ -193,7 +193,7 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 /// \}
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm
 
 #include "mm_evaluation.tpp"
 

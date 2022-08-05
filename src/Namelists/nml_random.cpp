@@ -4,7 +4,7 @@
 #include "namelist_element.h"
 #include "nml_random.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using data_types::uint;
@@ -210,4 +210,4 @@ NamelistEmulator randomInput(const TextFile &tf, int *start_line, bool *found,
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

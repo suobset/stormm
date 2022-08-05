@@ -1,7 +1,7 @@
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/common_types.h"
-#include "../../src/DataTypes/omni_vector_types.h"
+#include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/valence_potential.h"
@@ -13,23 +13,23 @@
 #include "../../src/Trajectory/coordinate_series.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::double2;
-using omni::llint;
-using omni::constants::ExceptionResponse;
-using omni::data_types::getOmniScalarTypeName;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::diskutil::osSeparator;
-using omni::errors::rtWarn;
-using omni::parse::NumberFormat;
-using omni::parse::polyNumericVector;
-using omni::topology::AtomGraph;
-using omni::trajectory::CoordinateFileKind;
-using omni::trajectory::CoordinateSeries;
-using omni::trajectory::PhaseSpace;
-using omni::trajectory::TrajectoryKind;
-using namespace omni::energy;
-using namespace omni::testing;
+using stormm::double2;
+using stormm::llint;
+using stormm::constants::ExceptionResponse;
+using stormm::data_types::getStormmScalarTypeName;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::diskutil::osSeparator;
+using stormm::errors::rtWarn;
+using stormm::parse::NumberFormat;
+using stormm::parse::polyNumericVector;
+using stormm::topology::AtomGraph;
+using stormm::trajectory::CoordinateFileKind;
+using stormm::trajectory::CoordinateSeries;
+using stormm::trajectory::PhaseSpace;
+using stormm::trajectory::TrajectoryKind;
+using namespace stormm::energy;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Evaluate forces for a particular combination of coordinate, force, and calculation precision.
@@ -75,8 +75,8 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
   const RelationalOperator rel_eq = RelationalOperator::EQUAL;
   check(bond_frc, rel_eq, Approx(bond_ref).margin(tol), "Forces due to harmonic bond "
         "stretching interactions in the " + sys_title + " system do not meet expectations when "
-        "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
-        getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+        "recomputed in " + getStormmScalarTypeName<Tcalc>() + ", with accumulation in " +
+        getStormmScalarTypeName<Tforce>() + ", based on " + getStormmScalarTypeName<Tcoord>() +
         " coordinates.", do_tests);
   for (int i = 0; i < faw.natom; i++) {
     faw.xcrd[i] = zero;
@@ -91,8 +91,8 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
   const std::vector<double> angl_frc = angl_frame.getInterlacedCoordinates();
   check(angl_frc, rel_eq, Approx(angl_ref).margin(0.5 * tol), "Forces due to harmonic angle "
         "bending interactions in the " + sys_title + " system do not meet expectations when "
-        "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
-        getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+        "recomputed in " + getStormmScalarTypeName<Tcalc>() + ", with accumulation in " +
+        getStormmScalarTypeName<Tforce>() + ", based on " + getStormmScalarTypeName<Tcoord>() +
         " coordinates.", do_tests);
   for (int i = 0; i < faw.natom; i++) {
     faw.xcrd[i] = zero;
@@ -107,8 +107,8 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
   const std::vector<double> dihe_frc = dihe_frame.getInterlacedCoordinates();
   check(dihe_frc, rel_eq, Approx(dihe_ref).margin(tol), "Forces due to cosine-based "
         "dihedral interactions in the " + sys_title + " system do not meet expectations when "
-        "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
-        getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+        "recomputed in " + getStormmScalarTypeName<Tcalc>() + ", with accumulation in " +
+        getStormmScalarTypeName<Tforce>() + ", based on " + getStormmScalarTypeName<Tcoord>() +
         " coordinates.", do_tests);
   if (vk.nubrd > 0) {
     for (int i = 0; i < faw.natom; i++) {
@@ -124,8 +124,8 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
     const std::vector<double> ubrd_frc = ubrd_frame.getInterlacedCoordinates();
     check(ubrd_frc, rel_eq, Approx(ubrd_ref).margin(0.5 * tol), "Forces due to Urey-Bradley angle "
           "stretching interactions in the " + sys_title + " system do not meet expectations when "
-          "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
-          getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+          "recomputed in " + getStormmScalarTypeName<Tcalc>() + ", with accumulation in " +
+          getStormmScalarTypeName<Tforce>() + ", based on " + getStormmScalarTypeName<Tcoord>() +
           " coordinates.", do_tests);
   }
   if (vk.ncimp > 0) {
@@ -142,8 +142,8 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
     const std::vector<double> cimp_frc = cimp_frame.getInterlacedCoordinates();
     check(cimp_frc, rel_eq, Approx(cimp_ref).margin(tol), "Forces due to CHARMM harmonic improper "
           "dihedral interactions in the " + sys_title + " system do not meet expectations when "
-          "recomputed in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
-          getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+          "recomputed in " + getStormmScalarTypeName<Tcalc>() + ", with accumulation in " +
+          getStormmScalarTypeName<Tforce>() + ", based on " + getStormmScalarTypeName<Tcoord>() +
           " coordinates.", do_tests);
   }
   if (vk.ncmap > 0) {
@@ -160,8 +160,8 @@ void evalAlternateForces(const ValenceKit<Tcalc> vk, const CoordinateSeriesReade
     const std::vector<double> cmap_frc = cmap_frame.getInterlacedCoordinates();
     check(cmap_frc, rel_eq, Approx(cmap_ref).margin(tol), "Forces due to CMAP 2D spline surface "
           "interactions in the " + sys_title + " system do not meet expectations when recomputed "
-          "in " + getOmniScalarTypeName<Tcalc>() + ", with accumulation in " +
-          getOmniScalarTypeName<Tforce>() + ", based on " + getOmniScalarTypeName<Tcoord>() +
+          "in " + getStormmScalarTypeName<Tcalc>() + ", with accumulation in " +
+          getStormmScalarTypeName<Tforce>() + ", based on " + getStormmScalarTypeName<Tcoord>() +
           " coordinates.", do_tests);
   }
 }
@@ -242,7 +242,7 @@ void evalAlternateCoords(const AtomGraph &ag, const CoordinateFrame &cf,
   CoordinateSeriesWriter<llint> fv_iw  = fv_i.data();
   section(4);
   evalAlternateForces(vkd, csdr, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
-                      cimp_frc, cmap_frc, omni::constants::tiny, do_tests);
+                      cimp_frc, cmap_frc, stormm::constants::tiny, do_tests);
   evalAlternateForces(vkd, csfr, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
                       cimp_frc, cmap_frc, frcf_tol, do_tests);
   evalAlternateForces(vkd, csir, &fv_d, sys_title, bond_frc, angl_frc, dihe_frc, ubrd_frc,
@@ -301,9 +301,9 @@ int main(const int argc, const char* argv[]) {
 
   // Locate topologies and coordinate files
   const char osc = osSeparator();
-  const std::string base_top_name = oe.getOmniSourcePath() + osc + "test" + osc + "Topology";
-  const std::string base_crd_name = oe.getOmniSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string base_ptl_name = oe.getOmniSourcePath() + osc + "test" + osc + "Potential";
+  const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
+  const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
+  const std::string base_ptl_name = oe.getStormmSourcePath() + osc + "test" + osc + "Potential";
   const std::string trpcage_top_name = base_top_name + osc + "trpcage.top";
   const std::string trpcage_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
@@ -320,8 +320,8 @@ int main(const int argc, const char* argv[]) {
   if (systems_exist == false) {
     rtWarn("Files for the Trp-cage miniprotein, the DHFR globular protein (with CHARMM potential "
            "details), and alanine dipeptide (with ff19SB) were not found.  These files should be "
-           "found in the ${OMNI_SOURCE}/test/Topology and ${OMNI_SOURCE}/test/Trajectory "
-           "directories.  Check the $OMNI_SOURCE environment variable.  A number of tests will be "
+           "found in the ${STORMM_SOURCE}/test/Topology and ${STORMM_SOURCE}/test/Trajectory "
+           "directories.  Check the $STORMM_SOURCE environment variable.  A number of tests will be "
            "skipped.", "test_valence_evaluation");
   }
   AtomGraph trpcage_ag, dhfr_ag, alad_ag;
@@ -492,8 +492,8 @@ int main(const int argc, const char* argv[]) {
   if (snps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("Snapshot files " + alad_snapshot + " were not found.  These files contain reference "
            "forces for checking the valence energy derivative calculations.  Check that the "
-           "${OMNI_SOURCE} environment variable is set properly so that these snapshot files may "
-           "be found in ${OMNI_SOURCE}/test/Potential/.  Subsequent tests will be skipped until "
+           "${STORMM_SOURCE} environment variable is set properly so that these snapshot files may "
+           "be found in ${STORMM_SOURCE}/test/Potential/.  Subsequent tests will be skipped until "
            "these reference files are available.", "test_valence_evaluation");
   }
   section(2);

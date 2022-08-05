@@ -1,6 +1,6 @@
 #include <cmath>
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
 #  include <cuda_runtime.h>
 #  endif
 #endif
@@ -12,11 +12,11 @@
 #include "Math/vector_ops.h"
 #include "Trajectory/write_frame.h"
 #include "phasespace_synthesis.h"
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 #  include "hpc_phasespace_synthesis.h"
 #endif
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
 using card::HybridKind;
@@ -721,7 +721,7 @@ int PhaseSpaceSynthesis::getForceAccumulationBits() const {
   return force_scale_bits;
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
 
@@ -763,7 +763,7 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData() {
   int*    devc_yprv_ovrf;
   int*    devc_zprv_ovrf;
   bool problem = false;
-#  ifdef OMNI_USE_CUDA
+#  ifdef STORMM_USE_CUDA
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_starts,
                                                  (void *)atom_starts.data(), 0) != cudaSuccess);
   problem = (problem || cudaHostGetDevicePointer((void **)&devc_atom_counts,
@@ -1034,7 +1034,7 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
           "to accept a system of " + std::to_string(atom_counts.readHost(index)) + " atoms from "
           "this synthesis.", "PhaseSpaceSynthesis", "extractPhaseSpace");
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   std::vector<llint> xcrd_buff, ycrd_buff, zcrd_buff, xvel_buff, yvel_buff, zvel_buff;
   std::vector<llint> xfrc_buff, yfrc_buff, zfrc_buff, box_buff, inv_buff, dim_buff;
 #endif
@@ -1124,7 +1124,7 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
       }
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
       const std::vector<llint> xcrd_buff = x_coordinates.readDevice(atom_offset, psw.natom);
@@ -1331,7 +1331,7 @@ void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
       break;
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
@@ -1492,7 +1492,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
       break;
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     switch (trajkind) {
     case TrajectoryKind::POSITIONS:
@@ -1553,7 +1553,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
         break;
       }
       break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     case HybridTargetLevel::DEVICE:
       switch (trajkind) {
       case TrajectoryKind::POSITIONS:
@@ -1586,7 +1586,7 @@ CoordinateFrame PhaseSpaceSynthesis::exportCoordinates(const int index,
 }
   
 //-------------------------------------------------------------------------------------------------
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::initializeForces(const GpuDetails &gpu, const HybridTargetLevel tier,
                                            const int index)
 #else
@@ -1597,7 +1597,7 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
     rtErr("Index " + std::to_string(index) + " is invalid for a collection of " +
           std::to_string(system_count) + " systems.", "PhaseSpaceSynthesis", "initializeForces");
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
@@ -1642,7 +1642,7 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
           }
         }
       }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     }
     break;
   case HybridTargetLevel::DEVICE:
@@ -1656,14 +1656,14 @@ void PhaseSpaceSynthesis::initializeForces(const int index)
 }
 
 //-------------------------------------------------------------------------------------------------
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::primeConjugateGradientCalculation(const GpuDetails &gpu,
                                                             const HybridTargetLevel tier)
 #else
 void PhaseSpaceSynthesis::primeConjugateGradientCalculation()
 #endif
 {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
@@ -1706,7 +1706,7 @@ void PhaseSpaceSynthesis::primeConjugateGradientCalculation()
           }
         }
       }      
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
     }
     break;
   case HybridTargetLevel::DEVICE:
@@ -1720,7 +1720,7 @@ void PhaseSpaceSynthesis::primeConjugateGradientCalculation()
 }
 
 //-------------------------------------------------------------------------------------------------
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices,
                                           const std::string &file_name, const double current_time,
                                           const CoordinateFileKind output_kind,
@@ -1737,7 +1737,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
   if (nframe == 0LLU) {
     return;
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   int low_frame = nframe;
   int high_frame = 0;
   for (size_t i = 0; i < nframe; i++) {
@@ -1792,7 +1792,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
       // Initialize the trajectory if this is the first time printing it
       if (fi_exists == false || actual_expectation == PrintSituation::OVERWRITE ||
           actual_expectation == PrintSituation::OPEN_NEW) {
-        sprintf(buffer, "Generated by OMNI\n");
+        sprintf(buffer, "Generated by STORMM\n");
         foutp.write(buffer, strlen(buffer));
       }
     }
@@ -1918,7 +1918,7 @@ void PhaseSpaceSynthesis::printTrajectory(const std::vector<int> &system_indices
         foutp = openOutputFile(aug_file_name, actual_expectation, "Open an output trajectory for "
                                "writing frame " + std::to_string(i + 1) + " of a "
                                "PhaseSpaceSynthesis object's contents.", style);
-        sprintf(buffer, "Generated by OMNI\n");
+        sprintf(buffer, "Generated by STORMM\n");
         sprintf(&buffer[strlen(buffer)], "%8d %15.7e\n", frame_atom_count, current_time);
         foutp.write(buffer, strlen(buffer));
         writeFrame(&foutp, file_name, output_kind, tmp_xcrd, tmp_ycrd, tmp_zcrd, tmp_xvel,
@@ -1992,4 +1992,4 @@ void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

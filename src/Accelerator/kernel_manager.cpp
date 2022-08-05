@@ -3,7 +3,7 @@
 #include "Constants/hpc_bounds.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 #include "Math/hpc_reduction.h"
 #include "Math/reduction_workunit.h"
 #include "Potential/hpc_nonbonded_potential.h"
@@ -11,11 +11,11 @@
 #endif
 #include "kernel_manager.h"
 
-namespace omni {
+namespace stormm {
 namespace card {
 
 using constants::ExceptionResponse;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 using math::queryReductionKernelRequirements;
@@ -60,8 +60,8 @@ KernelFormat::KernelFormat(const int lb_max_threads_per_block, const int lb_min_
                  shared_usage_in, 1, gpu, kernel_name_in)
 {}
 
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
 //-------------------------------------------------------------------------------------------------
 KernelFormat::KernelFormat(const cudaFuncAttributes &attr, const int lb_min_blocks_per_smp,
                            const int block_subdivision, const GpuDetails &gpu,
@@ -105,7 +105,7 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     reduction_block_multiplier{reductionBlockMultiplier(gpu_in, poly_ag)},
     k_dictionary{}
 {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   // Valence kernel entries
   const int valence_d_div = optValenceKernelSubdivision(poly_ag.getSystemAtomCounts(),
                                                         PrecisionModel::DOUBLE,
@@ -228,8 +228,8 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
     rtErr("Valence kernel identifier " + k_key + " already exists in the kernel map.",
           "KernelManager", "catalogValenceKernel");
   }
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
   const cudaFuncAttributes attr = queryValenceKernelRequirements(prec, eval_force, eval_nrg,
                                                                  acc_meth, purpose);
   k_dictionary[k_key] = KernelFormat(attr, valence_block_multiplier, subdivision, gpu,
@@ -252,8 +252,8 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
     rtErr("Non-bonded kernel identifier " + k_key + " already exists in the kernel map.",
           "KernelManager", "catalogNonbondedKernel");
   }
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
   const cudaFuncAttributes attr = queryNonbondedKernelRequirements(prec, kind, eval_force,
                                                                    eval_nrg, acc_meth);
   k_dictionary[k_key] = KernelFormat(attr, nonbond_block_multiplier, 1, gpu, kernel_name);
@@ -273,8 +273,8 @@ void KernelManager::catalogReductionKernel(const PrecisionModel prec, const Redu
     rtErr("Reduction kernel identifier " + k_key + " already exists in the kernel map.",
           "KernelManager", "catalogReductionKernel");
   }
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
   const cudaFuncAttributes attr = queryReductionKernelRequirements(prec, purpose, process);
   k_dictionary[k_key] = KernelFormat(attr, reduction_block_multiplier, subdivision, gpu,
                                      kernel_name);
@@ -350,7 +350,7 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
 
 //-------------------------------------------------------------------------------------------------
 int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   return 2;
 #else
   return 1;
@@ -359,8 +359,8 @@ int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly
 
 //-------------------------------------------------------------------------------------------------
 int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell) {
-#ifdef OMNI_USE_HPC
-#  ifdef OMNI_USE_CUDA
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
   switch (unit_cell) {
   case UnitCellType::NONE:
     return (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
@@ -386,7 +386,7 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell
 
 //-------------------------------------------------------------------------------------------------
 int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   return 4;
 #else
   return 1;
@@ -540,4 +540,4 @@ std::string reductionKernelKey(const PrecisionModel prec, const ReductionGoal pu
 }
 
 } // namespace card
-} // namespace omni
+} // namespace stormm

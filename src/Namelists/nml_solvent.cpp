@@ -4,7 +4,7 @@
 #include "namelist_element.h"
 #include "nml_solvent.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::CaseSensitivity;
@@ -249,4 +249,4 @@ NamelistEmulator solventInput(const TextFile &tf, int *start_line, bool *found,
 }
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm

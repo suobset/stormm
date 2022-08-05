@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_MIXED_TYPES_H
-#define OMNI_MIXED_TYPES_H
+#ifndef STORMM_MIXED_TYPES_H
+#define STORMM_MIXED_TYPES_H
 
-namespace omni {
+namespace stormm {
 namespace data_types {
 
 /// \brief A combination of integer and double data.  Like other mixed tuples in this library,
@@ -19,9 +19,9 @@ template <typename T> struct ValueWithCounter {
 };
   
 } // namespace data_types
-} // namespace omni
+} // namespace stormm
 
-namespace omni {
+namespace stormm {
 using data_types::CombineIDp;
 using data_types::ValueWithCounter;
 }

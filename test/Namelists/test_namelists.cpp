@@ -17,23 +17,23 @@
 #include "../../src/Trajectory/coordinateframe.h"
 #include "../../src/UnitTesting/unit_test.h"
 
-using omni::constants::ExceptionResponse;
-using omni::constants::tiny;
-using omni::diskutil::osSeparator;
-using omni::diskutil::DrivePathType;
-using omni::diskutil::getDrivePathType;
-using omni::errors::rtWarn;
-using omni::modeling::ForceFieldElement;
-using omni::modeling::ParameterKind;
-using omni::parse::separateText;
-using omni::parse::strcmpCased;
-using omni::parse::TextOrigin;
-using omni::topology::AtomGraph;
-using omni::topology::AtomicRadiusSet;
-using omni::topology::ImplicitSolventModel;
-using omni::trajectory::CoordinateFrame;
-using namespace omni::namelist;
-using namespace omni::testing;
+using stormm::constants::ExceptionResponse;
+using stormm::constants::tiny;
+using stormm::diskutil::osSeparator;
+using stormm::diskutil::DrivePathType;
+using stormm::diskutil::getDrivePathType;
+using stormm::errors::rtWarn;
+using stormm::modeling::ForceFieldElement;
+using stormm::modeling::ParameterKind;
+using stormm::parse::separateText;
+using stormm::parse::strcmpCased;
+using stormm::parse::TextOrigin;
+using stormm::topology::AtomGraph;
+using stormm::topology::AtomicRadiusSet;
+using stormm::topology::ImplicitSolventModel;
+using stormm::trajectory::CoordinateFrame;
+using namespace stormm::namelist;
+using namespace stormm::testing;
 
 //-------------------------------------------------------------------------------------------------
 // Test what should be bad namelist input and make sure that it throws.
@@ -107,10 +107,10 @@ int main(const int argc, const char* argv[]) {
   section("Test the &ffmorph namelist");
 
   // The files namelist is perhaps the most complex due to its interchangeable defaults, and
-  // will be critical to the operation of any OMNI app
+  // will be critical to the operation of any STORMM app
   section(1);
   const char osc = osSeparator();
-  const std::string input_base = oe.getOmniSourcePath() + osc + "test" + osc + "Namelists";
+  const std::string input_base = oe.getStormmSourcePath() + osc + "test" + osc + "Namelists";
   const std::string main_file = input_base + osc + "testrun.in";
   const bool input_exists = (getDrivePathType(main_file) == DrivePathType::FILE);
   const TestPriority do_tests = (input_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
@@ -239,7 +239,7 @@ int main(const int argc, const char* argv[]) {
         Approx(2.07).margin(tiny), "The amplitude of a dihedral parameter is not properly marked "
         "for modification.", do_tests);
   check(ffmcon.getModelEdit(ParameterKind::DIHEDRAL, 0).getPhaseAngle(), RelationalOperator::EQUAL,
-        Approx(0.24 * omni::symbols::pi / 180.0).margin(tiny), "The amplitude of a dihedral "
+        Approx(0.24 * stormm::symbols::pi / 180.0).margin(tiny), "The amplitude of a dihedral "
         "parameter is not properly marked for modification.", do_tests);
   testBadNamelist("ffmorph", "bond { -ti CX -tj CT }", "An incomplete bond keyword entry was "
                   "accepted");

@@ -5,7 +5,7 @@
 #include "Reporting/error_format.h"
 #include "input.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using parse::strncmpCased;
@@ -329,4 +329,4 @@ int readNamelist(const TextFile &tf, NamelistEmulator *nml, const int start_line
 }
 
 } // namspace namelist
-} // namespace omni
+} // namespace stormm

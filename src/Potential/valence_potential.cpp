@@ -3,7 +3,7 @@
 #include "Topology/atomgraph.h"
 #include "valence_potential.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 //-------------------------------------------------------------------------------------------------
@@ -459,4 +459,4 @@ double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameRea
 }
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm

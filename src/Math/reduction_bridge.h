@@ -1,11 +1,11 @@
 // -*-c++-*-
-#ifndef OMNI_REDUCTION_BRIDGE_H
-#define OMNI_REDUCTION_BRIDGE_H
+#ifndef STORMM_REDUCTION_BRIDGE_H
+#define STORMM_REDUCTION_BRIDGE_H
 
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::Hybrid;
@@ -61,6 +61,6 @@ private:
 };
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #endif

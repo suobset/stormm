@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_REDUCTION_H
-#define OMNI_REDUCTION_H
+#ifndef STORMM_REDUCTION_H
+#define STORMM_REDUCTION_H
 
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
@@ -11,7 +11,7 @@
 #include "reduction_enumerators.h"
 #include "reduction_workunit.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using numerics::max_llint_accumulation;
@@ -111,7 +111,7 @@ void evalReduction(GenericRdSubstrate<T> *rsbs, const ReductionKit &redk,
                    const ReductionGoal purpose = ReductionGoal::NORMALIZE);
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
 
 #include "reduction.tpp"
 

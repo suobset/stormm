@@ -1,12 +1,12 @@
 // -*-c++-*-
-#ifndef OMNI_RESTRAINT_APPARATUS_H
-#define OMNI_RESTRAINT_APPARATUS_H
+#ifndef STORMM_RESTRAINT_APPARATUS_H
+#define STORMM_RESTRAINT_APPARATUS_H
 
 #include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "bounded_restraint.h"
 
-namespace omni {
+namespace stormm {
 namespace restraints {
 
 using card::Hybrid;
@@ -408,7 +408,7 @@ std::vector<RestraintApparatus>
 createBlankRestraintApparatus(const std::vector<AtomGraph*> ags);
   
 } // namespace restraints
-} // namespace omni
+} // namespace stormm
 
 #include "restraint_apparatus.tpp"
 

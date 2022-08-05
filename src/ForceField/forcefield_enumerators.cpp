@@ -1,7 +1,7 @@
 #include <string>
 #include "forcefield_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace modeling {
 
 //-------------------------------------------------------------------------------------------------
@@ -36,4 +36,4 @@ std::string getParameterKindName(const ParameterKind kind) {
 }
   
 } // namespace modeling
-} // namespace omni
+} // namespace stormm

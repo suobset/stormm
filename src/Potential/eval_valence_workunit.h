@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_EVAL_VALENCE_WORKUNIT_H
-#define OMNI_EVAL_VALENCE_WORKUNIT_H
+#ifndef STORMM_EVAL_VALENCE_WORKUNIT_H
+#define STORMM_EVAL_VALENCE_WORKUNIT_H
 
 #include "Restraints/restraint_apparatus.h"
 #include "Synthesis/valence_workunit.h"
@@ -11,7 +11,7 @@
 #include "energy_enumerators.h"
 #include "scorecard.h"
 
-namespace omni {
+namespace stormm {
 namespace energy {
 
 using restraints::RestraintApparatus;
@@ -147,6 +147,6 @@ void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const Restr
 /// \}
 
 } // namespace energy
-} // namespace omni
+} // namespace stormm
 
 #endif

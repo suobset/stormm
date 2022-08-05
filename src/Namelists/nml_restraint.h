@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NML_RST_H
-#define OMNI_NML_RST_H
+#ifndef STORMM_NML_RST_H
+#define STORMM_NML_RST_H
 
 #include "input.h"
 #include "namelist_emulator.h"
@@ -10,7 +10,7 @@
 #include "Restraints/bounded_restraint.h"
 #include "Topology/atomgraph.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using chemistry::ChemicalFeatures;
@@ -125,6 +125,6 @@ NamelistEmulator restraintInput(const TextFile &tf, int *start_line,
                                 ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

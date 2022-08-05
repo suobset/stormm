@@ -1,7 +1,7 @@
 #include "Constants/hpc_bounds.h"
 #include "reduction_bridge.h"
 
-namespace omni {
+namespace stormm {
 namespace math {
 
 using card::HybridKind;
@@ -79,4 +79,4 @@ double* ReductionBridge::getPointer(const CartesianDimension cdim, const HybridT
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm

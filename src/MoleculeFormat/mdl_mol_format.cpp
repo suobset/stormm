@@ -1,6 +1,6 @@
 #include "mdl_mol_format.h"
 
-namespace omni {
+namespace stormm {
 namespace structure {
 
 //-------------------------------------------------------------------------------------------------
@@ -62,4 +62,4 @@ std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 }
 
 } // namespace structure
-} // namespace omni
+} // namespace stormm

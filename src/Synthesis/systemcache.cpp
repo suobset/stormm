@@ -7,21 +7,21 @@
 #include "Topology/atomgraph_abstracts.h"
 #include "Topology/atomgraph_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace synthesis {
 
-using omni::diskutil::getBaseName;
-using omni::diskutil::splitPath;
-using omni::energy::evaluateBondTerms;
-using omni::energy::evaluateAngleTerms;
-using omni::energy::ScoreCard;
-using omni::math::prefixSumInPlace;
-using omni::math::PrefixSumType;
-using omni::namelist::MoleculeSystem;
-using omni::parse::findStringInVector;
-using omni::topology::UnitCellType;
-using omni::topology::ValenceKit;
-using omni::trajectory::detectCoordinateFileKind;
+using stormm::diskutil::getBaseName;
+using stormm::diskutil::splitPath;
+using stormm::energy::evaluateBondTerms;
+using stormm::energy::evaluateAngleTerms;
+using stormm::energy::ScoreCard;
+using stormm::math::prefixSumInPlace;
+using stormm::math::PrefixSumType;
+using stormm::namelist::MoleculeSystem;
+using stormm::parse::findStringInVector;
+using stormm::topology::UnitCellType;
+using stormm::topology::ValenceKit;
+using stormm::trajectory::detectCoordinateFileKind;
   
 //-------------------------------------------------------------------------------------------------
 SystemCache::SystemCache() :
@@ -954,4 +954,4 @@ std::string SystemCache::getSystemCheckpointName(const int system_index) const {
 }
 
 } // namespace synthesis
-} // namespace omni
+} // namespace stormm

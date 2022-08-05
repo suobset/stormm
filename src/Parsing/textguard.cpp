@@ -1,7 +1,7 @@
 #include "Reporting/error_format.h"
 #include "textguard.h"
 
-namespace omni {
+namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
@@ -55,4 +55,4 @@ bool TextGuard::getTerminationRequirement() const {
 }
 
 } // namespace parse
-} // namespace omni
+} // namespace stormm

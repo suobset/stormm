@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_HPC_MINIMIZATION_H
-#define OMNI_HPC_MINIMIZATION_H
+#ifndef STORMM_HPC_MINIMIZATION_H
+#define STORMM_HPC_MINIMIZATION_H
 
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
@@ -15,7 +15,7 @@
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/static_mask_synthesis.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 using card::GpuDetails;
@@ -103,6 +103,6 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         const KernelManager &launcher);
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm
 
 #endif

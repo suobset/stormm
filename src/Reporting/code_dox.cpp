@@ -3,10 +3,10 @@
 #include "Parsing/parse.h"
 #include "FileManagement/file_listing.h"
 #include "DataTypes/common_types.h"
-#include "DataTypes/omni_vector_types.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "code_dox.h"
 
-namespace omni {
+namespace stormm {
 namespace docs {
 
 using diskutil::osSeparator;
@@ -231,38 +231,38 @@ ObjectIdentifier searchFileForObject(const std::string &object_name, const std::
 void searchObject(const std::string &object_name, const std::string &member_name,
                   const ObjectReportType report_format) {
 
-  // Get the OMNI home directory
-  const std::string omni_home = std::getenv("OMNI_HOME");
+  // Get the STORMM home directory
+  const std::string stormm_home = std::getenv("STORMM_HOME");
 
-  // Get a list of directories in OMNI's src/ directory, then make lists of .cpp and .h files
-  const std::vector<std::string> src_dirs = listDirectory(omni_home + osSeparator() + "src",
+  // Get a list of directories in STORMM's src/ directory, then make lists of .cpp and .h files
+  const std::vector<std::string> src_dirs = listDirectory(stormm_home + osSeparator() + "src",
                                                           SearchStyle::RECURSIVE,
                                                           DrivePathType::DIRECTORY);
-  std::vector<std::string> omni_cpp;
-  std::vector<std::string> omni_hdr;
+  std::vector<std::string> stormm_cpp;
+  std::vector<std::string> stormm_hdr;
   const int n_src_dir = src_dirs.size();
   for (int i = 0; i < n_src_dir; i++) {
     std::vector<std::string> tmp_cpp = listFilesInPath(src_dirs[i] + osSeparator() + ".*.cpp",
                                                        SearchStyle::NON_RECURSIVE);
-    omni_cpp.insert(omni_cpp.end(), tmp_cpp.begin(), tmp_cpp.end());
+    stormm_cpp.insert(stormm_cpp.end(), tmp_cpp.begin(), tmp_cpp.end());
     std::vector<std::string> tmp_hdr = listFilesInPath(src_dirs[i] + osSeparator() + ".*.h",
                                                        SearchStyle::NON_RECURSIVE);
-    omni_hdr.insert(omni_hdr.end(), tmp_hdr.begin(), tmp_hdr.end());
+    stormm_hdr.insert(stormm_hdr.end(), tmp_hdr.begin(), tmp_hdr.end());
   }
 
   // Go through all files, looking for the object.
-  const int n_cpp = omni_cpp.size();
-  const int n_hdr = omni_hdr.size();
+  const int n_cpp = stormm_cpp.size();
+  const int n_hdr = stormm_hdr.size();
   std::vector<ObjectIdentifier> obj_docs;
   for (int i = 0; i < n_cpp; i++) {
-    ObjectIdentifier tmp_id = searchFileForObject(object_name, omni_cpp[i]);
+    ObjectIdentifier tmp_id = searchFileForObject(object_name, stormm_cpp[i]);
     obj_docs.push_back(tmp_id);
   }
   for (int i = 0; i < n_hdr; i++) {
-    ObjectIdentifier tmp_id = searchFileForObject(object_name, omni_hdr[i]);
+    ObjectIdentifier tmp_id = searchFileForObject(object_name, stormm_hdr[i]);
     obj_docs.push_back(tmp_id);
   }
 }
 
 } // namespace docs
-} // namespace omni
+} // namespace stormm

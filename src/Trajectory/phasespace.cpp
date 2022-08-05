@@ -8,7 +8,7 @@
 #include "phasespace.h"
 #include "trajectory_enumerators.h"
 
-namespace omni {
+namespace stormm {
 namespace trajectory {
 
 using card::HybridKind;
@@ -440,7 +440,7 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
       }
     }
     break;
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
       std::vector<double> xval, yval, zval;
@@ -508,7 +508,7 @@ std::vector<double> PhaseSpace::getBoxSpaceTransform(const HybridTargetLevel tie
   switch (tier) {
   case HybridTargetLevel::HOST:
     return box_space_transform.readHost();
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return box_space_transform.readDevice();
 #endif
@@ -521,7 +521,7 @@ std::vector<double> PhaseSpace::getInverseTransform(const HybridTargetLevel tier
   switch (tier) {
   case HybridTargetLevel::HOST:
     return inverse_transform.readHost();
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return inverse_transform.readDevice();
 #endif
@@ -549,7 +549,7 @@ void PhaseSpace::initializeForces() {
     y_ptr[i] = 0.0;
     z_ptr[i] = 0.0;
   }
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
   uploadForces();
 #endif
 }
@@ -602,7 +602,7 @@ void PhaseSpace::exportToFile(const std::string &file_name, const double current
   foutp.close();
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::upload() {
   storage.upload();
@@ -746,4 +746,4 @@ UnitCellType determineUnitCellTypeByShape(const double* inv_ptr) {
 }
 
 } // namespace trajectory
-} // namespace omni
+} // namespace stormm

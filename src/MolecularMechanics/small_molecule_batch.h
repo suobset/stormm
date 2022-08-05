@@ -1,8 +1,8 @@
 // -*-c++-*-
-#ifndef OMNI_SMALL_MOLECULE_BATCH_H
-#define OMNI_SMALL_MOLECULE_BATCH_H
+#ifndef STORMM_SMALL_MOLECULE_BATCH_H
+#define STORMM_SMALL_MOLECULE_BATCH_H
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 /// \brief Atom limits for small molecules in various thread block sizes
@@ -20,7 +20,7 @@ constexpr int max_smmol_atom_count_large_block  = 720;
 
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm
 
 #include "small_molecule_batch.tpp"
 

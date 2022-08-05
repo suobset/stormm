@@ -11,7 +11,7 @@
 #include "chemical_features.h"
 #include "indigo.h"
 
-namespace omni {
+namespace stormm {
 namespace chemistry {
   
 using card::HybridKind;
@@ -2231,7 +2231,7 @@ void ChemicalFeatures::repairPointers() {
   anchor_b_branches.swapTarget(&int_data);
 }
 
-#ifdef OMNI_USE_HPC
+#ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void ChemicalFeatures::upload() {
   ring_inclusion.upload();
@@ -2767,4 +2767,4 @@ int getChiralOrientation(const CoordinateFrameReader &cfr, const int center_atom
 }
 
 } // namespace chemistry
-} // namespace omni
+} // namespace stormm

@@ -1,6 +1,6 @@
 // -*-c++-*-
-#ifndef OMNI_NML_PRECISION_H
-#define OMNI_NML_PRECISION_H
+#ifndef STORMM_NML_PRECISION_H
+#define STORMM_NML_PRECISION_H
 
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
@@ -8,7 +8,7 @@
 #include "input.h"
 #include "namelist_emulator.h"
 
-namespace omni {
+namespace stormm {
 namespace namelist {
 
 using constants::PrecisionModel;
@@ -34,7 +34,7 @@ constexpr double min_precision_constraint_tol       = 5.0e-9;
 ///        encapsualtors, this object can take input file data as part of its construction, or
 ///        by a series of setters.  Validation of each piece of data is handled as it appears
 ///        either in the contructor or via setters.  Getter functions dispense the internal
-///        information to any application using OMNI libraries.
+///        information to any application using STORMM libraries.
 class PrecisionControls {
 public:
 
@@ -173,6 +173,6 @@ NamelistEmulator precisionInput(const TextFile &tf, int *start_line,
                                 ExceptionResponse policy = ExceptionResponse::DIE);
 
 } // namespace namelist
-} // namespace omni
+} // namespace stormm
 
 #endif

@@ -1,6 +1,6 @@
 #include "mm_evaluation.h"
 
-namespace omni {
+namespace stormm {
 namespace mm {
 
 //-------------------------------------------------------------------------------------------------
@@ -188,4 +188,4 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
 }
 
 } // namespace mm
-} // namespace omni
+} // namespace stormm

@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace data_types {
 
 //-------------------------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ template <typename T> int getHpcVectorTypeSize() {
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename T> std::string getOmniHpcVectorTypeName() {
+template <typename T> std::string getStormmHpcVectorTypeName() {
   const size_t ct = std::type_index(typeid(T)).hash_code();
   if (ct == int2_type_index) return "int2";
   else if (ct == int3_type_index) return "int3";
@@ -107,7 +107,7 @@ template <typename T> std::string getOmniHpcVectorTypeName() {
   else if (ct == ushort4_type_index) return "unsigned_short_int4";
   else {
     rtErr("Data type " + std::string(std::type_index(typeid(T)).name()) + " is not a recognized "
-          "HPC vector type.", "getOmniHpcVectorTypeName");
+          "HPC vector type.", "getStormmHpcVectorTypeName");
   }
   __builtin_unreachable();
 }
@@ -236,4 +236,4 @@ template <typename T> std::vector<float4> vtConv4f(const std::vector<T> &rhs) {
 }
 
 } // namespace data_types
-} // namespace omni
+} // namespace stormm

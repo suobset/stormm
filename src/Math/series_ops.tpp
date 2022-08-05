@@ -1,5 +1,5 @@
 // -*-c++-*-
-namespace omni {
+namespace stormm {
 namespace math {
 
 using math::maxValue;
@@ -41,4 +41,4 @@ template <typename T> std::vector<T> extractIndexedValues(const Hybrid<T> &origi
 }
 
 } // namespace math
-} // namespace omni
+} // namespace stormm
