@@ -161,6 +161,11 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 //   mol_id_vec:          Indication of how to replicate various structures described in ps_vec
 //   gpu:                 Details of the GPU available
 //   do_tests:            Indicate whether tests are possible to run
+//   oe:                  Contains the name of the OMNI source path from shell variables as well
+//                        as information on whether to write snapshot files or do the comparisons
+//   psnap:               Instructions as to whether to begin printing a new snapshot file or
+//                        append to an existing one, if snapshots are to be written
+//   snap_name:           Name of the snapshot file for final energies of systems
 //   prec:                Precision model for arithmetic and fixed-precision representations
 //   gpos_bits:           Fixed-precision bits after the decimal in the positional representation
 //   frc_bits:            Fixed-precision bits after the decimal in force accumulation
@@ -177,6 +182,10 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                       const std::vector<PhaseSpace> &ps_vec, const std::vector<int> &mol_id_vec,
                       const GpuDetails &gpu, const TestPriority do_tests,
+                      const TestEnvironment &oe,
+                      const PrintSituation psnap = PrintSituation::OVERWRITE, 
+                      const std::string &snap_name = std::string(""),
+                      const std::string &var_name = std::string(""),
                       const PrecisionModel prec = PrecisionModel::DOUBLE, const int gpos_bits = 40,
                       const int frc_bits = 40, const int maxcyc = 500,
                       const bool enforce_same_track = true, const bool check_mm = true,
@@ -273,22 +282,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   std::vector<double> force_mue(n_mm_sample, 0.0);
   int consistency_failures = 0;
   for (int i = 0; i < mincon.getTotalCycles(); i++) {
-
-    // CHECK
-#if 0
-    if (prec == PrecisionModel::SINGLE) {
-      for (int j = 0; j < 20; j++) {
-        launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
-                      EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                      ForceAccumulationMethod::SPLIT, vale_fe_lp);
-        launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw,
-                        &f_nonb_tbk, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, nonb_lp);
-        f_ctrl_fe.step += 1;
-      }
-    }
-#endif
-    // END CHECK
     
     // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     poly_ps.initializeForces(gpu, devc);
@@ -314,8 +307,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
     // Check the forces computed for a couple of systems.  This is somewhat redundant, but serves
     // as a sanity check in case other aspects of the energy minimization show problems.
-    const int jlim = (check_mm) ? (3 * i) + 1 : 3 * i;
-    if ((i & 0x1f) == 0) {
+    if (check_mm && (i & 0x1f) == 0) {
+      const int jlim = (3 * i) + 1;
       const TrajectoryKind tforce = TrajectoryKind::FORCES; 
       for (int j = 3 * i; j < jlim; j++) {
         const int jmod = j % poly_ag.getSystemCount();
@@ -514,11 +507,22 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   }
   
   // Verify that the energies for all systems meet the expected values
-  const std::vector<double> final_e = sc.reportTotalEnergies(devc);
-  std::vector<double> sampled_e;
-  const int nsys = poly_ps.getSystemCount();
-  for (int i = 0; i < nsys; i++) {
-    
+  if (check_mm) {
+    const bool snap_exists = (getDrivePathType(snap_name) == DrivePathType::FILE);
+    if (snap_exists == false) {
+      rtWarn("The snapshot file " + snap_name + " could not be found.  Check the ${OMNI_SOURCE} "
+             "environment variable, currently set to " + oe.getOmniSourcePath() + ", for "
+             "validity.  Subsequent tests will be skipped.", "test_hpc_minimization");
+    }
+    const TestPriority do_snps = (snap_exists &&
+                                  do_tests == TestPriority::CRITICAL) ? TestPriority::CRITICAL :
+                                                                        TestPriority::ABORT;
+    const std::vector<double> final_e = sc.reportTotalEnergies(devc);
+    const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
+    snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-6, "Final energies of "
+             "energy-minimized structures did not reach their expected values.  Test: " +
+             test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
+             oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
   }
 }
 
@@ -534,13 +538,18 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 //   test_name:  Name given to this group of tests
 //   oe:         Contains the name of the OMNI source path from shell variables
 //   gpu:        Details of the GPU in use
+//   test_name:  Name given to this test 
+//   psnap:      Instructions as to whether to begin printing a new snapshot file or append to an
+//               existing one, if snapshots are to be written
+//   snap_name:  Name of the snapshot file for final energies of systems
 //   timer:      Time tracking object for optional performance analysis
 //-------------------------------------------------------------------------------------------------
 void testCompilation(const std::vector<std::string> &top_names,
                      const std::vector<std::string> &crd_names, const std::vector<int> tile_list,
                      const int n_tiles, const double frc_tol, const double nrg_tol,
                      const TestEnvironment &oe, const GpuDetails &gpu,
-                     const std::string &test_name, StopWatch *timer) {
+                     const std::string &test_name, const PrintSituation psnap,
+                     const std::string &snap_name, const std::string &var_name, StopWatch *timer) {
   const int mol_count = top_names.size();
   if (crd_names.size() != top_names.size()) {
     rtErr("A total of " + std::to_string(top_names.size()) + " topologies and " +
@@ -577,15 +586,23 @@ void testCompilation(const std::vector<std::string> &top_names,
   const int tlen = tile_list.size();
   const int total_mol = tlen * n_tiles;
   std::vector<int> mol_id(total_mol);
+  std::vector<int> d_nrg_target(total_mol);
+  std::vector<int> f_nrg_target(total_mol);
+
+  // The test name determines the content of the target energy vector.  Codify the test name.
   for (int i = 0; i < n_tiles; i++) {
     for (int j = 0; j < tlen; j++) {
       mol_id[(tlen * i) + j] = tile_list[j];
     }
   }
-  metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, PrecisionModel::DOUBLE, 40, 40, 100,
-                   false, true, frc_tol, nrg_tol, test_name + " (fp64)", timer);
-  metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, PrecisionModel::SINGLE, 28, 24, 500,
-                   false, true, 10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer);
+  const PrintSituation x_psnap = (psnap == PrintSituation::OVERWRITE) ? PrintSituation::OVERWRITE :
+                                                                        PrintSituation::APPEND;
+  metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, oe, x_psnap, snap_name, var_name,
+                   PrecisionModel::DOUBLE, 40, 40, 100, false, true, frc_tol, nrg_tol,
+                   test_name + " (fp64)", timer);
+  metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, oe, PrintSituation::APPEND,
+                   snap_name, var_name, PrecisionModel::SINGLE, 28, 24, 500, false, true,
+                   10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -627,23 +644,26 @@ int main(const int argc, const char* argv[]) {
                                              lig2_crd_name };
   const std::vector<std::string> pro_top = { trpi_top_name, dhfr_top_name };
   const std::vector<std::string> pro_crd = { trpi_crd_name, dhfr_crd_name };
-
+  const std::string snap_name = oe.getOmniSourcePath() + osc + "test" + osc +
+                                "MolecularMechanics" + osc + "min_energy.m";
+  
   // Run small molecule tests
   testCompilation(lig_top, lig_crd, { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 },
-                  256, 1.0e-5, 1.0e-5, oe, gpu, "Small molecules", &timer);
+                  256, 1.0e-5, 1.0e-5, oe, gpu, "Small molecules", PrintSituation::OVERWRITE,
+                  snap_name, "small_mol_", &timer);
 
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 1, 0, 1, 1, 1, 0, 0 }, 3, 1.0e-5, 1.0e-3, oe, gpu,
-                  "Folded proteins", &timer);
+                  "Folded proteins", PrintSituation::APPEND, snap_name, "folded_pro_", &timer);
 
   // Run tests on small proteins
-  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 16, 1.0e-5, 6.0e-5, oe, gpu,
-                  "Trp-cage only", &timer);
+  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
+                  "Trp-cage only", PrintSituation::APPEND, snap_name, "trp_cage_", &timer);
 
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
-                  "DHFR only", &timer);
-
+                  "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
+  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

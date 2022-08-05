@@ -47,18 +47,49 @@ void conjGradCoreGather(double* gg_collector, double* dgg_collector, const int s
                         const llint* zprv) {
   double gg  = 0.0;
   double dgg = 0.0;
-  for (int tpos = start_pos + threadIdx.x; tpos < end_pos; tpos += blockDim.x) {
-    const double dpx = (double)(xprv[tpos]) * inv_frc_scale;
-    const double dpy = (double)(yprv[tpos]) * inv_frc_scale;
-    const double dpz = (double)(zprv[tpos]) * inv_frc_scale;
-    gg += (dpx * dpx) + (dpy * dpy) + (dpz * dpz);
-    const double dfx = (double)(xfrc[tpos]) * inv_frc_scale;
-    const double dfy = (double)(yfrc[tpos]) * inv_frc_scale;
-    const double dfz = (double)(zfrc[tpos]) * inv_frc_scale;
-    const double ddx = dfx - dpx;
-    const double ddy = dfy - dpy;
-    const double ddz = dfz - dpz;
-    dgg += (ddx * dfx) + (ddy * dfy) + (ddz * dfz);
+  const int natom = end_pos - start_pos;
+  const int padded_natom = (((natom + warp_size_int - 1) >> warp_bits) << warp_bits);
+  int pos = threadIdx.x;
+  while (pos < padded_natom) {
+    if (pos < natom) {
+      const llint llpx = xprv[start_pos + pos];
+      const llint llfx = xfrc[start_pos + pos];
+      const llint lldx = llfx - llpx;
+      const double dpx = (double)(llpx);
+      const double dfx = (double)(llfx);
+      const double ddx = (double)(lldx);
+      gg += (dpx * dpx);
+      dgg += (ddx * dfx);
+    }
+    pos += blockDim.x;
+  }
+  while (pos < 2 * padded_natom) {
+    const int rel_pos = pos - padded_natom;
+    if (rel_pos < natom) {
+      const llint llpy = yprv[start_pos + rel_pos];
+      const llint llfy = yfrc[start_pos + rel_pos];
+      const llint lldy = llfy - llpy;
+      const double dpy = (double)(llpy);
+      const double dfy = (double)(llfy);
+      const double ddy = (double)(lldy);
+      gg += (dpy * dpy);
+      dgg += (ddy * dfy);
+    }
+    pos += blockDim.x;
+  }
+  while (pos < 3 * padded_natom) {
+    const int rel_pos = pos - (2 * padded_natom);
+    if (rel_pos < natom) {
+      const llint llpz = zprv[start_pos + rel_pos];
+      const llint llfz = zfrc[start_pos + rel_pos];
+      const llint lldz = llfz - llpz;
+      const double dpz = (double)(llpz);
+      const double dfz = (double)(llfz);
+      const double ddz = (double)(lldz);
+      gg += (dpz * dpz);
+      dgg += (ddz * dfz);
+    }
+    pos += blockDim.x;
   }
   WARP_REDUCE_DOWN(gg);
   WARP_REDUCE_DOWN(dgg);
@@ -129,26 +160,49 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
                        llint* yprv, llint* zprv, llint* x_cg_temp, llint* y_cg_temp,
                        llint* z_cg_temp) {
   double msum = 0.0;
-  for (int tpos = atom_start_pos + threadIdx.x; tpos < atom_end_pos; tpos += blockDim.x) {
-    const llint ifx = xfrc[tpos];
-    const llint ify = yfrc[tpos];
-    const llint ifz = zfrc[tpos];
-    xprv[tpos] = ifx;
-    yprv[tpos] = ify;
-    zprv[tpos] = ifz;
-    const double dfcgx = (double)(ifx) + (gam * (double)(x_cg_temp[tpos]));
-    const double dfcgy = (double)(ify) + (gam * (double)(y_cg_temp[tpos]));
-    const double dfcgz = (double)(ifz) + (gam * (double)(z_cg_temp[tpos]));
-    msum += (dfcgx * dfcgx) + (dfcgy * dfcgy) + (dfcgz * dfcgz);
-    const llint cg_x = __double2ll_rn(dfcgx);
-    const llint cg_y = __double2ll_rn(dfcgy);
-    const llint cg_z = __double2ll_rn(dfcgz);
-    x_cg_temp[tpos] = cg_x;
-    y_cg_temp[tpos] = cg_y;
-    z_cg_temp[tpos] = cg_z;
-    xfrc[tpos] = cg_x;
-    yfrc[tpos] = cg_y;
-    zfrc[tpos] = cg_z;
+  const int natom = atom_end_pos - atom_start_pos;
+  const int padded_natom = (((natom + warp_size_int - 1) >> warp_bits) << warp_bits);
+  int pos = threadIdx.x;
+  while (pos < padded_natom) {
+    if (pos < natom) {
+      const size_t gbl_pos = atom_start_pos + pos;
+      const llint ifx = xfrc[gbl_pos];
+      xprv[gbl_pos] = ifx;
+      const double dfcgx = (double)(ifx) + (gam * (double)(x_cg_temp[gbl_pos]));
+      msum += (dfcgx * dfcgx);
+      const llint cg_x = __double2ll_rn(dfcgx);
+      x_cg_temp[gbl_pos] = cg_x;
+      xfrc[gbl_pos] = cg_x;
+    }
+    pos += blockDim.x;
+  }
+  while (pos < 2 * padded_natom) {
+    const int rel_pos = pos - padded_natom;
+    if (rel_pos < natom) {
+      const size_t gbl_pos = atom_start_pos + rel_pos;
+      const llint ify = yfrc[gbl_pos];
+      yprv[gbl_pos] = ify;
+      const double dfcgy = (double)(ify) + (gam * (double)(y_cg_temp[gbl_pos]));
+      msum += (dfcgy * dfcgy);
+      const llint cg_y = __double2ll_rn(dfcgy);
+      y_cg_temp[gbl_pos] = cg_y;
+      yfrc[gbl_pos] = cg_y;
+    }
+    pos += blockDim.x;
+  }
+  while (pos < 3 * padded_natom) {
+    const int rel_pos = pos - (2 * padded_natom);
+    if (rel_pos < natom) {
+      const size_t gbl_pos = atom_start_pos + rel_pos;
+      const llint ifz = zfrc[gbl_pos];
+      zprv[gbl_pos] = ifz;
+      const double dfcgz = (double)(ifz) + (gam * (double)(z_cg_temp[gbl_pos]));
+      msum += (dfcgz * dfcgz);
+      const llint cg_z = __double2ll_rn(dfcgz);
+      z_cg_temp[gbl_pos] = cg_z;
+      zfrc[gbl_pos] = cg_z;
+    }
+    pos += blockDim.x;
   }
   WARP_REDUCE_DOWN(msum);
   const int warp_idx = (threadIdx.x >> warp_bits);
@@ -161,7 +215,13 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
   // All warps will copy the final summation over msum so that the correct accumulated value may
   // be returned on all threads.
   msum = (lane_idx < (blockDim.x >> warp_bits)) ? msum_collector[lane_idx] : 0.0;
-  WARP_REDUCE_DOWN(msum);
+  if (blockDim.x == 4 * warp_size_int) {
+    msum += SHFL_DOWN(msum, 2);
+    msum += SHFL_DOWN(msum, 1);
+  }
+  else {
+    WARP_REDUCE_DOWN(msum);
+  }
   msum = SHFL(msum, 0);
   return msum;
 }

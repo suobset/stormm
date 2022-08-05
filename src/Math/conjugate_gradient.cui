@@ -313,14 +313,26 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
     __syncthreads();
     if (warp_idx == 0) {
       double gg = (lane_idx < nwarps) ? gg_collector[lane_idx] : 0.0;
-      WARP_REDUCE_DOWN(gg);
+      if (blockDim.x == 4 * warp_size_int) {
+        gg += SHFL_DOWN(gg, 2);
+        gg += SHFL_DOWN(gg, 1);
+      }
+      else {
+        WARP_REDUCE_DOWN(gg);
+      }
       if (lane_idx == 0) {
         sh_gg_total = gg;
       }
     }
     else if (warp_idx == 1) {
       double dgg = (lane_idx < nwarps) ? dgg_collector[lane_idx] : 0.0;
-      WARP_REDUCE_DOWN(dgg);
+      if (blockDim.x == 4 * warp_size_int) {
+        dgg += SHFL_DOWN(dgg, 2);
+        dgg += SHFL_DOWN(dgg, 1);
+      }
+      else {
+        WARP_REDUCE_DOWN(dgg);
+      }
       if (lane_idx == 0) {
         sh_dgg_total = dgg;
       }
@@ -341,7 +353,7 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
                                         cgsbs.zprv, cgsbs.x_cg_temp, cgsbs.y_cg_temp,
                                         cgsbs.z_cg_temp);
 #endif
-    
+
     // The accumulated value of msum for this block, and thus the entire system, is understood by
     // all threads thanks to work done in conjGradScatter().  Use that value to scale the forces.
     const double inv_factor = 1.0 / (sqrt(msum) * cgsbs.inv_frc_scale);

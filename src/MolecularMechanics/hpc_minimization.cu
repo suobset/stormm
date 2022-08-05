@@ -119,20 +119,20 @@ extern void launchLineAdvance(const PrecisionModel prec, PhaseSpaceSynthesis *po
 //-------------------------------------------------------------------------------------------------
 extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                                const StaticExclusionMaskSynthesis &poly_se,
-                               PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl,
-                               ScoreCard *sc, CacheResource *vale_cache, CacheResource *nonb_cache,
-                               ReductionBridge *rbg, LineMinimization *line_record,
-                               const ForceAccumulationMethod acc_meth,
-                               const GpuDetails &gpu, const KernelManager &launcher) {
+                               PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl_fe,
+                               MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
+                               CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
+                               CacheResource *nonb_cache, ReductionBridge *rbg,
+                               LineMinimization *line_record,
+                               const ForceAccumulationMethod acc_meth, const GpuDetails &gpu,
+                               const KernelManager &launcher) {
 
   // Obtain abstracts of critical objects, re-using them throughout the inner loop.  Some abstracts
   // are needed by both branches.
-  const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-  PsSynthesisWriter poly_psw = poly_ps->data(tier);
-  const SeMaskSynthesisReader poly_ser = poly_se.data(tier);
-  MMControlKit<double> dctrl = mmctrl->dpData(tier);
-  MMControlKit<float>  fctrl = mmctrl->spData(tier);
-  ScoreCardWriter scw = sc->data(tier);
+  const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
+  const SeMaskSynthesisReader poly_ser = poly_se.data(devc_tier);
+  ScoreCardWriter scw = sc->data(devc_tier);
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
                                                         ForceAccumulationMethod::SPLIT,
@@ -142,60 +142,140 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                                         ForceAccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
-  const int2 nonb_fe_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
-                                                          EvaluateEnergy::YES,
-                                                          ForceAccumulationMethod::SPLIT);
-  const int2 nonb_xe_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::NO,
-                                                          EvaluateEnergy::YES,
-                                                          ForceAccumulationMethod::SPLIT);
+  const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
+                                                       EvaluateEnergy::YES,
+                                                       ForceAccumulationMethod::SPLIT);
   const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
-  LinMinWriter lmw = line_record->data(tier);
-  const ReductionKit redk(poly_ag, tier);
-  ConjGradSubstrate cgsbs(poly_psw, rbg, tier);
+  LinMinWriter lmw = line_record->data(devc_tier);
+  const ReductionKit redk(poly_ag, devc_tier);
+  ConjGradSubstrate cgsbs(poly_psw, rbg, devc_tier);
   
   // Progress through minimization cycles will not be measured with the step counter in the
   // molecular mechanics control object--that will increment at four times the rate in the case
   // of conjugate gradient line minimizations.
-  const int total_steps = mmctrl->getTotalCycles();
-  mmctrl->primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES, prec, poly_ag);
-  poly_ps->primeConjugateGradientCalculation(gpu, tier);
+  const int total_steps = mmctrl_fe->getTotalCycles();
+  mmctrl_fe->primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES, prec,
+                                   poly_ag);
+  mmctrl_xe->primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec,
+                                   poly_ag);
+  poly_ps->primeConjugateGradientCalculation(gpu, devc_tier);
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
-      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit();
-      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit();
-      const SyRestraintKit<double,
-                           double2, double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit();
-      CacheResourceKit<double> vale_tbr = vale_cache->dpData();
-      CacheResourceKit<double> nonb_tbr = nonb_cache->dpData();
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
+      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
+      const SyRestraintKit<double, double2, double4> poly_rk =
+        poly_ag.getDoublePrecisionRestraintKit(devc_tier);
+      CacheResourceKit<double> vale_fe_tbr = vale_fe_cache->dpData(devc_tier);
+      CacheResourceKit<double> vale_xe_tbr = vale_xe_cache->dpData(devc_tier);
+      CacheResourceKit<double> nonb_tbr = nonb_cache->dpData(devc_tier);
+      MMControlKit<double> ctrl_fe = mmctrl_fe->dpData(devc_tier);
+      MMControlKit<double> ctrl_xe = mmctrl_xe->dpData(devc_tier);
       for (int i = 0; i < total_steps; i++) {
-        poly_ps->initializeForces(gpu, tier);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &dctrl, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, nonb_fe_lp);
-        launchValence(poly_vk, poly_rk, &dctrl, &poly_psw, &scw, &vale_tbr, EvaluateForce::YES,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
-        launchConjugateGradient(redk, &cgsbs, &dctrl, redu_lp);
-        kfLineAdvance<<<redu_lp.x, redu_lp.y>>>(poly_psw, redk, scw, lmw, 0);
+
+        // First stage of the cycle: compute forces and obtain the conjugate gradient move.
+        poly_ps->initializeForces(gpu, devc_tier);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
+                      EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
+        ctrl_fe.step += 1;
+        launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
+
+        // Second stage of the cycle: advance once along the line and recompute the energy.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        ctrl_xe.step += 1;
+
+        // Third stage of the cycle: advance once more along the line and recompute the energy.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        ctrl_xe.step += 1;
+
+        // Final stage of the cycle: advance a final time along the line and recompute the energy.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        ctrl_xe.step += 1;
+
+        // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 3, redu_lp);
       }
     }
     break;
   case PrecisionModel::SINGLE:
     {
-      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit();
-      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit();
-      const SyRestraintKit<float,
-                           float2, float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit();
-      CacheResourceKit<float> vale_tbr = vale_cache->spData();
-      CacheResourceKit<float> nonb_tbr = nonb_cache->spData();
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
+      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
+      const SyRestraintKit<float, float2, float4> poly_rk =
+        poly_ag.getSinglePrecisionRestraintKit(devc_tier);
+      CacheResourceKit<float> vale_fe_tbr = vale_fe_cache->spData(devc_tier);
+      CacheResourceKit<float> vale_xe_tbr = vale_xe_cache->spData(devc_tier);
+      CacheResourceKit<float> nonb_tbr = nonb_cache->spData(devc_tier);
+      MMControlKit<float> ctrl_fe = mmctrl_fe->spData(devc_tier);
+      MMControlKit<float> ctrl_xe = mmctrl_xe->spData(devc_tier);
       for (int i = 0; i < total_steps; i++) {
-        poly_ps->initializeForces(gpu, tier);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &fctrl, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_fe_lp);
-        launchValence(poly_vk, poly_rk, &fctrl, &poly_psw, &scw, &vale_tbr, EvaluateForce::YES,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_fe_lp);
-        launchConjugateGradient(redk, &cgsbs, &fctrl, redu_lp);
-        kfLineAdvance<<<redu_lp.x, redu_lp.y>>>(poly_psw, redk, scw, lmw, 0);
+
+        // First stage of the cycle: compute forces and obtain the conjugate gradient move.
+        poly_ps->initializeForces(gpu, devc_tier);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::YES, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                        nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
+                      EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                      ForceAccumulationMethod::SPLIT, vale_fe_lp);
+        ctrl_fe.step += 1;
+        launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
+
+        // Second stage of the cycle: advance once along the line and recompute the energy.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
+                        ForceAccumulationMethod::SPLIT, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                      ForceAccumulationMethod::SPLIT, vale_xe_lp);
+        ctrl_xe.step += 1;
+
+        // Third stage of the cycle: advance once more along the line and recompute the energy.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
+                        ForceAccumulationMethod::SPLIT, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                      ForceAccumulationMethod::SPLIT, vale_xe_lp);
+        ctrl_xe.step += 1;
+
+        // Final stage of the cycle: advance a final time along the line and recompute the energy.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
+        sc->initialize(devc_tier, gpu);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
+                        ForceAccumulationMethod::SPLIT, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                      ForceAccumulationMethod::SPLIT, vale_xe_lp);
+        ctrl_xe.step += 1;
+
+        // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
+        launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 3, redu_lp);
       }
     }
     break;
