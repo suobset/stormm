@@ -780,10 +780,9 @@ int main(const int argc, const char* argv[]) {
   const int nsys = 17;
   std::vector<int> tsc_sample_sizes(10);
   std::vector<int> tsc_sample_size_ans(10);
-  std::vector<double> tsc_ave_dev(10 * nsys * nvar);
-  std::vector<double> tsc_ave_dev_ans(10 * nsys * nvar);
-  std::vector<double> tsc_std_dev(10 * nsys * nvar);
-  std::vector<double> tsc_std_dev_ans(10 * nsys * nvar);
+  std::vector<double> tsc_ave_dev(10 * nsys * nvar), tsc_ave_dev_ans(10 * nsys * nvar);
+  std::vector<double> tsc_std_dev(10 * nsys * nvar), tsc_std_dev_ans(10 * nsys * nvar);
+  bool lateral_survey = true;
   for (int npts = 3; npts <= 48; npts += 5) {
     ScoreCard trial_sc(nsys, npts, 32);
     ScoreCardWriter trial_scw = trial_sc.data();
@@ -852,6 +851,9 @@ int main(const int argc, const char* argv[]) {
     tsc_sample_size_ans[test_no] = npts;
     for (int i = 0; i < nvar; i++) {
       const StateVariable istate = static_cast<StateVariable>(i);
+
+      // Loop over the systems to get longitudinal measurements of mean and standard deviations
+      // for each potential energy quantity.
       for (int j = 0; j < nsys; j++) {
         const int tsc_idx = (test_no * nvar * nsys) + (i * nsys) + j;
         tsc_ave_dev[tsc_idx] = trial_sc.reportAverageStates(istate, j);
@@ -934,6 +936,85 @@ int main(const int argc, const char* argv[]) {
           break;
         }
       }
+
+      // Take lateral measurements over all "systems" at each time point, recording the mean and
+      // standard deviations.
+      if (i < 14) {
+        const std::vector<double2> ehist = trial_sc.reportEnergyHistory(istate);
+        std::vector<double2> ehist_chk(npts);
+        for (int j = 0; j < npts; j++) {
+          std::vector<double> survey(nsys);
+          for (int k = 0; k < nsys; k++) {
+            switch (istate) {
+            case StateVariable::BOND:
+              survey[k] = fake_bond_e[k][j];
+              break;
+            case StateVariable::ANGLE:
+              survey[k] = fake_angl_e[k][j];
+              break;
+            case StateVariable::PROPER_DIHEDRAL:
+              survey[k] = fake_dihe_e[k][j];
+              break;
+            case StateVariable::IMPROPER_DIHEDRAL:
+              survey[k] = fake_impr_e[k][j];
+              break;
+            case StateVariable::UREY_BRADLEY:
+              survey[k] = fake_ubrd_e[k][j];
+              break;
+            case StateVariable::CHARMM_IMPROPER:
+              survey[k] = fake_cimp_e[k][j];
+              break;
+            case StateVariable::CMAP:
+              survey[k] = fake_cmap_e[k][j];
+              break;
+            case StateVariable::ELECTROSTATIC:
+              survey[k] = fake_qqnb_e[k][j];
+              break;
+            case StateVariable::VDW:
+              survey[k] = fake_ljnb_e[k][j];
+              break;
+            case StateVariable::ELECTROSTATIC_ONE_FOUR:
+              survey[k] = fake_qq14_e[k][j];
+              break;
+            case StateVariable::VDW_ONE_FOUR:
+              survey[k] = fake_lj14_e[k][j];
+              break;
+            case StateVariable::GENERALIZED_BORN:
+              survey[k] = fake_gbrn_e[k][j];
+              break;
+            case StateVariable::RESTRAINT:
+              survey[k] = fake_rstr_e[k][j];
+              break;
+            case StateVariable::KINETIC:
+              survey[k] = fake_kine_e[k][j];
+              break;
+            case StateVariable::PRESSURE:
+            case StateVariable::VIRIAL_11:
+            case StateVariable::VIRIAL_12:
+            case StateVariable::VIRIAL_22:
+            case StateVariable::VIRIAL_13:
+            case StateVariable::VIRIAL_23:
+            case StateVariable::VIRIAL_33:
+            case StateVariable::VOLUME:
+            case StateVariable::TEMPERATURE_ALL:
+            case StateVariable::TEMPERATURE_PROTEIN:
+            case StateVariable::TEMPERATURE_LIGAND:
+            case StateVariable::TEMPERATURE_SOLVENT:
+            case StateVariable::DU_DLAMBDA:
+            case StateVariable::POTENTIAL_ENERGY:
+            case StateVariable::TOTAL_ENERGY:
+            case StateVariable::ALL_STATES:
+              break;
+            }
+          }
+          ehist_chk[j].x = mean(survey);
+          ehist_chk[j].y = variance(survey, VarianceMethod::STANDARD_DEVIATION);
+        }
+        for (int j = 0; j < npts; j++) {
+          lateral_survey = (lateral_survey && fabs(ehist[j].x - ehist_chk[j].x) < 1.0e-6 &&
+                            fabs(ehist[j].y - ehist_chk[j].y) < 1.0e-6);
+        }
+      }
     }
     test_no++;
   }
@@ -943,6 +1024,9 @@ int main(const int argc, const char* argv[]) {
         "various time series are not reported correctly by the ScoreCard object.");
   check(tsc_std_dev, RelationalOperator::EQUAL, tsc_std_dev_ans, "Standard deviations for "
         "various time series are not reported correctly by the ScoreCard object.");
+  check(lateral_survey, "A survey of the lateral mean values and standard deviations among "
+        "familiar potential energy terms, taken point by point throughout the history, failed to "
+        "confirm the results reported by the tracking object.");
 
   // Print results
   if (oe.getDisplayTimingsOrder()) {
