@@ -780,17 +780,13 @@ int main(const int argc, const char* argv[]) {
   const int nsys = 17;
   std::vector<int> tsc_sample_sizes(10);
   std::vector<int> tsc_sample_size_ans(10);
-  std::vector<int> tsc_ave_dev(10 * nsys * nvar);
-  std::vector<int> tsc_ave_dev_ans(10 * nsys * nvar);
-  std::vector<int> tsc_std_dev(10 * nsys * nvar);
-  std::vector<int> tsc_std_dev_ans(10 * nsys * nvar);
+  std::vector<double> tsc_ave_dev(10 * nsys * nvar);
+  std::vector<double> tsc_ave_dev_ans(10 * nsys * nvar);
+  std::vector<double> tsc_std_dev(10 * nsys * nvar);
+  std::vector<double> tsc_std_dev_ans(10 * nsys * nvar);
   for (int npts = 3; npts <= 48; npts += 5) {
     ScoreCard trial_sc(nsys, npts, 32);
-
-    // CHECK
     ScoreCardWriter trial_scw = trial_sc.data();
-    // END CHECK
-    
     std::vector<std::vector<double>> fake_bond_e(nsys, std::vector<double>(npts));
     std::vector<std::vector<double>> fake_angl_e(nsys, std::vector<double>(npts));
     std::vector<std::vector<double>> fake_dihe_e(nsys, std::vector<double>(npts));
@@ -804,6 +800,7 @@ int main(const int argc, const char* argv[]) {
     std::vector<std::vector<double>> fake_ljnb_e(nsys, std::vector<double>(npts));
     std::vector<std::vector<double>> fake_gbrn_e(nsys, std::vector<double>(npts));
     std::vector<std::vector<double>> fake_rstr_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_kine_e(nsys, std::vector<double>(npts));
     for (int j = 0; j < npts; j++) {
       for (int i = 0; i < nsys; i++) {
         fake_bond_e[i][j] =   20.0 * xrs.uniformRandomNumber();
@@ -819,6 +816,7 @@ int main(const int argc, const char* argv[]) {
         fake_ljnb_e[i][j] =  150.0 * (0.05 - xrs.uniformRandomNumber());
         fake_gbrn_e[i][j] = -(0.90 + (0.10 * xrs.uniformRandomNumber())) * fake_qqnb_e[i][j];
         fake_rstr_e[i][j] =   15.0 * xrs.uniformRandomNumber();
+        fake_kine_e[i][j] =  255.0 * (0.5 + xrs.uniformRandomNumber());
         const llint ll_bond_e = static_cast<llint>(fake_bond_e[i][j] * trial_scw.nrg_scale_lf);
         const llint ll_angl_e = static_cast<llint>(fake_angl_e[i][j] * trial_scw.nrg_scale_lf);
         const llint ll_dihe_e = static_cast<llint>(fake_dihe_e[i][j] * trial_scw.nrg_scale_lf);
@@ -832,6 +830,7 @@ int main(const int argc, const char* argv[]) {
         const llint ll_ljnb_e = static_cast<llint>(fake_ljnb_e[i][j] * trial_scw.nrg_scale_lf);
         const llint ll_gbrn_e = static_cast<llint>(fake_gbrn_e[i][j] * trial_scw.nrg_scale_lf);
         const llint ll_rstr_e = static_cast<llint>(fake_rstr_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_kine_e = static_cast<llint>(fake_kine_e[i][j] * trial_scw.nrg_scale_lf);
         trial_sc.contribute(StateVariable::BOND, ll_bond_e, i);
         trial_sc.contribute(StateVariable::ANGLE, ll_angl_e, i);
         trial_sc.contribute(StateVariable::PROPER_DIHEDRAL, ll_dihe_e, i);
@@ -845,6 +844,7 @@ int main(const int argc, const char* argv[]) {
         trial_sc.contribute(StateVariable::VDW, ll_ljnb_e, i);
         trial_sc.contribute(StateVariable::GENERALIZED_BORN, ll_gbrn_e, i);
         trial_sc.contribute(StateVariable::RESTRAINT, ll_rstr_e, i);
+        trial_sc.contribute(StateVariable::KINETIC, ll_kine_e, i);
       }
       trial_sc.incrementSampleCount();
     }
@@ -909,6 +909,10 @@ int main(const int argc, const char* argv[]) {
           tsc_ave_dev_ans[tsc_idx] = mean(fake_rstr_e[j]);
           tsc_std_dev_ans[tsc_idx] = variance(fake_rstr_e[j], VarianceMethod::STANDARD_DEVIATION);
           break;
+        case StateVariable::KINETIC:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_kine_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_kine_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
         case StateVariable::PRESSURE:
         case StateVariable::VIRIAL_11:
         case StateVariable::VIRIAL_12:
@@ -922,6 +926,8 @@ int main(const int argc, const char* argv[]) {
         case StateVariable::TEMPERATURE_LIGAND:
         case StateVariable::TEMPERATURE_SOLVENT:
         case StateVariable::DU_DLAMBDA:
+        case StateVariable::POTENTIAL_ENERGY:
+        case StateVariable::TOTAL_ENERGY:
         case StateVariable::ALL_STATES:
           tsc_ave_dev_ans[tsc_idx] = 0.0;
           tsc_std_dev_ans[tsc_idx] = 0.0;

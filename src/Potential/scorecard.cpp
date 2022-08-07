@@ -2,6 +2,8 @@
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
 #include "Math/rounding.h"
+#include "Math/vector_ops.h"
+#include "Math/statistics.h"
 #include "scorecard.h"
 #ifdef STORMM_USE_HPC
 #include "hpc_scorecard.h"
@@ -11,6 +13,9 @@ namespace stormm {
 namespace energy {
 
 using math::roundUp;
+using math::mean;
+using math::variance;
+using math::VarianceMethod;
 using numerics::default_energy_scale_f;
 using numerics::default_energy_scale_lf;
 using numerics::default_inverse_energy_scale_f;
@@ -108,6 +113,30 @@ ScoreCard::ScoreCard(const int system_count_in, const int capacity_in,
     inverse_nrg_scale_lf = 1.0 / nrg_scale_lf;
     inverse_nrg_scale_f = (float)1.0 / nrg_scale_f;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::sumPotentialEnergy(const llint* nrg_data) const {
+  llint lacc = nrg_data[static_cast<size_t>(StateVariable::BOND)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ANGLE)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::UREY_BRADLEY)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CMAP)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
+  return static_cast<double>(lacc) * inverse_nrg_scale_lf;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::sumTotalEnergy(const llint* nrg_data) const {
+  const llint lacc = nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
+  return (static_cast<double>(lacc) * inverse_nrg_scale_lf) + sumPotentialEnergy(nrg_data);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -511,20 +540,7 @@ std::vector<double> ScoreCard::reportTotalEnergies(const HybridTargetLevel tier)
 #endif
   for (int i = 0; i < system_count; i++) {
     const size_t info_start = (i * padded_nvar);
-    llint lacc = inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::BOND)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::ANGLE)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::UREY_BRADLEY)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::CMAP)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::VDW)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::ELECTROSTATIC)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::RESTRAINT)];
-    result[i] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+    result[i] = sumTotalEnergy(&inst_acc_ptr[info_start]);
   }
   return result;
 }
@@ -549,20 +565,7 @@ double ScoreCard::reportTotalEnergy(const int system_index, const HybridTargetLe
 #else
   inst_acc_ptr = &instantaneous_accumulators.data()[info_start];
 #endif
-  llint lacc = inst_acc_ptr[static_cast<size_t>(StateVariable::BOND)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::ANGLE)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::UREY_BRADLEY)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::CMAP)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::VDW)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::RESTRAINT)];
-  return inverse_nrg_scale_lf * static_cast<double>(lacc);
+  return sumTotalEnergy(inst_acc_ptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -909,6 +912,78 @@ double ScoreCard::reportVarianceOfStates(const StateVariable aspect, const int s
   s2 = squared_accumulators.readHost(offset + aspect_no);
 #endif
   return sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ScoreCard::reportEnergyHistory(const int system_index,
+                                                   const HybridTargetLevel tier) {
+  return reportEnergyHistory(StateVariable::TOTAL_ENERGY, system_index, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ScoreCard::reportEnergyHistory(const StateVariable aspect,
+                                                   const int system_index,
+                                                   const HybridTargetLevel tier) {
+  std::vector<double> result(sampled_step_count);
+#ifdef STORMM_USE_HPC
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    break;
+  case HybridTargetLevel::DEVICE:
+    download();
+    break;
+  }
+#endif
+  const llint* ts_ptr = time_series_accumulators.data();
+  const size_t data_stride_zu = static_cast<size_t>(data_stride);
+  for (int i = 0; i < sampled_step_count; i++) {
+    const size_t info_start = static_cast<size_t>(system_index + (i * system_count)) *
+                              data_stride_zu;
+    result[i] = static_cast<double>(ts_ptr[info_start + static_cast<size_t>(aspect)]) *
+                inverse_nrg_scale_lf;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double2> ScoreCard::reportEnergyHistory(const HybridTargetLevel tier) {
+  return reportEnergyHistory(StateVariable::TOTAL_ENERGY, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double2> ScoreCard::reportEnergyHistory(const StateVariable aspect,
+                                                    const HybridTargetLevel tier) {
+  std::vector<double2> result(sampled_step_count);
+#ifdef STORMM_USE_HPC
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    break;
+  case HybridTargetLevel::DEVICE:
+    download();
+    break;
+  }
+#endif
+  const llint* ts_ptr = time_series_accumulators.data();
+  const size_t data_stride_zu = static_cast<size_t>(data_stride);
+  std::vector<double> step_buffer(system_count);
+  for (int i = 0; i < sampled_step_count; i++) {
+    for (int j = 0; j < system_count; j++) {
+      const size_t info_start = static_cast<size_t>(j + (i * system_count)) * data_stride_zu;
+      if (aspect == StateVariable::TOTAL_ENERGY) {
+        step_buffer[j] = sumTotalEnergy(&ts_ptr[info_start]);
+      }
+      else if (aspect == StateVariable::POTENTIAL_ENERGY) {
+        step_buffer[j] = sumPotentialEnergy(&ts_ptr[info_start]);
+      }
+      else {
+        step_buffer[j] = static_cast<double>(ts_ptr[info_start + static_cast<size_t>(aspect)]) *
+                         inverse_nrg_scale_lf;
+      }
+    }
+    result[i].x = mean(step_buffer);
+    result[i].y = variance(step_buffer, VarianceMethod::STANDARD_DEVIATION);
+  }
+  return result;
 }
 
 } // namespace energy

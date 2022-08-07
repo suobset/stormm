@@ -18,6 +18,7 @@
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/scorecard.h"
+#include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
@@ -38,6 +39,7 @@ using namespace stormm::energy;
 using namespace stormm::errors;
 using namespace stormm::math;
 using namespace stormm::mm;
+using namespace stormm::random;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -524,6 +526,35 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
              test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
   }
+
+  // Perturb the structures and test the encapsulated energy minimization protocol.
+  Xoshiro256ppGenerator xrs(38175335);
+  poly_ps.download();
+  PhaseSpaceSynthesis host_psw = poly_ps.data();
+  for (int i = 0; i < host_psw.system_count; i++) {
+    const int jlim = host_psw.atom_starts[i] + host_psw.atom_counts[i];
+    for (int j = host_psw.atom_starts[i]; j < jlim; j++) {
+      host_psw.xcrd[j] += 0.1 * (0.5 - xrs.uniformRandomNumber());
+    }
+  }
+  host_psw.upload();
+  mincon.setDiagnosticPrintFrequency(mincon.getTotalCycles() / 10);  
+  ScoreCard e_refine = launchMinimization(poly_ag, &poly_ps, mincon, gpu, prec);
+  std::vector<std::vector<double>> e_hist;
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    e_hist[i] = e_refine.reportEnergyHistory(i, devc_tier);
+  }
+
+  // CHECK
+  printf("Result = [\n");
+  for (int i = 0; i < roundUp(mincon.getTotalCycles(), 10) + 1; i++) {
+    for (int j = 0; j < 6; j++) {
+      printf("  %12.4lf", e_hist[j][i]);
+    }
+    printf("\n");
+  }
+  printf("];\n");
+  // END CHECK
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -663,6 +694,10 @@ int main(const int argc, const char* argv[]) {
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
+
+  // Test the encapsulated minimization procedure and interpret the resulting energies
+  AtomGraphSynthesis lig1_ags = compileTopologies(lig1_top_name);
+  
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

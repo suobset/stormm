@@ -2,9 +2,10 @@
 #ifndef STORMM_SCORECARD_H
 #define STORMM_SCORECARD_H
 
-#include "Constants/fixed_precision.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/fixed_precision.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "energy_enumerators.h"
 
 namespace stormm {
@@ -303,6 +304,29 @@ public:
                                 HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
+  /// \brief Report the energy history for one or more systems.
+  ///
+  /// Overloaded:
+  ///   - Report the total energy history, as recorded on either the host or GPU device
+  ///   - Report the history of a specific energy component
+  ///   - Report results for a specific system or as the mean and standard deviation (in the x and
+  ///     y components of a double2 tuple) of all systems
+  ///
+  /// \param system_index  Index of the system of interest within all of those being tracked
+  /// \param aspect        The type of energy or virial quantity of interest (if none is specified
+  ///                      the history of systems' total energy will be reported, taking elements
+  ///                      from all potential and kinetic energy sources)
+  /// \param tier          Level from which to extract the data
+  /// \{
+  std::vector<double> reportEnergyHistory(int system_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double> reportEnergyHistory(StateVariable aspect, int system_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double2> reportEnergyHistory(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double2> reportEnergyHistory(StateVariable aspect,
+                                           HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
 private:
   int system_count;                          ///< The number of systems in the collection (each
                                              ///<   system will get a separate set of accumulators
@@ -353,6 +377,20 @@ private:
   Hybrid<llint> time_series_accumulators;    ///< A history of values for each energy accumulator
                                              ///<   at each sampled time step.  This detailed
                                              ///<   array is resized as needed, or can be reserved.
+
+  /// \brief Sum the potential energy contributions for a single system arranged in some array of
+  ///        long long integers.
+  ///
+  /// \param nrg_data  Energies for the system.  The first element of the array will coorespond to
+  ///                  the first element of the StateVariable enumerator, i.e. BOND.
+  double sumPotentialEnergy(const llint* nrg_data) const;
+
+  /// \brief Sum the total energy contributions for a single sustem arranged in some array of
+  ///        long long integers.  This adds kinetic energy to the usual potential contributions.
+  ///
+  /// \param nrg_data  Energies for the system.  The first element of the array will coorespond to
+  ///                  the first element of the StateVariable enumerator, i.e. BOND.
+  double sumTotalEnergy(const llint* nrg_data) const;
 };
 
 } // namespace energy

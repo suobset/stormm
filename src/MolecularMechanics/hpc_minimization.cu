@@ -234,6 +234,14 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 3, redu_lp);
       }
+
+      // One additional energy calculation to get the final energy
+      sc->initialize(devc_tier, gpu);
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                      &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                    EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      ctrl_xe.step += 1;
     }
     break;
   case PrecisionModel::SINGLE:
@@ -298,9 +306,23 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 3, redu_lp);
       }
+
+      // One additional energy calculation to get the final energy
+      sc->initialize(devc_tier, gpu);
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
+                      &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+                    EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                    vale_xe_lp);
+      ctrl_xe.step += 1;
     }
     break;
   }
+
+  // Advance the energy tracking history counter to log the final energy results
+  sc->commit(devc_tier);
+  sc->incrementStep();
+  scw = sc->data(devc_tier);
 }
 
 //-------------------------------------------------------------------------------------------------

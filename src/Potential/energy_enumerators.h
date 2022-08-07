@@ -46,6 +46,7 @@ enum class StateVariable {
   ELECTROSTATIC_ONE_FOUR, ///< Electrostatic energy from 1-4 attenuated interactions
   GENERALIZED_BORN,       ///< Generalized Born (implicit solvent) energy
   RESTRAINT,              ///< Energy due to flat-bottom bimodal harmonic potential restraints
+  KINETIC,                ///< Energy due to particle motion
   PRESSURE,               ///< System pressure (only computed if virials are accumulated)
   VIRIAL_11,              ///< Virial tensor (1,1) element
   VIRIAL_12,              ///< Virial tensor (1,2) element
@@ -64,6 +65,8 @@ enum class StateVariable {
   DU_DLAMBDA,             ///< Derivative of the mixed potential energy function with respect to
                           ///<   the mixing parameter Lambda (relevant to thermodynamic
                           ///<   integration applications only)
+  POTENTIAL_ENERGY,       ///< Sum of all potential energy contributions in the system
+  TOTAL_ENERGY,           ///< Sum of all potential and kinetic energy components in the system
   ALL_STATES              ///< This must always be the final entry.  The number of tracked
                           ///<   quantities is equal to the value of this entry (ALL_STATES does
                           ///<   not define its own index in the subsequent tracking arrays).
