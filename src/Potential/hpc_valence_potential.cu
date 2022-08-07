@@ -19,14 +19,15 @@ namespace energy {
 
 using card::GpuDetails;
 using card::KernelManager;
-using constants::warp_size_int;
-using constants::warp_bits;
-using constants::warp_bits_mask_int;
-using constants::twice_warp_bits_mask_int;
-using constants::twice_warp_size_int;
+using constants::chooseForceAccumulationMethod;
 using constants::large_block_size;
 using constants::medium_block_size;
 using constants::small_block_size;
+using constants::twice_warp_bits_mask_int;
+using constants::twice_warp_size_int;
+using constants::warp_size_int;
+using constants::warp_bits;
+using constants::warp_bits_mask_int;
 using data_types::int95_t;
 using math::roundUp;
 using numerics::ForceAccumulationMethod;
@@ -726,12 +727,22 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
                           const VwuGoal purpose, const ForceAccumulationMethod force_sum,
                           const int2 bt) {
+  ForceAccumulationMethod refined_force_sum;
+  switch (force_sum) {
+  case ForceAccumulationMethod::SPLIT:
+  case ForceAccumulationMethod::WHOLE:
+    refined_force_sum = force_sum;
+    break;
+  case ForceAccumulationMethod::AUTOMATIC:
+    refined_force_sum = chooseForceAccumulationMethod(poly_psw->frc_bits);
+    break;
+  }
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
     
     // When the goal is to accumulate energies, forces, or both, the force accumulation method
     // becomes a critical detail when choosing the kernel.
-    switch (eval_force) {
+    switch (refined_force_sum) {
     case EvaluateForce::YES:
       switch (force_sum) {
       case ForceAccumulationMethod::SPLIT:
@@ -757,30 +768,6 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         }
         break;
       case ForceAccumulationMethod::AUTOMATIC:
-        if (poly_psw->frc_bits <= 24) {
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            kfsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                              *scw, *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            kfsValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                        *gmem_r);
-            break;
-          }
-        }
-        else {
-          switch (eval_energy) {
-          case EvaluateEnergy::YES:
-            kfValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                             *scw, *gmem_r);
-            break;
-          case EvaluateEnergy::NO:
-            kfValenceForceAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
-                                                       *gmem_r);
-            break;
-          }
-        }
         break;
       }
       break;
@@ -796,7 +783,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     // which forces are accumulated is still important.  Whether to accumulate energies while
     // evaluating forces and moving the particles remains a consideration in choosing the proper
     // kernel.
-    switch (force_sum) {
+    switch (refined_force_sum) {
     case ForceAccumulationMethod::SPLIT:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
@@ -820,28 +807,6 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
       }
       break;
     case ForceAccumulationMethod::AUTOMATIC:
-      if (poly_psw->frc_bits <= 24) {
-        switch (eval_energy) {
-        case EvaluateEnergy::YES:
-          kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                     *gmem_r);
-          break;
-        case EvaluateEnergy::NO:
-          kfsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
-          break;
-        }
-      }
-      else {
-        switch (eval_energy) {
-        case EvaluateEnergy::YES:
-          kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                    *gmem_r);
-          break;
-        case EvaluateEnergy::NO:
-          kfValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
-          break;
-        }
-      }
       break;
     }
     break;

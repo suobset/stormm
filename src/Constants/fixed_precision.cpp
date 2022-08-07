@@ -201,5 +201,16 @@ void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+ForceAccumulationMethod chooseForceAccumulationMethod(const int frc_bits) {
+  if (frc_bits <= 24) {
+    return ForceAccumulationMethod::SPLIT;
+  }
+  else {
+    return ForceAccumulationMethod::WHOLE;
+  }
+  __builtin_unreachable();
+}
+  
 } // namespace numerics
 } // namespace stormm

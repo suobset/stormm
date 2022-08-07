@@ -2,12 +2,15 @@
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/statistics.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Potential/energy_enumerators.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/static_exclusionmask.h"
 #include "../../src/Potential/nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
+#include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/phasespace.h"
@@ -28,9 +31,13 @@ using stormm::diskutil::osSeparator;
 using stormm::energy::StateVariable;
 using stormm::energy::StaticExclusionMask;
 using stormm::errors::rtWarn;
+using stormm::math::mean;
+using stormm::math::variance;
+using stormm::math::VarianceMethod;
 using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
+using stormm::random::Xoshiro256ppGenerator;
 using stormm::topology::AtomGraph;
 using stormm::topology::NonbondedKit;
 using stormm::trajectory::CoordinateFileKind;
@@ -216,6 +223,9 @@ int main(const int argc, const char* argv[]) {
   // Section 7
   section("Fixed-precision coordinate performance");
 
+  // Section 8
+  section("Energy tracking object validation");
+  
   // Locate topologies and coordinate files
   const char osc = osSeparator();
   const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
@@ -762,7 +772,172 @@ int main(const int argc, const char* argv[]) {
                                              trpi_vdw_frc, 5.0e-6, do_tests);
   testNBPrecisionModel<llint, llint, float>(trpi_nbk_f, trpi_semask, trpi_ps, trpi_elec_frc,
                                             trpi_vdw_frc, 5.0e-5, do_tests);
-  
+
+  // Check the energy tracking object (placed in this test program for convenience)
+  Xoshiro256ppGenerator xrs;
+  int test_no = 0;
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  const int nsys = 17;
+  std::vector<int> tsc_sample_sizes(10);
+  std::vector<int> tsc_sample_size_ans(10);
+  std::vector<int> tsc_ave_dev(10 * nsys * nvar);
+  std::vector<int> tsc_ave_dev_ans(10 * nsys * nvar);
+  std::vector<int> tsc_std_dev(10 * nsys * nvar);
+  std::vector<int> tsc_std_dev_ans(10 * nsys * nvar);
+  for (int npts = 3; npts <= 48; npts += 5) {
+    ScoreCard trial_sc(nsys, npts, 32);
+
+    // CHECK
+    ScoreCardWriter trial_scw = trial_sc.data();
+    // END CHECK
+    
+    std::vector<std::vector<double>> fake_bond_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_angl_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_dihe_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_impr_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_ubrd_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_cimp_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_cmap_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_qq14_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_lj14_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_qqnb_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_ljnb_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_gbrn_e(nsys, std::vector<double>(npts));
+    std::vector<std::vector<double>> fake_rstr_e(nsys, std::vector<double>(npts));
+    for (int j = 0; j < npts; j++) {
+      for (int i = 0; i < nsys; i++) {
+        fake_bond_e[i][j] =   20.0 * xrs.uniformRandomNumber();
+        fake_angl_e[i][j] =   40.0 * xrs.uniformRandomNumber();
+        fake_dihe_e[i][j] =  125.0 * (0.50 - xrs.uniformRandomNumber());
+        fake_impr_e[i][j] =   25.0 * xrs.uniformRandomNumber();
+        fake_ubrd_e[i][j] =   35.0 * xrs.uniformRandomNumber();
+        fake_cimp_e[i][j] =   25.0 * xrs.uniformRandomNumber();
+        fake_cmap_e[i][j] =   15.0 * (0.50 - xrs.uniformRandomNumber());
+        fake_qq14_e[i][j] =  109.5 * (0.25 - xrs.uniformRandomNumber());
+        fake_lj14_e[i][j] =   75.5 * (0.05 - xrs.uniformRandomNumber());
+        fake_qqnb_e[i][j] =  250.0 * (0.50 - xrs.uniformRandomNumber());
+        fake_ljnb_e[i][j] =  150.0 * (0.05 - xrs.uniformRandomNumber());
+        fake_gbrn_e[i][j] = -(0.90 + (0.10 * xrs.uniformRandomNumber())) * fake_qqnb_e[i][j];
+        fake_rstr_e[i][j] =   15.0 * xrs.uniformRandomNumber();
+        const llint ll_bond_e = static_cast<llint>(fake_bond_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_angl_e = static_cast<llint>(fake_angl_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_dihe_e = static_cast<llint>(fake_dihe_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_impr_e = static_cast<llint>(fake_impr_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_ubrd_e = static_cast<llint>(fake_ubrd_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_cimp_e = static_cast<llint>(fake_cimp_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_cmap_e = static_cast<llint>(fake_cmap_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_qq14_e = static_cast<llint>(fake_qq14_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_lj14_e = static_cast<llint>(fake_lj14_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_qqnb_e = static_cast<llint>(fake_qqnb_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_ljnb_e = static_cast<llint>(fake_ljnb_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_gbrn_e = static_cast<llint>(fake_gbrn_e[i][j] * trial_scw.nrg_scale_lf);
+        const llint ll_rstr_e = static_cast<llint>(fake_rstr_e[i][j] * trial_scw.nrg_scale_lf);
+        trial_sc.contribute(StateVariable::BOND, ll_bond_e, i);
+        trial_sc.contribute(StateVariable::ANGLE, ll_angl_e, i);
+        trial_sc.contribute(StateVariable::PROPER_DIHEDRAL, ll_dihe_e, i);
+        trial_sc.contribute(StateVariable::IMPROPER_DIHEDRAL, ll_impr_e, i);
+        trial_sc.contribute(StateVariable::UREY_BRADLEY, ll_ubrd_e, i);
+        trial_sc.contribute(StateVariable::CHARMM_IMPROPER, ll_cimp_e, i);
+        trial_sc.contribute(StateVariable::CMAP, ll_cmap_e, i);
+        trial_sc.contribute(StateVariable::ELECTROSTATIC_ONE_FOUR, ll_qq14_e, i);
+        trial_sc.contribute(StateVariable::VDW_ONE_FOUR, ll_lj14_e, i);
+        trial_sc.contribute(StateVariable::ELECTROSTATIC, ll_qqnb_e, i);
+        trial_sc.contribute(StateVariable::VDW, ll_ljnb_e, i);
+        trial_sc.contribute(StateVariable::GENERALIZED_BORN, ll_gbrn_e, i);
+        trial_sc.contribute(StateVariable::RESTRAINT, ll_rstr_e, i);
+      }
+      trial_sc.incrementSampleCount();
+    }
+    tsc_sample_sizes[test_no] = trial_sc.getSampleSize();
+    tsc_sample_size_ans[test_no] = npts;
+    for (int i = 0; i < nvar; i++) {
+      const StateVariable istate = static_cast<StateVariable>(i);
+      for (int j = 0; j < nsys; j++) {
+        const int tsc_idx = (test_no * nvar * nsys) + (i * nsys) + j;
+        tsc_ave_dev[tsc_idx] = trial_sc.reportAverageStates(istate, j);
+        tsc_std_dev[tsc_idx] = trial_sc.reportVarianceOfStates(istate, j);
+        switch (istate) {
+        case StateVariable::BOND:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_bond_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_bond_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::ANGLE:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_angl_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_angl_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::PROPER_DIHEDRAL:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_dihe_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_dihe_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::IMPROPER_DIHEDRAL:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_impr_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_impr_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::UREY_BRADLEY:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_ubrd_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_ubrd_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::CHARMM_IMPROPER:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_cimp_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_cimp_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::CMAP:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_cmap_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_cmap_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::ELECTROSTATIC:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_qqnb_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_qqnb_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::VDW:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_ljnb_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_ljnb_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::ELECTROSTATIC_ONE_FOUR:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_qq14_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_qq14_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::VDW_ONE_FOUR:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_lj14_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_lj14_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::GENERALIZED_BORN:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_gbrn_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_gbrn_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::RESTRAINT:
+          tsc_ave_dev_ans[tsc_idx] = mean(fake_rstr_e[j]);
+          tsc_std_dev_ans[tsc_idx] = variance(fake_rstr_e[j], VarianceMethod::STANDARD_DEVIATION);
+          break;
+        case StateVariable::PRESSURE:
+        case StateVariable::VIRIAL_11:
+        case StateVariable::VIRIAL_12:
+        case StateVariable::VIRIAL_22:
+        case StateVariable::VIRIAL_13:
+        case StateVariable::VIRIAL_23:
+        case StateVariable::VIRIAL_33:
+        case StateVariable::VOLUME:
+        case StateVariable::TEMPERATURE_ALL:
+        case StateVariable::TEMPERATURE_PROTEIN:
+        case StateVariable::TEMPERATURE_LIGAND:
+        case StateVariable::TEMPERATURE_SOLVENT:
+        case StateVariable::DU_DLAMBDA:
+        case StateVariable::ALL_STATES:
+          tsc_ave_dev_ans[tsc_idx] = 0.0;
+          tsc_std_dev_ans[tsc_idx] = 0.0;
+          break;
+        }
+      }
+    }
+    test_no++;
+  }
+  check(tsc_sample_sizes, RelationalOperator::EQUAL, tsc_sample_size_ans, "Sample sizes for "
+        "various time series are not reported correctly by the ScoreCard object.");
+  check(tsc_ave_dev, RelationalOperator::EQUAL, tsc_ave_dev_ans, "Mean values for "
+        "various time series are not reported correctly by the ScoreCard object.");
+  check(tsc_std_dev, RelationalOperator::EQUAL, tsc_std_dev_ans, "Standard deviations for "
+        "various time series are not reported correctly by the ScoreCard object.");
+
   // Print results
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

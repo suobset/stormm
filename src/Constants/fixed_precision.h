@@ -236,6 +236,12 @@ void splitRealAccumulation(const float fval, int *primary, int *overflow);
 void splitRealAccumulation(const double fval, llint *primary, int *overflow);
 /// \}
 
+/// \brief Determine the best accumulation method based on the precision level of the forces.
+///
+/// \param frc_bits  Number of bits stored after the decimal in fixed-precision force
+///                  representations
+ForceAccumulationMethod chooseForceAccumulationMethod(int frc_bits);
+
 } // namespace numerics
 } // namespace stormm
 

@@ -119,7 +119,8 @@ extern void launchLineAdvance(const PrecisionModel prec, PhaseSpaceSynthesis *po
 //-------------------------------------------------------------------------------------------------
 extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                                const StaticExclusionMaskSynthesis &poly_se,
-                               PhaseSpaceSynthesis *poly_ps, MolecularMechanicsControls *mmctrl_fe,
+                               PhaseSpaceSynthesis *poly_ps, const MinimizeControl &mincon,
+                               MolecularMechanicsControls *mmctrl_fe,
                                MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
                                CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
                                CacheResource *nonb_cache, ReductionBridge *rbg,
@@ -132,6 +133,20 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
   const SeMaskSynthesisReader poly_ser = poly_se.data(devc_tier);
+  if (sc->getSystemCount() != poly_ag.getSystemCount()) {
+    rtErr("The energy tracking object is not prepared for the number of systems contained in the "
+          "topology synthesis (" + std::to_string(sc->getSystemCount()) + " vs. " +
+          std::to_string(poly_ag.getSystemCount()) + ").", "launchMinimization");
+  }
+
+  // Make sure that the energy tracking object holds space for storing all energy components in
+  // all snapshots that might be generated over the course of the energy minimization, plus the
+  // final energies of all minimized snapshots.
+  const int ntpr = mincon.getDiagnosticPrintFrequency();
+  const int total_nrg_snapshots = roundUp(mincon.getTotalCycles(), ntpr) + 1;
+  if (sc->getSampleCapacity() != total_nrg_snapshots) {
+    sc->reserve(total_nrg_snapshots);
+  }
   ScoreCardWriter scw = sc->data(devc_tier);
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
@@ -154,7 +169,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   // Progress through minimization cycles will not be measured with the step counter in the
   // molecular mechanics control object--that will increment at four times the rate in the case
   // of conjugate gradient line minimizations.
-  const int total_steps = mmctrl_fe->getTotalCycles();
+  const int total_steps = mincon.getTotalCycles();
   mmctrl_fe->primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES, prec,
                                    poly_ag);
   mmctrl_xe->primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec,
@@ -181,6 +196,11 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                         EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
+        if (i % ntpr == 0) {
+          sc->commit(devc_tier);
+          sc->incrementStep();
+          scw = sc->data(devc_tier);
+        }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
 
@@ -233,11 +253,15 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         poly_ps->initializeForces(gpu, devc_tier);
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                        nonb_lp);
+                        EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
-                      EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                      ForceAccumulationMethod::SPLIT, vale_fe_lp);
+                      EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_fe_lp);
+        if (i % ntpr == 0) {
+          sc->commit(devc_tier);
+          sc->incrementStep();
+          scw = sc->data(devc_tier);
+        }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
 
@@ -245,33 +269,30 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, nonb_lp);
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                      ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Third stage of the cycle: advance once more along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, nonb_lp);
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                      ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Final stage of the cycle: advance a final time along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, nonb_lp);
+                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                      ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
@@ -280,6 +301,69 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
     }
     break;
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
+                                    const StaticExclusionMaskSynthesis poly_se,
+                                    PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
+                                    const GpuDetails &gpu, const PrecisionModel prec) {
+
+  // Prepare to track the energies of the structures as they undergo geometry optimization.
+  ScoreCard result(poly_ps->getSystemCount(),
+                   mincon.getTotalCycles() / mincon.getDiagnosticPrintFrequency(), 32);
+
+  // Map out all kernels.  Only a few are needed but this is not a lot of work.
+  KernelManager launcher(gpu, poly_ag);
+  const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
+                                                        EvaluateEnergy::YES,
+                                                        ForceAccumulationMethod::SPLIT,
+                                                        VwuGoal::ACCUMULATE);
+  const int2 vale_xe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::NO,
+                                                        EvaluateEnergy::YES,
+                                                        ForceAccumulationMethod::SPLIT,
+                                                        VwuGoal::ACCUMULATE);
+  const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, NbwuKind::TILE_GROUPS,
+                                                       EvaluateForce::YES, EvaluateEnergy::YES,
+                                                       ForceAccumulationMethod::SPLIT);
+  const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
+                                                       ReductionStage::ALL_REDUCE);
+
+  // Prepare progress tracking objects.
+  MolecularMechanicsControls mmctrl_fe(mincon);
+  MolecularMechanicsControls mmctrl_xe(mincon);
+
+  // Prepare cache space for each kernel
+  CacheResource vale_fe_cache(vale_fe_lp.x, maximum_valence_work_unit_atoms);
+  CacheResource vale_xe_cache(vale_xe_lp.x, maximum_valence_work_unit_atoms);
+  CacheResource nonb_cache(nonb_lp.x, small_block_max_atoms);
+  ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
+  LineMinimization line_record(poly_ag.getSystemCount());
+  launchMinimization(prec, poly_ag, poly_se, poly_ps, &mmctrl_fe, &mmctrl_xe, result,
+                     &vale_fe_cache, &vale_xe_cache, &nonb_cache, &rbg, &line_record,
+                     chooseForceAccumulationMethod(poly_ps->getgetForceAccumulationBits()),
+                     gpu, launcher);
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag,
+                                    PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
+                                    const GpuDetails &gpu, const PrecisionModel prec) {
+  switch (poly_ag.getNonbondedWorkType()) {
+  case NbwuKind::TILE_GROUPS:
+  case NbwuKind::SUPERTILES:
+    {
+      const StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
+                                                 poly_ag.getTopologyIndices());
+      poly_ag.loadNonbondedWorkUnits(poly_se);
+      return launchMinimization(poly_ag, poly_se, poly_ps, mincon, gpu, prec);
+    }
+    break;
+  case NbwuKind::HONEYCOMB:
+    break;
+  }
+  __builtin_unreachable();
 }
 
 } // namespace mm

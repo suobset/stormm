@@ -98,6 +98,10 @@ public:
   ///        accumulator arrays.
   int getDataStride() const;
 
+  /// \brief Get the sample capacity (the number of individual energy measurements that the object
+  ///        is prepared to store).
+  int getSampleCapacity() const;
+  
   /// \brief Get the number of bits of fixed precision to which results are stored
   int getEnergyScaleBits() const;
 
@@ -132,7 +136,7 @@ public:
   /// \param new_capacity  The new capacity to allocate for
   void reserve(int new_capacity);
   
-  /// \brief Commit a result into one of the instantaneous state variable accumulators.  This is
+  /// \brief Place a result into one of the instantaneous state variable accumulators.  This is
   ///        for CPU activity; on the GPU, the contributions will occur as part of each energy
   ///        kernel using pointers.  This will automatically update running accumulators for
   ///        statistical tracking.  It is add + commit, below.
@@ -143,7 +147,9 @@ public:
   ///                      contrbution describes
   void contribute(StateVariable var, llint amount, int system_index = 0);
 
-  /// \brief Initialize some or all instantaneous state variable accumulators.
+  /// \brief Initialize some or all instantaneous state variable accumulators.  If all state
+  ///        variable accumulators are initialized in all systems, the sample counter will also be
+  ///        reset.
   ///
   /// Overloaded:
   ///   - Initialize a single state variable accumulator
@@ -183,19 +189,43 @@ public:
   ///
   /// Overloaded:
   ///   - Commit results for a single state variable
-  ///   - Commit results for a list of state variables
+  ///   - Commit results for a list of specific state variables
+  ///   - Commit results for all state variables
+  ///   - Commit results for a single system, or for all systems
   ///
   /// \param var           The state variable to which this contribution belongs, i.e. bond energy
   /// \param system_index  Index of the system (among a list of those being tracked) that the
   ///                      contrbution describes
   /// \{
-  void commit(StateVariable var, int system_index = 0);
-  void commit(const std::vector<StateVariable> &var, int system_index = 0);    
+  void commit(StateVariable var, int system_index,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(const std::vector<StateVariable> &var, int system_index,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(StateVariable var,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(const std::vector<StateVariable> &var,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(int system_index,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+  
+  void commit(HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
   /// \}
   
   /// \brief Increment the number of sampled steps.  This will automatically allocate additional
   ///        capacity if the sampled step count reaches the object's capacity.
   void incrementSampleCount();
+
+
+  /// \brief Reset the sample counter (this is implicitly done by initialize() if that function is
+  ///        called to operate on all start variables and all systems, on either the host or HPC
+  ///        device).
+  ///
+  /// \param count_in  The number of samples to set the object as having (default 0, full reset)
+  void resetSampleCount(int count_in = 0);
   
   /// \brief Report the total energy for all systems.  Each result will be summed in the internal
   ///        fixed-point accumulation before conversion to real values in units of kcal/mol.
@@ -252,7 +282,7 @@ public:
                              HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
-  /// \brief Report averaged results in kcal/mol, as a double-precision vector.
+  /// \brief Report standard deviations in kcal/mol, as a double-precision vector.
   ///
   /// Overloaded:
   ///   - Report results for all systems (the vector will be concatenated, with padding removed)
