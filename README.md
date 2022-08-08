@@ -317,11 +317,11 @@ calling a function, but passing by pointer guards against stealth data modificat
 
 Do not be afraid of pointers!  C++ is a superset of C, and therefore can make use of them.
 It is not desirable to use pointers to dynamically allocate memory, however: that is for
-containers and smart pointers, the most common being std::vector.  For array access, pointers are
-often (but not always) less desirable than containers due to the fact that a pointer to a block of
-memory is just that: it carries no information about what the bounds are, and while it is possible
-to reach a segmentation fault by accessing a non-existent element of a std::vector it is much
-easier to go into the code and install a bounds check if that happens.  In optimized code,
+containers and smart pointers, the most common being ```std::vector```.  For array access, pointers
+are often (but not always) less desirable than containers due to the fact that a pointer to a block
+of memory is just that: it carries no information about what the bounds are, and while it is
+possible to reach a segmentation fault by accessing a non-existent element of a std::vector it is
+much easier to go into the code and install a bounds check if that happens.  In optimized code,
 accessing an element of a std::vector by the ```[]``` operator is as fast as accessing an element 
 of an array through a pointer--the compiler knows what the program is meant to do, so pointers
 seldom have a performance advantage unless they help to skip over an extra layer of function calls
