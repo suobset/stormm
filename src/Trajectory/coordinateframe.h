@@ -2,6 +2,7 @@
 #ifndef STORMM_COORDINATE_FRAME_H
 #define STORMM_COORDINATE_FRAME_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"

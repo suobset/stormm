@@ -2,6 +2,7 @@
 #ifndef STORMM_RANDOM_H
 #define STORMM_RANDOM_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"

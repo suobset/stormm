@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "hpc_random.cuh"
 #include "random.h"

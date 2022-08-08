@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
 #include "Accelerator/hybrid.h"

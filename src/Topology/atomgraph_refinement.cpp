@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Chemistry/periodic_table.h"
 #include "Chemistry/znumber.h"

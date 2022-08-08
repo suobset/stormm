@@ -4,6 +4,7 @@
 #include <typeinfo>
 #include <typeindex>
 #include <unistd.h>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"

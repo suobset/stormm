@@ -3,6 +3,7 @@
 #define STORMM_VIRTUAL_SITE_PLACEMENT_H
 
 #include <cmath>
+#include "copyright.h"
 #include "Math/vector_ops.h"
 #include "local_arrangement.h"
 #include "Topology/atomgraph.h"

@@ -1,6 +1,8 @@
 #ifndef STORMM_TOPOLOGY_LIMITS_H
 #define STORMM_TOPOLOGY_LIMITS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace topology {
 

@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Restraints/bounded_restraint.h"

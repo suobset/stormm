@@ -3,6 +3,7 @@
 #define STORMM_NMR_RESTRAINT_H
 
 #include <string>
+#include "copyright.h"
 #include "Chemistry/chemical_features.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Trajectory/coordinateframe.h"

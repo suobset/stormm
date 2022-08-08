@@ -8,10 +8,13 @@
 #include "Math/hpc_reduction.h"
 #include "Math/reduction_abstracts.h"
 #include "Math/reduction_enumerators.h"
+#include "Math/rounding.h"
 #include "Potential/energy_enumerators.h"
 #include "Potential/hpc_nonbonded_potential.h"
 #include "Potential/hpc_valence_potential.h"
+#include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
+#include "Synthesis/valence_workunit.h"
 #include "hpc_minimization.h"
 
 namespace stormm {
@@ -24,14 +27,18 @@ using energy::EvaluateEnergy;
 using energy::EvaluateForce;
 using energy::StateVariable;
 using math::ConjGradSubstrate;
+using math::RdwuAbstractMap;
 using math::ReductionGoal;
 using math::ReductionStage;
-using math::RdwuAbstractMap;
+using math::roundUp;
 using math::rdwu_abstract_length;
+using numerics::chooseForceAccumulationMethod;
 using numerics::max_int_accumulation_f;
 using numerics::max_llint_accumulation;
+using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::NbwuKind;
 using synthesis::SeMaskSynthesisReader;
+using synthesis::small_block_max_atoms;
 using synthesis::SyNonbondedKit;
 using synthesis::SyRestraintKit;
 using synthesis::SyValenceKit;
@@ -120,7 +127,7 @@ extern void launchLineAdvance(const PrecisionModel prec, PhaseSpaceSynthesis *po
 //-------------------------------------------------------------------------------------------------
 extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                                const StaticExclusionMaskSynthesis &poly_se,
-                               PhaseSpaceSynthesis *poly_ps, const MinimizeControl &mincon,
+                               PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                                MolecularMechanicsControls *mmctrl_fe,
                                MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
                                CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
@@ -148,7 +155,6 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   if (sc->getSampleCapacity() != total_nrg_snapshots) {
     sc->reserve(total_nrg_snapshots);
   }
-  ScoreCardWriter scw = sc->data(devc_tier);
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
                                                         ForceAccumulationMethod::SPLIT,
@@ -193,14 +199,18 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
         sc->initialize(devc_tier, gpu);
+        ScoreCardWriter scw = sc->data(devc_tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
         if (i % ntpr == 0) {
+
+          // It is not necessary to re-initialize the ScoreCard abstract immediately, as the
+          // number of sampled steps has no bearing on how it will accept instantaneous results
+          // from the following energy evaluations.
           sc->commit(devc_tier);
-          sc->incrementStep();
-          scw = sc->data(devc_tier);
+          sc->incrementSampleCount();
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -208,28 +218,28 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         // Second stage of the cycle: advance once along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
         sc->initialize(devc_tier, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Third stage of the cycle: advance once more along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
         sc->initialize(devc_tier, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Final stage of the cycle: advance a final time along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
         sc->initialize(devc_tier, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
@@ -238,9 +248,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
       // One additional energy calculation to get the final energy
       sc->initialize(devc_tier, gpu);
-      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                      &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
-      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+      ScoreCardWriter scw_final = sc->data();
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       ctrl_xe.step += 1;
     }
@@ -261,15 +272,19 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
         sc->initialize(devc_tier, gpu);
+        ScoreCardWriter scw = sc->data(devc_tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                       vale_fe_lp);
         if (i % ntpr == 0) {
+
+          // It is not necessary to re-initialize the ScoreCard abstract immediately, as the
+          // number of sampled steps has no bearing on how it will accept instantaneous results
+          // from the following energy evaluations.
           sc->commit(devc_tier);
-          sc->incrementStep();
-          scw = sc->data(devc_tier);
+          sc->incrementSampleCount();
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -277,31 +292,28 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         // Second stage of the cycle: advance once along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
         sc->initialize(devc_tier, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
-                      vale_xe_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Third stage of the cycle: advance once more along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
         sc->initialize(devc_tier, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
-                      vale_xe_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Final stage of the cycle: advance a final time along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
         sc->initialize(devc_tier, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                        &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
-                      vale_xe_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
+                        EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
+                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         ctrl_xe.step += 1;
 
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
@@ -310,9 +322,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
       // One additional energy calculation to get the final energy
       sc->initialize(devc_tier, gpu);
-      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw,
-                      &nonb_tbr, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
-      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr,
+      ScoreCardWriter scw_final = sc->data();
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                     vale_xe_lp);
       ctrl_xe.step += 1;
@@ -322,8 +335,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
   // Advance the energy tracking history counter to log the final energy results
   sc->commit(devc_tier);
-  sc->incrementStep();
-  scw = sc->data(devc_tier);
+  sc->incrementSampleCount();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -362,9 +374,9 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   CacheResource nonb_cache(nonb_lp.x, small_block_max_atoms);
   ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
   LineMinimization line_record(poly_ag.getSystemCount());
-  launchMinimization(prec, poly_ag, poly_se, poly_ps, &mmctrl_fe, &mmctrl_xe, result,
-                     &vale_fe_cache, &vale_xe_cache, &nonb_cache, &rbg, &line_record,
-                     chooseForceAccumulationMethod(poly_ps->getgetForceAccumulationBits()),
+  launchMinimization(prec, poly_ag, poly_se, poly_ps, mincon, &mmctrl_fe, &mmctrl_xe, &result,
+                     &vale_fe_cache, &vale_xe_cache, &nonb_cache, &poly_rbg, &line_record,
+                     chooseForceAccumulationMethod(poly_ps->getForceAccumulationBits()),
                      gpu, launcher);
   return result;
 }
@@ -373,14 +385,14 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
 extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag,
                                     PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
                                     const GpuDetails &gpu, const PrecisionModel prec) {
-  switch (poly_ag.getNonbondedWorkType()) {
+  switch (poly_ag->getNonbondedWorkType()) {
   case NbwuKind::TILE_GROUPS:
   case NbwuKind::SUPERTILES:
     {
-      const StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
-                                                 poly_ag.getTopologyIndices());
-      poly_ag.loadNonbondedWorkUnits(poly_se);
-      return launchMinimization(poly_ag, poly_se, poly_ps, mincon, gpu, prec);
+      const StaticExclusionMaskSynthesis poly_se(poly_ag->getTopologyPointers(),
+                                                 poly_ag->getTopologyIndices());
+      poly_ag->loadNonbondedWorkUnits(poly_se);
+      return launchMinimization(*poly_ag, poly_se, poly_ps, mincon, gpu, prec);
     }
     break;
   case NbwuKind::HONEYCOMB:

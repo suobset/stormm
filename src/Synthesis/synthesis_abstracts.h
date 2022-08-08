@@ -2,6 +2,7 @@
 #ifndef STORMM_SYNTHESIS_ABSTRACTS_H
 #define STORMM_SYNTHESIS_ABSTRACTS_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph_enumerators.h"

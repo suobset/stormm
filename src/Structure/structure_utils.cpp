@@ -1,4 +1,5 @@
 #include <string>
+#include "copyright.h"
 #include "Reporting/error_format.h"
 #include "structure_utils.h"
 

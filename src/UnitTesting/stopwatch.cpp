@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <sys/time.h>
+#include "copyright.h"
 #include "Math/summation.h"
 #include "Math/statistics.h"
 #include "Parsing/parse.h"

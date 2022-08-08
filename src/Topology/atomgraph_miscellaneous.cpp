@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
+#include "copyright.h"
 #include "atomgraph.h"
 
 namespace stormm {

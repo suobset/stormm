@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
+#include "copyright.h"
 #include "Math/rounding.h"
 #include "Math/vector_ops.h"
 #include "Parsing/ascii_numbers.h"

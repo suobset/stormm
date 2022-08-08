@@ -2,6 +2,7 @@
 #ifndef STORMM_FILE_SHAPSHOT_H
 #define STORMM_FILE_SHAPSHOT_H
 
+#include "copyright.h"
 #include "FileManagement/file_util.h"
 #include "Parsing/parse.h"
 

@@ -1,4 +1,5 @@
 #include <cstring>
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"
 #include "Parsing/ascii_numbers.h"

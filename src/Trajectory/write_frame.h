@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "FileManagement/file_util.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "trajectory_enumerators.h"

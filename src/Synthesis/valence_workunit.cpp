@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "Math/statistics.h"
 #include "Math/summation.h"

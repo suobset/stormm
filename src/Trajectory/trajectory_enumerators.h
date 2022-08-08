@@ -3,6 +3,7 @@
 #define STORMM_TRAJECTORY_ENUMERATORS_H
 
 #include <string>
+#include "copyright.h"
 #include "FileManagement/file_util.h"
 #include "Parsing/textfile.h"
 

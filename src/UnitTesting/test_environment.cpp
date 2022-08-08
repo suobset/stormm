@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include "copyright.h"
 #include "FileManagement/directory_util.h"
 #include "FileManagement/file_listing.h"
 #include "FileManagement/file_util.h"

@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "Math/vector_ops.h"
 #include "local_arrangement.h"
 #include "virtual_site_handling.h"

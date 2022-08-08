@@ -2,6 +2,9 @@
 #ifndef STORMM_RESTRAINT_UTIL_H
 #define STORMM_RESTRAINT_UTIL_H
 
+#include "copyright.h"
+#include "DataTypes/stormm_vector_types.h"
+
 namespace stormm {
 namespace restraints {
 

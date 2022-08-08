@@ -2,6 +2,7 @@
 #ifndef STORMM_STATIC_MASK_SYNTHESIS_H
 #define STORMM_STATIC_MASK_SYNTHESIS_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Potential/static_exclusionmask.h"
 #include "Topology/atomgraph.h"

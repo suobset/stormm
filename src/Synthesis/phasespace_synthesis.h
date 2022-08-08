@@ -2,6 +2,7 @@
 #ifndef STORMM_PHASESPACE_SYNTHESIS_H
 #define STORMM_PHASESPACE_SYNTHESIS_H
 
+#include "copyright.h"
 #ifdef STORMM_USE_HPC
 #include "Accelerator/gpu_details.h"
 #endif

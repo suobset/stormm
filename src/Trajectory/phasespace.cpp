@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "FileManagement/file_util.h"

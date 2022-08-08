@@ -2,6 +2,7 @@
 #ifndef STORMM_NONBONDED_WORKUNIT_H
 #define STORMM_NONBONDED_WORKUNIT_H
 
+#include "copyright.h"
 #include "Math/summation.h"
 #include "Topology/atomgraph.h"
 #include "Potential/static_exclusionmask.h"

@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "atomgraph_abstracts.h"
 

@@ -2,6 +2,7 @@
 #ifndef STORMM_RESTRAINT_APPARATUS_H
 #define STORMM_RESTRAINT_APPARATUS_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "bounded_restraint.h"

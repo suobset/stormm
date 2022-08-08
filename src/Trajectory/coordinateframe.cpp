@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "FileManagement/file_listing.h"

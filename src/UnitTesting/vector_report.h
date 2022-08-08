@@ -3,6 +3,7 @@
 #define STORMM_VECTOR_REPORT_H
 
 #include <vector>
+#include "copyright.h"
 #include "Parsing/polynumeric.h"
 
 namespace stormm {

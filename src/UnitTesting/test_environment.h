@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "unit_test_enumerators.h"
 
 namespace stormm {

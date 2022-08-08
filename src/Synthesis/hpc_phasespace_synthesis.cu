@@ -4,6 +4,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/fixed_precision.h"
 #include "Reporting/error_format.h"

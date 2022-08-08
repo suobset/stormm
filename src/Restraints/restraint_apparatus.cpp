@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"

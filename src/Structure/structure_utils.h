@@ -2,6 +2,8 @@
 #ifndef STORMM_STRUCTURE_UTILS_H
 #define STORMM_STRUCTURE_UTILS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace structure {
 

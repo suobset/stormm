@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
+#include "copyright.h"
 #include "Constants/generalized_born.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"

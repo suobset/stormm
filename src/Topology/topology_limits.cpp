@@ -1,4 +1,5 @@
 #include <vector>
+#include "copyright.h"
 #include "Math/summation.h"
 #include "Reporting/error_format.h"
 

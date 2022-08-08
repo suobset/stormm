@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "isomerization.h"
 #include "local_arrangement.h"

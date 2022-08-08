@@ -7,6 +7,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "phasespace_synthesis.h"
 

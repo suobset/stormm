@@ -348,12 +348,10 @@ void ScoreCard::commit(const StateVariable var, const int system_index,
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    {
-      const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-      launchScoreCardCommit(var, -1, system_count, instantaneous_accumulators.data(tier),
-                            running_accumulators.data(tier), squared_accumulators.data(tier),
-                            time_series_accumulators.data(tier), gpu);
-    }
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
     break;
 #endif
   }
@@ -389,14 +387,12 @@ void ScoreCard::commit(const std::vector<StateVariable> &var, const int system_i
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    {
-      const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-      launchScoreCardCommit(var, -1, system_count, instantaneous_accumulators.data(tier),
-                            running_accumulators.data(tier), squared_accumulators.data(tier),
-                            time_series_accumulators.data(tier), gpu);
-    }
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
     break;
-#endif    
+#endif
   }
 }
 
@@ -435,12 +431,10 @@ void ScoreCard::commit(const StateVariable var, const HybridTargetLevel tier,
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    {
-      const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-      launchScoreCardCommit(var, -1, system_count, instantaneous_accumulators.data(tier),
-                            running_accumulators.data(tier), squared_accumulators.data(tier),
-                            time_series_accumulators.data(tier), gpu);
-    }
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
     break;
 #endif
   }
@@ -478,12 +472,10 @@ void ScoreCard::commit(const std::vector<StateVariable> &var, const HybridTarget
     break;
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
-    {
-      const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
-      launchScoreCardCommit(var, -1, system_count, instantaneous_accumulators.data(tier),
-                            running_accumulators.data(tier), squared_accumulators.data(tier),
-                            time_series_accumulators.data(tier), gpu);
-    }
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
     break;
 #endif
   }

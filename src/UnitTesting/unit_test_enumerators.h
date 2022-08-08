@@ -2,6 +2,8 @@
 #ifndef STORMM_UNIT_TEST_ENUMERATORS_H
 #define STORMM_UNIT_TEST_ENUMERATORS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace testing {
 

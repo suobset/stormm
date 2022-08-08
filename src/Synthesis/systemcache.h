@@ -3,6 +3,7 @@
 #define STORMM_SYSTEM_PREP_H
 
 #include <vector>
+#include "copyright.h"
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "Constants/behavior.h"

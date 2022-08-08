@@ -2,6 +2,7 @@
 #ifndef STORMM_PHASE_SPACE_H
 #define STORMM_PHASE_SPACE_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 #include "Topology/atomgraph.h"

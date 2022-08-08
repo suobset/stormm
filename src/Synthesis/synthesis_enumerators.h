@@ -2,6 +2,8 @@
 #ifndef STORMM_SYNTHESIS_ENUMERATORS_H
 #define STORMM_SYNTHESIS_ENUMERATORS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace synthesis {
   

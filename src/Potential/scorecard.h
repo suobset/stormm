@@ -30,6 +30,13 @@ struct ScoreCardReader {
                   const double* running_accumulators_in, const double* squared_accumulators_in,
                   const llint* time_series_in);
 
+  /// \brief Take only the default copy constructor and copy assignemnt operator for this
+  ///        struct with const elements.
+  /// \{
+  ScoreCardReader(const ScoreCardReader &original) = default;
+  ScoreCardReader& operator=(const ScoreCardReader &original) = default;
+  /// \}
+  
   const int system_count;                  ///< Number of independent systems tracked
   const int data_stride;                   ///< Size of the StateVariable enumerator rounded up
                                            ///<   to the nearest multiple of the HPC warp size
@@ -59,6 +66,13 @@ struct ScoreCardWriter {
                   double inverse_nrg_scale_lf_in, llint* instantaneous_accumulators_in,
                   double* running_accumulators_in, double* squared_accumulators_in,
                   llint* time_series_in);
+
+  /// \brief Take only the default copy constructor and copy assignemnt operator for this
+  ///        struct with const elements.
+  /// \{
+  ScoreCardWriter(const ScoreCardWriter &original) = default;
+  ScoreCardWriter& operator=(const ScoreCardWriter &original) = default;
+  /// \}
 
   const int system_count;             ///< Number of independent systems tracked
   const int data_stride;              ///< Size of the StateVariable enumerator rounded up to the

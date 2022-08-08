@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Topology/topology_util.h"
 #include "structure_ops.h"
 

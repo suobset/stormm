@@ -2,6 +2,7 @@
 #ifndef STORMM_ATOMGRAPH_SYNTHESIS_H
 #define STORMM_ATOMGRAPH_SYNTHESIS_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"

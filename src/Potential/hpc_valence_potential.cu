@@ -20,7 +20,6 @@ namespace energy {
 
 using card::GpuDetails;
 using card::KernelManager;
-using constants::chooseForceAccumulationMethod;
 using constants::large_block_size;
 using constants::medium_block_size;
 using constants::small_block_size;
@@ -31,6 +30,7 @@ using constants::warp_bits;
 using constants::warp_bits_mask_int;
 using data_types::int95_t;
 using math::roundUp;
+using numerics::chooseForceAccumulationMethod;
 using numerics::ForceAccumulationMethod;
 using numerics::max_int_accumulation;
 using numerics::max_int_accumulation_f;
@@ -743,9 +743,9 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     
     // When the goal is to accumulate energies, forces, or both, the force accumulation method
     // becomes a critical detail when choosing the kernel.
-    switch (refined_force_sum) {
+    switch (eval_force) {
     case EvaluateForce::YES:
-      switch (force_sum) {
+      switch (refined_force_sum) {
       case ForceAccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:

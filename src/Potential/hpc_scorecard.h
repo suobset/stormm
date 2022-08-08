@@ -51,7 +51,7 @@ void launchScoreCardInitialization(const std::vector<StateVariable> &var, int sy
 /// \param time_ser_acc  Pointer to the energy tracking object's time series data storage on the
 ///                      HPC device
 /// \{
-void launchScoreCardCommit(std::vector<StateVariable> &var, const int system_index,
+void launchScoreCardCommit(const std::vector<StateVariable> &var, const int system_index,
                            const int system_count, const size_t sample_count,
                            const llint* inst_acc, double* run_acc, double* sqd_acc,
                            llint* time_ser_acc, const GpuDetails &gpu);

@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"
