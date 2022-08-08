@@ -23,13 +23,13 @@ arrays do not restrict the actual algorithm in any severe way.
   a developer will need to learn (struct or class) member functions, enumerator class types,
   initialization of objects, templates, and function overloading.  These concepts can be learned
   independently and may reinforce one another.  The transition from intermediate C or python coding
-  to writing C++ with OMNI is intended to be a steady learning curve.
+  to writing C++ with STORMM is intended to be a steady learning curve.
 - Iterators, ranged for loops, and unique pointers are among the features of C++11 deemed to
   be further from the original C language than most programmers should have to go, and therefore
-  seldom appear in the OMNI libraries themselves.  Programmers writing backend or small programs
-  that link to the OMNI libraries may use these features at their discretion.
+  seldom appear in the STORMM libraries themselves.  Programmers writing backend or small programs
+  that link to the STORMM libraries may use these features at their discretion.
 - All dynamic memory intended to operate in a hybrid CPU / GPU environment should be allocated with
-  Hybrid objects from the OMNI library.  This class functions with many of the features of the STL
+  Hybrid objects from the STORMM library.  This class functions with many of the features of the STL
   vector container and interfaces with it for easy conversion to any function requiring that type.
 
 ---------------------------------------------------------------------------------------------------
@@ -81,6 +81,20 @@ arrays do not restrict the actual algorithm in any severe way.
   to prevent lowercase "l" from being confused with one (1).
 
 ---------------------------------------------------------------------------------------------------
+  Abstraction and Dependencies
+---------------------------------------------------------------------------------------------------
+- Class inheritance, while powerful, has not yet been implemented for STORMM objects.  The most
+  useful and appropriate places would likely be among the various coordinate objects, but even
+  there the practice would be of limited benefit as each of the differet coordinate objects are
+  somewhat orthogonal.  In general, STORMM development does not prohibit inheritance but does not
+  require it, either.
+- For including libraries, follow this order:
+  * C++ Standard Libraries (```#include <vector>```), in alphabetical order
+  * ```#include "copyright.h"``` (the copyright statement is found in the base source directory)
+  * STORMM libraries (```#include "Math/vector_ops.h"```), in alphabetical order
+- 
+
+---------------------------------------------------------------------------------------------------
   Naming Conventions
 ---------------------------------------------------------------------------------------------------
 - Camel case (thisIsCamelCase) for function names
@@ -104,9 +118,11 @@ arrays do not restrict the actual algorithm in any severe way.
 ---------------------------------------------------------------------------------------------------
   Function Declarations
 ---------------------------------------------------------------------------------------------------
-- When necessary, pass structs by non-const reference.  Pass by const reference to all other C++
-  functions.  Pass abstracts (structs of const pointers and scalars) by value to CUDA or HIP
-  kernels.
+- Pass by class objects by const reference to C++ functions, unless they will undergo changes in
+  the function--then, pass them by pointer to indicate that they may change as the function is
+  executed (see the discussion on pointer usage below).  Pass abstracts (structs of const pointers
+  and scalars) by value to CUDA or HIP kernels.  Depending on the situation, passing an abstract by
+  value to a C++ function (to avoid an extra layer of de-referencing) is permissible.  
 - Place function descriptions in the .cpp library file, ahead of the function declaration, not in
   the header.
 - Declare const-ness of elementary type variables in the library file but not in the header file,
@@ -169,7 +185,7 @@ i.e. ```double t = foo<double>(... argument list ...)``` or by infering the exac
 from a function argument of the template type, i.e. a primitive such as
   
 ```
-    template <typename T> T foo(std::vector<T> &list) {
+    template <typename T> T foo(const std::vector<T> &list) {
       ... function content ...
     }
 ```
@@ -232,7 +248,7 @@ de-reference the reference).  Passing by reference also removes the need to writ
 object attributes and also &x in the function call (it can be confusing, as to pass by reference
 there will be a &x in the function declaration).  One can write ```x.y``` inside a function passed
 argument ```&x``` (although the de-referencing will still occur), and call foo(x).  It
-is not best _just_ to pass arguments by reference, however: whenever passing by reference, OMNI
+is not best _just_ to pass arguments by reference, however: whenever passing by reference, STORMM
 passes by const reference, restricting the function from changing the data referenced by the
 variable (the only thing that a function can produce is its return value).  While some developers
 strive to have every argument be const (including arguments passed by value), there are situations
@@ -296,7 +312,7 @@ easier to go into the code and install a bounds check if that happens.  In optim
 accessing an element of a std::vector by the ```[]``` operator is as fast as accessing an element 
 of an array through a pointer--the compiler knows what the program is meant to do, so pointers
 seldom have a performance advantage unless they help to skip over an extra layer of function calls
-and de-referencing (there are cases of that, and OMNI libraries frequently provide small structs
+and de-referencing (there are cases of that, and STORMM libraries frequently provide small structs
 full of const pointers to expedite access to data, especially in GPU-based arrays).  However, for
 the specific purpose of letting a function modify one of its input arguments, pointers are the
 preferred route.
