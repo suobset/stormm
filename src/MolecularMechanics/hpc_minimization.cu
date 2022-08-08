@@ -211,6 +211,15 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // from the following energy evaluations.
           sc->commit(devc_tier);
           sc->incrementSampleCount();
+
+          // CHECK
+          printf("Step %4d : BOND %9.4lf  ANGL %9.4lf  DIHE %9.4lf %9.4lf  Total %9.4lf\n",
+                 i, sc->reportInstantaneousStates(StateVariable::BOND, 0, devc_tier),
+                 sc->reportInstantaneousStates(StateVariable::ANGLE, 0, devc_tier),
+                 sc->reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0, devc_tier),
+                 sc->reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0, devc_tier),
+                 sc->reportTotalEnergy(0, devc_tier));
+          // END CHECK
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -285,6 +294,15 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // from the following energy evaluations.
           sc->commit(devc_tier);
           sc->incrementSampleCount();
+
+          // CHECK
+          printf("Step %4d : BOND %9.4lf  ANGL %9.4lf  DIHE %9.4lf %9.4lf  Total %9.4lf\n",
+                 i, sc->reportInstantaneousStates(StateVariable::BOND, 0, devc_tier),
+                 sc->reportInstantaneousStates(StateVariable::ANGLE, 0, devc_tier),
+                 sc->reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0, devc_tier),
+                 sc->reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0, devc_tier),
+                 sc->reportTotalEnergy(0, devc_tier));
+          // END CHECK
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -341,12 +359,13 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 //-------------------------------------------------------------------------------------------------
 extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                                     const StaticExclusionMaskSynthesis poly_se,
-                                    PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
+                                    PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                                     const GpuDetails &gpu, const PrecisionModel prec) {
 
   // Prepare to track the energies of the structures as they undergo geometry optimization.
-  ScoreCard result(poly_ps->getSystemCount(),
-                   mincon.getTotalCycles() / mincon.getDiagnosticPrintFrequency(), 32);
+  const int ntpr   = mincon.getDiagnosticPrintFrequency();
+  const int nframe = (roundUp(mincon.getTotalCycles(), ntpr) / ntpr) + 1;
+  ScoreCard result(poly_ps->getSystemCount(), nframe, 32);
 
   // Map out all kernels.  Only a few are needed but this is not a lot of work.
   KernelManager launcher(gpu, poly_ag);
@@ -382,9 +401,9 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
 }
 
 //-------------------------------------------------------------------------------------------------
-extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag,
-                                    PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
-                                    const GpuDetails &gpu, const PrecisionModel prec) {
+extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag, PhaseSpaceSynthesis *poly_ps,
+                                    const MinimizeControls &mincon, const GpuDetails &gpu,
+                                    const PrecisionModel prec) {
   switch (poly_ag->getNonbondedWorkType()) {
   case NbwuKind::TILE_GROUPS:
   case NbwuKind::SUPERTILES:

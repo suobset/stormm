@@ -275,6 +275,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
   // Run minimizations
   const int meta_timings = (timer == nullptr) ? 0 : timer->addCategory(test_name);
+  const int pert_timings = (timer == nullptr) ? 0 : timer->addCategory("Structure perturbation");
+  const int rmin_timings = (timer == nullptr) ? 0 : timer->addCategory(test_name + " (II)");
   if (timer != nullptr) {
     timer->assignTime(0);
   }
@@ -528,32 +530,45 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   }
 
   // Perturb the structures and test the encapsulated energy minimization protocol.
+#if 0
+  if (timer != nullptr) {
+    timer->assignTime(0);
+  }
   Xoshiro256ppGenerator xrs(38175335);
   poly_ps.download();
-  PhaseSpaceSynthesis host_psw = poly_ps.data();
+  PsSynthesisWriter host_psw = poly_ps.data();
   for (int i = 0; i < host_psw.system_count; i++) {
     const int jlim = host_psw.atom_starts[i] + host_psw.atom_counts[i];
     for (int j = host_psw.atom_starts[i]; j < jlim; j++) {
       host_psw.xcrd[j] += 0.1 * (0.5 - xrs.uniformRandomNumber());
     }
   }
-  host_psw.upload();
+  poly_ps.upload();
+  if (timer != nullptr) {
+    timer->assignTime(pert_timings);
+  }
   mincon.setDiagnosticPrintFrequency(mincon.getTotalCycles() / 10);  
-  ScoreCard e_refine = launchMinimization(poly_ag, &poly_ps, mincon, gpu, prec);
-  std::vector<std::vector<double>> e_hist;
+  ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec);
+  if (timer != nullptr) {
+    timer->assignTime(rmin_timings);
+  }
+  std::vector<std::vector<double>> e_hist(poly_ps.getSystemCount());
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
-    e_hist[i] = e_refine.reportEnergyHistory(i, devc_tier);
+    e_hist[i] = e_refine.reportEnergyHistory(i, devc);
   }
 
   // CHECK
   printf("Result = [\n");
-  for (int i = 0; i < roundUp(mincon.getTotalCycles(), 10) + 1; i++) {
+  const int ntpr = mincon.getDiagnosticPrintFrequency();
+  const int nframe = (roundUp(mincon.getTotalCycles(), ntpr) / ntpr) + 1;
+  for (int i = 0; i < nframe; i++) {
     for (int j = 0; j < 6; j++) {
       printf("  %12.4lf", e_hist[j][i]);
     }
     printf("\n");
   }
   printf("];\n");
+#endif
   // END CHECK
 }
 
@@ -694,10 +709,6 @@ int main(const int argc, const char* argv[]) {
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
-
-  // Test the encapsulated minimization procedure and interpret the resulting energies
-  AtomGraphSynthesis lig1_ags = compileTopologies(lig1_top_name);
-  
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

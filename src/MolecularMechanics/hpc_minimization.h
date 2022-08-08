@@ -107,7 +107,7 @@ void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
 /// \{
 void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                         const StaticExclusionMaskSynthesis &poly_se,
-                        PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
+                        PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                         MolecularMechanicsControls *mmctrl_fe,
                         MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
                         CacheResource *vale_fe_cache, CacheResource *nonb_fe_cache,
@@ -118,12 +118,12 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
 
 ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                              const StaticExclusionMaskSynthesis poly_se,
-                             PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
+                             PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                              const GpuDetails &gpu, PrecisionModel prec = PrecisionModel::SINGLE);
 
-ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
-                             PhaseSpaceSynthesis *poly_ps, MinimizeControls mincon,
-                             const GpuDetails &gpu, PrecisionModel prec = PrecisionModel::SINGLE);
+ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly_ps,
+                             const MinimizeControls &mincon, const GpuDetails &gpu,
+                             PrecisionModel prec = PrecisionModel::SINGLE);
 /// \}
   
 } // namespace mm
