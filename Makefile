@@ -392,7 +392,7 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 
 # STORMM CUDA header files
 STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
-		      $(SRCDIR)/Accelerator/hpc_config.cuh \
+		      $(SRCDIR)/Accelerator/hpc_config.h \
 		      $(SRCDIR)/Accelerator/ptx_macros.h \
 		      $(SRCDIR)/Math/hpc_reduction.h \
 		      $(SRCDIR)/Math/hpc_summation.cuh \

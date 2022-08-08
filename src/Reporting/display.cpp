@@ -1,5 +1,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "copyright.h"
 #include "display.h"
 
 namespace stormm {

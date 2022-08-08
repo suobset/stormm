@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
 #include <nvml.h>
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/kernel_manager.h"
 #include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"

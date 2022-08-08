@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
 #include <nvml.h>
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/ptx_macros.h"
 #include "../../src/Constants/behavior.h"

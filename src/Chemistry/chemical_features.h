@@ -2,6 +2,7 @@
 #ifndef STORMM_CHEMICAL_FEATURES_H
 #define STORMM_CHEMICAL_FEATURES_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"

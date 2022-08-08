@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Reporting/error_format.h"
 #include "directory_util.h"

@@ -14,6 +14,7 @@
 #include <cuda_runtime.h>
 #  endif
 #endif
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"

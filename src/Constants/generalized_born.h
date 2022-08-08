@@ -2,6 +2,7 @@
 #ifndef STORMM_GENERALIZED_BORN_H
 #define STORMM_GENERALIZED_BORN_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 
 namespace stormm {

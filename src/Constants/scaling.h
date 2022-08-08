@@ -2,6 +2,7 @@
 #ifndef STORMM_SCALING_H
 #define STORMM_SCALING_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 
 namespace stormm {

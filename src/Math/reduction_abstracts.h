@@ -2,6 +2,7 @@
 #ifndef STORMM_REDUCTION_ABSTRACTS_H
 #define STORMM_REDUCTION_ABSTRACTS_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "Synthesis/atomgraph_synthesis.h"

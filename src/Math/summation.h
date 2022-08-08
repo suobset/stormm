@@ -3,6 +3,7 @@
 #define STORMM_SUMMATION_H
 
 #include <vector>
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"

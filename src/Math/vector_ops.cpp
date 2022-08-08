@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "vector_ops.h"
 
 namespace stormm {

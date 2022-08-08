@@ -9,6 +9,7 @@
 #    include <cuda_runtime.h>
 #  endif
 #endif
+#include "copyright.h"
 #include "Constants/scaling.h"
 
 namespace stormm {
@@ -112,7 +113,7 @@ private:
 /// \brief ***Global*** GPU descriptor that describes no valid GPU.  This is the equivalent of
 ///        nullptr for the GpuDetails object, and if passed to various functions that might launch
 ///        a CUDA kernel will trigger the corresponding CPU process instead.  An equivalent
-///        expression of this occurs in hpc_config.cuh if STORMM_USE_HPC is defined.
+///        expression of this occurs in hpc_config.h if STORMM_USE_HPC is defined.
 extern stormm::card::GpuDetails null_gpu;
 
 #endif

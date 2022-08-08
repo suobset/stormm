@@ -2,6 +2,7 @@
 #ifndef STORMM_REDUCTION_H
 #define STORMM_REDUCTION_H
 
+#include "copyright.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Math/summation.h"

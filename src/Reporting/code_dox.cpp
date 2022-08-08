@@ -1,5 +1,6 @@
 #include <vector>
 #include <string>
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "FileManagement/file_listing.h"
 #include "DataTypes/common_types.h"

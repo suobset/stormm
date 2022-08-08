@@ -1,3 +1,5 @@
+#include "copyright.h"
+
 #ifndef STORMM_PTX_MACROS_H
 #define STORMM_PTX_MACROS_H
 

@@ -1,5 +1,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "copyright.h"
 #include "display.h"
 #include "error_format.h"
 #include "summary_file.h"
@@ -43,23 +44,24 @@ void stormmSplash(std::ostream *foutp) {
             "CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE "
             "OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
   buffer = terminalFormat(buffer, nullptr, nullptr, 0, 0, 0, recommended_width,
-                          RTMessageKind::ERROR);
-  buffer += "\n";
+                          RTMessageKind::ERROR) + "\n";
   foutp->write(buffer.c_str(), buffer.size());
   terminalHorizontalRule("+", "+", recommended_width, foutp);
 }
 
 //-------------------------------------------------------------------------------------------------
-void summaryHeader(const std::string &description, std::ofstream *foutp) {
+void summaryHeader(const std::string &description, std::ofstream *foutp, const int file_width) {
 
   // Lead with the STORMM authorship and disclaimer
   stormmSplash(foutp);
   foutp->write("\n", 1);
 
   // Write the description, whether of a program itself or the program feature in use
-  int recommended_width = findFormatWidth(foutp);
+  int recommended_width = (file_width == -1) ? findFormatWidth(foutp) : file_width;
   terminalHorizontalRule("+", "+", recommended_width, foutp);
-  foutp->write(description.c_str(), description.size());
+  const std::string fmt_desc = terminalFormat(description, nullptr, nullptr, 0, 0, 0,
+                                              recommended_width, RTMessageKind::ERROR) + "\n";
+  foutp->write(fmt_desc.c_str(), fmt_desc.size());
   terminalHorizontalRule("+", "+", recommended_width, foutp);
 }
   

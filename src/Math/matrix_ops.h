@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "Accelerator/hybrid.h"

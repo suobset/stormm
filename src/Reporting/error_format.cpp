@@ -3,6 +3,7 @@
 #include <cstring>
 #include <vector>
 #include <stdexcept>
+#include "copyright.h"
 #include "error_format.h"
 #include "FileManagement/file_listing.h"
 

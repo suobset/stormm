@@ -2,6 +2,7 @@
 #ifndef STORMM_HPC_REDUCTION_H
 #define STORMM_HPC_REDUCTION_H
 
+#include "copyright.h"
 #include "Accelerator/kernel_manager.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Synthesis/atomgraph_synthesis.h"

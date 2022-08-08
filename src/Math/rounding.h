@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <vector>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 

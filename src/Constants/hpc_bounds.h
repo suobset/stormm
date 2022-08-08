@@ -2,6 +2,7 @@
 #ifndef STORMM_HPC_BOUNDS_H
 #define STORMM_HPC_BOUNDS_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 
 namespace stormm {

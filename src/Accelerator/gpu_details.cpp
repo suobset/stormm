@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include "copyright.h"
 #include "Reporting/error_format.h"
 #include "gpu_details.h"
 

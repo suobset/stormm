@@ -3,6 +3,7 @@
 #define STORMM_ZNUMBER_H
 
 #include <vector>
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {

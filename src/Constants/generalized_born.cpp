@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "generalized_born.h"
 
 namespace stormm {

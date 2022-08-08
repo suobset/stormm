@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "UnitTesting/unit_test.h"
 #include "znumber.h"
 #include "periodic_table.h"
