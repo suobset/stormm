@@ -1,7 +1,7 @@
 ![STORMM logo](images/StormmLogoSmall.jpg?raw=true)
 
-This code base will serve as a standard for developing interoperable libraries in the Amber family
-of programs with the ultimate goal of providing accessible, performant libraries for reading
+This code base will serve as a standard for developing interoperable libraries in a new family of
+MD programs with the ultimate goal of providing accessible, performant libraries for reading
 coordinates, topologies, and input data for conversion into a common set of C++ structs and
 CUDA or HIP kernels.  In many instances, HPC applications will be constructed using the same data
 arrays and layouts as their CPU counterparts, although the most efficient GPU code may require
