@@ -1,4 +1,4 @@
-![STORMM logo](https://github.com/stxinsite/Stormm/edit/master/images/StormmLogo.jpg)?raw=true
+![STORMM logo](images/StormmLogoSmall.jpg?raw=true)
 
 This code base will serve as a standard for developing interoperable libraries in the Amber family
 of programs with the ultimate goal of providing accessible, performant libraries for reading
