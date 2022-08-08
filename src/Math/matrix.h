@@ -2,6 +2,7 @@
 #ifndef STORMM_MATRIX_H
 #define STORMM_MATRIX_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Random/random.h"
 

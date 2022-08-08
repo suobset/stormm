@@ -2,6 +2,8 @@
 #ifndef STORMM_STATISTICS_H
 #define STORMM_STATISTICS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace math {
 

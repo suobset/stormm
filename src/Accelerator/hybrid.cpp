@@ -1,6 +1,7 @@
 #include <vector>
 #include <algorithm>
 #include <string.h>
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "hybrid.h"

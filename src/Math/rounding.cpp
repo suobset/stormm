@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "Constants/scaling.h"
 #include "rounding.h"

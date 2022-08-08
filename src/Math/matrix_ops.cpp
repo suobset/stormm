@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "matrix_ops.h"
 
 namespace stormm {

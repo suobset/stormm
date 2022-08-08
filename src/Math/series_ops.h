@@ -3,6 +3,7 @@
 #define STORMM_SET_OPS_H
 
 #include <vector>
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "Math/vector_ops.h"

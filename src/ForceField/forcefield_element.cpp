@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "Parsing/parse.h"
 #include "forcefield_element.h"

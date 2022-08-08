@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"

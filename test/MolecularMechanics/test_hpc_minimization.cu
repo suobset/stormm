@@ -2,7 +2,7 @@
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Accelerator/kernel_manager.h"
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/reduction_abstracts.h"

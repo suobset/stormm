@@ -3,6 +3,7 @@
 #define STORMM_FORCEFIELD_ELEMENT_H
 
 #include <vector>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph.h"

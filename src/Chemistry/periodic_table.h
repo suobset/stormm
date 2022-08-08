@@ -3,6 +3,7 @@
 #define STORMM_PERIODIC_TABLE_H
 
 #include <array>
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {

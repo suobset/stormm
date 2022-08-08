@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/mixed_types.h"

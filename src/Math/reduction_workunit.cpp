@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "Reporting/error_format.h"
 #include "reduction_workunit.h"

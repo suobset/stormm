@@ -2,6 +2,7 @@
 #ifndef STORMM_FFT_H
 #define STORMM_FFT_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 
 namespace stormm {

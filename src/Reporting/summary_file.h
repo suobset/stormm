@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Parsing/textfile.h"
 
 namespace stormm {
@@ -28,9 +29,10 @@ void stormmSplash(std::ostream *foutp = &std::cout);
 
 /// \brief Summarize the work done in a particular STORMM run.
 ///
-/// \param description
+/// \param description  Content of the header to write, a description of the program or activity
 /// \param foutp        Writeable file stream for the output file
-void summaryHeader(const std::string &description, std::ofstream *foutp);
+/// \param file_width   Width of the file to write (default -1 will choose the default file width)
+void summaryHeader(const std::string &description, std::ofstream *foutp, int file_width = -1);
  
 } // namespace review
 } // namespace stormm

@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace docs {

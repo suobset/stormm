@@ -3,6 +3,7 @@
 #define STORMM_BEHAVIOR_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace constants {

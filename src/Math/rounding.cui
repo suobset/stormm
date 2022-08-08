@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ int devcRoundUp(const int jagged, const int increment) {

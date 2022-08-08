@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <regex>
 #include <string.h>
+#include "copyright.h"
 #include "file_listing.h"
 #include "Reporting/error_format.h"
 

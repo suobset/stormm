@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Math/rounding.h"
 #include "reduction.h"

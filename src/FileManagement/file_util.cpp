@@ -1,4 +1,5 @@
 #include <cstdio>
+#include "copyright.h"
 #include "file_util.h"
 #include "file_listing.h"
 #include "Reporting/error_format.h"

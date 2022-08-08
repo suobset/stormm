@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "copyright.h"
 #include "Constants/behavior.h"
 
 namespace stormm {

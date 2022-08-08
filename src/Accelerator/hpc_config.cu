@@ -7,8 +7,9 @@
 #include <curand_kernel.h>
 #include <nvml.h>
 #endif
+#include "copyright.h"
 #include "Reporting/error_format.h"
-#include "hpc_config.cuh"
+#include "hpc_config.h"
 
 namespace stormm {
 namespace card {

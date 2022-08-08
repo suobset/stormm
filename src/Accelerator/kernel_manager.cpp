@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/hpc_bounds.h"
 #include "Math/vector_ops.h"

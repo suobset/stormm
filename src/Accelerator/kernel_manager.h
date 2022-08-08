@@ -9,6 +9,7 @@
 #    include <cuda_runtime.h>
 #  endif
 #endif
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/stormm_vector_types.h"

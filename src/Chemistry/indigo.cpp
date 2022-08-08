@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"

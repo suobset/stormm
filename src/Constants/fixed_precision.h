@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <string>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
