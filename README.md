@@ -92,7 +92,18 @@ arrays do not restrict the actual algorithm in any severe way.
   * C++ Standard Libraries (```#include <vector>```), in alphabetical order
   * ```#include "copyright.h"``` (the copyright statement is found in the base source directory)
   * STORMM libraries (```#include "Math/vector_ops.h"```), in alphabetical order
-- 
+- C++ implementation (.cpp) files should generally include their own corresponding header files.
+  Any classes, functions, or other objects present in a header file should be traceable by some
+  ```#include``` statement in that header file.  Any classes, funcions, or other objects present
+  in an implementation file should be traceable by additional ```#include``` statements in the
+  implementation file itself, or in the relevant library header file.
+- Place documentation for function usage in header (.h) files and implementation-relevant
+  documentation in implementation (.cpp or .tpp) files.  Place the implementations of template
+  functions in template implementation (.tpp) files, not in the header file where the templated
+  function or class template is first declared.  The .tpp file should be included at the end of the
+  corresponding header file, outside of any namespace scopes but within the header file's customary
+  ```#include``` guards.  Template files should re-declare the relevant namespace scopes to wrap
+  their implementations, but not contain additional ```#include``` guards.
 
 ---------------------------------------------------------------------------------------------------
   Naming Conventions
@@ -177,7 +188,7 @@ One of the most significant features that distinguishes C++ from the original C 
 existence of templates, objects or functions which are (within limits) agnostic to the data type
 that they will operate upon.  Because they step into the realm of modern C++ and a new world of
 abstraction and inference, templates make an important "boundary" case of what can be sanctioned
-within the (arbitrary, self-imposed) Omni coding conventions.  The critical aspect of successful
+within the (arbitrary, self-imposed) STORMM coding conventions.  The critical aspect of successful
 template design concerns type inference, a depthy and general aspect of C++ which made laudable
 improvements in C++11.  When a template is _used_ in the code, the compiler essentially creates an
 overloaded variant of the template function as stipulated either by an explicit type declaration,
