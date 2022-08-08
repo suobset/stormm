@@ -2,6 +2,7 @@
 #ifndef STORMM_MM_EVALUATION_H
 #define STORMM_MM_EVALUATION_H
 
+#include "copyright.h"
 #include "Potential/energy_enumerators.h"
 #include "Potential/nonbonded_potential.h"
 #include "Potential/scorecard.h"

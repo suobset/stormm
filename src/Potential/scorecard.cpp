@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
 #include "Math/rounding.h"

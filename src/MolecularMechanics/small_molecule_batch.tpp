@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 

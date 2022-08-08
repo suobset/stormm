@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "Synthesis/synthesis_enumerators.h"

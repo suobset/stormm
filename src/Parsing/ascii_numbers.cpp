@@ -1,4 +1,5 @@
 #include <climits>
+#include "copyright.h"
 #include "Reporting/error_format.h"
 #include "ascii_numbers.h"
 

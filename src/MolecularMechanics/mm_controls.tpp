@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 namespace stormm {
 namespace mm {
 

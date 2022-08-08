@@ -3,6 +3,7 @@
 #define STORMM_HPC_SCORECARD_H
 
 #include <vector>
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "energy_enumerators.h"
 

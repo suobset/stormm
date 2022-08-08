@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"

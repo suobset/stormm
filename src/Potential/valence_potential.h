@@ -3,6 +3,7 @@
 #define STORMM_VALENCE_POTENTIAL_H
 
 #include <cmath>
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"

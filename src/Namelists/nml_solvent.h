@@ -2,6 +2,7 @@
 #ifndef STORMM_NML_SOLVENT_H
 #define STORMM_NML_SOLVENT_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Parsing/textfile.h"
 #include "Topology/atomgraph_enumerators.h"

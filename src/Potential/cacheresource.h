@@ -2,6 +2,7 @@
 #ifndef STORMM_CACHERESOURCE_H
 #define STORMM_CACHERESOURCE_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 

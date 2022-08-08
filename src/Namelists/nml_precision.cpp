@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"

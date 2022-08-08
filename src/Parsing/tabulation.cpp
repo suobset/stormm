@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include "copyright.h"
 #include "Math/summation.h"
 #include "Reporting/error_format.h"
 #include "parse.h"

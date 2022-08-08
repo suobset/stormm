@@ -2,6 +2,7 @@
 #ifndef STORMM_EVAL_SYNTHESIS_H
 #define STORMM_EVAL_SYNTHESIS_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/vector_ops.h"

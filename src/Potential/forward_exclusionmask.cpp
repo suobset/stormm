@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "forward_exclusionmask.h"
 

@@ -2,6 +2,7 @@
 #ifndef STORMM_NML_PRECISION_H
 #define STORMM_NML_PRECISION_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/fixed_precision.h"
 #include "Parsing/textfile.h"

@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "nonbonded_potential.h"
 
 namespace stormm {

@@ -1,4 +1,5 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "Accelerator/ptx_macros.h"
 #include "Accelerator/gpu_details.h"
 #include "Constants/fixed_precision.h"

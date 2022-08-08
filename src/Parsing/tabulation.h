@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "polynumeric.h"
 #include "Math/sorting.h"
 

@@ -2,6 +2,7 @@
 #ifndef STORMM_HPC_MINIMIZATION_H
 #define STORMM_HPC_MINIMIZATION_H
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"

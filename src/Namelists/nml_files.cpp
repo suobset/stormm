@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"

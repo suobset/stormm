@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Math/vector_ops.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "eval_valence_workunit.h"

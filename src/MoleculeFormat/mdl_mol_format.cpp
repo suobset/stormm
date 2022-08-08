@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "mdl_mol_format.h"
 
 namespace stormm {

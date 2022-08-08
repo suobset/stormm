@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 __global__ void __launch_bounds__(small_block_size, 4)
 KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter scw,
             LinMinWriter lmw, int move_number) {

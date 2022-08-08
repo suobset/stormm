@@ -2,6 +2,7 @@
 #ifndef STORMM_MM_CONTROLS_H
 #define STORMM_MM_CONTROLS_H
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Accelerator/hybrid.h"

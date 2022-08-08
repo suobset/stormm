@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"
 #include "Topology/atomgraph.h"

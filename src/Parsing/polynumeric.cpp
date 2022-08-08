@@ -1,4 +1,5 @@
 #include <cstring>
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "polynumeric.h"

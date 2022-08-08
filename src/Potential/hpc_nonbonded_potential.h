@@ -2,6 +2,7 @@
 #ifndef STORMM_NONBONDED_POTENTIAL_CUH
 #define STORMM_NONBONDED_POTENTIAL_CUH
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"

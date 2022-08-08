@@ -2,6 +2,7 @@
 #ifndef STORMM_USER_SETTINGS_H
 #define STORMM_USER_SETTINGS_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_ffmorph.h"

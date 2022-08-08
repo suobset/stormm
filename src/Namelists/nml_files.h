@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "input.h"
 #include "namelist_emulator.h"
 #include "Parsing/textfile.h"

@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "mm_evaluation.h"
 
 namespace stormm {

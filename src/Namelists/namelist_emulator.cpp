@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "Parsing/tabulation.h"
 #include "Reporting/display.h"

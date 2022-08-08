@@ -2,6 +2,8 @@
 #ifndef STORMM_SMALL_MOLECULE_BATCH_H
 #define STORMM_SMALL_MOLECULE_BATCH_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace mm {
 

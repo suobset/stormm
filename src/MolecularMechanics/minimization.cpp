@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "minimization.h"
 
 namespace stormm {

@@ -2,6 +2,7 @@
 #ifndef STORMM_FORWARD_EXCLUSIONMASK_H
 #define STORMM_FORWARD_EXCLUSIONMASK_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph.h"

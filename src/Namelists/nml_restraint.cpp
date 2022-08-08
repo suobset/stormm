@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "Structure/local_arrangement.h"
 #include "namelist_element.h"

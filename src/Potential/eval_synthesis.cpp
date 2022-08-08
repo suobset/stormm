@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Math/vector_ops.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"

@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "FileManagement/file_listing.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_element.h"

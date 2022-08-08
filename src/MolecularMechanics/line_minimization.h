@@ -2,6 +2,7 @@
 #ifndef STORMM_LINE_MINIMIZATION_H
 #define STORMM_LINE_MINIMIZATION_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 
 namespace stormm {

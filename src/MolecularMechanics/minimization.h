@@ -3,6 +3,7 @@
 #define STORMM_MINIMIZATION_H
 
 #include <cmath>
+#include "copyright.h"
 #include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
