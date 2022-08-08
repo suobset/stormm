@@ -12,6 +12,7 @@
 #include "../../src/Potential/valence_potential.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Reporting/summary_file.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/Trajectory/coordinate_series.h"
@@ -38,6 +39,7 @@ using stormm::parse::char4ToString;
 using stormm::parse::NumberFormat;
 using stormm::parse::polyNumericVector;
 using stormm::random::Xoshiro256ppGenerator;
+using stormm::review::stormmSplash;
 using stormm::topology::AtomGraph;
 using stormm::topology::NonbondedKit;
 using stormm::trajectory::CoordinateFileKind;
@@ -196,6 +198,9 @@ int main(const int argc, const char* argv[]) {
 
   // Some baseline initialization
   TestEnvironment oe(argc, argv);
+  if (oe.getVerbosity() == TestVerbosity::FULL) {
+    stormmSplash();
+  }
   StopWatch timer;
   const int input_timings  = timer.addCategory("Input file parsing");
   const int sem_timings    = timer.addCategory("Static exclusion mask");

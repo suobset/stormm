@@ -7,7 +7,7 @@ namespace display {
 
 //-------------------------------------------------------------------------------------------------
 void terminalHorizontalRule(const std::string &left_corner, const std::string &right_corner,
-                            const int width) {
+                            const int width, std::ostream *foutp) {
 
   // Obtain the console size
   struct winsize console_dims;
@@ -15,8 +15,8 @@ void terminalHorizontalRule(const std::string &left_corner, const std::string &r
   int n_dash = (width == 0) ? console_dims.ws_col - 1 : width;
   n_dash -= left_corner.size() + right_corner.size();
   std::string hrule(n_dash, '-');
-  hrule = left_corner + hrule + right_corner;
-  printf("%s\n", hrule.c_str());
+  hrule = left_corner + hrule + right_corner + "\n";
+  foutp->write(hrule.c_str(), hrule.size());
 }
 
 } // namespace display

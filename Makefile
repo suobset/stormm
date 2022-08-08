@@ -70,6 +70,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Reporting/code_dox.cpp \
 	           $(SRCDIR)/Reporting/display.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
+		   $(SRCDIR)/Reporting/summary_file.cpp \
 		   $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		   $(SRCDIR)/Restraints/restraint_builder.cpp \
@@ -189,6 +190,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Reporting/code_dox.h \
 		     $(SRCDIR)/Reporting/display.h \
 	             $(SRCDIR)/Reporting/error_format.h \
+	             $(SRCDIR)/Reporting/summary_file.h \
 	             $(SRCDIR)/Restraints/bounded_restraint.h \
 	             $(SRCDIR)/Restraints/restraint_apparatus.h \
 	             $(SRCDIR)/Restraints/restraint_builder.h \
@@ -335,6 +337,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Reporting/code_dox.o \
 		  $(SRCDIR)/Reporting/display.o \
 	          $(SRCDIR)/Reporting/error_format.o \
+	          $(SRCDIR)/Reporting/summary_file.o \
 	          $(SRCDIR)/Restraints/bounded_restraint.o \
 	          $(SRCDIR)/Restraints/restraint_apparatus.o \
 	          $(SRCDIR)/Restraints/restraint_builder.o \
