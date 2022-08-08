@@ -13,11 +13,11 @@ arrays do not restrict the actual algorithm in any severe way.
 ---------------------------------------------------------------------------------------------------
   Code Standards
 ---------------------------------------------------------------------------------------------------
-- This code base will follow the C++11 standard, in particular for enum classes, member
+- This code base will follow the C++17 standard, in particular for enum classes, member
   initializers, brace initialization for POD aggregates, deleted and defaulted functions, nullptr,
-  constructor delegation, and key Standard Library algorithms.  C++11 is comprehensible and
-  compatible to NVIDIA's compilers.  It is both the major increment in C++ and a safe choice for
-  hybrid programming.
+  constructor delegation, and key Standard Library algorithms.  C++17 is comprehensible and
+  compatible to NVIDIA's compilers.  It subsumes the major C++11 increment in C++, will be
+  insulated from deprecation for years to come, and remains a safe choice for hybrid programming.
 - Developers should strive for a code feel much like C, with basic C++ features like templates,
   private or protected struct or class member variables with public getter functions, and often
   passing by reference rather than by pointer (in C++, type & rather than * in C).  The code base
@@ -26,7 +26,7 @@ arrays do not restrict the actual algorithm in any severe way.
   initialization of objects, templates, and function overloading.  These concepts can be learned
   independently and may reinforce one another.  The transition from intermediate C or python coding
   to writing C++ with STORMM is intended to be a steady learning curve.
-- Iterators, ranged for loops, and unique pointers are among the features of C++11 deemed to
+- Iterators, ranged for loops, and unique pointers are among the features of modern C++ deemed to
   be further from the original C language than most programmers should have to go, and therefore
   seldom appear in the STORMM libraries themselves.  Programmers writing backend or small programs
   that link to the STORMM libraries may use these features at their discretion.
