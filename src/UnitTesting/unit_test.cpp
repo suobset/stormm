@@ -508,8 +508,14 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
         const std::string parsed_msg = terminalFormat(error_message + error_edit,
                                                       "", "", 19, 0, 19);
         printf("%s\n", parsed_msg.c_str());
-        gbl_test_results.logResult(CheckResult::FAILURE);
-        return CheckResult::FAILURE;
+        if (urgency == TestPriority::NON_CRITICAL) {
+          gbl_test_results.logResult(CheckResult::IGNORED);
+          return CheckResult::IGNORED;
+        }
+        else if (urgency == TestPriority::CRITICAL) {
+          gbl_test_results.logResult(CheckResult::FAILURE);
+          return CheckResult::FAILURE;
+        }
       }
       else {
         gbl_test_results.logResult(CheckResult::SUCCESS);

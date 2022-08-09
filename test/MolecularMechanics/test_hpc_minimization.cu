@@ -4,6 +4,7 @@
 #include "../../src/Accelerator/kernel_manager.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/DataTypes/mixed_types.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_bridge.h"
@@ -14,6 +15,7 @@
 #include "../../src/MolecularMechanics/line_minimization.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/MolecularMechanics/mm_evaluation.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Potential/cacheresource.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/hpc_valence_potential.h"
@@ -34,11 +36,13 @@
 
 using namespace stormm::card;
 using namespace stormm::constants;
+using namespace stormm::data_types;
 using namespace stormm::diskutil;
 using namespace stormm::energy;
 using namespace stormm::errors;
 using namespace stormm::math;
 using namespace stormm::mm;
+using namespace stormm::parse;
 using namespace stormm::random;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
@@ -518,15 +522,74 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
              "environment variable, currently set to " + oe.getStormmSourcePath() + ", for "
              "validity.  Subsequent tests will be skipped.", "test_hpc_minimization");
     }
-    const TestPriority do_snps = (snap_exists &&
-                                  do_tests == TestPriority::CRITICAL) ? TestPriority::CRITICAL :
-                                                                        TestPriority::ABORT;
+
+    // Single-precision minimizations can sometimes end up at different points, depending on the
+    // card.  While there seems to be only a handful of different results one can get, it is hard
+    // to check in that level of detail.  The results always seem to be self-consistent for the
+    // same card, however: the same system goes to the same state, regardless of which SMP it
+    // passed through.
+    TestPriority do_snps;
+    if (snap_exists && do_tests == TestPriority::CRITICAL) {
+      switch (prec) {
+      case PrecisionModel::DOUBLE:
+        do_snps = TestPriority::CRITICAL;
+        break;
+      case PrecisionModel::SINGLE:
+        do_snps = TestPriority::NON_CRITICAL;
+        break;
+      }
+    }
+    else {
+      do_snps = TestPriority::ABORT;
+    }
     const std::vector<double> final_e = sc.reportTotalEnergies(devc);
     const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
     snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-6, "Final energies of "
              "energy-minimized structures did not reach their expected values.  Test: " +
              test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
+    if (prec == PrecisionModel::SINGLE) {
+      const int n_unique_systems = maxValue(mol_id_vec) + 1;
+      const int nsystems = mol_id_vec.size();
+      bool consistent = true;
+      std::vector<CombineIDp> failures;
+      for (int i = 0; i < n_unique_systems; i++) {
+        int ncopies = 0;
+        for (int j = 0; j < nsystems; j++) {
+          ncopies += (mol_id_vec[j] == i);
+        }
+        if (ncopies > 0) {
+          std::vector<double> copy_e(ncopies);
+          ncopies = 0;
+          for (int j = 0; j < nsystems; j++) {
+            if (mol_id_vec[j] == i) {
+              copy_e[ncopies] = final_e[j];
+              ncopies++;
+            }
+          }
+          const double nrg_spread = variance(copy_e.data(), ncopies,
+                                             VarianceMethod::COEFFICIENT_OF_VARIATION);
+          consistent = (consistent && fabs(nrg_spread) < 2.0e-6);
+          if (fabs(nrg_spread) >= 2.0e-6) {
+            failures.push_back({ i, nrg_spread });
+          }
+        }
+      }
+      std::string err_msg("Divergent systems include:");
+      if (consistent == false) {
+        for (size_t i = 0; i < failures.size(); i++) {
+          const int natom = ag_ptr_vec[failures[i].x]->getAtomCount();
+          err_msg += " " + std::to_string(failures[i].x) + " (" + std::to_string(natom) +
+                     " atoms, " + realToString(failures[i].y, 11, 4, NumberFormat::SCIENTIFIC) +
+                     " kcal/mol)";
+          if (i < failures.size() - 1LLU) {
+            err_msg += ", ";
+          }
+        }
+      }
+      check(consistent, "The energies of systems originating at identical coordinates do not "
+            "end up at the same values.  " + err_msg, do_tests);
+    }
   }
 
   // Perturb the structures and test the encapsulated energy minimization protocol.
