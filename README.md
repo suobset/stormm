@@ -1,14 +1,14 @@
 ![STORMM logo](images/StormmLogoSmall.jpg?raw=true)
 
-This code base will serve as a standard for developing interoperable libraries in a new family of
-MD programs with the ultimate goal of providing accessible, performant libraries for reading
-coordinates, topologies, and input data for conversion into a common set of C++ structs and
-CUDA or HIP kernels.  In many instances, HPC applications will be constructed using the same data
-arrays and layouts as their CPU counterparts, although the most efficient GPU code may require
-sacrifices in the convenience or performance of CPU code.  These sacrifices are likely to be
-minor, however, as the best CPU code takes advantage of similar vectorization as GPU code and,
-even if vectorization cannot happen in the same manner, the contents and format of basic data
-arrays do not restrict the actual algorithm in any severe way.
+This code base will provide accessible, performant, interoperable libraries in a new family of MD
+programs.  Basic operations such as coordinate and topology intake, user input parsing, and 
+energy evaluations are managed through a common set of C++ classes and CUDA or HIP kernels.  In
+many instances, HPC applications will be constructed using the same data arrays and layouts as
+their CPU counterparts, although the most efficient GPU code may require sacrifices in the
+convenience or performance of CPU code.  These sacrifices are likely to be minor, however, as the
+best CPU code takes advantage of similar vectorization as GPU code and, even if vectorization
+cannot happen in the same manner, the contents and format of basic data arrays do not restrict the
+actual algorithm in any severe way.
 
 ---------------------------------------------------------------------------------------------------
   Code Standards
