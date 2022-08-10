@@ -34,7 +34,7 @@ struct ScoreCardReader {
   ///        struct with const elements.
   /// \{
   ScoreCardReader(const ScoreCardReader &original) = default;
-  ScoreCardReader& operator=(const ScoreCardReader &original) = default;
+  ScoreCardReader(ScoreCardReader &&original) = default;
   /// \}
   
   const int system_count;                  ///< Number of independent systems tracked
@@ -71,7 +71,7 @@ struct ScoreCardWriter {
   ///        struct with const elements.
   /// \{
   ScoreCardWriter(const ScoreCardWriter &original) = default;
-  ScoreCardWriter& operator=(const ScoreCardWriter &original) = default;
+  ScoreCardWriter(ScoreCardWriter &&original) = default;
   /// \}
 
   const int system_count;             ///< Number of independent systems tracked

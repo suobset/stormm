@@ -39,6 +39,8 @@ template <typename T> struct SyValenceKit {
   // Member variables (all public)
   const int nvwu;                ///< The number of valence work units
   const T coulomb;               ///< Coulomb's constant in kcal-A2/mol-e2
+
+  // Condensed valence parameter tables
   const T* bond_keq;             ///< Consensus table of harmonic bond stiffness constants
   const T* bond_leq;             ///< Consensus table of harmonic bond equilibrium lengths
   const T* angl_keq;             ///< Consensus table of harmonic angle stiffness constants
@@ -64,6 +66,8 @@ template <typename T> struct SyValenceKit {
   const int* cmap_dim;           ///< Dimensions for each member of the consensus table of CMAPs
   const T* cmap_patches;         ///< Consensus table of CMAP pre-computed surface patch data
   const int* cmap_patch_bounds;  ///< Bounds array for cmap_patches
+  
+  // Details of each work unit and instruction sets
   const int2* vwu_abstracts;     ///< Abstracts for all valence work units
   const int* vwu_imports;        ///< Imported atom tables for all valence work units
   const uint2* vwu_manip;        ///< Manipulation masks (movement in x member, update in y member)
@@ -82,6 +86,7 @@ template <typename T> struct SyValenceKit {
   const uint* cdhe_acc;          ///< Composite dihedral energy accumulation masks
   const uint* cmap_acc;          ///< CMAP energy accumulation masks
   const uint* infr14_acc;        ///< Inferred 1:4 interaction energy accumulation masks
+
 };
 
 /// \brief Collect the critical restraint parameters and masking information for work unit-based
@@ -200,6 +205,30 @@ template <typename T> struct SyNonbondedKit {
   const T* gb_gamma;              ///< Generalized born gamma parameters (one parameter per atom)
 };
 
+/// \brief Collect the virtual site details and constraint parameters of the topology synthesis
+///        into a single abstract.  This is designed to work in the context of the valence work
+///        units from the same topology synthesis, whether in a standalone function or as an extra
+///        step in a workflow that compute valence interactions and then moves particles.
+template <typename T2, typename T4> struct SyAtomUpdateKit {
+
+  /// \brief The constructor takes a list of parameter arrays.  Like other AtomGraphSynthesis
+  ///        abstracts, then actual numbers of parameters in each array, which are irrelevant to
+  ///        the implementation as long as the work unit instructions do not overrun the bounds,
+  ///        are omitted to save space on the constants imported as arguments to each kernel.
+  SyAtomUpdateKit(const T4* vs_params);
+  
+  const T4* vs_params;        ///< Unique virtual site frames, with the first, second, and third
+                              ///<   dimension parameters in the 
+  const T4* settle_geom;      ///< Geometric considerations for SETTLE-constrained groups.  The
+                              ///<   SETTLE instructions will indicate which parameter set, and
+                              ///<   thus which index of this array to take.
+  const T2* settle_mass;      ///< Inverse mass considerations for SETTLE-constrained groups.  The
+                              ///<   SETTLE instructions will indicate which parameter set, and
+                              ///<   thus which index of this array to take.  
+  const T2* cnst_grp_params;  ///< Bond length (x member) and inverse mass (y member) information
+                              ///<   for hub-and-spoke constraint groups.
+};
+  
 } // namespace synthesis
 } // namespace stormm
 
