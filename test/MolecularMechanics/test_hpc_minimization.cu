@@ -201,7 +201,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(), mol_id_vec);
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_ptr_vec, mol_id_vec, gpos_bits, 24, 40, frc_bits);
-  
+    
   // Create the minimization instructions
   MinimizeControls mincon;
   mincon.setTotalCycles(maxcyc);
@@ -214,10 +214,10 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
   // Track energies in the systems
   ScoreCard sc(mol_id_vec.size(), mincon.getTotalCycles(), 32);
-
+  
   // Obtain kernel launch parameters for the workload
   KernelManager launcher(gpu, poly_ag);
-  
+    
   // Lay out GPU cache resources
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
@@ -273,14 +273,13 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   ReductionKit poly_redk(poly_ag, devc);
   ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
   ConjGradSubstrate cgsbs(&poly_ps, &poly_rbg, devc);
-  LineMinimization line_record(poly_ag.getSystemCount());
-  line_record.primeMoveLengths(mmctrl_fe.getInitialMinimizationStep());
+  LineMinimization line_record(poly_ag.getSystemCount(), mmctrl_fe.getInitialMinimizationStep());
   LinMinWriter lmw = line_record.data(devc);
-
+  
   // Run minimizations
   const int meta_timings = (timer == nullptr) ? 0 : timer->addCategory(test_name);
   const int pert_timings = (timer == nullptr) ? 0 : timer->addCategory("Structure perturbation");
-  const int rmin_timings = (timer == nullptr) ? 0 : timer->addCategory(test_name + " (II)");
+  const int chek_timings = (timer == nullptr) ? 0 : timer->addCategory("Check MM against CPU");
   if (timer != nullptr) {
     timer->assignTime(0);
   }
@@ -316,6 +315,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     // Check the forces computed for a couple of systems.  This is somewhat redundant, but serves
     // as a sanity check in case other aspects of the energy minimization show problems.
     if (check_mm && (i & 0x1f) == 0) {
+      cudaDeviceSynchronize();
+      timer->assignTime(meta_timings);
       const int jlim = (3 * i) + 1;
       const TrajectoryKind tforce = TrajectoryKind::FORCES; 
       for (int j = 3 * i; j < jlim; j++) {
@@ -332,6 +333,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         gpu_total_e[i / 32] = sc.reportTotalEnergy(jmod, devc);
         force_mue[i / 32] = meanUnsignedError(cpu_frc, gpu_frc);
       }
+      timer->assignTime(chek_timings);
     }
     
     // Download and check the forces for each system to verify consistency.  If the forces are
@@ -593,7 +595,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   }
 
   // Perturb the structures and test the encapsulated energy minimization protocol.
-#if 0
   if (timer != nullptr) {
     timer->assignTime(0);
   }
@@ -608,25 +609,28 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   }
   poly_ps.upload();
   if (timer != nullptr) {
+    cudaDeviceSynchronize();
     timer->assignTime(pert_timings);
   }
   mincon.setDiagnosticPrintFrequency(mincon.getTotalCycles() / 10);  
-  ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec);
-  if (timer != nullptr) {
-    timer->assignTime(rmin_timings);
-  }
+  ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec, timer,
+                                          test_name + " (II)");
+  e_refine.download();
   std::vector<std::vector<double>> e_hist(poly_ps.getSystemCount());
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
-    e_hist[i] = e_refine.reportEnergyHistory(i, devc);
+    e_hist[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
   }
-
+  
   // CHECK
+#if 0
   printf("Result = [\n");
   const int ntpr = mincon.getDiagnosticPrintFrequency();
   const int nframe = (roundUp(mincon.getTotalCycles(), ntpr) / ntpr) + 1;
+  printf("Each e_hist has %4zu data points and I think there are %4d\n", e_hist[0].size(), nframe);
   for (int i = 0; i < nframe; i++) {
-    for (int j = 0; j < 6; j++) {
-      printf("  %12.4lf", e_hist[j][i]);
+    const int jlim = std::min(6, static_cast<int>(e_hist.size()));
+    for (int j = 0; j < jlim; j++) {
+      printf("  %12.4lf", e_hist[j][i]);      
     }
     printf("\n");
   }
@@ -723,7 +727,7 @@ int main(const int argc, const char* argv[]) {
   HpcConfig gpu_config(ExceptionResponse::WARN);
   const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
-
+  
   // Kernel __shared__ memory configuration
   reductionKernelSetup();
   minimizationKernelSetup();
@@ -760,15 +764,15 @@ int main(const int argc, const char* argv[]) {
   testCompilation(lig_top, lig_crd, { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 },
                   256, 1.0e-5, 1.0e-5, oe, gpu, "Small molecules", PrintSituation::OVERWRITE,
                   snap_name, "small_mol_", &timer);
-
+  
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 1, 0, 1, 1, 1, 0, 0 }, 3, 1.0e-5, 1.0e-3, oe, gpu,
                   "Folded proteins", PrintSituation::APPEND, snap_name, "folded_pro_", &timer);
-
+  
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
                   "Trp-cage only", PrintSituation::APPEND, snap_name, "trp_cage_", &timer);
-
+  
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);

@@ -1887,23 +1887,6 @@ void ValenceWorkUnit::sortAtomSets() {
   // Check the atom import list to ensure that all entries are unique.
   for (int i = 1; i < imported_atom_count; i++) {
     if (atom_import_list[i] == atom_import_list[i - 1]) {
-
-      // CHECK
-      printf("Here are all the atoms:\n");
-      int k = 0;
-      for (int j = 0; j < imported_atom_count; j++) {
-        printf(" %4d", atom_import_list[j]);
-        k++;
-        if (k == 19) {
-          printf("\n");
-          k = 0;
-        }
-      }
-      if (k > 0) {
-        printf("\n");
-      }
-      // END CHECK
-      
       const int ires = ag_pointer->getResidueIndex(atom_import_list[i]);
       rtErr("A duplicate entry is present in the atom import list of work unit " +
             std::to_string(list_index) + " serving topology " + ag_pointer->getFileName() +

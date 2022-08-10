@@ -29,7 +29,7 @@ LinMinReader::LinMinReader(const int nsys_in, const double* l_move_in, const dou
 {}
 
 //-------------------------------------------------------------------------------------------------
-LineMinimization::LineMinimization(const int system_count_in) :
+LineMinimization::LineMinimization(const int system_count_in, const double dx0) :
     system_count{system_count_in},
     move_length{HybridKind::POINTER, "linmin_mlen"},
     save_length{HybridKind::POINTER, "linmin_slen"},
@@ -52,6 +52,7 @@ LineMinimization::LineMinimization(const int system_count_in) :
   energy_b.setPointer(&storage, 6LLU * padded_nsys, system_count);
   energy_c.setPointer(&storage, 7LLU * padded_nsys, system_count);
   energy_d.setPointer(&storage, 8LLU * padded_nsys, system_count);
+  primeMoveLengths(dx0);
 }
 
 //-------------------------------------------------------------------------------------------------

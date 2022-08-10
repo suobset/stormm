@@ -87,7 +87,10 @@ public:
 
   /// \brief The constructor takes only the number of systems as input and allocates for three
   ///        moves along the computed gradient.
-  LineMinimization(int system_count_in = 0);
+  ///
+  /// \param system_count_in  The number of systems to prepare for line minimizations upon
+  /// \param dx0              Initial step size for total movement of all atoms along the line
+  LineMinimization(int system_count_in = 0, double dx0 = 0.0);
 
   /// \brief The copy constructor and copy assignment operator must perform pointer repair.  The
   ///        default move and move assignment operators are the best choice.

@@ -266,8 +266,8 @@ template <typename T> double variance(const T* va, const size_t length,
       if (length == 1) {
         rtErr("Standard deviation is undefined for a single number.");
       }
-      const double sqrt_arg = (dlength * s2) - (s1 * s1);
-      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg) / (dlength * (dlength - 1.0));
+      const double sqrt_arg = ((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0));
+      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg);
     }
     break;
   case VarianceMethod::ROOT_MEAN_SQUARED_DEVIATION:
@@ -285,7 +285,7 @@ template <typename T> double variance(const T* va, const size_t length,
   case VarianceMethod::NORMALIZED_RMSD:
     {
       const double sqrt_arg = (dlength * s2) - (s1 * s1);
-      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg) / (dlength * fabs(mvalue));
+      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg) / fabs(dlength * mvalue);
     }
     break;
   }

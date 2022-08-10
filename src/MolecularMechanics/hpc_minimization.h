@@ -15,6 +15,7 @@
 #include "Synthesis/atomgraph_synthesis.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/static_mask_synthesis.h"
+#include "UnitTesting/stopwatch.h"
 
 namespace stormm {
 namespace mm {
@@ -32,7 +33,8 @@ using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::StaticExclusionMaskSynthesis;
-
+using testing::StopWatch;
+  
 /// \brief Set the __shared__ memory access size for the conjugate gradient particle advancement
 ///        kernels.
 void minimizationKernelSetup();
@@ -114,16 +116,21 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         CacheResource *vale_xe_cache, CacheResource *nonb_xe_cache,
                         ReductionBridge *rbg, LineMinimization *line_record,
                         const ForceAccumulationMethod acc_meth, const GpuDetails &gpu,
-                        const KernelManager &launcher);
+                        const KernelManager &launcher, StopWatch *timer = nullptr,
+                        const std::string &task_name = std::string(""));
 
 ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                              const StaticExclusionMaskSynthesis poly_se,
                              PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
-                             const GpuDetails &gpu, PrecisionModel prec = PrecisionModel::SINGLE);
+                             const GpuDetails &gpu, PrecisionModel prec = PrecisionModel::SINGLE,
+                             StopWatch *timer = nullptr,
+                             const std::string &task_name = std::string(""));
 
 ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag, PhaseSpaceSynthesis *poly_ps,
                              const MinimizeControls &mincon, const GpuDetails &gpu,
-                             PrecisionModel prec = PrecisionModel::SINGLE);
+                             PrecisionModel prec = PrecisionModel::SINGLE,
+                             StopWatch *timer = nullptr,
+                             const std::string &task_name = std::string(""));
 /// \}
   
 } // namespace mm

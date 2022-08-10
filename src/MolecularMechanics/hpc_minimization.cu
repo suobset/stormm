@@ -134,7 +134,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                CacheResource *nonb_cache, ReductionBridge *rbg,
                                LineMinimization *line_record,
                                const ForceAccumulationMethod acc_meth, const GpuDetails &gpu,
-                               const KernelManager &launcher) {
+                               const KernelManager &launcher, StopWatch *timer,
+                               const std::string &task_name) {
 
   // Obtain abstracts of critical objects, re-using them throughout the inner loop.  Some abstracts
   // are needed by both branches.
@@ -169,6 +170,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                                        ForceAccumulationMethod::SPLIT);
   const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
+  line_record->primeMoveLengths(mincon.getInitialStep());
   LinMinWriter lmw = line_record->data(devc_tier);
   const ReductionKit redk(poly_ag, devc_tier);
   ConjGradSubstrate cgsbs(poly_psw, rbg, devc_tier);
@@ -182,6 +184,11 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   mmctrl_xe->primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec,
                                    poly_ag);
   poly_ps->primeConjugateGradientCalculation(gpu, devc_tier);
+  int min_timings;
+  if (timer != nullptr) {
+    min_timings = timer->addCategory(task_name);
+    timer->assignTime(0);
+  }
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
@@ -211,15 +218,6 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // from the following energy evaluations.
           sc->commit(devc_tier);
           sc->incrementSampleCount();
-
-          // CHECK
-          printf("Step %4d : BOND %9.4lf  ANGL %9.4lf  DIHE %9.4lf %9.4lf  Total %9.4lf\n",
-                 i, sc->reportInstantaneousStates(StateVariable::BOND, 0, devc_tier),
-                 sc->reportInstantaneousStates(StateVariable::ANGLE, 0, devc_tier),
-                 sc->reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0, devc_tier),
-                 sc->reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0, devc_tier),
-                 sc->reportTotalEnergy(0, devc_tier));
-          // END CHECK
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -294,15 +292,6 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // from the following energy evaluations.
           sc->commit(devc_tier);
           sc->incrementSampleCount();
-
-          // CHECK
-          printf("Step %4d : BOND %9.4lf  ANGL %9.4lf  DIHE %9.4lf %9.4lf  Total %9.4lf\n",
-                 i, sc->reportInstantaneousStates(StateVariable::BOND, 0, devc_tier),
-                 sc->reportInstantaneousStates(StateVariable::ANGLE, 0, devc_tier),
-                 sc->reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, 0, devc_tier),
-                 sc->reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, 0, devc_tier),
-                 sc->reportTotalEnergy(0, devc_tier));
-          // END CHECK
         }
         ctrl_fe.step += 1;
         launchConjugateGradient(redk, &cgsbs, &ctrl_fe, redu_lp);
@@ -354,13 +343,18 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   // Advance the energy tracking history counter to log the final energy results
   sc->commit(devc_tier);
   sc->incrementSampleCount();
+  if (timer != nullptr) {
+    cudaDeviceSynchronize();
+    timer->assignTime(min_timings);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
 extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
                                     const StaticExclusionMaskSynthesis poly_se,
                                     PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
-                                    const GpuDetails &gpu, const PrecisionModel prec) {
+                                    const GpuDetails &gpu, const PrecisionModel prec,
+                                    StopWatch *timer, const std::string &task_name) {
 
   // Prepare to track the energies of the structures as they undergo geometry optimization.
   const int ntpr   = mincon.getDiagnosticPrintFrequency();
@@ -396,14 +390,15 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   launchMinimization(prec, poly_ag, poly_se, poly_ps, mincon, &mmctrl_fe, &mmctrl_xe, &result,
                      &vale_fe_cache, &vale_xe_cache, &nonb_cache, &poly_rbg, &line_record,
                      chooseForceAccumulationMethod(poly_ps->getForceAccumulationBits()),
-                     gpu, launcher);
+                     gpu, launcher, timer, task_name);
   return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag, PhaseSpaceSynthesis *poly_ps,
                                     const MinimizeControls &mincon, const GpuDetails &gpu,
-                                    const PrecisionModel prec) {
+                                    const PrecisionModel prec, StopWatch *timer,
+                                    const std::string &task_name) {
   switch (poly_ag->getNonbondedWorkType()) {
   case NbwuKind::TILE_GROUPS:
   case NbwuKind::SUPERTILES:
@@ -411,7 +406,7 @@ extern ScoreCard launchMinimization(AtomGraphSynthesis *poly_ag, PhaseSpaceSynth
       const StaticExclusionMaskSynthesis poly_se(poly_ag->getTopologyPointers(),
                                                  poly_ag->getTopologyIndices());
       poly_ag->loadNonbondedWorkUnits(poly_se);
-      return launchMinimization(*poly_ag, poly_se, poly_ps, mincon, gpu, prec);
+      return launchMinimization(*poly_ag, poly_se, poly_ps, mincon, gpu, prec, timer, task_name);
     }
     break;
   case NbwuKind::HONEYCOMB:
