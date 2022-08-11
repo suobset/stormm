@@ -80,6 +80,7 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
     __syncthreads();
 #endif
 
+    
 #ifdef VSITE_STANDALONE
   }
 }

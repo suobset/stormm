@@ -215,7 +215,15 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
   ///        abstracts, then actual numbers of parameters in each array, which are irrelevant to
   ///        the implementation as long as the work unit instructions do not overrun the bounds,
   ///        are omitted to save space on the constants imported as arguments to each kernel.
-  SyAtomUpdateKit(const T4* vs_params);
+  SyAtomUpdateKit(const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
+                  const T2* cnst_grp_params_in);
+
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyAtomUpdateKit(const SyAtomUpdateKit &original) = default;
+  SyAtomUpdateKit(SyAtomUpdateKit &&original) = default;
+  /// \}
   
   const T4* vs_params;        ///< Unique virtual site frames, with the first, second, and third
                               ///<   dimension parameters in the 

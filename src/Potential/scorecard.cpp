@@ -292,10 +292,6 @@ void ScoreCard::initialize(const int system_index, const HybridTargetLevel tier,
 
 //-------------------------------------------------------------------------------------------------
 void ScoreCard::initialize(const HybridTargetLevel tier, const GpuDetails &gpu) {
-
-  // This form of the function, having zeroed all energies for all systems, can implicitly reset
-  // the step counter.
-  sampled_step_count = 0;
   switch (tier) {
   case HybridTargetLevel::HOST:
     {

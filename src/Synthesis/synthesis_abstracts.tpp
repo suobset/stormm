@@ -95,5 +95,13 @@ SyNonbondedKit<T>::SyNonbondedKit(const int nsys_in, const UnitCellType unit_cel
     gb_screen{gb_screen_in}, gb_alpha{gb_alpha_in}, gb_beta{gb_beta_in}, gb_gamma{gb_gamma_in}
 {}
 
+//-------------------------------------------------------------------------------------------------
+template <typename T2, typename T4>
+SyAtomUpdateKit<T2, T4>::SyAtomUpdateKit(const T4* vs_params_in, const T4* settle_geom_in,
+                                         const T2* settle_mass_in, const T2* cnst_grp_params_in) :
+  vs_params{vs_params_in}, settle_geom{settle_geom_in}, settle_mass{settle_mass_in},
+  cnst_grp_params{cnst_grp_params_in}
+{}
+
 } // namespace synthesis
 } // namespace stormm

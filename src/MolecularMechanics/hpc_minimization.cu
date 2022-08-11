@@ -202,7 +202,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       MMControlKit<double> ctrl_fe = mmctrl_fe->dpData(devc_tier);
       MMControlKit<double> ctrl_xe = mmctrl_xe->dpData(devc_tier);
       for (int i = 0; i < total_steps; i++) {
-
+        
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
         sc->initialize(devc_tier, gpu);

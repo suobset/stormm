@@ -3491,6 +3491,25 @@ AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier)
                                sp_gb_gamma_parameters.data(tier));
 }
 
+//-------------------------------------------------------------------------------------------------
+SyAtomUpdateKit<double2, double4>
+AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
+  return SyAtomUpdateKit<double2, double4>(virtual_site_parameters.data(tier),
+                                           settle_group_geometry.data(tier),
+                                           settle_group_masses.data(tier),
+                                           constraint_group_params.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+SyAtomUpdateKit<float2, float4>
+AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
+  return SyAtomUpdateKit<float2, float4>(sp_virtual_site_parameters.data(tier),
+                                         sp_settle_group_geometry.data(tier),
+                                         sp_settle_group_masses.data(tier),
+                                         sp_constraint_group_params.data(tier));
+}
+
+
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::upload() {
