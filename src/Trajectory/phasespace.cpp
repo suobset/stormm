@@ -26,10 +26,12 @@ PhaseSpaceWriter::PhaseSpaceWriter(const int natom_in, const UnitCellType unit_c
                                    double* umat_in, double* invu_in, double* boxdim_in,
                                    double* xvel_in, double* yvel_in, double* zvel_in,
                                    double* xfrc_in, double* yfrc_in, double* zfrc_in,
-                                   double* xprv_in, double* yprv_in, double* zprv_in) :
+                                   double* xprv_in, double* yprv_in, double* zprv_in,
+                                   double* xnxt_in, double* ynxt_in, double* znxt_in) :
     natom{natom_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
     umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}, xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in},
-    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xprv{xprv_in}, yprv{yprv_in}, zprv{zprv_in}
+    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xprv{xprv_in}, yprv{yprv_in}, zprv{zprv_in},
+    xnxt{xnxt_in}, ynxt{ynxt_in}, znxt{znxt_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -41,10 +43,12 @@ PhaseSpaceReader::PhaseSpaceReader(const int natom_in, const UnitCellType unit_c
                                    const double* zvel_in, const double* xfrc_in,
                                    const double* yfrc_in, const double* zfrc_in,
                                    const double* xprv_in, const double* yprv_in,
-                                   const double* zprv_in) :
+                                   const double* zprv_in, const double* xnxt_in,
+                                   const double* ynxt_in, const double* znxt_in) :
     natom{natom_in}, unit_cell{unit_cell_in}, xcrd{xcrd_in}, ycrd{ycrd_in}, zcrd{zcrd_in},
     umat{umat_in}, invu{invu_in}, boxdim{boxdim_in}, xvel{xvel_in}, yvel{yvel_in}, zvel{zvel_in},
-    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xprv{xprv_in}, yprv{yprv_in}, zprv{zprv_in}
+    xfrc{xfrc_in}, yfrc{yfrc_in}, zfrc{zfrc_in}, xprv{xprv_in}, yprv{yprv_in}, zprv{zprv_in},
+    xnxt{xnxt_in}, ynxt{ynxt_in}, znxt{znxt_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -55,7 +59,8 @@ PhaseSpaceReader::PhaseSpaceReader(const PhaseSpaceWriter &psw) :
     umat{psw.umat}, invu{psw.invu}, boxdim{psw.boxdim},
     xvel{psw.xvel}, yvel{psw.yvel}, zvel{psw.zvel},
     xfrc{psw.xfrc}, yfrc{psw.yfrc}, zfrc{psw.zfrc},
-    xprv{psw.xprv}, yprv{psw.yprv}, zprv{psw.zprv}
+    xprv{psw.xprv}, yprv{psw.yprv}, zprv{psw.zprv},
+    xnxt{psw.xnxt}, ynxt{psw.ynxt}, znxt{psw.znxt}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -63,6 +68,7 @@ PhaseSpace::PhaseSpace(const int atom_count_in, const UnitCellType unit_cell_in)
     file_name{std::string("")},
     atom_count{atom_count_in},
     unit_cell{unit_cell_in},
+    cycle_position{CoordinateCycle::PRESENT},
     x_coordinates{HybridKind::POINTER, "x_coordinates"},
     y_coordinates{HybridKind::POINTER, "y_coordinates"},
     z_coordinates{HybridKind::POINTER, "z_coordinates"},
@@ -78,6 +84,9 @@ PhaseSpace::PhaseSpace(const int atom_count_in, const UnitCellType unit_cell_in)
     x_prior_coordinates{HybridKind::POINTER, "x_prior_coords"},
     y_prior_coordinates{HybridKind::POINTER, "y_prior_coords"},
     z_prior_coordinates{HybridKind::POINTER, "z_prior_coords"},
+    x_future_coordinates{HybridKind::POINTER, "x_future_coords"},
+    y_future_coordinates{HybridKind::POINTER, "y_future_coords"},
+    z_future_coordinates{HybridKind::POINTER, "z_future_coords"},
     storage{HybridKind::ARRAY, "phase_space_data"}
 {
   allocate();
@@ -109,6 +118,7 @@ PhaseSpace::PhaseSpace(const PhaseSpace &original) :
     file_name{original.file_name},
     atom_count{original.atom_count},
     unit_cell{original.unit_cell},
+    cycle_position{original.cycle_position},
     x_coordinates{original.x_coordinates},
     y_coordinates{original.y_coordinates},
     z_coordinates{original.z_coordinates},
@@ -124,6 +134,9 @@ PhaseSpace::PhaseSpace(const PhaseSpace &original) :
     x_prior_coordinates{original.x_prior_coordinates},
     y_prior_coordinates{original.y_prior_coordinates},
     z_prior_coordinates{original.z_prior_coordinates},
+    x_future_coordinates{original.x_future_coordinates},
+    y_future_coordinates{original.y_future_coordinates},
+    z_future_coordinates{original.z_future_coordinates},
     storage{original.storage}
 {
   // Set the POINTER-kind Hybrids in the new object appropriately.  Even the resize() operation
@@ -144,6 +157,7 @@ PhaseSpace& PhaseSpace::operator=(const PhaseSpace &other) {
   file_name = other.file_name;
   atom_count = other.atom_count;
   unit_cell = other.unit_cell;
+  cycle_position = other.cycle_position;
 
   // Copy the Hybrid objects to preserve tags and the proper kinds.  Copying the data storage
   // object carries over all of the other object's contents.
@@ -162,6 +176,9 @@ PhaseSpace& PhaseSpace::operator=(const PhaseSpace &other) {
   x_prior_coordinates = other.x_prior_coordinates;
   y_prior_coordinates = other.y_prior_coordinates;
   z_prior_coordinates = other.z_prior_coordinates;
+  x_future_coordinates = other.x_future_coordinates;
+  y_future_coordinates = other.y_future_coordinates;
+  z_future_coordinates = other.z_future_coordinates;
   storage = other.storage;
 
   // Allocating again sets the internal POINTER-kind Hybrid objects
@@ -174,6 +191,7 @@ PhaseSpace::PhaseSpace(PhaseSpace &&original) :
     file_name{std::move(original.file_name)},
     atom_count{original.atom_count},
     unit_cell{original.unit_cell},
+    cycle_position{original.cycle_position},
     x_coordinates{std::move(original.x_coordinates)},
     y_coordinates{std::move(original.y_coordinates)},
     z_coordinates{std::move(original.z_coordinates)},
@@ -189,6 +207,9 @@ PhaseSpace::PhaseSpace(PhaseSpace &&original) :
     x_prior_coordinates{std::move(original.x_prior_coordinates)},
     y_prior_coordinates{std::move(original.y_prior_coordinates)},
     z_prior_coordinates{std::move(original.z_prior_coordinates)},
+    x_future_coordinates{std::move(original.x_future_coordinates)},
+    y_future_coordinates{std::move(original.y_future_coordinates)},
+    z_future_coordinates{std::move(original.z_future_coordinates)},
     storage{std::move(original.storage)}
 {
   // No repair of the pointers is necessary, as they still point to valid data
@@ -204,6 +225,7 @@ PhaseSpace& PhaseSpace::operator=(PhaseSpace &&other) {
   file_name = std::move(other.file_name);
   atom_count = other.atom_count;
   unit_cell = other.unit_cell;
+  cycle_position = other.cycle_position;
   x_coordinates = std::move(other.x_coordinates);
   y_coordinates = std::move(other.y_coordinates);
   z_coordinates = std::move(other.z_coordinates);
@@ -219,6 +241,9 @@ PhaseSpace& PhaseSpace::operator=(PhaseSpace &&other) {
   x_prior_coordinates = std::move(other.x_prior_coordinates);
   y_prior_coordinates = std::move(other.y_prior_coordinates);
   z_prior_coordinates = std::move(other.z_prior_coordinates);
+  x_future_coordinates = std::move(other.x_future_coordinates);
+  y_future_coordinates = std::move(other.y_future_coordinates);
+  z_future_coordinates = std::move(other.z_future_coordinates);
   storage = std::move(other.storage);
   return *this;
 }
@@ -305,6 +330,11 @@ UnitCellType PhaseSpace::getUnitCellType() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+CoordinateCycle PhaseSpace::getCyclePosition() const {
+  return cycle_position;
+}
+
+//-------------------------------------------------------------------------------------------------
 const double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim,
                                                const TrajectoryKind kind,
                                                const HybridTargetLevel tier) const {
@@ -312,30 +342,57 @@ const double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim,
   case CartesianDimension::X:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      return x_coordinates.data(tier);
+      switch (cycle_position) {
+      case CoordinateCycle::PAST:
+        return x_prior_coordinates.data(tier);
+      case CoordinateCycle::PRESENT:
+        return x_coordinates.data(tier);
+      case CoordinateCycle::FUTURE:
+        return x_future_coordinates.data(tier);
+      }
+      break;
     case TrajectoryKind::VELOCITIES:
       return x_velocities.data(tier);
     case TrajectoryKind::FORCES:
       return x_forces.data(tier);
     }
+    break;
   case CartesianDimension::Y:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      return y_coordinates.data(tier);
+      switch (cycle_position) {
+      case CoordinateCycle::PAST:
+        return y_prior_coordinates.data(tier);
+      case CoordinateCycle::PRESENT:
+        return y_coordinates.data(tier);
+      case CoordinateCycle::FUTURE:
+        return y_future_coordinates.data(tier);
+      }
+      break;
     case TrajectoryKind::VELOCITIES:
       return y_velocities.data(tier);
     case TrajectoryKind::FORCES:
       return y_forces.data(tier);
     }
+    break;
   case CartesianDimension::Z:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      return z_coordinates.data(tier);
+      switch (cycle_position) {
+      case CoordinateCycle::PAST:
+        return z_prior_coordinates.data(tier);
+      case CoordinateCycle::PRESENT:
+        return z_coordinates.data(tier);
+      case CoordinateCycle::FUTURE:
+        return z_future_coordinates.data(tier);
+      }
+      break;
     case TrajectoryKind::VELOCITIES:
       return z_velocities.data(tier);
     case TrajectoryKind::FORCES:
       return z_forces.data(tier);
     }
+    break;
   }
   __builtin_unreachable();
 }
@@ -347,30 +404,57 @@ double* PhaseSpace::getCoordinatePointer(const CartesianDimension dim, const Tra
   case CartesianDimension::X:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      return x_coordinates.data(tier);
+      switch (cycle_position) {
+      case CoordinateCycle::PAST:
+        return x_prior_coordinates.data(tier);
+      case CoordinateCycle::PRESENT:
+        return x_coordinates.data(tier);
+      case CoordinateCycle::FUTURE:
+        return x_future_coordinates.data(tier);
+      }
+      break;
     case TrajectoryKind::VELOCITIES:
       return x_velocities.data(tier);
     case TrajectoryKind::FORCES:
       return x_forces.data(tier);
     }
+    break;
   case CartesianDimension::Y:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      return y_coordinates.data(tier);
+      switch (cycle_position) {
+      case CoordinateCycle::PAST:
+        return y_prior_coordinates.data(tier);
+      case CoordinateCycle::PRESENT:
+        return y_coordinates.data(tier);
+      case CoordinateCycle::FUTURE:
+        return y_future_coordinates.data(tier);
+      }
+      break;
     case TrajectoryKind::VELOCITIES:
       return y_velocities.data(tier);
     case TrajectoryKind::FORCES:
       return y_forces.data(tier);
     }
+    break;
   case CartesianDimension::Z:
     switch (kind) {
     case TrajectoryKind::POSITIONS:
-      return z_coordinates.data(tier);
+      switch (cycle_position) {
+      case CoordinateCycle::PAST:
+        return z_prior_coordinates.data(tier);
+      case CoordinateCycle::PRESENT:
+        return z_coordinates.data(tier);
+      case CoordinateCycle::FUTURE:
+        return z_future_coordinates.data(tier);
+      }
+      break;
     case TrajectoryKind::VELOCITIES:
       return z_velocities.data(tier);
     case TrajectoryKind::FORCES:
       return z_forces.data(tier);
     }
+    break;
   }
   __builtin_unreachable();
 }
@@ -382,8 +466,7 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const TrajectoryKind ki
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
-                                                         const int high_index,
+std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index, const int high_index,
                                                          const TrajectoryKind kind,
                                                          const HybridTargetLevel tier) const {
 
@@ -393,51 +476,31 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
           " in an object with " + std::to_string(atom_count) + " atoms.", "PhaseSpace",
           "getInterlacedCoordinates");
   }
-  std::vector<double> result(3 * (high_index - low_index));
   switch (tier) {
   case HybridTargetLevel::HOST:
     {
-      double *xptr, *yptr, *zptr;
       switch (kind) {
       case TrajectoryKind::POSITIONS:
         {
-          const double* xptr = x_coordinates.data();
-          const double* yptr = y_coordinates.data();
-          const double* zptr = z_coordinates.data();
-          for (int i = low_index; i < high_index; i++) {
-            const int base_idx = 3 * (i - low_index);
-            result[base_idx    ] = xptr[i];
-            result[base_idx + 1] = yptr[i];
-            result[base_idx + 2] = zptr[i];
+          switch (cycle_position) {
+          case CoordinateCycle::PAST:
+            return interlaceXYZ(x_prior_coordinates.data(), y_prior_coordinates.data(),
+                                z_prior_coordinates.data(), low_index, high_index);
+          case CoordinateCycle::PRESENT:
+            return interlaceXYZ(x_coordinates.data(), y_coordinates.data(), z_coordinates.data(),
+                                low_index, high_index);
+          case CoordinateCycle::FUTURE:
+            return interlaceXYZ(x_future_coordinates.data(), y_future_coordinates.data(),
+                                z_future_coordinates.data(), low_index, high_index);
           }
         }
         break;
       case TrajectoryKind::VELOCITIES:
-        {
-          const double* xptr = x_velocities.data();
-          const double* yptr = y_velocities.data();
-          const double* zptr = z_velocities.data();
-          for (int i = low_index; i < high_index; i++) {
-            const int base_idx = 3 * (i - low_index);
-            result[base_idx    ] = xptr[i];
-            result[base_idx + 1] = yptr[i];
-            result[base_idx + 2] = zptr[i];
-          }
-        }
-        break;
+        return interlaceXYZ(x_velocities.data(), y_velocities.data(), z_velocities.data(),
+                            low_index, high_index);
       case TrajectoryKind::FORCES:
-        {
-          const double* xptr = x_forces.data();
-          const double* yptr = y_forces.data();
-          const double* zptr = z_forces.data();
-          for (int i = low_index; i < high_index; i++) {
-            const int base_idx = 3 * (i - low_index);
-            result[base_idx    ] = xptr[i];
-            result[base_idx + 1] = yptr[i];
-            result[base_idx + 2] = zptr[i];
-          }
-        }
-        break;
+        return interlaceXYZ(x_forces.data(), y_forces.data(), z_forces.data(),
+                            low_index, high_index);
       }
     }
     break;
@@ -447,9 +510,23 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
       std::vector<double> xval, yval, zval;
       switch (kind) {
       case TrajectoryKind::POSITIONS:
-        xval = x_coordinates.readDevice(low_index, high_index);
-        yval = y_coordinates.readDevice(low_index, high_index);
-        zval = z_coordinates.readDevice(low_index, high_index);
+        switch (cycle_position) {
+        case CoordinateCycle::PAST:
+          xval = x_prior_coordinates.readDevice(low_index, high_index);
+          yval = y_prior_coordinates.readDevice(low_index, high_index);
+          zval = z_prior_coordinates.readDevice(low_index, high_index);
+          break;
+        case CoordinateCycle::PRESENT:
+          xval = x_coordinates.readDevice(low_index, high_index);
+          yval = y_coordinates.readDevice(low_index, high_index);
+          zval = z_coordinates.readDevice(low_index, high_index);
+          break;
+        case CoordinateCycle::FUTURE:
+          xval = x_future_coordinates.readDevice(low_index, high_index);
+          yval = y_future_coordinates.readDevice(low_index, high_index);
+          zval = z_future_coordinates.readDevice(low_index, high_index);
+          break;
+        }
         break;
       case TrajectoryKind::VELOCITIES:
         xval = x_velocities.readDevice(low_index, high_index);
@@ -462,16 +539,12 @@ std::vector<double> PhaseSpace::getInterlacedCoordinates(const int low_index,
         zval = z_forces.readDevice(low_index, high_index);
         break;
       }
-      for (int i = 0; i < high_index - low_index; i++) {
-        result[(3 * i)    ] = xval[i];
-        result[(3 * i) + 1] = yval[i];
-        result[(3 * i) + 2] = zval[i];
-      }
+      return interlaceXYZ(xval.data(), yval.data(), zval.data(), low_index, high_index);
     }
     break;
 #endif
   }
-  return result;
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -556,6 +629,26 @@ void PhaseSpace::initializeForces() {
 }
 
 //-------------------------------------------------------------------------------------------------
+void PhaseSpace::updateCyclePosition() {
+  switch (cycle_position) {
+  case CoordinateCycle::PAST:
+    cycle_position = CoordinateCycle::PRESENT;
+    break;
+  case CoordinateCycle::PRESENT:
+    cycle_position = CoordinateCycle::FUTURE;
+    break;
+  case CoordinateCycle::FUTURE:
+    cycle_position = CoordinateCycle::PAST;
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpace::updateCyclePosition(const CoordinateCycle time_point) {
+  cycle_position = time_point;
+}
+
+//-------------------------------------------------------------------------------------------------
 void PhaseSpace::exportToFile(const std::string &file_name, const double current_time,
                               const TrajectoryKind traj_kind, const CoordinateFileKind output_kind,
                               const PrintSituation expectation) const {
@@ -610,35 +703,44 @@ void PhaseSpace::upload() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpace::uploadPositions() {
-  storage.upload(0, 3 * roundUp(atom_count, warp_size_int));
+void PhaseSpace::uploadAllPositions() {
+  storage.upload(0, 9 * roundUp(atom_count, warp_size_int));
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpace::uploadCurrentPositions() {
+  const int stride = roundUp(atom_count, warp_size_int);
+  switch (cycle_position) {
+  case CoordinateCycle::PAST:
+    storage.upload(3 * stride, 3 * stride);
+    break;
+  case CoordinateCycle::PRESENT:
+    storage.upload(0         , 3 * stride);
+    break;
+  case CoordinateCycle::FUTURE:
+    storage.upload(6 * stride, 3 * stride);
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::uploadTransformations() {
   const int stride = roundUp(atom_count, warp_size_int);
-  storage.upload(3 * stride, 3 * roundUp(9, warp_size_int));
+  storage.upload(9 * stride, 3 * roundUp(9, warp_size_int));
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::uploadVelocities() {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
-  storage.upload((3 * stride) + offset, 3 * stride);
+  storage.upload((9 * stride) + offset, 3 * stride);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::uploadForces() {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
-  storage.upload((6 * stride) + offset, 3 * stride);
-}
-
-//-------------------------------------------------------------------------------------------------
-void PhaseSpace::uploadPriorPositions() {
-  const int stride = roundUp(atom_count, warp_size_int);
-  const int offset = 3 * roundUp(9, warp_size_int);
-  storage.upload((9 * stride) + offset, 3 * stride);
+  storage.upload((12 * stride) + offset, 3 * stride);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -647,60 +749,131 @@ void PhaseSpace::download() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpace::downloadPositions() {
-  storage.download(0, 3 * roundUp(atom_count, warp_size_int));
+void PhaseSpace::downloadAllPositions() {
+  storage.download(0, 9 * roundUp(atom_count, warp_size_int));
+}
+
+//-------------------------------------------------------------------------------------------------
+void PhaseSpace::downloadCurrentPositions() {
+  const int stride = roundUp(atom_count, warp_size_int);
+  switch (cycle_position) {
+  case CoordinateCycle::PAST:
+    storage.download(3 * stride, 3 * stride);
+    break;
+  case CoordinateCycle::PRESENT:
+    storage.download(0         , 3 * stride);
+    break;
+  case CoordinateCycle::FUTURE:
+    storage.download(6 * stride, 3 * stride);
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::downloadTransformations() {
   const int stride = roundUp(atom_count, warp_size_int);
-  storage.download(3 * stride, 3 * roundUp(9, warp_size_int));
+  storage.download(9 * stride, 3 * roundUp(9, warp_size_int));
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::downloadVelocities() {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
-  storage.download((3 * stride) + offset, 3 * stride);
+  storage.download((9 * stride) + offset, 3 * stride);
 }
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpace::downloadForces() {
   const int stride = roundUp(atom_count, warp_size_int);
   const int offset = 3 * roundUp(9, warp_size_int);
-  storage.download((6 * stride) + offset, 3 * stride);
-}
-
-//-------------------------------------------------------------------------------------------------
-void PhaseSpace::downloadPriorPositions() {
-  const int stride = roundUp(atom_count, warp_size_int);
-  const int offset = 3 * roundUp(9, warp_size_int);
-  storage.download((9 * stride) + offset, 3 * stride);
+  storage.download((12 * stride) + offset, 3 * stride);
 }
 #endif
 
 //-------------------------------------------------------------------------------------------------
 const PhaseSpaceReader PhaseSpace::data(const HybridTargetLevel tier) const {
-  return PhaseSpaceReader(atom_count, unit_cell, x_coordinates.data(tier),
-                          y_coordinates.data(tier), z_coordinates.data(tier),
-                          box_space_transform.data(tier), inverse_transform.data(tier),
-                          box_dimensions.data(tier), x_velocities.data(tier),
-                          y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
-                          y_forces.data(tier), z_forces.data(tier),
-                          x_prior_coordinates.data(tier), y_prior_coordinates.data(tier),
-                          z_prior_coordinates.data(tier));
+  return data(cycle_position, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+const PhaseSpaceReader PhaseSpace::data(const CoordinateCycle orientation,
+                                        const HybridTargetLevel tier) const {
+  switch (orientation) {
+  case CoordinateCycle::PAST:
+    return PhaseSpaceReader(atom_count, unit_cell, x_prior_coordinates.data(tier),
+                            y_prior_coordinates.data(tier), z_prior_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_velocities.data(tier),
+                            y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
+                            y_forces.data(tier), z_forces.data(tier),
+                            x_future_coordinates.data(tier), y_future_coordinates.data(tier),
+                            z_future_coordinates.data(tier), x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier));
+  case CoordinateCycle::PRESENT:
+    return PhaseSpaceReader(atom_count, unit_cell, x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_velocities.data(tier),
+                            y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
+                            y_forces.data(tier), z_forces.data(tier),
+                            x_prior_coordinates.data(tier), y_prior_coordinates.data(tier),
+                            z_prior_coordinates.data(tier), x_future_coordinates.data(tier),
+                            y_future_coordinates.data(tier), z_future_coordinates.data(tier));
+  case CoordinateCycle::FUTURE:
+    return PhaseSpaceReader(atom_count, unit_cell, x_future_coordinates.data(tier),
+                            y_future_coordinates.data(tier), z_future_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_velocities.data(tier),
+                            y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
+                            y_forces.data(tier), z_forces.data(tier),
+                            x_coordinates.data(tier), y_coordinates.data(tier),
+                            z_coordinates.data(tier), x_prior_coordinates.data(tier),
+                            y_prior_coordinates.data(tier), z_prior_coordinates.data(tier));
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
 PhaseSpaceWriter PhaseSpace::data(const HybridTargetLevel tier) {
-  return PhaseSpaceWriter(atom_count, unit_cell, x_coordinates.data(tier),
-                          y_coordinates.data(tier), z_coordinates.data(tier),
-                          box_space_transform.data(tier), inverse_transform.data(tier),
-                          box_dimensions.data(tier), x_velocities.data(tier),
-                          y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
-                          y_forces.data(tier), z_forces.data(tier),
-                          x_prior_coordinates.data(tier), y_prior_coordinates.data(tier),
-                          z_prior_coordinates.data(tier));
+  return data(cycle_position, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpaceWriter PhaseSpace::data(const CoordinateCycle orientation,
+                                  const HybridTargetLevel tier) {
+  switch (orientation) {
+  case CoordinateCycle::PAST:
+    return PhaseSpaceWriter(atom_count, unit_cell, x_prior_coordinates.data(tier),
+                            y_prior_coordinates.data(tier), z_prior_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_velocities.data(tier),
+                            y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
+                            y_forces.data(tier), z_forces.data(tier),
+                            x_future_coordinates.data(tier), y_future_coordinates.data(tier),
+                            z_future_coordinates.data(tier), x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier));
+  case CoordinateCycle::PRESENT:
+    return PhaseSpaceWriter(atom_count, unit_cell, x_coordinates.data(tier),
+                            y_coordinates.data(tier), z_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_velocities.data(tier),
+                            y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
+                            y_forces.data(tier), z_forces.data(tier),
+                            x_prior_coordinates.data(tier), y_prior_coordinates.data(tier),
+                            z_prior_coordinates.data(tier), x_future_coordinates.data(tier),
+                            y_future_coordinates.data(tier), z_future_coordinates.data(tier));
+  case CoordinateCycle::FUTURE:
+    return PhaseSpaceWriter(atom_count, unit_cell, x_future_coordinates.data(tier),
+                            y_future_coordinates.data(tier), z_future_coordinates.data(tier),
+                            box_space_transform.data(tier), inverse_transform.data(tier),
+                            box_dimensions.data(tier), x_velocities.data(tier),
+                            y_velocities.data(tier), z_velocities.data(tier), x_forces.data(tier),
+                            y_forces.data(tier), z_forces.data(tier),
+                            x_coordinates.data(tier), y_coordinates.data(tier),
+                            z_coordinates.data(tier), x_prior_coordinates.data(tier),
+                            y_prior_coordinates.data(tier), z_prior_coordinates.data(tier));
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -708,22 +881,25 @@ void PhaseSpace::allocate() {
   const int padded_atom_count  = roundUp(atom_count, warp_size_int);
   const int padded_matrix_size = roundUp(9, warp_size_int);
   storage.resize((15 * padded_atom_count) + (3 * padded_matrix_size));
-  x_coordinates.setPointer(&storage,                            0, atom_count);
-  y_coordinates.setPointer(&storage,            padded_atom_count, atom_count);
-  z_coordinates.setPointer(&storage,        2 * padded_atom_count, atom_count);
-  box_space_transform.setPointer(&storage,  3 * padded_atom_count, 9);
-  inverse_transform.setPointer(&storage,   (3 * padded_atom_count) +      padded_matrix_size, 9);
-  box_dimensions.setPointer(&storage,      (3 * padded_atom_count) + (2 * padded_matrix_size), 6);
-  const int thus_far = (3 * padded_atom_count) + (3 * padded_matrix_size);
+  x_coordinates.setPointer(&storage,                             0, atom_count);
+  y_coordinates.setPointer(&storage,             padded_atom_count, atom_count);
+  z_coordinates.setPointer(&storage,         2 * padded_atom_count, atom_count);
+  x_prior_coordinates.setPointer(&storage,   3 * padded_atom_count, atom_count);
+  y_prior_coordinates.setPointer(&storage,   4 * padded_atom_count, atom_count);
+  z_prior_coordinates.setPointer(&storage,   5 * padded_atom_count, atom_count);
+  x_future_coordinates.setPointer(&storage,  6 * padded_atom_count, atom_count);
+  y_future_coordinates.setPointer(&storage,  7 * padded_atom_count, atom_count);
+  z_future_coordinates.setPointer(&storage,  8 * padded_atom_count, atom_count);
+  box_space_transform.setPointer(&storage,   9 * padded_atom_count, 9);
+  inverse_transform.setPointer(&storage,    (9 * padded_atom_count) +      padded_matrix_size,  9);
+  box_dimensions.setPointer(&storage,       (9 * padded_atom_count) + (2 * padded_matrix_size), 6);
+  const int thus_far = (9 * padded_atom_count) + (3 * padded_matrix_size);
   x_velocities.setPointer(&storage,        thus_far,                           atom_count);
   y_velocities.setPointer(&storage,        thus_far +      padded_atom_count,  atom_count);
   z_velocities.setPointer(&storage,        thus_far + (2 * padded_atom_count), atom_count);
   x_forces.setPointer(&storage,            thus_far + (3 * padded_atom_count), atom_count);
   y_forces.setPointer(&storage,            thus_far + (4 * padded_atom_count), atom_count);
   z_forces.setPointer(&storage,            thus_far + (5 * padded_atom_count), atom_count);
-  x_prior_coordinates.setPointer(&storage, thus_far + (6 * padded_atom_count), atom_count);
-  y_prior_coordinates.setPointer(&storage, thus_far + (7 * padded_atom_count), atom_count);
-  z_prior_coordinates.setPointer(&storage, thus_far + (8 * padded_atom_count), atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -744,6 +920,19 @@ UnitCellType determineUnitCellTypeByShape(const double* inv_ptr) {
     return UnitCellType::TRICLINIC;
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> interlaceXYZ(const double* xptr, const double* yptr, const double* zptr,
+                                 const int low_index, const int high_index) {
+  std::vector<double> result(3 * (high_index - low_index));
+  for (int i = low_index; i < high_index; i++) {
+    const int base_idx = 3 * (i - low_index);
+    result[base_idx    ] = xptr[i];
+    result[base_idx + 1] = yptr[i];
+    result[base_idx + 2] = zptr[i];
+  }
+  return result;
 }
 
 } // namespace trajectory

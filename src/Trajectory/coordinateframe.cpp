@@ -426,29 +426,15 @@ CoordinateFrame::getInterlacedCoordinates(const int low_index, const int high_in
   std::vector<double> result(3 * (high_index - low_index));
   switch (tier) {
   case HybridTargetLevel::HOST:
-    {
-      const double* xptr = x_coordinates.data();
-      const double* yptr = y_coordinates.data();
-      const double* zptr = z_coordinates.data();
-      for (int i = low_index; i < high_index; i++) {
-        const int base_idx = 3 * (i - low_index);
-        result[base_idx    ] = xptr[i];
-        result[base_idx + 1] = yptr[i];
-        result[base_idx + 2] = zptr[i];
-      }
-    }
-    break;
+    return interlaceXYZ(x_coordinates.data(), y_coordinates.data(), z_coordinates.data(),
+                        low_index, high_index);
 #ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     {
       const std::vector<double> xval = x_coordinates.readDevice(low_index, high_index);
       const std::vector<double> yval = y_coordinates.readDevice(low_index, high_index);
       const std::vector<double> zval = z_coordinates.readDevice(low_index, high_index);
-      for (int i = 0; i < high_index - low_index; i++) {
-        result[(3 * i)    ] = xval[i];
-        result[(3 * i) + 1] = yval[i];
-        result[(3 * i) + 2] = zval[i];
-      }
+      return interlaceXYZ(xval.data(), yval.data(), zval.data(), low_index, high_index);
     }
     break;
 #endif
