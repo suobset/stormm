@@ -216,7 +216,8 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
   ///        the implementation as long as the work unit instructions do not overrun the bounds,
   ///        are omitted to save space on the constants imported as arguments to each kernel.
   SyAtomUpdateKit(const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
-                  const T2* cnst_grp_params_in);
+                  const T2* cnst_grp_params_in, const uint2* vste_insr_in,
+                  const uint2* sett_insr_in, const uint2* cnst_insr_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.

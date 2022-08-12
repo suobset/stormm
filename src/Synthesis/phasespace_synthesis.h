@@ -420,7 +420,19 @@ public:
   ///        upload of specific systems within the PhaseSpaceSynthesis with the launch latency
   ///        of only a single kernel call.  This offers a huge reduction in bandwidth requirements
   ///        and lower latency than multiple cudaMemcpy calls.
+  ///
+  /// Overloaded:
+  ///   - Let the object automatically assign pointers to past, present, and future coordinates
+  ///   - Specify which stage of the time cycle is to be taken as current
+  ///
+  /// \param orientation  Optional argument stipulating from which stage of the cycle to take the
+  ///                     current coordinates, past coordinates, and pointers to any future
+  ///                     coordinates.  If not specified the object's own cycle position will be
+  ///                     used.
+  /// \{
   PsSynthesisWriter deviceViewToHostData();
+  PsSynthesisWriter deviceViewToHostData(CoordinateCycle orientation);
+  /// \}
   
   /// \brief Upload data to the device.
   ///
