@@ -15,8 +15,8 @@
 /// \param primary   The first accumulator, which receives most of the traffic
 /// \param overflow  The emergency accumulator
 /// \{
-__device__ __forceinline__ void splitForceContribution(const double dval, const int pos,
-                                                       llint* primary, int* overflow) {
+__device__ __forceinline__ void atomicSplit(const double dval, const int pos, llint* primary,
+                                          int* overflow) {
   llint ival;
   if (fabs(dval) >= max_llint_accumulation) {
     const int spillover = dval / max_llint_accumulation;
@@ -33,8 +33,8 @@ __device__ __forceinline__ void splitForceContribution(const double dval, const 
   }
 }
 
-__device__ __forceinline__ void splitForceContribution(const float fval, const int pos,
-                                                       int* primary, int* overflow) {
+__device__ __forceinline__ void atomicSplit(const float fval, const int pos, int* primary,
+                                          int* overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
 
@@ -72,8 +72,8 @@ __device__ __forceinline__ void splitForceContribution(const float fval, const i
 /// \param primary    Primary accumulator
 /// \param overflow   Secondary / emergency accumulator
 /// \{
-__device__ __forceinline__ void addSplitFixedPrecision(const int95_t ival, const int pos,
-                                                       llint* primary, int* overflow) {
+__device__ __forceinline__ void atomicSplit(const int95_t ival, const int pos, llint* primary,
+                                          int* overflow) {
   const llint prim_old = atomicAdd((ullint*)&primary[pos], (ullint)(ival.x));
   const llint prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;
@@ -84,8 +84,8 @@ __device__ __forceinline__ void addSplitFixedPrecision(const int95_t ival, const
   }
 }
 
-__device__ __forceinline__ void addSplitFixedPrecision(const int2 ival, const int pos,
-                                                       int* primary, int* overflow) {
+__device__ __forceinline__ void atomicSplit(const int2 ival, const int pos, int* primary,
+                                          int* overflow) {
   const int prim_old = atomicAdd(&primary[pos], ival.x);
   const int prim_old_plus_x = prim_old + ival.x;
   int ival_y = ival.y;

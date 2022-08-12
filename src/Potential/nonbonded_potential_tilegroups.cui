@@ -433,16 +433,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
 #ifdef COMPUTE_FORCE
       read_idx -= EXCL_GMEM_OFFSET;
 #  ifdef SPLIT_FORCE_ACCUMULATION
-      splitForceContribution(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xfrc, sh_xfrc_overflow);
-      splitForceContribution(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, sh_yfrc_overflow);
-      splitForceContribution(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, sh_zfrc_overflow);
+      atomicSplit(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xfrc, sh_xfrc_overflow);
+      atomicSplit(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, sh_yfrc_overflow);
+      atomicSplit(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, sh_zfrc_overflow);
 #  else
-      atomicAdd((ullint*)&sh_xfrc[read_idx],
-                (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
-      atomicAdd((ullint*)&sh_yfrc[read_idx],
-                (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
-      atomicAdd((ullint*)&sh_zfrc[read_idx],
-                (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
+      atomicAdd((ullint*)&sh_xfrc[read_idx], (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
+      atomicAdd((ullint*)&sh_yfrc[read_idx], (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
+      atomicAdd((ullint*)&sh_zfrc[read_idx], (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
 #  endif
 #endif
 
@@ -490,7 +487,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           // the results into an int95_t (see Constants/stormm_vector_types.h) and contribute that
           // to the paired global accumulator arrays.
           int95_t ixfrc = { sh_xfrc[read_idx], sh_xfrc_overflow[read_idx] };
-          addSplitFixedPrecision(ixfrc, write_idx, poly_psw.xfrc, poly_psw.xfrc_ovrf);
+          atomicSplit(ixfrc, write_idx, poly_psw.xfrc, poly_psw.xfrc_ovrf);
 #    endif
 #  else
           atomicAdd((ullint*)&poly_psw.xfrc[write_idx], (ullint)(sh_xfrc[read_idx]));
@@ -518,7 +515,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           atomicAdd((ullint*)&poly_psw.yfrc[write_idx], (ullint)(iyfrc));        
 #    else
           int95_t iyfrc = { sh_yfrc[read_idx], sh_yfrc_overflow[read_idx] };
-          addSplitFixedPrecision(iyfrc, write_idx, poly_psw.yfrc, poly_psw.yfrc_ovrf);
+          atomicSplit(iyfrc, write_idx, poly_psw.yfrc, poly_psw.yfrc_ovrf);
 #    endif
 #  else
           atomicAdd((ullint*)&poly_psw.yfrc[write_idx], (ullint)(sh_yfrc[read_idx]));
@@ -546,7 +543,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           atomicAdd((ullint*)&poly_psw.zfrc[write_idx], (ullint)(izfrc));        
 #    else
           int95_t izfrc = { sh_zfrc[read_idx], sh_zfrc_overflow[read_idx] };
-          addSplitFixedPrecision(izfrc, write_idx, poly_psw.zfrc, poly_psw.zfrc_ovrf);
+          atomicSplit(izfrc, write_idx, poly_psw.zfrc, poly_psw.zfrc_ovrf);
 #    endif
 #  else
           atomicAdd((ullint*)&poly_psw.zfrc[write_idx], (ullint)(sh_zfrc[read_idx]));
