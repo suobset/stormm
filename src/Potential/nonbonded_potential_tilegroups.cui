@@ -333,22 +333,19 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       const TCALC t_zcrd   = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
 #else
       // Convert the negative values of the center-of-geometry coordinates so that the result
-      // can feed into combineSplitFixedPrecision() (which adds A + B).
-      const int95_t x_center = convertSplitFixedPrecision95(-tx_cog);
-      const int95_t y_center = convertSplitFixedPrecision95(-ty_cog);
-      const int95_t z_center = convertSplitFixedPrecision95(-tz_cog);
+      // can feed into splitFPSum() (which adds A + B).
+      const int95_t x_center = doubleToInt95(-tx_cog);
+      const int95_t y_center = doubleToInt95(-ty_cog);
+      const int95_t z_center = doubleToInt95(-tz_cog);
       const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
       const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
       const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
-      const int95_t x95_tmp  = combineSplitFixedPrecision(x_atom, x_center);
-      const int95_t y95_tmp  = combineSplitFixedPrecision(y_atom, y_center);
-      const int95_t z95_tmp  = combineSplitFixedPrecision(z_atom, z_center);
-      const TCALC t_xcrd = (((TCALC)(x95_tmp.y) * max_llint_accumulation) +
-                            (TCALC)(x95_tmp.x)) * poly_psw.inv_gpos_scale;
-      const TCALC t_ycrd = (((TCALC)(y95_tmp.y) * max_llint_accumulation) +
-                            (TCALC)(y95_tmp.x)) * poly_psw.inv_gpos_scale;
-      const TCALC t_zcrd = (((TCALC)(z95_tmp.y) * max_llint_accumulation) +
-                            (TCALC)(z95_tmp.x)) * poly_psw.inv_gpos_scale;
+      const int95_t x95_tmp  = splitFPSum(x_atom, x_center);
+      const int95_t y95_tmp  = splitFPSum(y_atom, y_center);
+      const int95_t z95_tmp  = splitFPSum(z_atom, z_center);
+      const TCALC t_xcrd = splitFPToReal(x95_tmp) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd = splitFPToReal(y95_tmp) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd = splitFPToReal(z95_tmp) * poly_psw.inv_gpos_scale;
 #endif
       const int t_ljidx   = gmem_r.lj_idx[read_idx];
       const TCALC t_q     = gmem_r.charges[read_idx];
@@ -429,8 +426,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       llint vdw_acc  = LLCONV_FUNC(vdw_nrg * scw.nrg_scale_f);
       WARP_REDUCE_DOWN(vdw_acc);
       if (warp_lane_idx == 0) {
-        atomicAdd((ullint*)&sh_elec_acc[absc_import_idx], lliToUlli(elec_acc));
-        atomicAdd((ullint*)&sh_vdw_acc[absc_import_idx], lliToUlli(vdw_acc));
+        atomicAdd((ullint*)&sh_elec_acc[absc_import_idx], (ullint)(elec_acc));
+        atomicAdd((ullint*)&sh_vdw_acc[absc_import_idx], (ullint)(vdw_acc));
       }
 #endif
 #ifdef COMPUTE_FORCE
@@ -441,11 +438,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       splitForceContribution(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, sh_zfrc_overflow);
 #  else
       atomicAdd((ullint*)&sh_xfrc[read_idx],
-                lliToUlli(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
+                (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
       atomicAdd((ullint*)&sh_yfrc[read_idx],
-                lliToUlli(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
+                (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
       atomicAdd((ullint*)&sh_zfrc[read_idx],
-                lliToUlli(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
+                (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
 #  endif
 #endif
 
@@ -486,7 +483,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           llint ixfrc = sh_xfrc_overflow[read_idx];
           ixfrc *= max_int_accumulation_ll;
           ixfrc += (llint)(sh_xfrc[read_idx]);
-          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(ixfrc));
+          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], (ullint)(ixfrc));
 #    else
           // Double-precision split force accumulation is intendede to extend the fixed-precision
           // format and cannot be combined back into a single integral number, ever.  Combine
@@ -496,7 +493,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           addSplitFixedPrecision(ixfrc, write_idx, poly_psw.xfrc, poly_psw.xfrc_ovrf);
 #    endif
 #  else
-          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], lliToUlli(sh_xfrc[read_idx]));
+          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], (ullint)(sh_xfrc[read_idx]));
 #  endif
         }
       }
@@ -518,13 +515,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           llint iyfrc = sh_yfrc_overflow[read_idx];
           iyfrc *= max_int_accumulation_ll;
           iyfrc += (llint)(sh_yfrc[read_idx]);
-          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(iyfrc));        
+          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], (ullint)(iyfrc));        
 #    else
           int95_t iyfrc = { sh_yfrc[read_idx], sh_yfrc_overflow[read_idx] };
           addSplitFixedPrecision(iyfrc, write_idx, poly_psw.yfrc, poly_psw.yfrc_ovrf);
 #    endif
 #  else
-          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], lliToUlli(sh_yfrc[read_idx]));
+          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], (ullint)(sh_yfrc[read_idx]));
 #  endif
         }
       }
@@ -546,13 +543,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
           llint izfrc = sh_zfrc_overflow[read_idx];
           izfrc *= max_int_accumulation_ll;
           izfrc += (llint)(sh_zfrc[read_idx]);
-          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(izfrc));        
+          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], (ullint)(izfrc));        
 #    else
           int95_t izfrc = { sh_zfrc[read_idx], sh_zfrc_overflow[read_idx] };
           addSplitFixedPrecision(izfrc, write_idx, poly_psw.zfrc, poly_psw.zfrc_ovrf);
 #    endif
 #  else
-          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], lliToUlli(sh_zfrc[read_idx]));
+          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], (ullint)(sh_zfrc[read_idx]));
 #  endif
         }
       }
@@ -566,8 +563,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       if (pos < import_count_ii) {
         const int write_idx = (sh_system_indices[pos] * scw.data_stride) +
                               (int)(StateVariable::ELECTROSTATIC);
-        atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
-                  lliToUlli(sh_elec_acc[pos]));
+        atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx], (ullint)(sh_elec_acc[pos]));
       }
       pos += blockDim.x;
     }
@@ -577,7 +573,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         const int write_idx = (sh_system_indices[rel_pos] * scw.data_stride) +
                               (int)(StateVariable::VDW);
         atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
-                  lliToUlli(sh_vdw_acc[rel_pos]));
+                  (ullint)(sh_vdw_acc[rel_pos]));
       }
       pos += blockDim.x;
     }
@@ -587,7 +583,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         const int write_idx = (sh_system_indices[rel_pos] * scw.data_stride) +
                               (int)(StateVariable::GENERALIZED_BORN);
         atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
-                  lliToUlli(sh_gb_acc[rel_pos]));
+                  (ullint)(sh_gb_acc[rel_pos]));
       }
       pos += blockDim.x;
     }

@@ -334,9 +334,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 #ifdef TCALC_IS_DOUBLE
           const TCALC fx = ((TCALC)(poly_psw.xfrc_ovrf[gbl_pos]) * max_llint_accumulation) +
                             (TCALC)(poly_psw.xfrc[gbl_pos]);
-          const int95_t inc_dx = convertSplitFixedPrecision95(move_factor * fx);
+          const int95_t inc_dx = doubleToInt95(move_factor * fx);
           const int95_t current_x = { poly_psw.xcrd[gbl_pos], poly_psw.xcrd_ovrf[gbl_pos] };
-          const int95_t update_x = combineSplitFixedPrecision(inc_dx, current_x);
+          const int95_t update_x = splitFPSum(inc_dx, current_x);
           poly_psw.xcrd[gbl_pos] = update_x.x;
           poly_psw.xcrd_ovrf[gbl_pos] = update_x.y;
 #else
@@ -352,9 +352,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 #ifdef TCALC_IS_DOUBLE
           const TCALC fy = ((TCALC)(poly_psw.yfrc_ovrf[gbl_pos]) * max_llint_accumulation) +
                             (TCALC)(poly_psw.yfrc[gbl_pos]);
-          const int95_t inc_dy = convertSplitFixedPrecision95(move_factor * fy);
+          const int95_t inc_dy = doubleToInt95(move_factor * fy);
           const int95_t current_y = { poly_psw.ycrd[gbl_pos], poly_psw.ycrd_ovrf[gbl_pos] };
-          const int95_t update_y = combineSplitFixedPrecision(inc_dy, current_y);
+          const int95_t update_y = splitFPSum(inc_dy, current_y);
           poly_psw.ycrd[gbl_pos] = update_y.x;
           poly_psw.ycrd_ovrf[gbl_pos] = update_y.y;
 #else
@@ -370,9 +370,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 #ifdef TCALC_IS_DOUBLE
           const TCALC fz = ((TCALC)(poly_psw.zfrc_ovrf[gbl_pos]) * max_llint_accumulation) +
                             (TCALC)(poly_psw.zfrc[gbl_pos]);
-          const int95_t inc_dz = convertSplitFixedPrecision95(move_factor * fz);
+          const int95_t inc_dz = doubleToInt95(move_factor * fz);
           const int95_t current_z = { poly_psw.zcrd[gbl_pos], poly_psw.zcrd_ovrf[gbl_pos] };
-          const int95_t update_z = combineSplitFixedPrecision(inc_dz, current_z);
+          const int95_t update_z = splitFPSum(inc_dz, current_z);
           poly_psw.zcrd[gbl_pos] = update_z.x;
           poly_psw.zcrd_ovrf[gbl_pos] = update_z.y;
 #else

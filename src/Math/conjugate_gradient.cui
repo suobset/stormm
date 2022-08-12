@@ -217,9 +217,9 @@ KRESCALE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ct
                         (double)(cgsbs.yfrc[tpos]);
       const double fz = ((double)(cgsbs.zfrc_ovrf[tpos]) * max_llint_accumulation) +
                         (double)(cgsbs.zfrc[tpos]);
-      const int95_t norm_fx = convertSplitFixedPrecision95(fx * inv_factor);
-      const int95_t norm_fy = convertSplitFixedPrecision95(fy * inv_factor);
-      const int95_t norm_fz = convertSplitFixedPrecision95(fz * inv_factor);
+      const int95_t norm_fx = doubleToInt95(fx * inv_factor);
+      const int95_t norm_fy = doubleToInt95(fy * inv_factor);
+      const int95_t norm_fz = doubleToInt95(fz * inv_factor);
       cgsbs.xfrc[tpos] = norm_fx.x;
       cgsbs.yfrc[tpos] = norm_fy.x;
       cgsbs.zfrc[tpos] = norm_fz.x;
@@ -348,9 +348,9 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
                         (double)(cgsbs.yfrc[tpos]);
       const double fz = ((double)(cgsbs.zfrc_ovrf[tpos]) * max_llint_accumulation) +
                         (double)(cgsbs.zfrc[tpos]);
-      const int95_t norm_fx = convertSplitFixedPrecision95(fx * inv_factor);
-      const int95_t norm_fy = convertSplitFixedPrecision95(fy * inv_factor);
-      const int95_t norm_fz = convertSplitFixedPrecision95(fz * inv_factor);
+      const int95_t norm_fx = doubleToInt95(fx * inv_factor);
+      const int95_t norm_fy = doubleToInt95(fy * inv_factor);
+      const int95_t norm_fz = doubleToInt95(fz * inv_factor);
       cgsbs.xfrc[tpos] = norm_fx.x;
       cgsbs.yfrc[tpos] = norm_fy.x;
       cgsbs.zfrc[tpos] = norm_fz.x;

@@ -282,7 +282,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TCALC3 float3
 #  define TCALC4 float4
 #  define LLCONV_FUNC __float2ll_rn
-#  define SPLITCONV_FUNC convertSplitFixedPrecision
+#  define SPLITCONV_FUNC floatToInt63
 #  define SPLIT_TYPE int2
 #  define SQRT_FUNC sqrtf
 #  define ACOS_FUNC acosf
@@ -375,7 +375,7 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #  define TCALC3 double3
 #  define TCALC4 double4
 #  define LLCONV_FUNC __double2ll_rn
-#  define SPLITCONV_FUNC convertSplitFixedPrecision95
+#  define SPLITCONV_FUNC doubleToInt95
 #  define SPLIT_TYPE int95_t
 #  define SQRT_FUNC sqrt
 #  define ACOS_FUNC acos

@@ -261,9 +261,9 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
     const double dfcgy = fy_part + cgy_part;
     const double dfcgz = fz_part + cgz_part;
     msum += (dfcgx * dfcgx) + (dfcgy * dfcgy) + (dfcgz * dfcgz);
-    const int95_t cg_x = convertSplitFixedPrecision95(dfcgx);
-    const int95_t cg_y = convertSplitFixedPrecision95(dfcgy);
-    const int95_t cg_z = convertSplitFixedPrecision95(dfcgz);
+    const int95_t cg_x = doubleToInt95(dfcgx);
+    const int95_t cg_y = doubleToInt95(dfcgy);
+    const int95_t cg_z = doubleToInt95(dfcgz);
     x_cg_temp[tpos] = cg_x.x;
     y_cg_temp[tpos] = cg_y.x;
     z_cg_temp[tpos] = cg_z.x;

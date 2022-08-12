@@ -164,9 +164,9 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
         const Tcalc p_vs_distance = vsk.dim1[param_idx];
         if (tcoord_is_sgnint) {
           const Tcalc disp_mult = p_vs_distance * invr * gpos_scale_factor;
-          xcrd[vsite_atom] = xcrd[parent_atom] + (disp_mult * dxm);
-          ycrd[vsite_atom] = ycrd[parent_atom] + (disp_mult * dym);
-          zcrd[vsite_atom] = zcrd[parent_atom] + (disp_mult * dzm);
+          xcrd[vsite_atom] = xcrd[parent_atom] + llround(disp_mult * dxm);
+          ycrd[vsite_atom] = ycrd[parent_atom] + llround(disp_mult * dym);
+          zcrd[vsite_atom] = zcrd[parent_atom] + llround(disp_mult * dzm);
         }
         else {
           xcrd[vsite_atom] = xcrd[parent_atom] + (p_vs_distance * dxm * invr);

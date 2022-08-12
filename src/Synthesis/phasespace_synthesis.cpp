@@ -765,6 +765,7 @@ const PsSynthesisReader PhaseSpaceSynthesis::data(const CoordinateCycle orientat
                              z_prior_coordinates.data(tier), x_prior_coord_overflow.data(tier),
                              y_prior_coord_overflow.data(tier), z_prior_coord_overflow.data(tier));
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -849,6 +850,7 @@ PsSynthesisWriter PhaseSpaceSynthesis::data(const CoordinateCycle orientation,
                              z_prior_coordinates.data(tier), x_prior_coord_overflow.data(tier),
                              y_prior_coord_overflow.data(tier), z_prior_coord_overflow.data(tier));
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -100,55 +100,49 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
         const VirtualSiteKind kind = static_cast<VirtualSiteKind>(fr_details.w);
 
         // The parent (first) and second frame atoms' locations must be read for any frame
-        const llint parent_xloc = __ldca(&gmem_r.xcrd[parent_atom]);
-        const llint parent_yloc = __ldca(&gmem_r.ycrd[parent_atom]);
-        const llint parent_zloc = __ldca(&gmem_r.zcrd[parent_atom]);
-        const llint frame2_xloc = __ldca(&gmem_r.xcrd[frame2_atom]);
-        const llint frame2_yloc = __ldca(&gmem_r.ycrd[frame2_atom]);
-        const llint frame2_zloc = __ldca(&gmem_r.zcrd[frame2_atom]);
+        const llint parent_x = __ldca(&gmem_r.xcrd[parent_atom]);
+        const llint parent_y = __ldca(&gmem_r.ycrd[parent_atom]);
+        const llint parent_z = __ldca(&gmem_r.zcrd[parent_atom]);
+        const llint frame2_x = __ldca(&gmem_r.xcrd[frame2_atom]);
+        const llint frame2_y = __ldca(&gmem_r.ycrd[frame2_atom]);
+        const llint frame2_z = __ldca(&gmem_r.zcrd[frame2_atom]);
 #ifndef TCALC_IS_SINGLE
-        const int parent_xloc_ovrf =  __ldca(&gmem_r.xcrd_ovrf[parent_atom]);
-        const int parent_yloc_ovrf =  __ldca(&gmem_r.ycrd_ovrf[parent_atom]);
-        const int parent_zloc_ovrf =  __ldca(&gmem_r.zcrd_ovrf[parent_atom]);
-        const int frame2_xloc_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame2_atom]);
-        const int frame2_yloc_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame2_atom]);
-        const int frame2_zloc_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame2_atom]);
+        const int parent_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[parent_atom]);
+        const int parent_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[parent_atom]);
+        const int parent_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[parent_atom]);
+        const int frame2_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame2_atom]);
+        const int frame2_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame2_atom]);
+        const int frame2_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame2_atom]);
 #endif
         switch (kind) {
         case VirtualSiteKind::FLEX_2:
           {
 #ifdef TCALC_IS_SINGLE
-            const TCALC dx = (TCALC)(frame2_xloc - parent_xloc);
-            const TCALC dy = (TCALC)(frame2_yloc - parent_yloc);
-            const TCALC dz = (TCALC)(frame2_zloc - parent_zloc);
+            const TCALC dx = (TCALC)(frame2_x - parent_x);
+            const TCALC dy = (TCALC)(frame2_y - parent_y);
+            const TCALC dz = (TCALC)(frame2_z - parent_z);
             const TCALC disp_mult = fr_details.x;
-            __stwb(&gmem_r.xcrd[vs_atom], parent_xloc + (llint)(dx * disp_mult));
-            __stwb(&gmem_r.ycrd[vs_atom], parent_yloc + (llint)(dy * disp_mult));
-            __stwb(&gmem_r.zcrd[vs_atom], parent_zloc + (llint)(dz * disp_mult));
+            __stwb(&gmem_r.xcrd[vs_atom], parent_x + (llint)(dx * disp_mult));
+            __stwb(&gmem_r.ycrd[vs_atom], parent_y + (llint)(dy * disp_mult));
+            __stwb(&gmem_r.zcrd[vs_atom], parent_z + (llint)(dz * disp_mult));
 #else
-            const int95_t idx = combineSplitFixedPrecision(frame2_xloc, frame2_xloc_ovrf,
-                                                           -parent_xloc, -parent_xloc_ovrf);
-            const int95_t idy = combineSplitFixedPrecision(frame2_yloc, frame2_yloc_ovrf,
-                                                           -parent_yloc, -parent_yloc_ovrf);
-            const int95_t idz = combineSplitFixedPrecision(frame2_zloc, frame2_zloc_ovrf,
-                                                           -parent_zloc, -parent_zloc_ovrf);
-            const TCALC dx = (((TCALC)(idx.y) * max_llint_accumulation) + (TCALC)(idx.x));
-            const TCALC dy = (((TCALC)(idy.y) * max_llint_accumulation) + (TCALC)(idy.x));
-            const TCALC dz = (((TCALC)(idz.y) * max_llint_accumulation) + (TCALC)(idz.x));
+            const int95_t idx = int95Sum(frame2_x, frame2_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95_t idy = int95Sum(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95_t idz = int95Sum(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC dx = splitFPToReal(idx);
+            const TCALC dy = splitFPToReal(idy);
+            const TCALC dz = splitFPToReal(idz);
             const TCALC disp_mult = fr_details.x;
-            const int95_t dvsx = convertSplitFixedPrecision95(disp_mult * dx);
-            const int95_t vs_x = combineSplitFixedPrecision(dvsx.x, dvsx.y, parent_xloc,
-                                                            parent_xloc_ovrf);
+            const int95_t dvsx = doubleToInt95(disp_mult * dx);
+            const int95_t vs_x = int95Sum(dvsx.x, dvsx.y, parent_x, parent_x_ovrf);
             __stwb(&gmem_r.xcrd[vs_atom],      vs_x.x);
             __stwb(&gmem_r.xcrd_ovrf[vs_atom], vs_x.y);
-            const int95_t dvsy = convertSplitFixedPrecision95(disp_mult * dy);
-            const int95_t vs_y = combineSplitFixedPrecision(dvsy.x, dvsy.y, parent_yloc,
-                                                            parent_yloc_ovrf);
+            const int95_t dvsy = doubleToInt95(disp_mult * dy);
+            const int95_t vs_y = int95Sum(dvsy.x, dvsy.y, parent_y, parent_y_ovrf);
             __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
             __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
-            const int95_t dvsz = convertSplitFixedPrecision95(disp_mult * dz);
-            const int95_t vs_z = combineSplitFixedPrecision(dvsz.x, dvsz.y, parent_zloc,
-                                                            parent_zloc_ovrf);
+            const int95_t dvsz = doubleToInt95(disp_mult * dz);
+            const int95_t vs_z = int95Sum(dvsz.x, dvsz.y, parent_z, parent_z_ovrf);
             __stwb(&gmem_r.zcrd[vs_atom],      vs_z.x);
             __stwb(&gmem_r.zcrd_ovrf[vs_atom], vs_z.y);
 #endif
@@ -157,41 +151,34 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
         case VirtualSiteKind::FIXED_2:
           {
 #ifdef TCALC_IS_SINGLE
-            const TCALC dx = (TCALC)(frame2_xloc - parent_xloc);
-            const TCALC dy = (TCALC)(frame2_yloc - parent_yloc);
-            const TCALC dz = (TCALC)(frame2_zloc - parent_zloc);
+            const TCALC dx = (TCALC)(frame2_x - parent_x);
+            const TCALC dy = (TCALC)(frame2_y - parent_y);
+            const TCALC dz = (TCALC)(frame2_z - parent_z);
 #else
-            const int95_t idx = combineSplitFixedPrecision(frame2_xloc, frame2_xloc_ovrf,
-                                                           -parent_xloc, -parent_xloc_ovrf);
-            const int95_t idy = combineSplitFixedPrecision(frame2_yloc, frame2_yloc_ovrf,
-                                                           -parent_yloc, -parent_yloc_ovrf);
-            const int95_t idz = combineSplitFixedPrecision(frame2_zloc, frame2_zloc_ovrf,
-                                                           -parent_zloc, -parent_zloc_ovrf);
-            const TCALC dx = (((TCALC)(idx.y) * max_llint_accumulation) + (TCALC)(idx.x));
-            const TCALC dy = (((TCALC)(idy.y) * max_llint_accumulation) + (TCALC)(idy.x));
-            const TCALC dz = (((TCALC)(idz.y) * max_llint_accumulation) + (TCALC)(idz.x));
-
+            const int95_t idx = int95Sum(frame2_x, frame2_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95_t idy = int95Sum(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95_t idz = int95Sum(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC dx = splitFPToReal(idx);
+            const TCALC dy = splitFPToReal(idy);
+            const TCALC dz = splitFPToReal(idz);
 #endif
             const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
             const TCALC disp_mult = fr_details.x * invr;
 #ifdef TCALC_IS_SINGLE
-            __stwb(&gmem_r.xcrd[vs_atom], parent_xloc + (llint)(dx * disp_mult));
-            __stwb(&gmem_r.ycrd[vs_atom], parent_yloc + (llint)(dy * disp_mult));
-            __stwb(&gmem_r.zcrd[vs_atom], parent_zloc + (llint)(dz * disp_mult));
+            __stwb(&gmem_r.xcrd[vs_atom], parent_x + (llint)(dx * disp_mult));
+            __stwb(&gmem_r.ycrd[vs_atom], parent_y + (llint)(dy * disp_mult));
+            __stwb(&gmem_r.zcrd[vs_atom], parent_z + (llint)(dz * disp_mult));
 #else
-            const int95_t dvsx = convertSplitFixedPrecision95(disp_mult * dx);
-            const int95_t vs_x = combineSplitFixedPrecision(dvsx.x, dvsx.y, parent_xloc,
-                                                            parent_xloc_ovrf);
+            const int95_t dvsx = doubleToInt95(disp_mult * dx);
+            const int95_t vs_x = int95Sum(dvsx.x, dvsx.y, parent_x, parent_x_ovrf);
             __stwb(&gmem_r.xcrd[vs_atom],      vs_x.x);
             __stwb(&gmem_r.xcrd_ovrf[vs_atom], vs_x.y);
-            const int95_t dvsy = convertSplitFixedPrecision95(disp_mult * dy);
-            const int95_t vs_y = combineSplitFixedPrecision(dvsy.x, dvsy.y, parent_yloc,
-                                                            parent_yloc_ovrf);
+            const int95_t dvsy = doubleToInt95(disp_mult * dy);
+            const int95_t vs_y = int95Sum(dvsy.x, dvsy.y, parent_y, parent_y_ovrf);
             __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
             __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
-            const int95_t dvsz = convertSplitFixedPrecision95(disp_mult * dz);
-            const int95_t vs_z = combineSplitFixedPrecision(dvsz.x, dvsz.y, parent_zloc,
-                                                            parent_zloc_ovrf);
+            const int95_t dvsz = doubleToInt95(disp_mult * dz);
+            const int95_t vs_z = int95Sum(dvsz.x, dvsz.y, parent_z, parent_z_ovrf);
             __stwb(&gmem_r.zcrd[vs_atom],      vs_z.x);
             __stwb(&gmem_r.zcrd_ovrf[vs_atom], vs_z.y);
 #endif
@@ -200,76 +187,105 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
         case VirtualSiteKind::FLEX_3:
           {
             const int frame3_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
-            const llint frame3_xloc = __ldca(&gmem_r.xcrd[frame3_atom]);
-            const llint frame3_yloc = __ldca(&gmem_r.ycrd[frame3_atom]);
-            const llint frame3_zloc = __ldca(&gmem_r.zcrd[frame3_atom]);
+            const llint frame3_x = __ldca(&gmem_r.xcrd[frame3_atom]);
+            const llint frame3_y = __ldca(&gmem_r.ycrd[frame3_atom]);
+            const llint frame3_z = __ldca(&gmem_r.zcrd[frame3_atom]);
 #ifdef TCALC_IS_SINGLE
             // Multiplying by the inverse position scaling constant, only to multiply each number
             // by the scaling constant, is unecessary and will not preserve any extra precision.
-            const TCALC3 p_f2 = { (TCALC)(frame2_xloc - parent_xloc),
-                                  (TCALC)(frame2_yloc - parent_yloc),
-                                  (TCALC)(frame2_zloc - parent_zloc) };
-            const TCALC3 p_f3 = { (TCALC)(frame3_xloc - parent_xloc),
-                                  (TCALC)(frame3_yloc - parent_yloc),
-                                  (TCALC)(frame3_zloc - parent_zloc) };
-            __stwb(&gmem_r.xcrd[vs_atom], parent_xloc + (llint)((p_f2.x * fr_details.x) +
-                                                                (p_f3.x * fr_details.y))); 
-            __stwb(&gmem_r.ycrd[vs_atom], parent_yloc + (llint)((p_f2.y * fr_details.x) +
-                                                                (p_f3.y * fr_details.y))); 
-            __stwb(&gmem_r.zcrd[vs_atom], parent_zloc + (llint)((p_f2.z * fr_details.x) +
-                                                                (p_f3.z * fr_details.y))); 
+            const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x), (TCALC)(frame2_y - parent_y),
+                                  (TCALC)(frame2_z - parent_z) };
+            const TCALC3 p_f3 = { (TCALC)(frame3_x - parent_x), (TCALC)(frame3_y - parent_y),
+                                  (TCALC)(frame3_z - parent_z) };
+            __stwb(&gmem_r.xcrd[vs_atom], parent_x + (llint)((p_f2.x * fr_details.x) +
+                                                             (p_f3.x * fr_details.y)));
+            __stwb(&gmem_r.ycrd[vs_atom], parent_y + (llint)((p_f2.y * fr_details.x) +
+                                                             (p_f3.y * fr_details.y))); 
+            __stwb(&gmem_r.zcrd[vs_atom], parent_z + (llint)((p_f2.z * fr_details.x) +
+                                                             (p_f3.z * fr_details.y))); 
 #else
-            const int frame3_xloc_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame3_atom]);
-            const int frame3_yloc_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame3_atom]);
-            const int frame3_zloc_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame3_atom]);
-            const int95t p_f2_xcmb = combineSplitFixedPrecision(frame2_xloc, frame2_xloc_ovrf,
-                                                                parent_xloc, parent_xloc_ovrf);
-            const int95t p_f2_ycmb = combineSplitFixedPrecision(frame2_yloc, frame2_yloc_ovrf,
-                                                                parent_yloc, parent_yloc_ovrf);
-            const int95t p_f2_zcmb = combineSplitFixedPrecision(frame2_zloc, frame2_zloc_ovrf,
-                                                                parent_zloc, parent_zloc_ovrf);
-            const TCALC3 p_f2 = { (((TCALC)(p_f2_xcmb.y) * max_llint_accumulation) +
-                                   (TCALC)(p_f2_xcmb.x)),
-                                  (((TCALC)(p_f2_ycmb.y) * max_llint_accumulation) +
-                                   (TCALC)(p_f2_ycmb.x)),
-                                  (((TCALC)(p_f2_zcmb.y) * max_llint_accumulation) +
-                                   (TCALC)(p_f2_zcmb.x)) };
-            const int95t p_f3_xcmb = combineSplitFixedPrecision(frame3_xloc, frame3_xloc_ovrf,
-                                                                parent_xloc, parent_xloc_ovrf);
-            const int95t p_f3_ycmb = combineSplitFixedPrecision(frame3_yloc, frame3_yloc_ovrf,
-                                                                parent_yloc, parent_yloc_ovrf);
-            const int95t p_f3_zcmb = combineSplitFixedPrecision(frame3_zloc, frame3_zloc_ovrf,
-                                                                parent_zloc, parent_zloc_ovrf);
-            const TCALC3 p_f3 = { (((TCALC)(p_f3_xcmb.y) * max_llint_accumulation) +
-                                   (TCALC)(p_f3_xcmb.x)),
-                                  (((TCALC)(p_f3_ycmb.y) * max_llint_accumulation) +
-                                   (TCALC)(p_f3_ycmb.x)),
-                                  (((TCALC)(p_f3_zcmb.y) * max_llint_accumulation) +
-                                   (TCALC)(p_f3_zcmb.x)) };
-            const int95_t dvsx = convertSplitFixedPrecision95((p_f2.x * fr_details.x) +
-                                                              (p_f3.x * fr_details.y));
-            const int95_t vs_x = combineSplitFixedPrecision(dvsx.x, dvsx.y, parent_xloc,
-                                                            parent_xloc_ovrf);
+            const int frame3_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame3_atom]);
+            const int frame3_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame3_atom]);
+            const int frame3_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame3_atom]);
+            const int95t p_f2_xcmb = int95Sum(frame2_x, frame2_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95t p_f2_ycmb = int95Sum(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95t p_f2_zcmb = int95Sum(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC3 p_f2 = { splitFPToReal(p_f2_xcmb), splitFPToReal(p_f2_ycmb),
+                                  splitFPToReal(p_f2_zcmb) };
+            const int95t p_f3_xcmb = int95Sum(frame3_x, frame3_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95t p_f3_ycmb = int95Sum(frame3_y, frame3_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95t p_f3_zcmb = int95Sum(frame3_z, frame3_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC3 p_f3 = { splitFPToReal(p_f3_xcmb), splitFPToReal(p_f3_ycmb),
+                                  splitFPToReal(p_f3_zcmb) };
+            const int95_t dvsx = doubleToInt95((p_f2.x * fr_details.x) + (p_f3.x * fr_details.y));
+            const int95_t vs_x = int95Sum(dvsx.x, dvsx.y, parent_x, parent_x_ovrf);
             __stwb(&gmem_r.xcrd[vs_atom],      vs_x.x);
             __stwb(&gmem_r.xcrd_ovrf[vs_atom], vs_x.y);
-            const int95_t dvsy = convertSplitFixedPrecision95((p_f2.y * fr_details.x) +
-                                                              (p_f3.y * fr_details.y));
-            const int95_t vs_y = combineSplitFixedPrecision(dvsy.x, dvsy.y, parent_yloc,
-                                                            parent_yloc_ovrf);
+            const int95_t dvsy = doubleToInt95((p_f2.y * fr_details.x) + (p_f3.y * fr_details.y));
+            const int95_t vs_y = int95Sum(dvsy.x, dvsy.y, parent_y, parent_y_ovrf);
             __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
             __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
-            const int95_t dvsz = convertSplitFixedPrecision95((p_f2.z * fr_details.x) +
-                                                              (p_f3.z * fr_details.y));
-            const int95_t vs_z = combineSplitFixedPrecision(dvsz.x, dvsz.y, parent_zloc,
-                                                            parent_zloc_ovrf);
+            const int95_t dvsz = doubleToInt95((p_f2.z * fr_details.x) + (p_f3.z * fr_details.y));
+            const int95_t vs_z = int95Sum(dvsz.x, dvsz.y, parent_z, parent_z_ovrf);
             __stwb(&gmem_r.zcrd[vs_atom],      vs_z.x);
             __stwb(&gmem_r.zcrd_ovrf[vs_atom], vs_z.y);
 #endif
           }
           break;
         case VirtualSiteKind::FIXED_3:
+          {
+            const int frame3_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
+            const llint frame3_x = __ldca(&gmem_r.xcrd[frame3_atom]);
+            const llint frame3_y = __ldca(&gmem_r.ycrd[frame3_atom]);
+            const llint frame3_z = __ldca(&gmem_r.zcrd[frame3_atom]);
+#ifdef TCALC_IS_SINGLE
+            const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x), (TCALC)(frame3_y - frame2_y),
+                                   (TCALC)(frame3_z - frame2_z) };
+            const llint midpt_x = frame2_x + (llint)(fr_details.y * f2_f3.x);
+            const llint midpt_y = frame2_y + (llint)(fr_details.y * f2_f3.y);
+            const llint midpt_z = frame2_z + (llint)(fr_details.y * f2_f3.z);
+            const TCALC3 dm = { (TCALC)(midpt_x - parent_x), (TCALC)(midpt_y - parent_y),
+                                (TCALC)(midpt_z - parent_z) };
+#else
+            const int frame3_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[frame3_atom]);
+            const int frame3_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame3_atom]);
+            const int frame3_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame3_atom]);
+
+            // Compute the midpoint location as a real-valued quantity
+            const int95_t f2_f3_xcmb = int95Sum( frame3_x,  frame3_x_ovrf,
+                                                -frame2_x, -frame2_x_ovrf);
+            const TCALC f2_f3_rx = splitFPToReal(f2_f3_xcmb);
+            const int95_t disp_x = doubleToInt95(f2_f3_rx * fr_details.y);
+            const int95_t midpt_x = int95Sum(frame2_x, frame2_x_ovrf, disp_x.x, disp_x.y);
+            const int95_t dm_x = int95Sum(midpt_x.x, midpt_x.y, -parent_x, -parent_x_ovrf);
+            const int95_t f2_f3_ycmb = int95Sum( frame3_y,  frame3_y_ovrf,
+                                                -frame2_y, -frame2_y_ovrf);
+            const TCALC f2_f3_ry = splitFPToReal(f2_f3_ycmb)
+            const int95_t disp_y = doubleToInt95(f2_f3_ry * fr_details.y);
+            const int95_t midpt_y = int95Sum(frame2_y, frame2_y_ovrf, disp_y.x, disp_y.y);
+            const int95_t dm_y = int95Sum(midpt_y.x, midpt_y.y, -parent_y, -parent_y_ovrf);
+            const int95_t f2_f3_zcmb = int95Sum( frame3_z,  frame3_z_ovrf,
+                                                -frame2_z, -frame2_z_ovrf);
+            const TCALC f2_f3_rz = splitFPToReal(f2_f3_zcmb);
+            const int95_t disp_z = doubleToInt95(f2_f3_rz * fr_details.y);
+            const int95_t midpt_z = int95Sum(frame2_z, frame2_z_ovrf, disp_z.x, disp_z.y);
+            const int95_t dm_z = int95Sum(midpt_z.x, midpt_z.y,
+                                          -parent_z, -parent_z_ovrf);
+            const TCALC3 dm = { splitFPToReal(dm_x), splitFPToReal(dm_y), splitFPToReal(dm_z) };
+#endif
+            const TCALC invr = (TCALC)(1.0) / ((dm.x * dm.x) + (dm.y * dm.y) + (dm.z * dm.z));
+            const TCALC disp_mult = fr_details.x * invr;
+#ifdef TCALC_IS_SINGLE
+            __stwb(&gmem_r.xcrd[vs_atom], parent_x + (llint)(disp_mult * dm.x));
+            __stwb(&gmem_r.ycrd[vs_atom], parent_y + (llint)(disp_mult * dm.y));
+            __stwb(&gmem_r.zcrd[vs_atom], parent_z + (llint)(disp_mult * dm.z));
+#else
+            
+#endif
+          }
           break;
         case VirtualSiteKind::FAD_3:
+          
           break;
         case VirtualSiteKind::OUT_3:
           break;
@@ -277,59 +293,41 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
           {
             const int frame3_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
             const int frame4_atom = ((tinsr.y >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
-            const llint frame3_xloc = __ldca(&gmem_r.xcrd[frame3_atom]);
-            const llint frame3_yloc = __ldca(&gmem_r.ycrd[frame3_atom]);
-            const llint frame3_zloc = __ldca(&gmem_r.zcrd[frame3_atom]);
-            const llint frame4_xloc = __ldca(&gmem_r.xcrd[frame4_atom]);
-            const llint frame4_yloc = __ldca(&gmem_r.ycrd[frame4_atom]);
-            const llint frame4_zloc = __ldca(&gmem_r.zcrd[frame4_atom]);
+            const llint frame3_x = __ldca(&gmem_r.xcrd[frame3_atom]);
+            const llint frame3_y = __ldca(&gmem_r.ycrd[frame3_atom]);
+            const llint frame3_z = __ldca(&gmem_r.zcrd[frame3_atom]);
+            const llint frame4_x = __ldca(&gmem_r.xcrd[frame4_atom]);
+            const llint frame4_y = __ldca(&gmem_r.ycrd[frame4_atom]);
+            const llint frame4_z = __ldca(&gmem_r.zcrd[frame4_atom]);
 #ifdef TCALC_IS_SINGLE
-            const TCALC3 p_f2 = { (TCALC)(frame2_xloc - parent_xloc),
-                                  (TCALC)(frame2_yloc - parent_yloc),
-                                  (TCALC)(frame2_zloc - parent_zloc) };
-            const TCALC3 p_f3 = { (TCALC)(frame3_xloc - parent_xloc),
-                                  (TCALC)(frame3_yloc - parent_yloc),
-                                  (TCALC)(frame3_zloc - parent_zloc) };
-            const TCALC3 p_f4 = { (TCALC)(frame4_xloc - parent_xloc),
-                                  (TCALC)(frame4_yloc - parent_yloc),
-                                  (TCALC)(frame4_zloc - parent_zloc) };
+            const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x), (TCALC)(frame2_y - parent_y),
+                                  (TCALC)(frame2_z - parent_z) };
+            const TCALC3 p_f3 = { (TCALC)(frame3_x - parent_x), (TCALC)(frame3_y - parent_y),
+                                  (TCALC)(frame3_z - parent_z) };
+            const TCALC3 p_f4 = { (TCALC)(frame4_x - parent_x), (TCALC)(frame4_y - parent_y),
+                                  (TCALC)(frame4_z - parent_z) };
 #else
-            const int frame3_xloc_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame3_atom]);
-            const int frame3_yloc_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame3_atom]);
-            const int frame3_zloc_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame3_atom]);
-            const int frame4_xloc_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame4_atom]);
-            const int frame4_yloc_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame4_atom]);
-            const int frame4_zloc_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame4_atom]);
-            const int95t p_f2_xcmb = combineSplitFixedPrecision(frame2_xloc, frame2_xloc_ovrf,
-                                                                parent_xloc, parent_xloc_ovrf);
-            const int95t p_f2_ycmb = combineSplitFixedPrecision(frame2_yloc, frame2_yloc_ovrf,
-                                                                parent_yloc, parent_yloc_ovrf);
-            const int95t p_f2_zcmb = combineSplitFixedPrecision(frame2_zloc, frame2_zloc_ovrf,
-                                                                parent_zloc, parent_zloc_ovrf);
-            const TCALC3 p_f2 =
-              { (((TCALC)(p_f2_xcmb.y) * max_llint_accumulation) + (TCALC)(p_f2_xcmb.x)),
-                (((TCALC)(p_f2_ycmb.y) * max_llint_accumulation) + (TCALC)(p_f2_ycmb.x)),
-                (((TCALC)(p_f2_zcmb.y) * max_llint_accumulation) + (TCALC)(p_f2_zcmb.x)) };
-            const int95t p_f3_xcmb = combineSplitFixedPrecision(frame3_xloc, frame3_xloc_ovrf,
-                                                                parent_xloc, parent_xloc_ovrf);
-            const int95t p_f3_ycmb = combineSplitFixedPrecision(frame3_yloc, frame3_yloc_ovrf,
-                                                                parent_yloc, parent_yloc_ovrf);
-            const int95t p_f3_zcmb = combineSplitFixedPrecision(frame3_zloc, frame3_zloc_ovrf,
-                                                                parent_zloc, parent_zloc_ovrf);
-            const TCALC3 p_f3 =
-              { (((TCALC)(p_f3_xcmb.y) * max_llint_accumulation) + (TCALC)(p_f3_xcmb.x)),
-                (((TCALC)(p_f3_ycmb.y) * max_llint_accumulation) + (TCALC)(p_f3_ycmb.x)),
-                (((TCALC)(p_f3_zcmb.y) * max_llint_accumulation) + (TCALC)(p_f3_zcmb.x)) };
-            const int95_t p_f4_xcmb = combineSplitFixedPrecision(frame4_xloc, frame4_xloc_ovrf,
-                                                                 parent_xloc, parent_xloc_ovrf);
-            const int95_t p_f4_ycmb = combineSplitFixedPrecision(frame4_yloc, frame4_yloc_ovrf,
-                                                                 parent_yloc, parent_yloc_ovrf);
-            const int95_t p_f4_zcmb = combineSplitFixedPrecision(frame4_zloc, frame4_zloc_ovrf,
-                                                                 parent_zloc, parent_zloc_ovrf);
-            const TCALC3 p_f4 =
-              { (((TCALC)(p_f4_xcmb.y) * max_llint_accumulation) + (TCALC)(p_f4_xcmb.x)),
-                (((TCALC)(p_f4_ycmb.y) * max_llint_accumulation) + (TCALC)(p_f4_ycmb.x)),
-                (((TCALC)(p_f4_zcmb.y) * max_llint_accumulation) + (TCALC)(p_f4_zcmb.x)) };
+            const int frame3_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame3_atom]);
+            const int frame3_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame3_atom]);
+            const int frame3_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame3_atom]);
+            const int frame4_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame4_atom]);
+            const int frame4_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame4_atom]);
+            const int frame4_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame4_atom]);
+            const int95_t p_f2_xcmb = int95Sum(frame2_x, frame2_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95_t p_f2_ycmb = int95Sum(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95_t p_f2_zcmb = int95Sum(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC3 p_f2 = { int95ToDouble(p_f2_xcmb), int95ToDouble(p_f2_ycmb),
+                                  int95ToDouble(p_f2_zcmb) };
+            const int95_t p_f3_xcmb = int95Sum(frame3_x, frame3_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95_t p_f3_ycmb = int95Sum(frame3_y, frame3_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95_t p_f3_zcmb = int95Sum(frame3_z, frame3_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC3 p_f3 = { int95ToDouble(p_f3_xcmb), int95ToDouble(p_f3_ycmb),
+                                  int95ToDouble(p_f3_zcmb) };
+            const int95_t p_f4_xcmb = int95Sum(frame4_x, frame4_x_ovrf, -parent_x, -parent_x_ovrf);
+            const int95_t p_f4_ycmb = int95Sum(frame4_y, frame4_y_ovrf, -parent_y, -parent_y_ovrf);
+            const int95_t p_f4_zcmb = int95Sum(frame4_z, frame4_z_ovrf, -parent_z, -parent_z_ovrf);
+            const TCALC3 p_f4 = { int95ToDouble(p_f4_xcmb), int95ToDouble(p_f4_ycmb),
+                                  int95ToDouble(p_f4_zcmb) };
 #endif
             const TCALC3 pf3_m_pf2 = { (fr_details.x * p_f3.x) - p_f2.x,
                                        (fr_details.x * p_f3.y) - p_f2.y,
@@ -342,23 +340,20 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
                                                               (p_vs.y * p_vs.y) +
                                                               (p_vs.z * p_vs.z));
 #ifdef TCALC_IS_SINGLE
-            __stwb(&gmem_r.xcrd[vs_atom], parent_xloc + (llint)(pvs_factor * p_vs.x));
-            __stwb(&gmem_r.ycrd[vs_atom], parent_yloc + (llint)(pvs_factor * p_vs.y));
-            __stwb(&gmem_r.zcrd[vs_atom], parent_zloc + (llint)(pvs_factor * p_vs.z));
+            __stwb(&gmem_r.xcrd[vs_atom], parent_x + (llint)(pvs_factor * p_vs.x));
+            __stwb(&gmem_r.ycrd[vs_atom], parent_y + (llint)(pvs_factor * p_vs.y));
+            __stwb(&gmem_r.zcrd[vs_atom], parent_z + (llint)(pvs_factor * p_vs.z));
 #else
-            const int95_t dvsx = convertSplitFixedPrecision95(pvs_factor * p_vs.x);
-            const int95_t vs_x = combineSplitFixedPrecision(dvsx.x, dvsx.y, parent_xloc,
-                                                            parent_xloc_ovrf);
+            const int95_t dvsx = doubleToInt95(pvs_factor * p_vs.x);
+            const int95_t vs_x = int95Sum(dvsx.x, dvsx.y, parent_x, parent_x_ovrf);
             __stwb(&gmem_r.xcrd[vs_atom],      vs_x.x);
             __stwb(&gmem_r.xcrd_ovrf[vs_atom], vs_x.y);
-            const int95_t dvsy = convertSplitFixedPrecision95(pvs_factor * p_vs.y);
-            const int95_t vs_y = combineSplitFixedPrecision(dvsy.x, dvsy.y, parent_yloc,
-                                                            parent_yloc_ovrf);
+            const int95_t dvsy = doubleToInt95(pvs_factor * p_vs.y);
+            const int95_t vs_y = int95Sum(dvsy.x, dvsy.y, parent_y, parent_y_ovrf);
             __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
             __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
-            const int95_t dvsz = convertSplitFixedPrecision95(pvs_factor * p_vs.z);
-            const int95_t vs_z = combineSplitFixedPrecision(dvsz.x, dvsz.y, parent_zloc,
-                                                            parent_zloc_ovrf);
+            const int95_t dvsz = doubleToInt95(pvs_factor * p_vs.z);
+            const int95_t vs_z = int95Sum(dvsz.x, dvsz.y, parent_z, parent_z_ovrf);
             __stwb(&gmem_r.zcrd[vs_atom],      vs_z.x);
             __stwb(&gmem_r.zcrd_ovrf[vs_atom], vs_z.y);            
 #endif
