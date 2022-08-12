@@ -2015,6 +2015,20 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                      warp_size_zu);
   ic = cnst_param_map_bounds.putHost(&valparam_int2_data, tmp_cnst_param_map_bounds, ic,
                                      warp_size_zu);
+
+  // Some parameter arrays have unusual types and are held in ARRAY-kind Hybrid objects
+  virtual_site_parameters.resize(filtered_vste_params.size());
+  virtual_site_parameters.putHost(filtered_vste_params);
+  sp_virtual_site_parameters.resize(sp_filtered_vste_params.size());
+  sp_virtual_site_parameters.putHost(sp_filtered_vste_params);
+  settle_group_masses.resize(filtered_sett_mass.size());
+  settle_group_masses.putHost(filtered_sett_mass);
+  settle_group_geometry.resize(filtered_sett_geom.size());
+  settle_group_geometry.putHost(filtered_sett_geom);
+  sp_settle_group_masses.resize(sp_filtered_sett_mass.size());
+  sp_settle_group_masses.putHost(sp_filtered_sett_mass);
+  sp_settle_group_geometry.resize(sp_filtered_sett_geom.size());
+  sp_settle_group_geometry.putHost(sp_filtered_sett_geom);
   constraint_param_bounds.resize(filtered_cnst_group_bounds.size());
   constraint_param_bounds.putHost(filtered_cnst_group_bounds);
   
@@ -3494,19 +3508,23 @@ AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier)
 //-------------------------------------------------------------------------------------------------
 SyAtomUpdateKit<double2, double4>
 AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
-  return SyAtomUpdateKit<double2, double4>(virtual_site_parameters.data(tier),
-                                           settle_group_geometry.data(tier),
-                                           settle_group_masses.data(tier),
-                                           constraint_group_params.data(tier));
+  return SyAtomUpdateKit<double2,
+                         double4>(virtual_site_parameters.data(tier),
+                                  settle_group_geometry.data(tier), settle_group_masses.data(tier),
+                                  constraint_group_params.data(tier), vste_instructions.data(tier),
+                                  sett_instructions.data(tier), cnst_instructions.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
 SyAtomUpdateKit<float2, float4>
 AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
-  return SyAtomUpdateKit<float2, float4>(sp_virtual_site_parameters.data(tier),
-                                         sp_settle_group_geometry.data(tier),
-                                         sp_settle_group_masses.data(tier),
-                                         sp_constraint_group_params.data(tier));
+  return SyAtomUpdateKit<float2,
+                         float4>(sp_virtual_site_parameters.data(tier),
+                                 sp_settle_group_geometry.data(tier),
+                                 sp_settle_group_masses.data(tier),
+                                 sp_constraint_group_params.data(tier),
+                                 vste_instructions.data(tier), sett_instructions.data(tier),
+                                 cnst_instructions.data(tier));
 }
 
 

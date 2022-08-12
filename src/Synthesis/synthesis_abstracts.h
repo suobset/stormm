@@ -235,6 +235,11 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
                               ///<   thus which index of this array to take.  
   const T2* cnst_grp_params;  ///< Bond length (x member) and inverse mass (y member) information
                               ///<   for hub-and-spoke constraint groups.
+
+  // Instruction sets for virtual sites and constraints
+  const uint2* vste_insr;     ///< Virtual site placement instructions
+  const uint2* sett_insr;     ///< SETLLE group constraints instructions
+  const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
 };
   
 } // namespace synthesis
