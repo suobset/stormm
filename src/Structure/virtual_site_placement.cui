@@ -10,9 +10,8 @@
 // and a cache resource kit named gmem_r.
 #ifdef VSITE_STANDALONE
 __global__ void	__launch_bounds__(small_block_size, 4)
-kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
-                   const SyAtomUpdateKit<TCALC2, TCALC4> poly_auk,
-                   const CacheResourceKit<TCALC> gmem_r) {
+KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
+            const SyAtomUpdateKit<TCALC2, TCALC4> poly_auk, CacheResourceKit<TCALC> gmem_r) {
   __shared__ int2 vwu_map[vwu_abstract_length];
   __shared__ int vwu_task_count[vwu_abstract_length];
   __shared__ int vwu_padded_task_count[vwu_abstract_length];
@@ -91,7 +90,7 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
 
         // Obtain the instruction
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::VSITE)].x;
-        const unit2 tinsr = __ldcs(&poly_auk.vste_insr[task_offset + pos]);
+        const uint2 tinsr = __ldcs(&poly_auk.vste_insr[task_offset + pos]);
         const int vs_atom = (tinsr.x & 0x3ff) + EXCL_GMEM_OFFSET;
         const int parent_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
         const int frame2_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
@@ -157,7 +156,7 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
             const TCALC dz = int95SumToDouble(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
 #endif
             const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
-'            const TCALC disp_mult = fr_details.x * invr;
+            const TCALC disp_mult = fr_details.x * invr;
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC(dx * disp_mult));
             __stwb(&gmem_r.ycrd[vs_atom], parent_y + LLCONV_FUNC(dy * disp_mult));
@@ -211,15 +210,15 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
             const TCALC p_f3z = int95SumToDouble( frame3_x,  frame3_x_ovrf,
                                                  -parent_x, -parent_x_ovrf);
             const int95_t vs_x = int95Sum(parent_x, parent_x_ovrf,
-                                          (p_f2.x * fr_details.x) + (p_f3.x * fr_details.y));
+                                          (p_f2x * fr_details.x) + (p_f3x * fr_details.y));
             __stwb(&gmem_r.xcrd[vs_atom],      vs_x.x);
             __stwb(&gmem_r.xcrd_ovrf[vs_atom], vs_x.y);
             const int95_t vs_y = int95Sum(parent_y, parent_y_ovrf,
-                                          (p_f2.y * fr_details.x) + (p_f3.y * fr_details.y));
+                                          (p_f2y * fr_details.x) + (p_f3y * fr_details.y));
             __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
             __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
             const int95_t vs_z = int95Sum(parent_z, parent_z_ovrf,
-                                          (p_f2.z * fr_details.x) + (p_f3.z * fr_details.y));
+                                          (p_f2z * fr_details.x) + (p_f3z * fr_details.y));
             __stwb(&gmem_r.zcrd[vs_atom],      vs_z.x);
             __stwb(&gmem_r.zcrd_ovrf[vs_atom], vs_z.y);
 #endif
@@ -250,17 +249,15 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
             const TCALC f2_f3_rx = int95SumToDouble( frame3_x,  frame3_x_ovrf,
                                                     -frame2_x, -frame2_x_ovrf);
             const int95_t midpt_x = int95Sum(frame2_x, frame2_x_ovrf, f2_f3_rx * fr_details.y);
-            const int95_t dmx = int95Sum(midpt_x.x, midpt_x.y, -parent_x, -parent_x_ovrf);
-
+            const TCALC dmx = int95SumToDouble(midpt_x.x, midpt_x.y, -parent_x, -parent_x_ovrf);
             const TCALC f2_f3_ry = int95SumToDouble( frame3_y,  frame3_y_ovrf,
                                                     -frame2_y, -frame2_y_ovrf);
             const int95_t midpt_y = int95Sum(frame2_y, frame2_y_ovrf, f2_f3_ry * fr_details.y);
-            const int95_t dmy = int95Sum(midpt_y.x, midpt_y.y, -parent_y, -parent_y_ovrf);
-
+            const TCALC dmy = int95SumToDouble(midpt_y.x, midpt_y.y, -parent_y, -parent_y_ovrf);
             const TCALC f2_f3_rz = int95SumToDouble( frame3_z,  frame3_z_ovrf,
                                                     -frame2_z, -frame2_z_ovrf);
             const int95_t midpt_z = int95Sum(frame2_z, frame2_z_ovrf, f2_f3_rz * fr_details.y);
-            const int95_t dmz = int95Sum(midpt_z.x, midpt_z.y, -parent_z, -parent_z_ovrf);
+            const TCALC dmz = int95SumToDouble(midpt_z.x, midpt_z.y, -parent_z, -parent_z_ovrf);
 #endif
             const TCALC disp_mult = fr_details.x /
                                     SQRT_FUNC((dmx * dmx) + (dmy * dmy) + (dmz * dmz));
@@ -288,8 +285,8 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
             const llint frame3_y = __ldca(&gmem_r.ycrd[frame3_atom]);
             const llint frame3_z = __ldca(&gmem_r.zcrd[frame3_atom]);
 #ifdef TCALC_IS_SINGLE
-            const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x), (TCALC)(frame2_y - parent_y),
-                                  (TCALC)(frame2_z - parent_z) };
+            const TCALC3 p_f2  = { (TCALC)(frame2_x - parent_x), (TCALC)(frame2_y - parent_y),
+                                   (TCALC)(frame2_z - parent_z) };
             const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x), (TCALC)(frame3_y - frame2_y),
                                    (TCALC)(frame3_z - frame2_z) };
 #else
@@ -351,6 +348,9 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
             const TCALC3 p_f3 = { (TCALC)(frame3_x - parent_x), (TCALC)(frame3_y - parent_y),
                                   (TCALC)(frame3_z - parent_z) };
 #else
+            const int frame3_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[frame3_atom]);
+            const int frame3_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame3_atom]);
+            const int frame3_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame3_atom]);
             const TCALC3 p_f2 = {
               int95SumToDouble(frame2_x, frame2_x_ovrf, -parent_x, -parent_x_ovrf),
               int95SumToDouble(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf),
@@ -476,12 +476,12 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
         // arrays for coordinates that the underlying PhaseSpaceSynthesis deems "future."
 #ifdef VSITE_STANDALONE
         const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
-        const int manip_segment = (vs_atom - GMEM_EXCL_OFFSET) >> warp_bits;
-        const int manip_bitpos  = ((vs_atom - GMEM_EXCL_OFFSET) & warp_bits_mask); 
+        const int manip_segment = (vs_atom - EXCL_GMEM_OFFSET) >> warp_bits;
+        const int manip_bitpos  = ((vs_atom - EXCL_GMEM_OFFSET) & warp_bits_mask_int); 
         const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
         if ((manip_mask.y >> manip_bitpos) & 0x1) {
           const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + vs_atom -
-                                                               GMEM_EXCL_OFFSET]);          
+                                                               EXCL_GMEM_OFFSET]);          
           __stwb(&poly_psw.xcrd[write_idx], __ldca(&gmem_r.xcrd[vs_atom]));
           __stwb(&poly_psw.ycrd[write_idx], __ldca(&gmem_r.ycrd[vs_atom]));
           __stwb(&poly_psw.zcrd[write_idx], __ldca(&gmem_r.zcrd[vs_atom]));

@@ -1131,6 +1131,28 @@ int optValenceKernelSubdivision(const std::vector<int> &atom_counts, PrecisionMo
 
 int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, PrecisionModel prec,
                                 EvaluateForce eval_frc, const GpuDetails &gpu);
+/// \}
+
+/// \brief Optimize the virtual site kernel handling subdivision.  This applies when the virtual
+///        sites are manipulated outside of broader work units computing valence interactions.
+///
+/// Overloaded:
+///   - Provide the system sizes as a C-style array with a trusted length.
+///   - Provide the system sizes as a Standard Template Library vector.
+///   - Provide the system sizes as a Hybrid object (host data will be valid).
+///
+/// \param vwu_abstracts  Abstracts for valence work units, containing the numbers of virtual sites
+///                       in each work unit
+/// \param vwu_count      The number of valence work units (this might be inferred from the length
+///                       of the abstracts array, but its inclusion is forced to make sure that the
+///                       true count in whatever synthesis of topologies is respected)
+/// \{
+int optVirtualSiteKernelSubdivision(const int2* vwu_abstracts, int vwu_count);
+
+int optVirtualSiteKernelSubdivision(const std::vector<int2> &vwu_abstracts, int vwu_count);
+
+int optVirtualSiteKernelSubdivision(const Hybrid<int2> &vwu_abstracts, int vwu_count);
+/// \}
 
 /// \brief Calculate the optimal sizes of valence work units based on a series of system sizes.
 ///        This will engage some simple heuristics, not examine the actual topologies to optimize

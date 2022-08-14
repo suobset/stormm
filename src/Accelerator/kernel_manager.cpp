@@ -9,6 +9,7 @@
 #include "Math/reduction_workunit.h"
 #include "Potential/hpc_nonbonded_potential.h"
 #include "Potential/hpc_valence_potential.h"
+#include "Structure/hpc_virtual_site_handling.h"
 #endif
 #include "kernel_manager.h"
 
@@ -21,7 +22,9 @@ using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 using math::queryReductionKernelRequirements;
 using math::optReductionKernelSubdivision;
+using structure::queryVirtualSiteKernelRequirements;
 using synthesis::optValenceKernelSubdivision;
+using synthesis::optVirtualSiteKernelSubdivision;
 #endif
 using math::findBin;
 using parse::CaseSensitivity;
@@ -101,9 +104,10 @@ const std::string& KernelFormat::getKernelName() const {
 //-------------------------------------------------------------------------------------------------
 KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis &poly_ag) :
     gpu{gpu_in},
-    valence_block_multiplier{valenceBlockMultiplier(gpu_in, poly_ag)},
+    valence_block_multiplier{valenceBlockMultiplier()},
     nonbond_block_multiplier{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType())},
-    reduction_block_multiplier{reductionBlockMultiplier(gpu_in, poly_ag)},
+    reduction_block_multiplier{reductionBlockMultiplier()},
+    virtual_site_block_multiplier{virtualSiteBlockMultiplier()},
     k_dictionary{}
 {
 #ifdef STORMM_USE_HPC
@@ -214,6 +218,14 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                          ReductionStage::RESCALE, reduction_div, "kfrsConjGrad");
   catalogReductionKernel(PrecisionModel::SINGLE, ReductionGoal::CONJUGATE_GRADIENT,
                          ReductionStage::ALL_REDUCE, reduction_div, "kfrdConjGrad");
+
+  // Virtual site kernel entries
+  const int vsite_div = optVirtualSiteKernelSubdivision(poly_ag.getValenceWorkUnitAbstracts(),
+                                                        poly_ag.getValenceWorkUnitCount());
+  catalogVirtualSiteKernel(PrecisionModel::DOUBLE, VirtualSiteActivity::PLACEMENT, vsite_div,
+                           "kdPlaceVirtualSites");
+  catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::PLACEMENT, vsite_div,
+                           "kfPlaceVirtualSites");
 #endif
 }
 
@@ -286,6 +298,28 @@ void KernelManager::catalogReductionKernel(const PrecisionModel prec, const Redu
 }
 
 //-------------------------------------------------------------------------------------------------
+void KernelManager::catalogVirtualSiteKernel(const PrecisionModel prec,
+                                             const VirtualSiteActivity purpose,
+                                             const int subdivision,
+                                             const std::string &kernel_name) {
+  const std::string k_key = virtualSiteKernelKey(prec, purpose);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Virtual site handling kernel identifier " + k_key + " already exists in the kernel "
+          "map.", "KernelManager", "catalogVirtualSiteKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryVirtualSiteKernelRequirements(prec, purpose);
+  k_dictionary[k_key] = KernelFormat(attr, virtual_site_block_multiplier, subdivision, gpu,
+                                     kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
                                          const ForceAccumulationMethod acc_meth,
@@ -323,6 +357,17 @@ int2 KernelManager::getReductionKernelDims(const PrecisionModel prec, const Redu
 }
 
 //-------------------------------------------------------------------------------------------------
+int2 KernelManager::getVirtualSiteKernelDims(const PrecisionModel prec,
+                                             const VirtualSiteActivity purpose) const {
+  const std::string k_key = virtualSiteKernelKey(prec, purpose);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Virtual site handling kernel identifier " + k_key + " was not found in the kernel map.",
+          "KernelManager", "getVirtualSiteKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
 const GpuDetails& KernelManager::getGpu() const {
   return gpu;
 }
@@ -350,7 +395,7 @@ void KernelManager::printLaunchParameters(const std::string &k_key) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
+int valenceBlockMultiplier() {
 #ifdef STORMM_USE_HPC
   return 2;
 #else
@@ -386,7 +431,16 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell
 }
 
 //-------------------------------------------------------------------------------------------------
-int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag) {
+int reductionBlockMultiplier() {
+#ifdef STORMM_USE_HPC
+  return 4;
+#else
+  return 1;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+int virtualSiteBlockMultiplier() {
 #ifdef STORMM_USE_HPC
   return 4;
 #else
@@ -520,7 +574,7 @@ std::string reductionKernelKey(const PrecisionModel prec, const ReductionGoal pu
   case ReductionGoal::CENTER_ON_ZERO:
     break;
   case ReductionGoal::CONJUGATE_GRADIENT:
-    k_key += "cg";
+    k_key += "_cg";
     break;
   }
   switch (process) {
@@ -540,5 +594,27 @@ std::string reductionKernelKey(const PrecisionModel prec, const ReductionGoal pu
   return k_key;
 }
 
+//-------------------------------------------------------------------------------------------------
+std::string virtualSiteKernelKey(const PrecisionModel prec, const VirtualSiteActivity purpose) {
+  std::string k_key("vste_");
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (purpose) {
+  case VirtualSiteActivity::PLACEMENT:
+    k_key += "_pl";
+    break;
+  case VirtualSiteActivity::TRANSMIT_FORCES:
+    k_key += "_xm";
+    break;
+  }
+  return k_key;
+}
+  
 } // namespace card
 } // namespace stormm

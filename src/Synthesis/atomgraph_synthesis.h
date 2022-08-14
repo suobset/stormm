@@ -246,6 +246,10 @@ public:
   ///        user or tailored by the automated heuristics to produce the best saturation.
   int getValenceWorkUnitSize() const;
 
+  /// \brief Get the abstracts (condensed lists of import and instruction set limits) for the
+  ///        valence work units spanning all systems in this synthesis.
+  const Hybrid<int2>& getValenceWorkUnitAbstracts() const;
+  
   /// \brief Get the type of non-bonded work required by systems in this synthesis.
   NbwuKind getNonbondedWorkType() const;
 

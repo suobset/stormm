@@ -466,6 +466,7 @@ extern void valenceKernelSetup() {
 }
 
 //-------------------------------------------------------------------------------------------------
+#if 0
 int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, const int vwu_size,
                                   const int vwu_count) {
   const std::vector<int> block_size_options = { 128, 160, 192, 224, 256, 288, 320, 384, 448, 512,
@@ -513,6 +514,7 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
   }
   return { best_block_mult, best_block_size };
 }
+#endif
 
 //-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel prec,

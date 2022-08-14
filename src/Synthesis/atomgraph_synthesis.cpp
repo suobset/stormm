@@ -3344,6 +3344,11 @@ int AtomGraphSynthesis::getValenceWorkUnitSize() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+const Hybrid<int2>& AtomGraphSynthesis::getValenceWorkUnitAbstracts() const {
+  return vwu_instruction_sets;
+}
+
+//-------------------------------------------------------------------------------------------------
 NbwuKind AtomGraphSynthesis::getNonbondedWorkType() const {
   return nonbonded_work_type;
 }

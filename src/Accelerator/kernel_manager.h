@@ -15,8 +15,9 @@
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction.h"
 #include "Potential/energy_enumerators.h"
-#include "Synthesis/synthesis_enumerators.h"
+#include "Structure/structure_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "gpu_details.h"
 
@@ -30,6 +31,7 @@ using data_types::int2;
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
 using numerics::ForceAccumulationMethod;
+using structure::VirtualSiteActivity;
 using synthesis::AtomGraphSynthesis;
 using synthesis::NbwuKind;
 using math::ReductionGoal;
@@ -159,6 +161,16 @@ public:
   int2 getReductionKernelDims(PrecisionModel prec, ReductionGoal purpose,
                               ReductionStage process) const;
 
+  /// \brief Get the block and thread counts for a virtual site placement or force transmission
+  ///        kernel.
+  ///
+  /// \param prec     Implies a level of detail in the fixed-precision coordinate representation,
+  ///                 and specifies the precision in which to perform the placement or force
+  ///                 transmission operations
+  /// \param purpose  The process to perform with standalone virtual site kernels: place virtual
+  ///                 sites or transmit forces from them to frame atoms with mass
+  int2 getVirtualSiteKernelDims(PrecisionModel prec, VirtualSiteActivity purpose) const;
+
   /// \brief Get the GPU information for the active GPU.
   const GpuDetails& getGpu() const;
   
@@ -193,12 +205,15 @@ private:
   /// thread count per streaming multiprocessor will not go above 1024 (this time out of bandwidth
   /// limitations), but the block multiplicity (which starts at 4) could be increased.
   int reduction_block_multiplier;
+
+  /// The architecture-specific block multiplier for virtual site handling kernels.
+  int virtual_site_block_multiplier;
   
   /// Store the resource requirements and selected launch parameters for a variety of kernels.
   /// Keys are determined according to the free functions further on in this library.
   std::map<std::string, KernelFormat> k_dictionary;
 
-  /// \brief Set the register, maximum block size, and threads counts for one of the valence
+  /// \brief Set the register, maximum block size, and thread counts for one of the valence
   ///        kernels.  This function complements getValenceKernelDims(), although the other
   ///        function reports numbers based on this functions input information and some further
   ///        analysis.
@@ -214,51 +229,52 @@ private:
                             ForceAccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
                             const std::string &kernel_name = std::string(""));
 
-  /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
+  /// \brief Set the register, maximum block size, and thread counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
   ///        setValenceKernelAttributes() above, with the addition of:
   ///
   /// \param kind         The type of non-bonded work unit: tile groups, supertiles, or honeycomb
   ///                     being relevant
-  /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
                               const std::string &kernel_name = std::string(""));
 
-  /// \brief Set the register, maximum block size, and threads counts for one of the reduction
+  /// \brief Set the register, maximum block size, and thread counts for one of the reduction
   ///        kernels.  Parameter descriptions for this function follow from
   ///        setValenceKernelAttributes() above, with the addition of:
   ///
-  /// \param prec         The precision model to expect in the coordinate arrays
   /// \param purpose      Reason for doing the reduction, i.e. conjugate gradient transformation
   /// \param process      How far to take the reduction operation
-  /// \param subdivision  Number of times that the basic reduction kernel should be subdivided
-  /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogReductionKernel(PrecisionModel prec, ReductionGoal purpose, ReductionStage process,
                               int subdivision, const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the register, maximum block size, and thread counts for one of the virtual site
+  ///        placement kernels.  The first two parameters follow from getVirtualSiteKernelDims(),
+  ///        above.
+  ///
+  /// \param prec         The type of floating point numbers in which the kernel shall work
+  /// \param purpose      The process to perform with standalone virtual site kernels
+  /// \param subdivision  Number of times that the basic virtual site kernel should be subdivided
+  /// \param kernel_name  [Optional] Name of the kernel in the actual code
+  void catalogVirtualSiteKernel(PrecisionModel prec, VirtualSiteActivity purpose, int subdivision,
+                                const std::string &kernel_name = std::string(""));
 };
 
-/// \brief Obtain the workload-specific block multiplier for valence interaction kernels.  In
-///        most cases, this is 1, but if there are many small jobs or enough atoms, it may rise
-///        to 2.
-///
-/// \param gpu      Details of the GPU that will perform the calculations
-/// \param poly_ag  A collection of topologies describing the workload
-int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+/// \brief Obtain the workload-specific block multiplier for valence interaction kernels.
+int valenceBlockMultiplier();
 
-/// \brief Obtain the architecture-specific block multiplier for valence interaction kernels.  In
-///        most cases, this is 1, but when no block may control more than half of the register
-///        space, it is 2.
+/// \brief Obtain the architecture-specific block multiplier for non-bonded interaction kernels.
 ///
 /// \param gpu        Details of the GPU that will perform the calculations
 /// \param unit_cell  The unit cell type of the systems to evaluate
 int nonbondedBlockMultiplier(const GpuDetails &gpu, UnitCellType unit_cell);
 
 /// \brief Obtain the workload-specific block multiplier for reduction kernels.
-///
-/// \param gpu      Details of the GPU that will perform the calculations
-/// \param poly_ag  A collection of topologies describing the workload
-int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+int reductionBlockMultiplier();
+
+/// \brief Obtain the workload-specific block multiplier for virtual site handling kernels.  The
+///        typical kernel will run on 256 threads.
+int virtualSiteBlockMultiplier();
   
 /// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
 ///        begins with "vale_" and is then appended with letter codes for different aspects
@@ -300,6 +316,8 @@ std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce
 /// \brief Obtain a unique string identifier for one of the reduction kernels.  Each identifier
 ///        begins with "redc_" and is then appended with letter codes for different aspects
 ///        according to the following system:
+///        - { d, f }        Perform calculations in double (d) or float (f) arithmetic
+///        - { cg }          Calculate the conjugate gradient vector
 ///        - { gt, sc, rd }  Perform a gathering, scattering, or combined all-reduce operation
 ///
 /// \param prec     The type of floating point numbers in which the kernel shall work
@@ -307,6 +325,16 @@ std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce
 /// \param process  The reduction stage to perform
 std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, ReductionStage process);
 
+/// \brief Obtain a unique string identifier for one of the virtaul site handling kernels.  Each
+///        identifier begins with "vste_" and is then appended with letter codes for different
+///        activities according to the following system:
+///        - { d, f }    Perform calculations in double (d) or float (f) arithmetic
+///        - { pl, xm }  Place particles or transmit forces to atoms with mass
+///
+/// \param prec     The type of floating point numbers in which the kernel shall work
+/// \param purpose  The process to perform with standalone virtual site kernels
+std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity process);
+  
 } // namespace card
 } // namespace stormm
 

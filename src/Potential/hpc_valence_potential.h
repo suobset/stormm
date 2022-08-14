@@ -96,10 +96,10 @@ cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateF
 /// \param launcher     General repository for launch parameters of all kernels
 /// \{
 void launchValence(const SyValenceKit<double> &poly_vk,
-                     const SyRestraintKit<double, double2, double4> &poly_rk,
-                     MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                     CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt);
+                   const SyRestraintKit<double, double2, double4> &poly_rk,
+                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                   CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
+                   EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt);
 
 void launchValence(const SyValenceKit<float> &poly_vk,
                    const SyRestraintKit<float, float2, float4> &poly_rk,

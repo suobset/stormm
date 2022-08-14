@@ -388,6 +388,7 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Potential/hpc_nonbonded_potential.cu \
 		    $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		    $(SRCDIR)/Random/hpc_random.cu \
+		    $(SRCDIR)/Structure/hpc_virtual_site_handling.cu \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
 
 # STORMM CUDA header files
@@ -401,6 +402,7 @@ STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		      $(SRCDIR)/Potential/hpc_scorecard.h \
 		      $(SRCDIR)/Potential/hpc_valence_potential.h \
 		      $(SRCDIR)/Random/hpc_random.cuh \
+		      $(SRCDIR)/Structure/hpc_virtual_site_handling.h \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
@@ -411,7 +413,8 @@ STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/MolecularMechanics/line_movement.cui \
 			     $(SRCDIR)/Potential/accumulation.cui \
 			     $(SRCDIR)/Potential/nonbonded_potential_tilegroups.cui \
-			     $(SRCDIR)/Potential/valence_potential.cui
+			     $(SRCDIR)/Potential/valence_potential.cui \
+			     $(SRCDIR)/Structure/virtual_site_placement.cui
 
 # STORMM CUDA object files
 STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
@@ -421,6 +424,7 @@ STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		   $(SRCDIR)/Potential/hpc_scorecard.o \
 		   $(SRCDIR)/Potential/hpc_valence_potential.o \
 		   $(SRCDIR)/Random/hpc_random.o \
+		   $(SRCDIR)/Structure/hpc_virtual_site_handling.o \
 		   $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
 
 # Test programs using stormm

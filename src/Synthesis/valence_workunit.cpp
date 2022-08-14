@@ -2457,6 +2457,33 @@ int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, const PrecisionM
 }
 
 //-------------------------------------------------------------------------------------------------
+int optVirtualSiteKernelSubdivision(const int2* vwu_abstracts, const int vwu_count) {
+  int nbig = 0;
+  int nsmall = 0;
+  for (int i = 0; i < vwu_count; i++) {
+    const int vsite_insr_idx = (i * vwu_abstract_length) + static_cast<int>(VwuAbstractMap::VSITE);
+    const int nvs_insr = vwu_abstracts[vsite_insr_idx].y - vwu_abstracts[vsite_insr_idx].x;
+    if (nvs_insr > (small_block_size / 2)) {
+      nbig++;
+    }
+    else {
+      nsmall++;
+    }
+  }
+  return (nbig > nsmall) ? 1 : 2;
+}
+
+//-------------------------------------------------------------------------------------------------
+int optVirtualSiteKernelSubdivision(const std::vector<int2> &vwu_abstracts, const int vwu_count) {
+  return optVirtualSiteKernelSubdivision(vwu_abstracts.data(), vwu_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+int optVirtualSiteKernelSubdivision(const Hybrid<int2> &vwu_abstracts, const int vwu_count) {
+  return optVirtualSiteKernelSubdivision(vwu_abstracts.data(), vwu_count);
+}
+
+//-------------------------------------------------------------------------------------------------
 int calculateValenceWorkUnitSize(const int* atom_counts, const int system_count) {
   int min_inefficiency, best_size;
   for (int vs = minimum_valence_work_unit_atoms; vs < maximum_valence_work_unit_atoms; vs *= 2) {
