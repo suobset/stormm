@@ -80,12 +80,13 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // Get the valence abstract and prepare for energy calculations
   SyValenceKit<double> syvk = poly_ag.getDoublePrecisionValenceKit();
+  SyAtomUpdateKit<double2, double4> syauk = poly_ag.getDoublePrecisionAtomUpdateKit();
   SyRestraintKit<double, double2, double4> syrk = poly_ag.getDoublePrecisionRestraintKit();
   ScoreCard sc(poly_ps->getSystemCount(), 1, 32);
 
   // Bonds
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::BOND,
                                                 VwuGoal::ACCUMULATE, 0);
   const int nsys = poly_ps->getSystemCount();
@@ -109,7 +110,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Typical harmonic angles
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::ANGL,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> angl_nrg, angl_nrg_answer, angl_frc_deviations;
@@ -131,7 +132,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Cosine-based dihedrals
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::DIHE,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> dihe_nrg, impr_nrg, dihe_nrg_answer, impr_nrg_answer, dihe_frc_deviations;
@@ -159,7 +160,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // General 1:4 interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::INFR14,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer, attn14_frc_deviations;
@@ -187,7 +188,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Urey-Bradley interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::UBRD,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> ubrd_nrg, ubrd_nrg_answer, ubrd_frc_deviations;
@@ -209,7 +210,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // CHARMM improper dihedral interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::CIMP,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> cimp_nrg, cimp_nrg_answer, cimp_frc_deviations;
@@ -231,7 +232,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // CMAP interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::CMAP,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> cmap_nrg, cmap_nrg_answer, cmap_frc_deviations;
@@ -253,16 +254,16 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Various restraints
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RPOSN,
                                                 VwuGoal::ACCUMULATE, 0);
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RBOND,
                                                 VwuGoal::ACCUMULATE, 0);
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RANGL,
                                                 VwuGoal::ACCUMULATE, 0);
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RDIHE,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> rstr_nrg, rstr_nrg_answer, rstr_frc_deviations;
@@ -341,9 +342,9 @@ int main(const int argc, const char* argv[]) {
   else {
     rtWarn("The topology files for the TIP3P and TIP4P water boxes as well as two versions of the "
            "solvated Trp-cage miniprotein, ubiquitin, and two drug molecules must be available in "
-           "${STORMM_SOURCE}/test/ subdirectories Topology and Trajectory, respectively.  Check the "
-           "$STORMM_SOURCE environment variable to make sure that it is set properly.  A number of "
-           "tests will be skipped.", "test_atomgraph_synthesis");
+           "${STORMM_SOURCE}/test/ subdirectories Topology and Trajectory, respectively.  Check "
+           "the $STORMM_SOURCE environment variable to make sure that it is set properly.  A "
+           "number of tests will be skipped.", "test_atomgraph_synthesis");
   }
 
   // Set one of the Trp-cage systems to have a different topology source name.  This will trick
@@ -408,16 +409,16 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Coordinates for the periodic systems needed to accompany the first AtomGraphSynthesis "
-           "were not found.  Check the installation and the ${STORMM_SOURCE} environment variable.  "
-           "Subsequent tests will be skipped.\n");
+           "were not found.  Check the installation and the ${STORMM_SOURCE} environment "
+           "variable.  Subsequent tests will be skipped.\n");
   }
   const TestPriority do_per_eval = (coords_exist && files_exist) ? TestPriority::CRITICAL :
                                                                    TestPriority::ABORT;
   
-  const std::string base_pept_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Namelist" +
-                                         osc + "topol";
-  const std::string base_pept_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Namelist" +
-                                         osc + "coord";
+  const std::string base_pept_top_name = oe.getStormmSourcePath() + osc + "test" + osc +
+                                         "Namelist" + osc + "topol";
+  const std::string base_pept_crd_name = oe.getStormmSourcePath() + osc + "test" + osc +
+                                         "Namelist" + osc + "coord";
   const std::string brbz_vs_top_name = base_top_name + osc + "bromobenzene_vs.top";
   const std::string brbz_vs_crd_name = base_crd_name + osc + "bromobenzene_vs.inpcrd";
   std::vector<AtomGraph*> ag_list;

@@ -157,7 +157,7 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
             const TCALC dz = int95SumToDouble(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
 #endif
             const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
-            const TCALC disp_mult = fr_details.x * invr;
+'            const TCALC disp_mult = fr_details.x * invr;
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC(dx * disp_mult));
             __stwb(&gmem_r.ycrd[vs_atom], parent_y + LLCONV_FUNC(dy * disp_mult));
@@ -464,10 +464,52 @@ kPlaceVirtualSites(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk
           }
           break;
         }
-      }
-    }
-    
+
+        // With the virtual site's position now committed to the block's private memory space,
+        // the question is whether to also copy the results to the global memory arrays.  This
+        // will happen as part of the general position update if the placement is part of a
+        // broader valence work unit, but should happen here, when the index of the virtual site
+        // is at hand and each warp is as full as possible with such virtual sites.  Performing
+        // this placement with the standalone kernel will replace the virtual site positions in
+        // the global arrays that the underlying PhaseSpaceSynthesis deems "current." If the
+        // placement is part of a broader valence work unit, the placement will go into global
+        // arrays for coordinates that the underlying PhaseSpaceSynthesis deems "future."
 #ifdef VSITE_STANDALONE
+        const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
+        const int manip_segment = (vs_atom - GMEM_EXCL_OFFSET) >> warp_bits;
+        const int manip_bitpos  = ((vs_atom - GMEM_EXCL_OFFSET) & warp_bits_mask); 
+        const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
+        if ((manip_mask.y >> manip_bitpos) & 0x1) {
+          const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + vs_atom -
+                                                               GMEM_EXCL_OFFSET]);          
+          __stwb(&poly_psw.xcrd[write_idx], __ldca(&gmem_r.xcrd[vs_atom]));
+          __stwb(&poly_psw.ycrd[write_idx], __ldca(&gmem_r.ycrd[vs_atom]));
+          __stwb(&poly_psw.zcrd[write_idx], __ldca(&gmem_r.zcrd[vs_atom]));
+#  ifndef TCALC_IS_SINGLE
+          __stwb(&poly_psw.xcrd_ovrf[write_idx], __ldca(&gmem_r.xcrd_ovrf[vs_atom]));
+          __stwb(&poly_psw.ycrd_ovrf[write_idx], __ldca(&gmem_r.ycrd_ovrf[vs_atom]));
+          __stwb(&poly_psw.zcrd_ovrf[write_idx], __ldca(&gmem_r.zcrd_ovrf[vs_atom]));
+#  endif
+        }
+#endif
+      }
+      pos += blockDim.x;
+    }
+
+    // Synchronize after all virtual sites for this work unit have been placed.  This must happen
+    // whether the kernel is called in standalone mode or as part of a broader work unit that also
+    // computes valence interactions.
+    __syncthreads();
+#ifdef VSITE_STANDALONE
+
+    // No asynchronous scheduling will be provided for advancing work units that merely place
+    // virtual sites.  If the placement is done as part of the valence work units, which it will
+    // be in the dynamics applications that make up the more common use cases, the work units will
+    // advance with the valence counter of a MolecularMechanicsControls object.
+    if (threadIdx.x == 0) {
+      vwu_idx += gridDim.x;
+    }
+    __syncthreads();
   }
 }
 #endif

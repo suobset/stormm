@@ -474,6 +474,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc, typename Tcalc2, typename Tcalc4>
 void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
+                         const SyAtomUpdateKit<Tcalc2, Tcalc4> syauk,
                          const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
                          ScoreCard *ecard, const EvaluateForce eval_force, const VwuTask activity,
                          const VwuGoal purpose, const int step_number) {
@@ -531,7 +532,7 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
           const int atom_idx = syvk.vwu_imports[j];
           const int j_sh = j - atom_limits.x;
           const int manip_idx = manip_limits.x + (j_sh / uint_bit_count_int);
-          const uint2 manip_mask = syvk.vwu_manip[manip_idx];
+          const uint2 manip_mask = syauk.vwu_manip[manip_idx];
           const int manip_bit = j_sh - ((j_sh / uint_bit_count_int) * uint_bit_count_int);
           if ((manip_mask.y >> manip_bit) & 0x1) {
             psyw.xcrd[atom_idx] = sh_xcrd[j_sh];

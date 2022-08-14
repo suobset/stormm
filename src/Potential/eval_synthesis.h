@@ -31,6 +31,7 @@ using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::SeMaskSynthesisReader;
 using synthesis::StaticExclusionMaskSynthesis;
+using synthesis::SyAtomUpdateKit;
 using synthesis::SyNonbondedKit;
 using synthesis::SyValenceKit;
 using synthesis::SyRestraintKit;
@@ -89,6 +90,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
 /// \param step_number  Number of the step in the simulation (relevant to restraint applications)
 template <typename Tcalc, typename Tcalc2, typename Tcalc4>
 void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
+                         const SyAtomUpdateKit<Tcalc2, Tcalc4> syauk,
                          const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
                          ScoreCard *ecard, EvaluateForce eval_force, VwuTask activity,
                          VwuGoal purpose, int step_number);

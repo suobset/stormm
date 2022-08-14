@@ -29,12 +29,11 @@ template <typename T> struct SyValenceKit {
                         const T* cimp_keq_in, const T* cimp_phi_in, const int* cmap_dim_in,
                         const T* cmap_patches_in, const int* cmap_patch_bounds_in,
                         const int2* vwu_abstracts_in, const int* vwu_imports_in,
-                        const uint2* vwu_manip_in, const uint2* cbnd_insr_in,
-                        const uint2* angl_insr_in, const uint2* cdhe_insr_in,
-                        const uint* cdhe_ovrt_insr_in, const uint2* cmap_insr_in,
-                        const uint* infr14_insr_in, const uint* cbnd_acc_in,
-                        const uint* angl_acc_in, const uint* cdhe_acc_in, const uint* cmap_acc_in,
-                        const uint* infr14_acc_in);
+                        const uint2* cbnd_insr_in, const uint2* angl_insr_in,
+                        const uint2* cdhe_insr_in, const uint* cdhe_ovrt_insr_in,
+                        const uint2* cmap_insr_in, const uint* infr14_insr_in,
+                        const uint* cbnd_acc_in, const uint* angl_acc_in, const uint* cdhe_acc_in,
+                        const uint* cmap_acc_in, const uint* infr14_acc_in);
 
   // Member variables (all public)
   const int nvwu;                ///< The number of valence work units
@@ -70,8 +69,6 @@ template <typename T> struct SyValenceKit {
   // Details of each work unit and instruction sets
   const int2* vwu_abstracts;     ///< Abstracts for all valence work units
   const int* vwu_imports;        ///< Imported atom tables for all valence work units
-  const uint2* vwu_manip;        ///< Manipulation masks (movement in x member, update in y member)
-                                 ///<   for all valence work units
   const uint2* cbnd_insr;        ///< Composite bond and Urey-Bradley instructions implemented by
                                  ///<   valence work units
   const uint2* angl_insr;        ///< Harmonic angle instructions implemented by valence work units
@@ -217,7 +214,7 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
   ///        are omitted to save space on the constants imported as arguments to each kernel.
   SyAtomUpdateKit(const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
                   const T2* cnst_grp_params_in, const uint2* vste_insr_in,
-                  const uint2* sett_insr_in, const uint2* cnst_insr_in);
+                  const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -241,6 +238,8 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
   const uint2* vste_insr;     ///< Virtual site placement instructions
   const uint2* sett_insr;     ///< SETLLE group constraints instructions
   const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
+  const uint2* vwu_manip;     ///< Manipulation masks (movement in x member, update in y member)
+                              ///<   for all valence work units
 };
   
 } // namespace synthesis

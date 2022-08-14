@@ -3386,12 +3386,11 @@ AtomGraphSynthesis::getDoublePrecisionValenceKit(const HybridTargetLevel tier) c
                               cimp_phase_angles.data(tier), cmap_surface_dimensions.data(tier),
                               cmap_patches.data(tier), cmap_patch_bounds.data(tier),
                               vwu_instruction_sets.data(tier), vwu_import_lists.data(tier),
-                              vwu_manipulation_masks.data(tier), cbnd_instructions.data(tier),
-                              angl_instructions.data(tier), cdhe_instructions.data(tier),
-                              cdhe_overtones.data(tier), cmap_instructions.data(tier),
-                              infr14_instructions.data(tier), accumulate_cbnd_energy.data(tier),
-                              accumulate_angl_energy.data(tier), accumulate_cdhe_energy.data(tier),
-                              accumulate_cmap_energy.data(tier),
+                              cbnd_instructions.data(tier), angl_instructions.data(tier),
+                              cdhe_instructions.data(tier), cdhe_overtones.data(tier),
+                              cmap_instructions.data(tier), infr14_instructions.data(tier),
+                              accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
+                              accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
                               accumulate_infr14_energy.data(tier));
 }
 
@@ -3413,12 +3412,11 @@ AtomGraphSynthesis::getSinglePrecisionValenceKit(const HybridTargetLevel tier) c
                              sp_cimp_phase_angles.data(tier), cmap_surface_dimensions.data(tier),
                              sp_cmap_patches.data(tier), cmap_patch_bounds.data(tier),
                              vwu_instruction_sets.data(tier), vwu_import_lists.data(tier),
-                             vwu_manipulation_masks.data(tier), cbnd_instructions.data(tier),
-                             angl_instructions.data(tier), cdhe_instructions.data(tier),
-                             cdhe_overtones.data(tier), cmap_instructions.data(tier),
-                             infr14_instructions.data(tier), accumulate_cbnd_energy.data(tier),
-                             accumulate_angl_energy.data(tier), accumulate_cdhe_energy.data(tier),
-                             accumulate_cmap_energy.data(tier),
+                             cbnd_instructions.data(tier), angl_instructions.data(tier),
+                             cdhe_instructions.data(tier), cdhe_overtones.data(tier),
+                             cmap_instructions.data(tier), infr14_instructions.data(tier),
+                             accumulate_cbnd_energy.data(tier), accumulate_angl_energy.data(tier),
+                             accumulate_cdhe_energy.data(tier), accumulate_cmap_energy.data(tier),
                              accumulate_infr14_energy.data(tier));
 }
 
@@ -3512,7 +3510,8 @@ AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier
                          double4>(virtual_site_parameters.data(tier),
                                   settle_group_geometry.data(tier), settle_group_masses.data(tier),
                                   constraint_group_params.data(tier), vste_instructions.data(tier),
-                                  sett_instructions.data(tier), cnst_instructions.data(tier));
+                                  sett_instructions.data(tier), cnst_instructions.data(tier),
+                                  vwu_manipulation_masks.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3524,7 +3523,7 @@ AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier
                                  sp_settle_group_masses.data(tier),
                                  sp_constraint_group_params.data(tier),
                                  vste_instructions.data(tier), sett_instructions.data(tier),
-                                 cnst_instructions.data(tier));
+                                 cnst_instructions.data(tier), vwu_manipulation_masks.data(tier));
 }
 
 
