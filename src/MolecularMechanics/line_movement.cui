@@ -312,6 +312,14 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
     // Broadcast the movement factor to all threads.
     if (threadIdx.x == 0) {
       sh_move_factor = move_factor;
+
+      // CHECK
+#if 0
+      if (move_factor > 1000.0) {
+        printf("Wow... move factor = %18.4lf on WU %4d\n", move_factor, wu_idx);
+      }
+#endif
+      // END CHECK
     }
     __syncthreads();
     move_factor = sh_move_factor;
@@ -381,6 +389,29 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
         }
         pos += blockDim.x;
       }
+
+      // CHECK
+#if 0
+      __syncthreads();
+      pos = threadIdx.x;
+      while (pos < padded_natom) {
+        if (pos < natom) {
+          const int gbl_pos = wu_atom_start + pos;
+#ifndef TCALC_IS_DOUBLE
+          const double txloc = poly_psw.xcrd[gbl_pos] * poly_psw.inv_gpos_scale;
+          const double tyloc = poly_psw.ycrd[gbl_pos] * poly_psw.inv_gpos_scale;
+          const double tzloc = poly_psw.zcrd[gbl_pos] * poly_psw.inv_gpos_scale;
+          if (fabs(txloc) > 1000.0 || fabs(tyloc) > 1000.0 || fabs(tzloc) > 1000.0) {
+            printf("Atom %4d / %4d of system %4d is now at %18.4lf %18.4lf %18.4lf\n",
+                   pos, natom, wu_idx, txloc, tyloc, tzloc);
+          }
+#endif
+        }
+        pos += blockDim.x;
+      }
+      __syncthreads();
+#endif
+      // END CHECK
     }
   }
 }

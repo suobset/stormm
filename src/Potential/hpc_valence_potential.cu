@@ -60,9 +60,9 @@ using topology::TorsionKind;
 #include "Math/vector_formulas.cui"
 
 //-------------------------------------------------------------------------------------------------
-__device__ __forceinline__ float angleVerification(const float costheta, const float3 crabbc,
-                                                   const float3 crbccd, const float3 bc,
-                                                   const float3 scr) {
+__device__ __forceinline__ float devcAngleVerification(const float costheta, const float3 crabbc,
+                                                       const float3 crbccd, const float3 bc,
+                                                       const float3 scr) {
   if (fabsf(costheta) >= near_to_one_f) {
 
     // The floating-point representation of costheta is numerically ill-conditioned.  Compute the
@@ -94,13 +94,12 @@ __device__ __forceinline__ float angleVerification(const float costheta, const f
     return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0f) ?
             acosf(costheta) : -acosf(costheta);
   }
-  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-__device__ __forceinline__ double angleVerification(const double costheta, const double3 crabbc,
-                                                    const double3 crbccd, const double3 bc,
-                                                    const double3 scr) {
+__device__ __forceinline__ double devcAngleVerification(const double costheta,
+                                                        const double3 crabbc, const double3 crbccd,
+                                                        const double3 bc, const double3 scr) {
   if (fabs(costheta) >= near_to_one_lf) {
 
     // The double-precision arccosine function is also vulnerable to numerical instability near
@@ -132,7 +131,6 @@ __device__ __forceinline__ double angleVerification(const double costheta, const
     return ((scr.x * bc.x) + (scr.y * bc.y) + (scr.z * bc.z) > 0.0) ?
             acos(costheta) : -acos(costheta);
   }
-  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

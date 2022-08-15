@@ -358,7 +358,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                              ((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
                               (crbccd.z * crbccd.z)));
         TCALC3 scr_phi = crossProduct(crabbc, crbccd);
-        TCALC phi = angleVerification(cos_phi, crabbc, crbccd, bc, scr_phi);
+        TCALC phi = devcAngleVerification(cos_phi, crabbc, crbccd, bc, scr_phi);
 #ifdef TCALC_IS_SINGLE
         // The single-precision floating point representation of PI is not the same as the
         // double-precision floating point representation, so use the fact that single precision
@@ -379,7 +379,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                              ((crcdde.x * crcdde.x) + (crcdde.y * crcdde.y) +
                               (crcdde.z * crcdde.z)));
         TCALC3 scr_psi = crossProduct(crbccd, crcdde);
-        TCALC psi = angleVerification(cos_psi, crbccd, crcdde, cd, scr_psi);
+        TCALC psi = devcAngleVerification(cos_psi, crbccd, crcdde, cd, scr_psi);
 #ifdef TCALC_IS_SINGLE
         psi += pi_f;
         psi = (psi < (TCALC)(0.0)) ? psi + twopi_f : (psi >= twopi_f) ? psi - twopi_f : psi;
@@ -748,7 +748,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                (crabbc.z * crabbc.z)) *
                               ((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
                                (crbccd.z * crbccd.z)));
-        const TCALC theta = angleVerification(costheta, crabbc, crbccd, bc, scr);
+        const TCALC theta = devcAngleVerification(costheta, crabbc, crbccd, bc, scr);
         TCALC sangle, sangle_ii, stiffness;
 #ifdef COMPUTE_FORCE
         TCALC stiffness_ii;
@@ -1796,7 +1796,7 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
                                (crabbc.z * crabbc.z)) *
                               ((crbccd.x * crbccd.x) + (crbccd.y * crbccd.y) +
                                (crbccd.z * crbccd.z)));
-        TCALC theta = angleVerification(costheta, crabbc, crbccd, bc, scr);
+        TCALC theta = devcAngleVerification(costheta, crabbc, crbccd, bc, scr);
         const int2 step_bounds = __ldca(&poly_rk.rbond_step_bounds[kr_param_idx]);
         const TCALC2 mixwt = MIX_FUNC(ctrl.step, step_bounds.x, step_bounds.y);
         const TCALC4 init_r = poly_rk.rdihe_init_r[kr_param_idx];
