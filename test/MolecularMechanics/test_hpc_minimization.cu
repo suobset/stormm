@@ -4,13 +4,15 @@
 #include "../../src/Accelerator/kernel_manager.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/mixed_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/hpc_reduction.h"
 #include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_bridge.h"
 #include "../../src/Math/reduction_enumerators.h"
 #include "../../src/Math/rounding.h"
-#include "../../src/Math/hpc_reduction.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/MolecularMechanics/hpc_minimization.h"
 #include "../../src/MolecularMechanics/line_minimization.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
@@ -158,6 +160,180 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check that the components of the PhaseSpaceSynthesis relevant to conjugate gradient line
+// minimizations are consistent with respect to identical systems.
+//
+//-------------------------------------------------------------------------------------------------
+void checkLineMinimizationComponents(PhaseSpaceSynthesis *poly_ps, LineMinimization *line_record,
+                                     const std::vector<int> &mol_id_vec, const int step_number,
+                                     const std::string &stage) {
+  poly_ps->download();
+  line_record->download();
+  const PsSynthesisWriter poly_psw = poly_ps->data();
+  const LinMinWriter lmw = line_record->data();
+
+  // Check the components, system-by-system
+  const int nsys = mol_id_vec.size();
+  int n_unique_sys = maxValue(mol_id_vec) + 1;
+  std::vector<int> sys_copies(n_unique_sys, 0);
+  std::vector<std::vector<int>> sys_map(n_unique_sys);
+  for (int sysid = 0; sysid < nsys; sysid++) {
+    sys_copies[mol_id_vec[sysid]] += 1;
+  }
+  for (int i = 0; i < n_unique_sys; i++) {
+    sys_map[i].reserve(sys_copies[i]);
+  }
+  for (int sysid = 0; sysid < nsys; sysid++) {
+    sys_map[mol_id_vec[sysid]].push_back(sysid);
+  }
+  for (int i = 0; i < n_unique_sys; i++) {
+
+    // Check individual atoms
+    const int natom = poly_psw.atom_counts[sys_map[i][0]];
+    std::vector<double> x_crd(sys_copies[i], 0.0);
+    std::vector<double> y_crd(sys_copies[i], 0.0);
+    std::vector<double> z_crd(sys_copies[i], 0.0);
+    for (int atomcon = 0; atomcon < natom; atomcon++) {
+      for (int j = 0; j < sys_copies[i]; j++) {
+        const int sysid = sys_map[i][j];
+        const int atom_llim = poly_psw.atom_starts[sysid];
+        const int readidx = atom_llim + atomcon;
+        x_crd[j] = poly_psw.xcrd[readidx] + (max_llint_accumulation * poly_psw.xcrd_ovrf[readidx]);
+        y_crd[j] = poly_psw.ycrd[readidx] + (max_llint_accumulation * poly_psw.ycrd_ovrf[readidx]);
+        z_crd[j] = poly_psw.zcrd[readidx] + (max_llint_accumulation * poly_psw.zcrd_ovrf[readidx]);
+        x_crd[j] *= poly_psw.inv_gpos_scale;
+        y_crd[j] *= poly_psw.inv_gpos_scale;
+        z_crd[j] *= poly_psw.inv_gpos_scale;
+      }
+      addScalarToVector(&x_crd, -(mean(x_crd)));
+      addScalarToVector(&y_crd, -(mean(y_crd)));
+      addScalarToVector(&z_crd, -(mean(z_crd)));
+      const double dx_max = maxAbsValue(x_crd);
+      const double dy_max = maxAbsValue(y_crd);
+      const double dz_max = maxAbsValue(z_crd);
+      if (dx_max > small) {
+        printf("A maximum deviation of %12.8lf is observed in X coordinates of atom %4d, system "
+               "%4zu.  Step: %4d  Stage: %s\n", dx_max, atomcon, locateValue(x_crd, dx_max),
+               step_number, stage.c_str());
+        exit(1);
+      }
+      if (dy_max > small) {
+        printf("A maximum deviation of %12.8lf is observed in Y coordinates of atom %4d, system "
+               "%4zu.  Step: %4d  Stage: %s\n", dy_max, atomcon, locateValue(y_crd, dy_max),
+               step_number, stage.c_str());
+        exit(1);
+      }
+      if (dz_max > small) {
+        printf("A maximum deviation of %12.8lf is observed in Z coordinates of atom %4d, system "
+               "%4zu.  Step: %4d  Stage: %s\n", dz_max, atomcon, locateValue(z_crd, dz_max),
+               step_number, stage.c_str());
+        exit(1);
+      }
+    }
+
+    // Check the line minimization data
+    std::vector<double> l_move(sys_copies[i], 0.0);
+    std::vector<double> s_move(sys_copies[i], 0.0);
+    std::vector<double> mfac_a(sys_copies[i], 0.0);
+    std::vector<double> mfac_b(sys_copies[i], 0.0);
+    std::vector<double> mfac_c(sys_copies[i], 0.0);
+    std::vector<double> nrg_a(sys_copies[i], 0.0);
+    std::vector<double> nrg_b(sys_copies[i], 0.0);
+    std::vector<double> nrg_c(sys_copies[i], 0.0);
+    std::vector<double> nrg_d(sys_copies[i], 0.0);
+    for (int j = 0; j < sys_copies[i]; j++) {
+      const int sysid = sys_map[i][j];
+      l_move[j] = lmw.l_move[sysid];
+      s_move[j] = lmw.s_move[sysid];
+      mfac_a[j] = lmw.mfac_a[sysid];
+      mfac_b[j] = lmw.mfac_b[sysid];
+      mfac_c[j] = lmw.mfac_c[sysid];
+      nrg_a[j] = lmw.nrg_a[sysid];
+      nrg_b[j] = lmw.nrg_b[sysid];
+      nrg_c[j] = lmw.nrg_c[sysid];
+      nrg_d[j] = lmw.nrg_d[sysid];
+    }
+    addScalarToVector(&l_move, -mean(l_move));
+    addScalarToVector(&s_move, -mean(s_move));
+    addScalarToVector(&mfac_a, -mean(mfac_a));
+    addScalarToVector(&mfac_b, -mean(mfac_b));
+    addScalarToVector(&mfac_c, -mean(mfac_c));
+    addScalarToVector(&nrg_a, -mean(nrg_a));
+    addScalarToVector(&nrg_b, -mean(nrg_b));
+    addScalarToVector(&nrg_c, -mean(nrg_c));
+    addScalarToVector(&nrg_d, -mean(nrg_d));
+    const double dlmove_max = maxAbsValue(l_move);
+    const double dsmove_max = maxAbsValue(s_move);
+    const double dmfaca_max = maxAbsValue(mfac_a);
+    const double dmfacb_max = maxAbsValue(mfac_b);
+    const double dmfacc_max = maxAbsValue(mfac_c);
+    const double dnrga_max = maxAbsValue(nrg_a);
+    const double dnrgb_max = maxAbsValue(nrg_b);
+    const double dnrgc_max = maxAbsValue(nrg_c);
+    const double dnrgd_max = maxAbsValue(nrg_d);
+    if (dlmove_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in the L-move.  Step: %4d  Stage: %s\n",
+             dlmove_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dsmove_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in the S-move.  Step: %4d  Stage: %s\n",
+             dsmove_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dmfaca_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in M-fac (A).  Step: %4d  Stage: %s\n",
+             dmfaca_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dmfacb_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in M-fac (B).  Step: %4d  Stage: %s\n",
+             dmfacb_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dmfacc_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in M-fac (C).  Step: %4d  Stage: %s\n",
+             dmfacc_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dnrga_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (A).  Step: %4d  Stage: %s\n",
+             dnrga_max, step_number, stage.c_str());
+      printf("Nrg A = [\n");
+      int k = 0;
+      for (size_t j = 0; j < nrg_a.size(); j++) {
+        printf("  %10.4lf", nrg_a[j]);
+        k++;
+        if (k == 16) {
+          k = 0;
+          printf("\n");
+        }
+      }
+      if (k > 0) {
+        printf("\n");
+      }
+      printf("];\n");
+      exit(1);
+    }
+    if (dnrgb_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (B).  Step: %4d  Stage: %s\n",
+             dnrgb_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dnrgc_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (C).  Step: %4d  Stage: %s\n",
+             dnrgc_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dnrgd_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (D).  Step: %4d  Stage: %s\n",
+             dnrgd_max, step_number, stage.c_str());
+      exit(1);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // Perform energy minimization with meticulous checks to ensure that the process is consistent and
 // reproducible.
 //
@@ -205,7 +381,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   // Create the minimization instructions
   MinimizeControls mincon;
   mincon.setTotalCycles(maxcyc);
-  mincon.setSteepestDescentCycles(maxcyc - 5);
+  mincon.setSteepestDescentCycles(maxcyc / 10);
   
   // Create separate molecular mechanics control objects based on the minimization operations
   // for each of the ways that the valence kernel gets subdivided. 
@@ -467,7 +643,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     }
 
     // CHECK
-    if (i >= 489 && poly_ag.getSystemCount() == 4096 &&
+#if 0
+    if (i >= 2 && poly_ag.getSystemCount() == 4096 &&
         prec == PrecisionModel::SINGLE) {
       sc.download();
       poly_ps.download();
@@ -509,6 +686,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       printf("];\n");
     }
+#endif
     // END CHECK
 
     // Download and check the particle advancement.
@@ -526,9 +704,9 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     // Fit a cubic polynomial to guess the best overall advancement, and place the system there.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 3, redu_lp);
 
-
     // CHECK
-    if (i >= 485 && poly_ag.getSystemCount() == 4096 &&
+#if 0
+    if (i >= 2 && poly_ag.getSystemCount() == 4096 &&
         prec == PrecisionModel::SINGLE) {
       sc.initialize(devc, gpu);
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
@@ -581,6 +759,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         exit(1);
       }
     }
+#endif
     // END CHECK
 
     // Download and check the particle advancement.
@@ -632,68 +811,54 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     // to check in that level of detail.  The results always seem to be self-consistent for the
     // same card, however: the same system goes to the same state, regardless of which SMP it
     // passed through.
-    TestPriority do_snps;
-    if (snap_exists && do_tests == TestPriority::CRITICAL) {
-      switch (prec) {
-      case PrecisionModel::DOUBLE:
-        do_snps = TestPriority::CRITICAL;
-        break;
-      case PrecisionModel::SINGLE:
-        do_snps = TestPriority::NON_CRITICAL;
-        break;
-      }
-    }
-    else {
-      do_snps = TestPriority::ABORT;
-    }
+    const TestPriority do_snps = (snap_exists && do_tests == TestPriority::CRITICAL) ?
+                                 TestPriority::NON_CRITICAL : TestPriority::ABORT;
     const std::vector<double> final_e = sc.reportTotalEnergies(devc);
     const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
     snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-6, "Final energies of "
              "energy-minimized structures did not reach their expected values.  Test: " +
              test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
-    if (prec == PrecisionModel::SINGLE) {
-      const int n_unique_systems = maxValue(mol_id_vec) + 1;
-      const int nsystems = mol_id_vec.size();
-      bool consistent = true;
-      std::vector<CombineIDp> failures;
-      for (int i = 0; i < n_unique_systems; i++) {
-        int ncopies = 0;
+    const int n_unique_systems = maxValue(mol_id_vec) + 1;
+    const int nsystems = mol_id_vec.size();
+    bool consistent = true;
+    std::vector<CombineIDp> failures;
+    for (int i = 0; i < n_unique_systems; i++) {
+      int ncopies = 0;
+      for (int j = 0; j < nsystems; j++) {
+        ncopies += (mol_id_vec[j] == i);
+      }
+      if (ncopies > 0) {
+        std::vector<double> copy_e(ncopies);
+        ncopies = 0;
         for (int j = 0; j < nsystems; j++) {
-          ncopies += (mol_id_vec[j] == i);
+          if (mol_id_vec[j] == i) {
+            copy_e[ncopies] = final_e[j];
+            ncopies++;
+          }
         }
-        if (ncopies > 0) {
-          std::vector<double> copy_e(ncopies);
-          ncopies = 0;
-          for (int j = 0; j < nsystems; j++) {
-            if (mol_id_vec[j] == i) {
-              copy_e[ncopies] = final_e[j];
-              ncopies++;
-            }
-          }
-          const double nrg_spread = variance(copy_e.data(), ncopies,
-                                             VarianceMethod::COEFFICIENT_OF_VARIATION);
-          consistent = (consistent && fabs(nrg_spread) < 2.0e-6);
-          if (fabs(nrg_spread) >= 2.0e-6) {
-            failures.push_back({ i, nrg_spread });
-          }
+        const double nrg_spread = variance(copy_e.data(), ncopies,
+                                           VarianceMethod::COEFFICIENT_OF_VARIATION);
+        consistent = (consistent && fabs(nrg_spread) < 2.0e-6);
+        if (fabs(nrg_spread) >= 2.0e-6) {
+          failures.push_back({ i, nrg_spread });
         }
       }
-      std::string err_msg("Divergent systems include:");
-      if (consistent == false) {
-        for (size_t i = 0; i < failures.size(); i++) {
-          const int natom = ag_ptr_vec[failures[i].x]->getAtomCount();
-          err_msg += " " + std::to_string(failures[i].x) + " (" + std::to_string(natom) +
-                     " atoms, " + realToString(failures[i].y, 11, 4, NumberFormat::SCIENTIFIC) +
-                     " kcal/mol)";
-          if (i < failures.size() - 1LLU) {
-            err_msg += ", ";
-          }
-        }
-      }
-      check(consistent, "The energies of systems originating at identical coordinates do not "
-            "end up at the same values.  " + err_msg, do_tests);
     }
+    std::string err_msg("Divergent systems include:");
+    if (consistent == false) {
+      for (size_t i = 0; i < failures.size(); i++) {
+        const int natom = ag_ptr_vec[failures[i].x]->getAtomCount();
+        err_msg += " " + std::to_string(failures[i].x) + " (" + std::to_string(natom) +
+                   " atoms, " + realToString(failures[i].y, 11, 4, NumberFormat::SCIENTIFIC) +
+                   " kcal/mol)";
+        if (i < failures.size() - 1LLU) {
+          err_msg += ", ";
+        }
+      }
+    }
+    check(consistent, "The energies of systems originating at identical coordinates do not "
+          "end up at the same values.  " + err_msg, do_tests);
   }
 
   // Perturb the structures and test the encapsulated energy minimization protocol.

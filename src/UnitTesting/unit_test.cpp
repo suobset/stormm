@@ -503,8 +503,10 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
       if (mismatch) {
         printf("Snapshot MISMATCH: ");
         std::string error_edit("  ");
-        error_edit += vectorAlignmentReport(ref_content, content, data_format,
-                                            comparison_tolerance);
+        if (urgency == TestPriority::CRITICAL) {
+          error_edit += vectorAlignmentReport(ref_content, content, data_format,
+                                              comparison_tolerance);
+        }
         const std::string parsed_msg = terminalFormat(error_message + error_edit,
                                                       "", "", 19, 0, 19);
         printf("%s\n", parsed_msg.c_str());

@@ -175,7 +175,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
         amat_inva[warp_idx + 28] = (warp_idx == 3);
       }
       __syncthreads();
-      
+
       // Perform Gauss-Jordan elimination on the A matrix and the identity matrix to obtain the
       // inverse matrix.  To expedite this, read the combined matrices into the first eight
       // threads and make row swaps explicit.  This requires at least eight threads per warp, but
@@ -252,6 +252,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 
       // With the coefficients for the equation, one thread solves for the location of the minimum
       // over the energy range.
+
       if (threadIdx.x == 0) {
         TCALC d_abcd[3];
         d_abcd[0] = (TCALC)(3.0) * abcd_coefs[0];
@@ -264,6 +265,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
             // Move the particles back to their starting points.  This line minimization did not
             // lead to any decreases in energy.
             move_factor = -sh_mvec[3];
+          }
+          else {
+            move_factor = (TCALC)(0.0);
           }
         }
         else {
@@ -307,6 +311,28 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
           }
         }
       }
+
+      // CHECK
+#if 0
+      if (threadIdx.x == 0) {
+        double min_nrg = sh_evec[0];
+        int min_loc = 0;
+        if (min_nrg > sh_evec[1]) {
+          min_nrg = sh_evec[1];
+          min_loc = 1;
+        }
+        if (min_nrg > sh_evec[2]) {
+          min_nrg = sh_evec[2];
+          min_loc = 2;
+        }
+        if (min_nrg > sh_evec[3]) {
+          min_nrg = sh_evec[3];
+          min_loc = 3;
+        }
+        move_factor = sh_mvec[min_loc] - sh_mvec[3];
+      }
+#endif
+      // END CHECK
     }
 
     // Broadcast the movement factor to all threads.
@@ -314,11 +340,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
       sh_move_factor = move_factor;
 
       // CHECK
-#if 0
-      if (move_factor > 1000.0) {
+      if (fabs(move_factor) > 1000.0) {
         printf("Wow... move factor = %18.4lf on WU %4d\n", move_factor, wu_idx);
       }
-#endif
       // END CHECK
     }
     __syncthreads();
