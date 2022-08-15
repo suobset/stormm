@@ -861,7 +861,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
           "end up at the same values.  " + err_msg, do_tests);
   }
 
-  // Perturb the structures and test the encapsulated energy minimization protocol.
+  // Perturb the structures and test the encapsulated energy minimization protocol.  Make a copy
+  // as a test against Heisenbugs.
   if (timer != nullptr) {
     timer->assignTime(0);
   }
@@ -875,6 +876,9 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     }
   }
   poly_ps.upload();
+  PhaseSpaceSynthesis poly_ps_cpy(poly_ps);
+  poly_ps_cpy.upload();
+  
   if (timer != nullptr) {
     cudaDeviceSynchronize();
     timer->assignTime(pert_timings);
@@ -882,28 +886,35 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   mincon.setDiagnosticPrintFrequency(mincon.getTotalCycles() / 10);  
   ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec, timer,
                                           test_name + " (II)");
+  cudaDeviceSynchronize();
   e_refine.download();
-  std::vector<std::vector<double>> e_hist(poly_ps.getSystemCount());
+  e_refine.computePotentialEnergy();
+  e_refine.computeTotalEnergy();
+  std::vector<std::vector<double>> e_hist_a(poly_ps.getSystemCount());
   for (int i = 0; i < poly_ps.getSystemCount(); i++) {
-    e_hist[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
+    e_hist_a[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
   }
-  
-  // CHECK
-#if 0
-  printf("Result = [\n");
-  const int ntpr = mincon.getDiagnosticPrintFrequency();
-  const int nframe = (roundUp(mincon.getTotalCycles(), ntpr) / ntpr) + 1;
-  printf("Each e_hist has %4zu data points and I think there are %4d\n", e_hist[0].size(), nframe);
-  for (int i = 0; i < nframe; i++) {
-    const int jlim = std::min(6, static_cast<int>(e_hist.size()));
-    for (int j = 0; j < jlim; j++) {
-      printf("  %12.4lf", e_hist[j][i]);      
+  e_refine = launchMinimization(poly_ag, poly_se, &poly_ps_cpy, mincon, gpu, prec, timer,
+                                test_name + " (III)");
+  cudaDeviceSynchronize();
+  e_refine.download();
+  e_refine.computePotentialEnergy();
+  e_refine.computeTotalEnergy();
+  std::vector<std::vector<double>> e_hist_b(poly_ps_cpy.getSystemCount());
+  std::vector<int> mismatch(poly_ps_cpy.getSystemCount(), 0);
+  const int npts = e_refine.getSampleSize();
+  for (int i = 0; i < poly_ps_cpy.getSystemCount(); i++) {
+    e_hist_b[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
+    for (int j = 0; j < npts; j++) {
+      if (fabs(e_hist_b[i][j] - e_hist_a[i][j]) > stormm::constants::small) {
+        mismatch[i] += 1;
+      }
     }
-    printf("\n");
   }
-  printf("];\n");
-#endif
-  // END CHECK
+  check(mismatch, RelationalOperator::EQUAL, std::vector<int>(poly_ps.getSystemCount(), 0),
+        "Mismatches were detected in back-to-back minimizations of the same batch of perturbed "
+        "starting coordinates.  Test: " + test_name + ".  Precision model: " +
+        getPrecisionModelName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------

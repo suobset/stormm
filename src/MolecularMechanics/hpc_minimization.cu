@@ -216,7 +216,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // It is not necessary to re-initialize the ScoreCard abstract immediately, as the
           // number of sampled steps has no bearing on how it will accept instantaneous results
           // from the following energy evaluations.
-          sc->commit(devc_tier);
+          sc->commit(devc_tier, gpu);
           sc->incrementSampleCount();
         }
         ctrl_fe.step += 1;
@@ -290,7 +290,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           // It is not necessary to re-initialize the ScoreCard abstract immediately, as the
           // number of sampled steps has no bearing on how it will accept instantaneous results
           // from the following energy evaluations.
-          sc->commit(devc_tier);
+          sc->commit(devc_tier, gpu);
           sc->incrementSampleCount();
         }
         ctrl_fe.step += 1;
@@ -341,7 +341,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   }
 
   // Advance the energy tracking history counter to log the final energy results
-  sc->commit(devc_tier);
+  sc->commit(devc_tier, gpu);
   sc->incrementSampleCount();
   if (timer != nullptr) {
     cudaDeviceSynchronize();

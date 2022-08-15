@@ -117,7 +117,7 @@ ScoreCard::ScoreCard(const int system_count_in, const int capacity_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-double ScoreCard::sumPotentialEnergy(const llint* nrg_data) const {
+llint ScoreCard::sumPotentialEnergyAsLlint(const llint* nrg_data) const {
   llint lacc = nrg_data[static_cast<size_t>(StateVariable::BOND)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::ANGLE)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
@@ -131,13 +131,37 @@ double ScoreCard::sumPotentialEnergy(const llint* nrg_data) const {
   lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
   lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
-  return static_cast<double>(lacc) * inverse_nrg_scale_lf;
+  return lacc;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::sumPotentialEnergy(const llint* nrg_data) const {
+  return static_cast<double>(sumPotentialEnergyAsLlint(nrg_data)) * inverse_nrg_scale_lf;
+}
+
+//-------------------------------------------------------------------------------------------------
+llint ScoreCard::sumTotalEnergyAsLlint(const llint* nrg_data) const {
+  llint lacc = nrg_data[static_cast<size_t>(StateVariable::BOND)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ANGLE)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::UREY_BRADLEY)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CMAP)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
+  return lacc;
 }
 
 //-------------------------------------------------------------------------------------------------
 double ScoreCard::sumTotalEnergy(const llint* nrg_data) const {
   const llint lacc = nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
-  return (static_cast<double>(lacc) * inverse_nrg_scale_lf) + sumPotentialEnergy(nrg_data);
+  return static_cast<double>(sumTotalEnergyAsLlint(nrg_data)) * inverse_nrg_scale_lf;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -495,6 +519,59 @@ void ScoreCard::commit(const HybridTargetLevel tier, const GpuDetails &gpu) {
     var_vec[i] = static_cast<StateVariable>(i);
   }
   commit(var_vec, tier, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::computePotentialEnergy(const HybridTargetLevel tier, const GpuDetails &gpu) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      const llint* tser_acc_ptr = time_series_accumulators.data();
+      const int pe_int = static_cast<int>(StateVariable::POTENTIAL_ENERGY);
+      const size_t pe_zu = static_cast<size_t>(pe_int);
+      for (int i = 0; i < system_count; i++) {
+        const llint* iptr = &inst_acc_ptr[i * data_stride];
+        instantaneous_accumulators.putHost(sumPotentialEnergyAsLlint(iptr),
+                                           (i * data_stride) + pe_int);
+        for (int j = 0; j < sampled_step_count; j++) {
+          const size_t sys_offset = static_cast<size_t>(data_stride * system_count) *
+                                    static_cast<size_t>(j) + static_cast<size_t>(data_stride * i);
+          time_series_accumulators.putHost(sumPotentialEnergyAsLlint(&tser_acc_ptr[sys_offset]),
+                                           sys_offset + pe_zu);
+        }
+      }
+    }
+    break;
+  case HybridTargetLevel::DEVICE:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::computeTotalEnergy(const HybridTargetLevel tier, const GpuDetails &gpu) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      const llint* tser_acc_ptr = time_series_accumulators.data();
+      const int te_int = static_cast<int>(StateVariable::TOTAL_ENERGY);
+      const size_t te_zu = static_cast<size_t>(te_int);
+      for (int i = 0; i < system_count; i++) {
+        instantaneous_accumulators.putHost(sumTotalEnergyAsLlint(&inst_acc_ptr[i * data_stride]),
+                                           (i * data_stride) + te_int);
+        for (int j = 0; j < sampled_step_count; j++) {
+          const size_t sys_offset = static_cast<size_t>(data_stride * system_count) *
+                                    static_cast<size_t>(j) + static_cast<size_t>(data_stride * i);
+          time_series_accumulators.putHost(sumTotalEnergyAsLlint(&tser_acc_ptr[sys_offset]),
+                                           sys_offset + te_zu);
+        }
+      }
+    }
+    break;
+  case HybridTargetLevel::DEVICE:
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------

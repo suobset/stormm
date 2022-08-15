@@ -104,6 +104,26 @@ public:
   ScoreCard(int system_count_in, int capacity_in = 16,
             int nrg_scale_bits_in = default_energy_scale_bits);
 
+  /// \brief Copy and move constructors help make the energy tracker a first-class C++ object.
+  ///        The defaults apply as there are no const member variables and no POINTER-kind Hybrid
+  ///        objects.
+  ///
+  /// \param original  The original energy tracking object to build from
+  /// \{
+  ScoreCard(const ScoreCard &original) = default;
+  ScoreCard(ScoreCard &&original) = default;
+  /// \}
+
+  /// \brief Copy and move assignment operators complete the support for integrating this energy
+  ///        tracker with Standard Template Library mechanics.  The defaults apply as there are no
+  ///        const member variables and no POINTER-kind Hybrid objects.
+  ///
+  /// \param other  Object to which the present ScoreCard shall be equated
+  /// \{
+  ScoreCard& operator=(const ScoreCard &other) = default;
+  ScoreCard& operator=(ScoreCard &&other) = default;
+  /// \}
+  
   /// \brief Get the number of systems that this object is tracking
   int getSystemCount() const;
 
@@ -230,11 +250,27 @@ public:
   
   void commit(HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
   /// \}
-  
+
+  /// \brief Compute total potential energies for all systems in the instantaneous accumulators as
+  ///        well as all time series accumulators.  This total is not automatically computed by
+  ///        various interaction evaluations, which only compute individual "components" of this
+  ///        quantity.
+  ///
+  /// \param tier  Perform this operation on the CPU host or GPU device
+  void computePotentialEnergy(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                              const GpuDetails &gpu = null_gpu);
+
+  /// \brief Compute total energies for all systems in the instantaneous accumulators as well as
+  ///        all time series accumulators.  This total is not automatically computed by various
+  ///        interaction evaluations, which only compute individual "components" of this quantity.
+  ///
+  /// \param tier  Perform this operation on the CPU host or GPU device
+  void computeTotalEnergy(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                          const GpuDetails &gpu = null_gpu);
+
   /// \brief Increment the number of sampled steps.  This will automatically allocate additional
   ///        capacity if the sampled step count reaches the object's capacity.
   void incrementSampleCount();
-
 
   /// \brief Reset the sample counter (this is implicitly done by initialize() if that function is
   ///        called to operate on all start variables and all systems, on either the host or HPC
@@ -396,16 +432,30 @@ private:
   /// \brief Sum the potential energy contributions for a single system arranged in some array of
   ///        long long integers.
   ///
+  /// Overloaded:
+  ///   - Sum the energy as a long long integer (native fixed-precision format)
+  ///   - Sum the energy and return a double-precision real number, scaled to units of kcal/mol
+  ///
   /// \param nrg_data  Energies for the system.  The first element of the array will coorespond to
   ///                  the first element of the StateVariable enumerator, i.e. BOND.
+  /// \{
+  llint sumPotentialEnergyAsLlint(const llint* nrg_data) const;
   double sumPotentialEnergy(const llint* nrg_data) const;
+  /// \}
 
   /// \brief Sum the total energy contributions for a single sustem arranged in some array of
   ///        long long integers.  This adds kinetic energy to the usual potential contributions.
   ///
+  /// Overloaded:
+  ///   - Sum the energy as a long long integer (native fixed-precision format)
+  ///   - Sum the energy and return a double-precision real number, scaled to units of kcal/mol
+  ///
   /// \param nrg_data  Energies for the system.  The first element of the array will coorespond to
   ///                  the first element of the StateVariable enumerator, i.e. BOND.
+  /// \{
+  llint sumTotalEnergyAsLlint(const llint* nrg_data) const;
   double sumTotalEnergy(const llint* nrg_data) const;
+  /// \}
 };
 
 } // namespace energy

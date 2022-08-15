@@ -605,7 +605,8 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const PhaseSpaceSynthesis &original) :
     int_data{original.int_data},
     llint_data{original.llint_data},
     double_data{original.double_data},
-    float_data{original.float_data}
+    float_data{original.float_data},
+    topologies{original.topologies}
 {
   // The allocate function again handle pointer repair, just like in the PhaseSpace object.
   // Sum the atom stride based on the AtomGraph pointers, as the PhaseSpace objects that created
