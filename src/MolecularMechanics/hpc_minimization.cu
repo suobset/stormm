@@ -136,7 +136,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                const ForceAccumulationMethod acc_meth, const GpuDetails &gpu,
                                const KernelManager &launcher, StopWatch *timer,
                                const std::string &task_name) {
-
+  
   // Obtain abstracts of critical objects, re-using them throughout the inner loop.  Some abstracts
   // are needed by both branches.
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;

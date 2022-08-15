@@ -642,53 +642,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     }
 
-    // CHECK
-#if 0
-    if (i >= 2 && poly_ag.getSystemCount() == 4096 &&
-        prec == PrecisionModel::SINGLE) {
-      sc.download();
-      poly_ps.download();
-      printf("A %3d System energy = [\n", i);
-      for (int j = 0; j < 4096; j++) {
-        std::vector<double> expected_e = { -27.28892046, 2.66019305, 144.07715015, 0.35715730 };
-        if (fabs(sc.reportTotalEnergy(j) - expected_e[mol_id_vec[j]]) > 1.0e-3 &&
-            fabs(sc.reportTotalEnergy(j) - sc.reportTotalEnergy(mol_id_vec[j])) > 5.0e-3) {
-          printf("  %4d %16.4lf (expect %9.4lf) :: ", j, sc.reportTotalEnergy(j),
-                 sc.reportTotalEnergy(mol_id_vec[j]));
-          printf(" %16.4lf %16.4lf %16.4lf %16.4lf %16.4lf %16.4lf %16.4lf",
-                 sc.reportInstantaneousStates(StateVariable::BOND, j),
-                 sc.reportInstantaneousStates(StateVariable::ANGLE, j),
-                 sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, j),
-                 sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, j),
-                 sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, j),
-                 sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, j),
-                 sc.reportInstantaneousStates(StateVariable::CMAP, j));
-          printf(" %16.4lf %16.4lf %16.4lf %16.4lf\n",
-                 sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, j),
-                 sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, j),
-                 sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, j),
-                 sc.reportInstantaneousStates(StateVariable::VDW, j));
-          const PhaseSpace ref_ps = poly_ps.exportSystem(mol_id_vec[j], HybridTargetLevel::HOST);
-          const PhaseSpace bad_ps = poly_ps.exportSystem(j, HybridTargetLevel::HOST);
-          const PhaseSpaceReader ref_psw = ref_ps.data();
-          const PhaseSpaceReader bad_psw = bad_ps.data();
-          printf("Ref Crd / Bad Crd   Ref Frc / Bad Frc\n");
-          for (int k = 0; k < ref_psw.natom; k++) {
-            printf("  %9.4lf %9.4lf %9.4lf   %9.4lf %9.4lf %9.4lf    ", ref_psw.xcrd[k],
-                   ref_psw.ycrd[k], ref_psw.zcrd[k], bad_psw.xcrd[k], bad_psw.ycrd[k],
-                   bad_psw.zcrd[k]);
-            printf("  %9.4lf %9.4lf %9.4lf   %9.4lf %9.4lf %9.4lf\n", ref_psw.xfrc[k],
-                   ref_psw.yfrc[k], ref_psw.zfrc[k], bad_psw.xfrc[k], bad_psw.yfrc[k],
-                   bad_psw.zfrc[k]);
-          }
-          printf("\n");
-        }
-      }
-      printf("];\n");
-    }
-#endif
-    // END CHECK
-
     // Download and check the particle advancement.
     if (enforce_same_track) {
       poly_ps.download();
@@ -703,64 +656,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Fit a cubic polynomial to guess the best overall advancement, and place the system there.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 3, redu_lp);
-
-    // CHECK
-#if 0
-    if (i >= 2 && poly_ag.getSystemCount() == 4096 &&
-        prec == PrecisionModel::SINGLE) {
-      sc.initialize(devc, gpu);
-      launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                      nonb_lp);
-      launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
-                    EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
-      f_ctrl_xe.step += 1;
-      sc.download();
-      poly_ps.download();
-      printf("B %3d System energy = [\n", i);
-      for (int j = 0; j < 4096; j++) {
-        std::vector<double> expected_e = { -27.28892046, 2.66019305, 144.07715015, 0.35715730 };
-        if (fabs(sc.reportTotalEnergy(j) - expected_e[mol_id_vec[j]]) > 1.0e-3 &&
-            fabs(sc.reportTotalEnergy(j) - sc.reportTotalEnergy(mol_id_vec[j])) > 5.0e-3) {
-          printf("  %4d %16.4lf (expect %9.4lf) :: ", j, sc.reportTotalEnergy(j),
-                 sc.reportTotalEnergy(mol_id_vec[j]));
-          printf(" %16.4lf %16.4lf %16.4lf %16.4lf %16.4lf %16.4lf %16.4lf",
-                 sc.reportInstantaneousStates(StateVariable::BOND, j),
-                 sc.reportInstantaneousStates(StateVariable::ANGLE, j),
-                 sc.reportInstantaneousStates(StateVariable::PROPER_DIHEDRAL, j),
-                 sc.reportInstantaneousStates(StateVariable::IMPROPER_DIHEDRAL, j),
-                 sc.reportInstantaneousStates(StateVariable::UREY_BRADLEY, j),
-                 sc.reportInstantaneousStates(StateVariable::CHARMM_IMPROPER, j),
-                 sc.reportInstantaneousStates(StateVariable::CMAP, j));
-          printf(" %16.4lf %16.4lf %16.4lf %16.4lf\n",
-                 sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, j),
-                 sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, j),
-                 sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, j),
-                 sc.reportInstantaneousStates(StateVariable::VDW, j));
-          const PhaseSpace ref_ps = poly_ps.exportSystem(mol_id_vec[j], HybridTargetLevel::HOST);
-          const PhaseSpace bad_ps = poly_ps.exportSystem(j, HybridTargetLevel::HOST);
-          const PhaseSpaceReader ref_psw = ref_ps.data();
-          const PhaseSpaceReader bad_psw = bad_ps.data();
-          printf("Ref Crd / Bad Crd   Ref Frc / Bad Frc\n");
-          for (int k = 0; k < ref_psw.natom; k++) {
-            printf("  %9.4lf %9.4lf %9.4lf   %9.4lf %9.4lf %9.4lf    ", ref_psw.xcrd[k],
-                   ref_psw.ycrd[k], ref_psw.zcrd[k], bad_psw.xcrd[k], bad_psw.ycrd[k],
-                   bad_psw.zcrd[k]);
-            printf("  %9.4lf %9.4lf %9.4lf   %9.4lf %9.4lf %9.4lf\n", ref_psw.xfrc[k],
-                   ref_psw.yfrc[k], ref_psw.zfrc[k], bad_psw.xfrc[k], bad_psw.yfrc[k],
-                   bad_psw.zfrc[k]);
-          }
-          printf("\n");
-        }
-      }
-      printf("];\n");
-      if (i == 494) {
-        exit(1);
-      }
-    }
-#endif
-    // END CHECK
 
     // Download and check the particle advancement.
     if (enforce_same_track) {

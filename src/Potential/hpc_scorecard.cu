@@ -106,16 +106,6 @@ kScoreCardCommit(const ullint state_mask, const int system_index, const int syst
           const size_t ts_slot = slot + (static_cast<size_t>(padded_max_states * system_count) *
                                          sample_count);
           time_ser_acc[ts_slot] = ll_amt;
-
-          // CHECK
-          if (lane_idx == 0 && syspos == 45) {
-            const double dbond_e = ll_amt;
-            const int its_slot = ts_slot;
-            const int isample_count = sample_count;
-            printf("Commit BOND %14.0lf to slot %10d at step %4d\n", dbond_e, its_slot,
-                   isample_count);
-          }
-          // END CHECK
         }
       }
       syspos += gridDim.x * (blockDim.x >> warp_bits);
