@@ -128,7 +128,7 @@ void scatterNormalization(GenericRdSubstrate<llint> rsbs, const double tsum, con
       for (int j = start_pos; j < end_pos; j++) {
         const double dx = ((static_cast<double>(rsbs.x_write_ovrf[j]) *
                             max_llint_accumulation) + static_cast<double>(rsbs.x_write[j]));
-        splitRealAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
+        splitAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
       }
     }
     else if (rsbs.y_read != nullptr && rsbs.z_read == nullptr) {
@@ -137,8 +137,8 @@ void scatterNormalization(GenericRdSubstrate<llint> rsbs, const double tsum, con
                             max_llint_accumulation) + static_cast<double>(rsbs.x_write[j]));
         const double dy = ((static_cast<double>(rsbs.y_write_ovrf[j]) *
                             max_llint_accumulation) + static_cast<double>(rsbs.y_write[j]));
-        splitRealAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
-        splitRealAccumulation(dy * nfactor, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
+        splitAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
+        splitAccumulation(dy * nfactor, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
       }
     }
     else {
@@ -149,9 +149,9 @@ void scatterNormalization(GenericRdSubstrate<llint> rsbs, const double tsum, con
                             max_llint_accumulation) + static_cast<double>(rsbs.y_write[j]));
         const double dz = ((static_cast<double>(rsbs.z_write_ovrf[j]) *
                             max_llint_accumulation) + static_cast<double>(rsbs.z_write[j]));
-        splitRealAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
-        splitRealAccumulation(dy * nfactor, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
-        splitRealAccumulation(dz * nfactor, &rsbs.z_write[j], &rsbs.z_write_ovrf[j]);
+        splitAccumulation(dx * nfactor, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
+        splitAccumulation(dy * nfactor, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
+        splitAccumulation(dz * nfactor, &rsbs.z_write[j], &rsbs.z_write_ovrf[j]);
       }
     }
   }
@@ -195,18 +195,18 @@ void scatterCenterOnZero(GenericRdSubstrate<llint> rsbs, const double tsum_x, co
   if (extended_precision) {
     const double center_x = tsum_x * inv_norm;
     for (int j = start_pos; j < end_pos; j++) {
-      splitRealAccumulation(center_x, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
+      splitAccumulation(center_x, &rsbs.x_write[j], &rsbs.x_write_ovrf[j]);
     }
     if (rsbs.y_read != nullptr) {
       const double center_y = tsum_y * inv_norm;
       for (int j = start_pos; j < end_pos; j++) {
-        splitRealAccumulation(center_y, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
+        splitAccumulation(center_y, &rsbs.y_write[j], &rsbs.y_write_ovrf[j]);
       }
     }
     if (rsbs.z_read != nullptr) {
       const double center_z = tsum_z * inv_norm;
       for (int j = start_pos; j < end_pos; j++) {
-        splitRealAccumulation(center_z, &rsbs.z_write[j], &rsbs.z_write_ovrf[j]);
+        splitAccumulation(center_z, &rsbs.z_write[j], &rsbs.z_write_ovrf[j]);
       }
     }
   }

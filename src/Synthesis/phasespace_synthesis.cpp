@@ -35,7 +35,7 @@ using numerics::checkForceBits;
 using numerics::force_scale_nonoverflow_bits;
 using numerics::globalpos_scale_nonoverflow_bits;
 using numerics::max_llint_accumulation;
-using numerics::splitRealConversion;
+using numerics::doubleToInt95;
 using numerics::transform_scale_lf;
 using numerics::velocity_scale_nonoverflow_bits;
 using topology::UnitCellType;
@@ -388,12 +388,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
         zpos_ptr[asi_j] = llround(psr.zcrd[j] * globalpos_scale);
       }
       else {
-        splitRealConversion(psr.xcrd[j] * globalpos_scale, &xpos_ptr[asi_j],
-                            &xpos_ovrf_ptr[asi_j]);
-        splitRealConversion(psr.ycrd[j] * globalpos_scale, &ypos_ptr[asi_j],
-                            &ypos_ovrf_ptr[asi_j]);
-        splitRealConversion(psr.zcrd[j] * globalpos_scale, &zpos_ptr[asi_j],
-                            &zpos_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.xcrd[j] * globalpos_scale, &xpos_ptr[asi_j], &xpos_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.ycrd[j] * globalpos_scale, &ypos_ptr[asi_j], &ypos_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.zcrd[j] * globalpos_scale, &zpos_ptr[asi_j], &zpos_ovrf_ptr[asi_j]);
       }
       if (velocity_scale_bits <= velocity_scale_nonoverflow_bits) {
         xvel_ptr[asi_j] = llround(psr.xvel[j] * velocity_scale);
@@ -401,12 +398,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
         zvel_ptr[asi_j] = llround(psr.zvel[j] * velocity_scale);
       }
       else {
-        splitRealConversion(psr.xvel[j] * globalpos_scale, &xvel_ptr[asi_j],
-                            &xvel_ovrf_ptr[asi_j]);
-        splitRealConversion(psr.yvel[j] * globalpos_scale, &yvel_ptr[asi_j],
-                            &yvel_ovrf_ptr[asi_j]);
-        splitRealConversion(psr.zvel[j] * globalpos_scale, &zvel_ptr[asi_j],
-                            &zvel_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.xvel[j] * globalpos_scale, &xvel_ptr[asi_j], &xvel_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.yvel[j] * globalpos_scale, &yvel_ptr[asi_j], &yvel_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.zvel[j] * globalpos_scale, &zvel_ptr[asi_j], &zvel_ovrf_ptr[asi_j]);
       }
       if (force_scale_bits <= force_scale_nonoverflow_bits) {
         xfrc_ptr[asi_j] = llround(psr.xfrc[j] * force_scale);
@@ -414,12 +408,9 @@ PhaseSpaceSynthesis::PhaseSpaceSynthesis(const std::vector<PhaseSpace> &ps_list,
         zfrc_ptr[asi_j] = llround(psr.zfrc[j] * force_scale);
       }
       else {
-        splitRealConversion(psr.xfrc[j] * globalpos_scale, &xfrc_ptr[asi_j],
-                            &xfrc_ovrf_ptr[asi_j]);
-        splitRealConversion(psr.yfrc[j] * globalpos_scale, &yfrc_ptr[asi_j],
-                            &yfrc_ovrf_ptr[asi_j]);
-        splitRealConversion(psr.zfrc[j] * globalpos_scale, &zfrc_ptr[asi_j],
-                            &zfrc_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.xfrc[j] * globalpos_scale, &xfrc_ptr[asi_j], &xfrc_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.yfrc[j] * globalpos_scale, &yfrc_ptr[asi_j], &yfrc_ovrf_ptr[asi_j]);
+        doubleToInt95(psr.zfrc[j] * globalpos_scale, &zfrc_ptr[asi_j], &zfrc_ovrf_ptr[asi_j]);
       }
     }
 

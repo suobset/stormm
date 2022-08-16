@@ -6,12 +6,14 @@
 #include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
+#include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {
 namespace numerics {
 
 using constants::ExceptionResponse;
 using constants::PrecisionModel;
+using data_types::int95_t;
   
 /// \brief Enumerate the choices for carrying out fixed-precision accumulation
 enum class ForceAccumulationMethod {
@@ -114,17 +116,23 @@ void checkChargeMeshBits(int choice, PrecisionModel pmodel);
 ///   - Convert a single-precision floating point number into two 32-bit signed integers.
 ///   - Convert a double-precision floating point number into a 64-bit primary integer and a
 ///     32-bit secondary / overflow integer.
+///   - Return the fixed-precision representation or assign it directly to the corresponding
+///     locations in two appropriate arrays.
 ///
 /// \param fval      Single-precision value to convert to fixed-precision
 /// \param dval      Double-precision value to convert to fixed-precision
 /// \param primary   The primary accumulator (the low 32 bits)
 /// \param overflow  The secondary accumulator (the high 31 bits)
 /// \{
-void splitRealConversion(const float fval, int *primary, int *overflow);
+int2 floatToInt63(const float fval);
 
-void splitRealConversion(const double fval, llint *primary, int *overflow);
+void floatToInt63(const float fval, int *primary, int *overflow);
+
+int95_t doubleToInt95(const double fval);
+
+void doubleToInt95(const double fval, llint *primary, int *overflow);
 /// \}
-  
+
 /// \brief Accumulate floating point numbers into fixed-precision representations with two
 ///        integers.
 ///
@@ -138,9 +146,9 @@ void splitRealConversion(const double fval, llint *primary, int *overflow);
 /// \param primary   The primary accumulator (the low 32 bits)
 /// \param overflow  The secondary accumulator (the high 31 bits)
 /// \{
-void splitRealAccumulation(const float fval, int *primary, int *overflow);
+void splitAccumulation(const float fval, int *primary, int *overflow);
 
-void splitRealAccumulation(const double fval, llint *primary, int *overflow);
+void splitAccumulation(const double fval, llint *primary, int *overflow);
 /// \}
 
 } // namespace numerics

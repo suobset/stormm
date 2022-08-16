@@ -56,7 +56,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         const float scaled_fr = fr * scale_factor;
         const llint fp_result = scaled_fr;
         int overflow, workbin;
-        splitRealConversion(scaled_fr, &workbin, &overflow);
+        floatToInt63(scaled_fr, &workbin, &overflow);
         const llint lloverflow = overflow;
         const llint llworkbin  = workbin;
         const llint fp_reconst = (lloverflow * max_int_accumulation_ll) + llworkbin;
@@ -69,7 +69,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
       {
         llint workbin;
         int overflow;
-        splitRealConversion(r * scale_factor, &workbin, &overflow);
+        doubleToInt95(r * scale_factor, &workbin, &overflow);
         double dp_reconst = static_cast<double>(workbin) * inv_scale_factor;
         dp_reconst += static_cast<double>(overflow) * inv_overflow_factor;
         if (fabs(dp_reconst - r) > tiny) {
@@ -95,7 +95,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
           float fr = r;
           double scaled_r = r * scale_factor;
           float scaled_fr = fr * scale_factorf;
-          splitRealAccumulation(scaled_fr, &workbin, &overflow);
+          splitAccumulation(scaled_fr, &workbin, &overflow);
           dp_result += static_cast<llint>(scaled_r);
           fp_result += static_cast<llint>(scaled_fr);
         }
@@ -114,7 +114,7 @@ void testSplitAccumulation(const double llim, const double hlim, const double in
         llint workbin = 0LL;
         for (int i = 0; i < 9; i++) {
           double scaled_r = r * scale_factor;
-          splitRealAccumulation(scaled_r, &workbin, &overflow);
+          splitAccumulation(scaled_r, &workbin, &overflow);
           dp_tracker += r;
         }
         double dp_reconst = static_cast<double>(workbin) * inv_scale_factor;

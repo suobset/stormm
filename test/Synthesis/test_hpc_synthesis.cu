@@ -629,16 +629,25 @@ int main(const int argc, const char* argv[]) {
     const ChemicalDetailsKit icdk = iag_ptr->getChemicalDetailsKit();
     for (int j = 0; j < icdk.natom; j++) {
       if (icdk.z_numbers[j] == 0) {
-        const int atom_synth_idx = ligand_psw.atom_starts[i] + j;
-        ligand_psw.xcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_psw.ycrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_psw.zcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_dbl_psw.xcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_dbl_psw.ycrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_dbl_psw.zcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_sdbl_psw.xcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_sdbl_psw.ycrd[atom_synth_idx] += xrs.gaussianRandomNumber();
-        ligand_sdbl_psw.zcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        const int synth_idx = ligand_psw.atom_starts[i] + j;
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_psw.xcrd[synth_idx], &ligand_psw.xcrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_psw.ycrd[synth_idx], &ligand_psw.ycrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_psw.zcrd[synth_idx], &ligand_psw.zcrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_dbl_psw.xcrd[synth_idx], &ligand_dbl_psw.xcrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_dbl_psw.ycrd[synth_idx], &ligand_dbl_psw.ycrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_dbl_psw.zcrd[synth_idx], &ligand_dbl_psw.zcrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_sdbl_psw.xcrd[synth_idx], &ligand_sdbl_psw.xcrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_sdbl_psw.ycrd[synth_idx], &ligand_sdbl_psw.ycrd_ovrf[synth_idx]);
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+                          &ligand_sdbl_psw.zcrd[synth_idx], &ligand_sdbl_psw.zcrd_ovrf[synth_idx]);
       }
     }
   }
@@ -662,12 +671,14 @@ int main(const int argc, const char* argv[]) {
     placeVirtualSites(&cpulig_dbl_cf_vec[i], iag_ptr);
     placeVirtualSites(&cpulig_sdbl_cf_vec[i], iag_ptr);
   }
+#if 0
   launchVirtualSitePlacement(PrecisionModel::SINGLE, &ligand_poly_ps, &valence_tb_space,
                              ligand_poly_ag, ligand_launcher);
   launchVirtualSitePlacement(PrecisionModel::DOUBLE, &ligand_poly_ps_dbl, &valence_tb_space,
                              ligand_poly_ag, ligand_launcher);
   launchVirtualSitePlacement(PrecisionModel::DOUBLE, &ligand_poly_ps_sdbl, &valence_tb_space,
                              ligand_poly_ag, ligand_launcher);
+#endif
   std::vector<CoordinateFrame> gpulig_cf_vec, gpulig_dbl_cf_vec, gpulig_sdbl_cf_vec;
   gpulig_cf_vec.reserve(nligands);
   gpulig_dbl_cf_vec.reserve(nligands);
@@ -723,8 +734,8 @@ int main(const int argc, const char* argv[]) {
         printf("\n");
       }
     }
-    // END CHECK
 #endif
+    // END CHECK
   }
   
   // Summary evaluation

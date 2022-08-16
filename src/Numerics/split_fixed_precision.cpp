@@ -150,34 +150,51 @@ void checkChargeMeshBits(const int choice, const PrecisionModel pmodel) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void splitRealConversion(const float fval, int *primary, int *overflow) {
-  int ival;
+int2 floatToInt63(const float fval) {
+  int2 result;
   if (fabsf(fval) >= max_int_accumulation_f) {
     const int spillover = fval / max_int_accumulation_f;
-    *primary = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
-    *overflow = spillover;
+    result.x = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
+    result.y = spillover;
   }
   else {
-    *primary = fval;
-    *overflow = 0;
+    result.x = fval;
+    result.y = 0;
   }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-void splitRealConversion(const double dval, llint *primary, int *overflow) {
+void floatToInt63(const float fval, int *primary, int *overflow) {
+  const int2 result = floatToInt63(fval);
+  *primary  = result.x;
+  *overflow = result.y;
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t doubleToInt95(const double dval) {
+  int95_t result;
   if (fabs(dval) >= max_llint_accumulation) {
     const int spillover = dval / max_llint_accumulation;
-    *primary = dval - (static_cast<double>(spillover) * max_llint_accumulation);
-    *overflow = spillover;
+    result.x = dval - (static_cast<double>(spillover) * max_llint_accumulation);
+    result.y = spillover;
   }
   else {
-    *primary = dval;
-    *overflow = 0;
+    result.x = dval;
+    result.y = 0;
   }
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
-void splitRealAccumulation(const float fval, int *primary, int *overflow) {
+void doubleToInt95(const double dval, llint *primary, int *overflow) {
+  const int95_t result = doubleToInt95(dval);
+  *primary  = result.x;
+  *overflow = result.y;
+}
+
+//-------------------------------------------------------------------------------------------------
+void splitAccumulation(const float fval, int *primary, int *overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
     const int spillover = fval / max_int_accumulation_f;
@@ -196,7 +213,7 @@ void splitRealAccumulation(const float fval, int *primary, int *overflow) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
+void splitAccumulation(const double dval, llint *primary, int *overflow) {
   llint ival;
   if (fabs(dval) >= max_llint_accumulation) {
     const int spillover = dval / max_llint_accumulation;
