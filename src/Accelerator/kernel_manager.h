@@ -11,9 +11,9 @@
 #endif
 #include "copyright.h"
 #include "Constants/behavior.h"
-#include "Constants/fixed_precision.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Potential/energy_enumerators.h"
 #include "Structure/structure_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"

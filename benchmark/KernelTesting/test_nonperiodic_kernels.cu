@@ -8,7 +8,7 @@
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/kernel_manager.h"
-#include "../../src/Constants/fixed_precision.h"
+#include "../../src/Constants/split_fixed_precision.h"
 #include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"

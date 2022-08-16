@@ -5,7 +5,6 @@
 #include <nvml.h>
 #include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/kernel_manager.h"
-#include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/rounding.h"
@@ -16,6 +15,7 @@
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
+#include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Restraints/restraint_apparatus.h"
@@ -682,8 +682,6 @@ int main(const int argc, const char* argv[]) {
     gpulig_dbl_cf_vec.emplace_back(ligand_poly_ps_dbl.exportCoordinates(i, tcoord, devc_tier));
     gpulig_sdbl_cf_vec.emplace_back(ligand_poly_ps_sdbl.exportCoordinates(i, tcoord, devc_tier));
   }
-
-  // CHECK
   for (int i = 0; i < lm_size; i++) {
     const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
     CoordinateFrameWriter cpu_cfr      = cpulig_cf_vec[i].data();
@@ -726,9 +724,8 @@ int main(const int argc, const char* argv[]) {
       }
     }
     // END CHECK
-  }
 #endif
-  // END CHECK
+  }
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

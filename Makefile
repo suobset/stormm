@@ -17,7 +17,6 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Chemistry/indigo.cpp \
 		   $(SRCDIR)/Chemistry/znumber.cpp \
 		   $(SRCDIR)/Constants/behavior.cpp \
-		   $(SRCDIR)/Constants/fixed_precision.cpp \
 		   $(SRCDIR)/Constants/generalized_born.cpp \
 		   $(SRCDIR)/FileManagement/directory_util.cpp \
 		   $(SRCDIR)/FileManagement/file_listing.cpp \
@@ -52,6 +51,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Namelists/nml_restraint.cpp \
 	           $(SRCDIR)/Namelists/nml_solvent.cpp \
 	           $(SRCDIR)/Namelists/user_settings.cpp \
+	           $(SRCDIR)/Numerics/split_fixed_precision.cpp \
 	           $(SRCDIR)/Parsing/ascii_numbers.cpp \
 	           $(SRCDIR)/Parsing/citation.cpp \
 		   $(SRCDIR)/Parsing/parse.cpp \
@@ -169,6 +169,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Namelists/nml_restraint.h \
 		     $(SRCDIR)/Namelists/nml_solvent.h \
 		     $(SRCDIR)/Namelists/user_settings.h \
+		     $(SRCDIR)/Numerics/split_fixed_precision.h \
 		     $(SRCDIR)/Parsing/ascii_numbers.h \
 		     $(SRCDIR)/Parsing/citation.h \
 	             $(SRCDIR)/Parsing/parse.h \
@@ -284,7 +285,6 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Chemistry/indigo.o \
 		  $(SRCDIR)/Chemistry/znumber.o \
 		  $(SRCDIR)/Constants/behavior.o \
-		  $(SRCDIR)/Constants/fixed_precision.o \
 		  $(SRCDIR)/Constants/generalized_born.o \
 		  $(SRCDIR)/FileManagement/directory_util.o \
 		  $(SRCDIR)/FileManagement/file_listing.o \
@@ -319,6 +319,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/Namelists/nml_restraint.o \
 	          $(SRCDIR)/Namelists/nml_solvent.o \
 	          $(SRCDIR)/Namelists/user_settings.o \
+	          $(SRCDIR)/Numerics/split_fixed_precision.o \
 		  $(SRCDIR)/Parsing/ascii_numbers.o \
 	          $(SRCDIR)/Parsing/citation.o \
 	          $(SRCDIR)/Parsing/parse.o \

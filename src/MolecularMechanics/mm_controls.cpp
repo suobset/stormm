@@ -1,6 +1,6 @@
 #include "copyright.h"
-#include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "mm_controls.h"
 

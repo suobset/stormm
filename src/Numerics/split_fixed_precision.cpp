@@ -1,7 +1,8 @@
 #include "copyright.h"
+#include "Constants/fixed_precision.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
-#include "fixed_precision.h"
+#include "split_fixed_precision.h"
 
 namespace stormm {
 namespace numerics {
@@ -33,6 +34,17 @@ std::string getForceAccumulationMethodName(const ForceAccumulationMethod method)
     return std::string("WHOLE");
   case ForceAccumulationMethod::AUTOMATIC:
     return std::string("AUTOMATIC");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+ForceAccumulationMethod chooseForceAccumulationMethod(const int frc_bits) {
+  if (frc_bits <= 24) {
+    return ForceAccumulationMethod::SPLIT;
+  }
+  else {
+    return ForceAccumulationMethod::WHOLE;
   }
   __builtin_unreachable();
 }
@@ -202,16 +214,5 @@ void splitRealAccumulation(const double dval, llint *primary, int *overflow) {
   }
 }
 
-//-------------------------------------------------------------------------------------------------
-ForceAccumulationMethod chooseForceAccumulationMethod(const int frc_bits) {
-  if (frc_bits <= 24) {
-    return ForceAccumulationMethod::SPLIT;
-  }
-  else {
-    return ForceAccumulationMethod::WHOLE;
-  }
-  __builtin_unreachable();
-}
-  
 } // namespace numerics
 } // namespace stormm

@@ -7,7 +7,7 @@
 #include "../../src/Accelerator/ptx_macros.h"
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
-#include "../../src/Constants/fixed_precision.h"
+#include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/DataTypes/common_types.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/UnitTesting/stopwatch.h"

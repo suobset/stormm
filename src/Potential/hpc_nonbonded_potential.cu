@@ -1,11 +1,11 @@
 // -*-c++-*-
 #include "copyright.h"
 #include "Accelerator/ptx_macros.h"
-#include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "hpc_nonbonded_potential.h"
@@ -13,17 +13,17 @@
 namespace stormm {
 namespace energy {
 
+using constants::PrecisionModel;
+using constants::twice_warp_bits_mask_int;
+using constants::twice_warp_size_int;
 using constants::warp_size_int;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
-using constants::twice_warp_bits_mask_int;
-using constants::twice_warp_size_int;
 using data_types::int95_t;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
-using numerics::PrecisionModel;
 using synthesis::NbwuKind;
 using synthesis::small_block_max_imports;
 using synthesis::small_block_max_atoms;

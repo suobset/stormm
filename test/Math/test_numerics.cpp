@@ -1,5 +1,4 @@
 #include "../../src/Constants/behavior.h"
-#include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/common_types.h"
@@ -7,6 +6,7 @@
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/matrix_ops.h"
 #include "../../src/Math/vector_ops.h"
+#include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"

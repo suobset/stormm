@@ -1,10 +1,10 @@
 // -*-c++-*-
 #include "copyright.h"
 #include "Accelerator/ptx_macros.h"
-#include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Numerics/split_fixed_precision.h"
 #include "hpc_reduction.h"
 
 namespace stormm {

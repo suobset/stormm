@@ -6,11 +6,11 @@
 #endif
 #include "copyright.h"
 #include "Constants/hpc_bounds.h"
-#include "Constants/fixed_precision.h"
 #include "FileManagement/file_listing.h"
 #include "Math/rounding.h"
 #include "Math/matrix_ops.h"
 #include "Math/vector_ops.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Trajectory/write_frame.h"
 #include "phasespace_synthesis.h"
 #ifdef STORMM_USE_HPC

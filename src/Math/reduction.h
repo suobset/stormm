@@ -3,10 +3,10 @@
 #define STORMM_REDUCTION_H
 
 #include "copyright.h"
-#include "Constants/fixed_precision.h"
 #include "DataTypes/common_types.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "reduction_abstracts.h"
 #include "reduction_enumerators.h"
