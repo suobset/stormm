@@ -500,14 +500,11 @@ public:
 
   /// \brief Extract the phase space (plus forces) of a specific system within the synthesis.
   ///
-  /// \param ps     Pointer to an allocated PhaseSpace object (i.e. the original) ready to accept
-  ///               data from the synthesis (which may have evolved since it was first loaded)
-  /// \param tier  The level (host or device) at which to get the data
-  /// \param index  Index of the system of interest within the synthesis
-  void extractSystem(PhaseSpace *ps, int index,
-                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
-
-  /// \brief Extract a specific type of coordinate from the synthesis into a pre-allocated space.
+  /// Overloaded:
+  ///   - Extract the whole coordinate object: positions (past, present, and future), velocities,
+  ///     and forces
+  ///   - Extract only positions (past, present, and future all come together), or velocities, or
+  ///     forces
   ///
   /// \param ps        Pointer to an allocated PhaseSpace object (i.e. the original) ready to
   ///                  accept data from the synthesis (which may have evolved since it was first
@@ -515,10 +512,14 @@ public:
   /// \param trajkind  Type of coordinates to copy
   /// \param tier      The level (host or device) at which to get the data
   /// \param index     Index of the system of interest within the synthesis
+  /// \{
   void extractSystem(PhaseSpace *ps, int index,
-                     TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
                      HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
+  void extractSystem(PhaseSpace *ps, int index, TrajectoryKind trajkind,
+                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  /// \}
+  
   /// \brief Export a system's coordinates, velocities, and forces to a PhaseSpace object.
   ///
   /// \param index     Index of the system of interest within the synthesis

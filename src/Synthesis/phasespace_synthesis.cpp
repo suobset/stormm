@@ -1443,6 +1443,9 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
           psw.xprv[i] = static_cast<double>(tpsr.xprv[atom_offset + i]) * crd_deflation;
           psw.yprv[i] = static_cast<double>(tpsr.yprv[atom_offset + i]) * crd_deflation;
           psw.zprv[i] = static_cast<double>(tpsr.zprv[atom_offset + i]) * crd_deflation;
+          psw.xnxt[i] = static_cast<double>(tpsr.xnxt[atom_offset + i]) * crd_deflation;
+          psw.ynxt[i] = static_cast<double>(tpsr.ynxt[atom_offset + i]) * crd_deflation;
+          psw.znxt[i] = static_cast<double>(tpsr.znxt[atom_offset + i]) * crd_deflation;
         }
         if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
           const double crd_ovrf_deflation = crd_deflation * max_llint_accumulation;
