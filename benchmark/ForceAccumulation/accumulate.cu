@@ -27,7 +27,7 @@ using namespace stormm::card;
 using namespace stormm::testing;
 
 // Copy the inline __device__ functions
-#include "../../src/Potential/accumulation.cui"
+#include "../../src/Numerics/accumulation.cui"
 
 //-------------------------------------------------------------------------------------------------
 // Perform arithmetic with +, -, and * using int32 numbers.
@@ -89,13 +89,13 @@ __global__ void __launch_bounds__(512, 2) kAddSplit(llint* result) {
       incr = 1.3f;
     }
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
+    atomicSplit(contrib * 256.0f, threadIdx.x, primary, overflow);
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
+    atomicSplit(contrib * 256.0f, threadIdx.x, primary, overflow);
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
+    atomicSplit(contrib * 256.0f, threadIdx.x, primary, overflow);
     contrib += incr;
-    splitForceContribution(contrib * 256.0f, threadIdx.x, primary, overflow);
+    atomicSplit(contrib * 256.0f, threadIdx.x, primary, overflow);
   }
   const llint ovrf_val = overflow[threadIdx.x];
   result[pos] = (ovrf_val * max_int_accumulation_ll) + (llint)(primary[threadIdx.x]);

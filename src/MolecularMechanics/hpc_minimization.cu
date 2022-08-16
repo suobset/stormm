@@ -44,7 +44,7 @@ using synthesis::SyRestraintKit;
 using synthesis::SyValenceKit;
 using synthesis::VwuGoal;
 
-#include "../Potential/accumulation.cui"
+#include "../Numerics/accumulation.cui"
 
 // Conjugate gradient particle advancement: both single- and double-precision kernels do
 // calculations in double-precision, but the double-precision form of the kernel respects the

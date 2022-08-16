@@ -1097,6 +1097,7 @@ PsSynthesisWriter PhaseSpaceSynthesis::deviceViewToHostData(const CoordinateCycl
                              devc_zcrd_ovrf, devc_xprv, devc_yprv, devc_zprv, devc_xprv_ovrf,
                              devc_yprv_ovrf, devc_zprv_ovrf);
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1411,9 +1412,9 @@ void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
 }
 
 //-------------------------------------------------------------------------------------------------
-void PhaseSpaceSynthesis::extractCoordinates(PhaseSpace *ps, const int index,
-                                             const TrajectoryKind trajkind,
-                                             const HybridTargetLevel tier) const {
+void PhaseSpaceSynthesis::extractSystem(PhaseSpace *ps, const int index,
+                                        const TrajectoryKind trajkind,
+                                        const HybridTargetLevel tier) const {
   PhaseSpaceWriter psw = ps->data();
   if (atom_counts.readHost(index) != psw.natom) {
     rtErr("A PhaseSpace object sized for " + std::to_string(psw.natom) + " atoms is not prepared "

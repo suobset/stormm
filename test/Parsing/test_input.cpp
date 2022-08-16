@@ -143,9 +143,9 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("The file " + namelist_file + " was not found and is critical to many subsequent "
-           "tests.  Make sure that the $STORMM_SOURCE environment variable is set properly, to the "
-           "source tree where src/ and test/ subdirectories can be found.  Subsequent tests that "
-           "rely on this file will be skipped.", "test_input");
+           "tests.  Make sure that the $STORMM_SOURCE environment variable is set properly, to "
+           "the source tree where src/ and test/ subdirectories can be found.  Subsequent tests "
+           "that rely on this file will be skipped.", "test_input");
   }
   std::vector<std::string> help_words_b = separateText(nml_b.getHelp());
   check(help_words_b[1], RelationalOperator::EQUAL, "stereotypical",

@@ -140,7 +140,8 @@ void testNBPrecisionModel(const NonbondedKit<Tcalc> nbk, const ImplicitSolventKi
   check(gb_result, RelationalOperator::EQUAL, Approx(gb_ref_frc).margin(tol),
         "Generalized Born forces do not agree with the reference when computed in " +
         getStormmScalarTypeName<Tcalc>() + " with " + getStormmScalarTypeName<Tcoord>() +
-        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.",
+        do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -202,8 +203,9 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_snaps = (snaps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snaps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("Snapshot files for the Trp-cage miniprotein, DHFR globular protein, and alanine "
-           "dipeptide were not found.  These should be found in the ${STORMM_SOURCE}/test/Potential "
-           "directory.  Some tests will be skipped.", "test_generalized_born");
+           "dipeptide were not found.  These should be found in the "
+           "${STORMM_SOURCE}/test/Potential directory.  Some tests will be skipped.",
+           "test_generalized_born");
   }
 
   // Read topologies and coordinates.  Suppress charge discretization and normalization to

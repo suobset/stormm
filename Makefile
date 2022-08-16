@@ -411,7 +411,7 @@ STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/Math/rounding.cui \
 			     $(SRCDIR)/Math/vector_formulas.cui \
 			     $(SRCDIR)/MolecularMechanics/line_movement.cui \
-			     $(SRCDIR)/Potential/accumulation.cui \
+			     $(SRCDIR)/Numerics/accumulation.cui \
 			     $(SRCDIR)/Potential/nonbonded_potential_tilegroups.cui \
 			     $(SRCDIR)/Potential/valence_potential.cui \
 			     $(SRCDIR)/Structure/virtual_site_placement.cui

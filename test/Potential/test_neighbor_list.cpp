@@ -104,8 +104,8 @@ int main(const int argc, const char* argv[]) {
     rtWarn("Files for the Trp-cage miniprotein, the DHFR globular protein (with CHARMM potential "
            "details), alanine dipeptide, and scorpion toxin were not found.  These files should "
            "befound in the ${STORMM_SOURCE}/test/Topology and ${STORMM_SOURCE}/test/Trajectory "
-           "directories.  Check the $STORMM_SOURCE environment variable.  A number of tests will be "
-           "skipped.", "test_neighbor_list");
+           "directories.  Check the $STORMM_SOURCE environment variable.  A number of tests will "
+           "be skipped.", "test_neighbor_list");
   }
   AtomGraph trpi_ag, trpw_ag, dhfr_ag, alad_ag, ahec_ag;
   PhaseSpace trpi_ps, trpw_ps, dhfr_ps, alad_ps, ahec_ps;

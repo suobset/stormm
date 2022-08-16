@@ -515,9 +515,9 @@ public:
   /// \param trajkind  Type of coordinates to copy
   /// \param tier      The level (host or device) at which to get the data
   /// \param index     Index of the system of interest within the synthesis
-  void extractCoordinates(PhaseSpace *ps, int index,
-                          TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
-                          HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  void extractSystem(PhaseSpace *ps, int index,
+                     TrajectoryKind trajkind = TrajectoryKind::POSITIONS,
+                     HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Export a system's coordinates, velocities, and forces to a PhaseSpace object.
   ///

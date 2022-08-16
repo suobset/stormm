@@ -321,8 +321,8 @@ int main(const int argc, const char* argv[]) {
     rtWarn("Files for the Trp-cage miniprotein, the DHFR globular protein (with CHARMM potential "
            "details), and alanine dipeptide (with ff19SB) were not found.  These files should be "
            "found in the ${STORMM_SOURCE}/test/Topology and ${STORMM_SOURCE}/test/Trajectory "
-           "directories.  Check the $STORMM_SOURCE environment variable.  A number of tests will be "
-           "skipped.", "test_valence_evaluation");
+           "directories.  Check the $STORMM_SOURCE environment variable.  A number of tests will "
+           "be skipped.", "test_valence_evaluation");
   }
   AtomGraph trpcage_ag, dhfr_ag, alad_ag;
   PhaseSpace trpcage_ps, dhfr_ps, alad_ps;
@@ -492,9 +492,9 @@ int main(const int argc, const char* argv[]) {
   if (snps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("Snapshot files " + alad_snapshot + " were not found.  These files contain reference "
            "forces for checking the valence energy derivative calculations.  Check that the "
-           "${STORMM_SOURCE} environment variable is set properly so that these snapshot files may "
-           "be found in ${STORMM_SOURCE}/test/Potential/.  Subsequent tests will be skipped until "
-           "these reference files are available.", "test_valence_evaluation");
+           "${STORMM_SOURCE} environment variable is set properly so that these snapshot files "
+           "may be found in ${STORMM_SOURCE}/test/Potential/.  Subsequent tests will be skipped "
+           "until these reference files are available.", "test_valence_evaluation");
   }
   section(2);
   snapshot(trpcage_snapshot, polyNumericVector(trpcage_bond_frc), "trpcage_bond",

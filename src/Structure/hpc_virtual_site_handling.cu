@@ -19,7 +19,7 @@ using topology::VirtualSiteKind;
   
 #include "Math/rounding.cui"
 #include "Math/vector_formulas.cui"
-#include "Potential/accumulation.cui"
+#include "Numerics/accumulation.cui"
   
 #define VSITE_STANDALONE
 #define TCALC  float

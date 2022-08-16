@@ -142,8 +142,8 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                             getDrivePathType(crd_name) == DrivePathType::FILE);
   if (files_exist == false) {
     rtWarn("The topology and input coordinates for a critical system appear to be missing.  Check "
-           "the ${STORMM_SOURCE} variable (currently " + oe.getStormmSourcePath() + ") to make sure "
-           "that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
+           "the ${STORMM_SOURCE} variable (currently " + oe.getStormmSourcePath() + ") to make "
+           "sure that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   AtomGraph ag  = (files_exist) ? AtomGraph(top_name, ExceptionResponse::SILENT) :

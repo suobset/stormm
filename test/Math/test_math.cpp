@@ -237,14 +237,15 @@ int main(const int argc, const char* argv[]) {
   TestPriority snp_found = (getDrivePathType(randoms_snp) == DrivePathType::FILE) ?
                            TestPriority::CRITICAL : TestPriority::ABORT;
   if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
-    rtWarn("Snapshot file " + randoms_snp + " was not found.  Check the $STORMM_SOURCE environment "
-           "variable and make sure it indicates the root source directory where src/ and test/ "
-           "can be found.  Some subsequent tests will be skipped.", "test_math");
+    rtWarn("Snapshot file " + randoms_snp + " was not found.  Check the $STORMM_SOURCE "
+           "environment variable and make sure it indicates the root source directory where src/ "
+           "and test/ can be found.  Some subsequent tests will be skipped.", "test_math");
   }
-  snapshot(oe.getStormmHomePath() + osSeparator() + "test" + osSeparator() + "Math" + osSeparator() +
-           "randoms.m", polyNumericVector(result_c), "rngvec", 1.0e-4, "Series of random numbers "
-           "created by the ran2 method does not conform to expectations.", oe.takeSnapshot(),
-           1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE, snp_found);
+  snapshot(oe.getStormmHomePath() + osSeparator() + "test" + osSeparator() + "Math" +
+           osSeparator() + "randoms.m", polyNumericVector(result_c), "rngvec", 1.0e-4,
+           "Series of random numbers created by the ran2 method does not conform to expectations.",
+           oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, PrintSituation::OVERWRITE,
+           snp_found);
   
   // Check scrambled linear random number generators
   Xoroshiro128pGenerator xrs128p(798031);
@@ -373,9 +374,9 @@ int main(const int argc, const char* argv[]) {
   snp_found = (getDrivePathType(matrices_snp) == DrivePathType::FILE) ? TestPriority::CRITICAL :
                                                                         TestPriority::ABORT;
   if (snp_found == TestPriority::ABORT && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
-    rtWarn("The snapshot file " + matrices_snp + "was not found.  Make sure that the $STORMM_SOURCE "
-           "environment variable is set to the root soruce directory, where src/ and test/ "
-           "subdirectories can be found.  A number of subsequent tests will be skipped.",
+    rtWarn("The snapshot file " + matrices_snp + "was not found.  Make sure that the "
+           "$STORMM_SOURCE environment variable is set to the root soruce directory, where src/ "
+           "and test/ subdirectories can be found.  A number of subsequent tests will be skipped.",
            "test_math");
   }
 

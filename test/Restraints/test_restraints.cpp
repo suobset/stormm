@@ -183,8 +183,8 @@ void testPrecModel(const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rak,
                               (rak.nangl > 0) ? 3 : (rak.ndihe > 0) ? 4 : -1;
   check(result_e, RelationalOperator::EQUAL, Approx(e_target).margin(e_tol), "Energy calculated "
         "due to restraints of order " + std::to_string(restraint_order) + " fails to meet the "
-        "target value when calculated in " + getStormmScalarTypeName<Tcalc>() + " with coordinates "
-        "in " + getStormmScalarTypeName<Tcoord>() + " and forces in " +
+        "target value when calculated in " + getStormmScalarTypeName<Tcalc>() +
+        " with coordinates in " + getStormmScalarTypeName<Tcoord>() + " and forces in " +
         getStormmScalarTypeName<Tforce>() + ".", do_tests);
   check(result_forces, RelationalOperator::EQUAL, Approx(frc_target).margin(f_tol),
         "Forces calculated due to restraints of order " + std::to_string(restraint_order) +

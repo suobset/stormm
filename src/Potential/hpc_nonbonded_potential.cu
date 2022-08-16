@@ -29,7 +29,7 @@ using synthesis::small_block_max_imports;
 using synthesis::small_block_max_atoms;
 using synthesis::tile_groups_wu_abstract_length;
 
-#include "accumulation.cui"
+#include "Numerics/accumulation.cui"
 #include "Math/rounding.cui"
 
 // Single-precision floating point definitions

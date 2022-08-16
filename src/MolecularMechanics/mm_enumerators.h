@@ -24,8 +24,8 @@ enum class ValenceWorkUnitSpecs {
                           ///<   index given by ATOM_INDEX_START and obtain the next ATOM_COUNT
                           ///<   entries in order to know the indices of actual atoms with which to
                           ///<   build the system.  ATOM_DIRECT_READ_START and ATOM_INDEX_START are
-                          ///<   mutually exclusive, and although different STORMM applications will
-                          ///<   look to one or the other by construction, only one of these
+                          ///<   mutually exclusive, and although different STORMM applications
+                          ///<   will look to one or the other by construction, only one of these
                           ///<   enumerations should be set.
   BOND_INSR_START,        ///< Starting position at which to begin reading bond instructions
   ANGL_INSR_START,        ///< Starting position for three-atom harmonic angle instructions

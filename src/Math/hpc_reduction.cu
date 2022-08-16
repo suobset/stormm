@@ -18,7 +18,7 @@ using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
 using data_types::int95_t;
 
-#include "Potential/accumulation.cui"
+#include "Numerics/accumulation.cui"
 
 //-------------------------------------------------------------------------------------------------
 // Perform an accumulation over the conjugate gradient work units' relevant atoms to obtain the

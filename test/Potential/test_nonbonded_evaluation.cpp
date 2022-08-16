@@ -184,11 +184,13 @@ void testNBPrecisionModel(const NonbondedKit<Tcalc>nbk, const StaticExclusionMas
   check(elec_result, RelationalOperator::EQUAL, Approx(elec_ref_frc).margin(tol),
         "Electrostatic forces do not agree with the reference when computed in " +
         getStormmScalarTypeName<Tcalc>() + " with " + getStormmScalarTypeName<Tcoord>() +
-        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.",
+        do_tests);
   check(vdw_result, RelationalOperator::EQUAL, Approx(vdw_ref_frc).margin(tol),
         "van-der Waals forces do not agree with the reference when computed in " +
         getStormmScalarTypeName<Tcalc>() + " with " + getStormmScalarTypeName<Tcoord>() +
-        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.", do_tests);
+        " coordinates and " + getStormmScalarTypeName<Tforce>() + " force accumulation.",
+        do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------

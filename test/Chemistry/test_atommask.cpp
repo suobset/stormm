@@ -60,8 +60,8 @@ int main(const int argc, const char* argv[]) {
   AtomGraph trpcage;
   CoordinateFrame trpcage_crd;
   const char osc = osSeparator();
-  const std::string trpcage_top_name = oe.getStormmSourcePath() + osc + "test" +  osc + "Topology" +
-                                       osc + "trpcage_in_water.top";
+  const std::string trpcage_top_name = oe.getStormmSourcePath() + osc + "test" +  osc +
+                                       "Topology" + osc + "trpcage_in_water.top";
   const std::string trpcage_crd_name = oe.getStormmSourcePath() + osc + "test" +  osc +
                                        "Trajectory" + osc + "trpcage_in_water.inpcrd";
   const bool trpcage_exists = (getDrivePathType(trpcage_top_name) == DrivePathType::FILE &&
@@ -74,9 +74,9 @@ int main(const int argc, const char* argv[]) {
   else {
     rtWarn("Atom masks refer to a specific topology, but either or both of the files " +
            trpcage_top_name + " and " + trpcage_crd_name + " were not found.  Check the "
-           "$STORMM_SOURCE environment variable to ensure that it is set to the STORMM root directory "
-           "where src/ and test/ subdirectories can be found.  Some subsequent tests will be "
-           "skipped.", "test_atommask");
+           "$STORMM_SOURCE environment variable to ensure that it is set to the STORMM root "
+           "directory where src/ and test/ subdirectories can be found.  Some subsequent tests "
+           "will be skipped.", "test_atommask");
   }
   const ChemicalFeatures trpcage_chem = (trpcage_exists) ?
                                         ChemicalFeatures(&trpcage, trpcage_crd) :
@@ -90,8 +90,8 @@ int main(const int argc, const char* argv[]) {
     mask_a_answer[i] = 1;
   }
   const std::vector<uint> mavec = mask_a.getRawMask();
-  const std::string trpcage_mask_snp = oe.getStormmSourcePath() + osc + "test" + osc + "Chemistry" +
-                                       osc + "trpcage_mask_image.m";
+  const std::string trpcage_mask_snp = oe.getStormmSourcePath() + osc + "test" + osc +
+                                       "Chemistry" + osc + "trpcage_mask_image.m";
   const bool trp_snap_exist = (getDrivePathType(trpcage_mask_snp) == DrivePathType::FILE);
   if (trp_snap_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("The snapshot file " + trpcage_mask_snp + ", needed for snapshot tests on some mask "

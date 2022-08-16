@@ -16,8 +16,11 @@
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/valence_potential.h"
+#include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Restraints/restraint_apparatus.h"
+#include "../../src/Structure/hpc_virtual_site_handling.h"
+#include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
@@ -41,7 +44,9 @@ using namespace stormm::math;
 using namespace stormm::mm;
 using namespace stormm::numerics;
 using namespace stormm::parse;
+using namespace stormm::random;
 using namespace stormm::restraints;
+using namespace stormm::structure;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -275,11 +280,17 @@ int main(const int argc, const char* argv[]) {
   StopWatch timer;
   
   // Section 1
-  section("Coordinate compilation and staging");
-  
-  // Section 2
   section("Topology compilation and staging");
   
+  // Section 2
+  section("Coordinate compilation and staging");
+
+  // Section 3
+  section("Potential energy and force calculations");
+
+  // Section 4
+  section("Virtual site placement");
+
   // Get the GPU specs.  Set of parameters for the work units and launch grids.  Preparing a cache
   // resource for the largest possible number of valence work unit atoms obviates the need to
   // worry about resizing it case by case, and does not contribute to cache pollution (individual
@@ -334,7 +345,7 @@ int main(const int argc, const char* argv[]) {
   check(poly_ag.getSystemCount(), RelationalOperator::EQUAL, poly_ps.getSystemCount(),
         "PhaseSpaceSynthesis and AtomGraphSynthesis objects formed from the same SystemCache have "
         "different numbers of systems inside of them.", do_tests);
-
+  
   // Upload the compiled systems and check the results
   poly_ag.upload();
   poly_se.upload();
@@ -372,8 +383,37 @@ int main(const int argc, const char* argv[]) {
   check(gpu_charges, RelationalOperator::EQUAL, rbt_charges, "Charges pulled from the GPU in an "
         "AtomGraphSynthesis object do not meet expectations.", do_tests);
 
+  // Check that different coordinate precisions translate to similar structures
+  section(2);
+  std::vector<int> sd_mismatch(nsys, 0);
+  std::vector<int> sld_mismatch(nsys, 0);
+  for (int i = 0; i < nsys; i++) {
+    const CoordinateFrame s_frm  = poly_ps.exportCoordinates(i);
+    const CoordinateFrame d_frm  = poly_ps_dbl.exportCoordinates(i);
+    const CoordinateFrame ld_frm = poly_ps_sdbl.exportCoordinates(i);
+    const CoordinateFrameReader s_frm_r  = s_frm.data();
+    const CoordinateFrameReader d_frm_r  = d_frm.data();
+    const CoordinateFrameReader ld_frm_r = ld_frm.data();
+    const int natom = s_frm_r.natom;
+    sd_mismatch[i] += (maxAbsoluteDifference(s_frm_r.xcrd, d_frm_r.xcrd, natom) > 1.0e-6);
+    sd_mismatch[i] += (maxAbsoluteDifference(s_frm_r.ycrd, d_frm_r.ycrd, natom) > 1.0e-6);
+    sd_mismatch[i] += (maxAbsoluteDifference(s_frm_r.zcrd, d_frm_r.zcrd, natom) > 1.0e-6);
+    sld_mismatch[i] += (maxAbsoluteDifference(s_frm_r.xcrd, ld_frm_r.xcrd, natom) > 1.0e-6);
+    sld_mismatch[i] += (maxAbsoluteDifference(s_frm_r.ycrd, ld_frm_r.ycrd, natom) > 1.0e-6);
+    sld_mismatch[i] += (maxAbsoluteDifference(s_frm_r.zcrd, ld_frm_r.zcrd, natom) > 1.0e-6);
+  }
+  check(sd_mismatch, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Coordinates of "
+        "various sytems do not align when shifting from " +
+        std::to_string(poly_ps.getGlobalPositionBits()) + " to " +
+        std::to_string(poly_ps_dbl.getGlobalPositionBits()) + ".");
+  check(sd_mismatch, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Coordinates of "
+        "various sytems do not align when shifting from " +
+        std::to_string(poly_ps.getGlobalPositionBits()) + " to " +
+        std::to_string(poly_ps_sdbl.getGlobalPositionBits()) + ".");
+
   // Allocate resources for various kernels.  The cache resources are allocated to accommodate
   // any foreseeable launch configuration.
+  section(3);
   CacheResource valence_tb_space(8 * nblocks, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_space(5 * nblocks, small_block_max_atoms);
   MolecularMechanicsControls mmctrl;
@@ -436,7 +476,8 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Files for several systems in implicit solvent were not found.  Check the "
-           "${STORMM_SOURCE} environment variable for validity.  Subsequent tests will be skipped.");
+           "${STORMM_SOURCE} environment variable for validity.  Subsequent tests will be "
+           "skipped.");
   }
 
   // Read some larger topologies, with CHARMM CMAP and other force field terms
@@ -518,8 +559,10 @@ int main(const int argc, const char* argv[]) {
   const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra };
   const std::vector<int> ligand_minitile = { 0, 1, 2, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 1, 0, 2 };
   const int lm_size = ligand_minitile.size();
+  const int n_ligand_tile_reps = 7;
+  const int nligands = n_ligand_tile_reps * lm_size;
   std::vector<int> ligand_tiling(112, 0);
-  for (int i = 0; i < 112; i += lm_size) {
+  for (int i = 0; i < nligands; i += lm_size) {
     for (int j = 0; j < lm_size; j++) {
       ligand_tiling[i + j] = ligand_minitile[j];
     }
@@ -575,6 +618,117 @@ int main(const int argc, const char* argv[]) {
                            ligand_poly_ag, ligand_poly_se, PrecisionModel::SINGLE, gpu,
                            ligand_launcher, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5,
                            6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6, do_tests);
+
+  // Scramble and replace virtual sites on the GPU
+  Xoroshiro128pGenerator xrs(618608377);
+  for (int i = 0; i < nligands; i++) {
+    const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
+    PsSynthesisWriter ligand_psw = ligand_poly_ps.data();
+    PsSynthesisWriter ligand_dbl_psw = ligand_poly_ps_dbl.data();
+    PsSynthesisWriter ligand_sdbl_psw = ligand_poly_ps_sdbl.data();
+    const ChemicalDetailsKit icdk = iag_ptr->getChemicalDetailsKit();
+    for (int j = 0; j < icdk.natom; j++) {
+      if (icdk.z_numbers[j] == 0) {
+        const int atom_synth_idx = ligand_psw.atom_starts[i] + j;
+        ligand_psw.xcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_psw.ycrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_psw.zcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_dbl_psw.xcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_dbl_psw.ycrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_dbl_psw.zcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_sdbl_psw.xcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_sdbl_psw.ycrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+        ligand_sdbl_psw.zcrd[atom_synth_idx] += xrs.gaussianRandomNumber();
+      }
+    }
+  }
+  ligand_poly_ps.upload();
+  ligand_poly_ps_dbl.upload();
+  ligand_poly_ps_sdbl.upload();
+
+  // Copy the host-based scrambled virtual site positions and replace them using vetted
+  // single-system methods.  Replace the virtual sites on the GPU.  Check the results against
+  // CPU-based computations.
+  std::vector<CoordinateFrame> cpulig_cf_vec, cpulig_dbl_cf_vec, cpulig_sdbl_cf_vec;
+  cpulig_cf_vec.reserve(nligands);
+  cpulig_dbl_cf_vec.reserve(nligands);
+  cpulig_sdbl_cf_vec.reserve(nligands);
+  for (int i = 0; i < nligands; i++) {
+    const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
+    cpulig_cf_vec.emplace_back(ligand_poly_ps.exportCoordinates(i));
+    cpulig_dbl_cf_vec.emplace_back(ligand_poly_ps_dbl.exportCoordinates(i));
+    cpulig_sdbl_cf_vec.emplace_back(ligand_poly_ps_sdbl.exportCoordinates(i));
+    placeVirtualSites(&cpulig_cf_vec[i], iag_ptr);
+    placeVirtualSites(&cpulig_dbl_cf_vec[i], iag_ptr);
+    placeVirtualSites(&cpulig_sdbl_cf_vec[i], iag_ptr);
+  }
+  launchVirtualSitePlacement(PrecisionModel::SINGLE, &ligand_poly_ps, &valence_tb_space,
+                             ligand_poly_ag, ligand_launcher);
+  launchVirtualSitePlacement(PrecisionModel::DOUBLE, &ligand_poly_ps_dbl, &valence_tb_space,
+                             ligand_poly_ag, ligand_launcher);
+  launchVirtualSitePlacement(PrecisionModel::DOUBLE, &ligand_poly_ps_sdbl, &valence_tb_space,
+                             ligand_poly_ag, ligand_launcher);
+  std::vector<CoordinateFrame> gpulig_cf_vec, gpulig_dbl_cf_vec, gpulig_sdbl_cf_vec;
+  gpulig_cf_vec.reserve(nligands);
+  gpulig_dbl_cf_vec.reserve(nligands);
+  gpulig_sdbl_cf_vec.reserve(nligands);
+  for (int i = 0; i < nligands; i++) {
+
+    // It's not as efficient to extract coordinates from the GPU level in this way, but the
+    // systems are not large and this leaves the CPU coordinates untouched.
+    const TrajectoryKind tcoord = TrajectoryKind::POSITIONS;
+    const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+    gpulig_cf_vec.emplace_back(ligand_poly_ps.exportCoordinates(i, tcoord, devc_tier));
+    gpulig_dbl_cf_vec.emplace_back(ligand_poly_ps_dbl.exportCoordinates(i, tcoord, devc_tier));
+    gpulig_sdbl_cf_vec.emplace_back(ligand_poly_ps_sdbl.exportCoordinates(i, tcoord, devc_tier));
+  }
+
+  // CHECK
+  for (int i = 0; i < lm_size; i++) {
+    const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
+    CoordinateFrameWriter cpu_cfr      = cpulig_cf_vec[i].data();
+    CoordinateFrameWriter cpu_dbl_cfr  = cpulig_dbl_cf_vec[i].data();
+    CoordinateFrameWriter cpu_sdbl_cfr = cpulig_sdbl_cf_vec[i].data();
+    CoordinateFrameWriter gpu_cfr      = gpulig_cf_vec[i].data();
+    CoordinateFrameWriter gpu_dbl_cfr  = gpulig_dbl_cf_vec[i].data();
+    CoordinateFrameWriter gpu_sdbl_cfr = gpulig_sdbl_cf_vec[i].data();
+    const ChemicalDetailsKit icdk = iag_ptr->getChemicalDetailsKit();
+
+    // CHECK
+#if 0
+    CoordinateFrame cpu_orig      = ligand_poly_ps.exportCoordinates(i);
+    CoordinateFrame cpu_dbl_orig  = ligand_poly_ps_dbl.exportCoordinates(i);
+    CoordinateFrame cpu_sdbl_orig = ligand_poly_ps_sdbl.exportCoordinates(i);
+    CoordinateFrameWriter cpuo_cfr      = cpu_orig.data();
+    CoordinateFrameWriter cpuo_dbl_cfr  = cpu_dbl_orig.data();
+    CoordinateFrameWriter cpuo_sdbl_cfr = cpu_sdbl_orig.data();    
+    printf("System %2d (%s):\n", i, getBaseName(iag_ptr->getFileName()).c_str());
+    for (int j = 0; j < icdk.natom; j++) {
+      if (icdk.z_numbers[j] == 0) {
+        printf("  %9.4lf %9.4lf %9.4lf  ", cpu_cfr.xcrd[j], cpu_cfr.ycrd[j], cpu_cfr.zcrd[j]);
+        printf("  %9.4lf %9.4lf %9.4lf  ||  ", gpu_cfr.xcrd[j], gpu_cfr.ycrd[j], gpu_cfr.zcrd[j]);
+        printf("  %9.4lf %9.4lf %9.4lf  ", cpu_dbl_cfr.xcrd[j], cpu_dbl_cfr.ycrd[j],
+               cpu_dbl_cfr.zcrd[j]);
+        printf("  %9.4lf %9.4lf %9.4lf  ||  ", gpu_dbl_cfr.xcrd[j], gpu_dbl_cfr.ycrd[j],
+               gpu_dbl_cfr.zcrd[j]);
+        printf("  %9.4lf %9.4lf %9.4lf  ", cpu_sdbl_cfr.xcrd[j], cpu_sdbl_cfr.ycrd[j],
+               cpu_sdbl_cfr.zcrd[j]);
+        printf("  %9.4lf %9.4lf %9.4lf\n", gpu_sdbl_cfr.xcrd[j], gpu_sdbl_cfr.ycrd[j],
+               gpu_sdbl_cfr.zcrd[j]);
+        printf("  %9.4lf %9.4lf %9.4lf  ", cpuo_cfr.xcrd[j], cpuo_cfr.ycrd[j], cpuo_cfr.zcrd[j]);
+        printf("                                 ||  ");
+        printf("  %9.4lf %9.4lf %9.4lf  ", cpuo_dbl_cfr.xcrd[j], cpuo_dbl_cfr.ycrd[j],
+               cpuo_dbl_cfr.zcrd[j]);
+        printf("                                 ||  ");
+        printf("  %9.4lf %9.4lf %9.4lf  ", cpuo_sdbl_cfr.xcrd[j], cpuo_sdbl_cfr.ycrd[j],
+               cpuo_sdbl_cfr.zcrd[j]);
+        printf("\n");
+      }
+    }
+    // END CHECK
+  }
+#endif
+  // END CHECK
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

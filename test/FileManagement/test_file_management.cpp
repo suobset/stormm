@@ -60,8 +60,8 @@ int main(const int argc, const char* argv[]) {
                                                                       TestPriority::ABORT;
   if (tmpdir_priority == TestPriority::ABORT) {
     rtWarn("An unwriteable temporary directory implies that some of the subsequent tests must be "
-           "skipped.  Check the $STORMM_TMPDIR environment variable and set it to a directory where "
-           "you have write permissions.", "test_file_management");
+           "skipped.  Check the $STORMM_TMPDIR environment variable and set it to a directory "
+           "where you have write permissions.", "test_file_management");
   }
   std::string new_folder = oe.getTemporaryDirectoryPath() + osc + "trial";
   while (getDrivePathType(new_folder) == DrivePathType::DIRECTORY) {
