@@ -543,8 +543,14 @@ void ScoreCard::computePotentialEnergy(const HybridTargetLevel tier, const GpuDe
       }
     }
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
+    launchScoreCardEnergySum(system_count, sampled_step_count,
+                             instantaneous_accumulators.data(tier),
+                             time_series_accumulators.data(tier), running_accumulators.data(tier),
+                             squared_accumulators.data(tier), inverse_nrg_scale_lf, gpu);
     break;
+#endif
   }
 }
 
@@ -569,8 +575,14 @@ void ScoreCard::computeTotalEnergy(const HybridTargetLevel tier, const GpuDetail
       }
     }
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
+    launchScoreCardEnergySum(system_count, sampled_step_count,
+                             instantaneous_accumulators.data(tier),
+                             time_series_accumulators.data(tier), running_accumulators.data(tier),
+                             squared_accumulators.data(tier), inverse_nrg_scale_lf, gpu);
     break;
+#endif
   }
 }
 
