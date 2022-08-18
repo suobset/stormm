@@ -35,13 +35,18 @@ cudaFuncAttributes queryVirtualSiteKernelRequirements(PrecisionModel prec,
 /// \brief Place virtual sites based on new atom positions within the current coordinate set.
 ///
 /// Overloaded:
-///   - Accept pre-obtained abstracts (the PhaseSpaceSynthesis abstract must point to the correct,
-///     current coordinate set
-///   - Accept the original coordinate and topology objects (abstracts will be created internally)
+///   - Accept double-precision abstracts (the PhaseSpaceSynthesis abstract must point to the
+///     correct, current coordinate set in either case), then launch the kernel at the implied
+///     precision.
+///   - Accept single-precision abstracts and launch the kernel at the implied precision
 ///
-/// \param prec     The precision model to use
-/// \param poly_ps  Coordinates for all atoms in all systems
-/// \param poly_ag  Topologies for all systems
+/// \param poly_psw  Coordinates and forces for all systems
+/// \param gmem_r    Thread block workspaces allocated on the GPU
+/// \param poly_vk   Valence interaction kit, containing atom imports for the valence work units
+///                  and the abstracts with the necessary atom counts
+/// \param poly_auk  Atom movement abtstract, containing virtual site instructions and the atom
+///                  responsibility masks for each work unit
+/// \param bt        Launch parameters (block and thread counts) for the appropriate kernel
 /// \{
 void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
                                 const SyValenceKit<double> &poly_vk,
@@ -50,11 +55,20 @@ void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<do
 void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
                                 const SyValenceKit<float> &poly_vk,
                                 const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt);
-
-void launchVirtualSitePlacement(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
-                                CacheResource *tb_space, const AtomGraphSynthesis &poly_ag,
-                                const KernelManager &launcher);
 /// \}
+
+/// \brief Launch a standalone kernel to place virtual sites or to transmit forces from virtual
+///        sites to their frame atoms.
+///
+/// \param prec      The precision model to use
+/// \param purpose   Intended activity, placing or transmitting forces for virtual sites
+/// \param poly_ps   Coordinates for all atoms in all systems
+/// \param tb_space  Thread block workspaces allocated on the GPU
+/// \param poly_ag   Topologies for all systems
+/// \param launcher  Repository with launch parameters for all kernels
+void launchVirtualSiteHandling(PrecisionModel prec, VirtualSiteActivity purpose,
+                               PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
+                               const AtomGraphSynthesis &poly_ag, const KernelManager &launcher);
 
 } // namespace structure
 } // namespace stormm

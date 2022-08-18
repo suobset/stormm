@@ -1476,6 +1476,10 @@ void ValenceWorkUnit::storeVirtualSiteInstructions(const std::vector<int> &param
     case VirtualSiteKind::FIXED_2:
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::NONE:
+
+      // The y member must be initialized here, to ensure that information written in previous
+      // passes cannot linger and pollute subsequent expressions given to the y member.
+      vste_instructions[pos].y = 0;
       break;
     case VirtualSiteKind::FIXED_3:
     case VirtualSiteKind::FLEX_3:

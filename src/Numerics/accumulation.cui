@@ -209,6 +209,18 @@ __device__ __forceinline__ int2 splitFPSum(const int2 a, const float breal) {
   return result;
 }
 
+__device__ __forceinline__ int95_t splitFPSum(const int95_t a, const llint b_x, const int b_y) {
+  int95_t result = { a.x + b_x, a.y + b_y };
+  result.y += (1 - (2 * (b_x < 0LL))) * ((a.x ^ result.x) < 0 && (a.x ^ b_x) >= 0LL) * 2;
+  return result;
+}
+
+__device__ __forceinline__ int2 splitFPSum(const int2 a, const int b_x, const int b_y) {
+  int2 result = { a.x + b_x, a.y + b_y };
+  result.y += (1 - (2 * (b_x < 0))) * ((a.x ^ result.x) < 0 && (a.x ^ b_x) >= 0) * 2;
+  return result;
+}
+
 __device__ __forceinline__ int95_t int95Sum(const llint a_x, const int a_y,
                                            const llint b_x, const int b_y) {
   int95_t result = { a_x + b_x, a_y + b_y };

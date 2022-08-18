@@ -48,9 +48,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
         const size_t write_idx = EXCL_GMEM_OFFSET + pos;
         __stwb(&gmem_r.xcrd[write_idx], __ldcs(&poly_psw.xcrd[read_idx]));
-#ifndef TCALC_IS_SINGLE
+#  ifndef TCALC_IS_SINGLE
         __stwb(&gmem_r.xcrd_ovrf[write_idx], __ldcs(&poly_psw.xcrd_ovrf[read_idx]));
-#endif
+#  endif
       }
       pos += blockDim.x;
     }
@@ -60,9 +60,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
         const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
         __stwb(&gmem_r.ycrd[write_idx], __ldcs(&poly_psw.ycrd[read_idx]));
-#ifndef TCALC_IS_SINGLE
+#  ifndef TCALC_IS_SINGLE
         __stwb(&gmem_r.ycrd_ovrf[write_idx], __ldcs(&poly_psw.ycrd_ovrf[read_idx]));
-#endif
+#  endif
       }
       pos += blockDim.x;
     }
@@ -72,9 +72,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
         const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
         __stwb(&gmem_r.zcrd[write_idx], __ldcs(&poly_psw.zcrd[read_idx]));
-#ifndef TCALC_IS_SINGLE
+#  ifndef TCALC_IS_SINGLE
         __stwb(&gmem_r.zcrd_ovrf[write_idx], __ldcs(&poly_psw.zcrd_ovrf[read_idx]));
-#endif
+#  endif
       }
       pos += blockDim.x;
     }
@@ -97,7 +97,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         const int fr_param_idx = ((tinsr.y >> 20) & 0xfff);
         const TCALC4 fr_details = poly_auk.vs_params[fr_param_idx];
         const VirtualSiteKind kind = static_cast<VirtualSiteKind>(fr_details.w);
-
+        
         // The parent (first) and second frame atoms' locations must be read for any frame
         const llint parent_x = __ldca(&gmem_r.xcrd[parent_atom]);
         const llint parent_y = __ldca(&gmem_r.ycrd[parent_atom]);
@@ -156,7 +156,10 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC dz = int95SumToDouble(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
 #endif
             const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
-            const TCALC disp_mult = fr_details.x * invr;
+
+            // The presence of a distance in the above expression requires normalization by the
+            // scaling factor, but only one multiplication operation is needed.
+            const TCALC disp_mult = fr_details.x * invr * poly_psw.gpos_scale;
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC(dx * disp_mult));
             __stwb(&gmem_r.ycrd[vs_atom], parent_y + LLCONV_FUNC(dy * disp_mult));
@@ -259,7 +262,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const int95_t midpt_z = int95Sum(frame2_z, frame2_z_ovrf, f2_f3_rz * fr_details.y);
             const TCALC dmz = int95SumToDouble(midpt_z.x, midpt_z.y, -parent_z, -parent_z_ovrf);
 #endif
-            const TCALC disp_mult = fr_details.x /
+            const TCALC disp_mult = fr_details.x * poly_psw.gpos_scale /
                                     SQRT_FUNC((dmx * dmx) + (dmy * dmy) + (dmz * dmz));
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC(disp_mult * dmx));
@@ -311,8 +314,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC invr_t = (TCALC)(1.0) / SQRT_FUNC((f23_t_pf2.x * f23_t_pf2.x) +
                                                           (f23_t_pf2.y * f23_t_pf2.y) +
                                                           (f23_t_pf2.z * f23_t_pf2.z));
-            const TCALC p_f2_factor = fr_details.x * COS_FUNC(fr_details.y) * invr_p_f2;
-            const TCALC t_factor    = fr_details.x * SIN_FUNC(fr_details.y) * invr_t;
+            const TCALC scaled_dim1 = fr_details.x * poly_psw.gpos_scale;
+            const TCALC p_f2_factor = scaled_dim1 * COS_FUNC(fr_details.y) * invr_p_f2;
+            const TCALC t_factor    = scaled_dim1 * SIN_FUNC(fr_details.y) * invr_t;
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC((p_f2_factor * p_f2.x) +
                                                                  (t_factor * f23_t_pf2.x)));
@@ -362,31 +366,31 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
 #endif
             const TCALC3 pf2_x_pf3 = crossProduct(p_f2, p_f3);
 #ifdef TCALC_IS_SINGLE
-            __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC((fr_details.x * p_f2.x) +
-                                                                 (fr_details.y * p_f3.x) +
-                                                                 (fr_details.z * pf2_x_pf3.x)));
-            __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC((fr_details.x * p_f2.y) +
-                                                                 (fr_details.y * p_f3.y) +
-                                                                 (fr_details.z * pf2_x_pf3.y)));
-            __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC((fr_details.x * p_f2.z) +
-                                                                 (fr_details.y * p_f3.z) +
-                                                                 (fr_details.z * pf2_x_pf3.z)));
+            __stwb(&gmem_r.xcrd[vs_atom],
+                   parent_x + LLCONV_FUNC((fr_details.x * p_f2.x) + (fr_details.y * p_f3.x) +
+                                          (fr_details.z * pf2_x_pf3.x * poly_psw.inv_gpos_scale)));
+            __stwb(&gmem_r.ycrd[vs_atom],
+                   parent_y + LLCONV_FUNC((fr_details.x * p_f2.y) + (fr_details.y * p_f3.y) +
+                                          (fr_details.z * pf2_x_pf3.y * poly_psw.inv_gpos_scale)));
+            __stwb(&gmem_r.zcrd[vs_atom],
+                   parent_z + LLCONV_FUNC((fr_details.x * p_f2.z) + (fr_details.y * p_f3.z) +
+                                          (fr_details.z * pf2_x_pf3.z * poly_psw.inv_gpos_scale)));
 #else
             const int95_t vs_x = int95Sum(parent_x, parent_x_ovrf,
                                           (fr_details.x * p_f2.x) + (fr_details.y * p_f3.x) +
-                                          (fr_details.z * pf2_x_pf3.x));
+                                          (fr_details.z * pf2_x_pf3.x * poly_psw.inv_gpos_scale));
             __stwb(&gmem_r.xcrd[vs_atom],      vs_x.x);
             __stwb(&gmem_r.xcrd_ovrf[vs_atom], vs_x.y);
             const int95_t vs_y = int95Sum(parent_y, parent_y_ovrf,
                                           (fr_details.x * p_f2.y) + (fr_details.y * p_f3.y) +
-                                          (fr_details.z * pf2_x_pf3.y));
+                                          (fr_details.z * pf2_x_pf3.y * poly_psw.inv_gpos_scale));
             __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
             __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
             const int95_t vs_z = int95Sum(parent_z, parent_z_ovrf,
                                           (fr_details.x * p_f2.z) + (fr_details.y * p_f3.z) +
-                                          (fr_details.z * pf2_x_pf3.z));
-            __stwb(&gmem_r.ycrd[vs_atom],      vs_y.x);
-            __stwb(&gmem_r.ycrd_ovrf[vs_atom], vs_y.y);
+                                          (fr_details.z * pf2_x_pf3.z * poly_psw.inv_gpos_scale));
+            __stwb(&gmem_r.zcrd[vs_atom],      vs_z.x);
+            __stwb(&gmem_r.zcrd_ovrf[vs_atom], vs_z.y);
 #endif
           }
           break;
@@ -443,9 +447,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
                                        (fr_details.y * p_f4y) - p_f2y,
                                        (fr_details.y * p_f4z) - p_f2z };
             const TCALC3 p_vs = crossProduct(pf3_m_pf2, pf4_m_pf2);
-            const TCALC pvs_factor = fr_details.z / SQRT_FUNC((p_vs.x * p_vs.x) +
-                                                              (p_vs.y * p_vs.y) +
-                                                              (p_vs.z * p_vs.z));
+            const TCALC pvs_factor = fr_details.z * poly_psw.gpos_scale /
+                                     SQRT_FUNC((p_vs.x * p_vs.x) + (p_vs.y * p_vs.y) +
+                                               (p_vs.z * p_vs.z));
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC(pvs_factor * p_vs.x));
             __stwb(&gmem_r.ycrd[vs_atom], parent_y + LLCONV_FUNC(pvs_factor * p_vs.y));
@@ -463,6 +467,8 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
 #endif
           }
           break;
+        case VirtualSiteKind::NONE:
+          break;
         }
 
         // With the virtual site's position now committed to the block's private memory space,
@@ -476,12 +482,12 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         // arrays for coordinates that the underlying PhaseSpaceSynthesis deems "future."
 #ifdef VSITE_STANDALONE
         const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
-        const int manip_segment = (vs_atom - EXCL_GMEM_OFFSET) >> warp_bits;
+        const int manip_segment = ((vs_atom - EXCL_GMEM_OFFSET) >> warp_bits);
         const int manip_bitpos  = ((vs_atom - EXCL_GMEM_OFFSET) & warp_bits_mask_int); 
         const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
         if ((manip_mask.y >> manip_bitpos) & 0x1) {
           const size_t write_idx = __ldca(&poly_vk.vwu_imports[import_llim + vs_atom -
-                                                               EXCL_GMEM_OFFSET]);          
+                                                               EXCL_GMEM_OFFSET]);
           __stwb(&poly_psw.xcrd[write_idx], __ldca(&gmem_r.xcrd[vs_atom]));
           __stwb(&poly_psw.ycrd[write_idx], __ldca(&gmem_r.ycrd[vs_atom]));
           __stwb(&poly_psw.zcrd[write_idx], __ldca(&gmem_r.zcrd[vs_atom]));

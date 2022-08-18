@@ -1824,7 +1824,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
                                           i_vsk_sp.dim3[j], static_cast<float>(ij_frame_type) });
       n_unique_vste++;
     }
-
+    
     // Seek out unique SETTLE parameter sets
     for (int j = 0; j < i_cnk.nsett_param; j++) {
       if (sett_synthesis_index[topology_sett_table_offsets[i] + j] >= 0) {
@@ -1905,7 +1905,7 @@ void AtomGraphSynthesis::condenseParameterTables() {
       n_unique_cnst++;
     }
   }
-  
+
   // Post-process the condensed array of CMAP surfaces into patches
   const CmapAccessories cmap_digest = ComputeCmapDerivatives(n_unique_cmap, filtered_cmap_dim,
                                                              filtered_cmap_surf_bounds,
@@ -3053,6 +3053,8 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
                                  rdihe_limits.y - rdihe_limits.x);
       vste_instructions.putHost(all_vwu[i][j].getVirtualSiteInstructions(), vste_limits.x,
                                 vste_limits.y - vste_limits.x);
+      sett_instructions.putHost(all_vwu[i][j].getSettleGroupInstructions(), sett_limits.x,
+                                sett_limits.y - sett_limits.x);
       cnst_instructions.putHost(all_vwu[i][j].getConstraintGroupInstructions(), cnst_limits.x,
                                 cnst_limits.y - cnst_limits.x);
       vwu_idx++;

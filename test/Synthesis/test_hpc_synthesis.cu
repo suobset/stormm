@@ -20,6 +20,7 @@
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Restraints/restraint_apparatus.h"
 #include "../../src/Structure/hpc_virtual_site_handling.h"
+#include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Structure/virtual_site_handling.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/systemcache.h"
@@ -636,17 +637,17 @@ int main(const int argc, const char* argv[]) {
                           &ligand_psw.ycrd[synth_idx], &ligand_psw.ycrd_ovrf[synth_idx]);
         splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
                           &ligand_psw.zcrd[synth_idx], &ligand_psw.zcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale,
                           &ligand_dbl_psw.xcrd[synth_idx], &ligand_dbl_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale,
                           &ligand_dbl_psw.ycrd[synth_idx], &ligand_dbl_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale,
                           &ligand_dbl_psw.zcrd[synth_idx], &ligand_dbl_psw.zcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale,
                           &ligand_sdbl_psw.xcrd[synth_idx], &ligand_sdbl_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale,
                           &ligand_sdbl_psw.ycrd[synth_idx], &ligand_sdbl_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale,
                           &ligand_sdbl_psw.zcrd[synth_idx], &ligand_sdbl_psw.zcrd_ovrf[synth_idx]);
       }
     }
@@ -671,14 +672,13 @@ int main(const int argc, const char* argv[]) {
     placeVirtualSites(&cpulig_dbl_cf_vec[i], iag_ptr);
     placeVirtualSites(&cpulig_sdbl_cf_vec[i], iag_ptr);
   }
-#if 0
-  launchVirtualSitePlacement(PrecisionModel::SINGLE, &ligand_poly_ps, &valence_tb_space,
-                             ligand_poly_ag, ligand_launcher);
-  launchVirtualSitePlacement(PrecisionModel::DOUBLE, &ligand_poly_ps_dbl, &valence_tb_space,
-                             ligand_poly_ag, ligand_launcher);
-  launchVirtualSitePlacement(PrecisionModel::DOUBLE, &ligand_poly_ps_sdbl, &valence_tb_space,
-                             ligand_poly_ag, ligand_launcher);
-#endif
+  const VirtualSiteActivity v_activity = VirtualSiteActivity::PLACEMENT;
+  launchVirtualSiteHandling(PrecisionModel::SINGLE, v_activity ,&ligand_poly_ps, &valence_tb_space,
+                           ligand_poly_ag, ligand_launcher);
+  launchVirtualSiteHandling(PrecisionModel::DOUBLE, v_activity, &ligand_poly_ps_dbl,
+                            &valence_tb_space, ligand_poly_ag, ligand_launcher);
+  launchVirtualSiteHandling(PrecisionModel::DOUBLE, v_activity, &ligand_poly_ps_sdbl,
+                            &valence_tb_space, ligand_poly_ag, ligand_launcher);
   std::vector<CoordinateFrame> gpulig_cf_vec, gpulig_dbl_cf_vec, gpulig_sdbl_cf_vec;
   gpulig_cf_vec.reserve(nligands);
   gpulig_dbl_cf_vec.reserve(nligands);

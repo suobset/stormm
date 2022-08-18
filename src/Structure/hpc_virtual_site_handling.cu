@@ -1,5 +1,6 @@
 // -*-c++-*-
 #include "copyright.h"
+#include "Accelerator/hybrid.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Synthesis/synthesis_enumerators.h"
@@ -10,9 +11,11 @@
 namespace stormm {
 namespace structure {
 
+using card::HybridTargetLevel;
 using data_types::int95_t;
 using numerics::max_llint_accumulation;
 using numerics::max_int_accumulation_f;
+using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::vwu_abstract_length;
 using synthesis::VwuAbstractMap;
 using topology::VirtualSiteKind;
@@ -34,6 +37,9 @@ using topology::VirtualSiteKind;
 #  define KERNEL_NAME kfPlaceVirtualSites
 #    include "virtual_site_placement.cui"
 #  undef KERNEL_NAME
+#  define KERNEL_NAME kfTransmitVSiteForces
+#    include "virtual_site_transmission.cui"
+#  undef KERNEL_NAME
 #undef TCALC
 #undef TCALC2
 #undef TCALC3
@@ -54,6 +60,9 @@ using topology::VirtualSiteKind;
 #  define KERNEL_NAME kdPlaceVirtualSites
 #    include "virtual_site_placement.cui"
 #  undef KERNEL_NAME
+#  define KERNEL_NAME kdTransmitVSiteForces
+#    include "virtual_site_transmission.cui"
+#  undef KERNEL_NAME
 #undef TCALC
 #undef TCALC2
 #undef TCALC3
@@ -73,10 +82,14 @@ extern cudaFuncAttributes queryVirtualSiteKernelRequirements(const PrecisionMode
     case VirtualSiteActivity::PLACEMENT:
       if (cudaFuncGetAttributes(&result, kdPlaceVirtualSites) != cudaSuccess) {
         rtErr("Error obtaining attributes for kernel kdVirtualSitePlacement.",
-              "queryValenceKernelRequirements");
+              "queryVirtualSiteKernelRequirements");
       }
       break;
     case VirtualSiteActivity::TRANSMIT_FORCES:
+      if (cudaFuncGetAttributes(&result, kdTransmitVSiteForces) != cudaSuccess) {
+        rtErr("Error obtaining attributes for kernel kdTransmitVSiteForces.",
+              "queryVirtualSiteKernelRequirements");
+      }
       break;
     }
     break;
@@ -85,10 +98,14 @@ extern cudaFuncAttributes queryVirtualSiteKernelRequirements(const PrecisionMode
     case VirtualSiteActivity::PLACEMENT:
       if (cudaFuncGetAttributes(&result, kfPlaceVirtualSites) != cudaSuccess) {
         rtErr("Error obtaining attributes for kernel kfVirtualSitePlacement.",
-              "queryValenceKernelRequirements");
+              "queryVirtualSiteKernelRequirements");
       }
       break;
     case VirtualSiteActivity::TRANSMIT_FORCES:
+      if (cudaFuncGetAttributes(&result, kfTransmitVSiteForces) != cudaSuccess) {
+        rtErr("Error obtaining attributes for kernel kfTransmitVSiteForces.",
+              "queryVirtualSiteKernelRequirements");
+      }
       break;
     }
     break;
@@ -111,26 +128,57 @@ void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<fl
 }
 
 //-------------------------------------------------------------------------------------------------
-void launchVirtualSitePlacement(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
-                                CacheResource *tb_space, const AtomGraphSynthesis &poly_ag,
-                                const KernelManager &launcher) {
-  PsSynthesisWriter poly_psw = poly_ps->data();
+void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
+                               const SyValenceKit<double> &poly_vk,
+                               const SyAtomUpdateKit<double2, double4> &poly_auk, const int2 bt) {
+  kdTransmitVSiteForces<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
+                               const SyValenceKit<float> &poly_vk,
+                               const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt) {
+  kfTransmitVSiteForces<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
+}
+
+//-------------------------------------------------------------------------------------------------
+void launchVirtualSiteHandling(const PrecisionModel prec, const VirtualSiteActivity purpose,
+                               PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
+                               const AtomGraphSynthesis &poly_ag, const KernelManager &launcher) {
+  const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+  PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
   const int2 lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
-      CacheResourceKit<double> gmem_r = tb_space->dpData();
-      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit();
-      const SyAtomUpdateKit<double2, double4> poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit();
-      launchVirtualSitePlacement(&poly_psw, &gmem_r, poly_vk, poly_auk, lp);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(devc_tier);
+      const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
+      const SyAtomUpdateKit<double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(devc_tier);
+      switch (purpose) {
+      case VirtualSiteActivity::PLACEMENT:
+        launchVirtualSitePlacement(&poly_psw, &gmem_r, poly_vk, poly_auk, lp);
+        break;
+      case VirtualSiteActivity::TRANSMIT_FORCES:
+        launchTransmitVSiteForces(&poly_psw, &gmem_r, poly_vk, poly_auk, lp);
+        break;
+      }
     }
     break;
   case PrecisionModel::SINGLE:
     {
-      CacheResourceKit<float> gmem_r = tb_space->spData();
-      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit();
-      const SyAtomUpdateKit<float2, float4> poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit();
-      launchVirtualSitePlacement(&poly_psw, &gmem_r, poly_vk, poly_auk, lp);
+      CacheResourceKit<float> gmem_r = tb_space->spData(devc_tier);
+      const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
+      const SyAtomUpdateKit<float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(devc_tier);
+      switch (purpose) {
+      case VirtualSiteActivity::PLACEMENT:
+        launchVirtualSitePlacement(&poly_psw, &gmem_r, poly_vk, poly_auk, lp);
+        break;
+      case VirtualSiteActivity::TRANSMIT_FORCES:
+        launchTransmitVSiteForces(&poly_psw, &gmem_r, poly_vk, poly_auk, lp);
+        break;
+      }
     }
     break;
   }
