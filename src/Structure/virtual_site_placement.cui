@@ -307,7 +307,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
 #endif
             const TCALC invr2_p_f2 = (TCALC)(1.0) / ((p_f2.x * p_f2.x) + (p_f2.y * p_f2.y) +
                                                      (p_f2.z * p_f2.z));
-            const TCALC3 f23_t_pf2 = projection(f2_f3, p_f2);
+            const TCALC3 f23_t_pf2 = project(f2_f3, p_f2);
             const TCALC invr_p_f2 = (TCALC)(1.0) / SQRT_FUNC((p_f2.x * p_f2.x) +
                                                              (p_f2.y * p_f2.y) +
                                                              (p_f2.z * p_f2.z));

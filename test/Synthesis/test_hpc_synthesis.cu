@@ -683,6 +683,7 @@ int main(const int argc, const char* argv[]) {
   gpulig_cf_vec.reserve(nligands);
   gpulig_dbl_cf_vec.reserve(nligands);
   gpulig_sdbl_cf_vec.reserve(nligands);
+  int nvs_atom = 0;
   for (int i = 0; i < nligands; i++) {
 
     // It's not as efficient to extract coordinates from the GPU level in this way, but the
@@ -692,8 +693,14 @@ int main(const int argc, const char* argv[]) {
     gpulig_cf_vec.emplace_back(ligand_poly_ps.exportCoordinates(i, tcoord, devc_tier));
     gpulig_dbl_cf_vec.emplace_back(ligand_poly_ps_dbl.exportCoordinates(i, tcoord, devc_tier));
     gpulig_sdbl_cf_vec.emplace_back(ligand_poly_ps_sdbl.exportCoordinates(i, tcoord, devc_tier));
+    const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
+    nvs_atom += iag_ptr->getVirtualSiteCount();
   }
-  for (int i = 0; i < lm_size; i++) {
+  std::vector<double> cpu_positions(3 * nvs_atom), gpu_positions(3 * nvs_atom);
+  std::vector<double> cpu_dbl_positions(3 * nvs_atom), gpu_dbl_positions(3 * nvs_atom);
+  std::vector<double> cpu_sdbl_positions(3 * nvs_atom), gpu_sdbl_positions(3 * nvs_atom);
+  int vscon = 0;
+  for (int i = 0; i < nligands; i++) {
     const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
     CoordinateFrameWriter cpu_cfr      = cpulig_cf_vec[i].data();
     CoordinateFrameWriter cpu_dbl_cfr  = cpulig_dbl_cf_vec[i].data();
@@ -702,41 +709,42 @@ int main(const int argc, const char* argv[]) {
     CoordinateFrameWriter gpu_dbl_cfr  = gpulig_dbl_cf_vec[i].data();
     CoordinateFrameWriter gpu_sdbl_cfr = gpulig_sdbl_cf_vec[i].data();
     const ChemicalDetailsKit icdk = iag_ptr->getChemicalDetailsKit();
-
-    // CHECK
-#if 0
-    CoordinateFrame cpu_orig      = ligand_poly_ps.exportCoordinates(i);
-    CoordinateFrame cpu_dbl_orig  = ligand_poly_ps_dbl.exportCoordinates(i);
-    CoordinateFrame cpu_sdbl_orig = ligand_poly_ps_sdbl.exportCoordinates(i);
-    CoordinateFrameWriter cpuo_cfr      = cpu_orig.data();
-    CoordinateFrameWriter cpuo_dbl_cfr  = cpu_dbl_orig.data();
-    CoordinateFrameWriter cpuo_sdbl_cfr = cpu_sdbl_orig.data();    
-    printf("System %2d (%s):\n", i, getBaseName(iag_ptr->getFileName()).c_str());
     for (int j = 0; j < icdk.natom; j++) {
       if (icdk.z_numbers[j] == 0) {
-        printf("  %9.4lf %9.4lf %9.4lf  ", cpu_cfr.xcrd[j], cpu_cfr.ycrd[j], cpu_cfr.zcrd[j]);
-        printf("  %9.4lf %9.4lf %9.4lf  ||  ", gpu_cfr.xcrd[j], gpu_cfr.ycrd[j], gpu_cfr.zcrd[j]);
-        printf("  %9.4lf %9.4lf %9.4lf  ", cpu_dbl_cfr.xcrd[j], cpu_dbl_cfr.ycrd[j],
-               cpu_dbl_cfr.zcrd[j]);
-        printf("  %9.4lf %9.4lf %9.4lf  ||  ", gpu_dbl_cfr.xcrd[j], gpu_dbl_cfr.ycrd[j],
-               gpu_dbl_cfr.zcrd[j]);
-        printf("  %9.4lf %9.4lf %9.4lf  ", cpu_sdbl_cfr.xcrd[j], cpu_sdbl_cfr.ycrd[j],
-               cpu_sdbl_cfr.zcrd[j]);
-        printf("  %9.4lf %9.4lf %9.4lf\n", gpu_sdbl_cfr.xcrd[j], gpu_sdbl_cfr.ycrd[j],
-               gpu_sdbl_cfr.zcrd[j]);
-        printf("  %9.4lf %9.4lf %9.4lf  ", cpuo_cfr.xcrd[j], cpuo_cfr.ycrd[j], cpuo_cfr.zcrd[j]);
-        printf("                                 ||  ");
-        printf("  %9.4lf %9.4lf %9.4lf  ", cpuo_dbl_cfr.xcrd[j], cpuo_dbl_cfr.ycrd[j],
-               cpuo_dbl_cfr.zcrd[j]);
-        printf("                                 ||  ");
-        printf("  %9.4lf %9.4lf %9.4lf  ", cpuo_sdbl_cfr.xcrd[j], cpuo_sdbl_cfr.ycrd[j],
-               cpuo_sdbl_cfr.zcrd[j]);
-        printf("\n");
+        cpu_positions[ 3 * vscon     ] = cpu_cfr.xcrd[j];
+        cpu_positions[(3 * vscon) + 1] = cpu_cfr.ycrd[j];
+        cpu_positions[(3 * vscon) + 2] = cpu_cfr.zcrd[j];
+        gpu_positions[ 3 * vscon     ] = gpu_cfr.xcrd[j];
+        gpu_positions[(3 * vscon) + 1] = gpu_cfr.ycrd[j];
+        gpu_positions[(3 * vscon) + 2] = gpu_cfr.zcrd[j];
+        cpu_dbl_positions[ 3 * vscon     ] = cpu_dbl_cfr.xcrd[j];
+        cpu_dbl_positions[(3 * vscon) + 1] = cpu_dbl_cfr.ycrd[j];
+        cpu_dbl_positions[(3 * vscon) + 2] = cpu_dbl_cfr.zcrd[j];
+        gpu_dbl_positions[ 3 * vscon     ] = gpu_dbl_cfr.xcrd[j];
+        gpu_dbl_positions[(3 * vscon) + 1] = gpu_dbl_cfr.ycrd[j];
+        gpu_dbl_positions[(3 * vscon) + 2] = gpu_dbl_cfr.zcrd[j];
+        cpu_sdbl_positions[ 3 * vscon     ] = cpu_sdbl_cfr.xcrd[j];
+        cpu_sdbl_positions[(3 * vscon) + 1] = cpu_sdbl_cfr.ycrd[j];
+        cpu_sdbl_positions[(3 * vscon) + 2] = cpu_sdbl_cfr.zcrd[j];
+        gpu_sdbl_positions[ 3 * vscon     ] = gpu_sdbl_cfr.xcrd[j];
+        gpu_sdbl_positions[(3 * vscon) + 1] = gpu_sdbl_cfr.ycrd[j];
+        gpu_sdbl_positions[(3 * vscon) + 2] = gpu_sdbl_cfr.zcrd[j];
       }
     }
-#endif
-    // END CHECK
   }
+  check(cpu_positions, RelationalOperator::EQUAL, gpu_positions, "Positions of virtual sites "
+        "placed by the GPU kernel do not agree with those placed by the CPU function.  "
+        "Precision level: " + getPrecisionModelName(PrecisionModel::SINGLE) + ".  Bits after "
+        "the decimal: " + std::to_string(ligand_poly_ps.getGlobalPositionBits()) + ".", do_tests);
+  check(cpu_dbl_positions, RelationalOperator::EQUAL, gpu_dbl_positions, "Positions of virtual "
+        "sites placed by the GPU kernel do not agree with those placed by the CPU function.  "
+        "Precision level: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after "
+        "the decimal: " + std::to_string(ligand_poly_ps_dbl.getGlobalPositionBits()) + ".",
+        do_tests);
+  check(cpu_sdbl_positions, RelationalOperator::EQUAL, gpu_sdbl_positions, "Positions of virtual "
+        "sites placed by the GPU kernel do not agree with those placed by the CPU function.  "
+        "Precision level: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the "
+        "decimal: " + std::to_string(ligand_poly_ps_sdbl.getGlobalPositionBits()) + ".", do_tests);
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
