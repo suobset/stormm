@@ -66,6 +66,7 @@ __device__ __forceinline__ void atomicSplit(const float fval, const int pos, int
 /// Overloaded:
 ///   - Accept int64 / int32 (95-bit accumulation of double-precision floating point calculations)
 ///   - Accept int32 / int32 (standard 63-bit accumulation of single-precision floating point math)
+///   - Accept the fused tuples or pairs of separate integers
 ///
 /// \param ival       The value to contribute
 /// \param pos        Position in the relevant arrays to contribute it into
@@ -91,6 +92,30 @@ __device__ __forceinline__ void atomicSplit(const int2 ival, const int pos, int*
   int ival_y = ival.y;
   ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival.x) >= 0) *
             (1 - (2 * (ival.x < 0))) * 2;    
+  if (ival_y) {
+    atomicAdd(&overflow[pos], ival_y);
+  }
+}
+
+__device__ __forceinline__ void atomicSplit(const llint ival_x, const int ival_y_in, const int pos,
+                                            llint* primary, int* overflow) {
+  const llint prim_old = atomicAdd((ullint*)&primary[pos], (ullint)(ival_x));
+  const llint prim_old_plus_x = prim_old + ival_x;
+  int ival_y = ival_y_in;
+  ival_y += ((prim_old ^ prim_old_plus_x) < 0LL && (prim_old ^ ival_x) >= 0LL) *
+            (1 - (2 * (ival_x < 0LL))) * 2;    
+  if (ival_y) {
+    atomicAdd(&overflow[pos], ival_y);
+  }
+}
+
+__device__ __forceinline__ void atomicSplit(const int ival_x, const int ival_y_in, const int pos,
+                                            int* primary, int* overflow) {
+  const int prim_old = atomicAdd(&primary[pos], ival_x);
+  const int prim_old_plus_x = prim_old + ival_x;
+  int ival_y = ival_y_in;
+  ival_y += ((prim_old ^ prim_old_plus_x) < 0 && (prim_old ^ ival_x) >= 0) *
+            (1 - (2 * (ival_x < 0))) * 2;
   if (ival_y) {
     atomicAdd(&overflow[pos], ival_y);
   }

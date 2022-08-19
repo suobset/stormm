@@ -106,29 +106,13 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         const int task_offset = vwu_map[(size_t)(VwuAbstractMap::VSITE)].x;
         const uint2 tinsr = __ldcs(&poly_auk.vste_insr[task_offset + pos]);
         const int vs_atom = (tinsr.x & 0x3ff);
-        int parent_atom = ((tinsr.x >> 10) & 0x3ff) + EXCL_GMEM_OFFSET;
-        int frame2_atom = ((tinsr.x >> 20) & 0x3ff) + EXCL_GMEM_OFFSET;
+        const int parent_atom = ((tinsr.x >> 10) & 0x3ff);
+        const int frame2_atom = ((tinsr.x >> 20) & 0x3ff);
         const int fr_param_idx = ((tinsr.y >> 20) & 0xfff);
         const TCALC4 fr_details = poly_auk.vs_params[fr_param_idx];
         const VirtualSiteKind kind = static_cast<VirtualSiteKind>(fr_details.w);
 
         // The parent (first) and second frame atoms' locations must be read for any frame
-        const llint parent_x = __ldca(&gmem_r.xcrd[parent_atom]);
-        const llint parent_y = __ldca(&gmem_r.ycrd[parent_atom]);
-        const llint parent_z = __ldca(&gmem_r.zcrd[parent_atom]);
-        const llint frame2_x = __ldca(&gmem_r.xcrd[frame2_atom]);
-        const llint frame2_y = __ldca(&gmem_r.ycrd[frame2_atom]);
-        const llint frame2_z = __ldca(&gmem_r.zcrd[frame2_atom]);
-#ifndef TCALC_IS_SINGLE
-        const int parent_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[parent_atom]);
-        const int parent_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[parent_atom]);
-        const int parent_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[parent_atom]);
-        const int frame2_x_ovrf =  __ldca(&gmem_r.xcrd_ovrf[frame2_atom]);
-        const int frame2_y_ovrf =  __ldca(&gmem_r.ycrd_ovrf[frame2_atom]);
-        const int frame2_z_ovrf =  __ldca(&gmem_r.zcrd_ovrf[frame2_atom]);
-#endif
-        parent_atom -= EXCL_GMEM_OFFSET;
-        frame2_atom -= EXCL_GMEM_OFFSET;
         switch (kind) {
         case VirtualSiteKind::FLEX_2:
           {
@@ -192,6 +176,14 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
         case VirtualSiteKind::FIXED_2:
           {
             const size_t vs_atom_cpos = vs_atom + EXCL_GMEM_OFFSET;
+            const size_t parent_atom_cpos = parent_atom + EXCL_GMEM_OFFSET;
+            const size_t frame2_atom_cpos = frame2_atom + EXCL_GMEM_OFFSET;
+            const llint parent_x = __ldca(&gmem_r.xcrd[parent_atom_cpos]);
+            const llint parent_y = __ldca(&gmem_r.ycrd[parent_atom_cpos]);
+            const llint parent_z = __ldca(&gmem_r.zcrd[parent_atom_cpos]);
+            const llint frame2_x = __ldca(&gmem_r.xcrd[frame2_atom_cpos]);
+            const llint frame2_y = __ldca(&gmem_r.ycrd[frame2_atom_cpos]);
+            const llint frame2_z = __ldca(&gmem_r.zcrd[frame2_atom_cpos]);
 #ifdef TCALC_IS_SINGLE
             const TCALC3 p_f2 = { (TCALC)(frame2_x - parent_x), (TCALC)(frame2_y - parent_y),
                                   (TCALC)(frame2_z - parent_z) };
@@ -199,6 +191,12 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
                                   (TCALC)(__ldca(&gmem_r.ycrd[vs_atom_cpos]) - parent_y),
                                   (TCALC)(__ldca(&gmem_r.zcrd[vs_atom_cpos]) - parent_z) };
 #else
+            const int parent_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[parent_atom_cpos]);
+            const int parent_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[parent_atom_cpos]);
+            const int parent_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[parent_atom_cpos]);
+            const int frame2_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[frame2_atom_cpos]);
+            const int frame2_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame2_atom_cpos]);
+            const int frame2_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame2_atom_cpos]);
             const TCALC3 p_f2 = {
               int95SumToDouble(frame2_x, frame2_x_ovrf, -parent_x, -parent_x_ovrf),
               int95SumToDouble(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf),
@@ -281,7 +279,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
           break;
         case VirtualSiteKind::FLEX_3:
           {
-            const int frame3_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
+            const int frame3_atom = (tinsr.y & 0x3ff);
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
             const TCALC vs_x = int63ToFloat(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom]);
@@ -321,15 +319,18 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const llint f3_xpart = LLCONV_FUNC(vs_x * fr_details.y);
             const llint f3_ypart = LLCONV_FUNC(vs_y * fr_details.y);
             const llint f3_zpart = LLCONV_FUNC(vs_z * fr_details.y);
-            atomicAdd((ullint*)&sh_xfrc[parent_atom], sh_xfrc[vs_atom] - f2_xpart - f3_xpart);
-            atomicAdd((ullint*)&sh_yfrc[parent_atom], sh_yfrc[vs_atom] - f2_ypart - f3_ypart);
-            atomicAdd((ullint*)&sh_zfrc[parent_atom], sh_zfrc[vs_atom] - f2_zpart - f3_zpart);
-            atomicAdd((ullint*)&sh_xfrc[frame2_atom], f2_xpart);
-            atomicAdd((ullint*)&sh_yfrc[frame2_atom], f2_ypart);
-            atomicAdd((ullint*)&sh_zfrc[frame2_atom], f2_zpart);
-            atomicAdd((ullint*)&sh_xfrc[frame3_atom], f3_xpart);
-            atomicAdd((ullint*)&sh_yfrc[frame3_atom], f3_ypart);
-            atomicAdd((ullint*)&sh_zfrc[frame3_atom], f3_zpart);
+            atomicAdd((ullint*)&sh_xfrc[parent_atom], (ullint)(sh_xfrc[vs_atom] -
+                                                               f2_xpart - f3_xpart));
+            atomicAdd((ullint*)&sh_yfrc[parent_atom], (ullint)(sh_yfrc[vs_atom] -
+                                                               f2_ypart - f3_ypart));
+            atomicAdd((ullint*)&sh_zfrc[parent_atom], (ullint)(sh_zfrc[vs_atom] -
+                                                               f2_zpart - f3_zpart));
+            atomicAdd((ullint*)&sh_xfrc[frame2_atom], (ullint)(f2_xpart));
+            atomicAdd((ullint*)&sh_yfrc[frame2_atom], (ullint)(f2_ypart));
+            atomicAdd((ullint*)&sh_zfrc[frame2_atom], (ullint)(f2_zpart));
+            atomicAdd((ullint*)&sh_xfrc[frame3_atom], (ullint)(f3_xpart));
+            atomicAdd((ullint*)&sh_yfrc[frame3_atom], (ullint)(f3_ypart));
+            atomicAdd((ullint*)&sh_zfrc[frame3_atom], (ullint)(f3_zpart));
 #  endif
 #else
             const TCALC vs_x = int95ToDouble(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom]);
@@ -364,22 +365,36 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
           break;
         case VirtualSiteKind::FIXED_3:
           {
-            // The bizarre convention here is that the virtual site's local index is read from the
-            // instruction and not combined with EXCL_GMEM_OFFSET, the thread block's workspace
-            // offset, but parent and frame atom indices are read with the offset for the purpose
-            // of obtaining coordinates, then modified to remove the offset for indexing into the
-            // force accumulators in __shared__memory.  Conversely, the coordinates of the virtual
-            // site are not always needed, so an alternative index, vs_atom_cpos, is built to
-            // index the coordinate arrays where necessary.
-            int frame3_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
+            // The convention here is that ints are used to index elements of the __shared__
+            // memory arrays because these accesses will take place after some degree of other
+            // work, and the intention is not to make the compiler carry a larger size_t type, or
+            // the instruction itself, through until that happens.  For accessing the thread-block
+            // specific workspaces, the EXCL_GMEM_OFFSET is added and the integer becomes a size_t
+            // as it will be used immediately to access array indices and never again thereafter.
+            // The ints will get converted to size_t as soon as they are used to access __shared__
+            // memory elements, but the compiler will do that.
+            const int frame3_atom = (tinsr.y & 0x3ff);
+            const size_t parent_atom_cpos = parent_atom + EXCL_GMEM_OFFSET;
+            const size_t frame2_atom_cpos = frame2_atom + EXCL_GMEM_OFFSET;
+            const size_t frame3_atom_cpos = frame3_atom + EXCL_GMEM_OFFSET;
             const size_t vs_atom_cpos = vs_atom + EXCL_GMEM_OFFSET;
+            const llint parent_x = __ldca(&gmem_r.xcrd[parent_atom_cpos]);
+            const llint parent_y = __ldca(&gmem_r.ycrd[parent_atom_cpos]);
+            const llint parent_z = __ldca(&gmem_r.zcrd[parent_atom_cpos]);
+            const llint frame2_x = __ldca(&gmem_r.xcrd[frame2_atom_cpos]);
+            const llint frame2_y = __ldca(&gmem_r.ycrd[frame2_atom_cpos]);
+            const llint frame2_z = __ldca(&gmem_r.zcrd[frame2_atom_cpos]);
+            const llint frame3_x = __ldca(&gmem_r.xcrd[frame3_atom_cpos]);
+            const llint frame3_y = __ldca(&gmem_r.ycrd[frame3_atom_cpos]);
+            const llint frame3_z = __ldca(&gmem_r.zcrd[frame3_atom_cpos]);
+            const llint vsite_x  = __ldca(&gmem_r.xcrd[vs_atom_cpos]);
+            const llint vsite_y  = __ldca(&gmem_r.ycrd[vs_atom_cpos]);
+            const llint vsite_z  = __ldca(&gmem_r.zcrd[vs_atom_cpos]);
 #ifdef TCALC_IS_SINGLE
-            const TCALC3 f2_f3 = { (TCALC)(__ldca(&gmem_r.xcrd[frame3_atom]) - frame2_x),
-                                   (TCALC)(__ldca(&gmem_r.ycrd[frame3_atom]) - frame2_y),
-                                   (TCALC)(__ldca(&gmem_r.zcrd[frame3_atom]) - frame2_z) };
-            const TCALC3 p_vs = { (TCALC)(__ldca(&gmem_r.xcrd[vs_atom_cpos]) - parent_x),
-                                  (TCALC)(__ldca(&gmem_r.ycrd[vs_atom_cpos]) - parent_y),
-                                  (TCALC)(__ldca(&gmem_r.zcrd[vs_atom_cpos]) - parent_z) };
+            const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x), (TCALC)(frame3_y - frame2_y),
+                                   (TCALC)(frame3_z - frame2_z) };
+            const TCALC3 p_vs = { (TCALC)(vsite_x - parent_x), (TCALC)(vsite_y - parent_y),
+                                  (TCALC)(vsite_z - parent_z) };
             const TCALC3 p_mid = { (TCALC)(frame2_x - parent_x) + (fr_details.y * f2_f3.x),
                                    (TCALC)(frame2_y - parent_y) + (fr_details.y * f2_f3.y),
                                    (TCALC)(frame2_z - parent_z) + (fr_details.y * f2_f3.z) };
@@ -392,34 +407,37 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
                                     (TCALC)(sh_zfrc[vs_atom]) };
 #  endif
 #else
-            const TCALC3 f2_f3 = { int95SumToDouble(__ldca(&gmem_r.xcrd[frame3_atom]),
-                                                    __ldca(&gmem_r.xcrd_ovrf[frame3_atom]),
+            const int parent_x_ovrf = __ldca(&gmem_r.xcrd[parent_atom_cpos]);
+            const int parent_y_ovrf = __ldca(&gmem_r.ycrd[parent_atom_cpos]);
+            const int parent_z_ovrf = __ldca(&gmem_r.zcrd[parent_atom_cpos]);
+            const int frame2_x_ovrf = __ldca(&gmem_r.xcrd[frame2_atom_cpos]);
+            const int frame2_y_ovrf = __ldca(&gmem_r.ycrd[frame2_atom_cpos]);
+            const int frame2_z_ovrf = __ldca(&gmem_r.zcrd[frame2_atom_cpos]);
+            const int frame3_x_ovrf = __ldca(&gmem_r.xcrd[frame3_atom_cpos]);
+            const int frame3_y_ovrf = __ldca(&gmem_r.ycrd[frame3_atom_cpos]);
+            const int frame3_z_ovrf = __ldca(&gmem_r.zcrd[frame3_atom_cpos]);
+            const int vsite_x_ovrf  = __ldca(&gmem_r.xcrd[vs_atom_cpos]);
+            const int vsite_y_ovrf  = __ldca(&gmem_r.ycrd[vs_atom_cpos]);
+            const int vsite_z_ovrf  = __ldca(&gmem_r.zcrd[vs_atom_cpos]);
+            const TCALC3 f2_f3 = { int95SumToDouble( frame3_x,  frame3_x_ovrf, 
                                                     -frame2_x, -frame2_x_ovrf),
-                                   int95SumToDouble(__ldca(&gmem_r.ycrd[frame3_atom]),
-                                                    __ldca(&gmem_r.ycrd_ovrf[frame3_atom]),
+                                   int95SumToDouble( frame3_y,  frame3_y_ovrf,
                                                     -frame2_y, -frame2_y_ovrf),
-                                   int95SumToDouble(__ldca(&gmem_r.zcrd[frame3_atom]),
-                                                    __ldca(&gmem_r.zcrd_ovrf[frame3_atom]),
+                                   int95SumToDouble( frame3_z,  frame3_z_ovrf,
                                                     -frame2_z, -frame2_z_ovrf) };
-            const TCALC3 p_vs = { int95SumToDouble(__ldca(&gmem_r.xcrd[vs_atom_cpos]),
-                                                   __ldca(&gmem_r.xcrd_ovrf[vs_atom_cpos]),
+            const TCALC3 p_vs = { int95SumToDouble( vsite_x,   vsite_x_ovrf,
                                                    -parent_x, -parent_x_ovrf),
-                                  int95SumToDouble(__ldca(&gmem_r.ycrd[vs_atom_cpos]),
-                                                   __ldca(&gmem_r.ycrd_ovrf[vs_atom_cpos]),
+                                  int95SumToDouble( vsite_y,   vsite_y_ovrf,
                                                    -parent_y, -parent_y_ovrf),
-                                  int95SumToDouble(__ldca(&gmem_r.zcrd[vs_atom_cpos]),
-                                                   __ldca(&gmem_r.zcrd_ovrf[vs_atom_cpos]),
+                                  int95SumToDouble( vsite_z,   vsite_z_ovrf,
                                                    -parent_z, -parent_z_ovrf) };
-            const TCALC3 p_mid = { int95SumToDouble(__ldca(&gmem_r.xcrd[frame2_atom]),
-                                                    __ldca(&gmem_r.xcrd_ovrf[frame2_atom]),
+            const TCALC3 p_mid = { int95SumToDouble( frame2_x,  frame2_x_ovrf,
                                                     -parent_x, -parent_x_ovrf) +
                                    (fr_details.y * f2_f3.x),
-                                   int95SumToDouble(__ldca(&gmem_r.ycrd[frame2_atom]),
-                                                    __ldca(&gmem_r.ycrd_ovrf[frame2_atom]),
+                                   int95SumToDouble( frame2_y,  frame2_y_ovrf,
                                                     -parent_y, -parent_y_ovrf) +
                                    (fr_details.y * f2_f3.y),
-                                   int95SumToDouble(__ldca(&gmem_r.zcrd[frame2_atom]),
-                                                    __ldca(&gmem_r.zcrd_ovrf[frame2_atom]),
+                                   int95SumToDouble( frame2_z,  frame2_z_ovrf,
                                                     -parent_z, -parent_z_ovrf) +
                                    (fr_details.y * f2_f3.z) };
             const TCALC3 vs_frc = { int95ToDouble(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom]),
@@ -430,10 +448,133 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC invr_p_mid = (TCALC)(1.0) / SQRT_FUNC((p_mid.x * p_mid.x) +
                                                               (p_mid.y * p_mid.y) +
                                                               (p_mid.z * p_mid.z));
+            const TCALC xpart = invr_p_mid * fr_details.x * (vs_frc.x - vs_frc_proj.x);
+            const TCALC ypart = invr_p_mid * fr_details.x * (vs_frc.y - vs_frc_proj.y);
+            const TCALC zpart = invr_p_mid * fr_details.x * (vs_frc.z - vs_frc_proj.z);
+            const TCALC f2f3_xpart = fr_details.y * xpart;
+            const TCALC f2f3_ypart = fr_details.y * ypart;
+            const TCALC f2f3_zpart = fr_details.y * zpart;
+#ifdef TCALC_IS_SINGLE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+            const int2 ixpart = floatToInt63(xpart);
+            const int2 iypart = floatToInt63(ypart);
+            const int2 izpart = floatToInt63(zpart);
+            const int2 if2f3_xpart = floatToInt63(f2f3_xpart);
+            const int2 if2f3_ypart = floatToInt63(f2f3_ypart);
+            const int2 if2f3_zpart = floatToInt63(f2f3_zpart);
+            const int2 pa_x_contrib = int63Sum(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom],
+                                               -ixpart.x, -ixpart.y);
+            const int2 pa_y_contrib = int63Sum(sh_yfrc[vs_atom], sh_yfrc_overflow[vs_atom],
+                                               -iypart.x, -iypart.y);
+            const int2 pa_z_contrib = int63Sum(sh_zfrc[vs_atom], sh_zfrc_overflow[vs_atom],
+                                               -izpart.x, -izpart.y);
+            atomicSplit(pa_x_contrib, parent_atom, sh_xfrc, sh_xfrc_overflow);
+            atomicSplit(pa_y_contrib, parent_atom, sh_yfrc, sh_yfrc_overflow);
+            atomicSplit(pa_z_contrib, parent_atom, sh_zfrc, sh_zfrc_overflow);
+            const int2 f2_x_contrib = splitFPSum(ixpart, -if2f3_xpart.x, -if2f3_xpart.y);
+            const int2 f2_y_contrib = splitFPSum(iypart, -if2f3_ypart.x, -if2f3_ypart.y);
+            const int2 f2_z_contrib = splitFPSum(izpart, -if2f3_zpart.x, -if2f3_zpart.y);
+            atomicSplit(f2_x_contrib, frame2_atom, sh_xfrc, sh_xfrc_overflow);
+            atomicSplit(f2_y_contrib, frame2_atom, sh_yfrc, sh_yfrc_overflow);
+            atomicSplit(f2_z_contrib, frame2_atom, sh_zfrc, sh_zfrc_overflow);
+            atomicSplit(if2f3_xpart, frame3_atom, sh_xfrc, sh_xfrc_overflow);
+            atomicSplit(if2f3_ypart, frame3_atom, sh_yfrc, sh_yfrc_overflow);
+            atomicSplit(if2f3_zpart, frame3_atom, sh_zfrc, sh_zfrc_overflow);
+#  else
+            const llint ixpart = (llint)(xpart);
+            const llint iypart = (llint)(ypart);
+            const llint izpart = (llint)(zpart);
+            const llint if2f3_xpart = (llint)(f2f3_xpart);
+            const llint if2f3_ypart = (llint)(f2f3_ypart);
+            const llint if2f3_zpart = (llint)(f2f3_zpart);
+            atomicAdd((ullint*)&sh_xfrc[parent_atom], (ullint)(sh_xfrc[vs_atom] - ixpart));
+            atomicAdd((ullint*)&sh_yfrc[parent_atom], (ullint)(sh_yfrc[vs_atom] - iypart));
+            atomicAdd((ullint*)&sh_zfrc[parent_atom], (ullint)(sh_zfrc[vs_atom] - izpart));
+            atomicAdd((ullint*)&sh_xfrc[frame2_atom], (ullint)(ixpart - if2f3_xpart));
+            atomicAdd((ullint*)&sh_yfrc[frame2_atom], (ullint)(iypart - if2f3_ypart));
+            atomicAdd((ullint*)&sh_zfrc[frame2_atom], (ullint)(izpart - if2f3_zpart));
+            atomicAdd((ullint*)&sh_xfrc[frame3_atom], (ullint)(if2f3_xpart));
+            atomicAdd((ullint*)&sh_yfrc[frame3_atom], (ullint)(if2f3_ypart));
+            atomicAdd((ullint*)&sh_zfrc[frame3_atom], (ullint)(if2f3_zpart));
+#  endif
+#else
+            const int95_t ixpart = doubleToInt95(xpart);
+            const int95_t iypart = doubleToInt95(ypart);
+            const int95_t izpart = doubleToInt95(zpart);
+            const int95_t if2f3_xpart = doubleToInt95(f2f3_xpart);
+            const int95_t if2f3_ypart = doubleToInt95(f2f3_ypart);
+            const int95_t if2f3_zpart = doubleToInt95(f2f3_zpart);
+            const int95_t pa_x_contrib = int95Sum(sh_xfrc[vs_atom], sh_xfrc_overflow[vs_atom],
+                                                  -ixpart.x, -ixpart.y);
+            const int95_t pa_y_contrib = int95Sum(sh_yfrc[vs_atom], sh_yfrc_overflow[vs_atom],
+                                                  -iypart.x, -iypart.y);
+            const int95_t pa_z_contrib = int95Sum(sh_zfrc[vs_atom], sh_zfrc_overflow[vs_atom],
+                                                  -izpart.x, -izpart.y);
+            atomicSplit(pa_x_contrib, parent_atom, sh_xfrc, sh_xfrc_overflow);
+            atomicSplit(pa_y_contrib, parent_atom, sh_yfrc, sh_yfrc_overflow);
+            atomicSplit(pa_z_contrib, parent_atom, sh_zfrc, sh_zfrc_overflow);
+            const int95_t f2_x_contrib = splitFPSum(ixpart, -if2f3_xpart.x, -if2f3_xpart.y);
+            const int95_t f2_y_contrib = splitFPSum(iypart, -if2f3_ypart.x, -if2f3_ypart.y);
+            const int95_t f2_z_contrib = splitFPSum(izpart, -if2f3_zpart.x, -if2f3_zpart.y);
+            atomicSplit(f2_x_contrib, frame2_atom, sh_xfrc, sh_xfrc_overflow);
+            atomicSplit(f2_y_contrib, frame2_atom, sh_yfrc, sh_yfrc_overflow);
+            atomicSplit(f2_z_contrib, frame2_atom, sh_zfrc, sh_zfrc_overflow);
+            atomicSplit(if2f3_xpart, frame3_atom, sh_xfrc, sh_xfrc_overflow);
+            atomicSplit(if2f3_ypart, frame3_atom, sh_yfrc, sh_yfrc_overflow);
+            atomicSplit(if2f3_zpart, frame3_atom, sh_zfrc, sh_zfrc_overflow);
+#endif
           }
           break;
         case VirtualSiteKind::FAD_3:
           {
+            const int frame3_atom = (tinsr.y & 0x3ff) + EXCL_GMEM_OFFSET;
+            const size_t parent_atom_cpos = parent_atom + EXCL_GMEM_OFFSET;
+            const size_t frame2_atom_cpos = frame2_atom + EXCL_GMEM_OFFSET;
+            const size_t frame3_atom_cpos = frame3_atom + EXCL_GMEM_OFFSET;
+            const llint parent_x = __ldca(&gmem_r.xcrd[parent_atom_cpos]);
+            const llint parent_y = __ldca(&gmem_r.ycrd[parent_atom_cpos]);
+            const llint parent_z = __ldca(&gmem_r.zcrd[parent_atom_cpos]);
+            const llint frame2_x = __ldca(&gmem_r.xcrd[frame2_atom_cpos]);
+            const llint frame2_y = __ldca(&gmem_r.ycrd[frame2_atom_cpos]);
+            const llint frame2_z = __ldca(&gmem_r.zcrd[frame2_atom_cpos]);
+            const llint frame3_x = __ldca(&gmem_r.xcrd[frame3_atom_cpos]);
+            const llint frame3_y = __ldca(&gmem_r.ycrd[frame3_atom_cpos]);
+            const llint frame3_z = __ldca(&gmem_r.zcrd[frame3_atom_cpos]);
+#ifdef TCALC_IS_SINGLE
+            const TCALC3 p_f2 = { (TCALC)(frame2_x - frame3_x), (TCALC)(frame2_y - frame3_y),
+                                  (TCALC)(frame2_z - frame3_z) };
+            const TCALC3 f2_f3 = { (TCALC)(frame3_x - frame2_x), (TCALC)(frame3_y - frame2_y),
+                                   (TCALC)(frame3_z - frame2_z) };
+#else
+            const int parent_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[parent_atom_cpos]);
+            const int parent_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[parent_atom_cpos]);
+            const int parent_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[parent_atom_cpos]);
+            const int frame2_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[frame2_atom_cpos]);
+            const int frame2_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame2_atom_cpos]);
+            const int frame2_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame2_atom_cpos]);
+            const int frame3_x_ovrf = __ldca(&gmem_r.xcrd_ovrf[frame3_atom_cpos]);
+            const int frame3_y_ovrf = __ldca(&gmem_r.ycrd_ovrf[frame3_atom_cpos]);
+            const int frame3_z_ovrf = __ldca(&gmem_r.zcrd_ovrf[frame3_atom_cpos]);
+            const TCALC3 p_f2 = { int95SumToDouble( frame2_x,  frame2_x_ovrf,
+                                                   -parent_x, -parent_x_ovrf),
+                                  int95SumToDouble( frame2_y,  frame2_y_ovrf,
+                                                   -parent_y, -parent_y_ovrf),
+                                  int95SumToDouble( frame2_z,  frame2_z_ovrf,
+                                                   -parent_z, -parent_z_ovrf) };
+            const TCALC3 f2_f3 = { int95SumToDouble( frame3_x,  frame3_x_ovrf,
+                                                    -frame2_x, -frame2_x_ovrf),
+                                   int95SumToDouble( frame3_y,  frame3_y_ovrf,
+                                                    -frame2_y, -frame2_y_ovrf),
+                                   int95SumToDouble( frame3_z,  frame3_z_ovrf,
+                                                    -frame2_z, -frame2_z_ovrf) };
+#endif
+
+#ifdef TCALC_IS_SINGLE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+#  else
+#  endif
+#else
+#endif
           }
           break;
         case VirtualSiteKind::OUT_3:
