@@ -79,7 +79,8 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                             const ForceAccumulationMethod facc_method, const PrecisionModel prec,
                             const GpuDetails &gpu, const KernelManager &launcher,
                             const double mue_tol, const double max_error_tol,
-                            const TestPriority do_tests) {
+                            const TestPriority do_tests,
+                            const std::string &side_note = std::string("")) {
 
   // Prepare for GPU-based calculations
   const int nsys = poly_ps->getSystemCount();
@@ -111,16 +112,19 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     total_restraints += poly_ag.getSystemRestraintPointer(i)->getTotalRestraintCount();
   }
   const std::string restraint_presence = (total_restraints > 0) ? "with" : "without";
+  const std::string end_note = (side_note.size() > 0LLU) ? "  " + side_note : std::string("");
   check(frc_mues, RelationalOperator::EQUAL, frc_mue_tolerance, "Forces obtained by the "
         "valence interaction kernel, operating on systems " + restraint_presence + " external " +
         "restraints, exceed the tolerance for mean unsigned errors in their vector components.  "
         "Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+        do_tests);
   check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the valence interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+        do_tests);
   
   // Clear forces again.  Compute non-bonded interactions.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
@@ -158,12 +162,14 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
         "non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the tolerance for mean unsigned errors in their vector "
         "components.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+        do_tests);
   check(frc_max_errors, RelationalOperator::EQUAL, frc_max_error_tolerance, "Forces obtained "
         "by the non-bonded interaction kernel, operating on systems " + restraint_presence +
         " external restraints, exceed the maximum allowed errors for forces acting on any one "
         "particle.  Force accumulation method: " + getForceAccumulationMethodName(facc_method) +
-        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+        ".  Precision level in the calculation: " + getPrecisionModelName(prec) + "." + end_note,
+        do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -629,25 +635,26 @@ int main(const int argc, const char* argv[]) {
     PsSynthesisWriter ligand_sdbl_psw = ligand_poly_ps_sdbl.data();
     const ChemicalDetailsKit icdk = iag_ptr->getChemicalDetailsKit();
     for (int j = 0; j < icdk.natom; j++) {
-      if (icdk.z_numbers[j] == 0) {
+      if (icdk.z_numbers[j] == 0 || true) {
+        const double pert_fac = (icdk.z_numbers[j] == 0) ? 1.0 : 0.05;
         const int synth_idx = ligand_psw.atom_starts[i] + j;
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
                           &ligand_psw.xcrd[synth_idx], &ligand_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
                           &ligand_psw.ycrd[synth_idx], &ligand_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_psw.gpos_scale * pert_fac,
                           &ligand_psw.zcrd[synth_idx], &ligand_psw.zcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
                           &ligand_dbl_psw.xcrd[synth_idx], &ligand_dbl_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
                           &ligand_dbl_psw.ycrd[synth_idx], &ligand_dbl_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_dbl_psw.gpos_scale * pert_fac,
                           &ligand_dbl_psw.zcrd[synth_idx], &ligand_dbl_psw.zcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
                           &ligand_sdbl_psw.xcrd[synth_idx], &ligand_sdbl_psw.xcrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
                           &ligand_sdbl_psw.ycrd[synth_idx], &ligand_sdbl_psw.ycrd_ovrf[synth_idx]);
-        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale,
+        splitAccumulation(xrs.gaussianRandomNumber() * ligand_sdbl_psw.gpos_scale * pert_fac,
                           &ligand_sdbl_psw.zcrd[synth_idx], &ligand_sdbl_psw.zcrd_ovrf[synth_idx]);
       }
     }
@@ -745,6 +752,46 @@ int main(const int argc, const char* argv[]) {
         "sites placed by the GPU kernel do not agree with those placed by the CPU function.  "
         "Precision level: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the "
         "decimal: " + std::to_string(ligand_poly_ps_sdbl.getGlobalPositionBits()) + ".", do_tests);
+  
+  // Now, download the updated positions to the CPU.  Recompute forces with the new positions
+  // and compare with CPU-derived forces on those new positions (checking the virtual site
+  // positions by exporting CoordinateFrame objects and then work in them did not change the
+  // virtual site positions on the CPU memory of the original PhaseSpaceSynthesis objects).
+  ligand_poly_ps.upload();
+  ligand_poly_ps_dbl.upload();
+  ligand_poly_ps_sdbl.upload();
+  mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::SINGLE, ligand_poly_ag);
+  checkCompilationForces(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionModel::SINGLE, gpu, ligand_launcher, 7.5e-5, 3.0e-3, do_tests,
+                         "(Following virtual site replacement.)");
+  mmctrl.primeWorkUnitCounters(ligand_launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::DOUBLE, ligand_poly_ag);
+  checkCompilationForces(&ligand_poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-6, 2.0e-6, do_tests,
+                         "(Following virtual site replacement.)");
+  checkCompilationForces(&ligand_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
+                         ligand_poly_ag, ligand_poly_se, ForceAccumulationMethod::SPLIT,
+                         PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-6, 2.0e-6, do_tests,
+                         "(Following virtual site replacement.)");
+
+  // Transmit forces from the virtual sites back to their frame atoms.  Attempt similar processes
+  // on the CPU, using PhaseSpace objects to process one system at a time.
+  const VirtualSiteActivity t_activity = VirtualSiteActivity::TRANSMIT_FORCES;
+  launchVirtualSiteHandling(PrecisionModel::SINGLE, t_activity ,&ligand_poly_ps, &valence_tb_space,
+                           ligand_poly_ag, ligand_launcher);
+  launchVirtualSiteHandling(PrecisionModel::DOUBLE, t_activity, &ligand_poly_ps_dbl,
+                            &valence_tb_space, ligand_poly_ag, ligand_launcher);
+  launchVirtualSiteHandling(PrecisionModel::DOUBLE, t_activity, &ligand_poly_ps_sdbl,
+                            &valence_tb_space, ligand_poly_ag, ligand_launcher);
+
+  // CHECK
+  for (int i = 0; i < nligands; i++) {
+
+  }
+  // END CHECK
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

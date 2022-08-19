@@ -155,11 +155,10 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
             const TCALC dy = int95SumToDouble(frame2_y, frame2_y_ovrf, -parent_y, -parent_y_ovrf);
             const TCALC dz = int95SumToDouble(frame2_z, frame2_z_ovrf, -parent_z, -parent_z_ovrf);
 #endif
-            const TCALC invr = (TCALC)(1.0) / SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
-
             // The presence of a distance in the above expression requires normalization by the
             // scaling factor, but only one multiplication operation is needed.
-            const TCALC disp_mult = fr_details.x * invr * poly_psw.gpos_scale;
+            const TCALC disp_mult = fr_details.x * poly_psw.gpos_scale_f /
+                                    SQRT_FUNC((dx * dx) + (dy * dy) + (dz * dz));
 #ifdef TCALC_IS_SINGLE
             __stwb(&gmem_r.xcrd[vs_atom], parent_x + LLCONV_FUNC(dx * disp_mult));
             __stwb(&gmem_r.ycrd[vs_atom], parent_y + LLCONV_FUNC(dy * disp_mult));

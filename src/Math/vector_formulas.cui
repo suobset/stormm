@@ -24,3 +24,13 @@ __device__ __forceinline__ float3 project(const float3 va, const float3 vb) {
   const float dp_val = ((va.x * vb.x) + (va.y * vb.y) + (va.z * vb.z)) / mag2_vb;
   return { va.x - (vb.x * dp_val), va.y - (vb.y * dp_val), va.z - (vb.z * dp_val) };
 }
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ double dot(const double3 va, const double3 vb) {
+  return (va.x * vb.x) + (va.y * vb.y) + (va.z * vb.z);
+}
+
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ float dot(const float3 va, const float3 vb) {
+  return (va.x * vb.x) + (va.y * vb.y) + (va.z * vb.z);
+}
