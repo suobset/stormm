@@ -803,11 +803,6 @@ int main(const int argc, const char* argv[]) {
   gpulig_sdbl_ps_vec.reserve(nligands);
   std::vector<double> cpu_forces, cpu_dbl_forces, cpu_sdbl_forces;
   std::vector<double> gpu_forces, gpu_dbl_forces, gpu_sdbl_forces;
-
-  // CHECK
-  int j_offset = 0;
-  // END CHECK
-  
   for (int i = 0; i < nligands; i++) {
 
     // Obtain coordinates and un-transmitted forces on the CPU
@@ -841,29 +836,24 @@ int main(const int argc, const char* argv[]) {
     gpu_forces.insert(gpu_forces.end(), gpu_ilfrc.begin(), gpu_ilfrc.end());
     gpu_dbl_forces.insert(gpu_dbl_forces.end(), gpu_dbl_ilfrc.begin(), gpu_dbl_ilfrc.end());
     gpu_sdbl_forces.insert(gpu_sdbl_forces.end(), gpu_sdbl_ilfrc.begin(), gpu_sdbl_ilfrc.end());
-
-    // CHECK
-    if (i < 4) {
-      printf("System %d: %24.24s\n", i, getBaseName(iag_ptr->getFileName()).c_str());
-      for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
-        printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %9.4lf %9.4lf ||", cpu_forces[(3 * j) + j_offset],
-               cpu_forces[(3 * j) + 1 + j_offset], cpu_forces[(3 * j) + 2 + j_offset],
-               gpu_forces[(3 * j) + j_offset], gpu_forces[(3 * j) + 1 + j_offset],
-               gpu_forces[(3 * j) + 2 + j_offset]);
-        printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %9.4lf %9.4lf ||",
-               cpu_dbl_forces[(3 * j) + j_offset], cpu_dbl_forces[(3 * j) + 1 + j_offset],
-               cpu_dbl_forces[(3 * j) + 2 + j_offset], gpu_dbl_forces[(3 * j) + j_offset],
-               gpu_dbl_forces[(3 * j) + 1 + j_offset], gpu_dbl_forces[(3 * j) + 2 + j_offset]);
-        printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %9.4lf %9.4lf\n",
-               cpu_sdbl_forces[(3 * j) + j_offset], cpu_sdbl_forces[(3 * j) + 1 + j_offset],
-               cpu_sdbl_forces[(3 * j) + 2 + j_offset], gpu_sdbl_forces[(3 * j) + j_offset],
-               gpu_sdbl_forces[(3 * j) + 1 + j_offset], gpu_sdbl_forces[(3 * j) + 2 + j_offset]);
-      }
-      j_offset += 3 * iag_ptr->getAtomCount();
-    }
-    // END CHECK
   }
-  
+  check(cpu_forces, RelationalOperator::EQUAL, Approx(gpu_forces).margin(1.0e-5),
+        "Force transmission from virtual sites produces different results when accomplished by "
+        "C++ functions and the standalone GPU kernel.  Precision model: " +
+        getPrecisionModelName(PrecisionModel::SINGLE) + ".");
+  check(cpu_dbl_forces, RelationalOperator::EQUAL, Approx(gpu_dbl_forces).margin(1.0e-5),
+        "Force transmission from virtual sites produces different results when accomplished by "
+        "C++ functions and the standalone GPU kernel.  Precision model: " +
+        getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the decimal (coordinates / "
+        "forces): " + std::to_string(ligand_poly_ps_dbl.getGlobalPositionBits()) + " / " +
+        std::to_string(ligand_poly_ps_dbl.getForceAccumulationBits()) + ".");
+  check(cpu_sdbl_forces, RelationalOperator::EQUAL, Approx(gpu_sdbl_forces).margin(1.0e-5),
+        "Force transmission from virtual sites produces different results when accomplished by "
+        "C++ functions and the standalone GPU kernel.  Precision model: " +
+        getPrecisionModelName(PrecisionModel::DOUBLE) + ".  Bits after the decimal (coordinates / "
+        "forces): " + std::to_string(ligand_poly_ps_sdbl.getGlobalPositionBits()) + " / " +
+        std::to_string(ligand_poly_ps_sdbl.getForceAccumulationBits()) + ".");
+
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);
