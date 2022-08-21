@@ -1156,28 +1156,29 @@ void PhaseSpaceSynthesis::download() {
 
 //-------------------------------------------------------------------------------------------------
 void PhaseSpaceSynthesis::download(const TrajectoryKind kind) {
-  const int stride = roundUp(atom_starts.readHost(system_count - 1) +
-                             atom_counts.readHost(system_count - 1), warp_size_int);
+  const size_t stride = roundUp<size_t>(atom_starts.readHost(system_count - 1) +
+                                        atom_counts.readHost(system_count - 1), warp_size_zu);
+  const size_t llbox_stride  = system_count * roundUp<size_t>(9, warp_size_zu);
+  const size_t system_offset = 2LLU * roundUp<size_t>(system_count, warp_size_zu);
   switch (kind) {
   case TrajectoryKind::POSITIONS:
-    x_coordinates.download(0, 9 * stride);
+    llint_data.download(0LLU, (9LLU * stride) + llbox_stride);
     if (globalpos_scale_bits > globalpos_scale_nonoverflow_bits) {
-      x_coordinate_overflow.download(0, 9 * stride);
+      int_data.download(system_offset, 9LLU * stride);
     }
     double_data.download();
     float_data.download();
-    box_vectors.download();
     break;
   case TrajectoryKind::VELOCITIES:
-    x_velocities.download(0, 3 * stride);
+    llint_data.download((9LLU * stride) + llbox_stride, 3LLU * stride);
     if (velocity_scale_bits > velocity_scale_nonoverflow_bits) {
-      x_velocity_overflow.download(0, 3 * stride);
+      int_data.download(system_offset + (9LLU * stride), 3 * stride);
     }
     break;
   case TrajectoryKind::FORCES:
-    x_forces.download(0, 3 * stride);
+    llint_data.download((12LLU * stride) + llbox_stride, 3LLU * stride);
     if (force_scale_bits > force_scale_nonoverflow_bits) {
-      x_force_overflow.download(0, 3 * stride);
+      int_data.download(system_offset + (12LLU * stride), 3 * stride);
     }
     break;
   }
@@ -2199,13 +2200,13 @@ void PhaseSpaceSynthesis::allocate(const size_t atom_stride) {
   x_future_coordinates.setPointer(&llint_data,  6LLU * atom_stride, atom_stride);
   y_future_coordinates.setPointer(&llint_data,  7LLU * atom_stride, atom_stride);
   z_future_coordinates.setPointer(&llint_data,  8LLU * atom_stride, atom_stride);
-  x_velocities.setPointer(&llint_data,          9LLU * atom_stride, atom_stride);
-  y_velocities.setPointer(&llint_data,         10LLU * atom_stride, atom_stride);
-  z_velocities.setPointer(&llint_data,         11LLU * atom_stride, atom_stride);
-  x_forces.setPointer(&llint_data,             12LLU * atom_stride, atom_stride);
-  y_forces.setPointer(&llint_data,             13LLU * atom_stride, atom_stride);
-  z_forces.setPointer(&llint_data,             14LLU * atom_stride, atom_stride);
-  box_vectors.setPointer(&llint_data,          15LLU * atom_stride, xfrm_stride);
+  box_vectors.setPointer(&llint_data,           9LLU * atom_stride, xfrm_stride);  
+  x_velocities.setPointer(&llint_data, xfrm_stride + ( 9LLU * atom_stride), atom_stride);
+  y_velocities.setPointer(&llint_data, xfrm_stride + (10LLU * atom_stride), atom_stride);
+  z_velocities.setPointer(&llint_data, xfrm_stride + (11LLU * atom_stride), atom_stride);
+  x_forces.setPointer(&llint_data,     xfrm_stride + (12LLU * atom_stride), atom_stride);
+  y_forces.setPointer(&llint_data,     xfrm_stride + (13LLU * atom_stride), atom_stride);
+  z_forces.setPointer(&llint_data,     xfrm_stride + (14LLU * atom_stride), atom_stride);
   x_coordinate_overflow.setPointer(&int_data,                           twosys, atom_stride);
   y_coordinate_overflow.setPointer(&int_data,            atom_stride  + twosys, atom_stride);
   z_coordinate_overflow.setPointer(&int_data,   ( 2LLU * atom_stride) + twosys, atom_stride);

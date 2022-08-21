@@ -664,13 +664,13 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
           F3[j] = f1fac * f23_t_pf2[j];          
         }
         if (tforce_is_sgnint) {
-          const Tforce f1_xpart = llround(((p_f2_factor * F1[0]) +
+          const Tforce f1_xpart = llround(((p_f2_factor * F1[0]) -
                                            (t_factor * ((abbcOabab * F2[0]) + F3[0]))) *
                                           force_scale_factor);
-          const Tforce f1_ypart = llround(((p_f2_factor * F1[1]) +
+          const Tforce f1_ypart = llround(((p_f2_factor * F1[1]) -
                                            (t_factor * ((abbcOabab * F2[1]) + F3[1]))) *
                                           force_scale_factor);
-          const Tforce f1_zpart = llround(((p_f2_factor * F1[2]) +
+          const Tforce f1_zpart = llround(((p_f2_factor * F1[2]) -
                                            (t_factor * ((abbcOabab * F2[2]) + F3[2]))) *
                                           force_scale_factor);
           const Tforce f3_xpart = llround(t_factor * F2[0] * force_scale_factor);

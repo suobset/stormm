@@ -777,6 +777,11 @@ int main(const int argc, const char* argv[]) {
                          PrecisionModel::DOUBLE, gpu, ligand_launcher, 3.5e-6, 2.0e-6, do_tests,
                          "(Following virtual site replacement.)");
 
+  // Download the forces computed on all particles (prior to virtual site force transmission)
+  ligand_poly_ps.download(TrajectoryKind::FORCES);
+  ligand_poly_ps_dbl.download(TrajectoryKind::FORCES);
+  ligand_poly_ps_sdbl.download(TrajectoryKind::FORCES);
+
   // Transmit forces from the virtual sites back to their frame atoms.  Attempt similar processes
   // on the CPU, using PhaseSpace objects to process one system at a time.
   const VirtualSiteActivity t_activity = VirtualSiteActivity::TRANSMIT_FORCES;
@@ -787,11 +792,77 @@ int main(const int argc, const char* argv[]) {
   launchVirtualSiteHandling(PrecisionModel::DOUBLE, t_activity, &ligand_poly_ps_sdbl,
                             &valence_tb_space, ligand_poly_ag, ligand_launcher);
 
+  // Check the force transmission kernel with the equivalent CPU routines
+  std::vector<PhaseSpace> cpulig_ps_vec, cpulig_dbl_ps_vec, cpulig_sdbl_ps_vec;
+  std::vector<PhaseSpace> gpulig_ps_vec, gpulig_dbl_ps_vec, gpulig_sdbl_ps_vec;
+  cpulig_ps_vec.reserve(nligands);
+  cpulig_dbl_ps_vec.reserve(nligands);
+  cpulig_sdbl_ps_vec.reserve(nligands);
+  gpulig_ps_vec.reserve(nligands);
+  gpulig_dbl_ps_vec.reserve(nligands);
+  gpulig_sdbl_ps_vec.reserve(nligands);
+  std::vector<double> cpu_forces, cpu_dbl_forces, cpu_sdbl_forces;
+  std::vector<double> gpu_forces, gpu_dbl_forces, gpu_sdbl_forces;
+
   // CHECK
+  int j_offset = 0;
+  // END CHECK
+  
   for (int i = 0; i < nligands; i++) {
 
+    // Obtain coordinates and un-transmitted forces on the CPU
+    cpulig_ps_vec.emplace_back(ligand_poly_ps.exportSystem(i));
+    cpulig_dbl_ps_vec.emplace_back(ligand_poly_ps_dbl.exportSystem(i));
+    cpulig_sdbl_ps_vec.emplace_back(ligand_poly_ps_sdbl.exportSystem(i));
+
+    // Obtain coordinates and transmitted forces from the GPU (virtual site forces should be zero)
+    const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+    gpulig_ps_vec.emplace_back(ligand_poly_ps.exportSystem(i, devc_tier));
+    gpulig_dbl_ps_vec.emplace_back(ligand_poly_ps_dbl.exportSystem(i, devc_tier));
+    gpulig_sdbl_ps_vec.emplace_back(ligand_poly_ps_sdbl.exportSystem(i, devc_tier));
+
+    // Transmit forces, via CPU routines, in the respective individual system coordinate objects
+    const AtomGraph *iag_ptr = ligand_poly_ag.getSystemTopologyPointer(i);
+    transmitVirtualSiteForces(&cpulig_ps_vec[i], *iag_ptr);
+    transmitVirtualSiteForces(&cpulig_dbl_ps_vec[i], *iag_ptr);
+    transmitVirtualSiteForces(&cpulig_sdbl_ps_vec[i], *iag_ptr);
+
+    // Test forces from each process for consistency
+    const TrajectoryKind tforce = TrajectoryKind::FORCES;
+    std::vector<double> cpu_ilfrc      = cpulig_ps_vec[i].getInterlacedCoordinates(tforce);
+    std::vector<double> cpu_dbl_ilfrc  = cpulig_dbl_ps_vec[i].getInterlacedCoordinates(tforce);
+    std::vector<double> cpu_sdbl_ilfrc = cpulig_sdbl_ps_vec[i].getInterlacedCoordinates(tforce);
+    std::vector<double> gpu_ilfrc      = gpulig_ps_vec[i].getInterlacedCoordinates(tforce);
+    std::vector<double> gpu_dbl_ilfrc  = gpulig_dbl_ps_vec[i].getInterlacedCoordinates(tforce);
+    std::vector<double> gpu_sdbl_ilfrc = gpulig_sdbl_ps_vec[i].getInterlacedCoordinates(tforce);
+    cpu_forces.insert(cpu_forces.end(), cpu_ilfrc.begin(), cpu_ilfrc.end());
+    cpu_dbl_forces.insert(cpu_dbl_forces.end(), cpu_dbl_ilfrc.begin(), cpu_dbl_ilfrc.end());
+    cpu_sdbl_forces.insert(cpu_sdbl_forces.end(), cpu_sdbl_ilfrc.begin(), cpu_sdbl_ilfrc.end());
+    gpu_forces.insert(gpu_forces.end(), gpu_ilfrc.begin(), gpu_ilfrc.end());
+    gpu_dbl_forces.insert(gpu_dbl_forces.end(), gpu_dbl_ilfrc.begin(), gpu_dbl_ilfrc.end());
+    gpu_sdbl_forces.insert(gpu_sdbl_forces.end(), gpu_sdbl_ilfrc.begin(), gpu_sdbl_ilfrc.end());
+
+    // CHECK
+    if (i < 4) {
+      printf("System %d: %24.24s\n", i, getBaseName(iag_ptr->getFileName()).c_str());
+      for (int j = 0; j < iag_ptr->getAtomCount(); j++) {
+        printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %9.4lf %9.4lf ||", cpu_forces[(3 * j) + j_offset],
+               cpu_forces[(3 * j) + 1 + j_offset], cpu_forces[(3 * j) + 2 + j_offset],
+               gpu_forces[(3 * j) + j_offset], gpu_forces[(3 * j) + 1 + j_offset],
+               gpu_forces[(3 * j) + 2 + j_offset]);
+        printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %9.4lf %9.4lf ||",
+               cpu_dbl_forces[(3 * j) + j_offset], cpu_dbl_forces[(3 * j) + 1 + j_offset],
+               cpu_dbl_forces[(3 * j) + 2 + j_offset], gpu_dbl_forces[(3 * j) + j_offset],
+               gpu_dbl_forces[(3 * j) + 1 + j_offset], gpu_dbl_forces[(3 * j) + 2 + j_offset]);
+        printf("  %9.4lf %9.4lf %9.4lf  %9.4lf %9.4lf %9.4lf\n",
+               cpu_sdbl_forces[(3 * j) + j_offset], cpu_sdbl_forces[(3 * j) + 1 + j_offset],
+               cpu_sdbl_forces[(3 * j) + 2 + j_offset], gpu_sdbl_forces[(3 * j) + j_offset],
+               gpu_sdbl_forces[(3 * j) + 1 + j_offset], gpu_sdbl_forces[(3 * j) + 2 + j_offset]);
+      }
+      j_offset += 3 * iag_ptr->getAtomCount();
+    }
+    // END CHECK
   }
-  // END CHECK
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
