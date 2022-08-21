@@ -808,8 +808,10 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
         rj_f34[1] = rj_f4[1] - rj_f3[1];
         rj_f34[2] = rj_f4[2] - rj_f3[2];
         crossProduct(rj_f3, rj_f4, rm);
-        const Tcalc invr2_rm = 1.0 / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2]));
-        const Tcalc invr_rm  = sqrt(invr2_rm);
+        const Tcalc invr2_rm = (tcalc_is_double) ?
+                               1.0 / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2])) :
+                               value_one / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2]));
+        const Tcalc invr_rm  = (tcalc_is_double) ? sqrt(invr2_rm) : sqrtf(invr2_rm);
         const Tcalc cfx = vsk.dim3[pidx] * invr_rm * vs_frc[0];
         const Tcalc cfy = vsk.dim3[pidx] * invr_rm * vs_frc[1];
         const Tcalc cfz = vsk.dim3[pidx] * invr_rm * vs_frc[2];
