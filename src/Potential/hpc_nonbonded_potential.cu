@@ -40,7 +40,7 @@ using topology::ImplicitSolventModel;
 //   nbwu_map:  Details of the non-bonded work unit, condensed into a simple array of integers
 //   pos:       Thread position in the list of atoms
 //-------------------------------------------------------------------------------------------------
-__device__ __forceinline__ int getTileSideAtomCount(int* nbwu_map, const int pos) {
+__device__ __forceinline__ int getTileSideAtomCount(const int* nbwu_map, const int pos) {
   const int key_idx  = pos / 4;
   const int key_slot = pos - (key_idx * 4);
   return ((nbwu_map[small_block_max_imports + 1 + key_idx] >> (8 * key_slot)) & 0xff);
@@ -48,6 +48,176 @@ __device__ __forceinline__ int getTileSideAtomCount(int* nbwu_map, const int pos
 
 #include "Numerics/accumulation.cui"
 #include "Math/rounding.cui"
+
+//-------------------------------------------------------------------------------------------------
+// Load coordinates relating to atoms in a non-bonded tile suitable for isolated boundary
+// conditions.
+//
+// Overloaded:
+//   - Work with an array of long long integers appropriate for single-precision arithmetic
+//   - Work with dual arrays of long long int and int types, appropriate for double-precision
+//     arithmetic
+//
+// Arguments:
+//   pos:
+//   tile_lane_idx:
+//   tile_sides_per_warp:
+//   warps_per_block:
+//   import_count:
+//   padded_import_count:
+//   iter:
+//   nbwu_map:
+//   read_crd:
+//   write_crd:
+//   read_crd_ovrf:
+//   write_crd_ovrf:
+//   sh_tile_cog:
+//   gpos_scale:
+//-------------------------------------------------------------------------------------------------
+__device__ int loadTileCoordinates(const int pos, const int tile_lane_idx,
+                                   const int tile_sides_per_warp, const int warps_per_block,
+                                   const int import_count, const int padded_import_count,
+                                   const int iter, const int* nbwu_map, const llint* read_crd,
+                                   llint* write_crd, float* sh_tile_cog, const float gpos_scale) {
+  int rel_pos = pos - (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    float fval;
+    if (rel_pos < import_count) {
+      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        const llint ival = __ldcs(&read_crd[read_idx]);
+        fval = (float)(ival);
+        __stwb(&write_crd[write_idx], ival);
+      }
+      else {
+        fval = (float)(0.0);
+        __stwb(&write_crd[write_idx], (128 * rel_pos * tile_lane_idx) * gpos_scale);
+      }
+    }
+    else {
+      fval = (float)(0.0);
+    }
+    for (int i = half_tile_length; i > 0; i >>= 1) {
+      fval += SHFL_DOWN(fval, i);
+    }
+    if (tile_lane_idx == 0 && rel_pos < import_count) {
+      sh_tile_cog[rel_pos] = fval;
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+__device__ int loadTileCoordinates(const int pos, const int tile_lane_idx,
+                                   const int tile_sides_per_warp, const int warps_per_block,
+                                   const int import_count, const int padded_import_count,
+                                   const int iter, const int* nbwu_map, const llint* read_crd,
+                                   llint* write_crd, const int* read_crd_ovrf, int* write_crd_ovrf,
+                                   double* sh_tile_cog, const double gpos_scale) {
+  int rel_pos = pos - (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    double fval;
+    if (rel_pos < import_count) {
+      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        const llint ival = __ldcs(&read_crd[read_idx]);
+        fval = (double)(ival);
+        __stwb(&write_crd[write_idx], ival);
+        const int ival_ovrf = __ldcs(&read_crd_ovrf[read_idx]);
+        fval += (double)(ival_ovrf) * max_llint_accumulation;
+        __stwb(&write_crd_ovrf[write_idx], ival_ovrf);
+      }
+      else {
+        fval = 0.0;
+        const int95_t fake_val = doubleToInt95((128 * rel_pos * tile_lane_idx) * gpos_scale);
+        __stwb(&write_crd[write_idx], fake_val.x);
+        __stwb(&write_crd_ovrf[write_idx], fake_val.y);
+      }
+    }
+    else {
+      fval = 0.0;
+    }
+    for (int i = half_tile_length; i > 0; i >>= 1) {
+      fval += SHFL_DOWN(fval, i);
+    }
+    if (tile_lane_idx == 0 && rel_pos < import_count) {
+      sh_tile_cog[rel_pos] = fval;
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+//
+//-------------------------------------------------------------------------------------------------
+__device__ int loadTileProperty(const int pos, const int tile_lane_idx,
+                                const int tile_sides_per_warp, const int warps_per_block,
+                                const int import_count, const int padded_import_count,
+                                const int iter, const int* nbwu_map, const int* read_array,
+                                int* write_array) {
+  int rel_pos = pos + (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        write_array[write_idx] = __ldcs(&read_array[read_idx]);
+      }
+      else {
+        write_array[write_idx] = 0;
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+__device__ int loadTileProperty(const int pos, const int tile_lane_idx,
+                                const int tile_sides_per_warp, const int warps_per_block,
+                                const int import_count, const int padded_import_count,
+                                const int iter, const int* nbwu_map, const float* read_array,
+                                float* write_array, const float multiplier) {
+  int rel_pos = pos + (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        write_array[write_idx] = __ldcs(&read_array[read_idx]) * multiplier;
+      }
+      else {
+        write_array[write_idx] = (float)(0.0);
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+__device__ int loadTileProperty(const int pos, const int tile_lane_idx,
+                                const int tile_sides_per_warp, const int warps_per_block,
+                                const int import_count, const int padded_import_count,
+                                const int iter, const int* nbwu_map, const double* read_array,
+                                double* write_array, const double multiplier) {
+  int rel_pos = pos + (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        write_array[write_idx] = __ldcs(&read_array[read_idx]) * multiplier;
+      }
+      else {
+        write_array[write_idx] = (float)(0.0);
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
 
 // Single-precision non-bonded kernel floating point definitions
 #define TCALC float

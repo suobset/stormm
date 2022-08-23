@@ -98,157 +98,33 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     const int import_count = nbwu_map[0];
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
-    while (pos < padded_import_count) {
-      TCALC fxval;
-      if (pos < import_count) {
-        const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
-        const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, pos)) {
-          const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
-          fxval = (TCALC)(ixval);
-          __stwb(&gmem_r.xcrd[write_idx], ixval);
-#ifndef TCALC_IS_SINGLE
-          const int ixval_ovrf = __ldcs(&poly_psw.xcrd_ovrf[read_idx]);
-          fxval += (TCALC)(ixval_ovrf) * max_llint_accumulation;
-          __stwb(&gmem_r.xcrd_ovrf[write_idx], ixval_ovrf);
-#endif
-        }
-        else {
-          fxval = (TCALC)(0.0);
 #ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.xcrd[write_idx], (128 * pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
+                              import_count, padded_import_count, 0, nbwu_map, poly_psw.xcrd,
+                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], sh_tile_xcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
+                              import_count, padded_import_count, 1, nbwu_map, poly_psw.ycrd,
+                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], sh_tile_ycog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
+                              import_count, padded_import_count, 2, nbwu_map, poly_psw.zcrd,
+                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], sh_tile_zcog, poly_psw.gpos_scale_f);
 #else
-          const int95_t fake_x = doubleToInt95((128 * pos * tile_lane_idx) * poly_psw.gpos_scale);
-          __stwb(&gmem_r.xcrd[write_idx], fake_x.x);
-          __stwb(&gmem_r.xcrd_ovrf[write_idx], fake_x.y);
+    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
+                              import_count, padded_import_count, 0, nbwu_map, poly_psw.xcrd,
+                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], poly_psw.xcrd_ovrf,
+                              &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_xcog,
+                              poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
+                              import_count, padded_import_count, 1, nbwu_map, poly_psw.ycrd,
+                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], poly_psw.ycrd_ovrf,
+                              &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_ycog,
+                              poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
+                              import_count, padded_import_count, 2, nbwu_map, poly_psw.zcrd,
+                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], poly_psw.zcrd_ovrf,
+                              &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
+                              poly_psw.gpos_scale);
 #endif
-        }
-#ifdef COMPUTE_FORCE
-#  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifdef TCALC_IS_SINGLE
-        sh_xfrc[write_idx - EXCL_GMEM_OFFSET] = 0;
-#    else
-        sh_xfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
-#    endif
-        sh_xfrc_overflow[write_idx - EXCL_GMEM_OFFSET] = 0;
-#  else
-        sh_xfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
-#  endif
-#endif
-      }
-      else {
-        fxval = (TCALC)(0.0);
-      }
-      for (int i = half_tile_length; i > 0; i >>= 1) {
-        fxval += SHFL_DOWN(fxval, i);
-      }
-      if (tile_lane_idx == 0 && pos < import_count) {
-        sh_tile_xcog[pos] = fxval;
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 2 * padded_import_count) {
-      TCALC fyval;
-      const int rel_pos = pos - padded_import_count;
-      if (rel_pos < import_count) {
-        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
-          fyval = (TCALC)(iyval);
-          __stwb(&gmem_r.ycrd[write_idx], iyval);
-#ifndef TCALC_IS_SINGLE
-          const int iyval_ovrf = __ldcs(&poly_psw.ycrd_ovrf[read_idx]);
-          fyval += (TCALC)(iyval_ovrf) * max_llint_accumulation;
-          __stwb(&gmem_r.ycrd_ovrf[write_idx], iyval_ovrf);
-#endif
-        }
-        else {
-          fyval = (TCALC)(0.0);
-#ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.ycrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
-#else
-          const int95_t fake_y = doubleToInt95((128 * rel_pos * tile_lane_idx) *
-                                               poly_psw.gpos_scale);
-          __stwb(&gmem_r.ycrd[write_idx], fake_y.x);
-          __stwb(&gmem_r.ycrd_ovrf[write_idx], fake_y.y);
-#endif
-        }
-#ifdef COMPUTE_FORCE
-#  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifdef TCALC_IS_SINGLE
-        sh_yfrc[write_idx - EXCL_GMEM_OFFSET] = 0;
-#    else
-        sh_yfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
-#    endif
-        sh_yfrc_overflow[write_idx - EXCL_GMEM_OFFSET] = 0;
-#  else
-        sh_yfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
-#  endif
-#endif
-      }
-      else {
-        fyval = (TCALC)(0.0);
-      }
-      for (int i = half_tile_length; i > 0; i >>= 1) {
-        fyval += SHFL_DOWN(fyval, i);
-      }
-      if (tile_lane_idx == 0 && rel_pos < import_count) {
-        sh_tile_ycog[rel_pos] = fyval;
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 3 * padded_import_count) {
-      TCALC fzval;
-      const int rel_pos = pos - (2 * padded_import_count);
-      if (rel_pos < import_count) {
-        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
-          fzval = (TCALC)(izval);
-          __stwb(&gmem_r.zcrd[write_idx], izval);
-#ifndef TCALC_IS_SINGLE
-          const int izval_ovrf = __ldcs(&poly_psw.zcrd_ovrf[read_idx]);
-          fzval += (TCALC)(izval_ovrf) * max_llint_accumulation;
-          __stwb(&gmem_r.zcrd_ovrf[write_idx], izval_ovrf);
-#endif
-        }
-        else {
-          fzval = (TCALC)(0.0);
-#ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.zcrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
-#else
-          const int95_t fake_z = doubleToInt95((128 * rel_pos * tile_lane_idx) *
-                                               poly_psw.gpos_scale);
-          __stwb(&gmem_r.zcrd[write_idx], fake_z.x);
-          __stwb(&gmem_r.zcrd_ovrf[write_idx], fake_z.y);
-#endif
-        }
-#ifdef COMPUTE_FORCE
-#  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifdef TCALC_IS_SINGLE
-        sh_zfrc[write_idx - EXCL_GMEM_OFFSET] = 0;
-#    else
-        sh_zfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
-#    endif
-        sh_zfrc_overflow[write_idx - EXCL_GMEM_OFFSET] = 0;
-#  else
-        sh_zfrc[write_idx - EXCL_GMEM_OFFSET] = 0LL;
-#  endif
-#endif
-      }
-      else {
-        fzval = (TCALC)(0.0);
-      }
-      for (int i = half_tile_length; i > 0; i >>= 1) {
-        fzval += SHFL_DOWN(fzval, i);
-      }
-      if (tile_lane_idx == 0 && rel_pos < import_count) {
-        sh_tile_zcog[rel_pos] = fzval;
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
     while (pos < 4 * padded_import_count) {
       const int rel_pos = pos - (3 * padded_import_count);
       if (rel_pos < import_count) {
@@ -261,15 +137,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         }
         else {
           __stwb(&gmem_r.charges[write_idx], (TCALC)(0.0));
-        }
-      
-        // Stuff the total number of particles in this tile side into its shared memory slot.
-        // Obtain this system's Lennard-Jone atom type count.  Any of the five warps gathering
-        // preliminary data could do this, but have this one do it for better load balancing.
-        if (tile_lane_idx == 0) {
-          sh_tile_tpts[rel_pos] = (TCALC)(tside_count);
-          const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
-          sh_n_lj_types[rel_pos] = poly_nbk.n_lj_types[system_idx];
         }
       }
       pos += tile_sides_per_warp * warps_per_block;
@@ -285,20 +152,56 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         else {
           __stwb(&gmem_r.lj_idx[write_idx], 0);
         }
-
-        // Transfer the system index of this group of atoms (this "tile side") into the appropriate
-        // __shared__ memory slot.  Obtain the Lennard-Jones table offsets for this tile's system.
-        // Any of the five warps could do this, but have this one do it for beetter load balancing.
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 6 * padded_import_count) {
+      const int rel_pos = pos - (5 * padded_import_count);
+      if (rel_pos < import_count) {
         if (tile_lane_idx == 0) {
+
+          // Stuff the total number of particles in this tile side into its shared memory slot.
+          // Obtain this system's Lennard-Jone atom type count.  Transfer the system index of this
+          // group of atoms (this "tile side") into the appropriate __shared__ memory slot.
+          // Obtain the Lennard-Jones table offsets for this tile's system.
+          sh_tile_tpts[rel_pos] = (TCALC)(getTileSideAtomCount(nbwu_map, rel_pos));
           const size_t system_idx = nbwu_map[small_block_max_imports + 8 + rel_pos];
+          sh_n_lj_types[rel_pos] = poly_nbk.n_lj_types[system_idx];
 #ifdef COMPUTE_ENERGY
           sh_system_indices[rel_pos] = system_idx;
 #endif
           sh_ljabc_offsets[rel_pos] = poly_nbk.ljabc_offsets[system_idx];
-        }
+        }          
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
+#ifdef COMPUTE_FORCE
+    while (pos < 7 * padded_import_count) {
+      const int rel_pos = pos - (6 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+#  ifdef SPLIT_FORCE_ACCUMULATION
+#    ifdef TCALC_IS_SINGLE
+        sh_xfrc[write_idx] = 0;
+        sh_yfrc[write_idx] = 0;
+        sh_zfrc[write_idx] = 0;
+#    else
+        sh_xfrc[write_idx] = 0LL;
+        sh_yfrc[write_idx] = 0LL;
+        sh_zfrc[write_idx] = 0LL;
+#    endif
+        sh_xfrc_overflow[write_idx] = 0;
+        sh_yfrc_overflow[write_idx] = 0;
+        sh_zfrc_overflow[write_idx] = 0;
+#  else
+        sh_xfrc[write_idx] = 0LL;
+        sh_yfrc[write_idx] = 0LL;
+        sh_zfrc[write_idx] = 0LL;
+#  endif
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+#endif
     __syncthreads();
 
     // Loop over tile instructions
