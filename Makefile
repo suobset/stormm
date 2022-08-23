@@ -82,6 +82,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Structure/structure_utils.cpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
+		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.cpp \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
@@ -205,6 +206,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Structure/structure_utils.h \
 		     $(SRCDIR)/Structure/virtual_site_handling.h \
 		     $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
+		     $(SRCDIR)/Synthesis/implicit_solvent_workspace.h \
 		     $(SRCDIR)/Synthesis/phasespace_synthesis.h \
 		     $(SRCDIR)/Synthesis/nonbonded_workunit.h \
 		     $(SRCDIR)/Synthesis/static_mask_synthesis.h \
@@ -350,6 +352,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Structure/structure_utils.o \
 		  $(SRCDIR)/Structure/virtual_site_handling.o \
 		  $(SRCDIR)/Synthesis/atomgraph_synthesis.o \
+		  $(SRCDIR)/Synthesis/implicit_solvent_workspace.o \
 		  $(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		  $(SRCDIR)/Synthesis/nonbonded_workunit.o \
 		  $(SRCDIR)/Synthesis/static_mask_synthesis.o \

@@ -6,8 +6,10 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Numerics/split_fixed_precision.h"
+#include "Synthesis/implicit_solvent_workspace.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "hpc_nonbonded_potential.h"
 
 namespace stormm {
@@ -28,21 +30,33 @@ using synthesis::NbwuKind;
 using synthesis::small_block_max_imports;
 using synthesis::small_block_max_atoms;
 using synthesis::tile_groups_wu_abstract_length;
-
+using topology::ImplicitSolventModel;
+  
+//-------------------------------------------------------------------------------------------------
+__device__ __forceinline__ int getTileSideAtomCount(int* nbwu_map, const int pos) {
+  const int key_idx  = pos / 4;
+  const int key_slot = pos - (key_idx * 4);
+  return ((nbwu_map[small_block_max_imports + 1 + key_idx] >> (8 * key_slot)) & 0xff);
+}
+  
 #include "Numerics/accumulation.cui"
 #include "Math/rounding.cui"
 
-// Single-precision floating point definitions
-#define NONBOND_KERNEL_THREAD_COUNT 256
+// Single-precision non-bonded kernel floating point definitions
 #define TCALC float
 #  define TCALC_IS_SINGLE
 #  if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
+#    define GBRADII_KERNEL_BLOCKS_MULTIPLIER 4
 #    define NONBOND_KERNEL_BLOCKS_MULTIPLIER 4
 #  else
+#    define GBRADII_KERNEL_BLOCKS_MULTIPLIER 5
 #    define NONBOND_KERNEL_BLOCKS_MULTIPLIER 5
 #  endif
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
+#  define KERNEL_NAME ktgfCalculateGBRadii
+#    include "gbradii_tilegroups.cui"
+#  undef KERNEL_NAME
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
 #      define COMPUTE_ENERGY
@@ -71,14 +85,20 @@ using synthesis::tile_groups_wu_abstract_length;
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
+#  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
 #  undef TCALC_IS_SINGLE
 #undef TCALC
 
+// Double-precision non-bonded kernel floating point definitions
 #define TCALC double
 #  define SPLIT_FORCE_ACCUMULATION
+#  define GBRADII_KERNEL_BLOCKS_MULTIPLIER 3
 #  define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
+#  define KERNEL_NAME ktgdCalculateGBRadii
+#    include "gbradii_tilegroups.cui"
+#  undef KERNEL_NAME
 #  define COMPUTE_FORCE
 #    define COMPUTE_ENERGY
 #      define KERNEL_NAME ktgdsNonbondedForceEnergy
@@ -99,7 +119,6 @@ using synthesis::tile_groups_wu_abstract_length;
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef SPLIT_FORCE_ACCUMULATION
 #undef TCALC
-#undef NONBOND_KERNEL_THREAD_COUNT
 
 //-------------------------------------------------------------------------------------------------
 extern void nonbondedKernelSetup() {
@@ -223,7 +242,111 @@ queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
   }
   return attr;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+extern cudaFuncAttributes queryBornRadiiKernelRequirements(const PrecisionModel prec,
+                                                           const NbwuKind kind) {
+  cudaFuncAttributes attr;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      if (cudaFuncGetAttributes(&attr, ktgdCalculateGBRadii) != cudaSuccess) {
+        rtErr("Error obtaining attributes for kernel ktgdCalculateGBRadii.",
+              "queryNonbondedKernelRequirements");
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      if (cudaFuncGetAttributes(&attr, ktgfCalculateGBRadii) != cudaSuccess) {
+        rtErr("Error obtaining attributes for kernel ktgfCalculateGBRadii.",
+              "queryNonbondedKernelRequirements");
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
+    break;
+  }
+  return attr;
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+                                       const NeckGeneralizedBornKit<double> &ngb_kit,
+                                       MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                                       CacheResourceKit<double> *gmem_r, ISWorkspaceKit *iswk,
+                                       const int2 bt) {
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    ktgdCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+    break;
+  case NbwuKind::SUPERTILES:
+    break;
+  case NbwuKind::HONEYCOMB:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+                                       const NeckGeneralizedBornKit<float> &ngb_kit,
+                                       MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                                       CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
+                                       const int2 bt) {
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    ktgfCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+    break;
+  case NbwuKind::SUPERTILES:
+    break;
+  case NbwuKind::HONEYCOMB:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+extern void launchBornRadiiCalculation(const PrecisionModel prec,
+                                       const AtomGraphSynthesis &poly_ag,
+                                       const NeckGeneralizedBornTable &ngb_tab,
+                                       MolecularMechanicsControls *mmctrl,
+                                       PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
+                                       ImplicitSolventWorkspace *isw,
+                                       const KernelManager &launcher) {
+  const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
+  const NbwuKind kind = poly_ag.getNonbondedWorkType();
+  PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
+  ISWorkspaceKit iswk = isw->data(devc_tier);
+  const int2 bt = launcher.getBornRadiiKernelDims(prec, kind);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    {
+      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
+      const NeckGeneralizedBornKit<double> ngb_kit = ngb_tab.getDoublePrecisionAbstract(devc_tier);
+      MMControlKit<double> ctrl = mmctrl->dpData(devc_tier);
+      CacheResourceKit<double> gmem_r = tb_space->dpData(devc_tier);
+      launchBornRadiiCalculation(kind, poly_nbk, ngb_kit, &ctrl, &poly_psw, &gmem_r, &iswk, bt);
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    {
+      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
+      const NeckGeneralizedBornKit<float> ngb_kit = ngb_tab.getSinglePrecisionAbstract(devc_tier);
+      MMControlKit<float> ctrl = mmctrl->spData(devc_tier);
+      CacheResourceKit<float> gmem_r = tb_space->spData(devc_tier);
+      launchBornRadiiCalculation(kind, poly_nbk, ngb_kit, &ctrl, &poly_psw, &gmem_r, &iswk, bt);
+    }
+    break;
+  }
+}
+
 //-------------------------------------------------------------------------------------------------
 extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
                             const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,

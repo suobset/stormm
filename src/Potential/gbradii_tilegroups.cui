@@ -1,0 +1,229 @@
+// -*-c++-*-
+#include "copyright.h"
+
+#define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
+
+/// \brief Compute the Generalized Born radii for all particles in all systems.
+///
+/// \param poly_nbk  Condensed non-bonded parameter tables and atomic properties for all systems
+/// \param ngb_kit   Neck Generalized Born parameters
+/// \param ctrl      Molecular mechanics control data
+/// \param poly_psw  Coordinates and forces for all particles
+/// \param gmem_r    Workspaces for each thread block
+__global__ void __launch_bounds__(small_block_size, GBRADII_KERNEL_BLOCKS_MULTIPLIER)
+KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<TCALC> ngb_kit,
+            MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r,
+            ISWorkspaceKit isw) {
+
+  // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
+  // exclusively by this block.
+  __shared__ TCALC sh_tile_xcog[small_block_max_imports];
+  __shared__ TCALC sh_tile_ycog[small_block_max_imports];
+  __shared__ TCALC sh_tile_zcog[small_block_max_imports];
+  __shared__ TCALC sh_tile_tpts[small_block_max_imports];
+  __shared__ TCALC sh_pbradii[small_block_max_imports];
+  __shared__ TCALC sh_screen[small_block_max_imports];
+#ifdef TCALC_IS_SINGLE
+  __shared__ int sh_psi[small_block_max_imports];
+#else
+  __shared__ llint sh_psi[small_block_max_imports];
+#endif
+  __shared__ int sh_psi_overflow[small_block_max_imports];
+  __shared__ int sh_neck_idx[small_block_max_imports];
+  __shared__ int nbwu_map[tile_groups_wu_abstract_length];
+  __shared__ int nbwu_idx;
+
+  // Read the non-bonded work unit abstracts
+  if (threadIdx.x == 0) {
+    nbwu_idx = blockIdx.x;
+  }
+  __syncthreads();
+  while (nbwu_idx < poly_nbk.nnbwu) {
+    if (threadIdx.x < tile_groups_wu_abstract_length) {
+      nbwu_map[threadIdx.x] =__ldcv(&poly_nbk.nbwu_abstracts[(nbwu_idx *
+                                                              tile_groups_wu_abstract_length) +
+                                                             threadIdx.x]);
+    }    
+    __syncthreads();
+
+    // Import atomic coordinates and properties.  Each warp will handle importing one of the
+    // Cartesian coordinates or properties of as many tile sides as it can handle, in order to
+    // get the most threads reaching out to global memory.
+    const int tile_sides_per_warp = (warp_size_int / tile_length);
+    const int warp_idx = (threadIdx.x >> warp_bits);
+    const int warps_per_block = blockDim.x >> warp_bits;
+    const int warp_lane_idx = (threadIdx.x & warp_bits_mask_int);
+    const int tile_side_offset = warp_lane_idx / tile_length;
+    const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+    const int import_count = nbwu_map[0];
+    int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
+    const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
+    while (pos < padded_import_count) {
+      TCALC fxval;
+      if (pos < import_count) {
+        const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
+        const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, pos)) {
+          const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
+          fxval = (TCALC)(ixval);
+          __stwb(&gmem_r.xcrd[write_idx], ixval);
+#ifndef TCALC_IS_SINGLE
+          const int ixval_ovrf = __ldcs(&poly_psw.xcrd_ovrf[read_idx]);
+          fxval += (TCALC)(ixval_ovrf) * max_llint_accumulation;
+          __stwb(&gmem_r.xcrd_ovrf[write_idx], ixval_ovrf);
+#endif
+        }
+        else {
+          fxval = (TCALC)(0.0);
+#ifdef TCALC_IS_SINGLE
+          __stwb(&gmem_r.xcrd[write_idx], (128 * pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+#else
+          const int95_t fake_x = doubleToInt95((128 * pos * tile_lane_idx) * poly_psw.gpos_scale);
+          __stwb(&gmem_r.xcrd[write_idx], fake_x.x);
+          __stwb(&gmem_r.xcrd_ovrf[write_idx], fake_x.y);
+#endif
+        }
+      }
+      else {
+        fxval = (TCALC)(0.0);
+      }
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        fxval += SHFL_DOWN(fxval, i);
+      }
+      if (tile_lane_idx == 0 && pos < import_count) {
+        sh_tile_xcog[pos] = fxval;
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 2 * padded_import_count) {
+      TCALC fyval;
+      const int rel_pos = pos - padded_import_count;
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+          const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
+          fyval = (TCALC)(iyval);
+          __stwb(&gmem_r.ycrd[write_idx], iyval);
+#ifndef TCALC_IS_SINGLE
+          const int iyval_ovrf = __ldcs(&poly_psw.ycrd_ovrf[read_idx]);
+          fyval += (TCALC)(iyval_ovrf) * max_llint_accumulation;
+          __stwb(&gmem_r.ycrd_ovrf[write_idx], iyval_ovrf);
+#endif
+        }
+        else {
+          fyval = (TCALC)(0.0);
+#ifdef TCALC_IS_SINGLE
+          __stwb(&gmem_r.ycrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+#else
+          const int95_t fake_y = doubleToInt95((128 * rel_pos * tile_lane_idx) *
+                                               poly_psw.gpos_scale);
+          __stwb(&gmem_r.ycrd[write_idx], fake_y.x);
+          __stwb(&gmem_r.ycrd_ovrf[write_idx], fake_y.y);
+#endif
+        }
+      }
+      else {
+        fyval = (TCALC)(0.0);
+      }
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        fyval += SHFL_DOWN(fyval, i);
+      }
+      if (tile_lane_idx == 0 && rel_pos < import_count) {
+        sh_tile_ycog[rel_pos] = fyval;
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 3 * padded_import_count) {
+      TCALC fzval;
+      const int rel_pos = pos - (2 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+          const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
+          fzval = (TCALC)(izval);
+          __stwb(&gmem_r.zcrd[write_idx], izval);
+#ifndef TCALC_IS_SINGLE
+          const int izval_ovrf = __ldcs(&poly_psw.zcrd_ovrf[read_idx]);
+          fzval += (TCALC)(izval_ovrf) * max_llint_accumulation;
+          __stwb(&gmem_r.zcrd_ovrf[write_idx], izval_ovrf);
+#endif
+        }
+        else {
+          fzval = (TCALC)(0.0);
+#ifdef TCALC_IS_SINGLE
+          __stwb(&gmem_r.zcrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+#else
+          const int95_t fake_z = doubleToInt95((128 * rel_pos * tile_lane_idx) *
+                                               poly_psw.gpos_scale);
+          __stwb(&gmem_r.zcrd[write_idx], fake_z.x);
+          __stwb(&gmem_r.zcrd_ovrf[write_idx], fake_z.y);
+#endif
+        }
+      }
+      else {
+        fzval = (TCALC)(0.0);
+      }
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        fzval += SHFL_DOWN(fzval, i);
+      }
+      if (tile_lane_idx == 0 && rel_pos < import_count) {
+        sh_tile_zcog[rel_pos] = fzval;
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 4 * padded_import_count) {
+      const int rel_pos = pos - (3 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+          sh_pbradii[write_idx] = __ldcs(&poly_nbk.pb_radii[read_idx]);
+        }
+        else {
+          sh_pbradii[write_idx] = (TCALC)(1.0);
+        }
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    while (pos < 5 * padded_import_count) {
+      const int rel_pos = pos - (4 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+          sh_screen[write_idx] = __ldcs(&poly_nbk.gb_screen[read_idx]);
+        }
+        else {
+          sh_screen[write_idx] = (TCALC)(1.0);
+        }
+#ifdef TCALC_IS_SINGLE
+        sh_psi[write_idx] = 0;
+#else
+        sh_psi[write_idx] = 0LL;
+#endif
+        sh_psi_overflow[write_idx] = 0;
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
+    if (poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
+        poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) {
+      while (pos < 6 * padded_import_count) {
+        const int rel_pos = pos - (4 * padded_import_count);
+        if (rel_pos < import_count) {
+          const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+          const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+          if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+            sh_neck_idx[write_idx] = __ldcs(&poly_nbk.neck_gb_idx[read_idx]);
+          }
+          else {
+            sh_neck_idx[write_idx] = 0;
+          }
+        }
+        pos += tile_sides_per_warp * warps_per_block;
+      }
+    }
+    
+  }
+}

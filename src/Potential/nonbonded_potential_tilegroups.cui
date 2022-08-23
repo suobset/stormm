@@ -3,8 +3,16 @@
 
 #define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
 
-//-------------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(NONBOND_KERNEL_THREAD_COUNT, NONBOND_KERNEL_BLOCKS_MULTIPLIER)
+/// \brief Compute the non-bonded energy and forces due to electrostatic, van-der Waals, and
+///        derivatives of Generalized Born radii.
+///
+/// \param poly_nbk  Condensed non-bonded parameter tables and atomic properties for all systems
+/// \param poly_se   Static exclusion masks spanning all systems
+/// \param ctrl      Molecular mechanics control data
+/// \param poly_psw  Coordinates and forces for all particles
+/// \param scw       Energy tracking object
+/// \param gmem_r    Workspaces for each thread block
+__global__ void __launch_bounds__(small_block_size, NONBOND_KERNEL_BLOCKS_MULTIPLIER)
 KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader poly_se,
             const MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef COMPUTE_ENERGY
@@ -12,8 +20,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
 #endif
             CacheResourceKit<TCALC> gmem_r) {
 
-  // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
-  // exclusively by this block.
+  // Coordinates and properties of particles are copied into special, L1-cached arrays of GMEM
+  // used exclusively by this block.
   __shared__ TCALC sh_tile_xcog[small_block_max_imports];
   __shared__ TCALC sh_tile_ycog[small_block_max_imports];
   __shared__ TCALC sh_tile_zcog[small_block_max_imports];
@@ -95,11 +103,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       if (pos < import_count) {
         const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
         const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
-        const int key_idx  = pos / 4;
-        const int key_slot = pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, pos)) {
           const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
           fxval = (TCALC)(ixval);
           __stwb(&gmem_r.xcrd[write_idx], ixval);
@@ -111,7 +115,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         }
         else {
           fxval = (TCALC)(0.0);
-          __stwb(&gmem_r.xcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+#ifdef TCALC_IS_SINGLE
+          __stwb(&gmem_r.xcrd[write_idx], (128 * pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+#else
+          const int95_t fake_x = doubleToInt95((128 * pos * tile_lane_idx) * poly_psw.gpos_scale);
+          __stwb(&gmem_r.xcrd[write_idx], fake_x.x);
+          __stwb(&gmem_r.xcrd_ovrf[write_idx], fake_x.y);
+#endif
         }
 #ifdef COMPUTE_FORCE
 #  ifdef SPLIT_FORCE_ACCUMULATION
@@ -143,11 +153,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       if (rel_pos < import_count) {
         const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        const int key_idx  = rel_pos / 4;
-        const int key_slot = rel_pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
           const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
           fyval = (TCALC)(iyval);
           __stwb(&gmem_r.ycrd[write_idx], iyval);
@@ -159,7 +165,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         }
         else {
           fyval = (TCALC)(0.0);
-          __stwb(&gmem_r.ycrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+#ifdef TCALC_IS_SINGLE
+          __stwb(&gmem_r.ycrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+#else
+          const int95_t fake_y = doubleToInt95((128 * rel_pos * tile_lane_idx) *
+                                               poly_psw.gpos_scale);
+          __stwb(&gmem_r.ycrd[write_idx], fake_y.x);
+          __stwb(&gmem_r.ycrd_ovrf[write_idx], fake_y.y);
+#endif
         }
 #ifdef COMPUTE_FORCE
 #  ifdef SPLIT_FORCE_ACCUMULATION
@@ -191,11 +204,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       if (rel_pos < import_count) {
         const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        const int key_idx  = rel_pos / 4;
-        const int key_slot = rel_pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
           const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
           fzval = (TCALC)(izval);
           __stwb(&gmem_r.zcrd[write_idx], izval);
@@ -207,7 +216,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
         }
         else {
           fzval = (TCALC)(0.0);
-          __stwb(&gmem_r.zcrd[write_idx], (TCALC)(1000.0) * tile_lane_idx);
+#ifdef TCALC_IS_SINGLE
+          __stwb(&gmem_r.zcrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
+#else
+          const int95_t fake_z = doubleToInt95((128 * rel_pos * tile_lane_idx) *
+                                               poly_psw.gpos_scale);
+          __stwb(&gmem_r.zcrd[write_idx], fake_z.x);
+          __stwb(&gmem_r.zcrd_ovrf[write_idx], fake_z.y);
+#endif
         }
 #ifdef COMPUTE_FORCE
 #  ifdef SPLIT_FORCE_ACCUMULATION
@@ -238,10 +254,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       if (rel_pos < import_count) {
         const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const int write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        const int key_idx  = rel_pos / 4;
-        const int key_slot = rel_pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
+        const int tside_count = getTileSideAtomCount(nbwu_map, rel_pos);
         if (tile_lane_idx < tside_count) {
           __stwb(&gmem_r.charges[write_idx],
                  __ldcs(&poly_nbk.charge[read_idx]) * SQRT_FUNC(poly_nbk.coulomb));
@@ -266,11 +279,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
       if (rel_pos < import_count) {
         const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const int write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        const int key_idx  = rel_pos / 4;
-        const int key_slot = rel_pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
           __stwb(&gmem_r.lj_idx[write_idx], __ldcs(&poly_nbk.lj_idx[read_idx]));
         }
         else {

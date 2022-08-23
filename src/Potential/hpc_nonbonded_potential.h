@@ -6,8 +6,10 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
+#include "Constants/generalized_born.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Potential/energy_enumerators.h"
+#include "Synthesis/implicit_solvent_workspace.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/static_mask_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
@@ -22,10 +24,14 @@ namespace energy {
 using card::GpuDetails;
 using card::KernelManager;
 using constants::PrecisionModel;
+using generalized_born_defaults::NeckGeneralizedBornKit;
+using generalized_born_defaults::NeckGeneralizedBornTable;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
 using numerics::ForceAccumulationMethod;
 using synthesis::AtomGraphSynthesis;
+using synthesis::ImplicitSolventWorkspace;
+using synthesis::ISWorkspaceKit;
 using synthesis::NbwuKind;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
@@ -50,6 +56,63 @@ cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKin
                                                     EvaluateForce eval_frc,
                                                     EvaluateEnergy eval_nrg,
                                                     ForceAccumulationMethod acc_meth);
+
+/// \brief Obtain information on launch bounds and block-specific requirements for each version of
+///        the Born Radii computation kernel.  Deposit the results in a developing object that
+///        will later record launch grid dimensions for managing the kernels.
+///
+/// \param prec      The desired precision model for the kernel
+/// \param kind      The type of non-bonded work units to evaluate
+cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKind kind);
+  
+/// \brief Evaluate Generalized Born radii for the current state.  Prepare for Born radii
+///        derivative calculations.  The accumulation of the radii and their derivatives is
+///        handled in fixed-precision arithmetic, using the Cartesian X and Y force components of
+///        the thread block workspace as accumulators.
+///
+/// Overloaded:
+///   - Accept abstracts that imply the precision level of kernel to use, and launch parameters
+///     assumed to fit that kernel.
+///   - Accept the original objects and make the necessary abstracts before launching (this is
+///     useful for testing purposes)
+///
+/// \param kind         The type non-bonded work to perform, indicating the kernel to launch
+/// \param poly_nbk     Non-bonded parameters of all systems
+/// \param poly_ag      Compiled topologies of all systems
+/// \param ngb_kit      Neck Generalized Born tables for certain GB models, translated to a
+///                     specific precision model
+/// \param ngb_tab      Neck Generalized Born tables for certain GB models
+/// \param ctrl         Abstract for molecular mechanics progress counters and run bounds
+/// \param mmctrl       Progress counters and run bounds
+/// \param poly_psw     Abstract for coordinates and forces of all systems
+/// \param poly_ps      Coordinate and force compilation for all systems
+/// \param gmem_r       Abstract for thread block specific resources
+/// \param tb_space     Cache resources for the kernel launch
+/// \param iswk         Abstract for the implicit solvent accumulator workspace
+/// \param isw          Implicit solvent accumulators for connecting each of the Generalized Born
+///                     calculation stages
+/// \param bt           Block and thread counts for the kernel, given the precision and force or
+///                     energy computation requirements (an "abstract" of the KernelManager object)
+/// \param launcher     Contains launch parameters for all kernels in STORMM
+/// \{
+void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+                                const NeckGeneralizedBornKit<double> &ngb_kit,
+                                MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                                CacheResourceKit<double> *gmem_r, ISWorkspaceKit *iswk,
+                                const int2 bt);
+
+void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+                                const NeckGeneralizedBornKit<float> &ngb_kit,
+                                MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                                CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
+                                const int2 bt);
+
+void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                                const NeckGeneralizedBornTable &ngb_tab,
+                                MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                                CacheResource *tb_space, ImplicitSolventWorkspace *isw,
+                                const KernelManager &launcher);
+/// \}
 
 /// \brief Evaluate nonbonded work units based on the strategy determined in the topology
 ///        synthesis.  All of the kernels launched by these functions will compute forces,

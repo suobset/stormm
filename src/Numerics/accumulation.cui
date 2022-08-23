@@ -1,9 +1,9 @@
 // -*-c++-*-
 #include "copyright.h"
 
-/// Add a floating point number to two integer accumulators, one intended to absorb the vast
-/// majority of the work and the other kept in reserve in case the primary accumulator cannot
-/// handle the value by itself.
+/// \brief Add a floating point number to two integer accumulators, one intended to absorb the
+///        vast majority of the work and the other kept in reserve in case the primary
+///        accumulator cannot handle the value by itself.
 ///
 /// Overloaded:
 ///   - Convert a double-precision number to 95-bit int64 / int32 format

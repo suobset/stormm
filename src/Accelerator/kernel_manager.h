@@ -144,7 +144,7 @@ public:
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
                             ForceAccumulationMethod acc_meth, VwuGoal purpose) const;
 
-  /// \brief Get the block and thread counts for the non-bonded kernel.  Parameters descriptions
+  /// \brief Get the block and thread counts for the non-bonded kernel.  Parameter descriptions
   ///        for this function follow from getValenceKernelDims() above, with the addition of:
   ///
   /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
@@ -152,6 +152,10 @@ public:
   int2 getNonbondedKernelDims(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth) const;
 
+  /// \brief Get the block and thread counts for the Born radii computation kernel.  Parameter
+  ///        descriptions for this function follow from getValenceKernelDims() above.
+  int2 getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind) const;
+  
   /// \brief Get the block and thread counts for a reduction kernel.
   ///
   /// \param prec     The type of floating point numbers represented by the kernel's substrate
@@ -201,6 +205,10 @@ private:
   /// of the topology synthesis at hand.
   int nonbond_block_multiplier;
 
+  /// Architecture-specific block multiplier for Generalized Born radii computation kernels, again
+  /// a provision for NVIDIA Turing cards.
+  int gbradii_block_multiplier;
+  
   /// The workload-specific block multiplier for reduction kernels.  Like the valence kernels, the
   /// thread count per streaming multiprocessor will not go above 1024 (this time out of bandwidth
   /// limitations), but the block multiplicity (which starts at 4) could be increased.
@@ -231,12 +239,18 @@ private:
 
   /// \brief Set the register, maximum block size, and thread counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
-  ///        setValenceKernelAttributes() above, with the addition of:
+  ///        catalogValenceKernel() above, with the addition of:
   ///
   /// \param kind         The type of non-bonded work unit: tile groups, supertiles, or honeycomb
   ///                     being relevant
   void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                              const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the register, maximum block size, and thread counts for one of the Generalized
+  ///        Born radius computation kernels.  Parameter descriptions for this function follow
+  ///        from catalogValenceKernel() and catalogNonbondedKernel() above.
+  void catalogBornRadiiKernel(PrecisionModel prec, NbwuKind kind,
                               const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and thread counts for one of the reduction
@@ -269,6 +283,11 @@ int valenceBlockMultiplier();
 /// \param unit_cell  The unit cell type of the systems to evaluate
 int nonbondedBlockMultiplier(const GpuDetails &gpu, UnitCellType unit_cell);
 
+/// \brief Obtain the architecture-specific block multiplier for Generalized Born radii kernels.
+///
+/// \param gpu  Details of the GPU that will perform the calculations
+int gbRadiiBlockMultiplier(const GpuDetails &gpu);
+  
 /// \brief Obtain the workload-specific block multiplier for reduction kernels.
 int reductionBlockMultiplier();
 
@@ -313,6 +332,18 @@ std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
 std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                                EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth);
 
+/// \brief Obtain a unique string identifier for one of the Born radii computation kernels.  Each
+///        identifier begins with "gbrd_" and is then appended with letter codes for different
+///        aspects according to the following system:
+///        - { d, f }        Perform calculations in double (d) or float (f) arithmetic
+///        - { tg, st, hc }  Use a "tile groups" or "supertiles" strategy for breaking down
+///                          systems with isolated boundary conditions, or a "honeycomb" strategy
+///                          for breaking down systems with periodic boundary conditions.
+///
+/// \param prec        The type of floating point numbers in which the kernel shall work
+/// \param kind        The type of non-bonded work unit to evaluate
+std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind);
+  
 /// \brief Obtain a unique string identifier for one of the reduction kernels.  Each identifier
 ///        begins with "redc_" and is then appended with letter codes for different aspects
 ///        according to the following system:

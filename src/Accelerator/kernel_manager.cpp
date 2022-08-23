@@ -20,6 +20,7 @@ using constants::ExceptionResponse;
 #ifdef STORMM_USE_HPC
 using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
+using energy::queryBornRadiiKernelRequirements;
 using math::queryReductionKernelRequirements;
 using math::optReductionKernelSubdivision;
 using structure::queryVirtualSiteKernelRequirements;
@@ -106,6 +107,7 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     gpu{gpu_in},
     valence_block_multiplier{valenceBlockMultiplier()},
     nonbond_block_multiplier{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType())},
+    gbradii_block_multiplier{gbRadiiBlockMultiplier(gpu_in)},
     reduction_block_multiplier{reductionBlockMultiplier()},
     virtual_site_block_multiplier{virtualSiteBlockMultiplier()},
     k_dictionary{}
@@ -277,6 +279,25 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
+void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const NbwuKind kind,
+                                           const std::string &kernel_name) {
+  const std::string k_key = bornRadiiKernelKey(prec, kind);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Born radii kernel identifier " + k_key + " already exists in the kernel map.",
+          "KernelManager", "catalogBornRadiiKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryBornRadiiKernelRequirements(prec, kind);
+  k_dictionary[k_key] = KernelFormat(attr, nonbond_block_multiplier, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 void KernelManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
                                            const ReductionStage process, const int subdivision,
                                            const std::string &kernel_name) {
@@ -341,6 +362,16 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const Nbwu
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Non-bonded kernel identifier " + k_key + " was not found in the kernel map.",
           "KernelManager", "getNonbondedKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 KernelManager::getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind) const {
+  const std::string k_key = bornRadiiKernelKey(prec, kind);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Born radii computation kernel identifier " + k_key + " was not found in the kernel "
+          "map.", "KernelManager", "getBornRadiiKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
@@ -425,6 +456,15 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell
   }
 #  endif
   __builtin_unreachable();
+#else
+  return 1;
+#endif  
+}
+
+//-------------------------------------------------------------------------------------------------
+int gbRadiiBlockMultiplier(const GpuDetails &gpu) {
+#ifdef STORMM_USE_HPC
+  return (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
 #else
   return 1;
 #endif  
@@ -553,6 +593,33 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
     case ForceAccumulationMethod::AUTOMATIC:
       break;
     }
+  }
+  return k_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind) {
+  std::string k_key("gbrd_");
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    k_key += "d";
+    break;
+  case PrecisionModel::SINGLE:
+    k_key += "f";
+    break;
+  }
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    k_key += "tg";
+    break;
+  case NbwuKind::SUPERTILES:
+    k_key += "st";
+    break;
+  case NbwuKind::HONEYCOMB:
+    k_key += "hc";
+    break;
+  case NbwuKind::UNKNOWN:
+    break;
   }
   return k_key;
 }
