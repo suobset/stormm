@@ -29,7 +29,7 @@ using card::KernelManager;
 using constants::PrecisionModel;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
@@ -67,7 +67,7 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
 ///                               back into global arrays or use them immediately to move particles
 cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateForce eval_frc,
                                                   EvaluateEnergy eval_nrg,
-                                                  ForceAccumulationMethod acc_meth,
+                                                  AccumulationMethod acc_meth,
                                                   VwuGoal purpose);
 
 /// \brief Evaluate valence work units and move atoms.
@@ -106,12 +106,12 @@ void launchValence(const SyValenceKit<float> &poly_vk,
                    MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                    CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
                    EvaluateEnergy eval_energy, VwuGoal purpose,
-                   ForceAccumulationMethod force_sum, const int2 bt);
+                   AccumulationMethod force_sum, const int2 bt);
   
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                    MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
                    CacheResource *tb_space, EvaluateForce eval_force, EvaluateEnergy eval_energy,
-                   VwuGoal purpose, ForceAccumulationMethod force_sum,
+                   VwuGoal purpose, AccumulationMethod force_sum,
                    const KernelManager &launcher);
 
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,

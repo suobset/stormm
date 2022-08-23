@@ -31,7 +31,7 @@ using math::ReductionGoal;
 using math::ReductionStage;
 using math::roundUp;
 using math::rdwu_abstract_length;
-using numerics::chooseForceAccumulationMethod;
+using numerics::chooseAccumulationMethod;
 using numerics::max_int_accumulation_f;
 using numerics::max_llint_accumulation;
 using synthesis::maximum_valence_work_unit_atoms;
@@ -132,7 +132,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
                                CacheResource *nonb_cache, ReductionBridge *rbg,
                                LineMinimization *line_record,
-                               const ForceAccumulationMethod acc_meth, const GpuDetails &gpu,
+                               const AccumulationMethod acc_meth, const GpuDetails &gpu,
                                const KernelManager &launcher, StopWatch *timer,
                                const std::string &task_name) {
   
@@ -157,16 +157,16 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   }
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const int2 vale_xe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::NO,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
   const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
                                                        EvaluateEnergy::YES,
-                                                       ForceAccumulationMethod::SPLIT);
+                                                       AccumulationMethod::SPLIT);
   const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
   line_record->primeMoveLengths(mincon.getInitialStep());
@@ -364,15 +364,15 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   KernelManager launcher(gpu, poly_ag);
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const int2 vale_xe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::NO,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, NbwuKind::TILE_GROUPS,
                                                        EvaluateForce::YES, EvaluateEnergy::YES,
-                                                       ForceAccumulationMethod::SPLIT);
+                                                       AccumulationMethod::SPLIT);
   const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
 
@@ -388,7 +388,7 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   LineMinimization line_record(poly_ag.getSystemCount());
   launchMinimization(prec, poly_ag, poly_se, poly_ps, mincon, &mmctrl_fe, &mmctrl_xe, &result,
                      &vale_fe_cache, &vale_xe_cache, &nonb_cache, &poly_rbg, &line_record,
-                     chooseForceAccumulationMethod(poly_ps->getForceAccumulationBits()),
+                     chooseAccumulationMethod(poly_ps->getForceAccumulationBits()),
                      gpu, launcher, timer, task_name);
   return result;
 }

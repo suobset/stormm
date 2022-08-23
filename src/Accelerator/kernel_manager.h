@@ -30,7 +30,7 @@ using data_types::int2;
 #endif
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
 using structure::VirtualSiteActivity;
 using synthesis::AtomGraphSynthesis;
 using synthesis::NbwuKind;
@@ -142,7 +142,7 @@ public:
   /// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
   ///                    error in this context)
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth, VwuGoal purpose) const;
+                            AccumulationMethod acc_meth, VwuGoal purpose) const;
 
   /// \brief Get the block and thread counts for the non-bonded kernel.  Parameter descriptions
   ///        for this function follow from getValenceKernelDims() above, with the addition of:
@@ -150,11 +150,12 @@ public:
   /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
   ///              being relevant
   int2 getNonbondedKernelDims(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
-                              EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth) const;
+                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth) const;
 
   /// \brief Get the block and thread counts for the Born radii computation kernel.  Parameter
   ///        descriptions for this function follow from getValenceKernelDims() above.
-  int2 getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind) const;
+  int2 getBornRadiiKernelDims(PrecisionModel prec, NbwuKind kind,
+                              AccumulationMethod acc_meth) const;
   
   /// \brief Get the block and thread counts for a reduction kernel.
   ///
@@ -234,7 +235,7 @@ private:
   /// \param subdivision  Number of times that the basic valence kernel should be subdivided
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
+                            AccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
                             const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and thread counts for one of the non-bonded
@@ -244,13 +245,13 @@ private:
   /// \param kind         The type of non-bonded work unit: tile groups, supertiles, or honeycomb
   ///                     being relevant
   void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
-                              EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
                               const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and thread counts for one of the Generalized
   ///        Born radius computation kernels.  Parameter descriptions for this function follow
   ///        from catalogValenceKernel() and catalogNonbondedKernel() above.
-  void catalogBornRadiiKernel(PrecisionModel prec, NbwuKind kind,
+  void catalogBornRadiiKernel(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
                               const std::string &kernel_name = std::string(""));
 
   /// \brief Set the register, maximum block size, and thread counts for one of the reduction
@@ -310,7 +311,7 @@ int virtualSiteBlockMultiplier();
 ///                    error in this context)
 /// \param purpose     The intended action to take with computed forces
 std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
-                             EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                             EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
                              VwuGoal purpose);
 
 /// \brief Obtain a unique string identifier for one of the non-bonded kernels.  Each identifier
@@ -330,7 +331,7 @@ std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
 /// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
 ///                    error in this context)
 std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
-                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth);
+                               EvaluateEnergy eval_nrg, AccumulationMethod acc_meth);
 
 /// \brief Obtain a unique string identifier for one of the Born radii computation kernels.  Each
 ///        identifier begins with "gbrd_" and is then appended with letter codes for different
@@ -340,9 +341,11 @@ std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce
 ///                          systems with isolated boundary conditions, or a "honeycomb" strategy
 ///                          for breaking down systems with periodic boundary conditions.
 ///
-/// \param prec        The type of floating point numbers in which the kernel shall work
-/// \param kind        The type of non-bonded work unit to evaluate
-std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind);
+/// \param prec      The type of floating point numbers in which the kernel shall work
+/// \param kind      The type of non-bonded work unit to evaluate
+/// \param acc_meth  The accumulation method for Born radii sums (SPLIT or WHOLE)
+std::string bornRadiiKernelKey(PrecisionModel prec, NbwuKind kind,
+                               AccumulationMethod acc_meth);
   
 /// \brief Obtain a unique string identifier for one of the reduction kernels.  Each identifier
 ///        begins with "redc_" and is then appended with letter codes for different aspects

@@ -28,7 +28,7 @@ using generalized_born_defaults::NeckGeneralizedBornKit;
 using generalized_born_defaults::NeckGeneralizedBornTable;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::ImplicitSolventWorkspace;
 using synthesis::ISWorkspaceKit;
@@ -55,7 +55,7 @@ void nonbondedKernelSetup();
 cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKind kind,
                                                     EvaluateForce eval_frc,
                                                     EvaluateEnergy eval_nrg,
-                                                    ForceAccumulationMethod acc_meth);
+                                                    AccumulationMethod acc_meth);
 
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
 ///        the Born Radii computation kernel.  Deposit the results in a developing object that
@@ -63,7 +63,10 @@ cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKin
 ///
 /// \param prec      The desired precision model for the kernel
 /// \param kind      The type of non-bonded work units to evaluate
-cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKind kind);
+/// \param acc_meth  Accumulation method for Born radii (like forces, they can span two
+///                  accumulators)
+cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKind kind,
+                                                    AccumulationMethod acc_meth);
   
 /// \brief Evaluate Generalized Born radii for the current state.  Prepare for Born radii
 ///        derivative calculations.  The accumulation of the radii and their derivatives is
@@ -91,6 +94,7 @@ cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKin
 /// \param iswk         Abstract for the implicit solvent accumulator workspace
 /// \param isw          Implicit solvent accumulators for connecting each of the Generalized Born
 ///                     calculation stages
+/// \param acc_meth     Accumulation method for Born radii
 /// \param bt           Block and thread counts for the kernel, given the precision and force or
 ///                     energy computation requirements (an "abstract" of the KernelManager object)
 /// \param launcher     Contains launch parameters for all kernels in STORMM
@@ -105,13 +109,14 @@ void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<float> &poly
                                 const NeckGeneralizedBornKit<float> &ngb_kit,
                                 MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
                                 CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
-                                const int2 bt);
+                                AccumulationMethod acc_meth, const int2 bt);
 
 void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                                 const NeckGeneralizedBornTable &ngb_tab,
                                 MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                                 CacheResource *tb_space, ImplicitSolventWorkspace *isw,
-                                const KernelManager &launcher);
+                                const KernelManager &launcher,
+                                AccumulationMethod acc_meth = AccumulationMethod::AUTOMATIC);
 /// \}
 
 /// \brief Evaluate nonbonded work units based on the strategy determined in the topology
@@ -142,6 +147,7 @@ void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &p
 /// \param tb_space     Cache resources for the kernel launch
 /// \param eval_force   Whether to evaluate forces
 /// \param eval_energy  Whether to evaluate energies
+/// \param acc_meth     Accumulation method for forces
 /// \param bt           Block and thread counts for the kernel, given the precision and force or
 ///                     energy computation requirements (an "abstract" of the KernelManager object)
 /// \param launcher     Contains launch parameters for all kernels in STORMM
@@ -156,13 +162,13 @@ void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, ForceAccumulationMethod force_sum, const int2 bt);
+                     EvaluateEnergy eval_energy, AccumulationMethod force_sum, const int2 bt);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      const StaticExclusionMaskSynthesis &poly_se,
                      MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                      ScoreCard *sc, CacheResource *tb_space, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, ForceAccumulationMethod force_sum,
+                     EvaluateEnergy eval_energy, AccumulationMethod force_sum,
                      const KernelManager &launcher);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,

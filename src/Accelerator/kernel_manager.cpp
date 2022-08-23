@@ -127,74 +127,74 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                                                           PrecisionModel::SINGLE,
                                                           EvaluateForce::YES, gpu_in);
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::NO, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                        valence_d_div, "kdsValenceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
                        valence_d_div, "kdsValenceAtomUpdate");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                        valence_d_div, "kdsValenceForceAccumulation");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
                        valence_d_div, "kdsValenceEnergyAtomUpdate");
   catalogValenceKernel(PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                        valence_d_div, "kdsValenceForceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::NO, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                        valence_fxe_div, "kfsValenceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
                        valence_ffx_div, "kfsValenceAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                       ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
+                       AccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
                        valence_ffx_div, "kfValenceAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                        valence_ffx_div, "kfsValenceForceAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                       ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
                        valence_ffx_div, "kfValenceForceAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
+                       AccumulationMethod::WHOLE, VwuGoal::MOVE_PARTICLES,
                        valence_ffe_div, "kfValenceEnergyAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
+                       AccumulationMethod::SPLIT, VwuGoal::MOVE_PARTICLES,
                        valence_ffe_div, "kfsValenceEnergyAtomUpdate");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE,
                        valence_ffe_div, "kfValenceForceEnergyAccumulation");
   catalogValenceKernel(PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                       ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
+                       AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE,
                        valence_ffe_div, "kfsValenceForceEnergyAccumulation");
 
   // Non-bonded kernel entries
   switch (poly_ag.getUnitCellType()) {
   case UnitCellType::NONE:
     catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
-                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                            "ktgdNonbondedEnergy");
     catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                           EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                           EvaluateEnergy::NO, AccumulationMethod::SPLIT,
                            "ktgdsNonbondedForce");
     catalogNonbondedKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                            "ktgdsNonbondedForceEnergy");
     catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::NO,
-                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                            "ktgfNonbondedEnergy");
     catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                           EvaluateEnergy::NO, ForceAccumulationMethod::SPLIT,
+                           EvaluateEnergy::NO, AccumulationMethod::SPLIT,
                            "ktgfsNonbondedForce");
     catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                           EvaluateEnergy::NO, ForceAccumulationMethod::WHOLE,
+                           EvaluateEnergy::NO, AccumulationMethod::WHOLE,
                            "ktgfsNonbondedForce");
     catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                           EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                           EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                            "ktgfsNonbondedForceEnergy");
     catalogNonbondedKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, EvaluateForce::YES,
-                           EvaluateEnergy::YES, ForceAccumulationMethod::WHOLE,
+                           EvaluateEnergy::YES, AccumulationMethod::WHOLE,
                            "ktgfsNonbondedForceEnergy");
     break;
   case UnitCellType::ORTHORHOMBIC:
@@ -234,7 +234,7 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
 //-------------------------------------------------------------------------------------------------
 void KernelManager::catalogValenceKernel(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
-                                         const ForceAccumulationMethod acc_meth,
+                                         const AccumulationMethod acc_meth,
                                          const VwuGoal purpose, const int subdivision,
                                          const std::string &kernel_name) {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose);
@@ -259,7 +259,7 @@ void KernelManager::catalogValenceKernel(const PrecisionModel prec, const Evalua
 void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const NbwuKind kind,
                                            const EvaluateForce eval_force,
                                            const EvaluateEnergy eval_nrg,
-                                           const ForceAccumulationMethod acc_meth,
+                                           const AccumulationMethod acc_meth,
                                            const std::string &kernel_name) {
   const std::string k_key = nonbondedKernelKey(prec, kind, eval_force, eval_nrg, acc_meth);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
@@ -280,8 +280,9 @@ void KernelManager::catalogNonbondedKernel(const PrecisionModel prec, const Nbwu
 
 //-------------------------------------------------------------------------------------------------
 void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const NbwuKind kind,
+                                           const AccumulationMethod acc_meth,
                                            const std::string &kernel_name) {
-  const std::string k_key = bornRadiiKernelKey(prec, kind);
+  const std::string k_key = bornRadiiKernelKey(prec, kind, acc_meth);
   std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
   if (it != k_dictionary.end()) {
     rtErr("Born radii kernel identifier " + k_key + " already exists in the kernel map.",
@@ -289,8 +290,8 @@ void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const Nbwu
   }
 #ifdef STORMM_USE_HPC
 #  ifdef STORMM_USE_CUDA
-  const cudaFuncAttributes attr = queryBornRadiiKernelRequirements(prec, kind);
-  k_dictionary[k_key] = KernelFormat(attr, nonbond_block_multiplier, 1, gpu, kernel_name);
+  const cudaFuncAttributes attr = queryBornRadiiKernelRequirements(prec, kind, acc_meth);
+  k_dictionary[k_key] = KernelFormat(attr, gbradii_block_multiplier, 1, gpu, kernel_name);
 #  endif
 #else
   k_dictionary[k_key] = KernelFormat();
@@ -343,7 +344,7 @@ void KernelManager::catalogVirtualSiteKernel(const PrecisionModel prec,
 //-------------------------------------------------------------------------------------------------
 int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const EvaluateForce eval_force,
                                          const EvaluateEnergy eval_nrg,
-                                         const ForceAccumulationMethod acc_meth,
+                                         const AccumulationMethod acc_meth,
                                          const VwuGoal purpose) const {
   const std::string k_key = valenceKernelKey(prec, eval_force, eval_nrg, acc_meth, purpose);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
@@ -357,7 +358,7 @@ int2 KernelManager::getValenceKernelDims(const PrecisionModel prec, const Evalua
 int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const NbwuKind kind,
                                            const EvaluateForce eval_force,
                                            const EvaluateEnergy eval_nrg,
-                                           const ForceAccumulationMethod acc_meth) const {
+                                           const AccumulationMethod acc_meth) const {
   const std::string k_key = nonbondedKernelKey(prec, kind, eval_force, eval_nrg, acc_meth);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Non-bonded kernel identifier " + k_key + " was not found in the kernel map.",
@@ -367,8 +368,9 @@ int2 KernelManager::getNonbondedKernelDims(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
-int2 KernelManager::getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind) const {
-  const std::string k_key = bornRadiiKernelKey(prec, kind);
+int2 KernelManager::getBornRadiiKernelDims(const PrecisionModel prec, const NbwuKind kind,
+                                           const AccumulationMethod acc_meth) const {
+  const std::string k_key = bornRadiiKernelKey(prec, kind, acc_meth);
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Born radii computation kernel identifier " + k_key + " was not found in the kernel "
           "map.", "KernelManager", "getBornRadiiKernelDims");
@@ -490,7 +492,7 @@ int virtualSiteBlockMultiplier() {
 
 //-------------------------------------------------------------------------------------------------
 std::string valenceKernelKey(const PrecisionModel prec, const EvaluateForce eval_force,
-                             const EvaluateEnergy eval_nrg, const ForceAccumulationMethod acc_meth,
+                             const EvaluateEnergy eval_nrg, const AccumulationMethod acc_meth,
                              const VwuGoal purpose) {
   std::string k_key("vale_");
   switch (prec) {
@@ -519,13 +521,13 @@ std::string valenceKernelKey(const PrecisionModel prec, const EvaluateForce eval
   }
   if (eval_force == EvaluateForce::YES) {
     switch (acc_meth) {
-    case ForceAccumulationMethod::SPLIT:
+    case AccumulationMethod::SPLIT:
       k_key += "s";
       break;
-    case ForceAccumulationMethod::WHOLE:
+    case AccumulationMethod::WHOLE:
       k_key += "w";
       break;
-    case ForceAccumulationMethod::AUTOMATIC:
+    case AccumulationMethod::AUTOMATIC:
       break;
     }
     switch (purpose) {
@@ -543,7 +545,7 @@ std::string valenceKernelKey(const PrecisionModel prec, const EvaluateForce eval
 //-------------------------------------------------------------------------------------------------
 std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
                                const EvaluateForce eval_force, const EvaluateEnergy eval_nrg,
-                               const ForceAccumulationMethod acc_meth) {
+                               const AccumulationMethod acc_meth) {
   std::string k_key("nonb_");
   switch (prec) {
   case PrecisionModel::DOUBLE:
@@ -584,13 +586,13 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
   }
   if (eval_force == EvaluateForce::YES) {
     switch (acc_meth) {
-    case ForceAccumulationMethod::SPLIT:
+    case AccumulationMethod::SPLIT:
       k_key += "s";
       break;
-    case ForceAccumulationMethod::WHOLE:
+    case AccumulationMethod::WHOLE:
       k_key += "w";
       break;
-    case ForceAccumulationMethod::AUTOMATIC:
+    case AccumulationMethod::AUTOMATIC:
       break;
     }
   }
@@ -598,7 +600,8 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind) {
+std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind,
+                               const AccumulationMethod acc_meth) {
   std::string k_key("gbrd_");
   switch (prec) {
   case PrecisionModel::DOUBLE:
@@ -619,6 +622,16 @@ std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind) {
     k_key += "hc";
     break;
   case NbwuKind::UNKNOWN:
+    break;
+  }
+  switch (acc_meth) {
+  case AccumulationMethod::SPLIT:
+    k_key += "s";
+    break;
+  case AccumulationMethod::WHOLE:
+    k_key += "w";
+    break;
+  case AccumulationMethod::AUTOMATIC:
     break;
   }
   return k_key;

@@ -31,8 +31,8 @@ using constants::warp_bits;
 using constants::warp_bits_mask_int;
 using data_types::int95_t;
 using math::roundUp;
-using numerics::chooseForceAccumulationMethod;
-using numerics::ForceAccumulationMethod;
+using numerics::chooseAccumulationMethod;
+using numerics::AccumulationMethod;
 using numerics::max_int_accumulation;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
@@ -59,6 +59,20 @@ using topology::TorsionKind;
 #include "Math/rounding.cui"
 #include "Math/vector_formulas.cui"
 
+//-------------------------------------------------------------------------------------------------
+// Compute an angle based on the value of its cosine, with the understanding that a fallback
+// method is appropriate when the angle is too actue for acos to be numerically well-conditioned.
+//
+// Overloaded:
+//   - Single-precision version
+//   - Double-precision version
+//
+// Arguments:
+//   costheta:   Cosine value of the angle of interest
+//   crabbc:     The first of two vectors decsribing the displacements that determine the angle
+//   crbccd:     The second of two vectors decsribing the displacements that determine the angle
+//   bc:         Vector defining the directionality of the angle
+//   scr:        Second vector defining the directionality of the angle
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ float devcAngleVerification(const float costheta, const float3 crabbc,
                                                        const float3 crbccd, const float3 bc,
@@ -96,7 +110,6 @@ __device__ __forceinline__ float devcAngleVerification(const float costheta, con
   }
 }
 
-//-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ double devcAngleVerification(const double costheta,
                                                         const double3 crabbc, const double3 crbccd,
                                                         const double3 bc, const double3 scr) {
@@ -133,6 +146,22 @@ __device__ __forceinline__ double devcAngleVerification(const double costheta,
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+// Compute critical elements of the restraining potential: its difference from the target value
+// that determines some harmonic stiffness penalty, the harmonic penalty stiffness, and the energy
+// contribution.
+//
+// Overloaded:
+//   - Single-precision version
+//   - Double-precision version
+//
+// Arguments:
+//   init_k   Initial stiffness parameters
+//   final_k  Final stiffness parameters
+//   init_r   Initial displacement parameters
+//   final_r  Final displacement parameters
+//   mixwt    Pre-calculated mixing factor for combining initial and final parameters
+//   dr       The measured value of the restraint coordinate among its participating atoms
 //-------------------------------------------------------------------------------------------------
 __device__ __forceinline__
 double3 restraintDelta(const double2 init_k, const double2 final_k, const double4 init_r,
@@ -172,7 +201,6 @@ double3 restraintDelta(const double2 init_k, const double2 final_k, const double
   return { keq, dl, du };
 }
 
-//-------------------------------------------------------------------------------------------------
 __device__ __forceinline__
 float3 restraintDelta(const float2 init_k, const float2 final_k, const float4 init_r,
                       const float4 final_r, const float2 mixwt, const float dr) {
@@ -212,6 +240,22 @@ float3 restraintDelta(const float2 init_k, const float2 final_k, const float4 in
 }
 
 //-------------------------------------------------------------------------------------------------
+// Compute the mixture of end-point values that will determine the actual strength and displacement
+// settings of a flat-bottom bimodal harmonic restraint.  The flag about a RestraintApparatus
+// having time-dependent restraints is mostly for convenience, a way to tell whether there is any
+// time-dependent restraint in the collection at all.  Initial and final settings of the steps for
+// each restraint encode whether there is actual time dependence in the result.
+//
+// Overloaded:
+//   - Single-precision version
+//   - Double-precision version
+//
+// Arguments:
+//   step_number  The current step number of the simulation (may include energy minimization step
+//                counts)
+//   init_step    The initial step at which the restraint engages
+//   final_step   The final step at which the restraint becomes mature
+//-------------------------------------------------------------------------------------------------
 __device__ __forceinline__
 double2 computeRestraintMixtureD(const int step_number, const int init_step,
                                  const int final_step) {
@@ -238,7 +282,6 @@ double2 computeRestraintMixtureD(const int step_number, const int init_step,
   return { (double)(0.0), (double)(1.0) };
 }
 
-//-------------------------------------------------------------------------------------------------
 __device__ __forceinline__
 float2 computeRestraintMixtureF(const int step_number, const int init_step, const int final_step) {
   if (step_number < init_step) {
@@ -518,7 +561,7 @@ int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, co
 extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel prec,
                                                          const EvaluateForce eval_frc,
                                                          const EvaluateEnergy eval_nrg,
-                                                         const ForceAccumulationMethod acc_meth,
+                                                         const AccumulationMethod acc_meth,
                                                          const VwuGoal purpose) {
 
   // The kernel manager will have information about the GPU to use--look at the work units from
@@ -576,7 +619,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
       switch (eval_nrg) {
       case EvaluateEnergy::YES:
         switch (acc_meth) {
-        case ForceAccumulationMethod::SPLIT:
+        case AccumulationMethod::SPLIT:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
             if (cudaFuncGetAttributes(&result, kfsValenceForceEnergyAccumulation) != cudaSuccess) {
@@ -592,7 +635,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
             break;
           }
           break;
-        case ForceAccumulationMethod::WHOLE:
+        case AccumulationMethod::WHOLE:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
             if (cudaFuncGetAttributes(&result, kfValenceForceEnergyAccumulation) != cudaSuccess) {
@@ -612,7 +655,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
         break;
       case EvaluateEnergy::NO:
         switch (acc_meth) {
-        case ForceAccumulationMethod::SPLIT:
+        case AccumulationMethod::SPLIT:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
             if (cudaFuncGetAttributes(&result, kfsValenceForceAccumulation) != cudaSuccess) {
@@ -628,7 +671,7 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
             break;
           }
           break;
-        case ForceAccumulationMethod::WHOLE:
+        case AccumulationMethod::WHOLE:
           switch (purpose) {
           case VwuGoal::ACCUMULATE:
             if (cudaFuncGetAttributes(&result, kfValenceForceAccumulation) != cudaSuccess) {
@@ -717,16 +760,16 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
                           MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
                           ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
                           const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                          const VwuGoal purpose, const ForceAccumulationMethod force_sum,
+                          const VwuGoal purpose, const AccumulationMethod force_sum,
                           const int2 bt) {
-  ForceAccumulationMethod refined_force_sum;
+  AccumulationMethod refined_force_sum;
   switch (force_sum) {
-  case ForceAccumulationMethod::SPLIT:
-  case ForceAccumulationMethod::WHOLE:
+  case AccumulationMethod::SPLIT:
+  case AccumulationMethod::WHOLE:
     refined_force_sum = force_sum;
     break;
-  case ForceAccumulationMethod::AUTOMATIC:
-    refined_force_sum = chooseForceAccumulationMethod(poly_psw->frc_bits);
+  case AccumulationMethod::AUTOMATIC:
+    refined_force_sum = chooseAccumulationMethod(poly_psw->frc_bits);
     break;
   }
   switch (purpose) {
@@ -737,7 +780,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     switch (eval_force) {
     case EvaluateForce::YES:
       switch (refined_force_sum) {
-      case ForceAccumulationMethod::SPLIT:
+      case AccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           kfsValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
@@ -748,7 +791,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
           break;
         }
         break;
-      case ForceAccumulationMethod::WHOLE:
+      case AccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           kfValenceForceEnergyAccumulation<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw,
@@ -759,7 +802,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
           break;
         }
         break;
-      case ForceAccumulationMethod::AUTOMATIC:
+      case AccumulationMethod::AUTOMATIC:
         break;
       }
       break;
@@ -776,7 +819,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     // evaluating forces and moving the particles remains a consideration in choosing the proper
     // kernel.
     switch (refined_force_sum) {
-    case ForceAccumulationMethod::SPLIT:
+    case AccumulationMethod::SPLIT:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
         kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
@@ -787,7 +830,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         break;
       }
       break;
-    case ForceAccumulationMethod::WHOLE:
+    case AccumulationMethod::WHOLE:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
         kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
@@ -798,7 +841,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
         break;
       }
       break;
-    case ForceAccumulationMethod::AUTOMATIC:
+    case AccumulationMethod::AUTOMATIC:
       break;
     }
     break;
@@ -810,12 +853,12 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                           ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
                           const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                          const ForceAccumulationMethod force_sum, const KernelManager &launcher) {
+                          const AccumulationMethod force_sum, const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
   const int2 bt = launcher.getValenceKernelDims(prec, eval_force, eval_energy,
-                                                ForceAccumulationMethod::SPLIT, purpose);
+                                                AccumulationMethod::SPLIT, purpose);
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
@@ -851,11 +894,11 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
                           const KernelManager &launcher) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchValence(prec, poly_ag, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy, purpose,
-                  ForceAccumulationMethod::SPLIT, launcher);
+                  AccumulationMethod::SPLIT, launcher);
   }
   else {
     launchValence(prec, poly_ag, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy, purpose,
-                  ForceAccumulationMethod::WHOLE, launcher);
+                  AccumulationMethod::WHOLE, launcher);
   }
 }
 

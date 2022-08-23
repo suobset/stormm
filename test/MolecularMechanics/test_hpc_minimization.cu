@@ -397,16 +397,16 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   // Lay out GPU cache resources
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const int2 vale_xe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::NO,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const int2 nonb_lp = launcher.getNonbondedKernelDims(prec,
                                                        NbwuKind::TILE_GROUPS,
                                                        EvaluateForce::YES, EvaluateEnergy::YES,
-                                                       ForceAccumulationMethod::SPLIT);
+                                                       AccumulationMethod::SPLIT);
   const int2 redu_lp = launcher.getReductionKernelDims(prec,
                                                        ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
@@ -479,11 +479,11 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::YES, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                      EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_fe_lp);
+                    AccumulationMethod::SPLIT, vale_fe_lp);
       f_ctrl_fe.step += 1;
       break;
     }
@@ -565,11 +565,11 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                      EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                    AccumulationMethod::SPLIT, vale_xe_lp);
       f_ctrl_xe.step += 1;
       break;
     }
@@ -599,11 +599,11 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                      EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                    AccumulationMethod::SPLIT, vale_xe_lp);
       f_ctrl_xe.step += 1;
       break;
     }
@@ -633,11 +633,11 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     case PrecisionModel::SINGLE:
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
+                      EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                    AccumulationMethod::SPLIT, vale_xe_lp);
       f_ctrl_xe.step += 1;
       break;
     }

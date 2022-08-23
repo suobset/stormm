@@ -16,7 +16,7 @@ using constants::PrecisionModel;
 using data_types::int95_t;
   
 /// \brief Enumerate the choices for carrying out fixed-precision accumulation
-enum class ForceAccumulationMethod {
+enum class AccumulationMethod {
   SPLIT,     ///< Use split accumulation, stashing the low 32 bits in a locally cached int and the
              ///<   high 32 bits in a secondary accumulator probably located further away in main
              ///<   memory.  So long as most of the work happens in the low 32 bits, this reduces
@@ -49,19 +49,19 @@ constexpr float max_llint_accumulation_f  = max_llint_accumulation;
 /// \brief Translate a string specifying a force accumulation method into the numerical code.
 ///
 /// \param method  The string to translate
-ForceAccumulationMethod translateForceAccumulationMethod(const std::string &choice,
+AccumulationMethod translateAccumulationMethod(const std::string &choice,
                                                          ExceptionResponse policy);
 
 /// \brief Get a string for the name of a force accumulation method.
 ///
 /// \param method  The method in question
-std::string getForceAccumulationMethodName(ForceAccumulationMethod method);
+std::string getAccumulationMethodName(AccumulationMethod method);
 
 /// \brief Determine the best accumulation method based on the precision level of the forces.
 ///
 /// \param frc_bits  Number of bits stored after the decimal in fixed-precision force
 ///                  representations
-ForceAccumulationMethod chooseForceAccumulationMethod(int frc_bits);
+AccumulationMethod chooseAccumulationMethod(int frc_bits);
 
 /// \brief Produce an error message describing range violations in user choices for various
 ///        fixed-precision methods.

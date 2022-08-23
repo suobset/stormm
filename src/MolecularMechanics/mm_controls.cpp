@@ -9,7 +9,7 @@ namespace mm {
 
 using card::HybridKind;
 using math::ReductionGoal;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
 using synthesis::VwuGoal;
 
 //-------------------------------------------------------------------------------------------------
@@ -290,11 +290,11 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
   // threads per block have to vary based on what each block of that kernel variant is required to
   // do.  Here, it should suffice to query the launch parameters of just one of the blocks.
   const int2 vwu_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg,
-                                                    ForceAccumulationMethod::SPLIT,
+                                                    AccumulationMethod::SPLIT,
                                                     VwuGoal::ACCUMULATE);
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                        eval_frc, eval_nrg,
-                                                       ForceAccumulationMethod::SPLIT);
+                                                       AccumulationMethod::SPLIT);
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
 

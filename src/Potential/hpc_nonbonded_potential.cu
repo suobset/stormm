@@ -22,6 +22,7 @@ using constants::warp_size_int;
 using constants::warp_bits;
 using constants::warp_bits_mask_int;
 using data_types::int95_t;
+using numerics::chooseAccumulationMethod;
 using numerics::max_int_accumulation_f;
 using numerics::max_int_accumulation_ll;
 using numerics::max_llint_accumulation;
@@ -33,12 +34,18 @@ using synthesis::tile_groups_wu_abstract_length;
 using topology::ImplicitSolventModel;
   
 //-------------------------------------------------------------------------------------------------
+// Get the number atoms in a particular tile stretch.
+//
+// Arguments:
+//   nbwu_map:  Details of the non-bonded work unit, condensed into a simple array of integers
+//   pos:       Thread position in the list of atoms
+//-------------------------------------------------------------------------------------------------
 __device__ __forceinline__ int getTileSideAtomCount(int* nbwu_map, const int pos) {
   const int key_idx  = pos / 4;
   const int key_slot = pos - (key_idx * 4);
   return ((nbwu_map[small_block_max_imports + 1 + key_idx] >> (8 * key_slot)) & 0xff);
 }
-  
+
 #include "Numerics/accumulation.cui"
 #include "Math/rounding.cui"
 
@@ -54,8 +61,19 @@ __device__ __forceinline__ int getTileSideAtomCount(int* nbwu_map, const int pos
 #  endif
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
+#  define SPLIT_FORCE_ACCUMULATION
+#    define KERNEL_NAME ktgfsCalculateGBRadii
+#      include "gbradii_tilegroups.cui"
+#    undef KERNEL_NAME
+#    define KERNEL_NAME ktgfsCalculateGBDerivatives
+#      include "gbderivative_tilegroups.cui"
+#    undef KERNEL_NAME
+#  undef SPLIT_FORCE_ACCUMULATION
 #  define KERNEL_NAME ktgfCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
+#  undef KERNEL_NAME
+#  define KERNEL_NAME ktgfCalculateGBDerivatives
+#    include "gbderivative_tilegroups.cui"
 #  undef KERNEL_NAME
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
@@ -96,8 +114,11 @@ __device__ __forceinline__ int getTileSideAtomCount(int* nbwu_map, const int pos
 #  define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
-#  define KERNEL_NAME ktgdCalculateGBRadii
+#  define KERNEL_NAME ktgdsCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
+#  undef KERNEL_NAME
+#  define KERNEL_NAME ktgdsCalculateGBDerivatives
+#    include "gbderivative_tilegroups.cui"
 #  undef KERNEL_NAME
 #  define COMPUTE_FORCE
 #    define COMPUTE_ENERGY
@@ -153,7 +174,7 @@ extern void nonbondedKernelSetup() {
 extern cudaFuncAttributes
 queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
                                  const EvaluateForce eval_frc, const EvaluateEnergy eval_nrg,
-                                 const ForceAccumulationMethod acc_meth) {
+                                 const AccumulationMethod acc_meth) {
 
   // The kernel manager will have information about the GPU to use--look at the work units from
   // the perspective of overall occupancy on the GPU.
@@ -193,13 +214,13 @@ queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
         switch (eval_nrg) {
         case EvaluateEnergy::YES:
           switch (acc_meth) {
-          case ForceAccumulationMethod::SPLIT:
+          case AccumulationMethod::SPLIT:
             if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForceEnergy) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel ktgfsNonbondedForceEnergy.",
                     "queryNonbondedKernelRequirements");
             }
             break;
-          case ForceAccumulationMethod::WHOLE:
+          case AccumulationMethod::WHOLE:
             if (cudaFuncGetAttributes(&attr, ktgfNonbondedForceEnergy) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel ktgfNonbondedForceEnergy.",
                     "queryNonbondedKernelRequirements");
@@ -209,13 +230,13 @@ queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
           break;
         case EvaluateEnergy::NO:
           switch (acc_meth) {
-          case ForceAccumulationMethod::SPLIT:
+          case AccumulationMethod::SPLIT:
             if (cudaFuncGetAttributes(&attr, ktgfsNonbondedForce) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel ktgfsNonbondedForce.",
                     "queryNonbondedKernelRequirements");
             }
             break;
-          case ForceAccumulationMethod::WHOLE:
+          case AccumulationMethod::WHOLE:
             if (cudaFuncGetAttributes(&attr, ktgfNonbondedForce) != cudaSuccess) {
               rtErr("Error obtaining attributes for kernel ktgfNonbondedForce.",
                     "queryNonbondedKernelRequirements");
@@ -244,14 +265,15 @@ queryNonbondedKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
 }
 
 //-------------------------------------------------------------------------------------------------
-extern cudaFuncAttributes queryBornRadiiKernelRequirements(const PrecisionModel prec,
-                                                           const NbwuKind kind) {
+extern cudaFuncAttributes
+queryBornRadiiKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
+                                 const AccumulationMethod acc_meth) {
   cudaFuncAttributes attr;
   switch (prec) {
   case PrecisionModel::DOUBLE:
     switch (kind) {
     case NbwuKind::TILE_GROUPS:
-      if (cudaFuncGetAttributes(&attr, ktgdCalculateGBRadii) != cudaSuccess) {
+      if (cudaFuncGetAttributes(&attr, ktgdsCalculateGBRadii) != cudaSuccess) {
         rtErr("Error obtaining attributes for kernel ktgdCalculateGBRadii.",
               "queryNonbondedKernelRequirements");
       }
@@ -264,9 +286,21 @@ extern cudaFuncAttributes queryBornRadiiKernelRequirements(const PrecisionModel 
   case PrecisionModel::SINGLE:
     switch (kind) {
     case NbwuKind::TILE_GROUPS:
-      if (cudaFuncGetAttributes(&attr, ktgfCalculateGBRadii) != cudaSuccess) {
-        rtErr("Error obtaining attributes for kernel ktgfCalculateGBRadii.",
-              "queryNonbondedKernelRequirements");
+      switch (acc_meth) {
+      case AccumulationMethod::SPLIT:
+        if (cudaFuncGetAttributes(&attr, ktgfsCalculateGBRadii) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgfsCalculateGBRadii.",
+                "queryNonbondedKernelRequirements");
+        }
+        break;
+      case AccumulationMethod::WHOLE:
+        if (cudaFuncGetAttributes(&attr, ktgfCalculateGBRadii) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgfCalculateGBRadii.",
+                "queryNonbondedKernelRequirements");
+        }
+        break;
+      case AccumulationMethod::AUTOMATIC:
+        break;
       }
       break;
     case NbwuKind::SUPERTILES:
@@ -286,7 +320,7 @@ extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit
                                        const int2 bt) {
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
-    ktgdCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+    ktgdsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
     break;
   case NbwuKind::SUPERTILES:
     break;
@@ -300,10 +334,19 @@ extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit
                                        const NeckGeneralizedBornKit<float> &ngb_kit,
                                        MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
                                        CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
-                                       const int2 bt) {
+                                       const AccumulationMethod acc_meth, const int2 bt) {
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
-    ktgfCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+    switch (acc_meth) {
+    case AccumulationMethod::SPLIT:
+      ktgfsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+      break;
+    case AccumulationMethod::WHOLE:
+      ktgfCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+      break;
+    case AccumulationMethod::AUTOMATIC:
+      break;
+    }
     break;
   case NbwuKind::SUPERTILES:
     break;
@@ -319,12 +362,23 @@ extern void launchBornRadiiCalculation(const PrecisionModel prec,
                                        MolecularMechanicsControls *mmctrl,
                                        PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
                                        ImplicitSolventWorkspace *isw,
-                                       const KernelManager &launcher) {
+                                       const KernelManager &launcher,
+                                       const AccumulationMethod acc_meth) {
+  AccumulationMethod actual_acc_meth;
+  switch (acc_meth) {
+  case AccumulationMethod::SPLIT:
+  case AccumulationMethod::WHOLE:
+    actual_acc_meth = acc_meth;
+    break;
+  case AccumulationMethod::AUTOMATIC:
+    actual_acc_meth = chooseAccumulationMethod(isw->getFixedPrecisionBits());
+    break;
+  }
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   const NbwuKind kind = poly_ag.getNonbondedWorkType();
   PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
   ISWorkspaceKit iswk = isw->data(devc_tier);
-  const int2 bt = launcher.getBornRadiiKernelDims(prec, kind);
+  const int2 bt = launcher.getBornRadiiKernelDims(prec, kind, actual_acc_meth);
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
@@ -341,7 +395,8 @@ extern void launchBornRadiiCalculation(const PrecisionModel prec,
       const NeckGeneralizedBornKit<float> ngb_kit = ngb_tab.getSinglePrecisionAbstract(devc_tier);
       MMControlKit<float> ctrl = mmctrl->spData(devc_tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(devc_tier);
-      launchBornRadiiCalculation(kind, poly_nbk, ngb_kit, &ctrl, &poly_psw, &gmem_r, &iswk, bt);
+      launchBornRadiiCalculation(kind, poly_nbk, ngb_kit, &ctrl, &poly_psw, &gmem_r, &iswk,
+                                 actual_acc_meth, bt);
     }
     break;
   }
@@ -384,13 +439,13 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float> &po
                             PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                             CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy,
-                            const ForceAccumulationMethod force_sum, const int2 bt) {
+                            const AccumulationMethod force_sum, const int2 bt) {
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
     switch (eval_force) {
     case EvaluateForce::YES:
       switch (force_sum) {
-      case ForceAccumulationMethod::SPLIT:
+      case AccumulationMethod::SPLIT:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgfsNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
@@ -401,7 +456,7 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float> &po
           break;
         }
         break;
-      case ForceAccumulationMethod::WHOLE:
+      case AccumulationMethod::WHOLE:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgfNonbondedForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
@@ -412,7 +467,7 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float> &po
           break;
         }
         break;
-      case ForceAccumulationMethod::AUTOMATIC:
+      case AccumulationMethod::AUTOMATIC:
         if (poly_psw->frc_bits <= 24) {
           switch (eval_energy) {
           case EvaluateEnergy::YES:
@@ -455,7 +510,7 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
                             MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                             ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
                             const EvaluateEnergy eval_energy,
-                            const ForceAccumulationMethod force_sum,
+                            const AccumulationMethod force_sum,
                             const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
@@ -494,11 +549,11 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
                             const EvaluateEnergy eval_energy, const KernelManager &launcher) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
     launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy,
-                    ForceAccumulationMethod::SPLIT, launcher);
+                    AccumulationMethod::SPLIT, launcher);
   }
   else {
     launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy,
-                    ForceAccumulationMethod::WHOLE, launcher);
+                    AccumulationMethod::WHOLE, launcher);
   }
 }
 

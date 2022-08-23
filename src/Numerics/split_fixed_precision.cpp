@@ -11,40 +11,40 @@ using constants::getPrecisionModelName;
 using parse::strcmpCased;
 
 //-------------------------------------------------------------------------------------------------
-ForceAccumulationMethod translateForceAccumulationMethod(const std::string &choice,
+AccumulationMethod translateAccumulationMethod(const std::string &choice,
                                                          const ExceptionResponse policy) {
   if (strcmpCased(choice, std::string("split"))) {
-    return ForceAccumulationMethod::SPLIT;
+    return AccumulationMethod::SPLIT;
   }
   else if (strcmpCased(choice, std::string("whole"))) {    
-    return ForceAccumulationMethod::WHOLE;
+    return AccumulationMethod::WHOLE;
   }
   else if (strcmpCased(choice, std::string("automatic"))) {    
-    return ForceAccumulationMethod::AUTOMATIC;
+    return AccumulationMethod::AUTOMATIC;
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string getForceAccumulationMethodName(const ForceAccumulationMethod method) {
+std::string getAccumulationMethodName(const AccumulationMethod method) {
   switch (method) {
-  case ForceAccumulationMethod::SPLIT:
+  case AccumulationMethod::SPLIT:
     return std::string("SPLIT");
-  case ForceAccumulationMethod::WHOLE:
+  case AccumulationMethod::WHOLE:
     return std::string("WHOLE");
-  case ForceAccumulationMethod::AUTOMATIC:
+  case AccumulationMethod::AUTOMATIC:
     return std::string("AUTOMATIC");
   }
   __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-ForceAccumulationMethod chooseForceAccumulationMethod(const int frc_bits) {
+AccumulationMethod chooseAccumulationMethod(const int frc_bits) {
   if (frc_bits <= 24) {
-    return ForceAccumulationMethod::SPLIT;
+    return AccumulationMethod::SPLIT;
   }
   else {
-    return ForceAccumulationMethod::WHOLE;
+    return AccumulationMethod::WHOLE;
   }
   __builtin_unreachable();
 }

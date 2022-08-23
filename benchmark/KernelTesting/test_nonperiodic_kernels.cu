@@ -100,7 +100,7 @@ SystemCache directorySweep(const std::vector<std::string> &topol_path,
 void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
                        MolecularMechanicsControls *mmctrl, const GpuDetails &gpu,
                        StopWatch *timer, const PrecisionModel prec, const EvaluateForce eval_frc,
-                       const EvaluateEnergy eval_nrg, const ForceAccumulationMethod acc_meth,
+                       const EvaluateEnergy eval_nrg, const AccumulationMethod acc_meth,
                        const VwuGoal purpose) {
   std::vector<AtomGraph*> ag_vec(1, ag);
   std::vector<PhaseSpace> ps_vec(1, ps);
@@ -243,26 +243,26 @@ void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEn
       const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
 
       // Only do double-precision calculations for low replica numbers--this can be strenuous on
       // many architectures, particularly in the non-bonded kernel.
       if (ncopy < 10) {
         replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                           timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
         replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                           timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       }
     }
   }

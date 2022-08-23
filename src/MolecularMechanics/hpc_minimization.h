@@ -28,7 +28,7 @@ using energy::ScoreCard;
 using energy::ScoreCardWriter;
 using math::ReductionBridge;
 using math::ReductionKit;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
@@ -115,7 +115,7 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         CacheResource *vale_fe_cache, CacheResource *nonb_fe_cache,
                         CacheResource *vale_xe_cache, CacheResource *nonb_xe_cache,
                         ReductionBridge *rbg, LineMinimization *line_record,
-                        const ForceAccumulationMethod acc_meth, const GpuDetails &gpu,
+                        const AccumulationMethod acc_meth, const GpuDetails &gpu,
                         const KernelManager &launcher, StopWatch *timer = nullptr,
                         const std::string &task_name = std::string(""));
 
