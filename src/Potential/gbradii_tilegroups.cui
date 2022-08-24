@@ -11,9 +11,8 @@
 /// \param poly_psw  Coordinates and forces for all particles
 /// \param gmem_r    Workspaces for each thread block
 __global__ void __launch_bounds__(small_block_size, GBRADII_KERNEL_BLOCKS_MULTIPLIER)
-KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<TCALC> ngb_kit,
-            MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r,
-            ISWorkspaceKit isw) {
+KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ctrl,
+            PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r, ISWorkspaceKit isw) {
 
   // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.
@@ -31,16 +30,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<T
   __shared__ int sh_psi_overflow[small_block_max_imports];
   __shared__ int sh_neck_idx[small_block_max_imports];
   __shared__ int nbwu_map[tile_groups_wu_abstract_length];
-  __shared__ int nbwu_idx;
+  __shared__ int gbrwu_idx;
 
   // Read the non-bonded work unit abstracts
   if (threadIdx.x == 0) {
-    nbwu_idx = blockIdx.x;
+    gbrwu_idx = blockIdx.x;
   }
   __syncthreads();
-  while (nbwu_idx < poly_nbk.nnbwu) {
+  while (gbrwu_idx < poly_nbk.nnbwu) {
     if (threadIdx.x < tile_groups_wu_abstract_length) {
-      nbwu_map[threadIdx.x] =__ldcv(&poly_nbk.nbwu_abstracts[(nbwu_idx *
+      nbwu_map[threadIdx.x] =__ldcv(&poly_nbk.nbwu_abstracts[(gbrwu_idx *
                                                               tile_groups_wu_abstract_length) +
                                                              threadIdx.x]);
     }    
@@ -76,7 +75,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<T
                               &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
                               poly_psw.gpos_scale);
 #endif
-    pos = loadTileProperty(pos, import_count, 3, nbwu_map, poly_nbk.pb_radii, sh_pbradii);
+    pos = loadTileProperty(pos, import_count, 3, nbwu_map, poly_nbk.pb_radii, -poly_nbk.gb_offset,
+                           sh_pbradii);
     pos = loadTileProperty(pos, import_count, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
@@ -147,13 +147,26 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<T
       const TCALC t_ycrd = splitFPToReal(y95_tmp) * poly_psw.inv_gpos_scale;
       const TCALC t_zcrd = splitFPToReal(z95_tmp) * poly_psw.inv_gpos_scale;
 #endif
+      const TCALC t_radius = sh_pbradii[read_idx - EXCL_GMEM_OFFSET];
+      const TCALC t_screen = sh_screen[read_idx - EXCL_GMEM_OFFSET];
+      for (int i = 0; i < half_tile_length; i++) {
+        int crd_src_lane = ((warp_lane_idx <  tile_length) * (warp_lane_idx + tile_length - i)) +
+                           ((warp_lane_idx >= tile_length) *
+                           (warp_lane_idx - three_halves_tile_length + i));
+        crd_src_lane += tile_length *
+                        ((crd_src_lane < tile_length && warp_lane_idx  < tile_length) +
+                         (crd_src_lane <           0 && warp_lane_idx >= tile_length));
+        const TCALC o_xcrd  = SHFL(t_xcrd,  crd_src_lane);
+        const TCALC o_ycrd  = SHFL(t_ycrd,  crd_src_lane);
+        const TCALC o_zcrd  = SHFL(t_zcrd,  crd_src_lane);
+      }
     }
 
     // Increment the work unit counter
     __syncthreads();
     if (threadIdx.x == 0) {
       const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
-      nbwu_idx = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);
+      gbrwu_idx = atomicAdd(&ctrl.gbrwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();    
   }

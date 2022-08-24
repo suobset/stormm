@@ -9,9 +9,9 @@
 namespace stormm {
 namespace energy {
 
-using generalized_born_defaults::NeckGeneralizedBornKit;
 using topology::ImplicitSolventKit;
 using topology::ImplicitSolventModel;
+using namespace generalized_born_defaults;
 
 template <typename T> struct ImplicitSolventRecipe {
 

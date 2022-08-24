@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "Constants/generalized_born.h"
 #include "Constants/hpc_bounds.h"
 #include "Math/rounding.h"
 #include "Math/summation.h"
@@ -41,6 +42,7 @@ using topology::VirtualSiteKit;
 using testing::Approx;
 using testing::ComparisonType;
 using testing::StopWatch;
+using namespace generalized_born_defaults;
   
 //-------------------------------------------------------------------------------------------------
 AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies_in,
@@ -64,7 +66,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
 
     // Descriptors spanning all systems
     periodic_box_class{UnitCellType::NONE}, gb_style{ImplicitSolventModel::NONE},
-    dielectric_constant{1.0}, salt_concentration{0.0}, coulomb_constant{accepted_coulomb_constant},
+    dielectric_constant{1.0}, is_kappa{0.0}, salt_concentration{0.0},
+    gb_offset{default_gb_radii_offset}, gb_neckscale{default_gb_neck_scale},
+    gb_neckcut{default_gb_neck_cut}, coulomb_constant{accepted_coulomb_constant},
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
     water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
 
@@ -263,11 +267,13 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     gb_alpha_parameters{HybridKind::POINTER, "tpsyn_gbalpha"},
     gb_beta_parameters{HybridKind::POINTER, "tpsyn_gbbeta"},
     gb_gamma_parameters{HybridKind::POINTER, "tpsyn_gbgamma"},
+    neck_limit_tables{HybridKind::ARRAY, "tpsyn_neck_limits"},
     sp_atomic_pb_radii{HybridKind::POINTER, "tpsyn_atom_pb_rad_sp"},
     sp_gb_screening_factors{HybridKind::POINTER, "tpsyn_gbscreen_sp"},
     sp_gb_alpha_parameters{HybridKind::POINTER, "tpsyn_gbalpha_sp"},
     sp_gb_beta_parameters{HybridKind::POINTER, "tpsyn_gbbeta_sp"},
     sp_gb_gamma_parameters{HybridKind::POINTER, "tpsyn_gbgamma_sp"},    
+    sp_neck_limit_tables{HybridKind::ARRAY, "tpsyn_neck_limits_sp"},
     
     // Restraint parameters for all systems
     rposn_step_bounds{HybridKind::POINTER, "tpsyn_rposn_steps"},
@@ -3478,36 +3484,43 @@ AtomGraphSynthesis::getSinglePrecisionRestraintKit(const HybridTargetLevel tier)
 }
 
 //-------------------------------------------------------------------------------------------------
-SyNonbondedKit<double>
+SyNonbondedKit<double, double2>
 AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return SyNonbondedKit<double>(system_count, periodic_box_class, total_nonbonded_work_units,
-                                nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
-                                atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
-                                dielectric_constant, salt_concentration, gb_style,
-                                atomic_charges.data(tier), lennard_jones_indices.data(tier),
-                                atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
-                                lennard_jones_a_coeff.data(tier), lennard_jones_b_coeff.data(tier),
-                                lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
-                                atomic_pb_radii.data(tier), gb_screening_factors.data(tier),
-                                gb_alpha_parameters.data(tier), gb_beta_parameters.data(tier),
-                                gb_gamma_parameters.data(tier));
+  return SyNonbondedKit<double,
+                        double2>(system_count, periodic_box_class, total_nonbonded_work_units,
+                                 nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
+                                 atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
+                                 gb_style, dielectric_constant, is_kappa, salt_concentration,
+                                 gb_offset, gb_neckscale, gb_neckcut, atomic_charges.data(tier),
+                                 lennard_jones_indices.data(tier), atom_type_counts.data(tier),
+                                 lennard_jones_abc_offsets.data(tier),
+                                 lennard_jones_a_coeff.data(tier),
+                                 lennard_jones_b_coeff.data(tier),
+                                 lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
+                                 atomic_pb_radii.data(tier), gb_screening_factors.data(tier),
+                                 gb_alpha_parameters.data(tier), gb_beta_parameters.data(tier),
+                                 gb_gamma_parameters.data(tier), neck_limit_tables.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
-SyNonbondedKit<float>
+SyNonbondedKit<float, float2>
 AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier) const {
-  return SyNonbondedKit<float>(system_count, periodic_box_class, total_nonbonded_work_units,
-                               nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
-                               atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
-                               dielectric_constant, salt_concentration, gb_style,
-                               sp_atomic_charges.data(tier), lennard_jones_indices.data(tier),
-                               atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
-                               sp_lennard_jones_a_coeff.data(tier),
-                               sp_lennard_jones_b_coeff.data(tier),
-                               sp_lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
-                               sp_atomic_pb_radii.data(tier), sp_gb_screening_factors.data(tier),
-                               sp_gb_alpha_parameters.data(tier), sp_gb_beta_parameters.data(tier),
-                               sp_gb_gamma_parameters.data(tier));
+  return SyNonbondedKit<float,
+                        float2>(system_count, periodic_box_class, total_nonbonded_work_units,
+                                nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
+                                atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
+                                gb_style, dielectric_constant, is_kappa, salt_concentration,
+                                gb_offset, gb_neckscale, gb_neckcut, sp_atomic_charges.data(tier),
+                                lennard_jones_indices.data(tier), atom_type_counts.data(tier),
+                                lennard_jones_abc_offsets.data(tier),
+                                sp_lennard_jones_a_coeff.data(tier),
+                                sp_lennard_jones_b_coeff.data(tier),
+                                sp_lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
+                                sp_atomic_pb_radii.data(tier), sp_gb_screening_factors.data(tier),
+                                sp_gb_alpha_parameters.data(tier),
+                                sp_gb_beta_parameters.data(tier),
+                                sp_gb_gamma_parameters.data(tier),
+                                sp_neck_limit_tables.data(tier));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3560,6 +3573,8 @@ void AtomGraphSynthesis::upload() {
   sp_lennard_jones_14_a_coeff.upload();
   sp_lennard_jones_14_b_coeff.upload();
   sp_lennard_jones_14_c_coeff.upload();
+  neck_limit_tables.upload();
+  sp_neck_limit_tables.upload();
   nmr_int2_data.upload();
   nmr_double_data.upload();
   nmr_double2_data.upload();
@@ -3617,6 +3632,8 @@ void AtomGraphSynthesis::download() {
   sp_lennard_jones_14_a_coeff.download();
   sp_lennard_jones_14_b_coeff.download();
   sp_lennard_jones_14_c_coeff.download();
+  neck_limit_tables.download();
+  sp_neck_limit_tables.download();
   nmr_int2_data.download();
   nmr_double_data.download();
   nmr_double2_data.download();
@@ -3649,6 +3666,11 @@ void AtomGraphSynthesis::download() {
   reduction_abstracts.download();
 }
 #endif
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel ism_in) {
+
+}
 
 } // namespace synthesis
 } // namespace stormm

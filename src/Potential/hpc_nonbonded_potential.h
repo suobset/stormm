@@ -6,7 +6,6 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
-#include "Constants/generalized_born.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Potential/energy_enumerators.h"
 #include "Synthesis/implicit_solvent_workspace.h"
@@ -24,8 +23,6 @@ namespace energy {
 using card::GpuDetails;
 using card::KernelManager;
 using constants::PrecisionModel;
-using generalized_born_defaults::NeckGeneralizedBornKit;
-using generalized_born_defaults::NeckGeneralizedBornTable;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
 using numerics::AccumulationMethod;
@@ -102,20 +99,17 @@ cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, Nb
 ///                     energy computation requirements (an "abstract" of the KernelManager object)
 /// \param launcher     Contains launch parameters for all kernels in STORMM
 /// \{
-void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
-                                const NeckGeneralizedBornKit<double> &ngb_kit,
+void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                                 MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
                                 CacheResourceKit<double> *gmem_r, ISWorkspaceKit *iswk,
                                 const int2 bt);
 
-void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
-                                const NeckGeneralizedBornKit<float> &ngb_kit,
+void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                                 MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
                                 CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
                                 AccumulationMethod acc_meth, const int2 bt);
 
 void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
-                                const NeckGeneralizedBornTable &ngb_tab,
                                 MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
                                 CacheResource *tb_space, ImplicitSolventWorkspace *isw,
                                 const KernelManager &launcher,
@@ -155,13 +149,13 @@ void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &p
 ///                     energy computation requirements (an "abstract" of the KernelManager object)
 /// \param launcher     Contains launch parameters for all kernels in STORMM
 /// \{
-void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
                      const EvaluateEnergy eval_energy, const int2 bt);
 
-void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,

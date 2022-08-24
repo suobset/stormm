@@ -106,10 +106,11 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 /// \param eval_elec_force  Flag to also carry out force evaluation of electrostatic interactions
 ///                         (energy is always evaluated in CPU functions)
 /// \param eval_vdw_force   Flag to also carry out force evaluation of van-der Waals interactions
-template <typename Tcalc>
-void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
-                               PsSynthesisWriter *psyw, ScoreCard *ecard,
-                               EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
+template <typename Tcalc, typename Tcalc2>
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
+                               const SeMaskSynthesisReader syse, PsSynthesisWriter *psyw,
+                               ScoreCard *ecard, EvaluateForce eval_elec_force,
+                               EvaluateForce eval_vdw_force);
 
 /// \brief Evaluate the non-bonded energy with a particular precision level.  This will invoke
 ///        the proper C++ function.

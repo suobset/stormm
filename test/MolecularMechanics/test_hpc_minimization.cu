@@ -426,8 +426,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   const HybridTargetLevel devc = HybridTargetLevel::DEVICE;
   const SyValenceKit<double> d_poly_vk = poly_ag.getDoublePrecisionValenceKit(devc);
   const SyValenceKit<float>  f_poly_vk = poly_ag.getSinglePrecisionValenceKit(devc);
-  const SyNonbondedKit<double> d_poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc);
-  const SyNonbondedKit<float>  f_poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc);
+  const SyNonbondedKit<double, double2> d_poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc);
+  const SyNonbondedKit<float, float2>  f_poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc);
   const SeMaskSynthesisReader poly_ser = poly_se.data(devc);
   const SyRestraintKit<double,
                        double2, double4> d_poly_rk = poly_ag.getDoublePrecisionRestraintKit(devc);

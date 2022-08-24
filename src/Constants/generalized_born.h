@@ -19,6 +19,9 @@ constexpr double inverse_gb_radii_scale_lf = 1.0 / gb_radii_scale_lf;
 constexpr float  inverse_gb_radii_scale_f  = (float)1.0 / gb_radii_scale_f;
 /// \}
 
+/// \brief Salt concentration dependence for Generalized Born kappa scaling parameter
+constexpr double default_salt_kappa_dependence = 0.10806;
+  
 /// \brief Double-precision Generalized Born Taylor series expansion coefficients
 /// \{
 constexpr double gb_taylor_a_lf  = 0.33333333333333333333;
@@ -104,11 +107,19 @@ constexpr double gb_neck_ii_beta_p   =  0.800000;
 constexpr double gb_neck_ii_gamma_p  =  4.850000;
 /// \}
 
+/// \brief The offset used to translate Poisson-Boltzmann atomic radii into baseline GB radii.
+/// \{
+constexpr double default_gb_radii_offset = 0.09;
+constexpr double default_neck_ii_gb_radii_offset = 0.195141;
+/// \}
+
 /// \brief Other "neck" GB parameters.  The neck cutoff has a physical interpretation which would
 ///        put it near 2.8 Angstroms, the diameter of a water molecule, but it is set higher (6.8)
 ///        to reduce the discontinuity at the cutoff.  gb_kscale is a "Kappa" scaling parameter.
-constexpr double gb_neck_cut  =  6.800000;
-constexpr double gb_kscale    =  0.730000;
+constexpr double default_gb_neck_cut  =  6.800000;
+constexpr double default_gb_kscale    =  0.730000;
+constexpr double default_gb_neck_scale    = 0.361825;
+constexpr double default_gb_neck_ii_scale = 0.826836;
 /// \}
 
 /// \brief Abstract for the NeckGeneralizedBornTable object, in single- or double-precision.

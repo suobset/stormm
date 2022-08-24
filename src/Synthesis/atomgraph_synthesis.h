@@ -6,6 +6,7 @@
 #include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
 #include "Constants/behavior.h"
+#include "Constants/generalized_born.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction_enumerators.h"
 #include "Math/reduction_workunit.h"
@@ -37,7 +38,8 @@ using topology::SettleSetting;
 using topology::ShakeSetting;
 using topology::UnitCellType;
 using testing::StopWatch;
-  
+using namespace generalized_born_defaults;
+
 /// \brief A collection of one or more AtomGraph objects, with similar components arranged in
 ///        contiguous arrays (often padded by the GPU warp size to prevent one system from flowing
 ///        into another).  Work units covering all systems are laid out in additional, contiguous
@@ -302,14 +304,14 @@ public:
   ///        interactions for all systems based on work units stored in this object.
   ///
   /// \param tier  Level at which to obtain pointers for the abstract
-  SyNonbondedKit<double>
+  SyNonbondedKit<double, double2>
   getDoublePrecisionNonbondedKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
   
   /// \brief Get a minimal kit with single-precision real numbers for computing non-bonded
   ///        interactions for all systems based on work units stored in this object.
   ///
   /// \param tier  Level at which to obtain pointers for the abstract
-  SyNonbondedKit<float>
+  SyNonbondedKit<float, float2>
   getSinglePrecisionNonbondedKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get a minimal kit with double-precision real numbers for updating atom and virtual
@@ -344,6 +346,16 @@ public:
   ///                 only be represented once in this mask synthesis.
   void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
 
+  /// \brief Apply an implicit solvent model to the synthesis.
+  ///
+  /// Overloaded:
+  ///   - Apply a well-known implicit solvent model
+  ///   - Apply a cusotmized implicit solvent model with its own parameters
+  ///
+  /// \param ism_in  A specific, established implicit solvent model (from literature and hard-coded
+  ///                into STORMM) to apply
+  void setImplicitSolventModel(ImplicitSolventModel ism_in);
+  
 private:
 
   // The first member variables pertain to totals across all systems: atoms, potential function
@@ -395,7 +407,12 @@ private:
                                       ///<   implicit solvent model is in effect.
   double dielectric_constant;         ///< Dielectric constant to take for implicit solvent
                                       ///<   calculations
+  double is_kappa;                    ///< Kappa scaling parameter used in some GB models (and
+                                      ///<   possibly other implicit solvents)
   double salt_concentration;          ///< Salt concentration affecting implicit solvent models
+  double gb_offset;                   ///< Standard offset for taking GB radii from PB radii
+  double gb_neckscale;                ///< Scaling factor inherent in "neck" GB approximations
+  double gb_neckcut;                  ///< Cutoff distance for apply GB "neck" corrections
   double coulomb_constant;            ///< Coulomb's constant in units of kcal-A/mol-e^2 (Amber
                                       ///<   differs from other programs in terms of what this is,
                                       ///<   so it can be set here)
@@ -731,9 +748,10 @@ private:
                                                 ///<  tables covering all systems (single
                                                 ///<   precision)
 
-  // Implicit solvent model parameters.  Like the atomic partial charges arrays, these will
+  // Implicit solvent model parameters.  Like the atomic partial charges arrays, most of these will
   // target chem_double_data, chem_float_data, and (in the case of the indices) chem_int_data,
-  // for convenience.
+  // for convenience.  The neck tables are their own ARRAY-type objects to expedite applying a
+  // new implicit solvent model to an existing synthesis.
   Hybrid<int> neck_gb_indices;           ///< Indicies into separation and maximum value parameter
                                          ///<   tables for Mongan's "neck" GB implementations
   Hybrid<double> atomic_pb_radii;        ///< Radii of all atoms according to the pb_radii_set
@@ -743,11 +761,19 @@ private:
                                          ///<   an Amber topology file but added later)
   Hybrid<double> gb_beta_parameters;     ///< Generalized Born beta parameters for each atom
   Hybrid<double> gb_gamma_parameters;    ///< Generalized Born gamma parameters for each atom
+  Hybrid<double2> neck_limit_tables;     ///< Neck maximum separations (the maximum distance at
+                                         ///<   which the neck correction applies) in the x member
+                                         ///<   and the maximum value of the neck correction in the
+                                         ///<   y member.  Neither table is symmetric.  Both are
+                                         ///<   copied into the synthesis for the purpose of
+                                         ///<   interlacing the values, which are needed in close
+                                         ///<   proximity throughout the "neck" GB code.
   Hybrid<float> sp_atomic_pb_radii;      ///< P.B. Radii of all atoms (single precision)
   Hybrid<float> sp_gb_screening_factors; ///< Generalized Born screening factors (single precision)
   Hybrid<float> sp_gb_alpha_parameters;  ///< Single-precision Generalized Born alpha parameters
   Hybrid<float> sp_gb_beta_parameters;   ///< Single-precision Generalized Born beta parameters
   Hybrid<float> sp_gb_gamma_parameters;  ///< Single-precision Generalized Born gamma parameters
+  Hybrid<float2> sp_neck_limit_tables;   ///< Single-precision neck GB limit tables
   
   // NMR restraint terms and details: these function exactly like other parameter sets and are
   // indexed by lists of atoms in the bond work units arrays.  They can be included in the

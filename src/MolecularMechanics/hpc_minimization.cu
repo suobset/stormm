@@ -192,7 +192,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   case PrecisionModel::DOUBLE:
     {
       const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
-      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
+      const SyNonbondedKit<double,
+                           double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<double, double2, double4> poly_rk =
         poly_ag.getDoublePrecisionRestraintKit(devc_tier);
       CacheResourceKit<double> vale_fe_tbr = vale_fe_cache->dpData(devc_tier);
@@ -265,7 +266,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   case PrecisionModel::SINGLE:
     {
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
-      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
+      const SyNonbondedKit<float,
+                           float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<float, float2, float4> poly_rk =
         poly_ag.getSinglePrecisionRestraintKit(devc_tier);
       CacheResourceKit<float> vale_fe_tbr = vale_fe_cache->spData(devc_tier);

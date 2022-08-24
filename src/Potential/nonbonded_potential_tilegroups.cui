@@ -13,7 +13,7 @@
 /// \param scw       Energy tracking object
 /// \param gmem_r    Workspaces for each thread block
 __global__ void __launch_bounds__(small_block_size, NONBOND_KERNEL_BLOCKS_MULTIPLIER)
-KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader poly_se,
+KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisReader poly_se,
             const MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter scw,

@@ -35,6 +35,13 @@ template <typename T> struct SyValenceKit {
                         const uint* cbnd_acc_in, const uint* angl_acc_in, const uint* cdhe_acc_in,
                         const uint* cmap_acc_in, const uint* infr14_acc_in);
 
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyValenceKit(const SyValenceKit &original) = default;
+  SyValenceKit(SyValenceKit &&original) = default;
+  /// \}
+
   // Member variables (all public)
   const int nvwu;                ///< The number of valence work units
   const T coulomb;               ///< Coulomb's constant in kcal-A2/mol-e2
@@ -108,6 +115,13 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
                           const uint* rposn_acc_in, const uint* rbond_acc_in,
                           const uint* rangl_acc_in, const uint* rdihe_acc_in);
 
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyRestraintKit(const SyRestraintKit &original) = default;
+  SyRestraintKit(SyRestraintKit &&original) = default;
+  /// \}
+
   // Member variables (all public)
   const int2* rposn_step_bounds;  ///< Steps for initiating and completely applying positional
                                   ///<   restraints
@@ -152,18 +166,28 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
 ///        single system's AtomGraph, this merges the ImplicitSolventKit and NonbondedKit.  For
 ///        comparison, the SyValenceKit object merges the information for valence interactions,
 ///        constraints, and virtual sites abstracts from the single topology's set of abstracts. 
-template <typename T> struct SyNonbondedKit {
+template <typename T, typename T2> struct SyNonbondedKit {
 
   /// \brief The constructor takes a straight list of arguments for each member variable.
   explicit SyNonbondedKit(int nsys_in, UnitCellType unit_cell_in, int nnbwu_in,
                           const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
                           const int* atom_offsets, const int* atom_counts, T coulomb_in,
-                          T dielectric_in, T saltcon_in, ImplicitSolventModel igb_in,
-                          const T* charge_in, const int* lj_idx_in, const int* n_lj_types_in,
+                          ImplicitSolventModel igb_in, T dielectric_in, T kappa_in, T saltcon_in,
+                          T gb_offset_in, T gb_neckscale_in, T gb_neckcut_in, const T* charge_in,
+                          const int* lj_idx_in, const int* n_lj_types_in,
                           const int* ljabc_offsets_in, const T* lja_coeff_in,
                           const T* ljb_coeff_in, const T* ljc_coeff_in, const int* neck_gb_idx_in,
                           const T* pb_radii_in, const T* gb_screen_in, const T* gb_alpha_in,
-                          const T* gb_beta_in, const T* gb_gamma_in);
+                          const T* gb_beta_in, const T* gb_gamma_in, const T2* neck_limits_in);
+
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+#if 0
+  SyNonbondedKit(const SyNonbondedKit &original) = default;
+  SyNonbondedKit(SyNonbondedKit &&original) = default;
+#endif
+  /// \}
 
   // Member variables (all public)
   const int nsys;                 ///< The total number of systems in the synthesis
@@ -177,10 +201,15 @@ template <typename T> struct SyNonbondedKit {
                                   ///<   tiles overrun the end of any one system)
   const T coulomb;                ///< Coulomb's constant (charges are stored in atomic units and
                                   ///<   converted to factor this in at the time they are cached)
-  const T dielectric;             ///< Solvent dielectric constant
-  const T saltcon;                ///< The salt concentration to use in GB calculations
   const ImplicitSolventModel igb; ///< The flavor of Generalized Born to use, i.e. Hawkins /
                                   ///<   Cramer / Truhlar
+  const T dielectric;             ///< Solvent dielectric constant
+  const T kappa;                  ///< Inverse of the Debye-Huckel length (based on the dielectic)
+  const T saltcon;                ///< The salt concentration to use in GB calculations
+  const T gb_offset;              ///< Offset for baseline Generalized Born radii (default 0.9,
+                                  ///<   larger for neck GB model II)
+  const T gb_neckscale;           ///< Neck function scaling parameter for neck GB
+  const T gb_neckcut;             ///< Cutoff for the "neck" GB function
   const T* charge;                ///< Partial charges for all atoms in the synthesis (one
                                   ///<   concatenated array, with each system's atoms padded by the
                                   ///<   warp size)
@@ -200,6 +229,7 @@ template <typename T> struct SyNonbondedKit {
   const T* gb_alpha;              ///< Generalized born alpha parameters (one parameter per atom)
   const T* gb_beta;               ///< Generalized born beta parameters (one parameter per atom)
   const T* gb_gamma;              ///< Generalized born gamma parameters (one parameter per atom)
+  const T2* neck_limits;          ///< Interlaced neck GB maximum separations and values tables
 };
 
 /// \brief Collect the virtual site details and constraint parameters of the topology synthesis

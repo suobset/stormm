@@ -6,7 +6,7 @@ namespace generalized_born_defaults {
 
 //-------------------------------------------------------------------------------------------------
 NeckGeneralizedBornTable::NeckGeneralizedBornTable() :
-    table_size{21}, neck_cut{gb_neck_cut}, kscale{gb_kscale},
+    table_size{21}, neck_cut{default_gb_neck_cut}, kscale{default_gb_kscale},
     neck_max_separation{static_cast<size_t>(table_size * table_size), "gb_table_maxsep"},
     neck_max_value{static_cast<size_t>(table_size * table_size), "gb_table_maxval"},
     sp_neck_max_separation{static_cast<size_t>(table_size * table_size), "gb_table_maxsep"},

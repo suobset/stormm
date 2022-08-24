@@ -6,6 +6,7 @@
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Numerics/split_fixed_precision.h"
+#include "Potential/energy_abstracts.h"
 #include "Synthesis/implicit_solvent_workspace.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
@@ -59,20 +60,19 @@ __device__ __forceinline__ int getTileSideAtomCount(const int* nbwu_map, const i
 //     arithmetic
 //
 // Arguments:
-//   pos:
-//   tile_lane_idx:
-//   tile_sides_per_warp:
-//   warps_per_block:
-//   import_count:
-//   padded_import_count:
-//   iter:
-//   nbwu_map:
-//   read_crd:
-//   write_crd:
-//   read_crd_ovrf:
-//   write_crd_ovrf:
-//   sh_tile_cog:
-//   gpos_scale:
+//   pos:              Position in the tile list (not the atom list)
+//   import_count:     Number of groups of atoms imported to populate one side of one or more tiles
+//   iter:             Number of passes made by this or related routines (incrementation of
+//                     iter is essential to maintain the correct procession through all loads)
+//   nbwu_map:         Non-bonded work unit details            
+//   read_crd:         Array of coordinates to read from
+//   write_crd:        Array of coordinates to write into
+//   read_crd_ovrf:    Overflow buffers for coordinates to be read
+//   write_crd_ovrf:   Overflow buffers for local copies of coordinates
+//   sh_tile_cog:      Array holding mean values of the positions of each imported atom group (this
+//                     later expedites computing the center of geometry for each complete tile)
+//   gpos_scale:       Scaling factor for coordinates in the fixed-precision representation (this
+//                     is needed only to place dummy atom coordinates for blank slots of a tile)
 //-------------------------------------------------------------------------------------------------
 __device__ int loadTileCoordinates(const int pos, const int import_count, const int iter,
                                    const int* nbwu_map, const llint* read_crd, llint* write_crd,
@@ -161,6 +161,9 @@ __device__ int loadTileCoordinates(const int pos, const int import_count, const 
 // Overloaded:
 //   - Copy the values directly
 //   - Fold in a scalar multiple
+//   - Fold in a scalar addition
+//
+// Parameter descriptors follow from loadTileCoordinates() above.
 //-------------------------------------------------------------------------------------------------
 template <typename T> __device__
 int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
@@ -210,8 +213,33 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
   return rel_pos + (iter * padded_import_count);
 }
 
+template <typename T> __device__
+int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
+                     const T* read_array, T increment, T* write_array) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);  
+  int rel_pos = pos - (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        write_array[write_idx] = __ldcs(&read_array[read_idx]) + increment;
+      }
+      else {
+        write_array[write_idx] = (T)(0);
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
 // Single-precision non-bonded kernel floating point definitions
 #define TCALC float
+#  define TCALC2 float2
 #  define TCALC_IS_SINGLE
 #  if (__CUDA_ARCH__ >= 750) && (__CUDA_ARCH__ < 800)
 #    define GBRADII_KERNEL_BLOCKS_MULTIPLIER 4
@@ -266,10 +294,12 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
 #  undef TCALC_IS_SINGLE
+#  undef TCALC2
 #undef TCALC
 
 // Double-precision non-bonded kernel floating point definitions
 #define TCALC double
+#  define TCALC2 double2
 #  define SPLIT_FORCE_ACCUMULATION
 #  define GBRADII_KERNEL_BLOCKS_MULTIPLIER 3
 #  define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
@@ -300,6 +330,7 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  undef SQRT_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef SPLIT_FORCE_ACCUMULATION
+#  undef TCALC2
 #undef TCALC
 
 //-------------------------------------------------------------------------------------------------
@@ -522,14 +553,14 @@ queryBornDerivativeKernelRequirements(const PrecisionModel prec, const NbwuKind 
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
-                                       const NeckGeneralizedBornKit<double> &ngb_kit,
+extern void launchBornRadiiCalculation(const NbwuKind kind,
+                                       const SyNonbondedKit<double, double2> &poly_nbk,
                                        MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
                                        CacheResourceKit<double> *gmem_r, ISWorkspaceKit *iswk,
                                        const int2 bt) {
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
-    ktgdsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+    ktgdsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
     break;
   case NbwuKind::SUPERTILES:
     break;
@@ -539,8 +570,8 @@ extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
-                                       const NeckGeneralizedBornKit<float> &ngb_kit,
+extern void launchBornRadiiCalculation(const NbwuKind kind,
+                                       const SyNonbondedKit<float, float2> &poly_nbk,
                                        MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
                                        CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
                                        const AccumulationMethod acc_meth, const int2 bt) {
@@ -548,10 +579,10 @@ extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit
   case NbwuKind::TILE_GROUPS:
     switch (acc_meth) {
     case AccumulationMethod::SPLIT:
-      ktgfsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+      ktgfsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
       break;
     case AccumulationMethod::WHOLE:
-      ktgfCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, ngb_kit, *ctrl, *poly_psw, *gmem_r, *iswk);
+      ktgfCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
       break;
     case AccumulationMethod::AUTOMATIC:
       break;
@@ -567,7 +598,6 @@ extern void launchBornRadiiCalculation(const NbwuKind kind, const SyNonbondedKit
 //-------------------------------------------------------------------------------------------------
 extern void launchBornRadiiCalculation(const PrecisionModel prec,
                                        const AtomGraphSynthesis &poly_ag,
-                                       const NeckGeneralizedBornTable &ngb_tab,
                                        MolecularMechanicsControls *mmctrl,
                                        PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
                                        ImplicitSolventWorkspace *isw,
@@ -591,28 +621,28 @@ extern void launchBornRadiiCalculation(const PrecisionModel prec,
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
-      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
-      const NeckGeneralizedBornKit<double> ngb_kit = ngb_tab.getDoublePrecisionAbstract(devc_tier);
+      const SyNonbondedKit<double,
+                           double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
       MMControlKit<double> ctrl = mmctrl->dpData(devc_tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(devc_tier);
-      launchBornRadiiCalculation(kind, poly_nbk, ngb_kit, &ctrl, &poly_psw, &gmem_r, &iswk, bt);
+      launchBornRadiiCalculation(kind, poly_nbk, &ctrl, &poly_psw, &gmem_r, &iswk, bt);
     }
     break;
   case PrecisionModel::SINGLE:
     {
-      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
-      const NeckGeneralizedBornKit<float> ngb_kit = ngb_tab.getSinglePrecisionAbstract(devc_tier);
+      const SyNonbondedKit<float,
+                           float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
       MMControlKit<float> ctrl = mmctrl->spData(devc_tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(devc_tier);
-      launchBornRadiiCalculation(kind, poly_nbk, ngb_kit, &ctrl, &poly_psw, &gmem_r, &iswk,
-                                 actual_acc_meth, bt);
+      launchBornRadiiCalculation(kind, poly_nbk, &ctrl, &poly_psw, &gmem_r, &iswk, actual_acc_meth,
+                                 bt);
     }
     break;
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                             const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
                             PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                             CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
@@ -643,7 +673,7 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double> &p
 }
 
 //-------------------------------------------------------------------------------------------------
-extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                             const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
                             PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                             CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
@@ -731,7 +761,8 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
   switch (prec) {
   case PrecisionModel::DOUBLE:
     {
-      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(tier);
+      const SyNonbondedKit<double,
+                           double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(tier);
       MMControlKit<double> ctrl = mmctrl->dpData(tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r,
@@ -740,7 +771,8 @@ extern void launchNonbonded(const PrecisionModel prec, const AtomGraphSynthesis 
     break;
   case PrecisionModel::SINGLE:
     {
-      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(tier);
+      const SyNonbondedKit<float,
+                           float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(tier);
       MMControlKit<float> ctrl = mmctrl->spData(tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(tier);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl, &poly_psw, &scw, &gmem_r,

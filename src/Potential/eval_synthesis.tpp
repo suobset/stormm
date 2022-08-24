@@ -546,8 +546,9 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 }
 
 //-------------------------------------------------------------------------------------------------
-template <typename Tcalc>
-void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
+template <typename Tcalc, typename Tcalc2>
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
+                               const SeMaskSynthesisReader syse,
                                PsSynthesisWriter psyw, ScoreCard *ecard,
                                const EvaluateForce eval_elec_force,
                                const EvaluateForce eval_vdw_force) {

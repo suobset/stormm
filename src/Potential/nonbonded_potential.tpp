@@ -638,8 +638,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     const Tcalc egbi = effective_gb_radii[i];
     const Tcalc atomi_radius = (tforce_is_sgnint) ? egbi / force_factor : egbi;
     const Tcalc expmkf = (tcalc_is_double) ?
-                         exp(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric :
-                         expf(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric;
+                         exp(-default_gb_kscale * isr.kappa * atomi_radius) / isr.dielectric :
+                         expf(-default_gb_kscale * isr.kappa * atomi_radius) / isr.dielectric;
     const Tcalc dielfac = v_one - expmkf;
     const Tcalc atmq2h = v_half * atomi_q * atomi_q * nbk.coulomb_constant;
     const Tcalc atmqd2h = atmq2h * dielfac;
@@ -648,11 +648,11 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     egb_acc += static_cast<llint>(contrib * nrg_scale_factor);
     if (eval_force == EvaluateForce::YES) {
       if (tforce_is_sgnint) {
-        sumdeijda[i] = llround((atmqd2h - (gb_kscale * isr.kappa *
+        sumdeijda[i] = llround((atmqd2h - (default_gb_kscale * isr.kappa *
                                            atmq2h * expmkf * atomi_radius)) * force_factor);
       }
       else {
-        sumdeijda[i] = atmqd2h - (gb_kscale * isr.kappa * atmq2h * expmkf * atomi_radius);
+        sumdeijda[i] = atmqd2h - (default_gb_kscale * isr.kappa * atmq2h * expmkf * atomi_radius);
       }
     }
   }
@@ -753,13 +753,13 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
               if (tcalc_is_double) {
                 efac = exp(-r2 / (v_four * ij_born_radius));
                 fgbi = v_one / sqrt(r2 + ij_born_radius * efac);
-                fgbk = -isr.kappa * gb_kscale / fgbi;
+                fgbk = -isr.kappa * default_gb_kscale / fgbi;
                 expmkf = exp(fgbk) / isr.dielectric;
               }
               else {
                 efac = expf(-r2 / (v_four * ij_born_radius));
                 fgbi = v_one / sqrtf(r2 + ij_born_radius * efac);
-                fgbk = -isr.kappa * gb_kscale / fgbi;
+                fgbk = -isr.kappa * default_gb_kscale / fgbi;
                 expmkf = expf(fgbk) / isr.dielectric;
               }
               const Tcalc dielfac = v_one - expmkf;
