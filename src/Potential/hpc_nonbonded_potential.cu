@@ -74,11 +74,13 @@ __device__ __forceinline__ int getTileSideAtomCount(const int* nbwu_map, const i
 //   sh_tile_cog:
 //   gpos_scale:
 //-------------------------------------------------------------------------------------------------
-__device__ int loadTileCoordinates(const int pos, const int tile_lane_idx,
-                                   const int tile_sides_per_warp, const int warps_per_block,
-                                   const int import_count, const int padded_import_count,
-                                   const int iter, const int* nbwu_map, const llint* read_crd,
-                                   llint* write_crd, float* sh_tile_cog, const float gpos_scale) {
+__device__ int loadTileCoordinates(const int pos, const int import_count, const int iter,
+                                   const int* nbwu_map, const llint* read_crd, llint* write_crd,
+                                   float* sh_tile_cog, const float gpos_scale) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     float fval;
@@ -109,12 +111,14 @@ __device__ int loadTileCoordinates(const int pos, const int tile_lane_idx,
   return rel_pos + (iter * padded_import_count);
 }
 
-__device__ int loadTileCoordinates(const int pos, const int tile_lane_idx,
-                                   const int tile_sides_per_warp, const int warps_per_block,
-                                   const int import_count, const int padded_import_count,
-                                   const int iter, const int* nbwu_map, const llint* read_crd,
-                                   llint* write_crd, const int* read_crd_ovrf, int* write_crd_ovrf,
+__device__ int loadTileCoordinates(const int pos, const int import_count, const int iter,
+                                   const int* nbwu_map, const llint* read_crd, llint* write_crd,
+                                   const int* read_crd_ovrf, int* write_crd_ovrf,
                                    double* sh_tile_cog, const double gpos_scale) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     double fval;
@@ -151,13 +155,16 @@ __device__ int loadTileCoordinates(const int pos, const int tile_lane_idx,
 }
 
 //-------------------------------------------------------------------------------------------------
+// Load scalar values (integral or real) from global memory into local arrays, on a tile-by-tile
+// basis for non-bonded work units involving isolated systems with all-to-all interaction matrices.
+//
 //
 //-------------------------------------------------------------------------------------------------
-__device__ int loadTileProperty(const int pos, const int tile_lane_idx,
-                                const int tile_sides_per_warp, const int warps_per_block,
-                                const int import_count, const int padded_import_count,
-                                const int iter, const int* nbwu_map, const int* read_array,
-                                int* write_array) {
+template <typename T> __device__
+int loadTileProperty(const int pos, const int tile_lane_idx, const int tile_sides_per_warp,
+                     const int warps_per_block, const int import_count,
+                     const int padded_import_count, const int iter, const int* nbwu_map,
+                     const T* read_array, T* write_array, T multiplier) {
   int rel_pos = pos + (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     if (rel_pos < import_count) {

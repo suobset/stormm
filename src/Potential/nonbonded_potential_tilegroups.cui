@@ -99,28 +99,22 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
 #ifdef TCALC_IS_SINGLE
-    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
-                              import_count, padded_import_count, 0, nbwu_map, poly_psw.xcrd,
+    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
                               &gmem_r.xcrd[EXCL_GMEM_OFFSET], sh_tile_xcog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
-                              import_count, padded_import_count, 1, nbwu_map, poly_psw.ycrd,
+    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
                               &gmem_r.ycrd[EXCL_GMEM_OFFSET], sh_tile_ycog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
-                              import_count, padded_import_count, 2, nbwu_map, poly_psw.zcrd,
+    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
                               &gmem_r.zcrd[EXCL_GMEM_OFFSET], sh_tile_zcog, poly_psw.gpos_scale_f);
 #else
-    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
-                              import_count, padded_import_count, 0, nbwu_map, poly_psw.xcrd,
+    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
                               &gmem_r.xcrd[EXCL_GMEM_OFFSET], poly_psw.xcrd_ovrf,
                               &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_xcog,
                               poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
-                              import_count, padded_import_count, 1, nbwu_map, poly_psw.ycrd,
+    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
                               &gmem_r.ycrd[EXCL_GMEM_OFFSET], poly_psw.ycrd_ovrf,
                               &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_ycog,
                               poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, tile_lane_idx, tile_sides_per_warp, warps_per_block,
-                              import_count, padded_import_count, 2, nbwu_map, poly_psw.zcrd,
+    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
                               &gmem_r.zcrd[EXCL_GMEM_OFFSET], poly_psw.zcrd_ovrf,
                               &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
                               poly_psw.gpos_scale);
