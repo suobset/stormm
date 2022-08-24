@@ -1,0 +1,18 @@
+// -*-c++-*-
+#include "copyright.h"
+
+#define EXCL_GMEM_OFFSET  (blockIdx.x * gmem_r.max_atoms)
+
+/// \brief Compute the Generalized Born radii for all particles in all systems.
+///
+/// \param poly_nbk  Condensed non-bonded parameter tables and atomic properties for all systems
+/// \param ngb_kit   Neck Generalized Born parameters
+/// \param ctrl      Molecular mechanics control data
+/// \param poly_psw  Coordinates and forces for all particles
+/// \param gmem_r    Workspaces for each thread block
+__global__ void __launch_bounds__(small_block_size, GBRADII_KERNEL_BLOCKS_MULTIPLIER)
+KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<TCALC> ngb_kit,
+            MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r,
+            ISWorkspaceKit isw) {
+
+}
