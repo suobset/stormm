@@ -158,14 +158,18 @@ __device__ int loadTileCoordinates(const int pos, const int import_count, const 
 // Load scalar values (integral or real) from global memory into local arrays, on a tile-by-tile
 // basis for non-bonded work units involving isolated systems with all-to-all interaction matrices.
 //
-//
+// Overloaded:
+//   - Copy the values directly
+//   - Fold in a scalar multiple
 //-------------------------------------------------------------------------------------------------
 template <typename T> __device__
-int loadTileProperty(const int pos, const int tile_lane_idx, const int tile_sides_per_warp,
-                     const int warps_per_block, const int import_count,
-                     const int padded_import_count, const int iter, const int* nbwu_map,
-                     const T* read_array, T* write_array, T multiplier) {
-  int rel_pos = pos + (iter * padded_import_count);
+int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
+                     const T* read_array, T* write_array) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);  
+  int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     if (rel_pos < import_count) {
       const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
@@ -174,7 +178,7 @@ int loadTileProperty(const int pos, const int tile_lane_idx, const int tile_side
         write_array[write_idx] = __ldcs(&read_array[read_idx]);
       }
       else {
-        write_array[write_idx] = 0;
+        write_array[write_idx] = (T)(0);
       }
     }
     rel_pos += tile_sides_per_warp * warps_per_block;
@@ -182,12 +186,14 @@ int loadTileProperty(const int pos, const int tile_lane_idx, const int tile_side
   return rel_pos + (iter * padded_import_count);
 }
 
-__device__ int loadTileProperty(const int pos, const int tile_lane_idx,
-                                const int tile_sides_per_warp, const int warps_per_block,
-                                const int import_count, const int padded_import_count,
-                                const int iter, const int* nbwu_map, const float* read_array,
-                                float* write_array, const float multiplier) {
-  int rel_pos = pos + (iter * padded_import_count);
+template <typename T> __device__
+int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
+                     const T* read_array, T* write_array, T multiplier) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);  
+  int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     if (rel_pos < import_count) {
       const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
@@ -196,29 +202,7 @@ __device__ int loadTileProperty(const int pos, const int tile_lane_idx,
         write_array[write_idx] = __ldcs(&read_array[read_idx]) * multiplier;
       }
       else {
-        write_array[write_idx] = (float)(0.0);
-      }
-    }
-    rel_pos += tile_sides_per_warp * warps_per_block;
-  }
-  return rel_pos + (iter * padded_import_count);
-}
-
-__device__ int loadTileProperty(const int pos, const int tile_lane_idx,
-                                const int tile_sides_per_warp, const int warps_per_block,
-                                const int import_count, const int padded_import_count,
-                                const int iter, const int* nbwu_map, const double* read_array,
-                                double* write_array, const double multiplier) {
-  int rel_pos = pos + (iter * padded_import_count);
-  while (rel_pos < padded_import_count) {
-    if (rel_pos < import_count) {
-      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
-      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-        write_array[write_idx] = __ldcs(&read_array[read_idx]) * multiplier;
-      }
-      else {
-        write_array[write_idx] = (float)(0.0);
+        write_array[write_idx] = (T)(0);
       }
     }
     rel_pos += tile_sides_per_warp * warps_per_block;
@@ -473,6 +457,54 @@ queryBornRadiiKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
       case AccumulationMethod::WHOLE:
         if (cudaFuncGetAttributes(&attr, ktgfCalculateGBRadii) != cudaSuccess) {
           rtErr("Error obtaining attributes for kernel ktgfCalculateGBRadii.",
+                "queryNonbondedKernelRequirements");
+        }
+        break;
+      case AccumulationMethod::AUTOMATIC:
+        break;
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
+    break;
+  }
+  return attr;
+}
+
+//-------------------------------------------------------------------------------------------------
+extern cudaFuncAttributes
+queryBornDerivativeKernelRequirements(const PrecisionModel prec, const NbwuKind kind,
+                                      const AccumulationMethod acc_meth) {
+  cudaFuncAttributes attr;
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      if (cudaFuncGetAttributes(&attr, ktgdsCalculateGBDerivatives) != cudaSuccess) {
+        rtErr("Error obtaining attributes for kernel ktgdCalculateGBDerivatives.",
+              "queryNonbondedKernelRequirements");
+      }
+      break;
+    case NbwuKind::SUPERTILES:
+    case NbwuKind::HONEYCOMB:
+      break;
+    }
+    break;
+  case PrecisionModel::SINGLE:
+    switch (kind) {
+    case NbwuKind::TILE_GROUPS:
+      switch (acc_meth) {
+      case AccumulationMethod::SPLIT:
+        if (cudaFuncGetAttributes(&attr, ktgfsCalculateGBDerivatives) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgfsCalculateGBDerivatives.",
+                "queryNonbondedKernelRequirements");
+        }
+        break;
+      case AccumulationMethod::WHOLE:
+        if (cudaFuncGetAttributes(&attr, ktgfCalculateGBDerivatives) != cudaSuccess) {
+          rtErr("Error obtaining attributes for kernel ktgfCalculateGBDerivatives.",
                 "queryNonbondedKernelRequirements");
         }
         break;

@@ -58,16 +58,19 @@ cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKin
                                                     AccumulationMethod acc_meth);
 
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
-///        the Born Radii computation kernel.  Deposit the results in a developing object that
-///        will later record launch grid dimensions for managing the kernels.
-///
-/// \param prec      The desired precision model for the kernel
-/// \param kind      The type of non-bonded work units to evaluate
-/// \param acc_meth  Accumulation method for Born radii (like forces, they can span two
-///                  accumulators)
+///        the Born radii computation kernel.  Deposit the results in a developing object that
+///        will later record launch grid dimensions for managing the kernels.  This kernel's
+///        parameter descriptions follow from queryNonbondedKernelRequirements() above.
 cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKind kind,
                                                     AccumulationMethod acc_meth);
-  
+
+/// \brief Obtain information on launch bounds and block-specific requirements for each version of
+///        the Born radii derivative computation kernel.  Deposit the results in a developing
+///        object that will later record launch grid dimensions for managing the kernels.  This
+///        kernel's parameter descriptions follow from queryNonbondedKernelRequirements() above.
+cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, NbwuKind kind,
+                                                         AccumulationMethod acc_meth);
+
 /// \brief Evaluate Generalized Born radii for the current state.  Prepare for Born radii
 ///        derivative calculations.  The accumulation of the radii and their derivatives is
 ///        handled in fixed-precision arithmetic, using the Cartesian X and Y force components of

@@ -23,17 +23,21 @@ MolecularMechanicsControls::MolecularMechanicsControls(const double time_step_in
   vwu_progress{HybridKind::POINTER, "mm_vwu_counters"},
   nbwu_progress{HybridKind::POINTER, "mm_nbwu_counters"},
   pmewu_progress{HybridKind::POINTER, "mm_pmewu_counters"},
+  gbrwu_progress{HybridKind::POINTER, "mm_gbrwu_counters"},
+  gbdwu_progress{HybridKind::POINTER, "mm_gbdwu_counters"},
   gather_wu_progress{HybridKind::POINTER, "mm_gtwu_counters"},
   scatter_wu_progress{HybridKind::POINTER, "mm_scwu_counters"},
   all_reduce_wu_progress{HybridKind::POINTER, "mm_rdwu_counters"},
-  progress_data{12 * warp_size_int, "work_unit_prog_data"}
+  int_data{16 * warp_size_int, "work_unit_prog_data"}
 {
-  vwu_progress.setPointer(&progress_data,                             0, 2 * warp_size_int);
-  nbwu_progress.setPointer(&progress_data,            2 * warp_size_int, 2 * warp_size_int);
-  pmewu_progress.setPointer(&progress_data,           4 * warp_size_int, 2 * warp_size_int);
-  gather_wu_progress.setPointer(&progress_data,       6 * warp_size_int, 2 * warp_size_int);
-  scatter_wu_progress.setPointer(&progress_data,      8 * warp_size_int, 2 * warp_size_int);
-  all_reduce_wu_progress.setPointer(&progress_data,  10 * warp_size_int, 2 * warp_size_int);
+  vwu_progress.setPointer(&int_data,                             0, 2 * warp_size_int);
+  nbwu_progress.setPointer(&int_data,            2 * warp_size_int, 2 * warp_size_int);
+  pmewu_progress.setPointer(&int_data,           4 * warp_size_int, 2 * warp_size_int);
+  gbrwu_progress.setPointer(&int_data,           6 * warp_size_int, 2 * warp_size_int);
+  gbdwu_progress.setPointer(&int_data,           8 * warp_size_int, 2 * warp_size_int);
+  gather_wu_progress.setPointer(&int_data,      10 * warp_size_int, 2 * warp_size_int);
+  scatter_wu_progress.setPointer(&int_data,     12 * warp_size_int, 2 * warp_size_int);
+  all_reduce_wu_progress.setPointer(&int_data,  14 * warp_size_int, 2 * warp_size_int);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -62,17 +66,21 @@ MolecularMechanicsControls(const MolecularMechanicsControls &original) :
   vwu_progress{original.vwu_progress},
   nbwu_progress{original.nbwu_progress},
   pmewu_progress{original.pmewu_progress},
+  gbrwu_progress{original.gbrwu_progress},
+  gbdwu_progress{original.gbdwu_progress},
   gather_wu_progress{original.gather_wu_progress},
   scatter_wu_progress{original.scatter_wu_progress},
   all_reduce_wu_progress{original.all_reduce_wu_progress},
-  progress_data{original.progress_data}
+  int_data{original.int_data}
 {
-  vwu_progress.swapTarget(&progress_data);
-  nbwu_progress.swapTarget(&progress_data);
-  pmewu_progress.swapTarget(&progress_data);
-  gather_wu_progress.swapTarget(&progress_data);
-  scatter_wu_progress.swapTarget(&progress_data);
-  all_reduce_wu_progress.swapTarget(&progress_data);
+  vwu_progress.swapTarget(&int_data);
+  nbwu_progress.swapTarget(&int_data);
+  pmewu_progress.swapTarget(&int_data);
+  gbrwu_progress.swapTarget(&int_data);
+  gbdwu_progress.swapTarget(&int_data);
+  gather_wu_progress.swapTarget(&int_data);
+  scatter_wu_progress.swapTarget(&int_data);
+  all_reduce_wu_progress.swapTarget(&int_data);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -92,18 +100,22 @@ MolecularMechanicsControls::operator=(const MolecularMechanicsControls &other) {
   vwu_progress = other.vwu_progress;
   nbwu_progress = other.nbwu_progress;
   pmewu_progress = other.pmewu_progress;
+  gbrwu_progress = other.gbrwu_progress;
+  gbdwu_progress = other.gbdwu_progress;
   gather_wu_progress = other.gather_wu_progress;
   scatter_wu_progress = other.scatter_wu_progress;
   all_reduce_wu_progress = other.all_reduce_wu_progress;
-  progress_data = other.progress_data;
+  int_data = other.int_data;
 
   // Repair pointers and return the result
-  vwu_progress.swapTarget(&progress_data);
-  nbwu_progress.swapTarget(&progress_data);
-  pmewu_progress.swapTarget(&progress_data);
-  gather_wu_progress.swapTarget(&progress_data);
-  scatter_wu_progress.swapTarget(&progress_data);
-  all_reduce_wu_progress.swapTarget(&progress_data);
+  vwu_progress.swapTarget(&int_data);
+  nbwu_progress.swapTarget(&int_data);
+  pmewu_progress.swapTarget(&int_data);
+  gbrwu_progress.swapTarget(&int_data);
+  gbdwu_progress.swapTarget(&int_data);
+  gather_wu_progress.swapTarget(&int_data);
+  scatter_wu_progress.swapTarget(&int_data);
+  all_reduce_wu_progress.swapTarget(&int_data);
   return *this;
 }
 
@@ -118,10 +130,12 @@ MolecularMechanicsControls::MolecularMechanicsControls(MolecularMechanicsControl
   vwu_progress{std::move(original.vwu_progress)},
   nbwu_progress{std::move(original.nbwu_progress)},
   pmewu_progress{std::move(original.pmewu_progress)},
+  gbrwu_progress{std::move(original.gbrwu_progress)},
+  gbdwu_progress{std::move(original.gbdwu_progress)},
   gather_wu_progress{std::move(original.gather_wu_progress)},
   scatter_wu_progress{std::move(original.scatter_wu_progress)},
   all_reduce_wu_progress{std::move(original.all_reduce_wu_progress)},
-  progress_data{std::move(original.progress_data)}
+  int_data{std::move(original.int_data)}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -141,10 +155,12 @@ MolecularMechanicsControls::operator=(MolecularMechanicsControls &&other) {
   vwu_progress = std::move(other.vwu_progress);
   nbwu_progress = std::move(other.nbwu_progress);
   pmewu_progress = std::move(other.pmewu_progress);
+  gbrwu_progress = std::move(other.gbrwu_progress);
+  gbdwu_progress = std::move(other.gbdwu_progress);
   gather_wu_progress = std::move(other.gather_wu_progress);
   scatter_wu_progress = std::move(other.scatter_wu_progress);
   all_reduce_wu_progress = std::move(other.all_reduce_wu_progress);
-  progress_data = std::move(other.progress_data);
+  int_data = std::move(other.int_data);
   return *this;
 }
 
@@ -261,7 +277,8 @@ int MolecularMechanicsControls::getReductionWorkUnitProgress(const int counter_i
 MMControlKit<double> MolecularMechanicsControls::dpData(const HybridTargetLevel tier) {
   return MMControlKit<double>(step_number, sd_cycles, max_cycles, time_step, rattle_tol,
                               initial_step, vwu_progress.data(tier), nbwu_progress.data(tier),
-                              pmewu_progress.data(tier), gather_wu_progress.data(tier),
+                              pmewu_progress.data(tier), gbrwu_progress.data(tier),
+                              gbdwu_progress.data(tier), gather_wu_progress.data(tier),
                               scatter_wu_progress.data(tier), all_reduce_wu_progress.data(tier));
 }
 
@@ -269,7 +286,8 @@ MMControlKit<double> MolecularMechanicsControls::dpData(const HybridTargetLevel 
 MMControlKit<float> MolecularMechanicsControls::spData(const HybridTargetLevel tier) {
   return MMControlKit<float>(step_number, sd_cycles, max_cycles, time_step, rattle_tol,
                              initial_step, vwu_progress.data(tier), nbwu_progress.data(tier),
-                             pmewu_progress.data(tier), gather_wu_progress.data(tier),
+                             pmewu_progress.data(tier), gbrwu_progress.data(tier),
+                             gbdwu_progress.data(tier), gather_wu_progress.data(tier),
                              scatter_wu_progress.data(tier), all_reduce_wu_progress.data(tier));
 }
 
@@ -292,22 +310,30 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
   const int2 vwu_lp = launcher.getValenceKernelDims(prec, eval_frc, eval_nrg,
                                                     AccumulationMethod::SPLIT,
                                                     VwuGoal::ACCUMULATE);
+  const int2 gbrwu_lp = launcher.getBornRadiiKernelDims(prec, poly_ag.getNonbondedWorkType(),
+                                                        AccumulationMethod::SPLIT);
+  const int2 gbdwu_lp = launcher.getBornDerivativeKernelDims(prec, poly_ag.getNonbondedWorkType(),
+                                                             AccumulationMethod::SPLIT);
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                        eval_frc, eval_nrg,
                                                        AccumulationMethod::SPLIT);
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
 
-  int vwu_block_count = vwu_lp.x;
-  int nbwu_block_count = nbwu_lp.x;
-  int pmewu_block_count = smp_count;
-  int gtwu_block_count = rdwu_lp.x;
-  int scwu_block_count = rdwu_lp.x;
-  int rdwu_block_count = rdwu_lp.x;
+  const int vwu_block_count = vwu_lp.x;
+  const int nbwu_block_count = nbwu_lp.x;
+  const int gbrwu_block_count = gbrwu_lp.x;
+  const int gbdwu_block_count = gbdwu_lp.x;
+  const int pmewu_block_count = smp_count;
+  const int gtwu_block_count = rdwu_lp.x;
+  const int scwu_block_count = rdwu_lp.x;
+  const int rdwu_block_count = rdwu_lp.x;
   for (int i = 0; i < twice_warp_size_int; i++) {
     vwu_progress.putHost(vwu_block_count, i);
     nbwu_progress.putHost(nbwu_block_count, i);
     pmewu_progress.putHost(pmewu_block_count, i);
+    gbrwu_progress.putHost(gbrwu_block_count, i);
+    gbdwu_progress.putHost(gbdwu_block_count, i);
     gather_wu_progress.putHost(gtwu_block_count, i);
     scatter_wu_progress.putHost(scwu_block_count, i);
     all_reduce_wu_progress.putHost(rdwu_block_count, i);
@@ -325,12 +351,12 @@ void MolecularMechanicsControls::incrementStep() {
 #ifdef STORMM_USE_HPC
 //-------------------------------------------------------------------------------------------------
 void MolecularMechanicsControls::upload() {
-  progress_data.upload();
+  int_data.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
 void MolecularMechanicsControls::download() {
-  progress_data.download();
+  int_data.download();
 }
 #endif
   

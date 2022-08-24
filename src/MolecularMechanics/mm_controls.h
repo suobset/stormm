@@ -42,8 +42,8 @@ template <typename T> struct MMControlKit {
   ///        left modifiable so that the object can be re-used over successive time steps.
   MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T dt_in, T rattle_tol_in,
                T initial_step_in, int* vwu_progress_in, int* nbwu_progress_in,
-               int* pmewu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
-               int* rdwu_progress_in);
+               int* pmewu_progress_in, int* gbrwu_progress_in, int* gbdwu_progress_in,
+               int* gtwu_progress_in, int* scwu_progress_in, int* rdwu_progress_in);
 
   /// \brief The usual copy and move constructors for an abstract apply here.  
   /// \{
@@ -60,6 +60,8 @@ template <typename T> struct MMControlKit {
   int* vwu_progress;     ///< Progress counters for valence work units
   int* nbwu_progress;    ///< Progress counters for non-bonded work units
   int* pmewu_progress;   ///< Progress counters for PME long-ranged work units
+  int* gbrwu_progress;   ///< Progress counters for Generalized Born radii computations
+  int* gbdwu_progress;   ///< Progress counters for Generalized Born derivative computations
   int* gtwu_progress;    ///< Progress counters for gathering work units
   int* scwu_progress;    ///< Progress counters for scattering work units
   int* rdwu_progress;    ///< Progress counters for reduction work units
@@ -225,6 +227,12 @@ private:
   /// Progress counters for long-ranged, mesh-based PME work units
   Hybrid<int> pmewu_progress;
 
+  /// Progress counters for Generalized Born radii computation work units
+  Hybrid<int> gbrwu_progress;
+
+  /// Progress counters for Generalized Born derivative computation work units
+  Hybrid<int> gbdwu_progress;
+  
   /// Progress counters for gathering information across each system.
   Hybrid<int> gather_wu_progress;
 
@@ -237,7 +245,7 @@ private:
   Hybrid<int> all_reduce_wu_progress;
 
   /// ARRAY-kind Hybrid object targeted by the above POINTER-kind Hybrid objects
-  Hybrid<int> progress_data;
+  Hybrid<int> int_data;
 };
 
 } // namespace mm

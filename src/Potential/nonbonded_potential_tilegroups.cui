@@ -91,13 +91,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
     // get the most threads reaching out to global memory.
     const int tile_sides_per_warp = (warp_size_int / tile_length);
     const int warp_idx = (threadIdx.x >> warp_bits);
-    const int warps_per_block = blockDim.x >> warp_bits;
     const int warp_lane_idx = (threadIdx.x & warp_bits_mask_int);
     const int tile_side_offset = warp_lane_idx / tile_length;
-    const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
     const int import_count = nbwu_map[0];
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
-    const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
 #ifdef TCALC_IS_SINGLE
     pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
                               &gmem_r.xcrd[EXCL_GMEM_OFFSET], sh_tile_xcog, poly_psw.gpos_scale_f);
@@ -119,36 +116,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const SeMaskSynthesisReader po
                               &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
                               poly_psw.gpos_scale);
 #endif
-    while (pos < 4 * padded_import_count) {
-      const int rel_pos = pos - (3 * padded_import_count);
-      if (rel_pos < import_count) {
-        const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const int write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        const int tside_count = getTileSideAtomCount(nbwu_map, rel_pos);
-        if (tile_lane_idx < tside_count) {
-          __stwb(&gmem_r.charges[write_idx],
-                 __ldcs(&poly_nbk.charge[read_idx]) * SQRT_FUNC(poly_nbk.coulomb));
-        }
-        else {
-          __stwb(&gmem_r.charges[write_idx], (TCALC)(0.0));
-        }
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 5 * padded_import_count) {
-      const int rel_pos = pos - (4 * padded_import_count);
-      if (rel_pos < import_count) {
-        const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const int write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          __stwb(&gmem_r.lj_idx[write_idx], __ldcs(&poly_nbk.lj_idx[read_idx]));
-        }
-        else {
-          __stwb(&gmem_r.lj_idx[write_idx], 0);
-        }
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
+    pos = loadTileProperty(pos, import_count, 3, nbwu_map, poly_nbk.charge,
+                           &gmem_r.charges[EXCL_GMEM_OFFSET], SQRT_FUNC(poly_nbk.coulomb));
+    pos = loadTileProperty(pos, import_count, 4, nbwu_map, poly_nbk.lj_idx,
+                           &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
+    const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
+    const int warps_per_block = blockDim.x >> warp_bits;
+    const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
     while (pos < 6 * padded_import_count) {
       const int rel_pos = pos - (5 * padded_import_count);
       if (rel_pos < import_count) {

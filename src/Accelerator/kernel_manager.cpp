@@ -21,6 +21,7 @@ using constants::ExceptionResponse;
 using energy::queryValenceKernelRequirements;
 using energy::queryNonbondedKernelRequirements;
 using energy::queryBornRadiiKernelRequirements;
+using energy::queryBornDerivativeKernelRequirements;
 using math::queryReductionKernelRequirements;
 using math::optReductionKernelSubdivision;
 using structure::queryVirtualSiteKernelRequirements;
@@ -108,6 +109,7 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     valence_block_multiplier{valenceBlockMultiplier()},
     nonbond_block_multiplier{nonbondedBlockMultiplier(gpu_in, poly_ag.getUnitCellType())},
     gbradii_block_multiplier{gbRadiiBlockMultiplier(gpu_in)},
+    gbderiv_block_multiplier{gbDerivativeBlockMultiplier(gpu_in)},
     reduction_block_multiplier{reductionBlockMultiplier()},
     virtual_site_block_multiplier{virtualSiteBlockMultiplier()},
     k_dictionary{}
@@ -202,6 +204,20 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
     break;
   }
 
+  // Genrealized Born kernel entries
+  catalogBornRadiiKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS, AccumulationMethod::SPLIT,
+                         "ktgdsCalculateGBRadii");
+  catalogBornRadiiKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, AccumulationMethod::SPLIT,
+                         "ktgfsCalculateGBRadii");
+  catalogBornRadiiKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS, AccumulationMethod::WHOLE,
+                         "ktgfCalculateGBRadii");
+  catalogBornDerivativeKernel(PrecisionModel::DOUBLE, NbwuKind::TILE_GROUPS,
+                              AccumulationMethod::SPLIT, "ktgdsCalculateGBDerivatives");
+  catalogBornDerivativeKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                              AccumulationMethod::SPLIT, "ktgfsCalculateGBDerivatives");
+  catalogBornDerivativeKernel(PrecisionModel::SINGLE, NbwuKind::TILE_GROUPS,
+                              AccumulationMethod::WHOLE, "ktgfCalculateGBDerivatives");
+  
   // Reduction kernel entries
   const int reduction_div = optReductionKernelSubdivision(poly_ag.getSystemAtomCounts(), gpu_in);
   catalogReductionKernel(PrecisionModel::DOUBLE, ReductionGoal::CONJUGATE_GRADIENT,
@@ -299,6 +315,26 @@ void KernelManager::catalogBornRadiiKernel(const PrecisionModel prec, const Nbwu
 }
 
 //-------------------------------------------------------------------------------------------------
+void KernelManager::catalogBornDerivativeKernel(const PrecisionModel prec, const NbwuKind kind,
+                                                const AccumulationMethod acc_meth,
+                                                const std::string &kernel_name) {
+  const std::string k_key = bornDerivativeKernelKey(prec, kind, acc_meth);
+  std::map<std::string, KernelFormat>::iterator it = k_dictionary.find(k_key);
+  if (it != k_dictionary.end()) {
+    rtErr("Born radii derivative kernel identifier " + k_key + " already exists in the kernel "
+          "map.", "KernelManager", "catalogBornRadiiKernel");
+  }
+#ifdef STORMM_USE_HPC
+#  ifdef STORMM_USE_CUDA
+  const cudaFuncAttributes attr = queryBornDerivativeKernelRequirements(prec, kind, acc_meth);
+  k_dictionary[k_key] = KernelFormat(attr, gbderiv_block_multiplier, 1, gpu, kernel_name);
+#  endif
+#else
+  k_dictionary[k_key] = KernelFormat();
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 void KernelManager::catalogReductionKernel(const PrecisionModel prec, const ReductionGoal purpose,
                                            const ReductionStage process, const int subdivision,
                                            const std::string &kernel_name) {
@@ -374,6 +410,17 @@ int2 KernelManager::getBornRadiiKernelDims(const PrecisionModel prec, const Nbwu
   if (k_dictionary.find(k_key) == k_dictionary.end()) {
     rtErr("Born radii computation kernel identifier " + k_key + " was not found in the kernel "
           "map.", "KernelManager", "getBornRadiiKernelDims");
+  }
+  return k_dictionary.at(k_key).getLaunchParameters();
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 KernelManager::getBornDerivativeKernelDims(const PrecisionModel prec, const NbwuKind kind,
+                                                const AccumulationMethod acc_meth) const {
+  const std::string k_key = bornDerivativeKernelKey(prec, kind, acc_meth);
+  if (k_dictionary.find(k_key) == k_dictionary.end()) {
+    rtErr("Born radii derivative computation kernel identifier " + k_key + " was not found in "
+          "the kernel map.", "KernelManager", "getBornRadiiKernelDims");
   }
   return k_dictionary.at(k_key).getLaunchParameters();
 }
@@ -465,6 +512,15 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, const UnitCellType unit_cell
 
 //-------------------------------------------------------------------------------------------------
 int gbRadiiBlockMultiplier(const GpuDetails &gpu) {
+#ifdef STORMM_USE_HPC
+  return (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
+#else
+  return 1;
+#endif  
+}
+
+//-------------------------------------------------------------------------------------------------
+int gbDerivativeBlockMultiplier(const GpuDetails &gpu) {
 #ifdef STORMM_USE_HPC
   return (gpu.getArchMajor() == 7 && gpu.getArchMinor() >= 5) ? 4 : 5;
 #else
@@ -600,41 +656,55 @@ std::string nonbondedKernelKey(const PrecisionModel prec, const NbwuKind kind,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind,
-                               const AccumulationMethod acc_meth) {
-  std::string k_key("gbrd_");
+std::string appendBornKernelKey(const PrecisionModel prec, const NbwuKind kind,
+                                const AccumulationMethod acc_meth) {
+  std::string app_key("");
   switch (prec) {
   case PrecisionModel::DOUBLE:
-    k_key += "d";
+    app_key += "d";
     break;
   case PrecisionModel::SINGLE:
-    k_key += "f";
+    app_key += "f";
     break;
   }
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
-    k_key += "tg";
+    app_key += "tg";
     break;
   case NbwuKind::SUPERTILES:
-    k_key += "st";
+    app_key += "st";
     break;
   case NbwuKind::HONEYCOMB:
-    k_key += "hc";
+    app_key += "hc";
     break;
   case NbwuKind::UNKNOWN:
     break;
   }
   switch (acc_meth) {
   case AccumulationMethod::SPLIT:
-    k_key += "s";
+    app_key += "s";
     break;
   case AccumulationMethod::WHOLE:
-    k_key += "w";
+    app_key += "w";
     break;
   case AccumulationMethod::AUTOMATIC:
     break;
   }
-  return k_key;
+  return app_key;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string bornRadiiKernelKey(const PrecisionModel prec, const NbwuKind kind,
+                               const AccumulationMethod acc_meth) {
+  std::string k_key("gbrd_");
+  return k_key + appendBornKernelKey(prec, kind, acc_meth);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string bornDerivativeKernelKey(const PrecisionModel prec, const NbwuKind kind,
+                                    const AccumulationMethod acc_meth) {
+  std::string k_key("gbdv_");
+  return k_key + appendBornKernelKey(prec, kind, acc_meth);
 }
 
 //-------------------------------------------------------------------------------------------------

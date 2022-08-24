@@ -16,3 +16,5 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<T
             ISWorkspaceKit isw) {
 
 }
+
+#undef EXCL_GMEM_OFFSET

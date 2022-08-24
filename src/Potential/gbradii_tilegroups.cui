@@ -51,153 +51,40 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<T
     // get the most threads reaching out to global memory.
     const int tile_sides_per_warp = (warp_size_int / tile_length);
     const int warp_idx = (threadIdx.x >> warp_bits);
-    const int warps_per_block = blockDim.x >> warp_bits;
     const int warp_lane_idx = (threadIdx.x & warp_bits_mask_int);
     const int tile_side_offset = warp_lane_idx / tile_length;
-    const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
     const int import_count = nbwu_map[0];
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
+#ifdef TCALC_IS_SINGLE
+    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
+                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], sh_tile_xcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
+                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], sh_tile_ycog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
+                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], sh_tile_zcog, poly_psw.gpos_scale_f);
+#else
+    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
+                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], poly_psw.xcrd_ovrf,
+                              &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_xcog,
+                              poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
+                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], poly_psw.ycrd_ovrf,
+                              &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_ycog,
+                              poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
+                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], poly_psw.zcrd_ovrf,
+                              &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
+                              poly_psw.gpos_scale);
+#endif
+    pos = loadTileProperty(pos, import_count, 3, nbwu_map, poly_nbk.pb_radii, sh_pbradii);
+    pos = loadTileProperty(pos, import_count, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
-    while (pos < padded_import_count) {
-      TCALC fxval;
-      if (pos < import_count) {
-        const size_t read_idx = nbwu_map[pos + 1] + tile_lane_idx;
-        const size_t write_idx = EXCL_GMEM_OFFSET + (pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, pos)) {
-          const llint ixval = __ldcs(&poly_psw.xcrd[read_idx]);
-          fxval = (TCALC)(ixval);
-          __stwb(&gmem_r.xcrd[write_idx], ixval);
-#ifndef TCALC_IS_SINGLE
-          const int ixval_ovrf = __ldcs(&poly_psw.xcrd_ovrf[read_idx]);
-          fxval += (TCALC)(ixval_ovrf) * max_llint_accumulation;
-          __stwb(&gmem_r.xcrd_ovrf[write_idx], ixval_ovrf);
-#endif
-        }
-        else {
-          fxval = (TCALC)(0.0);
-#ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.xcrd[write_idx], (128 * pos * tile_lane_idx) * poly_psw.gpos_scale_f);
-#else
-          const int95_t fake_x = doubleToInt95((128 * pos * tile_lane_idx) * poly_psw.gpos_scale);
-          __stwb(&gmem_r.xcrd[write_idx], fake_x.x);
-          __stwb(&gmem_r.xcrd_ovrf[write_idx], fake_x.y);
-#endif
-        }
-      }
-      else {
-        fxval = (TCALC)(0.0);
-      }
-      for (int i = half_tile_length; i > 0; i >>= 1) {
-        fxval += SHFL_DOWN(fxval, i);
-      }
-      if (tile_lane_idx == 0 && pos < import_count) {
-        sh_tile_xcog[pos] = fxval;
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 2 * padded_import_count) {
-      TCALC fyval;
-      const int rel_pos = pos - padded_import_count;
+    const int warps_per_block = blockDim.x >> warp_bits;
+    const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+    while (pos < 6 * padded_import_count) {
+      const int rel_pos = pos - (5 * padded_import_count);
       if (rel_pos < import_count) {
-        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          const llint iyval = __ldcs(&poly_psw.ycrd[read_idx]);
-          fyval = (TCALC)(iyval);
-          __stwb(&gmem_r.ycrd[write_idx], iyval);
-#ifndef TCALC_IS_SINGLE
-          const int iyval_ovrf = __ldcs(&poly_psw.ycrd_ovrf[read_idx]);
-          fyval += (TCALC)(iyval_ovrf) * max_llint_accumulation;
-          __stwb(&gmem_r.ycrd_ovrf[write_idx], iyval_ovrf);
-#endif
-        }
-        else {
-          fyval = (TCALC)(0.0);
-#ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.ycrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
-#else
-          const int95_t fake_y = doubleToInt95((128 * rel_pos * tile_lane_idx) *
-                                               poly_psw.gpos_scale);
-          __stwb(&gmem_r.ycrd[write_idx], fake_y.x);
-          __stwb(&gmem_r.ycrd_ovrf[write_idx], fake_y.y);
-#endif
-        }
-      }
-      else {
-        fyval = (TCALC)(0.0);
-      }
-      for (int i = half_tile_length; i > 0; i >>= 1) {
-        fyval += SHFL_DOWN(fyval, i);
-      }
-      if (tile_lane_idx == 0 && rel_pos < import_count) {
-        sh_tile_ycog[rel_pos] = fyval;
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 3 * padded_import_count) {
-      TCALC fzval;
-      const int rel_pos = pos - (2 * padded_import_count);
-      if (rel_pos < import_count) {
-        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const size_t write_idx = EXCL_GMEM_OFFSET + (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          const llint izval = __ldcs(&poly_psw.zcrd[read_idx]);
-          fzval = (TCALC)(izval);
-          __stwb(&gmem_r.zcrd[write_idx], izval);
-#ifndef TCALC_IS_SINGLE
-          const int izval_ovrf = __ldcs(&poly_psw.zcrd_ovrf[read_idx]);
-          fzval += (TCALC)(izval_ovrf) * max_llint_accumulation;
-          __stwb(&gmem_r.zcrd_ovrf[write_idx], izval_ovrf);
-#endif
-        }
-        else {
-          fzval = (TCALC)(0.0);
-#ifdef TCALC_IS_SINGLE
-          __stwb(&gmem_r.zcrd[write_idx], (128 * rel_pos * tile_lane_idx) * poly_psw.gpos_scale_f);
-#else
-          const int95_t fake_z = doubleToInt95((128 * rel_pos * tile_lane_idx) *
-                                               poly_psw.gpos_scale);
-          __stwb(&gmem_r.zcrd[write_idx], fake_z.x);
-          __stwb(&gmem_r.zcrd_ovrf[write_idx], fake_z.y);
-#endif
-        }
-      }
-      else {
-        fzval = (TCALC)(0.0);
-      }
-      for (int i = half_tile_length; i > 0; i >>= 1) {
-        fzval += SHFL_DOWN(fzval, i);
-      }
-      if (tile_lane_idx == 0 && rel_pos < import_count) {
-        sh_tile_zcog[rel_pos] = fzval;
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 4 * padded_import_count) {
-      const int rel_pos = pos - (3 * padded_import_count);
-      if (rel_pos < import_count) {
-        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          sh_pbradii[write_idx] = __ldcs(&poly_nbk.pb_radii[read_idx]);
-        }
-        else {
-          sh_pbradii[write_idx] = (TCALC)(1.0);
-        }
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 5 * padded_import_count) {
-      const int rel_pos = pos - (4 * padded_import_count);
-      if (rel_pos < import_count) {
-        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-          sh_screen[write_idx] = __ldcs(&poly_nbk.gb_screen[read_idx]);
-        }
-        else {
-          sh_screen[write_idx] = (TCALC)(1.0);
-        }
 #ifdef TCALC_IS_SINGLE
         sh_psi[write_idx] = 0;
 #else
@@ -209,21 +96,65 @@ KERNEL_NAME(const SyNonbondedKit<TCALC> poly_nbk, const NeckGeneralizedBornKit<T
     }
     if (poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
         poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) {
-      while (pos < 6 * padded_import_count) {
-        const int rel_pos = pos - (4 * padded_import_count);
-        if (rel_pos < import_count) {
-          const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-          const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
-          if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-            sh_neck_idx[write_idx] = __ldcs(&poly_nbk.neck_gb_idx[read_idx]);
-          }
-          else {
-            sh_neck_idx[write_idx] = 0;
-          }
-        }
-        pos += tile_sides_per_warp * warps_per_block;
-      }
+      pos = loadTileProperty(pos, import_count, 5, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
     }
-    
+    __syncthreads();
+
+    // Loop over tile instructions
+    pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
+    while (pos < nbwu_map[small_block_max_imports + 7]) {
+
+      // Handle one tile per warp.  This works perfectly when the tile width is half the warp
+      // width, but for commodity AMD and Intel architectures these bounds will need alterations.
+      uint2 tinsr = poly_nbk.nbwu_insr[pos];
+      const int local_absc_start = (tinsr.x & 0xffff);
+      const int local_ordi_start = ((tinsr.x >> 16) & 0xffff);
+      const int absc_import_idx = local_absc_start >> tile_length_bits;
+      const int ordi_import_idx = local_ordi_start >> tile_length_bits;
+
+      // Obtain the tile atoms' Cartesian X, Y, and Z centering for best results.
+      const TCALC inv_tile_pts = (TCALC)(1.0) /
+                                 (sh_tile_tpts[absc_import_idx] + sh_tile_tpts[ordi_import_idx]);
+      const TCALC tx_cog = (sh_tile_xcog[absc_import_idx] + sh_tile_xcog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const TCALC ty_cog = (sh_tile_ycog[absc_import_idx] + sh_tile_ycog[ordi_import_idx]) *
+                           inv_tile_pts;
+      const TCALC tz_cog = (sh_tile_zcog[absc_import_idx] + sh_tile_zcog[ordi_import_idx]) *
+                           inv_tile_pts;
+      int read_idx  = ((warp_lane_idx <  tile_length) * local_absc_start) +
+                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx +
+                      EXCL_GMEM_OFFSET;
+#ifdef TCALC_IS_SINGLE
+      const llint x_center = LLCONV_FUNC(tx_cog);
+      const llint y_center = LLCONV_FUNC(ty_cog);
+      const llint z_center = LLCONV_FUNC(tz_cog);
+      const TCALC t_xcrd   = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd   = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd   = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+#else
+      // Convert the negative values of the center-of-geometry coordinates so that the result
+      // can feed into splitFPSum() (which adds A + B).
+      const int95_t x_center = doubleToInt95(-tx_cog);
+      const int95_t y_center = doubleToInt95(-ty_cog);
+      const int95_t z_center = doubleToInt95(-tz_cog);
+      const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
+      const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
+      const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
+      const int95_t x95_tmp  = splitFPSum(x_atom, x_center);
+      const int95_t y95_tmp  = splitFPSum(y_atom, y_center);
+      const int95_t z95_tmp  = splitFPSum(z_atom, z_center);
+      const TCALC t_xcrd = splitFPToReal(x95_tmp) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd = splitFPToReal(y95_tmp) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd = splitFPToReal(z95_tmp) * poly_psw.inv_gpos_scale;
+#endif
+    }
+
+    // Increment the work unit counter
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
+      nbwu_idx = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);
+    }
+    __syncthreads();    
   }
 }

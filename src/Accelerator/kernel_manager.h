@@ -134,7 +134,7 @@ public:
   ///        when large blocks cannot use more than 32k registers in all.
   int getArchBlockMultiplier() const;
   
-  /// \brief Get the block and thread counts for the valence kernel.
+  /// \brief Get the block and thread counts for a valence kernel.
   ///
   /// \param prec        The type of floating point numbers in which the kernel shall work
   /// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
@@ -144,7 +144,7 @@ public:
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
                             AccumulationMethod acc_meth, VwuGoal purpose) const;
 
-  /// \brief Get the block and thread counts for the non-bonded kernel.  Parameter descriptions
+  /// \brief Get the block and thread counts for a non-bonded kernel.  Parameter descriptions
   ///        for this function follow from getValenceKernelDims() above, with the addition of:
   ///
   /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
@@ -152,11 +152,16 @@ public:
   int2 getNonbondedKernelDims(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                               EvaluateEnergy eval_nrg, AccumulationMethod acc_meth) const;
 
-  /// \brief Get the block and thread counts for the Born radii computation kernel.  Parameter
+  /// \brief Get the block and thread counts for a Born radii computation kernel.  Parameter
   ///        descriptions for this function follow from getValenceKernelDims() above.
   int2 getBornRadiiKernelDims(PrecisionModel prec, NbwuKind kind,
                               AccumulationMethod acc_meth) const;
-  
+
+  /// \brief Get the block and thread counts for a Born derivative computation kernel.  Parameter
+  ///        descriptions for this function follow from getValenceKernelDims() above.
+  int2 getBornDerivativeKernelDims(PrecisionModel prec, NbwuKind kind,
+                                   AccumulationMethod acc_meth) const;
+
   /// \brief Get the block and thread counts for a reduction kernel.
   ///
   /// \param prec     The type of floating point numbers represented by the kernel's substrate
@@ -209,7 +214,11 @@ private:
   /// Architecture-specific block multiplier for Generalized Born radii computation kernels, again
   /// a provision for NVIDIA Turing cards.
   int gbradii_block_multiplier;
-  
+
+  /// Architecture-specific block multiplier for Generalized Born radii derivative computation
+  /// kernels, again a provision for NVIDIA Turing cards.
+  int gbderiv_block_multiplier;
+
   /// The workload-specific block multiplier for reduction kernels.  Like the valence kernels, the
   /// thread count per streaming multiprocessor will not go above 1024 (this time out of bandwidth
   /// limitations), but the block multiplicity (which starts at 4) could be increased.
@@ -254,6 +263,12 @@ private:
   void catalogBornRadiiKernel(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
                               const std::string &kernel_name = std::string(""));
 
+  /// \brief Set the register, maximum block size, and thread counts for one of the Generalized
+  ///        Born derivative computation kernels.  Parameter descriptions for this function follow
+  ///        from catalogValenceKernel() and catalogNonbondedKernel() above.
+  void catalogBornDerivativeKernel(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                                   const std::string &kernel_name = std::string(""));
+
   /// \brief Set the register, maximum block size, and thread counts for one of the reduction
   ///        kernels.  Parameter descriptions for this function follow from
   ///        setValenceKernelAttributes() above, with the addition of:
@@ -288,7 +303,13 @@ int nonbondedBlockMultiplier(const GpuDetails &gpu, UnitCellType unit_cell);
 ///
 /// \param gpu  Details of the GPU that will perform the calculations
 int gbRadiiBlockMultiplier(const GpuDetails &gpu);
-  
+
+/// \brief Obtain the architecture-specific block multiplier for Generalized Born derivative
+///        computation kernels.
+///
+/// \param gpu  Details of the GPU that will perform the calculations
+int gbDerivativeBlockMultiplier(const GpuDetails &gpu);
+
 /// \brief Obtain the workload-specific block multiplier for reduction kernels.
 int reductionBlockMultiplier();
 
@@ -333,20 +354,24 @@ std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
 std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
                                EvaluateEnergy eval_nrg, AccumulationMethod acc_meth);
 
+/// \brief Encapsulate the work of encoding a Generalized Born computation kernel key, shared
+///        across radii and derivative computations.
+std::string appendBornKernelKey(const PrecisionModel prec, const NbwuKind kind,
+                                const AccumulationMethod acc_meth);
+  
 /// \brief Obtain a unique string identifier for one of the Born radii computation kernels.  Each
 ///        identifier begins with "gbrd_" and is then appended with letter codes for different
-///        aspects according to the following system:
-///        - { d, f }        Perform calculations in double (d) or float (f) arithmetic
-///        - { tg, st, hc }  Use a "tile groups" or "supertiles" strategy for breaking down
-///                          systems with isolated boundary conditions, or a "honeycomb" strategy
-///                          for breaking down systems with periodic boundary conditions.
-///
-/// \param prec      The type of floating point numbers in which the kernel shall work
-/// \param kind      The type of non-bonded work unit to evaluate
-/// \param acc_meth  The accumulation method for Born radii sums (SPLIT or WHOLE)
-std::string bornRadiiKernelKey(PrecisionModel prec, NbwuKind kind,
-                               AccumulationMethod acc_meth);
-  
+///        aspects of the kernel, following the codes set forth in nonbondedKernelKey() above.
+///        Parameter descriptions also follow from nonbondedKernelKey().
+std::string bornRadiiKernelKey(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth);
+
+/// \brief Obtain a unique string identifier for one of the Born radii computation kernels.  Each
+///        identifier begins with "gbrd_" and is then appended with letter codes for different
+///        aspects of the kernel, following the codes set forth in nonbondedKernelKey() above.
+///        Parameter descriptions also follow from nonbondedKernelKey().
+std::string bornDerivativeKernelKey(PrecisionModel prec, NbwuKind kind,
+                                    AccumulationMethod acc_meth);
+
 /// \brief Obtain a unique string identifier for one of the reduction kernels.  Each identifier
 ///        begins with "redc_" and is then appended with letter codes for different aspects
 ///        according to the following system:
