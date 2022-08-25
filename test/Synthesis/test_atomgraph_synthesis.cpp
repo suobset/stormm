@@ -305,6 +305,9 @@ int main(const int argc, const char* argv[]) {
   section("Test molecular mechanics potential calculations");
 
   // Section 3
+  section("Apply implicit solvent models");
+  
+  // Section 4
   section("Traps for bad input");
   
   // Create some vectors of random numbers, then upload them and test what happens when perturbing
@@ -510,6 +513,9 @@ int main(const int argc, const char* argv[]) {
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list, system_list);
   checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests, EvaluateNonbonded::YES);
+
+  // Apply implicit solvent models to a synthesis
+  
   
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {

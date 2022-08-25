@@ -66,7 +66,7 @@ using namespace stormm::testing;
 std::vector<double> finiteDifferenceForces(const RestraintApparatus &ra,
                                            CoordinateFrameWriter *cfw,
                                            const double fd_delta = 0.0000001) {
-  const RestraintKit<double, double2, double4> rar = ra.getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra.dpData();
   const CoordinateFrameReader cfr(*cfw);
   ScoreCard sc(1);
   std::vector<double> result(cfr.natom * 3, 0.0);
@@ -229,8 +229,8 @@ void testPrecisionSetup(const RestraintApparatus &ra, const PhaseSpace &ps,
     frc_dw.ycrd[i] = 0.0;
     frc_dw.zcrd[i] = 0.0;
   }
-  RestraintKit<double, double2, double4> rakd = ra.getDoublePrecisionAbstract();
-  RestraintKit<float, float2, float4> rakf = ra.getSinglePrecisionAbstract();
+  RestraintKit<double, double2, double4> rakd = ra.dpData();
+  RestraintKit<float, float2, float4> rakf = ra.spData();
   evaluateRestraints<double, double,
                      double, double2, double4>(rakd, csdr.xcrd, csdr.ycrd, csdr.zcrd, csdr.umat,
                                                csdr.invu, csdr.unit_cell, frc_dw.xcrd, frc_dw.ycrd,
@@ -621,10 +621,8 @@ int main(const int argc, const char* argv[]) {
 
   // Try new precision models
   section(4);
-  const RestraintKit<double,
-                     double2, double4> gk_posn_dbl = gk_posn_ra.getDoublePrecisionAbstract();
-  const RestraintKit<float,
-                     float2, float4> gk_posn_flt = gk_posn_ra.getSinglePrecisionAbstract();
+  const RestraintKit<double, double2, double4> gk_posn_dbl = gk_posn_ra.dpData();
+  const RestraintKit<float, float2, float4> gk_posn_flt = gk_posn_ra.spData();
   testPrecisionSetup(gk_posn_ra, gk_ps, 1.0e-5, 1.0e-6, 1.0e-4, 1.0e-5, do_tests);
   
   // Summary evaluation

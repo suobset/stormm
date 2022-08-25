@@ -527,7 +527,7 @@ int main(const int argc, const char* argv[]) {
   ScoreCard traj_sc(20, 1, 32);
   const NonbondedKit<double> trpi_nbk_d = trpi_ag.getDoublePrecisionNonbondedKit();
   const ImplicitSolventKit<double> trpi_isk_d = trpi_ag.getDoublePrecisionImplicitSolventKit();
-  const NeckGeneralizedBornKit<double> ngb_kit_d = ngb_tab.getDoublePrecisionAbstract();
+  const NeckGeneralizedBornKit<double> ngb_kit_d = ngb_tab.dpData();
   for (int i = 0; i < nframe; i++) {
     gbe_dd[i] = evaluateGeneralizedBornEnergy<double, double>(trpi_nbk_d, trpi_se.data(),
                                                               trpi_isk_d, ngb_kit_d,
@@ -541,7 +541,7 @@ int main(const int argc, const char* argv[]) {
   }
   const NonbondedKit<float> trpi_nbk_f = trpi_ag.getSinglePrecisionNonbondedKit();
   const ImplicitSolventKit<float> trpi_isk_f = trpi_ag.getSinglePrecisionImplicitSolventKit();
-  const NeckGeneralizedBornKit<float> ngb_kit_f = ngb_tab.getSinglePrecisionAbstract();
+  const NeckGeneralizedBornKit<float> ngb_kit_f = ngb_tab.spData();
   for (int i = 0; i < nframe; i++) {
     gbe_df[i] = evaluateGeneralizedBornEnergy<double, float>(trpi_nbk_f, trpi_se.data(),
                                                              trpi_isk_f, ngb_kit_f,

@@ -394,11 +394,10 @@ double evaluateRestraints(const RestraintApparatus &ra, PhaseSpace *ps, ScoreCar
                           const int step_number) {
   PhaseSpaceWriter psw = ps->data();
   return evaluateRestraints<double, double,
-                            double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd,
-                                                      psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc,
-                                                      ecard, eval_force, system_index,
-                                                      step_number);
+                            double, double2, double4>(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                                      psw.umat, psw.invu, psw.unit_cell, psw.xfrc,\
+                                                      psw.yfrc, psw.zfrc, ecard, eval_force,
+                                                      system_index, step_number);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -407,11 +406,10 @@ double evaluateRestraints(const RestraintApparatus *ra, PhaseSpace *ps, ScoreCar
                           const int step_number) {
   PhaseSpaceWriter psw = ps->data();
   return evaluateRestraints<double, double,
-                            double, double2, double4>(ra->getDoublePrecisionAbstract(), psw.xcrd,
-                                                      psw.ycrd, psw.zcrd, psw.umat, psw.invu,
-                                                      psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc,
-                                                      ecard, eval_force, system_index,
-                                                      step_number);
+                            double, double2, double4>(ra->dpData(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                                      psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                                                      psw.yfrc, psw.zfrc, ecard, eval_force,
+                                                      system_index, step_number);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -441,22 +439,20 @@ double evaluateRestraints(const RestraintKit<double, double2, double4> rar,
 double evaluateRestraints(const RestraintApparatus &ra, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, const int system_index, const int step_number) {
   return evaluateRestraints<double, double,
-                            double, double2, double4>(ra.getDoublePrecisionAbstract(), cfr.xcrd,
-                                                      cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
-                                                      cfr.unit_cell, nullptr, nullptr, nullptr,
-                                                      ecard, EvaluateForce::NO, system_index,
-                                                      step_number);
+                            double, double2, double4>(ra.dpData(), cfr.xcrd, cfr.ycrd, cfr.zcrd,
+                                                      cfr.umat, cfr.invu, cfr.unit_cell, nullptr,
+                                                      nullptr, nullptr, ecard, EvaluateForce::NO,
+                                                      system_index, step_number);
 }
 
 //-------------------------------------------------------------------------------------------------
 double evaluateRestraints(const RestraintApparatus *ra, const CoordinateFrameReader cfr,
                           ScoreCard *ecard, const int system_index, const int step_number) {
   return evaluateRestraints<double, double,
-                            double, double2, double4>(ra->getDoublePrecisionAbstract(), cfr.xcrd,
-                                                      cfr.ycrd, cfr.zcrd, cfr.umat, cfr.invu,
-                                                      cfr.unit_cell, nullptr, nullptr, nullptr,
-                                                      ecard, EvaluateForce::NO, system_index,
-                                                      step_number);
+                            double, double2, double4>(ra->dpData(), cfr.xcrd, cfr.ycrd, cfr.zcrd,
+                                                      cfr.umat, cfr.invu, cfr.unit_cell, nullptr,
+                                                      nullptr, nullptr, ecard, EvaluateForce::NO,
+                                                      system_index, step_number);
 }
 
 } // namespace energy

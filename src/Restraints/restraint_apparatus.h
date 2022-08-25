@@ -172,13 +172,13 @@ public:
   ///
   /// \param tier  The level at which to obtain pointers
   RestraintKit<double, double2, double4>
-  getDoublePrecisionAbstract(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  dpData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get a single-precision abstract of this apparatus
   ///
   /// \param tier  The level at which to obtain pointers
   RestraintKit<float, float2, float4>
-  getSinglePrecisionAbstract(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get an integer pointer into one of the restraint initial or final application step
   ///        parameter arrays, specified by the order of the restraint.

@@ -1100,7 +1100,9 @@ public:
   /// \param igb_in         The implicit solvent model to impart onto the system
   /// \param dielectric_in  The desired dielectric constant
   /// \param saltcon_in     The intended salt concentration (affects the GB decay parameter Kappa)
-  /// \param radii_set      Radii to impart to the topology (this 
+  /// \param radii_set      Radii to impart to the topology (this is often coupled to the choice of
+  ///                       implicit solvent model, but for purposes of experimentation or new
+  ///                       model development might be flexible)
   /// \param policy         Indicator of what to do if the topology's PB radii to not meet the
   ///                       implicit solvent model requirements, or there is some other problem
   void setImplicitSolventModel(ImplicitSolventModel igb_in, double dielectric_in = 80.0,

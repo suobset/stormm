@@ -12,6 +12,7 @@
 #include "Math/reduction_workunit.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Topology/atomgraph.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "Topology/topology_util.h"
 #include "UnitTesting/stopwatch.h"
 #include "static_mask_synthesis.h"
@@ -30,6 +31,7 @@ using math::ReductionWorkUnit;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
+using topology::AtomicRadiusSet;
 using topology::ChemicalDetailsKit;
 using topology::getRealParameters;
 using topology::ImplicitSolventModel;
@@ -192,9 +194,9 @@ public:
   ///   - Get the PB radii set for a series of systems between low and high limits
   ///   - Get the PB radii set for a specific system
   /// \{
-  std::vector<std::string> getPBRadiiSet() const;
-  std::vector<std::string> getPBRadiiSet(int low_limit, int high_limit) const;
-  std::string getPBRadiiSet(int index) const;
+  std::vector<AtomicRadiusSet> getPBRadiiSet() const;
+  std::vector<AtomicRadiusSet> getPBRadiiSet(int low_limit, int high_limit) const;
+  AtomicRadiusSet getPBRadiiSet(int index) const;
   /// \}
 
   /// \brief Get partial charges stored within the synthesis.
@@ -349,12 +351,44 @@ public:
   /// \brief Apply an implicit solvent model to the synthesis.
   ///
   /// Overloaded:
-  ///   - Apply a well-known implicit solvent model
-  ///   - Apply a cusotmized implicit solvent model with its own parameters
+  ///   - Apply specific atomic radius sets to each system
+  ///   - Apply a common atomic radius set ot all systems
+  ///   - Accept a GB neck model, its double-precision abstract, or no such model
   ///
-  /// \param ism_in  A specific, established implicit solvent model (from literature and hard-coded
+  /// \param igb_in  A specific, established implicit solvent model (from literature and hard-coded
   ///                into STORMM) to apply
-  void setImplicitSolventModel(ImplicitSolventModel ism_in);
+  /// \param dielectric_in  The desired dielectric constant
+  /// \param saltcon_in     The intended salt concentration (affects the GB decay parameter Kappa)
+  /// \param radii_sets_in  Radii to impart to the topology (this is often coupled to the choice of
+  ///                       implicit solvent model, but for purposes of experimentation or new
+  ///                       model development might be flexible)
+  /// \param policy         Indicator of what to do if the topology's PB radii to not meet the
+  ///                       implicit solvent model requirements, or there is some other problem
+  /// \{
+  void setImplicitSolventModel(ImplicitSolventModel igb_in,
+                               const NeckGeneralizedBornKit<double> &ngbk,
+                               const std::vector<AtomicRadiusSet> &radii_sets_in,
+                               double dielectric_in = 80.0, double saltcon_in = 0.0,
+                               ExceptionResponse policy = ExceptionResponse::WARN);
+
+  void setImplicitSolventModel(ImplicitSolventModel igb_in,
+                               const NeckGeneralizedBornKit<double> &ngbk,
+                               AtomicRadiusSet radii_set = AtomicRadiusSet::NONE,
+                               double dielectric_in = 80.0, double saltcon_in = 0.0,
+                               ExceptionResponse policy = ExceptionResponse::WARN);
+
+  void setImplicitSolventModel(ImplicitSolventModel igb_in,
+                               const NeckGeneralizedBornTable &ngb_tab,
+                               const std::vector<AtomicRadiusSet> &radii_sets_in,
+                               double dielectric_in = 80.0, double saltcon_in = 0.0,
+                               ExceptionResponse policy = ExceptionResponse::WARN);
+
+  void setImplicitSolventModel(ImplicitSolventModel igb_in,
+                               const NeckGeneralizedBornTable &ngb_tab,
+                               AtomicRadiusSet radii_set = AtomicRadiusSet::NONE,
+                               double dielectric_in = 80.0, double saltcon_in = 0.0,
+                               ExceptionResponse policy = ExceptionResponse::WARN);
+  /// \}
   
 private:
 
@@ -420,11 +454,11 @@ private:
   SettleSetting use_settle;           ///< Toggles analytic constraints on rigid water
   char4 water_residue_name;           ///< Name of water residue, compared to residue_names
 
-  /// Names of the Poisson-Boltzmann radii sets for each system, also used in GB.  While it is
+  /// Settings for the Poisson-Boltzmann radii sets for each system, also used in GB.  While it is
   /// typical to use a prescribed radii set with a particular GB model, the choice is not limited.
   /// Therefore, each system may operate with a different set of radii, provided that they pass
   /// any particular requirements of the common GB model in use.
-  std::vector<std::string> pb_radii_sets;
+  std::vector<AtomicRadiusSet> pb_radii_sets;
 
   /// An array of pointers to the individual topologies that form the basis of this work plan.
   /// This array is topology_count in length and accessible only on the host as it is used to
@@ -752,6 +786,10 @@ private:
   // target chem_double_data, chem_float_data, and (in the case of the indices) chem_int_data,
   // for convenience.  The neck tables are their own ARRAY-type objects to expedite applying a
   // new implicit solvent model to an existing synthesis.
+  int neck_table_size;                   ///< Dimension of the Neck Generalized Born limit tables.
+                                         ///<   All indices into the limits tables, defined in
+                                         ///<   neck_gb_indices (below), must be less than this
+                                         ///<   value.
   Hybrid<int> neck_gb_indices;           ///< Indicies into separation and maximum value parameter
                                          ///<   tables for Mongan's "neck" GB implementations
   Hybrid<double> atomic_pb_radii;        ///< Radii of all atoms according to the pb_radii_set

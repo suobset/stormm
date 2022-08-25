@@ -185,13 +185,13 @@ public:
   ///
   /// \param tier  Level at which to get the pointers (CPU or GPU, HOST or DEVICE)
   const NeckGeneralizedBornKit<double>
-  getDoublePrecisionAbstract(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  dpData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get a collection of single-precision pointers for this object
   ///
   /// \param tier  Level at which to get the pointers (CPU or GPU, HOST or DEVICE)
   const NeckGeneralizedBornKit<float>
-  getSinglePrecisionAbstract(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 private:
   int table_size;                        ///< Size of the neck GB lookup tables (if applicable)

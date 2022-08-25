@@ -528,7 +528,7 @@ std::vector<std::vector<int>> getAtomForceContributors(const AtomGraph &ag,
                                                        const RestraintApparatus &ra) {
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
-  const RestraintKit<double, double2, double4> rar = ra.getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra.dpData();
 
   // Initialize the result.  Every atom list includes the atom itself.
   std::vector<std::vector<int>> result(vk.natom, std::vector<int>());

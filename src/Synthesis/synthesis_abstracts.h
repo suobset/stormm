@@ -172,21 +172,20 @@ template <typename T, typename T2> struct SyNonbondedKit {
   explicit SyNonbondedKit(int nsys_in, UnitCellType unit_cell_in, int nnbwu_in,
                           const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
                           const int* atom_offsets, const int* atom_counts, T coulomb_in,
-                          ImplicitSolventModel igb_in, T dielectric_in, T kappa_in, T saltcon_in,
-                          T gb_offset_in, T gb_neckscale_in, T gb_neckcut_in, const T* charge_in,
-                          const int* lj_idx_in, const int* n_lj_types_in,
-                          const int* ljabc_offsets_in, const T* lja_coeff_in,
-                          const T* ljb_coeff_in, const T* ljc_coeff_in, const int* neck_gb_idx_in,
-                          const T* pb_radii_in, const T* gb_screen_in, const T* gb_alpha_in,
-                          const T* gb_beta_in, const T* gb_gamma_in, const T2* neck_limits_in);
+                          ImplicitSolventModel igb_in, int neck_table_size_in, T dielectric_in,
+                          T kappa_in, T saltcon_in, T gb_offset_in, T gb_neckscale_in,
+                          T gb_neckcut_in, const T* charge_in, const int* lj_idx_in,
+                          const int* n_lj_types_in, const int* ljabc_offsets_in,
+                          const T* lja_coeff_in, const T* ljb_coeff_in, const T* ljc_coeff_in,
+                          const int* neck_gb_idx_in, const T* pb_radii_in, const T* gb_screen_in,
+                          const T* gb_alpha_in, const T* gb_beta_in, const T* gb_gamma_in,
+                          const T2* neck_limits_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
   /// \{
-#if 0
   SyNonbondedKit(const SyNonbondedKit &original) = default;
   SyNonbondedKit(SyNonbondedKit &&original) = default;
-#endif
   /// \}
 
   // Member variables (all public)
@@ -203,6 +202,7 @@ template <typename T, typename T2> struct SyNonbondedKit {
                                   ///<   converted to factor this in at the time they are cached)
   const ImplicitSolventModel igb; ///< The flavor of Generalized Born to use, i.e. Hawkins /
                                   ///<   Cramer / Truhlar
+  const int neck_table_size;      ///< Length of each side of the square "neck" GB limit tables
   const T dielectric;             ///< Solvent dielectric constant
   const T kappa;                  ///< Inverse of the Debye-Huckel length (based on the dielectic)
   const T saltcon;                ///< The salt concentration to use in GB calculations

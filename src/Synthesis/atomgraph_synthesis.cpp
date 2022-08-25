@@ -1,6 +1,7 @@
 #include "copyright.h"
 #include "Constants/generalized_born.h"
 #include "Constants/hpc_bounds.h"
+#include "Constants/scaling.h"
 #include "Math/rounding.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
@@ -70,7 +71,8 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     gb_offset{default_gb_radii_offset}, gb_neckscale{default_gb_neck_scale},
     gb_neckcut{default_gb_neck_cut}, coulomb_constant{accepted_coulomb_constant},
     use_bond_constraints{ShakeSetting::OFF}, use_settle{SettleSetting::OFF},
-    water_residue_name{' ', ' ', ' ', ' '}, pb_radii_sets{},
+    water_residue_name{' ', ' ', ' ', ' '},
+    pb_radii_sets{std::vector<AtomicRadiusSet>(system_count, AtomicRadiusSet::NONE)},
 
     // Individual topologies and restraint networks (RestraintApparatus objects), each of them
     // describing one or more of the individual systems within the synthesis
@@ -261,6 +263,7 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
     sp_lennard_jones_14_c_coeff{HybridKind::ARRAY, "tpsyn_lj_14_c_sp"},
 
     // Implicit solvent model parameters
+    neck_table_size{0},
     neck_gb_indices{HybridKind::POINTER, "tpsyn_gb_idx"},
     atomic_pb_radii{HybridKind::POINTER, "tpsyn_atom_pb_rad"},
     gb_screening_factors{HybridKind::POINTER, "tpsyn_gbscreen"},
@@ -983,7 +986,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     nb_exclusion_offsets.putHost(excl_offset, i);
     excl_offset += roundUp(ag_ptr->getTotalExclusions(), warp_size_int);
     if (ra_ptr != nullptr) {
-      const RestraintKit<double, double2, double4> rar = ra_ptr->getDoublePrecisionAbstract();
+      const RestraintKit<double, double2, double4> rar = ra_ptr->dpData();
       posn_restraint_counts.putHost(rar.nposn, i);
       bond_restraint_counts.putHost(rar.nbond, i);
       angl_restraint_counts.putHost(rar.nangl, i);
@@ -1311,7 +1314,7 @@ void AtomGraphSynthesis::buildAtomAndTermArrays(const std::vector<int> &topology
     if (ra_ptr == nullptr) {
       continue;
     }
-    const RestraintKit<double, double2, double4> rar = ra_ptr->getDoublePrecisionAbstract();
+    const RestraintKit<double, double2, double4> rar = ra_ptr->dpData();
     const int synth_atom_base = atom_offsets.readHost(sysid);
     const int synth_rposn_offset = posn_restraint_offsets.readHost(sysid);
     const int synth_rbond_offset = bond_restraint_offsets.readHost(sysid);
@@ -2488,7 +2491,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
     if (ira_ptr == nullptr) {
       continue;
     }
-    const RestraintKit<double, double2, double4> irar_dp = ira_ptr->getDoublePrecisionAbstract();
+    const RestraintKit<double, double2, double4> irar_dp = ira_ptr->dpData();
     for (int j = 0; j < irar_dp.nposn; j++) {
 
       // Skip restraints that have been determined to have unique x / y / z targets.  This is
@@ -2510,7 +2513,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
             continue;
           }
           const RestraintKit<double,
-                             double2, double4> krar_dp = kra_ptr->getDoublePrecisionAbstract();
+                             double2, double4> krar_dp = kra_ptr->dpData();
           const int mstart = (k == i) ? j : 0;
           for (int m = mstart; m < krar_dp.nposn; m++) {
             if (rposn_synthesis_xyz_index[network_rposn_table_offsets[k] + m] >= 0) {
@@ -2667,7 +2670,7 @@ void AtomGraphSynthesis::condenseRestraintNetworks() {
     if (ra_ptr == nullptr) {
       continue;
     }
-    const RestraintKit<double, double2, double4> rar = ra_ptr->getDoublePrecisionAbstract();
+    const RestraintKit<double, double2, double4> rar = ra_ptr->dpData();
     const int ra_posn_table_offset = network_rposn_table_offsets[ra_index];
     const int ra_bond_table_offset = network_rbond_table_offsets[ra_index];
     const int ra_angl_table_offset = network_rangl_table_offsets[ra_index];
@@ -3312,12 +3315,12 @@ double AtomGraphSynthesis::getCoulombConstant() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<std::string> AtomGraphSynthesis::getPBRadiiSet() const {
+std::vector<AtomicRadiusSet> AtomGraphSynthesis::getPBRadiiSet() const {
   return pb_radii_sets;
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<std::string> AtomGraphSynthesis::getPBRadiiSet(const int low_limit,
+std::vector<AtomicRadiusSet> AtomGraphSynthesis::getPBRadiiSet(const int low_limit,
                                                            const int high_limit) const {
   if (high_limit < low_limit || high_limit < 0 || low_limit < 0 || high_limit > system_count ||
       low_limit > system_count) {
@@ -3325,7 +3328,7 @@ std::vector<std::string> AtomGraphSynthesis::getPBRadiiSet(const int low_limit,
           " is invalid for a collection of " + std::to_string(system_count) + " systems.",
           "AtomGraphSynthesis", "getPBRadiiSet");
   }
-  std::vector<std::string> result(high_limit - low_limit);
+  std::vector<AtomicRadiusSet> result(high_limit - low_limit);
   for (int i = low_limit; i < high_limit; i++) {
     result[i - low_limit] = pb_radii_sets[i];
   }
@@ -3333,7 +3336,7 @@ std::vector<std::string> AtomGraphSynthesis::getPBRadiiSet(const int low_limit,
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string AtomGraphSynthesis::getPBRadiiSet(const int index) const {
+AtomicRadiusSet AtomGraphSynthesis::getPBRadiiSet(const int index) const {
   if (index < 0 || index > system_count) {
     rtErr("The index " + std::to_string(index) + " is invalid for a collection of " +
           std::to_string(system_count) + " systems.", "AtomGraphSynthesis", "getPBRadiiSet");
@@ -3490,10 +3493,10 @@ AtomGraphSynthesis::getDoublePrecisionNonbondedKit(const HybridTargetLevel tier)
                         double2>(system_count, periodic_box_class, total_nonbonded_work_units,
                                  nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
                                  atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
-                                 gb_style, dielectric_constant, is_kappa, salt_concentration,
-                                 gb_offset, gb_neckscale, gb_neckcut, atomic_charges.data(tier),
-                                 lennard_jones_indices.data(tier), atom_type_counts.data(tier),
-                                 lennard_jones_abc_offsets.data(tier),
+                                 gb_style, neck_table_size, dielectric_constant, is_kappa,
+                                 salt_concentration, gb_offset, gb_neckscale, gb_neckcut,
+                                 atomic_charges.data(tier), lennard_jones_indices.data(tier),
+                                 atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                  lennard_jones_a_coeff.data(tier),
                                  lennard_jones_b_coeff.data(tier),
                                  lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
@@ -3509,10 +3512,10 @@ AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier)
                         float2>(system_count, periodic_box_class, total_nonbonded_work_units,
                                 nonbonded_abstracts.data(tier), nbwu_instructions.data(tier),
                                 atom_offsets.data(tier), atom_counts.data(tier), coulomb_constant,
-                                gb_style, dielectric_constant, is_kappa, salt_concentration,
-                                gb_offset, gb_neckscale, gb_neckcut, sp_atomic_charges.data(tier),
-                                lennard_jones_indices.data(tier), atom_type_counts.data(tier),
-                                lennard_jones_abc_offsets.data(tier),
+                                gb_style, neck_table_size, dielectric_constant, is_kappa,
+                                salt_concentration, gb_offset, gb_neckscale, gb_neckcut,
+                                sp_atomic_charges.data(tier), lennard_jones_indices.data(tier),
+                                atom_type_counts.data(tier), lennard_jones_abc_offsets.data(tier),
                                 sp_lennard_jones_a_coeff.data(tier),
                                 sp_lennard_jones_b_coeff.data(tier),
                                 sp_lennard_jones_c_coeff.data(tier), neck_gb_indices.data(tier),
@@ -3668,8 +3671,128 @@ void AtomGraphSynthesis::download() {
 #endif
 
 //-------------------------------------------------------------------------------------------------
-void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel ism_in) {
+void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_in,
+                                                 const NeckGeneralizedBornKit<double> &ngbk,
+                                                 const std::vector<AtomicRadiusSet> &radii_sets_in,
+                                                 const double dielectric_in,
+                                                 const double saltcon_in,
+                                                 const ExceptionResponse policy) {
 
+  // Check that there are the appropriate number of atomic radius sets
+  if (static_cast<int>(radii_sets_in.size()) != system_count) {
+    rtErr("For " + std::to_string(system_count) + " systems, " +
+          std::to_string(radii_sets_in.size()) + " is an invalid number of unique atomic radii "
+          "sets.", "AtomGraphSynthesis", "setImplicitSolventModel");
+  }
+  
+  // Set features of the synthesis.  Here, the GB offset, neck scaling, and neck cutoff are
+  // explicit members of the object, as opposed to the single-system AtomGraph where it is inferred
+  // when an ImplicitSolventRecipe is constructed.  In either case, the values of the GB offset are
+  // hard-coded.
+  gb_style = igb_in;
+  dielectric_constant = dielectric_in;
+  salt_concentration = saltcon_in;
+  is_kappa = (salt_concentration > constants::tiny) ?
+             sqrt(default_salt_kappa_dependence * salt_concentration) : 0.0;
+  gb_offset = (igb_in == ImplicitSolventModel::NECK_GB_II) ?
+              static_cast<double>(default_neck_ii_gb_radii_offset) :
+              static_cast<double>(default_gb_radii_offset);
+  gb_neckscale = (igb_in == ImplicitSolventModel::NECK_GB_II) ?
+                 static_cast<double>(default_gb_neck_ii_scale) :
+                 static_cast<double>(default_gb_neck_scale);
+  gb_neckcut = ngbk.neck_cut;
+
+  // Set the implicit solvent models in each reference topology one by one, then port the results
+  // to the appropriate array positions in the synthesis.
+  std::vector<AtomicRadiusSet> top_rad_settings(topology_count);
+  std::vector<bool> top_coverage(topology_count, false);
+  for (int i = 0; i < system_count; i++) {
+    const int top_idx = topology_indices.readHost(i);
+    AtomGraph *iag_ptr = topologies[top_idx];
+    if (top_coverage[top_idx]) {
+      if (top_rad_settings[top_idx] != radii_sets_in[i]) {
+        iag_ptr->setImplicitSolventModel(igb_in, dielectric_in, saltcon_in, radii_sets_in[i],
+                                         policy);
+        top_rad_settings[top_idx] = radii_sets_in[i];
+      }
+    }
+    else {
+      top_coverage[top_idx] = true;
+      iag_ptr->setImplicitSolventModel(igb_in, dielectric_in, saltcon_in, radii_sets_in[i],
+                                       policy);
+    }
+    const ImplicitSolventKit<double> isk = iag_ptr->getDoublePrecisionImplicitSolventKit();
+    const int jmin = atom_offsets.readHost(i);
+    const int jmax = jmin + atom_counts.readHost(i);
+    int* neck_gb_indices_ptr = neck_gb_indices.data();
+    double* atomic_pb_radii_ptr = atomic_pb_radii.data();
+    double* gb_screen_ptr = gb_screening_factors.data();
+    double* gb_alpha_ptr = gb_alpha_parameters.data();
+    double* gb_beta_ptr = gb_beta_parameters.data();
+    double* gb_gamma_ptr = gb_gamma_parameters.data();
+    for (int j = jmin; j < jmax; j++) {
+      neck_gb_indices_ptr[j] = isk.neck_gb_idx[j - jmin];
+      atomic_pb_radii_ptr[j] = isk.pb_radii[j - jmin];
+      gb_screen_ptr[j] = isk.gb_screen[j - jmin];
+      gb_alpha_ptr[j] = isk.gb_alpha[j - jmin];
+      gb_beta_ptr[j] = isk.gb_beta[j - jmin];
+      gb_gamma_ptr[j] = isk.gb_gamma[j - jmin];
+    }
+  }
+
+  // Load the neck Generalized Born tables, if applicable
+  switch (igb_in) {
+  case ImplicitSolventModel::NONE:
+  case ImplicitSolventModel::HCT_GB:
+  case ImplicitSolventModel::OBC_GB:
+  case ImplicitSolventModel::OBC_GB_II:
+    break;
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    {
+      neck_table_size = ngbk.table_size;
+      neck_limit_tables.resize(neck_table_size * neck_table_size);
+      double2* neck_limit_ptr = neck_limit_tables.data();
+      for (int i = 0; i < neck_table_size * neck_table_size; i++) {
+         neck_limit_ptr[i].x = ngbk.max_separation[i];
+         neck_limit_ptr[i].y = ngbk.max_value[i];
+      }
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_in,
+                                                 const NeckGeneralizedBornKit<double> &ngbk,
+                                                 const AtomicRadiusSet radii_set_in,
+                                                 const double dielectric_in,
+                                                 const double saltcon_in,
+                                                 const ExceptionResponse policy) {
+  const std::vector rsets_in = std::vector<AtomicRadiusSet>(system_count, radii_set_in);
+  setImplicitSolventModel(igb_in, ngbk, rsets_in, dielectric_in, saltcon_in, policy); 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_in,
+                                                 const NeckGeneralizedBornTable &ngb_tab,
+                                                 const std::vector<AtomicRadiusSet> &radii_sets_in,
+                                                 const double dielectric_in,
+                                                 const double saltcon_in,
+                                                 const ExceptionResponse policy) {
+  setImplicitSolventModel(igb_in, ngb_tab.dpData(), radii_sets_in, dielectric_in, saltcon_in,
+                          policy); 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_in,
+                                                 const NeckGeneralizedBornTable &ngb_tab,
+                                                 const AtomicRadiusSet radii_set_in,
+                                                 const double dielectric_in,
+                                                 const double saltcon_in,
+                                                 const ExceptionResponse policy) {
+  const std::vector rsets_in = std::vector<AtomicRadiusSet>(system_count, radii_set_in);
+  setImplicitSolventModel(igb_in, ngb_tab.dpData(), rsets_in, dielectric_in, saltcon_in, policy); 
 }
 
 } // namespace synthesis

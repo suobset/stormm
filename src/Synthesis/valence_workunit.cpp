@@ -51,7 +51,7 @@ ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintAppara
   const ValenceKit<double> vk = ag_in->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_in->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_in->getDoublePrecisionConstraintKit();
-  const RestraintKit<double, double2, double4> rar = ra_in->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_in->dpData();
   
   // Allocate and fill the arrays
   allocate();
@@ -260,7 +260,7 @@ std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
   result.reserve(32);
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   
   // Form a new call stack from the input.  Check that the call stack has not grown too large,
   // as this might indicate an infinite loop and some nonsensical feature of the topology.
@@ -675,7 +675,7 @@ void ValenceDelegator::allocate() {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   bond_affector_list.resize(2 * vk.nbond);
   bond_affector_bounds.resize(atom_count + 1, 0);
   angl_affector_list.resize(3 * vk.nangl);
@@ -1361,7 +1361,7 @@ void ValenceWorkUnit::storeInferred14Instructions(const std::vector<int> &parame
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storePositionalRestraintInstructions(const std::vector<int> &kr_param_map,
                                                            const std::vector<int> &xyz_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rposn_instructions.resize(rposn_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (kr_param_map.size() != xyz_param_map.size()) {
@@ -1398,7 +1398,7 @@ void ValenceWorkUnit::storePositionalRestraintInstructions(const std::vector<int
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeDistanceRestraintInstructions(const std::vector<int> &kr_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rbond_instructions.resize(rbond_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nbond) {
@@ -1418,7 +1418,7 @@ void ValenceWorkUnit::storeDistanceRestraintInstructions(const std::vector<int> 
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeAngleRestraintInstructions(const std::vector<int> &kr_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rangl_instructions.resize(rangl_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nangl) {
@@ -1439,7 +1439,7 @@ void ValenceWorkUnit::storeAngleRestraintInstructions(const std::vector<int> &kr
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeDihedralRestraintInstructions(const std::vector<int> &kr_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rdihe_instructions.resize(rdihe_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.ndihe) {
@@ -1948,7 +1948,7 @@ void ValenceWorkUnit::logActivities() {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
 
   // Make a "straight table" based on the minimum and maximum imported atom indices.  Most work
   // units will involve a confined sequence of atoms from within the topology.  While it might

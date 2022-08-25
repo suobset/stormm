@@ -60,10 +60,9 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                                      ag.getDoublePrecisionNonbondedKit(), eval_force,
                                      system_index);
   evaluateRestraints<double, double,
-                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
-                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
-                                               system_index, step);
+                     double, double2, double4>(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                               psw.zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -77,10 +76,9 @@ void evalValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                      ag->getDoublePrecisionNonbondedKit(), eval_force,
                                      system_index);
   evaluateRestraints<double, double,
-                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
-                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
-                                               system_index, step);
+                     double, double2, double4>(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                               psw.zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -161,10 +159,9 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                                      ag.getDoublePrecisionValenceKit(), nbk, eval_force,
                                      system_index);
   evaluateRestraints<double, double,
-                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
-                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
-                                               system_index, step);
+                     double, double2, double4>(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                               psw.zfrc, sc, eval_force, system_index, step);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -182,10 +179,9 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                      ag->getDoublePrecisionValenceKit(), nbk, eval_force,
                                      system_index);
   evaluateRestraints<double, double,
-                     double, double2, double4>(ra.getDoublePrecisionAbstract(), psw.xcrd, psw.ycrd,
-                                               psw.zcrd, psw.umat, psw.invu, psw.unit_cell,
-                                               psw.xfrc, psw.yfrc, psw.zfrc, sc, eval_force,
-                                               system_index, step);
+                     double, double2, double4>(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
+                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
+                                               psw.zfrc, sc, eval_force, system_index, step);
 }
 
 } // namespace mm
