@@ -1,0 +1,17 @@
+// -*-c++-*-
+#include "copyright.h"
+
+namespace stormm {
+namespace synthesis {
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+ISWorkspaceKit<T>::ISWorkspaceKit(const int fp_bits_in, llint* psi_in, int* psi_overflow_in,
+                                  llint* sum_deijda_in, int* sum_deijda_overflow_in) :
+    fp_bits{fp_bits_in}, fp_scale{static_cast<T>(pow(2, fp_bits_in))},
+    inv_fp_scale{static_cast<T>(1.0 / fp_scale)}, psi{psi_in}, psi_overflow{psi_overflow_in},
+    sum_deijda{sum_deijda_in}, sum_deijda_overflow{sum_deijda_overflow_in}
+{}
+
+} // namespace synthesis
+} // namespace stormm

@@ -101,12 +101,12 @@ cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, Nb
 /// \{
 void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                                 MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
-                                CacheResourceKit<double> *gmem_r, ISWorkspaceKit *iswk,
+                                CacheResourceKit<double> *gmem_r, ISWorkspaceKit<double> *iswk,
                                 const int2 bt);
 
 void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                                 MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
-                                CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
+                                CacheResourceKit<float> *gmem_r, ISWorkspaceKit<float> *iswk,
                                 AccumulationMethod acc_meth, const int2 bt);
 
 void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,

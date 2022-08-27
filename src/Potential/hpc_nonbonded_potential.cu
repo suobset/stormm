@@ -250,6 +250,7 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  endif
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
+#  define LOG_FUNC  logf
 #  define SPLIT_FORCE_ACCUMULATION
 #    define KERNEL_NAME ktgfsCalculateGBRadii
 #      include "gbradii_tilegroups.cui"
@@ -291,6 +292,7 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  undef COMPUTE_ENERGY
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
+#  undef LOG_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
 #  undef TCALC_IS_SINGLE
@@ -305,6 +307,7 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  define NONBOND_KERNEL_BLOCKS_MULTIPLIER 3
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
+#  define LOG_FUNC  log
 #  define KERNEL_NAME ktgdsCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
 #  undef KERNEL_NAME
@@ -328,6 +331,7 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  undef COMPUTE_ENERGY
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
+#  undef LOG_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef SPLIT_FORCE_ACCUMULATION
 #  undef TCALC2
@@ -556,8 +560,8 @@ queryBornDerivativeKernelRequirements(const PrecisionModel prec, const NbwuKind 
 extern void launchBornRadiiCalculation(const NbwuKind kind,
                                        const SyNonbondedKit<double, double2> &poly_nbk,
                                        MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
-                                       CacheResourceKit<double> *gmem_r, ISWorkspaceKit *iswk,
-                                       const int2 bt) {
+                                       CacheResourceKit<double> *gmem_r,
+                                       ISWorkspaceKit<double> *iswk, const int2 bt) {
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
     ktgdsCalculateGBRadii<<<bt.x, bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
@@ -573,7 +577,8 @@ extern void launchBornRadiiCalculation(const NbwuKind kind,
 extern void launchBornRadiiCalculation(const NbwuKind kind,
                                        const SyNonbondedKit<float, float2> &poly_nbk,
                                        MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
-                                       CacheResourceKit<float> *gmem_r, ISWorkspaceKit *iswk,
+                                       CacheResourceKit<float> *gmem_r,
+                                       ISWorkspaceKit<float> *iswk,
                                        const AccumulationMethod acc_meth, const int2 bt) {
   switch (kind) {
   case NbwuKind::TILE_GROUPS:
@@ -616,7 +621,6 @@ extern void launchBornRadiiCalculation(const PrecisionModel prec,
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   const NbwuKind kind = poly_ag.getNonbondedWorkType();
   PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
-  ISWorkspaceKit iswk = isw->data(devc_tier);
   const int2 bt = launcher.getBornRadiiKernelDims(prec, kind, actual_acc_meth);
   switch (prec) {
   case PrecisionModel::DOUBLE:
@@ -625,6 +629,7 @@ extern void launchBornRadiiCalculation(const PrecisionModel prec,
                            double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
       MMControlKit<double> ctrl = mmctrl->dpData(devc_tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(devc_tier);
+      ISWorkspaceKit<double> iswk = isw->dpData(devc_tier);
       launchBornRadiiCalculation(kind, poly_nbk, &ctrl, &poly_psw, &gmem_r, &iswk, bt);
     }
     break;
@@ -634,6 +639,7 @@ extern void launchBornRadiiCalculation(const PrecisionModel prec,
                            float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
       MMControlKit<float> ctrl = mmctrl->spData(devc_tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(devc_tier);
+      ISWorkspaceKit<float> iswk = isw->spData(devc_tier);
       launchBornRadiiCalculation(kind, poly_nbk, &ctrl, &poly_psw, &gmem_r, &iswk, actual_acc_meth,
                                  bt);
     }

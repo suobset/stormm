@@ -2,6 +2,7 @@
 #ifndef STORMM_IMPLICIT_SOLVENT_WORKSPACE_H
 #define STORMM_IMPLICIT_SOLVENT_WORKSPACE_H
 
+#include <cmath>
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 
@@ -14,7 +15,7 @@ using constants::PrecisionModel;
 
 /// \brief A simple abstract for the implicit solvent workspace.  There are not readers and writers
 ///        as the only useful application involves this workspace being writeable.
-struct ISWorkspaceKit {
+template <typename T> struct ISWorkspaceKit {
 
   /// \brief The constructor takes a straight list of arguments.
   ISWorkspaceKit(int fp_bits_in, llint* psi_in, int* psi_overflow_in, llint* sum_deijda_in,
@@ -30,10 +31,20 @@ struct ISWorkspaceKit {
   /// \}
 
   const int fp_bits;           ///< Fixed-precision bits after the decimal
-  llint* psi;                  ///< 
-  int*   psi_overflow;
-  llint* sum_deijda;
-  int*   sum_deijda_overflow;
+  const T fp_scale;            ///< The "forward" scaling factor to take real values into the
+                               ///<   fixed-precision representation
+  const T inv_fp_scale;        ///< The "backward" scaling factor to take fixed-precision values
+                               ///<   back into their real number representations and units
+  llint* psi;                  ///< Accumulators for quantities that will determine effective Born
+                               ///<   radii (this will be used exclusively for single-precision
+                               ///<   mode calculations, even if a GPU kernel's local thread block
+                               ///<   accumulation is handled in the split fixed precision method)
+  int*   psi_overflow;         ///< Overflow accumulators for psi (used for double-precision mode
+                               ///<   calculations, only)
+  llint* sum_deijda;           ///< Accumulators for quantities that will become force
+                               ///<   contributions due to derivatives of the effective Born radii
+  int*   sum_deijda_overflow;  ///< Overflow accumulators for sum_deijda (used for
+                               ///<   double-precision mode calculations, only)
 };
   
 /// \brief A small collection of arrays to manage temporary accumulators for computing Born radii
@@ -80,10 +91,15 @@ public:
   ///        are stored.
   int getFixedPrecisionBits() const;
 
-  /// \brief Get the abstract, containing pointers to data on the host or device.
+  /// \brief Get the double-precision abstract, containing pointers to data on the host or device.
   ///
   /// \param tier  Level at which to retrieve pointers (the CPU host, or GPU device)
-  ISWorkspaceKit data(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  ISWorkspaceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+
+  /// \brief Get the single-precision abstract, containing pointers to data on the host or device.
+  ///
+  /// \param tier  Level at which to retrieve pointers (the CPU host, or GPU device)
+  ISWorkspaceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object's contents from the host to the GPU device.  This may be useful in
@@ -112,5 +128,7 @@ private:
 
 } // namespace synthesis
 } // namespace stormm
+
+#include "implicit_solvent_workspace.tpp"
 
 #endif

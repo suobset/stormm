@@ -1,5 +1,6 @@
 #include <vector>
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/generalized_born.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Accelerator/gpu_details.h"
@@ -28,6 +29,7 @@ using stormm::constants::verytiny;
 using stormm::data_types::double2;
 using stormm::data_types::double3;
 using stormm::data_types::double4;
+using stormm::data_types::float2;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
@@ -36,6 +38,7 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::restraints::BoundedRestraint;
 using stormm::restraints::RestraintApparatus;
 using namespace stormm::energy;
+using namespace stormm::generalized_born_defaults;
 using namespace stormm::synthesis;
 using namespace stormm::topology;
 using namespace stormm::trajectory;
@@ -495,6 +498,7 @@ int main(const int argc, const char* argv[]) {
            "are the same as for other files needed by this test program.  Subsequent tests will "
            "be skipped.", "test_atomgraph_synthesis");
   }
+  const TestPriority do_new_tests = (new_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
 
   // Create some restraints and apply them, then check the synthesis implementation
   RestraintApparatus tiso_ra = assembleRestraints(&tiso_ag, tiso_ps);
@@ -512,11 +516,61 @@ int main(const int argc, const char* argv[]) {
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list, system_list);
-  checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests, EvaluateNonbonded::YES);
+  checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_new_tests, EvaluateNonbonded::YES);
+  
+  // Apply implicit solvent models to the synthesis
+  NeckGeneralizedBornTable ngb_tab;
+  poly_agn_rst.setImplicitSolventModel(ImplicitSolventModel::NECK_GB_II, ngb_tab,
+                                       AtomicRadiusSet::MBONDI3);
+  const int nsys = poly_agn_rst.getSystemCount();
+  std::vector<int> radius_mistakes(nsys, 0);
+  std::vector<int> sp_radius_mistakes(nsys, 0);
+  std::vector<int> abg_mistakes(nsys, 0);
+  std::vector<int> sp_abg_mistakes(nsys, 0);
+  const SyNonbondedKit<double, double2> ism_nbk = poly_agn_rst.getDoublePrecisionNonbondedKit();
+  const SyNonbondedKit<float, float2> ism_nbk_sp = poly_agn_rst.getSinglePrecisionNonbondedKit();
+  for (int i = 0; i < nsys; i++) {
+    AtomGraph *iag_ptr = poly_agn_rst.getSystemTopologyPointer(i);
+    const ImplicitSolventKit<double> isk = iag_ptr->getDoublePrecisionImplicitSolventKit();
+    const ImplicitSolventKit<float> isk_sp = iag_ptr->getSinglePrecisionImplicitSolventKit();
+    const int natom = iag_ptr->getAtomCount();
+    const int aoffs = ism_nbk.atom_offsets[i];
+    for (int j = 0; j < natom; j++) {
+      if (fabs(isk.pb_radii[j] - ism_nbk.pb_radii[aoffs + j]) > stormm::constants::tiny) {
+        radius_mistakes[i] += 1;
+      }
+      if (fabs(isk_sp.pb_radii[j] - ism_nbk_sp.pb_radii[aoffs + j]) > stormm::constants::tiny) {
+        sp_radius_mistakes[i] += 1;
+      }
+      if (fabs(isk.gb_alpha[j] - ism_nbk.gb_alpha[aoffs + j]) > stormm::constants::tiny ||
+          fabs(isk.gb_beta[j]  - ism_nbk.gb_beta[aoffs + j])  > stormm::constants::tiny ||
+          fabs(isk.gb_gamma[j] - ism_nbk.gb_gamma[aoffs + j]) > stormm::constants::tiny) {
+        abg_mistakes[i] += 1;
+      }
+      if (fabs(isk_sp.gb_alpha[j] - ism_nbk_sp.gb_alpha[aoffs + j]) > stormm::constants::tiny ||
+          fabs(isk_sp.gb_beta[j]  - ism_nbk_sp.gb_beta[aoffs + j])  > stormm::constants::tiny ||
+          fabs(isk_sp.gb_gamma[j] - ism_nbk_sp.gb_gamma[aoffs + j]) > stormm::constants::tiny) {
+        sp_abg_mistakes[i] += 1;
+      }
+    }
+  }
+  check(radius_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Radii entered "
+        "into the synthesis when setting all systems to MBondi3 disagree with the underlying "
+        "topologies.  Precision setting: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".",
+        do_new_tests);
+  check(sp_radius_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Radii entered "
+        "into the synthesis when setting all systems to MBondi3 disagree with the underlying "
+        "topologies.  Precision setting: " + getPrecisionModelName(PrecisionModel::SINGLE) + ".",
+        do_new_tests);
+  check(abg_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Alpha, Beta, and "
+        "Gamma atomic parameters entered into the synthesis when setting all systems to MBondi3 "
+        "disagree with the underlying topologies.  Precision setting: " +
+        getPrecisionModelName(PrecisionModel::DOUBLE) + ".", do_new_tests);
+  check(sp_abg_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Alpha, Beta, and "
+        "Gamma atomic parameters entered into the synthesis when setting all systems to MBondi3 "
+        "disagree with the underlying topologies.  Precision setting: " +
+        getPrecisionModelName(PrecisionModel::SINGLE) + ".", do_new_tests);
 
-  // Apply implicit solvent models to a synthesis
-  
-  
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

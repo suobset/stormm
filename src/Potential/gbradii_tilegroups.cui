@@ -12,7 +12,8 @@
 /// \param gmem_r    Workspaces for each thread block
 __global__ void __launch_bounds__(small_block_size, GBRADII_KERNEL_BLOCKS_MULTIPLIER)
 KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ctrl,
-            PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r, ISWorkspaceKit isw) {
+            PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r,
+            ISWorkspaceKit<TCALC> isw) {
 
   // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.
@@ -23,11 +24,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   __shared__ TCALC sh_pbradii[small_block_max_imports];
   __shared__ TCALC sh_screen[small_block_max_imports];
 #ifdef TCALC_IS_SINGLE
+#  ifdef SPLIT_FORCE_ACCUMULATION
   __shared__ int sh_psi[small_block_max_imports];
+  __shared__ int sh_psi_overflow[small_block_max_imports];
+#  else
+  __shared__ llint sh_psi[small_block_max_imports];
+#  endif
 #else
   __shared__ llint sh_psi[small_block_max_imports];
-#endif
   __shared__ int sh_psi_overflow[small_block_max_imports];
+#endif
   __shared__ int sh_neck_idx[small_block_max_imports];
   __shared__ int nbwu_map[tile_groups_wu_abstract_length];
   __shared__ int gbrwu_idx;
@@ -86,11 +92,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       if (rel_pos < import_count) {
         const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
 #ifdef TCALC_IS_SINGLE
+#  ifdef SPLIT_FORCE_ACCUMULATION
         sh_psi[write_idx] = 0;
+        sh_psi_overflow[write_idx] = 0;
+#  else
+        sh_psi[write_idx] = 0LL;
+#  endif
 #else
         sh_psi[write_idx] = 0LL;
-#endif
         sh_psi_overflow[write_idx] = 0;
+#endif
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
@@ -111,6 +122,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       const int local_ordi_start = ((tinsr.x >> 16) & 0xffff);
       const int absc_import_idx = local_absc_start >> tile_length_bits;
       const int ordi_import_idx = local_ordi_start >> tile_length_bits;
+      const bool on_diagonal = (absc_import_idx == ordi_import_idx);
 
       // Obtain the tile atoms' Cartesian X, Y, and Z centering for best results.
       const TCALC inv_tile_pts = (TCALC)(1.0) /
@@ -148,18 +160,145 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       const TCALC t_zcrd = splitFPToReal(z95_tmp) * poly_psw.inv_gpos_scale;
 #endif
       const TCALC t_radius = sh_pbradii[read_idx - EXCL_GMEM_OFFSET];
+      const TCALC t_inv_radius = (TCALC)(1.0) / t_radius;
       const TCALC t_screen = sh_screen[read_idx - EXCL_GMEM_OFFSET];
+      const int t_neck_idx = sh_neck_idx[read_idx - EXCL_GMEM_OFFSET];
+      TCALC psi_acc = (TCALC)(0.0);
       for (int i = 0; i < half_tile_length; i++) {
-        int crd_src_lane = ((warp_lane_idx <  tile_length) * (warp_lane_idx + tile_length - i)) +
-                           ((warp_lane_idx >= tile_length) *
-                           (warp_lane_idx - three_halves_tile_length + i));
-        crd_src_lane += tile_length *
-                        ((crd_src_lane < tile_length && warp_lane_idx  < tile_length) +
-                         (crd_src_lane <           0 && warp_lane_idx >= tile_length));
-        const TCALC o_xcrd  = SHFL(t_xcrd,  crd_src_lane);
-        const TCALC o_ycrd  = SHFL(t_ycrd,  crd_src_lane);
-        const TCALC o_zcrd  = SHFL(t_zcrd,  crd_src_lane);
+
+        // Calculate the lane with the relevant partner atom
+        int src_lane = ((warp_lane_idx <  tile_length) * (warp_lane_idx + tile_length - i)) +
+                       ((warp_lane_idx >= tile_length) *
+                        (warp_lane_idx - three_halves_tile_length + i));
+        src_lane += tile_length * ((src_lane < tile_length && warp_lane_idx  < tile_length) +
+                                   (src_lane <           0 && warp_lane_idx >= tile_length));
+        const TCALC o_xcrd  = SHFL(t_xcrd, src_lane);
+        const TCALC o_ycrd  = SHFL(t_ycrd, src_lane);
+        const TCALC o_zcrd  = SHFL(t_zcrd, src_lane);
+
+        // Compute the Born radius contribution
+        const TCALC dx = o_xcrd - t_xcrd;
+        const TCALC dy = o_ycrd - t_ycrd;
+        const TCALC dz = o_zcrd - t_zcrd;
+        const TCALC r2 = (dx * dx) + (dy * dy) + (dz * dz);
+        const TCALC r  = SQRT_FUNC(r2);
+        const TCALC invr = (TCALC)(1.0) / r;
+        const TCALC o_radius = SHFL(t_radius, src_lane);
+        const TCALC o_screen = SHFL(t_screen, src_lane);
+        const TCALC o_inv_radius = (TCALC)(1.0) / o_radius;
+        const int o_neck_idx = SHFL(t_neck_idx, src_lane);
+
+        // First computation: atom I -> atom J
+        const TCALC sj = o_screen * o_radius;
+        const TCALC sj2 = sj * sj;
+        TCALC t_psi = (TCALC)(0.0);
+        if (r > (TCALC)(4.0) * sj) {
+          const TCALC invr2 = invr * invr;
+          const TCALC tmpsd = sj2 * invr2;
+          const TCALC dumbo = gb_taylor_a_f +
+                              (tmpsd * (gb_taylor_b_f +
+                                        (tmpsd * (gb_taylor_c_f +
+                                                  (tmpsd * (gb_taylor_d_f +
+                                                            (tmpsd * gb_taylor_dd_f)))))));
+          t_psi -= sj * tmpsd * invr2 * dumbo;
+        }
+        else if (r > t_radius + sj) {
+          t_psi -= (TCALC)(0.5) * ((sj / (r2 - sj2)) +
+                                   ((TCALC)(0.5) * invr * LOG_FUNC((r - sj) / (r + sj))));
+        }
+        else if (r > fabs(t_radius - sj)) {
+          const TCALC theta = (TCALC)(0.5) * t_inv_radius * invr *
+                              (r2 + (t_radius * t_radius) - sj2);
+          const TCALC uij   = (TCALC)(1.0) / (r + sj);
+          t_psi -= (TCALC)(0.25) * ((t_inv_radius * ((TCALC)(2.0) - theta)) -
+                                    uij + (invr * LOG_FUNC(t_radius * uij)));
+        }
+        else if (t_radius < sj) {
+          t_psi -= (TCALC)(0.5) * ((sj / (r2 - sj2)) + ((TCALC)(2.0) * t_inv_radius) +
+                                   ((TCALC)(0.5) * invr * LOG_FUNC((sj - r) / (sj + r))));
+        }
+
+        // Second computation: atom J -> atom I
+        const TCALC si = t_screen * t_radius;
+        const TCALC si2 = si * si;
+        TCALC o_psi = (TCALC)(0.0);
+        if (r > (TCALC)(4.0) * si) {
+          const TCALC invr2  = invr * invr;
+          const TCALC tmpsd  = si2 * invr2;
+          const TCALC dumbo  = gb_taylor_a_f +
+                               (tmpsd * (gb_taylor_b_f +
+                                         (tmpsd * (gb_taylor_c_f +
+                                                   (tmpsd * (gb_taylor_d_f +
+                                                             (tmpsd * gb_taylor_dd_f)))))));
+          o_psi -= si * tmpsd * invr2 * dumbo;
+        }
+        else if (r > o_radius + si) {
+          o_psi -= (TCALC)(0.5) * ((si / (r2 - si2)) +
+                                   ((TCALC)(0.5) * invr * LOG_FUNC((r - si) / (r + si))));
+        }
+        else if (r > fabs(o_radius - si)) {
+          const TCALC theta = (TCALC)(0.5) * o_inv_radius * invr *
+                              (r2 + (o_radius * o_radius) - si2);
+          const TCALC uij   = (TCALC)(1.0) / (r + si);
+          o_psi -= (TCALC)(0.25) * (o_inv_radius * ((TCALC)(2.0) - theta) - uij +
+                                    invr * LOG_FUNC(o_radius * uij));
+        }
+        else if (o_radius < si) {
+          o_psi -= (TCALC)(0.5) * ((si / (r2 - si2)) + ((TCALC)(2.0) * o_inv_radius) +
+                                   ((TCALC)(0.5) * invr * LOG_FUNC((si - r) / (si + r))));
+        }
+
+        // Neck GB contributions
+        if ((poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
+             poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) &&
+            r < t_radius + o_radius + ((TCALC)(2.0) * poly_nbk.gb_offset) + poly_nbk.gb_neckcut) {
+
+          // First computation: atom I -> atom J
+          const int ot_table_idx = (poly_nbk.neck_table_size * o_neck_idx) + t_neck_idx;
+          const TCALC2 ot_neck_parm = poly_nbk.neck_limits[ot_table_idx];
+          TCALC mdist  = r - ot_neck_parm.x;
+          TCALC mdist2 = mdist * mdist;
+          TCALC mdist6 = mdist2 * mdist2 * mdist2;
+          t_psi -= poly_nbk.gb_neckscale * ot_neck_parm.y /
+                   ((TCALC)(1.0) + mdist2 + ((TCALC)(0.3) * mdist6));
+          
+          // Second computation: atom J -> atom I
+          const int to_table_idx = (poly_nbk.neck_table_size * t_neck_idx) + o_neck_idx;
+          const TCALC2 to_neck_parm = poly_nbk.neck_limits[to_table_idx];
+          mdist  = r - to_neck_parm.x;
+          mdist2 = mdist * mdist;
+          mdist6 = mdist2 * mdist2 * mdist2;
+          o_psi -= poly_nbk.gb_neckscale * to_neck_parm.y /
+                   ((TCALC)(1.0) + mdist2 + ((TCALC)(0.3) * mdist6));
+        }
+        
+        // Correct for on-diagonal tiles.
+        if (on_diagonal) {
+          t_psi *= (TCALC)(0.5);
+          o_psi *= (TCALC)(0.5);
+          if (i == 0 && warp_lane_idx < tile_length) {
+            t_psi = (TCALC)(0.0);
+            o_psi = (TCALC)(0.0);
+          }
+        }
+
+        // Calculate the lane that read from this one and read its Psi contribution
+        int ret_lane = ((warp_lane_idx <  tile_length) *
+                        (warp_lane_idx + three_halves_tile_length - i)) +
+                       ((warp_lane_idx >= tile_length) * (warp_lane_idx - tile_length + i));
+        ret_lane += tile_length * ((ret_lane >= tile_length   && warp_lane_idx >= tile_length) -
+                                   (ret_lane >= warp_size_int && warp_lane_idx <  tile_length));
+        psi_acc += t_psi + SHFL(o_psi, ret_lane);
       }
+
+      // Add the Psi accumulators back to the local array
+      int write_idx = ((warp_lane_idx <  tile_length) * local_absc_start) +
+                      ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
+#ifdef SPLIT_FORCE_ACCUMULATION
+      atomicSplit(psi_acc * isw.fp_scale, write_idx, sh_psi, sh_psi_overflow);
+#else
+      atomicAdd((ullint*)&sh_psi[write_idx], LLCONV_FUNC(psi_acc * isw.fp_scale));
+#endif
     }
 
     // Increment the work unit counter

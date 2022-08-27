@@ -9,13 +9,6 @@ using card::HybridKind;
 using math::roundUp;
 
 //-------------------------------------------------------------------------------------------------
-ISWorkspaceKit::ISWorkspaceKit(const int fp_bits_in, llint* psi_in, int* psi_overflow_in,
-                               llint* sum_deijda_in, int* sum_deijda_overflow_in) :
-    fp_bits{fp_bits_in}, psi{psi_in}, psi_overflow{psi_overflow_in}, sum_deijda{sum_deijda_in},
-    sum_deijda_overflow{sum_deijda_overflow_in}
-{}
-
-//-------------------------------------------------------------------------------------------------
 ImplicitSolventWorkspace::ImplicitSolventWorkspace(const Hybrid<int> &atom_starts,
                                                    const Hybrid<int> &atom_counts,
                                                    const int bit_count) :
@@ -47,9 +40,15 @@ int ImplicitSolventWorkspace::getFixedPrecisionBits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-ISWorkspaceKit ImplicitSolventWorkspace::data(const HybridTargetLevel tier) {
-  return ISWorkspaceKit(fp_bits, psi.data(tier), psi_overflow.data(tier), sum_deijda.data(tier),
-                        sum_deijda_overflow.data(tier));
+ISWorkspaceKit<double> ImplicitSolventWorkspace::dpData(const HybridTargetLevel tier) {
+  return ISWorkspaceKit<double>(fp_bits, psi.data(tier), psi_overflow.data(tier),
+                                sum_deijda.data(tier), sum_deijda_overflow.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+ISWorkspaceKit<float> ImplicitSolventWorkspace::spData(const HybridTargetLevel tier) {
+  return ISWorkspaceKit<float>(fp_bits, psi.data(tier), psi_overflow.data(tier),
+                               sum_deijda.data(tier), sum_deijda_overflow.data(tier));
 }
 
 #ifdef STORMM_USE_HPC

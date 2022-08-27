@@ -3,6 +3,7 @@
 #include <climits>
 #include "copyright.h"
 #include "Constants/generalized_born.h"
+#include "FileManagement/file_listing.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
@@ -12,6 +13,7 @@
 namespace stormm {
 namespace topology {
 
+using diskutil::getBaseName;
 using parse::CaseSensitivity;
 using parse::char4ToString;
 using parse::realToString;
@@ -670,20 +672,33 @@ void AtomGraph::setImplicitSolventModel(const ImplicitSolventModel igb_in,
       bad_radii_found = (bad_radii_found || radii_ptr [i] < 1.0 || radii_ptr[i] > 2.0);
     }
     if (bad_radii_found) {
+      std::string correction;
+      if (gb_style == ImplicitSolventModel::NECK_GB) {
+        correction = "Radii will be replaced by BONDI parameters.";
+      }
+      else if (gb_style == ImplicitSolventModel::NECK_GB_II) {
+        correction = "Radii will be replaced by Modified BONDI-3 parameters.";
+      }
       switch (policy) {
       case ExceptionResponse::DIE:
         rtErr("The \"neck\" GB models are incompatible with atomic radii smaller than 1.0 "
-              "Anstroms or larger than 2.0 Angstroms, which were found in the topology.",
-              "AtomGraph", "setImplicitSolventModel");
+              "Anstroms or larger than 2.0 Angstroms, which were found in topology " +
+              getBaseName(source) + ".  " + correction, "AtomGraph", "setImplicitSolventModel");
       case ExceptionResponse::WARN:
         rtWarn("The \"neck\" GB models are incompatible with atomic radii smaller than 1.0 "
-               "Anstroms or larger than 2.0 Angstroms, which were found in the topology.",
-               "AtomGraph", "setImplicitSolventModel");
+               "Anstroms or larger than 2.0 Angstroms, which were found in topology " +
+               getBaseName(source) + ".  " + correction, "AtomGraph", "setImplicitSolventModel");
         break;
       case ExceptionResponse::SILENT:
         break;
       }
-      setImplicitSolventModel(igb_in, dielectric_in, saltcon_in, AtomicRadiusSet::BONDI, policy);
+      if (gb_style == ImplicitSolventModel::NECK_GB) {
+        setImplicitSolventModel(igb_in, dielectric_in, saltcon_in, AtomicRadiusSet::BONDI, policy);
+      }
+      else if (gb_style == ImplicitSolventModel::NECK_GB_II) {
+        setImplicitSolventModel(igb_in, dielectric_in, saltcon_in, AtomicRadiusSet::MBONDI3,
+                                policy);        
+      }
       return;
     }
   }

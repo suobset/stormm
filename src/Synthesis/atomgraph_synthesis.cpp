@@ -3720,6 +3720,7 @@ void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_
       top_coverage[top_idx] = true;
       iag_ptr->setImplicitSolventModel(igb_in, dielectric_in, saltcon_in, radii_sets_in[i],
                                        policy);
+      top_rad_settings[top_idx] = radii_sets_in[i];
     }
     const ImplicitSolventKit<double> isk = iag_ptr->getDoublePrecisionImplicitSolventKit();
     const int jmin = atom_offsets.readHost(i);
@@ -3730,6 +3731,11 @@ void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_
     double* gb_alpha_ptr = gb_alpha_parameters.data();
     double* gb_beta_ptr = gb_beta_parameters.data();
     double* gb_gamma_ptr = gb_gamma_parameters.data();
+    float* sp_atomic_pb_radii_ptr = sp_atomic_pb_radii.data();
+    float* sp_gb_screen_ptr = sp_gb_screening_factors.data();
+    float* sp_gb_alpha_ptr = sp_gb_alpha_parameters.data();
+    float* sp_gb_beta_ptr = sp_gb_beta_parameters.data();
+    float* sp_gb_gamma_ptr = sp_gb_gamma_parameters.data();
     for (int j = jmin; j < jmax; j++) {
       neck_gb_indices_ptr[j] = isk.neck_gb_idx[j - jmin];
       atomic_pb_radii_ptr[j] = isk.pb_radii[j - jmin];
@@ -3737,6 +3743,11 @@ void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_
       gb_alpha_ptr[j] = isk.gb_alpha[j - jmin];
       gb_beta_ptr[j] = isk.gb_beta[j - jmin];
       gb_gamma_ptr[j] = isk.gb_gamma[j - jmin];
+      sp_atomic_pb_radii_ptr[j] = isk.pb_radii[j - jmin];
+      sp_gb_screen_ptr[j] = isk.gb_screen[j - jmin];
+      sp_gb_alpha_ptr[j] = isk.gb_alpha[j - jmin];
+      sp_gb_beta_ptr[j] = isk.gb_beta[j - jmin];
+      sp_gb_gamma_ptr[j] = isk.gb_gamma[j - jmin];
     }
   }
 
@@ -3752,10 +3763,14 @@ void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_
     {
       neck_table_size = ngbk.table_size;
       neck_limit_tables.resize(neck_table_size * neck_table_size);
+      sp_neck_limit_tables.resize(neck_table_size * neck_table_size);
       double2* neck_limit_ptr = neck_limit_tables.data();
+      float2* sp_neck_limit_ptr = sp_neck_limit_tables.data();
       for (int i = 0; i < neck_table_size * neck_table_size; i++) {
-         neck_limit_ptr[i].x = ngbk.max_separation[i];
-         neck_limit_ptr[i].y = ngbk.max_value[i];
+        neck_limit_ptr[i].x = ngbk.max_separation[i];
+        neck_limit_ptr[i].y = ngbk.max_value[i];
+        sp_neck_limit_ptr[i].x = ngbk.max_separation[i];
+        sp_neck_limit_ptr[i].y = ngbk.max_value[i];
       }
     }
     break;
