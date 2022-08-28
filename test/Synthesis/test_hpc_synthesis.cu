@@ -539,40 +539,49 @@ int main(const int argc, const char* argv[]) {
   const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs_iso.top";
   const std::string lig1_top_name = topology_base + osc + "stereo_L1_vs.top";
   const std::string lig2_top_name = topology_base + osc + "symmetry_L1_vs.top";
-  const std::string lig3_top_name = topology_base + osc + "drug_example_iso_vs.top";
+  const std::string lig3_top_name = topology_base + osc + "drug_example_vs_iso.top";
+  const std::string lig4_top_name = topology_base + osc + "drug_example_iso.top";
   const std::string brbz_crd_name = coordinate_base + osc + "bromobenzene_vs_iso.inpcrd";
   const std::string lig1_crd_name = coordinate_base + osc + "stereo_L1_vs.inpcrd";
   const std::string lig2_crd_name = coordinate_base + osc + "symmetry_L1_vs.inpcrd";
-  const std::string lig3_crd_name = coordinate_base + osc + "drug_example_iso_vs.inpcrd";
+  const std::string lig3_crd_name = coordinate_base + osc + "drug_example_vs_iso.inpcrd";
+  const std::string lig4_crd_name = coordinate_base + osc + "drug_example_iso.inpcrd";
   const bool ligands_exist = (getDrivePathType(brbz_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig1_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig2_top_name) == DrivePathType::FILE &&
                               getDrivePathType(lig3_top_name) == DrivePathType::FILE &&
+                              getDrivePathType(lig4_top_name) == DrivePathType::FILE &&
                               getDrivePathType(brbz_crd_name) == DrivePathType::FILE &&
                               getDrivePathType(lig1_crd_name) == DrivePathType::FILE &&
                               getDrivePathType(lig2_crd_name) == DrivePathType::FILE &&
-                              getDrivePathType(lig3_crd_name) == DrivePathType::FILE);
-  AtomGraph brbz_ag, lig1_ag, lig2_ag, lig3_ag;
-  PhaseSpace brbz_ps, lig1_ps, lig2_ps, lig3_ps;
+                              getDrivePathType(lig3_crd_name) == DrivePathType::FILE &&
+                              getDrivePathType(lig4_crd_name) == DrivePathType::FILE);
+  AtomGraph brbz_ag, lig1_ag, lig2_ag, lig3_ag, lig4_ag;
+  PhaseSpace brbz_ps, lig1_ps, lig2_ps, lig3_ps, lig4_ps;
   if (ligands_exist) {
     brbz_ag.buildFromPrmtop(brbz_top_name);
     lig1_ag.buildFromPrmtop(lig1_top_name);
     lig2_ag.buildFromPrmtop(lig2_top_name);
     lig3_ag.buildFromPrmtop(lig3_top_name);
+    lig4_ag.buildFromPrmtop(lig4_top_name);
     brbz_ps.buildFromFile(brbz_crd_name);
     lig1_ps.buildFromFile(lig1_crd_name);
     lig2_ps.buildFromFile(lig2_crd_name);
     lig3_ps.buildFromFile(lig3_crd_name);
+    lig4_ps.buildFromFile(lig4_crd_name);
   }
   RestraintApparatus brbz_ra = assembleRestraints(&brbz_ag, brbz_ps);
   RestraintApparatus lig1_ra = assembleRestraints(&lig1_ag, lig1_ps);
   RestraintApparatus lig2_ra = assembleRestraints(&lig2_ag, lig2_ps);
   RestraintApparatus lig3_ra = assembleRestraints(&lig3_ag, lig3_ps);
-  const std::vector<AtomGraph*> ligand_ag_list = { &brbz_ag, &lig1_ag, &lig2_ag, &lig3_ag };
-  const std::vector<PhaseSpace> ligand_ps_list = {  brbz_ps,  lig1_ps,  lig2_ps,  lig3_ps };
+  RestraintApparatus lig4_ra = assembleRestraints(&lig4_ag, lig3_ps);
+  const std::vector<AtomGraph*> ligand_ag_list = { &brbz_ag, &lig1_ag, &lig2_ag, &lig3_ag,
+                                                   &lig4_ag };
+  const std::vector<PhaseSpace> ligand_ps_list = {  brbz_ps,  lig1_ps,  lig2_ps,  lig3_ps,
+                                                    lig4_ps };
   const std::vector<RestraintApparatus*> ligand_ra_list = { &brbz_ra, &lig1_ra, &lig2_ra,
-                                                            &lig3_ra };
-  const std::vector<int> ligand_minitile = { 0, 1, 2, 3, 0, 0, 1, 1, 3, 2, 2, 3, 2, 1, 0, 2 };
+                                                            &lig3_ra, &lig4_ra };
+  const std::vector<int> ligand_minitile = { 0, 1, 2, 3, 4, 0, 1, 4, 3, 2, 2, 3, 2, 1, 0, 4 };
   const int lm_size = ligand_minitile.size();
   const int n_ligand_tile_reps = 7;
   const int nligands = n_ligand_tile_reps * lm_size;

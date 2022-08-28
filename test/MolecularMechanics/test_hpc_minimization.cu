@@ -24,6 +24,8 @@
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Structure/virtual_site_handling.h"
+#include "../../src/Structure/hpc_virtual_site_handling.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
@@ -46,6 +48,7 @@ using namespace stormm::math;
 using namespace stormm::mm;
 using namespace stormm::parse;
 using namespace stormm::random;
+using namespace stormm::structure;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -403,6 +406,10 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                                                         EvaluateEnergy::YES,
                                                         AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
+  const int2 vste_mv_lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);
+  const int2 vste_xm_lp = launcher.getVirtualSiteKernelDims(prec,
+                                                            VirtualSiteActivity::TRANSMIT_FORCES);
+
   const int2 nonb_lp = launcher.getNonbondedKernelDims(prec,
                                                        NbwuKind::TILE_GROUPS,
                                                        EvaluateForce::YES, EvaluateEnergy::YES,
@@ -422,10 +429,15 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                                   poly_ag);
   mmctrl_xe.primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec, poly_ag);
   
-  // Obtain the appropriate abstracts
+  // Obtain the appropriate abstracts.  Both precision modes are covered, even though in this test
+  // only one is used.
   const HybridTargetLevel devc = HybridTargetLevel::DEVICE;
   const SyValenceKit<double> d_poly_vk = poly_ag.getDoublePrecisionValenceKit(devc);
   const SyValenceKit<float>  f_poly_vk = poly_ag.getSinglePrecisionValenceKit(devc);
+  const SyAtomUpdateKit<double2,
+                        double4> d_poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit(devc);
+  const SyAtomUpdateKit<float2,
+                        float4> f_poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit(devc);
   const SyNonbondedKit<double, double2> d_poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc);
   const SyNonbondedKit<float, float2>  f_poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc);
   const SeMaskSynthesisReader poly_ser = poly_se.data(devc);
@@ -434,6 +446,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   const SyRestraintKit<float,
                        float2, float4> f_poly_rk = poly_ag.getSinglePrecisionRestraintKit(devc);
   const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
+  const bool virtual_sites_present = (poly_ag.getVirtualSiteCount() > 0);
   MMControlKit<double> d_ctrl_fe = mmctrl_fe.dpData(devc);
   MMControlKit<double> d_ctrl_xe = mmctrl_xe.dpData(devc);
   MMControlKit<float>  f_ctrl_fe = mmctrl_fe.spData(devc);
@@ -471,19 +484,31 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_fe, &poly_psw, &scw, &d_nonb_tbk,
                       EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_fe, &poly_psw, &scw, &d_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_fe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw, &f_nonb_tbk,
                       EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_fe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_fe.step += 1;
       break;
     }
@@ -501,9 +526,10 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
         chkj_ps.initializeForces();
         ScoreCard tmp_sc(1, 1, 32);
-        StaticExclusionMask chkj_se(poly_ag.getSystemTopologyPointer(jmod));
-        evalNonbValeMM(&chkj_ps, &tmp_sc, poly_ag.getSystemTopologyPointer(jmod), chkj_se,
-                       EvaluateForce::YES, 0);
+        const AtomGraph *jag_ptr = poly_ag.getSystemTopologyPointer(jmod);
+        StaticExclusionMask chkj_se(jag_ptr);
+        evalNonbValeMM(&chkj_ps, &tmp_sc, jag_ptr, chkj_se, EvaluateForce::YES, 0);
+        transmitVirtualSiteForces(&chkj_ps, jag_ptr);
         const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
         cpu_total_e[i / 32] = tmp_sc.reportTotalEnergy(0);
         gpu_total_e[i / 32] = sc.reportTotalEnergy(jmod, devc);
@@ -557,19 +583,31 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
                       EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_xe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
                       EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_xe.step += 1;
       break;
     }
@@ -591,19 +629,31 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
                       EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_xe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
                       EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_xe.step += 1;
       break;
     }
@@ -625,19 +675,31 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
                       EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_xe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
                       EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_xe.step += 1;
       break;
     }
@@ -656,7 +718,19 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Fit a cubic polynomial to guess the best overall advancement, and place the system there.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 3, redu_lp);
-
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
+      break;
+    }
+    
     // Download and check the particle advancement.
     if (enforce_same_track) {
       poly_ps.download();
@@ -924,12 +998,26 @@ int main(const int argc, const char* argv[]) {
   const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
+  const std::string l1vs_top_name = base_top_name + osc + "stereo_L1_vs.top";
+  const std::string l1vs_crd_name = base_crd_name + osc + "stereo_L1_vs.inpcrd";
+  const std::string l2vs_top_name = base_top_name + osc + "symmetry_L1_vs.top";
+  const std::string l2vs_crd_name = base_crd_name + osc + "symmetry_L1_vs.inpcrd";
+  const std::string l3vs_top_name = base_top_name + osc + "bromobenzene_vs_iso.top";
+  const std::string l3vs_crd_name = base_crd_name + osc + "bromobenzene_vs_iso.inpcrd";
+  const std::string l4vs_top_name = base_top_name + osc + "drug_example_vs_iso.top";
+  const std::string l4vs_crd_name = base_crd_name + osc + "drug_example_vs_iso.inpcrd";
   const std::vector<std::string> lig_top = { alad_top_name, brbz_top_name, lig1_top_name,
                                              lig2_top_name };
   const std::vector<std::string> lig_crd = { alad_crd_name, brbz_crd_name, lig1_crd_name,
                                              lig2_crd_name };
   const std::vector<std::string> pro_top = { trpi_top_name, dhfr_top_name };
   const std::vector<std::string> pro_crd = { trpi_crd_name, dhfr_crd_name };
+  const std::vector<std::string> tvs_top = { l1vs_top_name, l2vs_top_name, trpi_top_name,
+                                             l4vs_top_name, brbz_top_name, l3vs_top_name,
+                                             lig1_top_name, lig2_top_name };
+  const std::vector<std::string> tvs_crd = { l1vs_crd_name, l2vs_crd_name, trpi_crd_name,
+                                             l4vs_crd_name, brbz_crd_name, l3vs_crd_name,
+                                             lig1_crd_name, lig2_crd_name };  
   const std::string snap_name = oe.getStormmSourcePath() + osc + "test" + osc +
                                 "MolecularMechanics" + osc + "min_energy.m";
   
@@ -949,7 +1037,12 @@ int main(const int argc, const char* argv[]) {
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
-  
+
+  // Run tests on systems with virtual sites
+  testCompilation(tvs_top, tvs_crd, { 0, 1, 2, 3, 4, 5, 6, 7, 4, 2, 3, 7, 5, 0, 6, 1 }, 4, 1.0e-5,
+                  6.0e-3, oe, gpu, "Molecules including some virtual sites",
+                  PrintSituation::APPEND, snap_name, "vste_", &timer);  
+
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

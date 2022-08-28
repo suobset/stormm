@@ -300,9 +300,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       atomicAdd((ullint*)&sh_psi[write_idx], LLCONV_FUNC(psi_acc * isw.fp_scale));
 #endif
     }
-
-    // Increment the work unit counter
     __syncthreads();
+
+    // Write the Psi values back to their global accumulators
+    pos = threadIdx.x;
+
+    // Increment the work unit counter.  No additional __syncthreads() is needed as the imported
+    // atom list that the various threads are working with will not change until passing through
+    // another synchronization below. 
     if (threadIdx.x == 0) {
       const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
       gbrwu_idx = atomicAdd(&ctrl.gbrwu_progress[prog_counter_idx], 1);

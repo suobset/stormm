@@ -342,11 +342,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       if (pos < import_count_ii) {
         const size_t write_idx = nbwu_map[pos + 1] + tile_lane_idx;
         const int read_idx = (pos * tile_length) + tile_lane_idx;
-        const int key_idx  = pos / 4;
-        const int key_slot = pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, pos)) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
 #    ifdef TCALC_IS_SINGLE
           // Single-precision force accumulation can be split within this kernel, but the global
@@ -362,7 +358,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           ixfrc += (llint)(sh_xfrc[read_idx]);
           atomicAdd((ullint*)&poly_psw.xfrc[write_idx], (ullint)(ixfrc));
 #    else
-          // Double-precision split force accumulation is intendede to extend the fixed-precision
+          // Double-precision split force accumulation is intended to extend the fixed-precision
           // format and cannot be combined back into a single integral number, ever.  Combine
           // the results into an int95_t (see Constants/stormm_vector_types.h) and contribute that
           // to the paired global accumulator arrays.
@@ -381,11 +377,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       if (rel_pos < import_count_ii) {
         const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
-        const int key_idx  = rel_pos / 4;
-        const int key_slot = rel_pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
 #    ifdef TCALC_IS_SINGLE
           // See Cartesian X force handling on why single- and double-precision modes differ here.
@@ -409,11 +401,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       if (rel_pos < import_count_ii) {
         const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
-        const int key_idx  = rel_pos / 4;
-        const int key_slot = rel_pos - (key_idx * 4);
-        const int tside_count = ((nbwu_map[small_block_max_imports + 1 + key_idx] >>
-                                  (8 * key_slot)) & 0xff);
-        if (tile_lane_idx < tside_count) {
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
 #    ifdef TCALC_IS_SINGLE
           // See Cartesian X force handling on why single- and double-precision modes differ here.

@@ -36,6 +36,15 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
     }
     __syncthreads();
 
+    // Skip if this work unit involves no virtual sites.
+    if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] == 0) {
+      if (threadIdx.x == 0) {
+        vwu_idx += gridDim.x;
+      }
+      __syncthreads();
+      continue;
+    }
+
     // Import atomic coordinates, properties, and (if appropriate) velocities.  This employs all
     // threads of the block, breaking up each set of information at the warp level.
     const int import_llim = vwu_map[(size_t)(VwuAbstractMap::IMPORT)].x;

@@ -31,7 +31,7 @@ using synthesis::SyValenceKit;
 ///                 transmit forces from the virtual sites to their frame atoms
 cudaFuncAttributes queryVirtualSiteKernelRequirements(PrecisionModel prec,
                                                       VirtualSiteActivity purpose);
-  
+
 /// \brief Place virtual sites based on new atom positions within the current coordinate set.
 ///
 /// Overloaded:
@@ -57,6 +57,22 @@ void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<fl
                                 const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt);
 /// \}
 
+/// \brief Transmit forces acting on virtual sites to frame atoms with mass.  This process is
+///        needed before any particle position update and must be undertaken as a standalone
+///        activity in situations like conjugate gradient energy minimization when forces might be
+///        modified to determine a particle movement vector.  Descriptions of parameters for this
+///        kernel follow from launchVirtualSitePlacement() above.
+///
+/// \{
+void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
+                               const SyValenceKit<double> &poly_vk,
+                               const SyAtomUpdateKit<double2, double4> &poly_auk, const int2 bt);
+
+void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
+                               const SyValenceKit<float> &poly_vk,
+                               const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt);
+/// \}
+  
 /// \brief Launch a standalone kernel to place virtual sites or to transmit forces from virtual
 ///        sites to their frame atoms.
 ///

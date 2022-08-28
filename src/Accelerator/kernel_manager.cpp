@@ -244,6 +244,10 @@ KernelManager::KernelManager(const GpuDetails &gpu_in, const AtomGraphSynthesis 
                            "kdPlaceVirtualSites");
   catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::PLACEMENT, vsite_div,
                            "kfPlaceVirtualSites");
+  catalogVirtualSiteKernel(PrecisionModel::DOUBLE, VirtualSiteActivity::TRANSMIT_FORCES, vsite_div,
+                           "kdTransmitVSiteForces");
+  catalogVirtualSiteKernel(PrecisionModel::SINGLE, VirtualSiteActivity::TRANSMIT_FORCES, vsite_div,
+                           "kfTransmitVSiteForces");
 #endif
 }
 

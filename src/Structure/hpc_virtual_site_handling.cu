@@ -145,6 +145,11 @@ void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<flo
 void launchVirtualSiteHandling(const PrecisionModel prec, const VirtualSiteActivity purpose,
                                PhaseSpaceSynthesis *poly_ps, CacheResource *tb_space,
                                const AtomGraphSynthesis &poly_ag, const KernelManager &launcher) {
+
+  // Bail out if there are no virtual sites in the synthesis
+  if (poly_ag.getVirtualSiteCount() == 0) {
+    return;
+  }
   const HybridTargetLevel devc_tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(devc_tier);
   const int2 lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);

@@ -11,6 +11,8 @@
 #include "Potential/energy_enumerators.h"
 #include "Potential/hpc_nonbonded_potential.h"
 #include "Potential/hpc_valence_potential.h"
+#include "Structure/hpc_virtual_site_handling.h"
+#include "Structure/structure_enumerators.h"
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
@@ -34,10 +36,14 @@ using math::rdwu_abstract_length;
 using numerics::chooseAccumulationMethod;
 using numerics::max_int_accumulation_f;
 using numerics::max_llint_accumulation;
+using structure::launchVirtualSitePlacement;
+using structure::launchTransmitVSiteForces;
+using structure::VirtualSiteActivity;
 using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::NbwuKind;
 using synthesis::SeMaskSynthesisReader;
 using synthesis::small_block_max_atoms;
+using synthesis::SyAtomUpdateKit;
 using synthesis::SyNonbondedKit;
 using synthesis::SyRestraintKit;
 using synthesis::SyValenceKit;
@@ -163,6 +169,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                                         EvaluateEnergy::YES,
                                                         AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
+  const int2 vste_mv_lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);
+  const int2 vste_xm_lp = launcher.getVirtualSiteKernelDims(prec,
+                                                            VirtualSiteActivity::TRANSMIT_FORCES);
   const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
   const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
                                                        EvaluateEnergy::YES,
@@ -173,6 +182,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   LinMinWriter lmw = line_record->data(devc_tier);
   const ReductionKit redk(poly_ag, devc_tier);
   ConjGradSubstrate cgsbs(poly_psw, rbg, devc_tier);
+
+  // Test whether there are virtual sites in the synthesis
+  const bool virtual_sites_present = (poly_ag.getVirtualSiteCount() > 0);
   
   // Progress through minimization cycles will not be measured with the step counter in the
   // molecular mechanics control object--that will increment at four times the rate in the case
@@ -192,6 +204,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   case PrecisionModel::DOUBLE:
     {
       const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
+      const SyAtomUpdateKit<double2,
+                            double4> poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit(devc_tier);
       const SyNonbondedKit<double,
                            double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<double, double2, double4> poly_rk =
@@ -201,6 +215,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       CacheResourceKit<double> nonb_tbr = nonb_cache->dpData(devc_tier);
       MMControlKit<double> ctrl_fe = mmctrl_fe->dpData(devc_tier);
       MMControlKit<double> ctrl_xe = mmctrl_xe->dpData(devc_tier);
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+      }
       for (int i = 0; i < total_steps; i++) {
         
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
@@ -211,6 +228,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                         EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_fe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         if (i % ntpr == 0) {
 
           // It is not necessary to re-initialize the ScoreCard abstract immediately, as the
@@ -224,33 +244,54 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
         // Second stage of the cycle: advance once along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         ctrl_xe.step += 1;
 
         // Third stage of the cycle: advance once more along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         ctrl_xe.step += 1;
 
         // Final stage of the cycle: advance a final time along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         ctrl_xe.step += 1;
 
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 3, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
       }
 
       // One additional energy calculation to get the final energy
@@ -266,6 +307,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   case PrecisionModel::SINGLE:
     {
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
+      const SyAtomUpdateKit<float2,
+                            float4> poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit(devc_tier);
       const SyNonbondedKit<float,
                            float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<float, float2, float4> poly_rk =
@@ -275,6 +318,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       CacheResourceKit<float> nonb_tbr = nonb_cache->spData(devc_tier);
       MMControlKit<float> ctrl_fe = mmctrl_fe->spData(devc_tier);
       MMControlKit<float> ctrl_xe = mmctrl_xe->spData(devc_tier);
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+      }
       for (int i = 0; i < total_steps; i++) {
 
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
@@ -286,6 +332,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                       vale_fe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         if (i % ntpr == 0) {
 
           // It is not necessary to re-initialize the ScoreCard abstract immediately, as the
@@ -299,33 +348,54 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
         // Second stage of the cycle: advance once along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 0, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         ctrl_xe.step += 1;
 
         // Third stage of the cycle: advance once more along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 1, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         ctrl_xe.step += 1;
 
         // Final stage of the cycle: advance a final time along the line and recompute the energy.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 2, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
+        if (virtual_sites_present) {
+          launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
+        }
         ctrl_xe.step += 1;
 
         // Fit a cubic polynomial to guess the best overall advancement.  Place the system there.
         launchLineAdvance(prec, &poly_psw, redk, scw, &lmw, 3, redu_lp);
+        if (virtual_sites_present) {
+          launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
+        }
       }
 
       // One additional energy calculation to get the final energy
