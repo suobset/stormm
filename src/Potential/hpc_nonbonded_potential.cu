@@ -74,12 +74,13 @@ __device__ __forceinline__ int getTileSideAtomCount(const int* nbwu_map, const i
 //   gpos_scale:       Scaling factor for coordinates in the fixed-precision representation (this
 //                     is needed only to place dummy atom coordinates for blank slots of a tile)
 //-------------------------------------------------------------------------------------------------
-__device__ int loadTileCoordinates(const int pos, const int import_count, const int iter,
-                                   const int* nbwu_map, const llint* read_crd, llint* write_crd,
-                                   float* sh_tile_cog, const float gpos_scale) {
+__device__ int loadTileCoordinates(const int pos, const int iter, const int* nbwu_map,
+                                   const llint* read_crd, llint* write_crd, float* sh_tile_cog,
+                                   const float gpos_scale) {
   const int tile_sides_per_warp = (warp_size_int / tile_length);
   const int warps_per_block = blockDim.x >> warp_bits;
   const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
   const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
@@ -111,13 +112,14 @@ __device__ int loadTileCoordinates(const int pos, const int import_count, const 
   return rel_pos + (iter * padded_import_count);
 }
 
-__device__ int loadTileCoordinates(const int pos, const int import_count, const int iter,
-                                   const int* nbwu_map, const llint* read_crd, llint* write_crd,
+__device__ int loadTileCoordinates(const int pos, const int iter, const int* nbwu_map,
+                                   const llint* read_crd, llint* write_crd,
                                    const int* read_crd_ovrf, int* write_crd_ovrf,
                                    double* sh_tile_cog, const double gpos_scale) {
   const int tile_sides_per_warp = (warp_size_int / tile_length);
   const int warps_per_block = blockDim.x >> warp_bits;
   const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
   const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
@@ -163,20 +165,23 @@ __device__ int loadTileCoordinates(const int pos, const int import_count, const 
 //   - Fold in a scalar multiple
 //   - Fold in a scalar addition
 //
-// Parameter descriptors follow from loadTileCoordinates() above.
+// Parameter descriptors follow from loadTileCoordinates() above, with alterations:
+//   read_array:   Generic array of (global) information to read from
+//   write_array:  Generic (local) array of information to write 
 //-------------------------------------------------------------------------------------------------
 template <typename T> __device__
-int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
-                     const T* read_array, T* write_array) {
+int loadTileProperty(const int pos, const int iter, const int* nbwu_map, const T* read_array,
+                     T* write_array) {
   const int tile_sides_per_warp = (warp_size_int / tile_length);
   const int warps_per_block = blockDim.x >> warp_bits;
   const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
   const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);  
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     if (rel_pos < import_count) {
-      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
       if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
         write_array[write_idx] = __ldcs(&read_array[read_idx]);
       }
@@ -190,17 +195,18 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 }
 
 template <typename T> __device__
-int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
-                     const T* read_array, T* write_array, T multiplier) {
+int loadTileProperty(const int pos, const int iter, const int* nbwu_map, const T* read_array,
+                     T* write_array, T multiplier) {
   const int tile_sides_per_warp = (warp_size_int / tile_length);
   const int warps_per_block = blockDim.x >> warp_bits;
   const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
   const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);  
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     if (rel_pos < import_count) {
-      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
       if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
         write_array[write_idx] = __ldcs(&read_array[read_idx]) * multiplier;
       }
@@ -214,22 +220,110 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 }
 
 template <typename T> __device__
-int loadTileProperty(const int pos, const int import_count, const int iter, const int* nbwu_map,
-                     const T* read_array, T increment, T* write_array) {
+int loadTileProperty(const int pos, const int iter, const int* nbwu_map, const T* read_array,
+                     T increment, T* write_array) {
   const int tile_sides_per_warp = (warp_size_int / tile_length);
   const int warps_per_block = blockDim.x >> warp_bits;
   const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
   const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);  
   int rel_pos = pos - (iter * padded_import_count);
   while (rel_pos < padded_import_count) {
     if (rel_pos < import_count) {
-      const int read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-      const int write_idx = (rel_pos * tile_length) + tile_lane_idx;
+      const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
       if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
         write_array[write_idx] = __ldcs(&read_array[read_idx]) + increment;
       }
       else {
         write_array[write_idx] = (T)(0);
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Write information about the atoms in tile groups back to global accumulators.  Relevant for
+// systems with all-to-all interactions in isolated boundary conditions.
+//
+// Overloaded:
+//   - Accept various combinations of single- or double-integer local accumulators to contribute
+//     to the implied single- or double-integer global accumulators
+//
+// Arguments:
+//   pos:                   Position in the tile list (not the atom list)
+//   iter:                  Number of passes made by this or related routines (incrementation of
+//                          iter is essential to maintain the correct procession through all loads)
+//   nbwu_map:              Non-bonded work unit details
+//   tile_prop:             Primary local accumulator for the tile-based computed property
+//   tile_prop_ovrf:        Local overflow accumulator for the tile-based computed property
+//   gbl_accumulator:       Primary (or, perhaps lone) global accumulator for the computed property
+//   gbl_accumulator_ovrf:  Overflow global accumulator for the computed property
+//-------------------------------------------------------------------------------------------------
+__device__ int accumulateTileProperty(const int pos, const int iter, const int* nbwu_map,
+                                      const int* tile_prop, const int* tile_prop_ovrf,
+                                      llint* gbl_accumulator) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
+  int rel_pos = pos - (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t read_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        llint itp = tile_prop_ovrf[read_idx];
+        itp *= max_int_accumulation_ll;
+        itp += tile_prop[read_idx];
+        atomicAdd((ullint*)&gbl_accumulator[write_idx], (ullint)(itp));
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+__device__ int accumulateTileProperty(const int pos, const int iter, const int* nbwu_map,
+                                      const llint* tile_prop, llint* gbl_accumulator) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
+  int rel_pos = pos - (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t read_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        atomicAdd((ullint*)&gbl_accumulator[write_idx], (ullint)(tile_prop[read_idx]));
+      }
+    }
+    rel_pos += tile_sides_per_warp * warps_per_block;
+  }
+  return rel_pos + (iter * padded_import_count);
+}
+
+__device__ int accumulateTileProperty(const int pos, const int iter, const int* nbwu_map,
+                                      const llint* tile_prop, const int* tile_prop_ovrf,
+                                      llint* gbl_accumulator, int* gbl_accumulator_ovrf) {
+  const int tile_sides_per_warp = (warp_size_int / tile_length);
+  const int warps_per_block = blockDim.x >> warp_bits;
+  const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
+  const int import_count = nbwu_map[0];
+  const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
+  int rel_pos = pos - (iter * padded_import_count);
+  while (rel_pos < padded_import_count) {
+    if (rel_pos < import_count) {
+      const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+      const size_t read_idx = (rel_pos * tile_length) + tile_lane_idx;
+      if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+        atomicSplit(tile_prop[read_idx], tile_prop_ovrf[read_idx], write_idx, gbl_accumulator,
+                    gbl_accumulator_ovrf);
       }
     }
     rel_pos += tile_sides_per_warp * warps_per_block;
@@ -251,6 +345,8 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  define LLCONV_FUNC __float2ll_rn
 #  define SQRT_FUNC sqrtf
 #  define LOG_FUNC  logf
+#  define EXP_FUNC  expf
+#  define TANH_FUNC tanhf
 #  define SPLIT_FORCE_ACCUMULATION
 #    define KERNEL_NAME ktgfsCalculateGBRadii
 #      include "gbradii_tilegroups.cui"
@@ -293,6 +389,8 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef LOG_FUNC
+#  undef EXP_FUNC
+#  undef TANH_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
 #  undef TCALC_IS_SINGLE
@@ -308,6 +406,8 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  define LLCONV_FUNC __double2ll_rn
 #  define SQRT_FUNC sqrt
 #  define LOG_FUNC  log
+#  define EXP_FUNC  exp
+#  define TANH_FUNC tanh
 #  define KERNEL_NAME ktgdsCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
 #  undef KERNEL_NAME
@@ -332,6 +432,8 @@ int loadTileProperty(const int pos, const int import_count, const int iter, cons
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
 #  undef LOG_FUNC
+#  undef EXP_FUNC
+#  undef TANH_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef SPLIT_FORCE_ACCUMULATION
 #  undef TCALC2

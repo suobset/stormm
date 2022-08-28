@@ -30,21 +30,21 @@ template <typename T> struct ISWorkspaceKit {
   ISWorkspaceKit(ISWorkspaceKit &&original) = default;
   /// \}
 
-  const int fp_bits;           ///< Fixed-precision bits after the decimal
-  const T fp_scale;            ///< The "forward" scaling factor to take real values into the
-                               ///<   fixed-precision representation
-  const T inv_fp_scale;        ///< The "backward" scaling factor to take fixed-precision values
-                               ///<   back into their real number representations and units
-  llint* psi;                  ///< Accumulators for quantities that will determine effective Born
-                               ///<   radii (this will be used exclusively for single-precision
-                               ///<   mode calculations, even if a GPU kernel's local thread block
-                               ///<   accumulation is handled in the split fixed precision method)
-  int*   psi_overflow;         ///< Overflow accumulators for psi (used for double-precision mode
-                               ///<   calculations, only)
-  llint* sum_deijda;           ///< Accumulators for quantities that will become force
-                               ///<   contributions due to derivatives of the effective Born radii
-  int*   sum_deijda_overflow;  ///< Overflow accumulators for sum_deijda (used for
-                               ///<   double-precision mode calculations, only)
+  const int fp_bits;       ///< Fixed-precision bits after the decimal
+  const T fp_scale;        ///< The "forward" scaling factor to take real values into the
+                           ///<   fixed-precision representation
+  const T inv_fp_scale;    ///< The "backward" scaling factor to take fixed-precision values
+                           ///<   back into their real number representations and units
+  llint* psi;              ///< Accumulators for quantities that will determine effective Born
+                           ///<   radii (this will be used exclusively for single-precision
+                           ///<   mode calculations, even if a GPU kernel's local thread block
+                           ///<   accumulation is handled in the split fixed precision method)
+  int*   psi_ovrf;         ///< Overflow accumulators for psi (used for double-precision mode
+                           ///<   calculations, only)
+  llint* sum_deijda;       ///< Accumulators for quantities that will become force
+                           ///<   contributions due to derivatives of the effective Born radii
+  int*   sum_deijda_ovrf;  ///< Overflow accumulators for sum_deijda (used for
+                           ///<   double-precision mode calculations, only)
 };
   
 /// \brief A small collection of arrays to manage temporary accumulators for computing Born radii

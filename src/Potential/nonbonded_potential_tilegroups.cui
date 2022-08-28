@@ -96,30 +96,26 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     const int import_count = nbwu_map[0];
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef TCALC_IS_SINGLE
-    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
-                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], sh_tile_xcog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
-                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], sh_tile_ycog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
-                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], sh_tile_zcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
+                              sh_tile_xcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
+                              sh_tile_ycog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
+                              sh_tile_zcog, poly_psw.gpos_scale_f);
 #else
-    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
-                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], poly_psw.xcrd_ovrf,
-                              &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_xcog,
-                              poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
-                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], poly_psw.ycrd_ovrf,
-                              &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_ycog,
-                              poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
-                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], poly_psw.zcrd_ovrf,
-                              &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
-                              poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
+                              poly_psw.xcrd_ovrf, &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET],
+                              sh_tile_xcog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
+                              poly_psw.ycrd_ovrf, &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET],
+                              sh_tile_ycog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
+                              poly_psw.zcrd_ovrf, &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET],
+                              sh_tile_zcog, poly_psw.gpos_scale);
 #endif
-    pos = loadTileProperty(pos, import_count, 3, nbwu_map, poly_nbk.charge,
-                           &gmem_r.charges[EXCL_GMEM_OFFSET], SQRT_FUNC(poly_nbk.coulomb));
-    pos = loadTileProperty(pos, import_count, 4, nbwu_map, poly_nbk.lj_idx,
-                           &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
+    pos = loadTileProperty(pos, 3, nbwu_map, poly_nbk.charge, &gmem_r.charges[EXCL_GMEM_OFFSET],
+                           SQRT_FUNC(poly_nbk.coulomb));
+    pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.lj_idx, &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
@@ -334,97 +330,32 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     // Re-read the __shared__ memory value as a local constant to avoid having to carry it through
     // the loops above and thus reduce register pressure.  Commit the locally accumulated forces
     // back to global arrays.
-    const int import_count_ii = nbwu_map[0];
-    const int padded_import_count_ii = devcRoundUp(import_count_ii, tile_sides_per_warp);
     pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef COMPUTE_FORCE
-    while (pos < padded_import_count_ii) {
-      if (pos < import_count_ii) {
-        const size_t write_idx = nbwu_map[pos + 1] + tile_lane_idx;
-        const int read_idx = (pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, pos)) {
-#  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifdef TCALC_IS_SINGLE
-          // Single-precision force accumulation can be split within this kernel, but the global
-          // array values are still expected to be contained in a single 64-bit signed integer.
-          // Recombine the split accumulation values here and then store the result.  While it
-          // seems the logical choice for combining two 32-bit integers into a single 64-bit
-          // value, this method does not work in the valence kernel, apparently because register
-          // pressure forces the compiler to choose a 32-bit signed integer for the eponymous
-          // ixfrc, rather than the correct 64-bit signed integer.  Emulate the valence kernel if
-          // this code path shows any signs of similar behavior.
-          llint ixfrc = sh_xfrc_overflow[read_idx];
-          ixfrc *= max_int_accumulation_ll;
-          ixfrc += (llint)(sh_xfrc[read_idx]);
-          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], (ullint)(ixfrc));
+#  ifdef TCALC_IS_SINGLE
+#    ifdef SPLIT_FORCE_ACCUMULATION
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_xfrc, sh_xfrc_overflow, poly_psw.xfrc);
+    pos = accumulateTileProperty(pos, 1, nbwu_map, sh_yfrc, sh_yfrc_overflow, poly_psw.yfrc);
+    pos = accumulateTileProperty(pos, 2, nbwu_map, sh_zfrc, sh_zfrc_overflow, poly_psw.zfrc);
 #    else
-          // Double-precision split force accumulation is intended to extend the fixed-precision
-          // format and cannot be combined back into a single integral number, ever.  Combine
-          // the results into an int95_t (see Constants/stormm_vector_types.h) and contribute that
-          // to the paired global accumulator arrays.
-          int95_t ixfrc = { sh_xfrc[read_idx], sh_xfrc_overflow[read_idx] };
-          atomicSplit(ixfrc, write_idx, poly_psw.xfrc, poly_psw.xfrc_ovrf);
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_xfrc, poly_psw.xfrc);
+    pos = accumulateTileProperty(pos, 1, nbwu_map, sh_yfrc, poly_psw.yfrc);
+    pos = accumulateTileProperty(pos, 2, nbwu_map, sh_zfrc, poly_psw.zfrc);
 #    endif
 #  else
-          atomicAdd((ullint*)&poly_psw.xfrc[write_idx], (ullint)(sh_xfrc[read_idx]));
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_xfrc, sh_xfrc_overflow, poly_psw.xfrc,
+                                 poly_psw.xfrc_ovrf);
+    pos = accumulateTileProperty(pos, 1, nbwu_map, sh_yfrc, sh_yfrc_overflow, poly_psw.yfrc,
+                                 poly_psw.yfrc_ovrf);
+    pos = accumulateTileProperty(pos, 2, nbwu_map, sh_zfrc, sh_zfrc_overflow, poly_psw.zfrc,
+                                 poly_psw.zfrc_ovrf);
 #  endif
-        }
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 2 * padded_import_count_ii) {
-      const int rel_pos = pos - padded_import_count_ii;
-      if (rel_pos < import_count_ii) {
-        const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-#  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifdef TCALC_IS_SINGLE
-          // See Cartesian X force handling on why single- and double-precision modes differ here.
-          llint iyfrc = sh_yfrc_overflow[read_idx];
-          iyfrc *= max_int_accumulation_ll;
-          iyfrc += (llint)(sh_yfrc[read_idx]);
-          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], (ullint)(iyfrc));        
-#    else
-          int95_t iyfrc = { sh_yfrc[read_idx], sh_yfrc_overflow[read_idx] };
-          atomicSplit(iyfrc, write_idx, poly_psw.yfrc, poly_psw.yfrc_ovrf);
-#    endif
-#  else
-          atomicAdd((ullint*)&poly_psw.yfrc[write_idx], (ullint)(sh_yfrc[read_idx]));
-#  endif
-        }
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-    while (pos < 3 * padded_import_count_ii) {
-      const int rel_pos = pos - (2 * padded_import_count_ii);
-      if (rel_pos < import_count_ii) {
-        const size_t write_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-        const int read_idx = (rel_pos * tile_length) + tile_lane_idx;
-        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
-#  ifdef SPLIT_FORCE_ACCUMULATION
-#    ifdef TCALC_IS_SINGLE
-          // See Cartesian X force handling on why single- and double-precision modes differ here.
-          llint izfrc = sh_zfrc_overflow[read_idx];
-          izfrc *= max_int_accumulation_ll;
-          izfrc += (llint)(sh_zfrc[read_idx]);
-          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], (ullint)(izfrc));        
-#    else
-          int95_t izfrc = { sh_zfrc[read_idx], sh_zfrc_overflow[read_idx] };
-          atomicSplit(izfrc, write_idx, poly_psw.zfrc, poly_psw.zfrc_ovrf);
-#    endif
-#  else
-          atomicAdd((ullint*)&poly_psw.zfrc[write_idx], (ullint)(sh_zfrc[read_idx]));
-#  endif
-        }
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
 #endif
 #ifdef COMPUTE_ENERGY
     pos = threadIdx.x;
-    const int padded_import_count_iii = devcRoundUp(import_count_ii, warp_size_int);
-    while (pos < padded_import_count_iii) {
+    const int import_count_ii = nbwu_map[0];
+    const int padded_import_count_ii = devcRoundUp(import_count_ii, warp_size_int);
+    while (pos < padded_import_count_ii) {
       if (pos < import_count_ii) {
         const int write_idx = (sh_system_indices[pos] * scw.data_stride) +
                               (int)(StateVariable::ELECTROSTATIC);
@@ -432,8 +363,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += blockDim.x;
     }
-    while (pos < 2 * padded_import_count_iii) {
-      const int rel_pos = pos - padded_import_count_iii;
+    while (pos < 2 * padded_import_count_ii) {
+      const int rel_pos = pos - padded_import_count_ii;
       if (rel_pos < import_count_ii) {
         const int write_idx = (sh_system_indices[rel_pos] * scw.data_stride) +
                               (int)(StateVariable::VDW);
@@ -442,8 +373,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += blockDim.x;
     }
-    while (pos < 3 * padded_import_count_iii) {
-      const int rel_pos = pos - (2 * padded_import_count_iii);
+    while (pos < 3 * padded_import_count_ii) {
+      const int rel_pos = pos - (2 * padded_import_count_ii);
       if (rel_pos < import_count_ii) {
         const int write_idx = (sh_system_indices[rel_pos] * scw.data_stride) +
                               (int)(StateVariable::GENERALIZED_BORN);

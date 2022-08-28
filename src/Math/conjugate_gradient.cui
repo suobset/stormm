@@ -257,7 +257,6 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
   __shared__ double   gg_collector[small_block_size >> warp_bits];
   __shared__ double  dgg_collector[small_block_size >> warp_bits];
   __shared__ double msum_collector[small_block_size >> warp_bits];
-  __shared__ int sh_rdwu_idx;
 
   const int warp_idx = threadIdx.x >> warp_bits;
   const int lane_idx = (threadIdx.x & warp_bits_mask_int);

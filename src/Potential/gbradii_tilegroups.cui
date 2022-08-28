@@ -21,20 +21,20 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
   __shared__ TCALC sh_tile_ycog[small_block_max_imports];
   __shared__ TCALC sh_tile_zcog[small_block_max_imports];
   __shared__ TCALC sh_tile_tpts[small_block_max_imports];
-  __shared__ TCALC sh_pbradii[small_block_max_imports];
-  __shared__ TCALC sh_screen[small_block_max_imports];
+  __shared__ TCALC sh_pbradii[small_block_max_atoms];
+  __shared__ TCALC sh_screen[small_block_max_atoms];
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
-  __shared__ int sh_psi[small_block_max_imports];
-  __shared__ int sh_psi_overflow[small_block_max_imports];
+  __shared__ int sh_psi[small_block_max_atoms];
+  __shared__ int sh_psi_overflow[small_block_max_atoms];
 #  else
-  __shared__ llint sh_psi[small_block_max_imports];
+  __shared__ llint sh_psi[small_block_max_atoms];
 #  endif
 #else
-  __shared__ llint sh_psi[small_block_max_imports];
-  __shared__ int sh_psi_overflow[small_block_max_imports];
+  __shared__ llint sh_psi[small_block_max_atoms];
+  __shared__ int sh_psi_overflow[small_block_max_atoms];
 #endif
-  __shared__ int sh_neck_idx[small_block_max_imports];
+  __shared__ int sh_neck_idx[small_block_max_atoms];
   __shared__ int nbwu_map[tile_groups_wu_abstract_length];
   __shared__ int gbrwu_idx;
 
@@ -61,29 +61,25 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     const int import_count = nbwu_map[0];
     int pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef TCALC_IS_SINGLE
-    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
-                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], sh_tile_xcog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
-                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], sh_tile_ycog, poly_psw.gpos_scale_f);
-    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
-                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], sh_tile_zcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
+                              sh_tile_xcog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
+                              sh_tile_ycog, poly_psw.gpos_scale_f);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
+                              sh_tile_zcog, poly_psw.gpos_scale_f);
 #else
-    pos = loadTileCoordinates(pos, import_count, 0, nbwu_map, poly_psw.xcrd,
-                              &gmem_r.xcrd[EXCL_GMEM_OFFSET], poly_psw.xcrd_ovrf,
-                              &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_xcog,
-                              poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, import_count, 1, nbwu_map, poly_psw.ycrd,
-                              &gmem_r.ycrd[EXCL_GMEM_OFFSET], poly_psw.ycrd_ovrf,
-                              &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_ycog,
-                              poly_psw.gpos_scale);
-    pos = loadTileCoordinates(pos, import_count, 2, nbwu_map, poly_psw.zcrd,
-                              &gmem_r.zcrd[EXCL_GMEM_OFFSET], poly_psw.zcrd_ovrf,
-                              &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET], sh_tile_zcog,
-                              poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 0, nbwu_map, poly_psw.xcrd, &gmem_r.xcrd[EXCL_GMEM_OFFSET],
+                              poly_psw.xcrd_ovrf, &gmem_r.xcrd_ovrf[EXCL_GMEM_OFFSET],
+                              sh_tile_xcog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 1, nbwu_map, poly_psw.ycrd, &gmem_r.ycrd[EXCL_GMEM_OFFSET],
+                              poly_psw.ycrd_ovrf, &gmem_r.ycrd_ovrf[EXCL_GMEM_OFFSET],
+                              sh_tile_ycog, poly_psw.gpos_scale);
+    pos = loadTileCoordinates(pos, 2, nbwu_map, poly_psw.zcrd, &gmem_r.zcrd[EXCL_GMEM_OFFSET],
+                              poly_psw.zcrd_ovrf, &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET],
+                              sh_tile_zcog, poly_psw.gpos_scale);
 #endif
-    pos = loadTileProperty(pos, import_count, 3, nbwu_map, poly_nbk.pb_radii, -poly_nbk.gb_offset,
-                           sh_pbradii);
-    pos = loadTileProperty(pos, import_count, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
+    pos = loadTileProperty(pos, 3, nbwu_map, poly_nbk.pb_radii, -poly_nbk.gb_offset, sh_pbradii);
+    pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
@@ -107,7 +103,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     }
     if (poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
         poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) {
-      pos = loadTileProperty(pos, import_count, 5, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
+      pos = loadTileProperty(pos, 6, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
     }
     __syncthreads();
 
@@ -303,8 +299,17 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     __syncthreads();
 
     // Write the Psi values back to their global accumulators
-    pos = threadIdx.x;
-
+    pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
+#ifdef TCALC_IS_SINGLE
+#  ifdef SPLIT_FORCE_ACCUMULATION
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, sh_psi_overflow, isw.psi);
+#  else
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, isw.psi);
+#  endif
+#else
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, sh_psi_overflow, isw.psi, isw.psi_ovrf);
+#endif
+    
     // Increment the work unit counter.  No additional __syncthreads() is needed as the imported
     // atom list that the various threads are working with will not change until passing through
     // another synchronization below. 
