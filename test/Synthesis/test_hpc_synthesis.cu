@@ -22,11 +22,12 @@
 #include "../../src/Structure/hpc_virtual_site_handling.h"
 #include "../../src/Structure/structure_enumerators.h"
 #include "../../src/Structure/virtual_site_handling.h"
-#include "../../src/Synthesis/phasespace_synthesis.h"
-#include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
+#include "../../src/Synthesis/implicit_solvent_workspace.h"
 #include "../../src/Synthesis/synthesis_abstracts.h"
 #include "../../src/Synthesis/nonbonded_workunit.h"
+#include "../../src/Synthesis/phasespace_synthesis.h"
+#include "../../src/Synthesis/systemcache.h"
 #include "../../src/Synthesis/valence_workunit.h"
 #include "../../src/Topology/atomgraph.h"
 #include "../../src/Topology/atomgraph_abstracts.h"
@@ -91,6 +92,8 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   std::vector<double> frc_max_errors(nsys);
   ScoreCard sc(nsys, 1, 32);
   const TrajectoryKind frcid = TrajectoryKind::FORCES;
+  ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
+                                     poly_ag.getSystemAtomCounts(), prec);
 
   // Clear forces.  Perform calculations for valence interactions and restraints.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
@@ -129,7 +132,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   // Clear forces again.  Compute non-bonded interactions.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
-  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space,
+  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space, &ism_space,
                   EvaluateForce::YES, EvaluateEnergy::NO, facc_method, launcher);
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);

@@ -13,6 +13,7 @@
 #include "Potential/scorecard.h"
 #include "Math/reduction_bridge.h"
 #include "Synthesis/atomgraph_synthesis.h"
+#include "Synthesis/implicit_solvent_workspace.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/static_mask_synthesis.h"
 #include "UnitTesting/stopwatch.h"
@@ -30,6 +31,8 @@ using math::ReductionBridge;
 using math::ReductionKit;
 using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
+using synthesis::ImplicitSolventWorkspace;
+using synthesis::ISWorkspaceKit;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::StaticExclusionMaskSynthesis;
@@ -94,12 +97,11 @@ void launchLineAdvance(PrecisionModel prec, PhaseSpaceSynthesis *poly_ps,
 /// \param sc             Energy tracking object allocated to cover all systems in the synthesis
 /// \param vale_fe_cache  Pre-allocated scratch space for valence kernel thread blocks in force +
 ///                       energy computations
-/// \param nonb_fe_cache  Pre-allocated scratch space for non-bonded kernel thread blocks in
-///                       energy-only computations
 /// \param vale_xe_cache  Pre-allocated scratch space for valence kernel thread blocks in force +
 ///                       energy computations
-/// \param nonb_xe_cache  Pre-allocated scratch space for non-bonded kernel thread blocks in
-///                       energy-only computations
+/// \param nonb_cache     Pre-allocated scratch space for non-bonded kernel thread blocks
+/// \param ism_space      Pre-allocated space to store intermediate computations for Born radii
+///                       and their derivatives
 /// \param rbg            Pre-allocated storage space for reduction work units
 /// \param line_record    Stores line minimization progress, energies and move lengths
 /// \param acc_meth       Choice of force accumulation method
@@ -112,8 +114,8 @@ void launchMinimization(const PrecisionModel prec, const AtomGraphSynthesis &pol
                         PhaseSpaceSynthesis *poly_ps, const MinimizeControls &mincon,
                         MolecularMechanicsControls *mmctrl_fe,
                         MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
-                        CacheResource *vale_fe_cache, CacheResource *nonb_fe_cache,
-                        CacheResource *vale_xe_cache, CacheResource *nonb_xe_cache,
+                        CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
+                        CacheResource *nonb_xe_cache, ImplicitSolventWorkspace *ism_space,
                         ReductionBridge *rbg, LineMinimization *line_record,
                         const AccumulationMethod acc_meth, const GpuDetails &gpu,
                         const KernelManager &launcher, StopWatch *timer = nullptr,

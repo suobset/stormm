@@ -136,8 +136,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
                                MolecularMechanicsControls *mmctrl_fe,
                                MolecularMechanicsControls *mmctrl_xe, ScoreCard *sc,
                                CacheResource *vale_fe_cache, CacheResource *vale_xe_cache,
-                               CacheResource *nonb_cache, ReductionBridge *rbg,
-                               LineMinimization *line_record,
+                               CacheResource *nonb_cache, ImplicitSolventWorkspace *ism_space,
+                               ReductionBridge *rbg, LineMinimization *line_record,
                                const AccumulationMethod acc_meth, const GpuDetails &gpu,
                                const KernelManager &launcher, StopWatch *timer,
                                const std::string &task_name) {
@@ -213,6 +213,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       CacheResourceKit<double> vale_fe_tbr = vale_fe_cache->dpData(devc_tier);
       CacheResourceKit<double> vale_xe_tbr = vale_xe_cache->dpData(devc_tier);
       CacheResourceKit<double> nonb_tbr = nonb_cache->dpData(devc_tier);
+      ISWorkspaceKit<double> iswk = ism_space->dpData(devc_tier);
       MMControlKit<double> ctrl_fe = mmctrl_fe->dpData(devc_tier);
       MMControlKit<double> ctrl_xe = mmctrl_xe->dpData(devc_tier);
       if (virtual_sites_present) {
@@ -225,7 +226,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
+                        &iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
         if (virtual_sites_present) {
@@ -249,7 +250,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
@@ -264,7 +265,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
@@ -279,7 +280,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
@@ -298,7 +299,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       sc->initialize(devc_tier, gpu);
       ScoreCardWriter scw_final = sc->data();
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       ctrl_xe.step += 1;
@@ -316,6 +317,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       CacheResourceKit<float> vale_fe_tbr = vale_fe_cache->spData(devc_tier);
       CacheResourceKit<float> vale_xe_tbr = vale_xe_cache->spData(devc_tier);
       CacheResourceKit<float> nonb_tbr = nonb_cache->spData(devc_tier);
+      ISWorkspaceKit<float> iswk = ism_space->spData(devc_tier);
       MMControlKit<float> ctrl_fe = mmctrl_fe->spData(devc_tier);
       MMControlKit<float> ctrl_xe = mmctrl_xe->spData(devc_tier);
       if (virtual_sites_present) {
@@ -328,7 +330,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp);
+                        &iswk, EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                       vale_fe_lp);
@@ -353,7 +355,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         if (virtual_sites_present) {
@@ -368,7 +370,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         if (virtual_sites_present) {
@@ -383,7 +385,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         if (virtual_sites_present) {
@@ -402,7 +404,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       sc->initialize(devc_tier, gpu);
       ScoreCardWriter scw_final = sc->data();
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
-                      EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
+                      &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp);
       launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                     vale_xe_lp);
@@ -456,11 +458,13 @@ extern ScoreCard launchMinimization(const AtomGraphSynthesis &poly_ag,
   CacheResource vale_fe_cache(vale_fe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource vale_xe_cache(vale_xe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonb_cache(nonb_lp.x, small_block_max_atoms);
+  ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
+                                     poly_ag.getSystemAtomCounts(), prec);
   ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
   LineMinimization line_record(poly_ag.getSystemCount());
   launchMinimization(prec, poly_ag, poly_se, poly_ps, mincon, &mmctrl_fe, &mmctrl_xe, &result,
-                     &vale_fe_cache, &vale_xe_cache, &nonb_cache, &poly_rbg, &line_record,
-                     chooseAccumulationMethod(poly_ps->getForceAccumulationBits()),
+                     &vale_fe_cache, &vale_xe_cache, &nonb_cache, &ism_space, &poly_rbg,
+                     &line_record, chooseAccumulationMethod(poly_ps->getForceAccumulationBits()),
                      gpu, launcher, timer, task_name);
   return result;
 }

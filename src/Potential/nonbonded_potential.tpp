@@ -833,7 +833,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   }
   
   // A second pair of nested loops over all atoms is needed to fold in derivatives of the
-  // effective Born radii to the forces on each atom.
+  // effective Born radii to the forces on each atom.  Begin by updating the energy derivative
+  // factors (sumdeijda) for each atom, then roll into the nested loops.
   switch (isr.igb) {
   case ImplicitSolventModel::HCT_GB:
   case ImplicitSolventModel::NONE:
@@ -867,8 +868,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                                           sdi_current * sdi_multiplier;
     }
   }
-  
-  // One final tile-based loop
   for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
     for (int stj = 0; stj <= sti; stj++) {
 

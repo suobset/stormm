@@ -420,6 +420,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   CacheResource valence_fe_tb_reserve(vale_fe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource valence_xe_tb_reserve(vale_xe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
+  ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
+                                     poly_ag.getSystemAtomCounts(), prec);
   
   // Upload the synthesis and prime the pumps
   poly_ag.upload();
@@ -459,6 +461,8 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   CacheResourceKit<float> f_vale_fe_tbk = valence_fe_tb_reserve.spData(devc);
   CacheResourceKit<float> f_vale_xe_tbk = valence_xe_tb_reserve.spData(devc);
   CacheResourceKit<float> f_nonb_tbk = nonbond_tb_reserve.spData(devc);
+  ISWorkspaceKit<double> d_iswk = ism_space.dpData(devc);
+  ISWorkspaceKit<float>  f_iswk = ism_space.spData(devc);
   ReductionKit poly_redk(poly_ag, devc);
   ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
   ConjGradSubstrate cgsbs(&poly_ps, &poly_rbg, devc);
@@ -488,7 +492,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_fe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_fe, &poly_psw, &scw, &d_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
       if (virtual_sites_present) {
@@ -501,7 +505,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      &f_iswk, EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
@@ -587,7 +591,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       if (virtual_sites_present) {
@@ -600,7 +604,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
@@ -633,7 +637,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       if (virtual_sites_present) {
@@ -646,7 +650,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
@@ -679,7 +683,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       if (virtual_sites_present) {
@@ -692,7 +696,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
                       nonb_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,

@@ -31,7 +31,7 @@ ImplicitSolventWorkspace::ImplicitSolventWorkspace(const Hybrid<int> &atom_start
 ImplicitSolventWorkspace::ImplicitSolventWorkspace(const Hybrid<int> &atom_starts,
                                                    const Hybrid<int> &atom_counts,
                                                    const PrecisionModel prec) :
-  ImplicitSolventWorkspace(atom_starts, atom_counts, (prec == PrecisionModel::SINGLE) ? 25 : 55)
+  ImplicitSolventWorkspace(atom_starts, atom_counts, (prec == PrecisionModel::SINGLE) ? 24 : 55)
 {}
 
 //-------------------------------------------------------------------------------------------------
