@@ -351,15 +351,9 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #    define KERNEL_NAME ktgfsCalculateGBRadii
 #      include "gbradii_tilegroups.cui"
 #    undef KERNEL_NAME
-#    define KERNEL_NAME ktgfsCalculateGBDerivatives
-#      include "gbderivative_tilegroups.cui"
-#    undef KERNEL_NAME
 #  undef SPLIT_FORCE_ACCUMULATION
 #  define KERNEL_NAME ktgfCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
-#  undef KERNEL_NAME
-#  define KERNEL_NAME ktgfCalculateGBDerivatives
-#    include "gbderivative_tilegroups.cui"
 #  undef KERNEL_NAME
 #  define COMPUTE_FORCE
 #    define SPLIT_FORCE_ACCUMULATION
@@ -367,24 +361,80 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #        define KERNEL_NAME ktgfsNonbondedForceEnergy
 #          include "nonbonded_potential_tilegroups.cui"
 #        undef KERNEL_NAME
+#        define DO_GENERALIZED_BORN
+#          define KERNEL_NAME ktgfsGBForceEnergy
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#          define DO_NECK_CORRECTION
+#            define KERNEL_NAME ktgfsGBNeckForceEnergy
+#              include "nonbonded_potential_tilegroups.cui"
+#            undef KERNEL_NAME
+#          undef DO_NECK_CORRECTION
+#        undef DO_GENERALIZED_BORN
 #      undef COMPUTE_ENERGY
 #      define KERNEL_NAME ktgfsNonbondedForce
 #        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgfsGBForce
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgfsGBNeckForce
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
+#      define KERNEL_NAME ktgfsCalculateGBDerivatives
+#        include "gbderivative_tilegroups.cui"
 #      undef KERNEL_NAME
 #    undef SPLIT_FORCE_ACCUMULATION
 #    define COMPUTE_ENERGY
 #      define KERNEL_NAME ktgfNonbondedForceEnergy
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgfGBForceEnergy
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgfGBNeckForceEnergy
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
 #    undef COMPUTE_ENERGY
 #    define KERNEL_NAME ktgfNonbondedForce
 #      include "nonbonded_potential_tilegroups.cui"
+#    undef KERNEL_NAME
+#    define DO_GENERALIZED_BORN
+#      define KERNEL_NAME ktgfGBForce
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_NECK_CORRECTION
+#        define KERNEL_NAME ktgfGBNeckForce
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#      undef DO_NECK_CORRECTION
+#    undef DO_GENERALIZED_BORN
+#    define KERNEL_NAME ktgfCalculateGBDerivatives
+#      include "gbderivative_tilegroups.cui"
 #    undef KERNEL_NAME
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
 #    define KERNEL_NAME ktgfNonbondedEnergy
 #      include "nonbonded_potential_tilegroups.cui"
 #    undef KERNEL_NAME
+#    define DO_GENERALIZED_BORN
+#      define KERNEL_NAME ktgfGBEnergy
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_NECK_CORRECTION
+#        define KERNEL_NAME ktgfGBNeckEnergy
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#      undef DO_NECK_CORRECTION
+#    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_ENERGY
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC
@@ -411,23 +461,53 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  define KERNEL_NAME ktgdsCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
 #  undef KERNEL_NAME
-#  define KERNEL_NAME ktgdsCalculateGBDerivatives
-#    include "gbderivative_tilegroups.cui"
-#  undef KERNEL_NAME
 #  define COMPUTE_FORCE
 #    define COMPUTE_ENERGY
 #      define KERNEL_NAME ktgdsNonbondedForceEnergy
 #        include "nonbonded_potential_tilegroups.cui"
 #      undef KERNEL_NAME
+#      define DO_GENERALIZED_BORN
+#        define KERNEL_NAME ktgdsGBForceEnergy
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#        define DO_NECK_CORRECTION
+#          define KERNEL_NAME ktgdsGBNeckForceEnergy
+#            include "nonbonded_potential_tilegroups.cui"
+#          undef KERNEL_NAME
+#        undef DO_NECK_CORRECTION
+#      undef DO_GENERALIZED_BORN
+#      define KERNEL_NAME ktgdsCalculateGBDerivatives
+#        include "gbderivative_tilegroups.cui"
+#      undef KERNEL_NAME
 #    undef COMPUTE_ENERGY
 #    define KERNEL_NAME ktgdsNonbondedForce
 #      include "nonbonded_potential_tilegroups.cui"
 #    undef KERNEL_NAME
+#    define DO_GENERALIZED_BORN
+#      define KERNEL_NAME ktgdsGBForce
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_NECK_CORRECTION
+#        define KERNEL_NAME ktgdsGBNeckForce
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#      undef DO_NECK_CORRECTION
+#    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_FORCE
 #  define COMPUTE_ENERGY
 #    define KERNEL_NAME ktgdNonbondedEnergy
 #      include "nonbonded_potential_tilegroups.cui"
 #    undef KERNEL_NAME
+#    define DO_GENERALIZED_BORN
+#      define KERNEL_NAME ktgdGBEnergy
+#        include "nonbonded_potential_tilegroups.cui"
+#      undef KERNEL_NAME
+#      define DO_NECK_CORRECTION
+#        define KERNEL_NAME ktgdGBNeckEnergy
+#          include "nonbonded_potential_tilegroups.cui"
+#        undef KERNEL_NAME
+#      undef DO_NECK_CORRECTION
+#    undef DO_GENERALIZED_BORN
 #  undef COMPUTE_ENERGY
 #  undef LLCONV_FUNC
 #  undef SQRT_FUNC

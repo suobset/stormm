@@ -28,7 +28,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
   __shared__ TCALC sh_tile_tpts[small_block_max_imports];
   __shared__ int sh_n_lj_types[small_block_max_imports];
   __shared__ int sh_ljabc_offsets[small_block_max_imports];
+#ifdef DO_GENERALIZED_BORN
   __shared__ TCALC sh_gbeff_radii[small_block_max_atoms];
+#endif
 #ifdef COMPUTE_FORCE
 #  ifdef TCALC_IS_SINGLE
 #    ifdef SPLIT_FORCE_ACCUMULATION
@@ -47,8 +49,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
   __shared__ llint sh_zfrc[small_block_max_atoms];
 #    endif
 #  else
+#ifdef DO_GENERALIZED_BORN
   __shared__ llint sh_sum_deijda[small_block_max_atoms];
   __shared__ int sh_sum_deijda_overflow[small_block_max_atoms];
+#endif
   __shared__ llint sh_xfrc[small_block_max_atoms];
   __shared__ llint sh_yfrc[small_block_max_atoms];
   __shared__ llint sh_zfrc[small_block_max_atoms];
@@ -62,7 +66,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
   __shared__ int sh_system_indices[small_block_max_imports];
   __shared__ llint sh_elec_acc[small_block_max_imports];
   __shared__ llint sh_vdw_acc[small_block_max_imports];
+#  ifdef DO_GENERALIZED_BORN
   __shared__ llint sh_gb_acc[small_block_max_imports];
+#  endif
 #endif
   __shared__ int nbwu_map[tile_groups_wu_abstract_length];
   __shared__ int nbwu_idx;
@@ -89,7 +95,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
              threadIdx.x <  padded_abstract_length + small_block_max_imports) {
       sh_elec_acc[threadIdx.x - padded_abstract_length] = 0LL;
       sh_vdw_acc[ threadIdx.x - padded_abstract_length] = 0LL;
+#  ifdef DO_GENERALIZED_BORN
       sh_gb_acc[  threadIdx.x - padded_abstract_length] = 0LL;
+#  endif
     }
 #endif
     __syncthreads();
@@ -171,90 +179,89 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-#ifdef COMPUTE_ENERGY
+#if defined(COMPUTE_ENERGY) && defined(DO_GENERALIZED_BORN)
     llint egb_acc;
 #endif
-    if (poly_nbk.igb == ImplicitSolventModel::NONE) {
-      pos += padded_import_count;
-    }
-    else {
-      while (pos < 7 * padded_import_count) {
-        const int rel_pos = pos - (6 * padded_import_count);
-        if (rel_pos < import_count) {
-          const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
-          const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+#ifdef DO_GENERALIZED_BORN
+    while (pos < 7 * padded_import_count) {
+      const int rel_pos = pos - (6 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
 
-          // Compute the effective GB radii and, if applicable, begin to accumulate the energy.
-          const TCALC pb_radius = __ldcs(&poly_nbk.pb_radii[read_idx]);
-          const TCALC gb_radius = pb_radius - poly_nbk.gb_offset;
-          const TCALC inv_gb_radius = (TCALC)(1.0) / gb_radius;
-#ifdef TCALC_IS_SINGLE
-          const TCALC psival = (TCALC)(__ldcs(&iswk.psi[read_idx])) * iswk.inv_fp_scale;
-#else
-          const TCALC psival = int95ToDouble(__ldcs(&iswk.psi[read_idx]),
-                                             __ldcs(&iswk.psi_ovrf[read_idx])) * iswk.inv_fp_scale;
-#endif
-          TCALC egbi = 0.0;
-          switch (poly_nbk.igb) {
-          case ImplicitSolventModel::HCT_GB:
-            egbi = (TCALC)(1.0) / (inv_gb_radius + psival);
-            if (egbi < (TCALC)(0.0)) {
-              egbi = (TCALC)(30.0);
-            }
-            break;
-          case ImplicitSolventModel::OBC_GB:
-          case ImplicitSolventModel::OBC_GB_II:
-          case ImplicitSolventModel::NECK_GB:
-          case ImplicitSolventModel::NECK_GB_II:
-            {
-              const TCALC fipsi = psival * poly_psw.inv_frc_scale * (-gb_radius);
-              egbi = (TCALC)(1.0) /
-                     (inv_gb_radius -
-                      (TANH_FUNC(__ldcs(&poly_nbk.gb_alpha[read_idx]) -
-                                 ((__ldcs(&poly_nbk.gb_beta[read_idx]) -
-                                   (__ldcs(&poly_nbk.gb_gamma[read_idx]) * fipsi)) * fipsi)) /
-                       pb_radius));
-            }
-            break;
-          case ImplicitSolventModel::NONE:
-            break;
-          }
-          sh_gbeff_radii[write_idx] = egbi;
-          const TCALC atomq = __ldcs(&poly_nbk.charge[read_idx]);
-          __stwb(&gmem_r.charges[EXCL_GMEM_OFFSET + write_idx], atomq);
-          const TCALC expmkf = EXP_FUNC(-default_gb_kscale * poly_nbk.kappa * egbi) /
-                               poly_nbk.dielectric;
-          const TCALC dielfac = (TCALC)(1.0) - expmkf;
-          const TCALC atmq2h = (TCALC)(0.5) * atomq * atomq * poly_nbk.coulomb;
-          const TCALC atmqd2h = atmq2h * dielfac;
-#ifdef COMPUTE_ENERGY
-          egb_acc += (-atmqd2h / egbi) * scw.nrg_scale_f;
-#endif
-#ifdef COMPUTE_FORCE
+        // Compute the effective GB radii and, if applicable, begin to accumulate the energy.
+        const TCALC pb_radius = __ldcs(&poly_nbk.pb_radii[read_idx]);
+        const TCALC gb_radius = pb_radius - poly_nbk.gb_offset;
+        const TCALC inv_gb_radius = (TCALC)(1.0) / gb_radius;
 #  ifdef TCALC_IS_SINGLE
-#    ifdef SPLIT_FORCE_ACCUMULATION
-          const int2 ssd = floatToInt63((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
-                                                    atmq2h * expmkf * egbi)) *
-                                        poly_psw.frc_scale_f);
-          sh_sum_deijda[write_idx] = ssd.x;
-          sh_sum_deijda_overflow[write_idx] = ssd.y;
-#    else
-          sh_sum_deijda[write_idx] = LLCONV_FUNC((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
-                                                             atmq2h * expmkf * egbi)) *
-                                                 poly_psw.frc_scale_f);
-#    endif
+        const TCALC psival = (TCALC)(__ldcs(&iswk.psi[read_idx])) * iswk.inv_fp_scale;
 #  else
-          const int95_t ssd = doubleToInt95((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
-                                                        atmq2h * expmkf * egbi)) *
-                                            poly_psw.frc_scale_f);
-          sh_sum_deijda[write_idx] = ssd.x;
-          sh_sum_deijda_overflow[write_idx] = ssd.y;
+        const TCALC psival = int95ToDouble(__ldcs(&iswk.psi[read_idx]),
+                                           __ldcs(&iswk.psi_ovrf[read_idx])) * iswk.inv_fp_scale;
 #  endif
-#endif
+        TCALC egbi = 0.0;
+        switch (poly_nbk.igb) {
+        case ImplicitSolventModel::HCT_GB:
+          egbi = (TCALC)(1.0) / (inv_gb_radius + psival);
+          if (egbi < (TCALC)(0.0)) {
+            egbi = (TCALC)(30.0);
+          }
+          break;
+        case ImplicitSolventModel::OBC_GB:
+        case ImplicitSolventModel::OBC_GB_II:
+        case ImplicitSolventModel::NECK_GB:
+        case ImplicitSolventModel::NECK_GB_II:
+          {
+            const TCALC fipsi = psival * poly_psw.inv_frc_scale * (-gb_radius);
+            egbi = (TCALC)(1.0) /
+                   (inv_gb_radius -
+                    (TANH_FUNC(__ldcs(&poly_nbk.gb_alpha[read_idx]) -
+                               ((__ldcs(&poly_nbk.gb_beta[read_idx]) -
+                                 (__ldcs(&poly_nbk.gb_gamma[read_idx]) * fipsi)) * fipsi)) /
+                     pb_radius));
+          }
+          break;
+        case ImplicitSolventModel::NONE:
+          break;
         }
-        pos += tile_sides_per_warp * warps_per_block;
+        sh_gbeff_radii[write_idx] = egbi;
+        const TCALC atomq = __ldcs(&poly_nbk.charge[read_idx]);
+        __stwb(&gmem_r.charges[EXCL_GMEM_OFFSET + write_idx], atomq);
+        const TCALC expmkf = EXP_FUNC(-default_gb_kscale * poly_nbk.kappa * egbi) /
+                             poly_nbk.dielectric;
+        const TCALC dielfac = (TCALC)(1.0) - expmkf;
+        const TCALC atmq2h = (TCALC)(0.5) * atomq * atomq * poly_nbk.coulomb;
+        const TCALC atmqd2h = atmq2h * dielfac;
+#  if defined (COMPUTE_ENERGY) && defined(DO_GENERALIZED_BORN)
+        egb_acc += (-atmqd2h / egbi) * scw.nrg_scale_f;
+#  endif
+#  ifdef COMPUTE_FORCE
+#    ifdef TCALC_IS_SINGLE
+#      ifdef SPLIT_FORCE_ACCUMULATION
+        const int2 ssd = floatToInt63((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
+                                                  atmq2h * expmkf * egbi)) *
+                                      poly_psw.frc_scale_f);
+        sh_sum_deijda[write_idx] = ssd.x;
+        sh_sum_deijda_overflow[write_idx] = ssd.y;
+#      else
+        sh_sum_deijda[write_idx] = LLCONV_FUNC((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
+                                                           atmq2h * expmkf * egbi)) *
+                                               poly_psw.frc_scale_f);
+#      endif
+#    else
+        const int95_t ssd = doubleToInt95((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
+                                                      atmq2h * expmkf * egbi)) *
+                                          poly_psw.frc_scale_f);
+        sh_sum_deijda[write_idx] = ssd.x;
+        sh_sum_deijda_overflow[write_idx] = ssd.y;
+#    endif
+#  endif
       }
+      pos += tile_sides_per_warp * warps_per_block;
     }
+#else // DO_GENERALIZED_BORN
+    pos += padded_import_count;
+#endif // DO_GENERALIZED_BORN
 #ifdef COMPUTE_FORCE
     while (pos < 8 * padded_import_count) {
       const int rel_pos = pos - (7 * padded_import_count);
@@ -281,7 +288,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-#endif
+#endif // COMPUTE_FORCE
     __syncthreads();
 
     // Loop over tile instructions
@@ -346,6 +353,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #ifdef COMPUTE_ENERGY
       TCALC elec_nrg = 0.0;
       TCALC vdw_nrg = 0.0;
+#  ifdef DO_GENERALIZED_BORN
+      TCALC gb_nrg = 0.0;
+#  endif
 #endif
 #ifdef COMPUTE_FORCE
       TCALC t_xfrc = (TCALC)(0.0);
@@ -489,6 +499,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += blockDim.x;
     }
+#  ifdef DO_GENERALIZED_BORN
     while (pos < 3 * padded_import_count_ii) {
       const int rel_pos = pos - (2 * padded_import_count_ii);
       if (rel_pos < import_count_ii) {
@@ -499,6 +510,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += blockDim.x;
     }
+#  endif
 #endif
     
     // Increment the work unit counter
