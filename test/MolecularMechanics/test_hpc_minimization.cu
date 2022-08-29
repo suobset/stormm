@@ -409,13 +409,16 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   const int2 vste_mv_lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);
   const int2 vste_xm_lp = launcher.getVirtualSiteKernelDims(prec,
                                                             VirtualSiteActivity::TRANSMIT_FORCES);
-
-  const int2 nonb_lp = launcher.getNonbondedKernelDims(prec,
-                                                       NbwuKind::TILE_GROUPS,
-                                                       EvaluateForce::YES, EvaluateEnergy::YES,
-                                                       AccumulationMethod::SPLIT);
-  const int2 redu_lp = launcher.getReductionKernelDims(prec,
-                                                       ReductionGoal::CONJUGATE_GRADIENT,
+  const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
+  const ImplicitSolventModel ism_type = poly_ag.getImplicitSolventModel();
+  const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
+                                                       EvaluateEnergy::YES,
+                                                       AccumulationMethod::SPLIT, ism_type);
+  const int2 gbr_lp = launcher.getBornRadiiKernelDims(prec, nb_work_type,
+                                                      AccumulationMethod::SPLIT, ism_type);
+  const int2 gbd_lp = launcher.getBornDerivativeKernelDims(prec, nb_work_type,
+                                                           AccumulationMethod::SPLIT, ism_type);
+  const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
   CacheResource valence_fe_tb_reserve(vale_fe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource valence_xe_tb_reserve(vale_xe_lp.x, maximum_valence_work_unit_atoms);
@@ -447,7 +450,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                        double2, double4> d_poly_rk = poly_ag.getDoublePrecisionRestraintKit(devc);
   const SyRestraintKit<float,
                        float2, float4> f_poly_rk = poly_ag.getSinglePrecisionRestraintKit(devc);
-  const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
   const bool virtual_sites_present = (poly_ag.getVirtualSiteCount() > 0);
   MMControlKit<double> d_ctrl_fe = mmctrl_fe.dpData(devc);
   MMControlKit<double> d_ctrl_xe = mmctrl_xe.dpData(devc);
@@ -492,7 +494,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_fe, &poly_psw, &scw, &d_nonb_tbk,
-                      &d_iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_fe, &poly_psw, &scw, &d_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
       if (virtual_sites_present) {
@@ -506,7 +508,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw, &f_nonb_tbk,
                       &f_iswk, EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
-                      nonb_lp);
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_fe_lp);
@@ -591,7 +593,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       if (virtual_sites_present) {
@@ -605,7 +607,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
                       &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
-                      nonb_lp);
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_xe_lp);
@@ -637,7 +639,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       if (virtual_sites_present) {
@@ -651,7 +653,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
                       &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
-                      nonb_lp);
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_xe_lp);
@@ -683,7 +685,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
       }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       if (virtual_sites_present) {
@@ -697,7 +699,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
                       &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
-                      nonb_lp);
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
                     AccumulationMethod::SPLIT, vale_xe_lp);

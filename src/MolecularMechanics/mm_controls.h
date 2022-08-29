@@ -12,6 +12,7 @@
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
 #include "Synthesis/atomgraph_synthesis.h"
+#include "Topology/atomgraph_enumerators.h"
 
 namespace stormm {
 namespace mm {
@@ -32,7 +33,8 @@ using namelist::default_rattle_tolerance;
 using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
-  
+using topology::ImplicitSolventModel;
+
 /// \brief The C-style, always writeable abstract for the MolecularMechanicsControls object.  To
 ///        not be able to modify this object's contents would be nonsensical, as it is intended to
 ///        to keep counters of the simulation time step as well as force evaluation work units.
@@ -186,7 +188,7 @@ public:
   ///                  descriptors such as the non-bonded work unit type)
   void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, PrecisionModel prec,
-                             const AtomGraphSynthesis &poly_ag);
+                             const AtomGraphSynthesis &poly_ag); 
 
   /// \brief Increment the step counter, moving the controls to a different progress counter.
   void incrementStep();

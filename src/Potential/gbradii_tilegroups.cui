@@ -101,10 +101,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-    if (poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
-        poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) {
-      pos = loadTileProperty(pos, 6, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
-    }
+#ifdef DO_NECK_CORRECTION
+    pos = loadTileProperty(pos, 6, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
+#endif
     __syncthreads();
 
     // Loop over tile instructions
@@ -245,9 +244,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         }
 
         // Neck GB contributions
-        if ((poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
-             poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) &&
-            r < t_radius + o_radius + ((TCALC)(2.0) * poly_nbk.gb_offset) + poly_nbk.gb_neckcut) {
+#ifdef DO_NECK_CORRECTION
+        if (r < t_radius + o_radius + ((TCALC)(2.0) * poly_nbk.gb_offset) + poly_nbk.gb_neckcut) {
 
           // First computation: atom I -> atom J
           const int ot_table_idx = (poly_nbk.neck_table_size * o_neck_idx) + t_neck_idx;
@@ -267,7 +265,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
           o_psi -= poly_nbk.gb_neckscale * to_neck_parm.y /
                    ((TCALC)(1.0) + mdist2 + ((TCALC)(0.3) * mdist6));
         }
-        
+#endif        
         // Correct for on-diagonal tiles.
         if (on_diagonal) {
           t_psi *= (TCALC)(0.5);

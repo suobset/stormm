@@ -832,7 +832,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     return egb_energy;
   }
   
-  // A second pair of nested loops over all atoms is needed to fold in derivatives of the
+  // A third pair of nested loops over all atoms is needed to fold in derivatives of the
   // effective Born radii to the forces on each atom.  Begin by updating the energy derivative
   // factors (sumdeijda) for each atom, then roll into the nested loops.
   switch (isr.igb) {

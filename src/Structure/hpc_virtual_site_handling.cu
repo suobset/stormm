@@ -26,50 +26,54 @@ using topology::VirtualSiteKind;
   
 #define VSITE_STANDALONE
 #define TCALC  float
-#define TCALC2 float2
-#define TCALC3 float3
-#define TCALC4 float4
-#define TCALC_IS_SINGLE
-#define COS_FUNC cosf
-#define SIN_FUNC sinf
-#define SQRT_FUNC sqrtf
-#define LLCONV_FUNC __float2ll_rn
-#  define KERNEL_NAME kfPlaceVirtualSites
-#    include "virtual_site_placement.cui"
-#  undef KERNEL_NAME
-#  define KERNEL_NAME kfTransmitVSiteForces
-#    include "virtual_site_transmission.cui"
-#  undef KERNEL_NAME
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 4
+#  define TCALC2 float2
+#  define TCALC3 float3
+#  define TCALC4 float4
+#  define TCALC_IS_SINGLE
+#  define COS_FUNC cosf
+#  define SIN_FUNC sinf
+#  define SQRT_FUNC sqrtf
+#  define LLCONV_FUNC __float2ll_rn
+#    define KERNEL_NAME kfPlaceVirtualSites
+#      include "virtual_site_placement.cui"
+#    undef KERNEL_NAME
+#    define KERNEL_NAME kfTransmitVSiteForces
+#      include "virtual_site_transmission.cui"
+#    undef KERNEL_NAME
+#  undef TCALC2
+#  undef TCALC3
+#  undef TCALC4
+#  undef TCALC_IS_SINGLE
+#  undef COS_FUNC
+#  undef SIN_FUNC
+#  undef SQRT_FUNC
+#  undef LLCONV_FUNC
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
 #undef TCALC
-#undef TCALC2
-#undef TCALC3
-#undef TCALC4
-#undef TCALC_IS_SINGLE
-#undef COS_FUNC
-#undef SIN_FUNC
-#undef SQRT_FUNC
-#undef LLCONV_FUNC
 
 #define TCALC  double
-#define TCALC2 double2
-#define TCALC3 double3
-#define TCALC4 double4
-#define COS_FUNC cos
-#define SIN_FUNC sin
-#define SQRT_FUNC sqrt
-#  define KERNEL_NAME kdPlaceVirtualSites
-#    include "virtual_site_placement.cui"
-#  undef KERNEL_NAME
-#  define KERNEL_NAME kdTransmitVSiteForces
-#    include "virtual_site_transmission.cui"
-#  undef KERNEL_NAME
+#  define VSITE_STANDALONE_BLOCK_MULTIPLIER 3
+#  define TCALC2 double2
+#  define TCALC3 double3
+#  define TCALC4 double4
+#  define COS_FUNC cos
+#  define SIN_FUNC sin
+#  define SQRT_FUNC sqrt
+#    define KERNEL_NAME kdPlaceVirtualSites
+#      include "virtual_site_placement.cui"
+#    undef KERNEL_NAME
+#    define KERNEL_NAME kdTransmitVSiteForces
+#      include "virtual_site_transmission.cui"
+#    undef KERNEL_NAME
+#  undef TCALC2
+#  undef TCALC3
+#  undef TCALC4
+#  undef COS_FUNC
+#  undef SIN_FUNC
+#  undef SQRT_FUNC
+#  undef VSITE_STANDALONE_BLOCK_MULTIPLIER
 #undef TCALC
-#undef TCALC2
-#undef TCALC3
-#undef TCALC4
-#undef COS_FUNC
-#undef SIN_FUNC
-#undef SQRT_FUNC
 #undef VSITE_STANDALONE
 
 //-------------------------------------------------------------------------------------------------

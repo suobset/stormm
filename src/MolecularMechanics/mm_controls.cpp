@@ -298,6 +298,7 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
                                                        const PrecisionModel prec,
                                                        const AtomGraphSynthesis &poly_ag) {
   const GpuDetails wgpu = launcher.getGpu();
+  const ImplicitSolventModel igb = poly_ag.getImplicitSolventModel();
   const int arch_major = wgpu.getArchMajor();
   const int arch_minor = wgpu.getArchMinor();
   const int smp_count = wgpu.getSMPCount();
@@ -311,12 +312,12 @@ void MolecularMechanicsControls::primeWorkUnitCounters(const KernelManager &laun
                                                     AccumulationMethod::SPLIT,
                                                     VwuGoal::ACCUMULATE);
   const int2 gbrwu_lp = launcher.getBornRadiiKernelDims(prec, poly_ag.getNonbondedWorkType(),
-                                                        AccumulationMethod::SPLIT);
+                                                        AccumulationMethod::SPLIT, igb);
   const int2 gbdwu_lp = launcher.getBornDerivativeKernelDims(prec, poly_ag.getNonbondedWorkType(),
-                                                             AccumulationMethod::SPLIT);
+                                                             AccumulationMethod::SPLIT, igb);
   const int2 nbwu_lp = launcher.getNonbondedKernelDims(prec, poly_ag.getNonbondedWorkType(),
                                                        eval_frc, eval_nrg,
-                                                       AccumulationMethod::SPLIT);
+                                                       AccumulationMethod::SPLIT, igb);
   const int2 rdwu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
 

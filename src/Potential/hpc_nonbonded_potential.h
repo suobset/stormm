@@ -13,6 +13,7 @@
 #include "Synthesis/static_mask_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "cacheresource.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
@@ -36,6 +37,7 @@ using synthesis::SeMaskSynthesisReader;
 using synthesis::StaticExclusionMaskSynthesis;
 using synthesis::SyNonbondedKit;
 using synthesis::VwuGoal;
+using topology::ImplicitSolventModel;
 
 /// \brief Set the __shared__ memory configuration for various nonbonded interaction kernels
 void nonbondedKernelSetup();
@@ -49,72 +51,29 @@ void nonbondedKernelSetup();
 /// \param eval_frc  Whether the kernel shall evaluate forces
 /// \param eval_nrg  Whether the kernel shall evaluate energies
 /// \param acc_meth  Accumulation method for forces
+/// \param igb       The implicit solvent model to use (i.e. "NONE" in periodic boundary
+///                  conditions--otherwise NECK and non-NECK models are the relevant choices)
 cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKind kind,
                                                     EvaluateForce eval_frc,
                                                     EvaluateEnergy eval_nrg,
-                                                    AccumulationMethod acc_meth);
+                                                    AccumulationMethod acc_meth,
+                                                    ImplicitSolventModel igb);
 
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
 ///        the Born radii computation kernel.  Deposit the results in a developing object that
 ///        will later record launch grid dimensions for managing the kernels.  This kernel's
 ///        parameter descriptions follow from queryNonbondedKernelRequirements() above.
 cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKind kind,
-                                                    AccumulationMethod acc_meth);
+                                                    AccumulationMethod acc_meth,
+                                                    ImplicitSolventModel igb);
 
 /// \brief Obtain information on launch bounds and block-specific requirements for each version of
 ///        the Born radii derivative computation kernel.  Deposit the results in a developing
 ///        object that will later record launch grid dimensions for managing the kernels.  This
 ///        kernel's parameter descriptions follow from queryNonbondedKernelRequirements() above.
 cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, NbwuKind kind,
-                                                         AccumulationMethod acc_meth);
-
-/// \brief Evaluate Generalized Born radii for the current state.  Prepare for Born radii
-///        derivative calculations.  The accumulation of the radii and their derivatives is
-///        handled in fixed-precision arithmetic, using the Cartesian X and Y force components of
-///        the thread block workspace as accumulators.
-///
-/// Overloaded:
-///   - Accept abstracts that imply the precision level of kernel to use, and launch parameters
-///     assumed to fit that kernel.
-///   - Accept the original objects and make the necessary abstracts before launching (this is
-///     useful for testing purposes)
-///
-/// \param kind         The type non-bonded work to perform, indicating the kernel to launch
-/// \param poly_nbk     Non-bonded parameters of all systems
-/// \param poly_ag      Compiled topologies of all systems
-/// \param ngb_kit      Neck Generalized Born tables for certain GB models, translated to a
-///                     specific precision model
-/// \param ngb_tab      Neck Generalized Born tables for certain GB models
-/// \param ctrl         Abstract for molecular mechanics progress counters and run bounds
-/// \param mmctrl       Progress counters and run bounds
-/// \param poly_psw     Abstract for coordinates and forces of all systems
-/// \param poly_ps      Coordinate and force compilation for all systems
-/// \param gmem_r       Abstract for thread block specific resources
-/// \param tb_space     Cache resources for the kernel launch
-/// \param iswk         Abstract for the implicit solvent accumulator workspace
-/// \param ism_space    Implicit solvent accumulators for connecting each of the Generalized Born
-///                     calculation stages
-/// \param acc_meth     Accumulation method for Born radii
-/// \param bt           Block and thread counts for the kernel, given the precision and force or
-///                     energy computation requirements (an "abstract" of the KernelManager object)
-/// \param launcher     Contains launch parameters for all kernels in STORMM
-/// \{
-void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
-                                MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
-                                CacheResourceKit<double> *gmem_r, ISWorkspaceKit<double> *iswk,
-                                const int2 bt);
-
-void launchBornRadiiCalculation(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
-                                MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
-                                CacheResourceKit<float> *gmem_r, ISWorkspaceKit<float> *iswk,
-                                AccumulationMethod acc_meth, const int2 bt);
-
-void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
-                                MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                                CacheResource *tb_space, ImplicitSolventWorkspace *ism_space,
-                                const KernelManager &launcher,
-                                AccumulationMethod acc_meth = AccumulationMethod::AUTOMATIC);
-/// \}
+                                                         AccumulationMethod acc_meth,
+                                                         ImplicitSolventModel igb);
 
 /// \brief Evaluate nonbonded work units based on the strategy determined in the topology
 ///        synthesis.  All of the kernels launched by these functions will compute forces,
@@ -148,22 +107,27 @@ void launchBornRadiiCalculation(PrecisionModel prec, const AtomGraphSynthesis &p
 /// \param eval_force   Whether to evaluate forces
 /// \param eval_energy  Whether to evaluate energies
 /// \param acc_meth     Accumulation method for forces
-/// \param bt           Block and thread counts for the kernel, given the precision and force or
-///                     energy computation requirements (an "abstract" of the KernelManager object)
+/// \param bt           Block and thread counts for the main kernel, given the precision and force
+///                     or energy computation requirements (a KernelManager object "abstract")
+/// \param gbr_bt       Block and thread counts for the Generalized Born radii computation kernel
+/// \param gbd_bt       Block and thread counts for the Generalized Born radii derivative
+///                     computation kernel
 /// \param launcher     Contains launch parameters for all kernels in STORMM
 /// \{
 void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<double> *gmem_r, ISWorkspaceKit<double> *iswk,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy, const int2 bt);
+                     EvaluateForce eval_force, EvaluateEnergy eval_energy, const int2 bt,
+                     const int2 gbr_bt, const int2 gbd_bt);
 
 void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
                      CacheResourceKit<float> *gmem_r, ISWorkspaceKit<float> *iswk,
                      EvaluateForce eval_force, EvaluateEnergy eval_energy,
-                     AccumulationMethod force_sum, const int2 bt);
+                     AccumulationMethod force_sum, const int2 bt, const int2 gbr_bt,
+                     const int2 gbd_bt);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      const StaticExclusionMaskSynthesis &poly_se,
