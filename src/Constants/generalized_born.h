@@ -116,10 +116,14 @@ constexpr double default_neck_ii_gb_radii_offset = 0.195141;
 /// \brief Other "neck" GB parameters.  The neck cutoff has a physical interpretation which would
 ///        put it near 2.8 Angstroms, the diameter of a water molecule, but it is set higher (6.8)
 ///        to reduce the discontinuity at the cutoff.  gb_kscale is a "Kappa" scaling parameter.
-constexpr double default_gb_neck_cut  =  6.800000;
-constexpr double default_gb_kscale    =  0.730000;
+constexpr double default_gb_neck_cut      =  6.800000;
+constexpr double default_gb_kscale        =  0.730000;
 constexpr double default_gb_neck_scale    = 0.361825;
 constexpr double default_gb_neck_ii_scale = 0.826836;
+constexpr float default_gb_neck_cut_f      = default_gb_neck_cut;
+constexpr float default_gb_kscale_f        = default_gb_kscale;
+constexpr float default_gb_neck_scale_f    = default_gb_neck_scale;
+constexpr float default_gb_neck_ii_scale_f = default_gb_neck_ii_scale;
 /// \}
 
 /// \brief Abstract for the NeckGeneralizedBornTable object, in single- or double-precision.

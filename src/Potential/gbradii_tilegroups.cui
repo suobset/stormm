@@ -13,7 +13,7 @@
 __global__ void __launch_bounds__(small_block_size, GBRADII_KERNEL_BLOCKS_MULTIPLIER)
 KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ctrl,
             PsSynthesisWriter poly_psw, CacheResourceKit<TCALC> gmem_r,
-            ISWorkspaceKit<TCALC> isw) {
+            ISWorkspaceKit<TCALC> iswk) {
 
   // Coordinate and properties of particles are copied into special, L1-cached arrays of GMEM used
   // exclusively by this block.
@@ -289,9 +289,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       int write_idx = ((warp_lane_idx <  tile_length) * local_absc_start) +
                       ((warp_lane_idx >= tile_length) * local_ordi_start) + tile_lane_idx;
 #ifdef SPLIT_FORCE_ACCUMULATION
-      atomicSplit(psi_acc * isw.fp_scale, write_idx, sh_psi, sh_psi_overflow);
+      atomicSplit(psi_acc * iswk.fp_scale, write_idx, sh_psi, sh_psi_overflow);
 #else
-      atomicAdd((ullint*)&sh_psi[write_idx], LLCONV_FUNC(psi_acc * isw.fp_scale));
+      atomicAdd((ullint*)&sh_psi[write_idx], LLCONV_FUNC(psi_acc * iswk.fp_scale));
 #endif
     }
     __syncthreads();
@@ -300,12 +300,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
-    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, sh_psi_overflow, isw.psi);
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, sh_psi_overflow, iswk.psi);
 #  else
-    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, isw.psi);
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, iswk.psi);
 #  endif
 #else
-    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, sh_psi_overflow, isw.psi, isw.psi_ovrf);
+    pos = accumulateTileProperty(pos, 0, nbwu_map, sh_psi, sh_psi_overflow, iswk.psi,
+                                 iswk.psi_ovrf);
 #endif
     
     // Increment the work unit counter.  No additional __syncthreads() is needed as the imported

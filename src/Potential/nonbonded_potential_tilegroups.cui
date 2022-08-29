@@ -134,31 +134,28 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
-    if (poly_nbk.igb == ImplicitSolventModel::NECK_GB ||
-        poly_nbk.igb == ImplicitSolventModel::NECK_GB_II) {
-      while (pos < 5 * padded_import_count) {
-        const int rel_pos = pos - (4 * padded_import_count);
-        if (rel_pos < import_count) {
-          const size_t read_idx = (size_t)(nbwu_map[rel_pos + 1] + tile_lane_idx);
-          const size_t write_idx = (size_t)((rel_pos * tile_length) + tile_lane_idx +
-                                            EXCL_GMEM_OFFSET);
+#if defined(DO_GENERALIZED_BORN) && defined(DO_NECK_CORRECTION)
+    while (pos < 5 * padded_import_count) {
+      const int rel_pos = pos - (4 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = (size_t)(nbwu_map[rel_pos + 1] + tile_lane_idx);
+        const size_t write_idx = (size_t)((rel_pos * tile_length) + tile_lane_idx +
+                                          EXCL_GMEM_OFFSET);
 
-          // Fuse the Lennard-Jones and Neck Generalized Born indices.  Provide up to 65,536 types
-          // for each in a single 32-bit integer.
-          const int lj_idx = __ldcs(&poly_nbk.lj_idx[read_idx]);
-          const int gb_neck_idx = __ldcs(&poly_nbk.neck_gb_idx[read_idx]);
-          const int fused_idx = ((gb_neck_idx << 16) | lj_idx);
-          __stwb(&gmem_r.lj_idx[write_idx], fused_idx);
-        }
-        pos += tile_sides_per_warp * warps_per_block;
+        // Fuse the Lennard-Jones and Neck Generalized Born indices.  Provide up to 65,536 types
+        // for each in a single 32-bit integer.
+        const int lj_idx = __ldcs(&poly_nbk.lj_idx[read_idx]);
+        const int gb_neck_idx = __ldcs(&poly_nbk.neck_gb_idx[read_idx]);
+        const int fused_idx = ((gb_neck_idx << 16) | lj_idx);
+        __stwb(&gmem_r.lj_idx[write_idx], fused_idx);
       }
+      pos += tile_sides_per_warp * warps_per_block;
     }
-    else {
-
-      // Read the Lennard-Jones indices into the pre-allocated thread block-exclusive space.  This
-      // advances the pos counter by the same amount as the other branch that reads both indices.
-      pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.lj_idx, &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
-    }
+#else
+    // Read the Lennard-Jones indices into the pre-allocated thread block-exclusive space.  This
+    // advances the pos counter by the same amount as the other branch that reads both indices.
+    pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.lj_idx, &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
+#endif
     while (pos < 6 * padded_import_count) {
       const int rel_pos = pos - (5 * padded_import_count);
       if (rel_pos < import_count) {
@@ -179,10 +176,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       }
       pos += tile_sides_per_warp * warps_per_block;
     }
-#if defined(COMPUTE_ENERGY) && defined(DO_GENERALIZED_BORN)
-    llint egb_acc;
-#endif
 #ifdef DO_GENERALIZED_BORN
+#  ifdef DO_GENERALIZED_BORN
+      TCALC gb_nrg = (TCALC)(0.0);
+#  endif
     while (pos < 7 * padded_import_count) {
       const int rel_pos = pos - (6 * padded_import_count);
       if (rel_pos < import_count) {
@@ -232,8 +229,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC dielfac = (TCALC)(1.0) - expmkf;
         const TCALC atmq2h = (TCALC)(0.5) * atomq * atomq * poly_nbk.coulomb;
         const TCALC atmqd2h = atmq2h * dielfac;
-#  if defined (COMPUTE_ENERGY) && defined(DO_GENERALIZED_BORN)
-        egb_acc += (-atmqd2h / egbi) * scw.nrg_scale_f;
+#  ifdef COMPUTE_ENERGY
+        gb_nrg += (-atmqd2h / egbi) * scw.nrg_scale_f;
 #  endif
 #  ifdef COMPUTE_FORCE
 #    ifdef TCALC_IS_SINGLE
@@ -251,7 +248,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #    else
         const int95_t ssd = doubleToInt95((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
                                                       atmq2h * expmkf * egbi)) *
-                                          poly_psw.frc_scale_f);
+                                          poly_psw.frc_scale);
         sh_sum_deijda[write_idx] = ssd.x;
         sh_sum_deijda_overflow[write_idx] = ssd.y;
 #    endif
@@ -350,12 +347,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       const TCALC t_q     = gmem_r.charges[read_idx];
       const int nljt      = sh_n_lj_types[absc_import_idx];
       const int lj_offset = sh_ljabc_offsets[absc_import_idx];
+#ifdef DO_GENERALIZED_BORN
+      const bool on_diagonal = (absc_import_idx == ordi_import_idx);
+      const TCALC t_rad      = sh_gbeff_radii[read_idx - EXCL_GMEM_OFFSET];
+      TCALC sdeijda          = (TCALC)(0.0);
+#endif
 #ifdef COMPUTE_ENERGY
-      TCALC elec_nrg = 0.0;
-      TCALC vdw_nrg = 0.0;
-#  ifdef DO_GENERALIZED_BORN
-      TCALC gb_nrg = 0.0;
-#  endif
+      TCALC elec_nrg = (TCALC)(0.0);
+      TCALC vdw_nrg = (TCALC)(0.0);
 #endif
 #ifdef COMPUTE_FORCE
       TCALC t_xfrc = (TCALC)(0.0);
@@ -380,15 +379,38 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC dy      = o_ycrd - t_ycrd;
         const TCALC dz      = o_zcrd - t_zcrd;
         const TCALC r2      = (dx * dx) + (dy * dy) + (dz * dz);
-#ifdef COMPUTE_FORCE
-        TCALC fmag;
+#ifdef DO_GENERALIZED_BORN
+        const TCALC o_rad   = SHFL(t_rad, crd_src_lane);
+        const TCALC ot_rad  = t_rad * o_rad;
+        const TCALC efac    = EXP_FUNC(-r2 / ((TCALC)(4.0) * ot_rad));
+        const TCALC fgbi    = (TCALC)(1.0) / SQRT_FUNC(r2 + ot_rad * efac);
+        const TCALC fgbk    = -poly_nbk.kappa * default_gb_kscale_f / fgbi;
+        const TCALC expmkf  = EXP_FUNC(fgbk) / poly_nbk.dielectric;
+        const TCALC dielfac = (TCALC)(1.0) - expmkf;
+#  ifdef COMPUTE_ENERGY
+        gb_nrg -= ot_qq * dielfac * fgbi;
+#  endif
 #endif
-        if ((t_mask >> (crd_src_lane - (tile_length * (warp_lane_idx < tile_length)))) & 0x1) {
 #ifdef COMPUTE_FORCE
-          fmag = (TCALC)(0.0);
-#endif
+#  ifdef DO_GENERALIZED_BORN
+        const TCALC temp4 = fgbi * fgbi * fgbi;
+        const TCALC temp6 = ot_qq * temp4 * (dielfac + fgbk * expmkf);
+        TCALC fmag        = temp6 * ((TCALC)(1.0) - ((TCALC)(0.25) * efac));
+        TCALC temp5       = (TCALC)(0.5) * efac * temp6 * (ot_rad + ((TCALC)(0.25) * r2));
+        if (on_diagonal) {
+          fmag  *= (TCALC)(0.5);
+          temp5 *= (TCALC)(0.5);
+          if (i == 0 && warp_lane_idx < tile_length) {
+            fmag  = (TCALC)(0.0);
+            temp5 = (TCALC)(0.0);
+          }
         }
-        else {
+        sdeijda += temp5 * t_rad;
+#  else
+        TCALC fmag = TCALC(0.0);
+#  endif
+#endif
+        if (!((t_mask >> (crd_src_lane - (tile_length * (warp_lane_idx < tile_length)))) & 0x1)) {
           const TCALC invr      = rsqrt(r2);
           const TCALC invr2     = invr * invr;
           const TCALC invr4     = invr2 * invr2;
@@ -396,8 +418,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           const TCALC lja       = poly_nbk.lja_coeff[ot_ljidx];
           const TCALC ljb       = poly_nbk.ljb_coeff[ot_ljidx];
 #ifdef COMPUTE_FORCE
-          fmag = ((((TCALC)(6.0) * ljb) - ((TCALC)(12.0) * lja * invr4 * invr2)) * invr4 * invr4) -
-                 (ot_qq * invr2 * invr);
+          fmag += ((((TCALC)(6.0) * ljb) -
+                    ((TCALC)(12.0) * lja * invr4 * invr2)) * invr4 * invr4) -
+                  (ot_qq * invr2 * invr);
 #endif
 #ifdef COMPUTE_ENERGY
           elec_nrg += ot_qq * invr;
@@ -420,6 +443,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         t_xfrc -= SHFL(fmag_dx, frc_ret_lane);
         t_yfrc -= SHFL(fmag_dy, frc_ret_lane);
         t_zfrc -= SHFL(fmag_dz, frc_ret_lane);
+#  ifdef DO_GENERALIZED_BORN
+        sdeijda += SHFL(temp5, frc_ret_lane) * o_rad;
+#  endif
 #endif
       }
 #ifdef COMPUTE_ENERGY
@@ -427,9 +453,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       WARP_REDUCE_DOWN(elec_acc);
       llint vdw_acc  = LLCONV_FUNC(vdw_nrg * scw.nrg_scale_f);
       WARP_REDUCE_DOWN(vdw_acc);
+#  ifdef DO_GENERALIZED_BORN
+      llint egb_acc  = LLCONV_FUNC(gb_nrg * scw.nrg_scale_f);
+      WARP_REDUCE_DOWN(egb_acc);
+#  endif
       if (warp_lane_idx == 0) {
         atomicAdd((ullint*)&sh_elec_acc[absc_import_idx], (ullint)(elec_acc));
         atomicAdd((ullint*)&sh_vdw_acc[absc_import_idx], (ullint)(vdw_acc));
+#  ifdef DO_GENERALIZED_BORN
+        atomicAdd((ullint*)&sh_gb_acc[absc_import_idx], (ullint)(egb_acc));
+#  endif
       }
 #endif
 #ifdef COMPUTE_FORCE
@@ -438,10 +471,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       atomicSplit(t_xfrc * poly_psw.frc_scale_f, read_idx, sh_xfrc, sh_xfrc_overflow);
       atomicSplit(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, sh_yfrc_overflow);
       atomicSplit(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, sh_zfrc_overflow);
+#    ifdef DO_GENERALIZED_BORN
+      atomicSplit(sdeijda * iswk.fp_scale, read_idx, sh_sum_deijda, sh_sum_deijda_overflow);
+#    endif
 #  else
       atomicAdd((ullint*)&sh_xfrc[read_idx], (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
       atomicAdd((ullint*)&sh_yfrc[read_idx], (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
       atomicAdd((ullint*)&sh_zfrc[read_idx], (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
+#    ifdef DO_GENERALIZED_BORN
+      atomicAdd((ullint*)&sh_sum_deijda[read_idx], (ullint)(LLCONV_FUNC(sdeijda * iswk.fp_scale)));
+#    endif
 #  endif
 #endif
 
@@ -463,10 +502,17 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     pos = accumulateTileProperty(pos, 0, nbwu_map, sh_xfrc, sh_xfrc_overflow, poly_psw.xfrc);
     pos = accumulateTileProperty(pos, 1, nbwu_map, sh_yfrc, sh_yfrc_overflow, poly_psw.yfrc);
     pos = accumulateTileProperty(pos, 2, nbwu_map, sh_zfrc, sh_zfrc_overflow, poly_psw.zfrc);
+#      ifdef DO_GENERALIZED_BORN
+    pos = accumulateTileProperty(pos, 3, nbwu_map, sh_sum_deijda, sh_sum_deijda_overflow,
+                                 iswk.sum_deijda);
+#      endif
 #    else
     pos = accumulateTileProperty(pos, 0, nbwu_map, sh_xfrc, poly_psw.xfrc);
     pos = accumulateTileProperty(pos, 1, nbwu_map, sh_yfrc, poly_psw.yfrc);
     pos = accumulateTileProperty(pos, 2, nbwu_map, sh_zfrc, poly_psw.zfrc);
+#      ifdef DO_GENERALIZED_BORN
+    pos = accumulateTileProperty(pos, 3, nbwu_map, sh_sum_deijda, iswk.sum_deijda);
+#      endif
 #    endif
 #  else
     pos = accumulateTileProperty(pos, 0, nbwu_map, sh_xfrc, sh_xfrc_overflow, poly_psw.xfrc,
@@ -475,6 +521,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                                  poly_psw.yfrc_ovrf);
     pos = accumulateTileProperty(pos, 2, nbwu_map, sh_zfrc, sh_zfrc_overflow, poly_psw.zfrc,
                                  poly_psw.zfrc_ovrf);
+#      ifdef DO_GENERALIZED_BORN
+    pos = accumulateTileProperty(pos, 3, nbwu_map, sh_sum_deijda, sh_sum_deijda_overflow,
+                                 iswk.sum_deijda, iswk.sum_deijda_ovrf);
+#      endif
 #  endif
 #endif
 #ifdef COMPUTE_ENERGY
