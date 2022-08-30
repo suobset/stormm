@@ -134,6 +134,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   mmctrl->incrementStep();
   launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space, &ism_space,
                   EvaluateForce::YES, EvaluateEnergy::NO, facc_method, launcher);
+  const NeckGeneralizedBornTable ngb_tables;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
     PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
@@ -143,6 +144,15 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const StaticExclusionMask ise(iag_ptr);
     const double2 tnbe = evaluateNonbondedEnergy(iag_ptr, ise, &host_result, &isc,
                                                  EvaluateForce::YES, EvaluateForce::YES, 0);
+    if (iag_ptr->getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+
+      // CHECK
+      printf("Evaluate GB on system %s\n", getBaseName(iag_ptr->getFileName()).c_str());
+      // END CHECK
+      
+      const double tgbe = evaluateGeneralizedBornEnergy(iag_ptr, ise, ngb_tables, &host_result,
+                                                        &isc, EvaluateForce::YES, 0);
+    }
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
 
@@ -565,6 +575,24 @@ int main(const int argc, const char* argv[]) {
                            big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, big_launcher,
                            1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4,
                            1.0e-6, 7.5e-4, 7.5e-3, do_tests);
+  
+  // Tweak the original synthesis to incorporate a Generalized Born model.
+  const NeckGeneralizedBornTable ngb_tables;
+  poly_ag.setImplicitSolventModel(ImplicitSolventModel::HCT_GB, ngb_tables,
+                                  AtomicRadiusSet::BONDI);
+  mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::DOUBLE, poly_ag);
+  checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                         poly_se, AccumulationMethod::SPLIT, PrecisionModel::DOUBLE, gpu,
+                         launcher, 3.5e-6, 2.0e-6, do_tests);
+  checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                           poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, do_tests);
+
+  // CHECK
+  printf("Done with GB tests.\n");
+  // END CHECK
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.

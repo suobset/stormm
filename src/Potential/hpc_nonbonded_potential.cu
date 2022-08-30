@@ -1140,6 +1140,8 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, do
           ktgdsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
           break;
         }
+        ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
+                                                            *iswk);
         break;
       case EvaluateForce::NO:
         ktgdGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r, *iswk);
@@ -1161,6 +1163,8 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, do
           ktgdsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
           break;
         }
+        ktgdsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                *gmem_r, *iswk);
         break;
       case EvaluateForce::NO:
         ktgdGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
@@ -1256,6 +1260,8 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
             ktgfsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
             break;
           }
+          ktgfsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
+                                                              *iswk);
           break;
         case AccumulationMethod::WHOLE:
           switch (eval_energy) {
@@ -1267,6 +1273,8 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
             ktgfGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
             break;
           }
+          ktgfCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
+                                                             *iswk);
           break;
         case AccumulationMethod::AUTOMATIC:
           break;
@@ -1305,6 +1313,8 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
                                              *iswk);
             break;
           }
+          ktgfsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                  *gmem_r, *iswk);
           break;
         case AccumulationMethod::WHOLE:
           switch (eval_energy) {
@@ -1317,6 +1327,8 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
                                             *iswk);
             break;
           }
+          ktgfCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
+                                                                 *gmem_r, *iswk);
           break;
         case AccumulationMethod::AUTOMATIC:
           break;

@@ -309,6 +309,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
 #else
       atomicAdd((ullint*)&sh_psi[write_idx], LLCONV_FUNC(psi_acc * iswk.fp_scale));
 #endif
+
+      // Increment the tile counter
+      pos += warps_per_block;
     }
     __syncthreads();
 
