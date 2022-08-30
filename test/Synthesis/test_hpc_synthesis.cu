@@ -212,6 +212,7 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                               const double angl_tol, const double dihe_tol, const double impr_tol,
                               const double ubrd_tol, const double cimp_tol, const double cmap_tol,
                               const double lj14_tol, const double qq14_tol, const double rstr_tol,
+                              const double ljnb_tol, const double qqnb_tol,
                               const TestPriority do_tests) {
   const int nsys = poly_ps->getSystemCount();
   ScoreCard sc(nsys, 1, 32);
@@ -220,18 +221,27 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
   launchValence(prec, poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::NO,
                 EvaluateEnergy::YES, VwuGoal::ACCUMULATE, AccumulationMethod::SPLIT,
                 launcher);
+  ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
+                                     poly_ag.getSystemAtomCounts(), prec);
+  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space, &ism_space,
+                  EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT, launcher);
   sc.download();
   std::vector<double> cpu_bond(nsys), gpu_bond(nsys), cpu_angl(nsys), gpu_angl(nsys);
   std::vector<double> cpu_dihe(nsys), gpu_dihe(nsys), cpu_impr(nsys), gpu_impr(nsys);
   std::vector<double> cpu_ubrd(nsys), gpu_ubrd(nsys), cpu_cimp(nsys), gpu_cimp(nsys);
   std::vector<double> cpu_cmap(nsys), gpu_cmap(nsys), cpu_qq14(nsys), gpu_qq14(nsys);
-  std::vector<double> cpu_lj14(nsys), gpu_lj14(nsys);
+  std::vector<double> cpu_lj14(nsys), gpu_lj14(nsys), cpu_rstr(nsys), gpu_rstr(nsys);
+  std::vector<double> cpu_ljnb(nsys), gpu_ljnb(nsys), cpu_qqnb(nsys), gpu_qqnb(nsys);
+  int nrstr = 0;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
     host_result.initializeForces();
     ScoreCard isc(1, 1, 32);
-    evalValeMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), EvaluateForce::NO, 0);
+    const StaticExclusionMask sysi_se(poly_ag.getSystemTopologyPointer(i));
+    evalNonbValeRestMM(&host_result, &isc, poly_ag.getSystemTopologyPointer(i), sysi_se,
+                       poly_ag.getSystemRestraintPointer(i), EvaluateForce::NO, 0, 0);
+    nrstr += poly_ag.getSystemRestraintPointer(i)->getTotalRestraintCount();
     gpu_bond[i] =  sc.reportInstantaneousStates(StateVariable::BOND, i);
     cpu_bond[i] = isc.reportInstantaneousStates(StateVariable::BOND, 0);
     gpu_angl[i] =  sc.reportInstantaneousStates(StateVariable::ANGLE, i);
@@ -250,6 +260,12 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
     cpu_qq14[i] = isc.reportInstantaneousStates(StateVariable::ELECTROSTATIC_ONE_FOUR, 0);
     gpu_lj14[i] =  sc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, i);
     cpu_lj14[i] = isc.reportInstantaneousStates(StateVariable::VDW_ONE_FOUR, 0);
+    gpu_rstr[i] =  sc.reportInstantaneousStates(StateVariable::RESTRAINT, i);
+    cpu_rstr[i] = isc.reportInstantaneousStates(StateVariable::RESTRAINT, 0);
+    gpu_ljnb[i] =  sc.reportInstantaneousStates(StateVariable::VDW, i);
+    cpu_ljnb[i] = isc.reportInstantaneousStates(StateVariable::VDW, 0);
+    gpu_qqnb[i] =  sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, i);
+    cpu_qqnb[i] = isc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0);
   }
   check(gpu_bond, RelationalOperator::EQUAL, Approx(cpu_bond).margin(bond_tol), "Bond energies "
         "computed on the CPU and GPU do not agree.  Precision level in the calculation: " +
@@ -278,6 +294,17 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
   check(gpu_lj14, RelationalOperator::EQUAL, Approx(cpu_lj14).margin(lj14_tol), "Lennard-Jones "
         "1:4 energies computed on the CPU and GPU do not agree.  Precision level in the "
         "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+  if (nrstr > 0) {
+    check(gpu_rstr, RelationalOperator::EQUAL, Approx(cpu_rstr).margin(rstr_tol), "Restraint "
+          "energies computed on the CPU and GPU do not agree.  Precision level in the "
+          "calculation: " + getPrecisionModelName(prec) + ".", do_tests);    
+  }
+  check(gpu_qqnb, RelationalOperator::EQUAL, Approx(cpu_qqnb).margin(qqnb_tol), "Electrostatic "
+        "non-bonded energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);
+  check(gpu_ljnb, RelationalOperator::EQUAL, Approx(cpu_ljnb).margin(ljnb_tol), "Lennard-Jones "
+        "non-bonded energies computed on the CPU and GPU do not agree.  Precision level in the "
+        "calculation: " + getPrecisionModelName(prec) + ".", do_tests);  
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -438,7 +465,8 @@ int main(const int argc, const char* argv[]) {
                          launcher, 3.5e-6, 2.0e-6, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6, 1.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                           1.0e-6, do_tests);
 
   // Check that super-high precision forms of the coordinates and force accumulation are OK in
   // double-precision mode.
@@ -457,7 +485,8 @@ int main(const int argc, const char* argv[]) {
                          3.5e-5, 2.0e-4, do_tests);
   checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, PrecisionModel::SINGLE, gpu, launcher, 1.5e-5, 1.5e-5, 5.0e-6,
-                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6, do_tests);
+                           1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6,
+                           1.0e-1, 3.5e-5, do_tests);
 
   // Create a set of larger systems, now involving CMAPs and other CHARMM force field terms
   const std::string topology_base = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
@@ -518,7 +547,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            big_poly_ag, big_poly_se, PrecisionModel::DOUBLE, gpu, big_launcher,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 1.0e-6, 1.0e-6,
-                           1.0e-6, do_tests);
+                           1.0e-6, 1.0e-6, 1.0e-6, do_tests);
   checkCompilationForces(&big_poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                          big_poly_ag, big_poly_se, AccumulationMethod::SPLIT,
                          PrecisionModel::DOUBLE, gpu, big_launcher, 3.5e-6, 2.5e-5, do_tests);
@@ -535,7 +564,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&big_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            big_poly_ag, big_poly_se, PrecisionModel::SINGLE, gpu, big_launcher,
                            1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5, 6.0e-6, 7.5e-5, 2.2e-4,
-                           1.0e-6, do_tests);
+                           1.0e-6, 7.5e-4, 7.5e-3, do_tests);
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
@@ -621,7 +650,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            ligand_poly_ag, ligand_poly_se, PrecisionModel::DOUBLE, gpu,
                            ligand_launcher, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
-                           6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
+                           6.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, do_tests);
 
   // Remarkably, the "super-double" representation with ultra-high precision coordinates cannot
   // get forces any closer than 5.0e-7 kcal/mol-A, due to something that happens in the last bit
@@ -644,7 +673,7 @@ int main(const int argc, const char* argv[]) {
   checkCompilationEnergies(&ligand_poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space,
                            ligand_poly_ag, ligand_poly_se, PrecisionModel::SINGLE, gpu,
                            ligand_launcher, 1.5e-4, 2.2e-5, 9.0e-5, 1.5e-5, 6.0e-5, 3.0e-5,
-                           6.0e-6, 7.5e-5, 2.2e-4, 1.0e-6, do_tests);
+                           6.0e-6, 7.5e-5, 2.2e-4, 1.0e-5, 2.2e-4, 3.0e-5, do_tests);
 
   // Scramble and replace virtual sites on the GPU
   Xoroshiro128pGenerator xrs(618608377);

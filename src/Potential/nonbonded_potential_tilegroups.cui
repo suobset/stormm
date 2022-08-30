@@ -34,8 +34,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #ifdef COMPUTE_FORCE
 #  ifdef TCALC_IS_SINGLE
 #    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef DO_GENERALIZED_BORN
   __shared__ int sh_sum_deijda[small_block_max_atoms];
   __shared__ int sh_sum_deijda_overflow[small_block_max_atoms];
+#      endif
   __shared__ int sh_xfrc[small_block_max_atoms];
   __shared__ int sh_yfrc[small_block_max_atoms];
   __shared__ int sh_zfrc[small_block_max_atoms];
@@ -43,16 +45,18 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
   __shared__ int sh_yfrc_overflow[small_block_max_atoms];
   __shared__ int sh_zfrc_overflow[small_block_max_atoms];
 #    else
+#      ifdef DO_GENERALIZED_BORN
   __shared__ llint sh_sum_deijda[small_block_max_atoms];
+#      endif
   __shared__ llint sh_xfrc[small_block_max_atoms];
   __shared__ llint sh_yfrc[small_block_max_atoms];
   __shared__ llint sh_zfrc[small_block_max_atoms];
 #    endif
 #  else
-#ifdef DO_GENERALIZED_BORN
+#    ifdef DO_GENERALIZED_BORN
   __shared__ llint sh_sum_deijda[small_block_max_atoms];
   __shared__ int sh_sum_deijda_overflow[small_block_max_atoms];
-#endif
+#    endif
   __shared__ llint sh_xfrc[small_block_max_atoms];
   __shared__ llint sh_yfrc[small_block_max_atoms];
   __shared__ llint sh_zfrc[small_block_max_atoms];
@@ -159,8 +163,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       pos += tile_sides_per_warp * warps_per_block;
     }
 #ifdef DO_GENERALIZED_BORN
-#  ifdef DO_GENERALIZED_BORN
-      TCALC gb_nrg = (TCALC)(0.0);
+#  ifdef COMPUTE_ENERGY
+    TCALC gb_nrg = (TCALC)(0.0);
 #  endif
     while (pos < 7 * padded_import_count) {
       const int rel_pos = pos - (6 * padded_import_count);
@@ -332,7 +336,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #ifdef DO_GENERALIZED_BORN
       const bool on_diagonal = (absc_import_idx == ordi_import_idx);
       const TCALC t_rad      = sh_gbeff_radii[read_idx - EXCL_GMEM_OFFSET];
+#  ifdef COMPUTE_FORCE
       TCALC sdeijda          = (TCALC)(0.0);
+#  endif
 #endif
 #ifdef COMPUTE_ENERGY
       TCALC elec_nrg = (TCALC)(0.0);
@@ -370,7 +376,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC expmkf  = EXP_FUNC(fgbk) / poly_nbk.dielectric;
         const TCALC dielfac = (TCALC)(1.0) - expmkf;
 #  ifdef COMPUTE_ENERGY
-        gb_nrg -= ot_qq * dielfac * fgbi;
+        if (on_diagonal) {
+          if (i > 0 || warp_lane_idx >= tile_length) {
+            gb_nrg -= (TCALC)(0.5) * ot_qq * dielfac * fgbi;
+          }
+        }
+        else {
+          gb_nrg -= ot_qq * dielfac * fgbi;
+        }
 #  endif
 #endif
 #ifdef COMPUTE_FORCE

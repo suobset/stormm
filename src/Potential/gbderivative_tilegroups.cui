@@ -356,7 +356,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         // Contribute the forces
         const TCALC t_sdj = sh_sum_deijda[read_idx];
         const TCALC o_sdj = SHFL(t_sdj, crd_src_lane);
-        const TCALC fmag = (datmpi * t_sdj) + (datmpj * o_sdj);
+        TCALC fmag = (datmpi * t_sdj) + (datmpj * o_sdj);
+        if (on_diagonal) {
+          fmag  *= (TCALC)(0.5);
+          if (i == 0 && warp_lane_idx < tile_length) {
+            fmag  = (TCALC)(0.0);
+          }
+        }
         const TCALC fmag_dx = fmag * dx;
         const TCALC fmag_dy = fmag * dy;
         const TCALC fmag_dz = fmag * dz;

@@ -166,7 +166,7 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
 
 //-------------------------------------------------------------------------------------------------
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
-                        const StaticExclusionMask &se, const RestraintApparatus &ra,
+                        const StaticExclusionMask &se, const RestraintApparatus *ra,
                         const EvaluateForce eval_force, const int system_index, const int step) {
   PhaseSpaceWriter psw = ps->data();
   const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
@@ -179,9 +179,50 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
                                      ag->getDoublePrecisionValenceKit(), nbk, eval_force,
                                      system_index);
   evaluateRestraints<double, double,
-                     double, double2, double4>(ra.dpData(), psw.xcrd, psw.ycrd, psw.zcrd, psw.umat,
-                                               psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc,
-                                               psw.zfrc, sc, eval_force, system_index, step);
+                     double, double2, double4>(ra->dpData(), psw.xcrd, psw.ycrd, psw.zcrd,
+                                               psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
+                                               psw.yfrc, psw.zfrc, sc, eval_force, system_index,
+                                               step);
+}
+
+//-------------------------------------------------------------------------------------------------
+void evalRestraintMMGB(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
+                       const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
+                       const ImplicitSolventKit<double> &isk,
+                       const NeckGeneralizedBornKit<double> &neck_gbk,
+                       double* effective_gb_radii, double *psi, double *sumdeijda,
+                       const RestraintKit<double, double2, double4> &rar,
+                       const EvaluateForce eval_force, const int system_index, const int step) {
+  evaluateGeneralizedBornEnergy(nbk, ser, isk, neck_gbk, psw, sc, eval_force, system_index);
+  evalNonbValeRestMM(psw, sc, vk, nbk, ser, rar, eval_force, system_index, step);
+}
+
+//-------------------------------------------------------------------------------------------------
+void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
+                        const NeckGeneralizedBornTable &neck_gbtab,
+			const StaticExclusionMask &se, const RestraintApparatus &ra,
+                        const EvaluateForce eval_force, const int system_index, const int step) {
+  const ImplicitSolventKit<double> isk = ag.getDoublePrecisionImplicitSolventKit();
+  const NonbondedKit<double> nbk = ag.getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
+  const StaticExclusionMaskReader ser = se.data();
+  evaluateGeneralizedBornEnergy(nbk, ser, isk, neck_gbtab.dpData(), ps->data(), sc, eval_force,
+                                system_index);
+  evalNonbValeRestMM(ps->data(), sc, vk, nbk, ser, ra.dpData(), eval_force, system_index, step);
+}
+
+//-------------------------------------------------------------------------------------------------
+void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
+                        const NeckGeneralizedBornTable &neck_gbtab,
+			const StaticExclusionMask &se, const RestraintApparatus *ra,
+                        const EvaluateForce eval_force, const int system_index, const int step) {
+  const ImplicitSolventKit<double> isk = ag->getDoublePrecisionImplicitSolventKit();
+  const NonbondedKit<double> nbk = ag->getDoublePrecisionNonbondedKit();
+  const ValenceKit<double> vk = ag->getDoublePrecisionValenceKit();
+  const StaticExclusionMaskReader ser = se.data();
+  evaluateGeneralizedBornEnergy(nbk, ser, isk, neck_gbtab.dpData(), ps->data(), sc, eval_force,
+                                system_index);
+  evalNonbValeRestMM(ps->data(), sc, vk, nbk, ser, ra->dpData(), eval_force, system_index, step);
 }
 
 } // namespace mm

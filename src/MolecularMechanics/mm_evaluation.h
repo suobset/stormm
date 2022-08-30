@@ -3,6 +3,7 @@
 #define STORMM_MM_EVALUATION_H
 
 #include "copyright.h"
+#include "Constants/generalized_born.h"
 #include "Potential/energy_enumerators.h"
 #include "Potential/nonbonded_potential.h"
 #include "Potential/scorecard.h"
@@ -19,21 +20,23 @@ namespace stormm {
 namespace mm {
 
 using energy::EvaluateForce;
-using energy::evaluateBondTerms;
 using energy::evaluateAngleTerms;
-using energy::evaluateDihedralTerms;
-using energy::evaluateUreyBradleyTerms;
+using energy::evaluateAttenuated14Terms;
+using energy::evaluateBondTerms;
 using energy::evaluateCharmmImproperTerms;
 using energy::evaluateCmapTerms;
-using energy::evaluateAttenuated14Terms;
-using energy::evaluateRestraints;
+using energy::evaluateDihedralTerms;
+using energy::evaluateGeneralizedBornEnergy;
 using energy::evaluateNonbondedEnergy;
+using energy::evaluateRestraints;
+using energy::evaluateUreyBradleyTerms;
 using energy::ScoreCard;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
 using restraints::RestraintApparatus;
 using restraints::RestraintKit;
 using topology::AtomGraph;
+using topology::ImplicitSolventKit;
 using topology::NonbondedKit;
 using topology::UnitCellType;
 using topology::ValenceKit;
@@ -42,6 +45,7 @@ using trajectory::CoordinateFrame;
 using trajectory::CoordinateFrameReader;
 using trajectory::PhaseSpace;
 using trajectory::PhaseSpaceWriter;
+using namespace generalized_born_defaults;
   
 /// \brief Evaluate molecular mechanics valence energies and forces in a single system.  Energy
 ///        results are collected in fixed precision in the ScoreCard object fed to this routine.
@@ -189,10 +193,57 @@ void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
                         EvaluateForce eval_force, int system_index = 0, int step = 0);
 
 void evalNonbValeRestMM(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
-                        const StaticExclusionMask &se, const RestraintApparatus &ra,
+                        const StaticExclusionMask &se, const RestraintApparatus *ra,
                         EvaluateForce eval_force, int system_index = 0, int step = 0);
 /// \}
 
+/// \brief Evaluate the complete molecular mechanics energies and forces for a system in isolated
+///        boundary conditions, including valence terms, restraints, non-bonded interactions, and
+///        Generalized Born implicit solvent contributions.
+///
+/// Overloaded:
+///   - Take raw pointers to coordinates, box transformations, and forces, along with abstracts
+///     to the required parameters
+///   - Take a PhaseSpace object and the relevant topology plus restraint collection, or abstracts
+///     thereof
+///
+/// Descriptions of input variables follow from evalValeMM(), evalValeRestMM(), and
+/// evalNonbValeRestMM() above, with the addition of:
+///
+/// \param isk         A recipe for evaluating implicit solvent contributions constructed from the
+///                    topology (containing the implicit solvent model) and a Generalized Born
+///                    parameter table
+/// \param neck_gbk    Abstract of a neck GB table at the appropriate (double) precision level
+/// \param neck_gbtab  Table of "neck" Generalized Born parameters, if applicable
+/// \{
+template <typename Tcoord, typename Tforce, typename Tcalc, typename Tcalc2, typename Tcalc4>
+void evalRestrainedMMGB(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, double* umat, double* invu,
+                        UnitCellType unit_cell, Tforce* xfrc, Tforce* yfrc, Tforce* zfrc,
+                        ScoreCard *sc, const ValenceKit<Tcalc> &vk, const NonbondedKit<Tcalc> &nbk,
+                        const StaticExclusionMaskReader &ser, const ImplicitSolventKit<Tcalc> &isk,
+                        const NeckGeneralizedBornKit<Tcalc> &neck_gbk,
+                        Tforce* effective_gb_radii, Tforce* psi, Tforce* sumdeijda,
+                        const RestraintKit<Tcalc, Tcalc2, Tcalc4> &rar, EvaluateForce eval_force,
+                        int system_index = 0, int step = 0);
+
+void evalRestrainedMMGB(PhaseSpaceWriter psw, ScoreCard *sc, const ValenceKit<double> &vk,
+                        const NonbondedKit<double> &nbk, const StaticExclusionMaskReader &ser,
+                        const ImplicitSolventKit<double> &isk,
+                        const NeckGeneralizedBornKit<double> &neck_gbk,
+                        const RestraintKit<double, double2, double4> &rar,
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+
+void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph &ag,
+                        const NeckGeneralizedBornTable &neck_gbtab,
+                        const StaticExclusionMask &se, const RestraintApparatus &ra,
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+                        
+void evalRestrainedMMGB(PhaseSpace *ps, ScoreCard *sc, const AtomGraph *ag,
+                        const NeckGeneralizedBornTable &neck_gbtab,
+                        const StaticExclusionMask &se, const RestraintApparatus *ra,
+                        EvaluateForce eval_force, int system_index = 0, int step = 0);
+/// \}
+  
 } // namespace mm
 } // namespace stormm
 

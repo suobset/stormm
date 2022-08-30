@@ -288,7 +288,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
             }
           }
           else if (min_pos < sh_mvec[3]) {
-            
+
             // Make a final check that the minimum value of the function is an improvement over
             // the extrema.  Otherwise, move the particles to a point within the range scored by
             // the four data points.
