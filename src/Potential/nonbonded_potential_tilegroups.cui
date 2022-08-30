@@ -134,28 +134,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
-#if defined(DO_GENERALIZED_BORN) && defined(DO_NECK_CORRECTION)
-    while (pos < 5 * padded_import_count) {
-      const int rel_pos = pos - (4 * padded_import_count);
-      if (rel_pos < import_count) {
-        const size_t read_idx = (size_t)(nbwu_map[rel_pos + 1] + tile_lane_idx);
-        const size_t write_idx = (size_t)((rel_pos * tile_length) + tile_lane_idx +
-                                          EXCL_GMEM_OFFSET);
 
-        // Fuse the Lennard-Jones and Neck Generalized Born indices.  Provide up to 65,536 types
-        // for each in a single 32-bit integer.
-        const int lj_idx = __ldcs(&poly_nbk.lj_idx[read_idx]);
-        const int gb_neck_idx = __ldcs(&poly_nbk.neck_gb_idx[read_idx]);
-        const int fused_idx = ((gb_neck_idx << 16) | lj_idx);
-        __stwb(&gmem_r.lj_idx[write_idx], fused_idx);
-      }
-      pos += tile_sides_per_warp * warps_per_block;
-    }
-#else
-    // Read the Lennard-Jones indices into the pre-allocated thread block-exclusive space.  This
-    // advances the pos counter by the same amount as the other branch that reads both indices.
+    // Read the Lennard-Jones indices into the pre-allocated thread block-exclusive space.  Neck
+    // GB models do not need to access their table indices during this phase of the calculation.
     pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.lj_idx, &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
-#endif
     while (pos < 6 * padded_import_count) {
       const int rel_pos = pos - (5 * padded_import_count);
       if (rel_pos < import_count) {
@@ -492,9 +474,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     }
     __syncthreads();
 
-    // Re-read the __shared__ memory value as a local constant to avoid having to carry it through
-    // the loops above and thus reduce register pressure.  Commit the locally accumulated forces
-    // back to global arrays.
+    // Commit the locally accumulated forces back to global arrays.
     pos = (tile_sides_per_warp * warp_idx) + tile_side_offset;
 #ifdef COMPUTE_FORCE
 #  ifdef TCALC_IS_SINGLE
@@ -564,7 +544,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #endif
     
     // Increment the work unit counter
-    __syncthreads();
     if (threadIdx.x == 0) {
       const size_t prog_counter_idx = (ctrl.step & twice_warp_bits_mask_int);
       nbwu_idx = atomicAdd(&ctrl.nbwu_progress[prog_counter_idx], 1);

@@ -190,11 +190,19 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         if (r > (TCALC)(4.0) * sj) {
           const TCALC invr2 = invr * invr;
           const TCALC tmpsd = sj2 * invr2;
+#ifdef TCALC_IS_SINGLE
           const TCALC dumbo = gb_taylor_a_f +
                               (tmpsd * (gb_taylor_b_f +
                                         (tmpsd * (gb_taylor_c_f +
                                                   (tmpsd * (gb_taylor_d_f +
                                                             (tmpsd * gb_taylor_dd_f)))))));
+#else
+          const TCALC dumbo = gb_taylor_a_lf +
+                              (tmpsd * (gb_taylor_b_lf +
+                                        (tmpsd * (gb_taylor_c_lf +
+                                                  (tmpsd * (gb_taylor_d_lf +
+                                                            (tmpsd * gb_taylor_dd_lf)))))));
+#endif
           t_psi -= sj * tmpsd * invr2 * dumbo;
         }
         else if (r > t_radius + sj) {
@@ -220,11 +228,19 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         if (r > (TCALC)(4.0) * si) {
           const TCALC invr2  = invr * invr;
           const TCALC tmpsd  = si2 * invr2;
+#ifdef TCALC_IS_SINGLE
           const TCALC dumbo  = gb_taylor_a_f +
                                (tmpsd * (gb_taylor_b_f +
                                          (tmpsd * (gb_taylor_c_f +
                                                    (tmpsd * (gb_taylor_d_f +
                                                              (tmpsd * gb_taylor_dd_f)))))));
+#else
+          const TCALC dumbo  = gb_taylor_a_lf +
+                               (tmpsd * (gb_taylor_b_lf +
+                                         (tmpsd * (gb_taylor_c_lf +
+                                                   (tmpsd * (gb_taylor_d_lf +
+                                                             (tmpsd * gb_taylor_dd_lf)))))));
+#endif
           o_psi -= si * tmpsd * invr2 * dumbo;
         }
         else if (r > o_radius + si) {
@@ -317,5 +333,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       gbrwu_idx = atomicAdd(&ctrl.gbrwu_progress[prog_counter_idx], 1);
     }
     __syncthreads();    
+  }
+
+  // Set the block counters for future iterations of this kernel
+  if (blockIdx.x == 0 && threadIdx.x < warp_size_int) {
+    const int step_modulus = (ctrl.step & twice_warp_bits_mask_int);
+    if (step_modulus == 0) {
+      ctrl.gbrwu_progress[threadIdx.x + warp_size_int] = gridDim.x;
+    }
+    if (step_modulus == warp_size_int) {
+      ctrl.gbrwu_progress[threadIdx.x] = gridDim.x;
+    }
   }
 }
