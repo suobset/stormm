@@ -445,7 +445,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                 const Tcalc invr2 = invr * invr;
                 const Tcalc tmpsd = sj2 * invr2;
                 const Tcalc dumbo = gta +
-                                    tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd))); 
+                                    tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd)));
                 cachi_psi[i] -= sj * tmpsd * invr2 * dumbo;
               }
               else if (r > atomi_radius + sj) {
@@ -655,6 +655,16 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       }
     }
   }
+
+  // CHECK
+  if (nbk.natom == 41) {
+    printf("CPU sum_deijda initialized: [\n");
+    for (int i = 0; i < nbk.natom; i++) {
+      printf("  %10.6lf\n", sumdeijda[i]);
+    }
+    printf("];\n");
+  }
+  // END CHECK
   
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.  However,
@@ -750,13 +760,13 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
               Tcalc efac, fgbi, fgbk, expmkf;
               if (tcalc_is_double) {
                 efac = exp(-r2 / (v_four * ij_born_radius));
-                fgbi = v_one / sqrt(r2 + ij_born_radius * efac);
+                fgbi = v_one / sqrt(r2 + (ij_born_radius * efac));
                 fgbk = -isr.kappa * default_gb_kscale / fgbi;
                 expmkf = exp(fgbk) / isr.dielectric;
               }
               else {
                 efac = expf(-r2 / (v_four * ij_born_radius));
-                fgbi = v_one / sqrtf(r2 + ij_born_radius * efac);
+                fgbi = v_one / sqrtf(r2 + (ij_born_radius * efac));
                 fgbk = -isr.kappa * default_gb_kscale / fgbi;
                 expmkf = expf(fgbk) / isr.dielectric;
               }
@@ -764,11 +774,31 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
               contrib -= qiqj * dielfac * fgbi;
               if (eval_force == EvaluateForce::YES) {
                 const Tcalc temp4 = fgbi * fgbi * fgbi;
-                const Tcalc temp6 = qiqj * temp4 * (dielfac + fgbk * expmkf);
+                const Tcalc temp6 = qiqj * temp4 * (dielfac + (fgbk * expmkf));
                 const Tcalc fmag = temp6 * (v_one - (v_qrtr * efac));
                 const Tcalc temp5 = v_half * efac * temp6 * (ij_born_radius + (v_qrtr * r2));
                 cachi_psi[i] += atomi_radius * temp5;
+
+                // CHECK
+                if (nbk.natom == 41 && ti == 0 && i == 0) {
+                  printf("Contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> "
+                         "%10.6lf to atom 0 sdj\n", cachi_screen[i] * sqrt(nbk.coulomb_constant),
+                         cachj_screen[j] * sqrt(nbk.coulomb_constant), r2, ij_born_radius, efac,
+                         fgbi, atomi_radius * temp5);
+                }
+                // END CHECK
+                
                 cachj_psi[j] += cachj_radii[j] * temp5;
+
+                // CHECK
+                if (nbk.natom == 41 && tj == 0 && j == 0) {
+                  printf("Contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> "
+                         "%10.6lf to atom 0 sdj\n", cachi_screen[i] * sqrt(nbk.coulomb_constant),
+                         cachj_screen[j] * sqrt(nbk.coulomb_constant), r2, ij_born_radius, efac,
+                         fgbi, cachj_radii[j] * temp5);
+                }
+                // END CHECK
+                
                 cachi_xfrc[i] += fmag * dx;
                 cachi_yfrc[i] += fmag * dy;
                 cachi_zfrc[i] += fmag * dz;

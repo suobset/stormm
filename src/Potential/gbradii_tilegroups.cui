@@ -80,12 +80,18 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
 #endif
     pos = loadTileProperty(pos, 3, nbwu_map, poly_nbk.pb_radii, -poly_nbk.gb_offset, sh_pbradii);
     pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.gb_screen, sh_screen);
+
+    // Initialize the psi accumulators, and record the number of atoms per tile for normalizing
+    // each tiles' center of geometry
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
     while (pos < 6 * padded_import_count) {
       const int rel_pos = pos - (5 * padded_import_count);
       if (rel_pos < import_count) {
+        if (tile_lane_idx == 0) {
+          sh_tile_tpts[rel_pos] = (TCALC)(getTileSideAtomCount(nbwu_map, rel_pos));
+        }
         const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
 #ifdef TCALC_IS_SINGLE
 #  ifdef SPLIT_FORCE_ACCUMULATION
@@ -105,7 +111,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     pos = loadTileProperty(pos, 6, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
 #endif
     __syncthreads();
-
+    
     // Loop over tile instructions
     pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
     while (pos < nbwu_map[small_block_max_imports + 7]) {
@@ -135,9 +141,12 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       const llint x_center = LLCONV_FUNC(tx_cog);
       const llint y_center = LLCONV_FUNC(ty_cog);
       const llint z_center = LLCONV_FUNC(tz_cog);
-      const TCALC t_xcrd   = (TCALC)(gmem_r.xcrd[read_idx] - x_center) * poly_psw.inv_gpos_scale;
-      const TCALC t_ycrd   = (TCALC)(gmem_r.ycrd[read_idx] - y_center) * poly_psw.inv_gpos_scale;
-      const TCALC t_zcrd   = (TCALC)(gmem_r.zcrd[read_idx] - z_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_xcrd   = (TCALC)(__ldca(&gmem_r.xcrd[read_idx]) - x_center) *
+                             poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd   = (TCALC)(__ldca(&gmem_r.ycrd[read_idx]) - y_center) *
+                             poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd   = (TCALC)(__ldca(&gmem_r.zcrd[read_idx]) - z_center) *
+                             poly_psw.inv_gpos_scale;
 #else
       // Convert the negative values of the center-of-geometry coordinates so that the result
       // can feed into splitFPSum() (which adds A + B).
@@ -147,12 +156,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
       const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
       const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
-      const int95_t x95_tmp  = splitFPSum(x_atom, x_center);
-      const int95_t y95_tmp  = splitFPSum(y_atom, y_center);
-      const int95_t z95_tmp  = splitFPSum(z_atom, z_center);
-      const TCALC t_xcrd = splitFPToReal(x95_tmp) * poly_psw.inv_gpos_scale;
-      const TCALC t_ycrd = splitFPToReal(y95_tmp) * poly_psw.inv_gpos_scale;
-      const TCALC t_zcrd = splitFPToReal(z95_tmp) * poly_psw.inv_gpos_scale;
+      const TCALC t_xcrd = int95SumToDouble(x_atom, x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd = int95SumToDouble(y_atom, y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd = int95SumToDouble(z_atom, z_center) * poly_psw.inv_gpos_scale;
 #endif
       const TCALC t_radius = sh_pbradii[read_idx - EXCL_GMEM_OFFSET];
       const TCALC t_inv_radius = (TCALC)(1.0) / t_radius;
@@ -182,7 +188,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         const TCALC o_screen = SHFL(t_screen, src_lane);
         const TCALC o_inv_radius = (TCALC)(1.0) / o_radius;
         const int o_neck_idx = SHFL(t_neck_idx, src_lane);
-
+        
         // First computation: atom I -> atom J
         const TCALC sj = o_screen * o_radius;
         const TCALC sj2 = sj * sj;

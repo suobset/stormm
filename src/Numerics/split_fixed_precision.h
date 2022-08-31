@@ -133,6 +133,33 @@ int95_t doubleToInt95(const double fval);
 void doubleToInt95(const double fval, llint *primary, int *overflow);
 /// \}
 
+/// \brief Convert numbers in split fixed precision to floating point reals.  Downscaling to the
+///        proper units is the responsibility of the developer.
+///
+/// Overloaded:
+///   - Convert two 32-bit integer values or a 64-bit / 32-bit combination into a float or double
+///     (64-bit primary accumulators will always convert to double, but the output can be recast
+///     as float)
+///   - Convert the corresponding fused tuples into either type (int95_t will be converted to
+///     double only)
+///
+/// \param primary   Primary accumulator (the maximum accumulation increment is inferred from the
+///                  size of the data type)
+/// \param overflow  Overflow accumulator
+/// \{
+double int63ToDouble(int primary, int overflow);
+
+float int63ToFloat(int primary, int overflow);
+
+double int63ToDouble(int2 ival);
+
+float int63ToFloat(int2 ival);
+
+double int95ToDouble(llint primary, int overflow);
+
+double int95ToDouble(int95_t ival);
+/// \}
+
 /// \brief Accumulate floating point numbers into fixed-precision representations with two
 ///        integers.
 ///

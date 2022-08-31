@@ -137,7 +137,12 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
     ism_space.download();
   }
+  const ISWorkspaceKit<double> ismr = ism_space.dpData();
   const NeckGeneralizedBornTable ngb_tables;
+  const int total_atoms = sum<int>(poly_ag.getSystemAtomCounts());
+  std::vector<double> cpu_psi_values(total_atoms), gpu_psi_values(total_atoms);
+  std::vector<double> cpu_sdj_values(total_atoms), gpu_sdj_values(total_atoms);
+  int gb_counter = 0;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
     PhaseSpace devc_result = poly_ps->exportSystem(i, HybridTargetLevel::DEVICE);
@@ -147,7 +152,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const StaticExclusionMask ise(iag_ptr);
     const double2 tnbe = evaluateNonbondedEnergy(iag_ptr, ise, &host_result, &isc,
                                                  EvaluateForce::YES, EvaluateForce::YES, 0);
-    if (iag_ptr->getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+    if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
       PhaseSpaceWriter hostw = host_result.data();
       std::vector<double> eff_gb_radii(hostw.natom, 0.0);
       std::vector<double> psi(hostw.natom, 0.0);
@@ -155,6 +160,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
       const NonbondedKit<double> inbk = iag_ptr->getDoublePrecisionNonbondedKit();
       const ValenceKit<double> ivk = iag_ptr->getDoublePrecisionValenceKit();
       const ImplicitSolventKit<double> iisk = iag_ptr->getDoublePrecisionImplicitSolventKit();
+      const ImplicitSolventRecipe<double> isr(iisk, ngb_tables.dpData());
       const double tgbe = evaluateGeneralizedBornEnergy(inbk, ise.data(), iisk,
                                                         ngb_tables.dpData(), hostw.xcrd,
                                                         hostw.ycrd, hostw.zcrd, hostw.xfrc,
@@ -162,18 +168,54 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
                                                         eff_gb_radii.data(), psi.data(),
                                                         sum_deijda.data(), &isc,
                                                         EvaluateForce::YES, 0);
+      const int sys_ofs = poly_ag.getSystemAtomOffsets().readHost(i);
+      for (int j = 0; j < hostw.natom; j++) {
+        cpu_psi_values[gb_counter] = psi[j];
+        cpu_sdj_values[gb_counter] = sum_deijda[j];
 
-      // CHECK
-      if (i == 0) {
-        printf("System 0 forces = [\n");
-        for (int j = 0; j < hostw.natom; j++) {
-          printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n", hostw.xfrc[j], hostw.yfrc[j],
-                 hostw.zfrc[j], eff_gb_radii[j], iisk.pb_radii[j], psi[j]);
+        // Roll the CPU sum_deijda result back to the point just after the nested loop over all
+        // atoms, for consistency with where the intermediate GPU array is expected to be.
+        switch (poly_ag.getImplicitSolventModel()) {
+        case ImplicitSolventModel::NONE:
+        case ImplicitSolventModel::HCT_GB:
+          break;
+        case ImplicitSolventModel::OBC_GB:
+        case ImplicitSolventModel::OBC_GB_II:
+        case ImplicitSolventModel::NECK_GB:
+        case ImplicitSolventModel::NECK_GB_II:
+          {
+            const double atomj_radius = iisk.pb_radii[j] - isr.gb_offset;
+            const double psi_j = psi[j];
+            const double fjpsi = psi_j * (-atomj_radius);
+            const double thj = tanh((iisk.gb_alpha[j] -
+                                     (iisk.gb_beta[j] -
+                                      (iisk.gb_gamma[j] * fjpsi)) * fjpsi) * fjpsi);
+            const double multiplier = (iisk.gb_alpha[j] -
+                                       ((2.0 * iisk.gb_beta[i]) -
+                                        (3.0 * iisk.gb_gamma[i] * fjpsi)) * fjpsi) *
+                                      (1.0 - thj * thj) * atomj_radius / iisk.pb_radii[j];
+            cpu_sdj_values[gb_counter] /= multiplier;
+          }
+          break;
         }
-        printf("];\n");
+        switch (prec) {
+        case PrecisionModel::DOUBLE:
+          gpu_psi_values[gb_counter] = int95ToDouble(ismr.psi[sys_ofs + j],
+                                                     ismr.psi_ovrf[sys_ofs + j]) *
+                                       ismr.inv_fp_scale;
+          gpu_sdj_values[gb_counter] = int95ToDouble(ismr.sum_deijda[sys_ofs + j],
+                                                     ismr.sum_deijda_ovrf[sys_ofs + j]) *
+                                       ismr.inv_fp_scale;
+          break;
+        case PrecisionModel::SINGLE:
+          gpu_psi_values[gb_counter] = static_cast<double>(ismr.psi[sys_ofs + j]) *
+                                       ismr.inv_fp_scale;
+          gpu_sdj_values[gb_counter] = static_cast<double>(ismr.sum_deijda[sys_ofs + j]) *
+                                       ismr.inv_fp_scale;
+          break;
+        }
+        gb_counter++;
       }
-      // END CHECK
-      
     }
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
@@ -191,7 +233,17 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
       }
     }
     frc_mues[i] = meanUnsignedError(devc_frc, host_frc);
-    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);    
+    frc_max_errors[i] = maxAbsoluteDifference(devc_frc, host_frc);
+  }
+  if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+    check(gpu_psi_values, RelationalOperator::EQUAL, Approx(cpu_psi_values).margin(max_error_tol),
+          "Values for Psi computed on the GPU do not agree with their CPU counterparts.  "
+          "Accumulation method: " + getAccumulationMethodName(facc_method) + ".  Precision level "
+          "in the calculation: " + getPrecisionModelName(prec) + "." + end_note, do_tests);
+    check(gpu_sdj_values, RelationalOperator::EQUAL, Approx(cpu_sdj_values).margin(max_error_tol),
+          "Values for sum_deijda computed on the GPU do not agree with their CPU counterparts.  "
+          "Accumulation method: " + getAccumulationMethodName(facc_method) + ".  Precision level "
+          "in the calculation: " + getPrecisionModelName(prec) + "." + end_note, do_tests);
   }
   check(frc_mues, RelationalOperator::EQUAL, frc_mue_tolerance, "Forces obtained by the "
         "non-bonded interaction kernel, operating on systems " + restraint_presence +
@@ -612,7 +664,7 @@ int main(const int argc, const char* argv[]) {
                            poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                            1.0e-6, do_tests);
-
+  
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
   const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs_iso.top";

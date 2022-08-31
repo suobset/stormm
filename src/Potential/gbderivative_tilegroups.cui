@@ -148,6 +148,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     while (pos < 6 * padded_import_count) {
       const int rel_pos = pos - (5 * padded_import_count);
       if (rel_pos < import_count) {
+        if (tile_lane_idx == 0) {
+          sh_tile_tpts[rel_pos] = (TCALC)(getTileSideAtomCount(nbwu_map, rel_pos));
+        }
         const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
 #ifdef SPLIT_FORCE_ACCUMULATION
 #  ifdef TCALC_IS_SINGLE

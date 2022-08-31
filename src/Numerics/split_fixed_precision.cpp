@@ -194,6 +194,36 @@ void doubleToInt95(const double dval, llint *primary, int *overflow) {
 }
 
 //-------------------------------------------------------------------------------------------------
+double int63ToDouble(const int primary, const int overflow) {
+  return (static_cast<double>(overflow) * max_int_accumulation) + static_cast<double>(primary);
+}
+
+//-------------------------------------------------------------------------------------------------
+float int63ToFloat(const int primary, const int overflow) {
+  return (static_cast<float>(overflow) * max_int_accumulation_f) + static_cast<float>(primary);
+}
+
+//-------------------------------------------------------------------------------------------------
+double int63ToDouble(const int2 ival) {
+  return (static_cast<double>(ival.y) * max_int_accumulation) + static_cast<double>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
+float int63ToFloat(const int2 ival) {
+  return (static_cast<float>(ival.y) * max_int_accumulation_f) + static_cast<float>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
+double int95ToDouble(const llint primary, const int overflow) {
+  return (static_cast<double>(overflow) * max_llint_accumulation) + static_cast<double>(primary);
+}
+
+//-------------------------------------------------------------------------------------------------
+double int95ToDouble(const int95_t ival) {
+  return (static_cast<double>(ival.y) * max_llint_accumulation) + static_cast<double>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
 void splitAccumulation(const float fval, int *primary, int *overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {

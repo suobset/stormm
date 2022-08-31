@@ -132,13 +132,20 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                               poly_psw.zcrd_ovrf, &gmem_r.zcrd_ovrf[EXCL_GMEM_OFFSET],
                               sh_tile_zcog, poly_psw.gpos_scale);
 #endif
-    pos = loadTileProperty(pos, 3, nbwu_map, poly_nbk.charge, &gmem_r.charges[EXCL_GMEM_OFFSET],
-                           SQRT_FUNC(poly_nbk.coulomb));
     const int import_count = nbwu_map[0];
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
-
+#ifndef DO_GENERALIZED_BORN
+    pos = loadTileProperty(pos, 3, nbwu_map, poly_nbk.charge, &gmem_r.charges[EXCL_GMEM_OFFSET],
+                           SQRT_FUNC(poly_nbk.coulomb));
+#else
+    // When performing calculations in Generalized Born solvents, the charges will be loaded by an
+    // alternate loop wherein they are needed for other pre-computations and stored values.
+    // Advance the counter to keep pace with the overall structure of the loading process.
+    pos += padded_import_count;
+#endif
+    
     // Read the Lennard-Jones indices into the pre-allocated thread block-exclusive space.  Neck
     // GB models do not need to access their table indices during this phase of the calculation.
     pos = loadTileProperty(pos, 4, nbwu_map, poly_nbk.lj_idx, &gmem_r.lj_idx[EXCL_GMEM_OFFSET]);
@@ -208,8 +215,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           break;
         }
         sh_gbeff_radii[write_idx] = egbi;
+
+        // In Generalized Born calculations, use this read of the charge value to cache it.
         const TCALC atomq = __ldcs(&poly_nbk.charge[read_idx]);
-        __stwb(&gmem_r.charges[EXCL_GMEM_OFFSET + write_idx], atomq);
+        __stwb(&gmem_r.charges[EXCL_GMEM_OFFSET + write_idx], atomq * SQRT_FUNC(poly_nbk.coulomb));
         const TCALC expmkf = EXP_FUNC(-default_gb_kscale * poly_nbk.kappa * egbi) /
                              poly_nbk.dielectric;
         const TCALC dielfac = (TCALC)(1.0) - expmkf;
@@ -322,12 +331,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       const int95_t x_atom   = { gmem_r.xcrd[read_idx], gmem_r.xcrd_ovrf[read_idx] };
       const int95_t y_atom   = { gmem_r.ycrd[read_idx], gmem_r.ycrd_ovrf[read_idx] };
       const int95_t z_atom   = { gmem_r.zcrd[read_idx], gmem_r.zcrd_ovrf[read_idx] };
-      const int95_t x95_tmp  = splitFPSum(x_atom, x_center);
-      const int95_t y95_tmp  = splitFPSum(y_atom, y_center);
-      const int95_t z95_tmp  = splitFPSum(z_atom, z_center);
-      const TCALC t_xcrd = splitFPToReal(x95_tmp) * poly_psw.inv_gpos_scale;
-      const TCALC t_ycrd = splitFPToReal(y95_tmp) * poly_psw.inv_gpos_scale;
-      const TCALC t_zcrd = splitFPToReal(z95_tmp) * poly_psw.inv_gpos_scale;
+      const TCALC t_xcrd  = int95SumToDouble(x_atom, x_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_ycrd  = int95SumToDouble(y_atom, y_center) * poly_psw.inv_gpos_scale;
+      const TCALC t_zcrd  = int95SumToDouble(z_atom, z_center) * poly_psw.inv_gpos_scale;
 #endif
       const int t_ljidx   = gmem_r.lj_idx[read_idx];
       const TCALC t_q     = gmem_r.charges[read_idx];
@@ -360,6 +366,20 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC o_xcrd  = SHFL(t_xcrd,  crd_src_lane);
         const TCALC o_ycrd  = SHFL(t_ycrd,  crd_src_lane);
         const TCALC o_zcrd  = SHFL(t_zcrd,  crd_src_lane);
+
+        // CHECK
+        const bool report_t =
+          (nbwu_idx == 0 && absc_import_idx < 3 &&
+           fabs(t_xcrd + (tx_cog * poly_psw.inv_gpos_scale) - 2.0000010) < 1.0e-6 &&
+           fabs(t_ycrd + (ty_cog * poly_psw.inv_gpos_scale) - 1.0000000) < 1.0e-6 &&
+           fabs(t_zcrd + (tz_cog * poly_psw.inv_gpos_scale) + 0.0000013) < 1.0e-6);
+        const bool report_o =
+          (nbwu_idx == 0 && absc_import_idx < 3 &&
+           fabs(o_xcrd + (tx_cog * poly_psw.inv_gpos_scale) - 2.0000010) < 1.0e-6 &&
+           fabs(o_ycrd + (ty_cog * poly_psw.inv_gpos_scale) - 1.0000000) < 1.0e-6 &&
+           fabs(o_zcrd + (tz_cog * poly_psw.inv_gpos_scale) + 0.0000013) < 1.0e-6);           
+        // END CHECK
+        
         const TCALC o_ljidx = SHFL(t_ljidx, crd_src_lane);
         const TCALC o_q     = SHFL(t_q,     crd_src_lane);
         const TCALC ot_qq   = t_q * o_q;
@@ -371,8 +391,12 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC o_rad   = SHFL(t_rad, crd_src_lane);
         const TCALC ot_rad  = t_rad * o_rad;
         const TCALC efac    = EXP_FUNC(-r2 / ((TCALC)(4.0) * ot_rad));
-        const TCALC fgbi    = (TCALC)(1.0) / SQRT_FUNC(r2 + ot_rad * efac);
+        const TCALC fgbi    = (TCALC)(1.0) / SQRT_FUNC(r2 + (ot_rad * efac));
+#  ifdef TCALC_IS_SINGLE
         const TCALC fgbk    = -poly_nbk.kappa * default_gb_kscale_f / fgbi;
+#  else
+        const TCALC fgbk    = -poly_nbk.kappa * default_gb_kscale / fgbi;
+#  endif
         const TCALC expmkf  = EXP_FUNC(fgbk) / poly_nbk.dielectric;
         const TCALC dielfac = (TCALC)(1.0) - expmkf;
 #  ifdef COMPUTE_ENERGY
@@ -389,7 +413,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #ifdef COMPUTE_FORCE
 #  ifdef DO_GENERALIZED_BORN
         const TCALC temp4 = fgbi * fgbi * fgbi;
-        const TCALC temp6 = ot_qq * temp4 * (dielfac + fgbk * expmkf);
+        const TCALC temp6 = ot_qq * temp4 * (dielfac + (fgbk * expmkf));
         TCALC fmag        = temp6 * ((TCALC)(1.0) - ((TCALC)(0.25) * efac));
         TCALC temp5       = (TCALC)(0.5) * efac * temp6 * (ot_rad + ((TCALC)(0.25) * r2));
         if (on_diagonal) {
@@ -400,6 +424,15 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
             temp5 = (TCALC)(0.0);
           }
         }
+
+        // CHECK
+        if (report_t) {
+          const double contrib = (on_diagonal) ? 2.0 * temp5 * t_rad : temp5 * t_rad;
+          printf("GPU contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
+                 "to atom 0 sdj\n", t_q, o_q, r2, ot_rad, efac, fgbi, contrib);
+        }
+        // END CHECK
+        
         sdeijda += temp5 * t_rad;
 #  else
         TCALC fmag = TCALC(0.0);
@@ -439,6 +472,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         t_yfrc -= SHFL(fmag_dy, frc_ret_lane);
         t_zfrc -= SHFL(fmag_dz, frc_ret_lane);
 #  ifdef DO_GENERALIZED_BORN
+
+        // CHECK
+        const double o_expmkf = SHFL(expmkf, frc_ret_lane);
+        const double o_ot_qq  = SHFL(ot_qq, frc_ret_lane);
+        const double o_ot_rad = SHFL(ot_rad, frc_ret_lane);
+        const double o_fgbi   = SHFL(fgbi, frc_ret_lane);
+        const double o_efac   = SHFL(efac, frc_ret_lane);
+        const double ncontrib = (on_diagonal) ? 2.0 * SHFL(temp5, frc_ret_lane) * o_rad :
+                                                      SHFL(temp5, frc_ret_lane) * o_rad;
+        if (report_o) {
+          printf("GPU contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
+                 "to atom 0 sdj\n", t_q, o_q, r2, o_ot_rad, o_efac, o_fgbi, ncontrib);
+        }
+        // END CHECK
+        
         sdeijda += SHFL(temp5, frc_ret_lane) * o_rad;
 #  endif
 #endif
