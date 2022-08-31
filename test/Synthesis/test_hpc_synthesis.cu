@@ -134,6 +134,9 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   mmctrl->incrementStep();
   launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space, &ism_space,
                   EvaluateForce::YES, EvaluateEnergy::NO, facc_method, launcher);
+  if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+    ism_space.download();
+  }
   const NeckGeneralizedBornTable ngb_tables;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
@@ -145,13 +148,32 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
     const double2 tnbe = evaluateNonbondedEnergy(iag_ptr, ise, &host_result, &isc,
                                                  EvaluateForce::YES, EvaluateForce::YES, 0);
     if (iag_ptr->getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+      PhaseSpaceWriter hostw = host_result.data();
+      std::vector<double> eff_gb_radii(hostw.natom, 0.0);
+      std::vector<double> psi(hostw.natom, 0.0);
+      std::vector<double> sum_deijda(hostw.natom, 0.0);
+      const NonbondedKit<double> inbk = iag_ptr->getDoublePrecisionNonbondedKit();
+      const ValenceKit<double> ivk = iag_ptr->getDoublePrecisionValenceKit();
+      const ImplicitSolventKit<double> iisk = iag_ptr->getDoublePrecisionImplicitSolventKit();
+      const double tgbe = evaluateGeneralizedBornEnergy(inbk, ise.data(), iisk,
+                                                        ngb_tables.dpData(), hostw.xcrd,
+                                                        hostw.ycrd, hostw.zcrd, hostw.xfrc,
+                                                        hostw.yfrc, hostw.zfrc,
+                                                        eff_gb_radii.data(), psi.data(),
+                                                        sum_deijda.data(), &isc,
+                                                        EvaluateForce::YES, 0);
 
       // CHECK
-      printf("Evaluate GB on system %s\n", getBaseName(iag_ptr->getFileName()).c_str());
+      if (i == 0) {
+        printf("System 0 forces = [\n");
+        for (int j = 0; j < hostw.natom; j++) {
+          printf("  %9.4lf %9.4lf %9.4lf    %9.4lf %9.4lf %9.4lf\n", hostw.xfrc[j], hostw.yfrc[j],
+                 hostw.zfrc[j], eff_gb_radii[j], iisk.pb_radii[j], psi[j]);
+        }
+        printf("];\n");
+      }
       // END CHECK
       
-      const double tgbe = evaluateGeneralizedBornEnergy(iag_ptr, ise, ngb_tables, &host_result,
-                                                        &isc, EvaluateForce::YES, 0);
     }
     std::vector<double> devc_frc = devc_result.getInterlacedCoordinates(frcid);
     std::vector<double> host_frc = host_result.getInterlacedCoordinates(frcid);
@@ -580,6 +602,7 @@ int main(const int argc, const char* argv[]) {
   const NeckGeneralizedBornTable ngb_tables;
   poly_ag.setImplicitSolventModel(ImplicitSolventModel::HCT_GB, ngb_tables,
                                   AtomicRadiusSet::BONDI);
+  poly_ag.upload();
   mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
                                PrecisionModel::DOUBLE, poly_ag);
   checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
@@ -589,10 +612,6 @@ int main(const int argc, const char* argv[]) {
                            poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6, 1.0e-6,
                            1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                            1.0e-6, do_tests);
-
-  // CHECK
-  printf("Done with GB tests.\n");
-  // END CHECK
 
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.

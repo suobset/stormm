@@ -77,41 +77,53 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     const int padded_import_count = devcRoundUp(import_count, tile_sides_per_warp);
     const int warps_per_block = blockDim.x >> warp_bits;
     const int tile_lane_idx = (threadIdx.x & tile_length_bits_mask);
-    while (pos < padded_import_count) {
-      if (pos < import_count) {
-        const size_t read_idx = (size_t)(nbwu_map[pos + 1] + tile_lane_idx);
-        const int write_idx = (pos * tile_length) + tile_lane_idx;
-        const TCALC pb_radius = poly_nbk.pb_radii[read_idx];
-        const TCALC gb_radius = pb_radius - poly_nbk.gb_offset;
+    switch (poly_nbk.igb) {
+    case ImplicitSolventModel::NONE:
+    case ImplicitSolventModel::HCT_GB:
+      pos += padded_import_count;
+      break;
+    case ImplicitSolventModel::OBC_GB:
+    case ImplicitSolventModel::OBC_GB_II:
+    case ImplicitSolventModel::NECK_GB:
+    case ImplicitSolventModel::NECK_GB_II:
+      while (pos < padded_import_count) {
+        if (pos < import_count) {
+          const size_t read_idx = (size_t)(nbwu_map[pos + 1] + tile_lane_idx);
+          const int write_idx = (pos * tile_length) + tile_lane_idx;
+          const TCALC pb_radius = poly_nbk.pb_radii[read_idx];
+          const TCALC gb_radius = pb_radius - poly_nbk.gb_offset;
 
-        // Use the charge array of the thread-block exclusive workspace to store baseline GB radii
-        __stwb(&gmem_r.charges[write_idx + EXCL_GMEM_OFFSET], gb_radius);
+          // Use the thread-block exclusive workspace's charge array to store baseline GB radii
+          __stwb(&gmem_r.charges[write_idx + EXCL_GMEM_OFFSET], gb_radius);
 #ifdef TCALC_IS_SINGLE
-        const TCALC psival = (TCALC)(__ldcs(&iswk.psi[read_idx])) * iswk.inv_fp_scale;
+          const TCALC psival = (TCALC)(__ldcs(&iswk.psi[read_idx])) * iswk.inv_fp_scale;
 #else
-        const TCALC psival = int95ToDouble(__ldcs(&iswk.psi[read_idx]),
-                                           __ldcs(&iswk.psi_ovrf[read_idx])) * iswk.inv_fp_scale;
+          const TCALC psival = int95ToDouble(__ldcs(&iswk.psi[read_idx]),
+                                             __ldcs(&iswk.psi_ovrf[read_idx])) * iswk.inv_fp_scale;
 #endif
-        const TCALC fipsi  = psival * (-gb_radius);
-        const TCALC talpha = __ldcs(&poly_nbk.gb_alpha[read_idx]);
-        const TCALC tbeta  = __ldcs(&poly_nbk.gb_beta[read_idx]);
-        const TCALC tgamma = __ldcs(&poly_nbk.gb_gamma[read_idx]);
-        const TCALC thi    = TANH_FUNC((talpha - (tbeta - (tgamma * fipsi)) * fipsi) * fipsi);
+          const TCALC fipsi  = psival * (-gb_radius);
+          const TCALC talpha = __ldcs(&poly_nbk.gb_alpha[read_idx]);
+          const TCALC tbeta  = __ldcs(&poly_nbk.gb_beta[read_idx]);
+          const TCALC tgamma = __ldcs(&poly_nbk.gb_gamma[read_idx]);
+          const TCALC thi    = TANH_FUNC((talpha - (tbeta - (tgamma * fipsi)) * fipsi) * fipsi);
 #ifdef TCALC_IS_SINGLE
-        const TCALC sdi_current = (TCALC)(__ldcs(&iswk.sum_deijda[read_idx])) * iswk.inv_fp_scale;
+          const TCALC sdi_current = (TCALC)(__ldcs(&iswk.sum_deijda[read_idx])) *
+                                    iswk.inv_fp_scale;
 #else
-        const TCALC sdi_current = int95ToDouble(__ldcs(&iswk.sum_deijda[read_idx]),
-                                                __ldcs(&iswk.sum_deijda_ovrf[read_idx])) *
-                                  iswk.inv_fp_scale;
+          const TCALC sdi_current = int95ToDouble(__ldcs(&iswk.sum_deijda[read_idx]),
+                                                  __ldcs(&iswk.sum_deijda_ovrf[read_idx])) *
+                                    iswk.inv_fp_scale;
 #endif
-        const TCALC sdi_multiplier = (talpha - (((TCALC)(2.0) * tbeta) -
-                                                ((TCALC)(3.0) * tgamma * fipsi)) * fipsi) *
-                                     ((TCALC)(1.0) - (thi * thi)) * gb_radius / pb_radius;
-        sh_sum_deijda[write_idx] = sdi_current * sdi_multiplier;
+          const TCALC sdi_multiplier = (talpha - (((TCALC)(2.0) * tbeta) -
+                                                  ((TCALC)(3.0) * tgamma * fipsi)) * fipsi) *
+                                       ((TCALC)(1.0) - (thi * thi)) * gb_radius / pb_radius;
+          sh_sum_deijda[write_idx] = sdi_current * sdi_multiplier;
+        }
+        pos += tile_sides_per_warp * warps_per_block;
       }
-      pos += tile_sides_per_warp * warps_per_block;
+      break;
     }
-
+    
     // Load the usual coordinates, plus the screening factors.  This is done after the initial,
     // lengthy reading process to backfill idle threads and keep the memory bus load consistent.
 #ifdef TCALC_IS_SINGLE
@@ -221,7 +233,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       for (int i = 0; i < half_tile_length; i++) {
         int crd_src_lane = ((warp_lane_idx <  tile_length) * (warp_lane_idx + tile_length - i)) +
                            ((warp_lane_idx >= tile_length) *
-                           (warp_lane_idx - three_halves_tile_length + i));
+                            (warp_lane_idx - three_halves_tile_length + i));
         crd_src_lane += tile_length * ((crd_src_lane <  tile_length &&
                                         warp_lane_idx < tile_length) +
                                        (crd_src_lane <             0 &&

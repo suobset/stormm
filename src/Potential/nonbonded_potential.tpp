@@ -370,7 +370,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
       // Access the supertile's map index: if zero, there are no exclusions to worry about
-      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
 
       // The outer loops can proceed until the branch about exclusions
@@ -670,7 +669,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
       // Access the supertile's map index: if zero, there are no exclusions to worry about
-      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
 
       // The outer loops can proceed until the branch about exclusions
@@ -867,6 +865,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       sumdeijda[i] = (tforce_is_sgnint) ? llround(sdi_current * sdi_multiplier * force_factor) :
                                           sdi_current * sdi_multiplier;
     }
+    break;
   }
   for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
     for (int stj = 0; stj <= sti; stj++) {
@@ -878,7 +877,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
       // Access the supertile's map index: if zero, there are no exclusions to worry about
-      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
 
       // The outer loops can proceed until the branch about exclusions

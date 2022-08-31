@@ -1140,8 +1140,10 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, do
           ktgdsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
           break;
         }
+#if 0
         ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
                                                             *iswk);
+#endif
         break;
       case EvaluateForce::NO:
         ktgdGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r, *iswk);
@@ -1163,8 +1165,10 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, do
           ktgdsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
           break;
         }
+#if 0
         ktgdsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
                                                                 *gmem_r, *iswk);
+#endif
         break;
       case EvaluateForce::NO:
         ktgdGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
