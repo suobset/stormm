@@ -231,19 +231,17 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #    ifdef TCALC_IS_SINGLE
 #      ifdef SPLIT_FORCE_ACCUMULATION
         const int2 ssd = floatToInt63((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
-                                                  atmq2h * expmkf * egbi)) *
-                                      poly_psw.frc_scale_f);
+                                                  atmq2h * expmkf * egbi)) * iswk.fp_scale);
         sh_sum_deijda[write_idx] = ssd.x;
         sh_sum_deijda_overflow[write_idx] = ssd.y;
 #      else
         sh_sum_deijda[write_idx] = LLCONV_FUNC((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
                                                            atmq2h * expmkf * egbi)) *
-                                               poly_psw.frc_scale_f);
+                                               iswk.fp_scale);
 #      endif
 #    else
         const int95_t ssd = doubleToInt95((atmqd2h - (default_gb_kscale * poly_nbk.kappa *
-                                                      atmq2h * expmkf * egbi)) *
-                                          poly_psw.frc_scale);
+                                                      atmq2h * expmkf * egbi)) * iswk.fp_scale);
         sh_sum_deijda[write_idx] = ssd.x;
         sh_sum_deijda_overflow[write_idx] = ssd.y;
 #    endif
@@ -282,6 +280,49 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     }
 #endif // COMPUTE_FORCE
     __syncthreads();
+
+    // CHECK
+#if 0
+#if defined(DO_GENERALIZED_BORN) && defined(COMPUTE_FORCE)
+    if (nbwu_idx == 0 && threadIdx.x == 0) {
+      printf("GPU gbeff result = [\n");
+      int jj = 0;
+      for (int ii = 0; ii < 36; ii++) {
+        printf("  %10.6lf", sh_gbeff_radii[ii]);
+        jj++;
+        if (jj == 6) {
+          jj = 0;
+          printf("\n");
+        }
+      }
+      printf("];\n");
+      jj = 0;
+      printf("GPU sum_deijda init = [\n");
+      for (int ii = 0; ii < 36; ii++) {
+#  ifdef TCALC_IS_SINGLE
+#    ifdef SPLIT_FORCE_ACCUMULATION
+        const double t_ssd = int63ToFloat(sh_sum_deijda[ii], sh_sum_deijda_overflow[ii]) *
+                             iswk.inv_fp_scale;
+#    else
+        const double t_ssd = (TCALC)(sh_sum_deijda[ii]) * iswk.inv_fp_scale;
+#    endif
+#  else
+        const double t_ssd = int95ToDouble(sh_sum_deijda[ii], sh_sum_deijda_overflow[ii]) *
+                             iswk.inv_fp_scale;
+#  endif
+        printf("  %10.6lf", t_ssd);
+        jj++;
+        if (jj == 6) {
+          jj = 0;
+          printf("\n");
+        }
+      }
+      printf("];\n");      
+    }
+    __syncthreads();
+#endif
+#endif
+    // END CHECK
 
     // Loop over tile instructions
     pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
@@ -343,7 +384,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       const bool on_diagonal = (absc_import_idx == ordi_import_idx);
       const TCALC t_rad      = sh_gbeff_radii[read_idx - EXCL_GMEM_OFFSET];
 #  ifdef COMPUTE_FORCE
-      TCALC sdeijda          = (TCALC)(0.0);
+      TCALC t_deijda         = (TCALC)(0.0);
 #  endif
 #endif
 #ifdef COMPUTE_ENERGY
@@ -368,6 +409,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC o_zcrd  = SHFL(t_zcrd,  crd_src_lane);
 
         // CHECK
+#if 0
         const bool report_t =
           (nbwu_idx == 0 && absc_import_idx < 3 &&
            fabs(t_xcrd + (tx_cog * poly_psw.inv_gpos_scale) - 2.0000010) < 1.0e-6 &&
@@ -378,6 +420,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
            fabs(o_xcrd + (tx_cog * poly_psw.inv_gpos_scale) - 2.0000010) < 1.0e-6 &&
            fabs(o_ycrd + (ty_cog * poly_psw.inv_gpos_scale) - 1.0000000) < 1.0e-6 &&
            fabs(o_zcrd + (tz_cog * poly_psw.inv_gpos_scale) + 0.0000013) < 1.0e-6);           
+#endif
         // END CHECK
         
         const TCALC o_ljidx = SHFL(t_ljidx, crd_src_lane);
@@ -426,14 +469,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         }
 
         // CHECK
-        if (report_t) {
+#if 0
+        if (r2 < 1.0e-8 && fabs(temp5) > 1.0e-12) {
+          printf("On lane %2d reading %2d (iteration %d), temp5 = %10.6lf\n", warp_lane_idx,
+                 crd_src_lane, i, temp5);
+        }
+        if (report_t && r2 < 4000.0) {
           const double contrib = (on_diagonal) ? 2.0 * temp5 * t_rad : temp5 * t_rad;
-          printf("GPU contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
+          printf("GPU T contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
                  "to atom 0 sdj\n", t_q, o_q, r2, ot_rad, efac, fgbi, contrib);
         }
+#endif
         // END CHECK
         
-        sdeijda += temp5 * t_rad;
+        t_deijda += temp5 * t_rad;
+        const TCALC o_deijda = temp5 * o_rad;
 #  else
         TCALC fmag = TCALC(0.0);
 #  endif
@@ -474,20 +524,23 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #  ifdef DO_GENERALIZED_BORN
 
         // CHECK
-        const double o_expmkf = SHFL(expmkf, frc_ret_lane);
-        const double o_ot_qq  = SHFL(ot_qq, frc_ret_lane);
-        const double o_ot_rad = SHFL(ot_rad, frc_ret_lane);
-        const double o_fgbi   = SHFL(fgbi, frc_ret_lane);
-        const double o_efac   = SHFL(efac, frc_ret_lane);
-        const double ncontrib = (on_diagonal) ? 2.0 * SHFL(temp5, frc_ret_lane) * o_rad :
-                                                      SHFL(temp5, frc_ret_lane) * o_rad;
-        if (report_o) {
-          printf("GPU contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
-                 "to atom 0 sdj\n", t_q, o_q, r2, o_ot_rad, o_efac, o_fgbi, ncontrib);
+#if 0
+        const double ox_q      = SHFL(t_q, frc_ret_lane);
+        const double ox_r2     = SHFL(r2, frc_ret_lane);
+        const double ox_expmkf = SHFL(expmkf, frc_ret_lane);
+        const double ox_ot_qq  = SHFL(ot_qq, frc_ret_lane);
+        const double ox_ot_rad = SHFL(ot_rad, frc_ret_lane);
+        const double ox_fgbi   = SHFL(fgbi, frc_ret_lane);
+        const double ox_efac   = SHFL(efac, frc_ret_lane);
+        const double ncontrib  = SHFL(o_deijda, frc_ret_lane);
+        if (report_t && ox_r2 < 4000.0) {
+          printf("GPU O contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
+                 "to atom 0 sdj\n", t_q, ox_q, ox_r2, ox_ot_rad, ox_efac, ox_fgbi, ncontrib);
         }
+#endif
         // END CHECK
         
-        sdeijda += SHFL(temp5, frc_ret_lane) * o_rad;
+        t_deijda += SHFL(o_deijda, frc_ret_lane);
 #  endif
 #endif
       }
@@ -515,14 +568,15 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       atomicSplit(t_yfrc * poly_psw.frc_scale_f, read_idx, sh_yfrc, sh_yfrc_overflow);
       atomicSplit(t_zfrc * poly_psw.frc_scale_f, read_idx, sh_zfrc, sh_zfrc_overflow);
 #    ifdef DO_GENERALIZED_BORN
-      atomicSplit(sdeijda * iswk.fp_scale, read_idx, sh_sum_deijda, sh_sum_deijda_overflow);
+      atomicSplit(t_deijda * iswk.fp_scale, read_idx, sh_sum_deijda, sh_sum_deijda_overflow);
 #    endif
 #  else
       atomicAdd((ullint*)&sh_xfrc[read_idx], (ullint)(LLCONV_FUNC(t_xfrc * poly_psw.frc_scale_f)));
       atomicAdd((ullint*)&sh_yfrc[read_idx], (ullint)(LLCONV_FUNC(t_yfrc * poly_psw.frc_scale_f)));
       atomicAdd((ullint*)&sh_zfrc[read_idx], (ullint)(LLCONV_FUNC(t_zfrc * poly_psw.frc_scale_f)));
 #    ifdef DO_GENERALIZED_BORN
-      atomicAdd((ullint*)&sh_sum_deijda[read_idx], (ullint)(LLCONV_FUNC(sdeijda * iswk.fp_scale)));
+      atomicAdd((ullint*)&sh_sum_deijda[read_idx],
+                (ullint)(LLCONV_FUNC(t_deijda * iswk.fp_scale)));
 #    endif
 #  endif
 #endif

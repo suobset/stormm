@@ -80,7 +80,21 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     switch (poly_nbk.igb) {
     case ImplicitSolventModel::NONE:
     case ImplicitSolventModel::HCT_GB:
-      pos += padded_import_count;
+      while (pos < padded_import_count) {
+        if (pos < import_count) {
+          const size_t read_idx = (size_t)(nbwu_map[pos + 1] + tile_lane_idx);
+          const int write_idx = (pos * tile_length) + tile_lane_idx;
+#ifdef TCALC_IS_SINGLE
+          sh_sum_deijda[write_idx] = (TCALC)(__ldcs(&iswk.sum_deijda[read_idx])) *
+                                     iswk.inv_fp_scale;
+#else
+          sh_sum_deijda[write_idx] = int95ToDouble(__ldcs(&iswk.sum_deijda[read_idx]),
+                                                  __ldcs(&iswk.sum_deijda_ovrf[read_idx])) *
+                                     iswk.inv_fp_scale;
+#endif
+        }
+        pos += tile_sides_per_warp * warps_per_block;
+      }
       break;
     case ImplicitSolventModel::OBC_GB:
     case ImplicitSolventModel::OBC_GB_II:
@@ -182,6 +196,23 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
 #endif
     __syncthreads();
 
+    // CHECK
+    if (gbdwu_idx == 0 && threadIdx.x == 0) {
+      printf("sh_sum_deijda = [\n");
+      int jj = 0;
+      for (int ii = 0; ii < 36; ii++) {
+        printf("  %12.6lf", sh_sum_deijda[ii]);
+        jj++;
+        if (jj == 6) {
+          printf("\n");
+          jj = 0;
+        }
+      }
+      printf("];\n");
+    }
+    __syncthreads();
+    // END CHECK
+    
     // Loop over tile instructions
     pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
     while (pos < nbwu_map[small_block_max_imports + 7]) {
@@ -291,7 +322,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         else if (t_rad < sj) {
           const TCALC temp1  = (TCALC)(1.0) / (r2 - sj2);
           datmpi = (TCALC)(-0.5) * ((sj * invr2 * temp1) - ((TCALC)(2.0) * sj * temp1 * temp1) -
-                              ((TCALC)(0.5) * invr2 * invr * LOG_FUNC((sj - r) / (sj + r))));
+                                    ((TCALC)(0.5) * invr2 * invr * LOG_FUNC((sj - r) / (sj + r))));
         }
         else {
           datmpi = (TCALC)(0.0);
@@ -333,7 +364,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         else if (o_rad < si) {
           const TCALC temp1  = (TCALC)(1.0) / (r2 - si2);
           datmpj = (TCALC)(-0.5) * ((si * invr2 * temp1) - ((TCALC)(2.0) * si * temp1 * temp1) -
-                              ((TCALC)(0.5) * invr2 * invr * LOG_FUNC((si - r) / (si + r))));
+                                    ((TCALC)(0.5) * invr2 * invr * LOG_FUNC((si - r) / (si + r))));
         }
         else {
           datmpj = (TCALC)(0.0);
@@ -373,9 +404,9 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
         const TCALC o_sdj = SHFL(t_sdj, crd_src_lane);
         TCALC fmag = (datmpi * t_sdj) + (datmpj * o_sdj);
         if (on_diagonal) {
-          fmag  *= (TCALC)(0.5);
+          fmag *= (TCALC)(0.5);
           if (i == 0 && warp_lane_idx < tile_length) {
-            fmag  = (TCALC)(0.0);
+            fmag = (TCALC)(0.0);
           }
         }
         const TCALC fmag_dx = fmag * dx;

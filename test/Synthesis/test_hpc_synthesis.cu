@@ -141,7 +141,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   const NeckGeneralizedBornTable ngb_tables;
   const int total_atoms = sum<int>(poly_ag.getSystemAtomCounts());
   std::vector<double> cpu_psi_values(total_atoms), gpu_psi_values(total_atoms);
-  std::vector<double> cpu_sdj_values(total_atoms), gpu_sdj_values(total_atoms);
   int gb_counter = 0;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
@@ -171,46 +170,14 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
       const int sys_ofs = poly_ag.getSystemAtomOffsets().readHost(i);
       for (int j = 0; j < hostw.natom; j++) {
         cpu_psi_values[gb_counter] = psi[j];
-        cpu_sdj_values[gb_counter] = sum_deijda[j];
-
-        // Roll the CPU sum_deijda result back to the point just after the nested loop over all
-        // atoms, for consistency with where the intermediate GPU array is expected to be.
-        switch (poly_ag.getImplicitSolventModel()) {
-        case ImplicitSolventModel::NONE:
-        case ImplicitSolventModel::HCT_GB:
-          break;
-        case ImplicitSolventModel::OBC_GB:
-        case ImplicitSolventModel::OBC_GB_II:
-        case ImplicitSolventModel::NECK_GB:
-        case ImplicitSolventModel::NECK_GB_II:
-          {
-            const double atomj_radius = iisk.pb_radii[j] - isr.gb_offset;
-            const double psi_j = psi[j];
-            const double fjpsi = psi_j * (-atomj_radius);
-            const double thj = tanh((iisk.gb_alpha[j] -
-                                     (iisk.gb_beta[j] -
-                                      (iisk.gb_gamma[j] * fjpsi)) * fjpsi) * fjpsi);
-            const double multiplier = (iisk.gb_alpha[j] -
-                                       ((2.0 * iisk.gb_beta[i]) -
-                                        (3.0 * iisk.gb_gamma[i] * fjpsi)) * fjpsi) *
-                                      (1.0 - thj * thj) * atomj_radius / iisk.pb_radii[j];
-            cpu_sdj_values[gb_counter] /= multiplier;
-          }
-          break;
-        }
         switch (prec) {
         case PrecisionModel::DOUBLE:
           gpu_psi_values[gb_counter] = int95ToDouble(ismr.psi[sys_ofs + j],
                                                      ismr.psi_ovrf[sys_ofs + j]) *
                                        ismr.inv_fp_scale;
-          gpu_sdj_values[gb_counter] = int95ToDouble(ismr.sum_deijda[sys_ofs + j],
-                                                     ismr.sum_deijda_ovrf[sys_ofs + j]) *
-                                       ismr.inv_fp_scale;
           break;
         case PrecisionModel::SINGLE:
           gpu_psi_values[gb_counter] = static_cast<double>(ismr.psi[sys_ofs + j]) *
-                                       ismr.inv_fp_scale;
-          gpu_sdj_values[gb_counter] = static_cast<double>(ismr.sum_deijda[sys_ofs + j]) *
                                        ismr.inv_fp_scale;
           break;
         }
@@ -238,10 +205,6 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
     check(gpu_psi_values, RelationalOperator::EQUAL, Approx(cpu_psi_values).margin(max_error_tol),
           "Values for Psi computed on the GPU do not agree with their CPU counterparts.  "
-          "Accumulation method: " + getAccumulationMethodName(facc_method) + ".  Precision level "
-          "in the calculation: " + getPrecisionModelName(prec) + "." + end_note, do_tests);
-    check(gpu_sdj_values, RelationalOperator::EQUAL, Approx(cpu_sdj_values).margin(max_error_tol),
-          "Values for sum_deijda computed on the GPU do not agree with their CPU counterparts.  "
           "Accumulation method: " + getAccumulationMethodName(facc_method) + ".  Precision level "
           "in the calculation: " + getPrecisionModelName(prec) + "." + end_note, do_tests);
   }
@@ -459,6 +422,15 @@ int main(const int argc, const char* argv[]) {
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(),
                                        poly_ag.getTopologyIndices());
   poly_ag.loadNonbondedWorkUnits(poly_se);
+
+  // CHECK
+  printf("poly_ag systems = [\n");
+  for (int i = 0 ; i < poly_ag.getSystemCount(); i++) {
+    printf("  %s\n", getBaseName(poly_ag.getSystemTopologyPointer(i)->getFileName()).c_str());
+  }
+  printf("];\n");
+  // END CHECK
+  
   PhaseSpaceSynthesis poly_ps(sysc);
   PhaseSpaceSynthesis poly_ps_dbl(sysc, 36, 24, 34, 40);
   PhaseSpaceSynthesis poly_ps_sdbl(sysc, 72, 24, 34, 72);
