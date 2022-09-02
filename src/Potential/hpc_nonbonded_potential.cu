@@ -349,6 +349,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  define LOG_FUNC  logf
 #  define EXP_FUNC  expf
 #  define TANH_FUNC tanhf
+#  define FABS_FUNC fabsf
 #  define SPLIT_FORCE_ACCUMULATION
 #    define KERNEL_NAME ktgfsCalculateGBRadii
 #      include "gbradii_tilegroups.cui"
@@ -459,6 +460,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  undef LOG_FUNC
 #  undef EXP_FUNC
 #  undef TANH_FUNC
+#  undef FABS_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBDERIV_KERNEL_BLOCKS_MULTIPLIER
@@ -478,6 +480,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  define LOG_FUNC  log
 #  define EXP_FUNC  exp
 #  define TANH_FUNC tanh
+#  define FABS_FUNC fabs
 #  define KERNEL_NAME ktgdsCalculateGBRadii
 #    include "gbradii_tilegroups.cui"
 #  undef KERNEL_NAME
@@ -542,6 +545,7 @@ __device__ int accumulateTileProperty(const int pos, const int iter, const int* 
 #  undef LOG_FUNC
 #  undef EXP_FUNC
 #  undef TANH_FUNC
+#  undef FABS_FUNC
 #  undef NONBOND_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBRADII_KERNEL_BLOCKS_MULTIPLIER
 #  undef GBDERIV_KERNEL_BLOCKS_MULTIPLIER

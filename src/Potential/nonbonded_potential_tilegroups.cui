@@ -105,6 +105,22 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     }
 #endif
     __syncthreads();
+
+    // CHECK
+    if (nbwu_idx == 1 && threadIdx.x == 0) {
+      printf("WU %d Imports = [ ", nbwu_idx);
+      for (int i = 0; i < nbwu_map[0]; i++) {
+        printf("%4d ", nbwu_map[i + 1]);
+      }
+      printf("];\n");
+      printf("WU %d Systems = [ ", nbwu_idx);
+      for (int i = 0; i < nbwu_map[0]; i++) {
+        printf("%4d ", nbwu_map[small_block_max_imports + 8 + i]);
+      }
+      printf("];\n");
+    }
+    __syncthreads();
+    // END CHECK
     
     // Import atomic coordinates and properties.  Each warp will handle importing one of the
     // Cartesian coordinates or properties of as many tile sides as it can handle, in order to
@@ -282,9 +298,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     __syncthreads();
 
     // CHECK
-#if 0
 #if defined(DO_GENERALIZED_BORN) && defined(COMPUTE_FORCE)
-    if (nbwu_idx == 0 && threadIdx.x == 0) {
+    if (nbwu_idx == 1 && threadIdx.x == 0) {
       printf("GPU gbeff result = [\n");
       int jj = 0;
       for (int ii = 0; ii < 36; ii++) {
@@ -321,9 +336,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
     }
     __syncthreads();
 #endif
-#endif
     // END CHECK
-
+    
     // Loop over tile instructions
     pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
     while (pos < nbwu_map[small_block_max_imports + 7]) {
@@ -341,6 +355,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       const int absc_import_idx = local_absc_start >> tile_length_bits;
       const int ordi_import_idx = local_ordi_start >> tile_length_bits;
 
+      // CHECK
+      const int system_idx = sh_system_indices[absc_import_idx];
+      const int atom_idx   = (warp_lane_idx < tile_length) ?
+                             nbwu_map[absc_import_idx + 1] - poly_nbk.atom_offsets[system_idx] :
+                             nbwu_map[ordi_import_idx + 1] - poly_nbk.atom_offsets[system_idx];
+      // END CHECK
+      
       // Obtain the centering for best single-precision results.  This can be done in either
       // precision level.  It is unnecessary with double-precision, but the cost is marginal and
       // performance is not the purpose of double-precision computations.  As with the CPU code,
@@ -407,22 +428,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         const TCALC o_xcrd  = SHFL(t_xcrd,  crd_src_lane);
         const TCALC o_ycrd  = SHFL(t_ycrd,  crd_src_lane);
         const TCALC o_zcrd  = SHFL(t_zcrd,  crd_src_lane);
-
-        // CHECK
-#if 0
-        const bool report_t =
-          (nbwu_idx == 0 && absc_import_idx < 3 &&
-           fabs(t_xcrd + (tx_cog * poly_psw.inv_gpos_scale) - 2.0000010) < 1.0e-6 &&
-           fabs(t_ycrd + (ty_cog * poly_psw.inv_gpos_scale) - 1.0000000) < 1.0e-6 &&
-           fabs(t_zcrd + (tz_cog * poly_psw.inv_gpos_scale) + 0.0000013) < 1.0e-6);
-        const bool report_o =
-          (nbwu_idx == 0 && absc_import_idx < 3 &&
-           fabs(o_xcrd + (tx_cog * poly_psw.inv_gpos_scale) - 2.0000010) < 1.0e-6 &&
-           fabs(o_ycrd + (ty_cog * poly_psw.inv_gpos_scale) - 1.0000000) < 1.0e-6 &&
-           fabs(o_zcrd + (tz_cog * poly_psw.inv_gpos_scale) + 0.0000013) < 1.0e-6);           
-#endif
-        // END CHECK
-        
         const TCALC o_ljidx = SHFL(t_ljidx, crd_src_lane);
         const TCALC o_q     = SHFL(t_q,     crd_src_lane);
         const TCALC ot_qq   = t_q * o_q;
@@ -467,21 +472,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
             temp5 = (TCALC)(0.0);
           }
         }
-
-        // CHECK
-#if 0
-        if (r2 < 1.0e-8 && fabs(temp5) > 1.0e-12) {
-          printf("On lane %2d reading %2d (iteration %d), temp5 = %10.6lf\n", warp_lane_idx,
-                 crd_src_lane, i, temp5);
-        }
-        if (report_t && r2 < 4000.0) {
-          const double contrib = (on_diagonal) ? 2.0 * temp5 * t_rad : temp5 * t_rad;
-          printf("GPU T contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
-                 "to atom 0 sdj\n", t_q, o_q, r2, ot_rad, efac, fgbi, contrib);
-        }
-#endif
-        // END CHECK
-        
         t_deijda += temp5 * t_rad;
         const TCALC o_deijda = temp5 * o_rad;
 #  else
@@ -522,24 +512,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
         t_yfrc -= SHFL(fmag_dy, frc_ret_lane);
         t_zfrc -= SHFL(fmag_dz, frc_ret_lane);
 #  ifdef DO_GENERALIZED_BORN
-
-        // CHECK
-#if 0
-        const double ox_q      = SHFL(t_q, frc_ret_lane);
-        const double ox_r2     = SHFL(r2, frc_ret_lane);
-        const double ox_expmkf = SHFL(expmkf, frc_ret_lane);
-        const double ox_ot_qq  = SHFL(ot_qq, frc_ret_lane);
-        const double ox_ot_rad = SHFL(ot_rad, frc_ret_lane);
-        const double ox_fgbi   = SHFL(fgbi, frc_ret_lane);
-        const double ox_efac   = SHFL(efac, frc_ret_lane);
-        const double ncontrib  = SHFL(o_deijda, frc_ret_lane);
-        if (report_t && ox_r2 < 4000.0) {
-          printf("GPU O contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> %10.6lf "
-                 "to atom 0 sdj\n", t_q, ox_q, ox_r2, ox_ot_rad, ox_efac, ox_fgbi, ncontrib);
-        }
-#endif
-        // END CHECK
-        
         t_deijda += SHFL(o_deijda, frc_ret_lane);
 #  endif
 #endif

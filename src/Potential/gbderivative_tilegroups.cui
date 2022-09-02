@@ -92,6 +92,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
                                                   __ldcs(&iswk.sum_deijda_ovrf[read_idx])) *
                                      iswk.inv_fp_scale;
 #endif
+          // Use the thread-block exclusive workspace's charge array to store baseline GB radii
+          const TCALC pb_radius = poly_nbk.pb_radii[read_idx];
+          const TCALC gb_radius = pb_radius - poly_nbk.gb_offset;
+          __stwb(&gmem_r.charges[write_idx + EXCL_GMEM_OFFSET], gb_radius);
         }
         pos += tile_sides_per_warp * warps_per_block;
       }
@@ -197,16 +201,27 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     __syncthreads();
 
     // CHECK
-    if (gbdwu_idx == 0 && threadIdx.x == 0) {
-      printf("sh_sum_deijda = [\n");
-      int jj = 0;
-      for (int ii = 0; ii < 36; ii++) {
-        printf("  %12.6lf", sh_sum_deijda[ii]);
-        jj++;
-        if (jj == 6) {
-          printf("\n");
-          jj = 0;
-        }
+    if (gbdwu_idx == 1 && threadIdx.x == 0) {
+      printf("GPU force at A = [\n");
+      const int aoffst = poly_nbk.atom_offsets[1];
+      const int acount = poly_nbk.atom_counts[1];
+      for (int i = aoffst; i < aoffst + acount; i++) {
+#ifdef TCALC_IS_SINGLE
+        const float txfrc = int63ToFloat(poly_psw.xfrc[i], poly_psw.xfrc_ovrf[i]) *
+                            poly_psw.inv_frc_scale_f;
+        const float tyfrc = int63ToFloat(poly_psw.yfrc[i], poly_psw.yfrc_ovrf[i]) *
+                            poly_psw.inv_frc_scale_f;
+        const float tzfrc = int63ToFloat(poly_psw.zfrc[i], poly_psw.zfrc_ovrf[i]) *
+                            poly_psw.inv_frc_scale_f;
+#else
+        const double txfrc = int95ToDouble(poly_psw.xfrc[i], poly_psw.xfrc_ovrf[i]) *
+                             poly_psw.inv_frc_scale;
+        const double tyfrc = int95ToDouble(poly_psw.yfrc[i], poly_psw.yfrc_ovrf[i]) *
+                             poly_psw.inv_frc_scale;
+        const double tzfrc = int95ToDouble(poly_psw.zfrc[i], poly_psw.zfrc_ovrf[i]) *
+                             poly_psw.inv_frc_scale;
+#endif
+        printf("  %10.6lf %10.6lf %10.6lf\n", txfrc, tyfrc, tzfrc);
       }
       printf("];\n");
     }
@@ -311,7 +326,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
           datmpi = (temp1 * sj * ((TCALC)(-0.5) * invr2 + temp1)) +
                    ((TCALC)(0.25) * invr * invr2 * LOG_FUNC((r - sj) / (r + sj)));
         }
-        else if (r > fabs(t_rad - sj)) {
+        else if (r > FABS_FUNC(t_rad - sj)) {
           const TCALC temp1  = (TCALC)(1.0) / (r + sj);
           const TCALC invr3  = invr2 * invr;
           datmpi = -(TCALC)(0.25) * (((TCALC)(-0.5) * (r2 - (t_rad * t_rad) + sj2) *
@@ -353,7 +368,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
           datmpj = (temp1 * si * ((TCALC)(-0.5) * invr2 + temp1)) +
                    ((TCALC)(0.25) * invr * invr2 * LOG_FUNC((r - si) / (r + si)));
         }
-        else if (r > fabs(o_rad - si)) {
+        else if (r > FABS_FUNC(o_rad - si)) {
           const TCALC temp1 = (TCALC)(1.0) / (r + si);
           const TCALC invr3 = invr2 * invr;
           datmpj = -(TCALC)(0.25) * (((TCALC)(-0.5) * (r2 - (o_rad * o_rad) + si2) *

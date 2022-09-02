@@ -657,8 +657,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   }
 
   // CHECK
-  const bool report = (nbk.natom == 36 && fabs(nbk.charge[23] - 0.446600) < 1.0e-6);
-#if 0
+  const bool report = (nbk.natom == 36 &&
+                       fabs((nbk.charge[17] * sqrt(nbk.coulomb_constant)) - 7.32755128) < 1.0e-6);
   if (report) {
     printf("CPU gbeff result = [\n");
     int j = 0;
@@ -683,9 +683,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     }
     printf("];\n");
   }
-#endif
   // END CHECK
-
+  
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.  However,
   // the tiling continues to add a degree of complexity.
@@ -798,31 +797,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                 const Tcalc fmag = temp6 * (v_one - (v_qrtr * efac));
                 const Tcalc temp5 = v_half * efac * temp6 * (ij_born_radius + (v_qrtr * r2));
                 cachi_psi[i] += atomi_radius * temp5;
-
-                // CHECK
-#if 0
-                if (report && ti == 0 && i == 0) {
-                  printf("Contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> "
-                         "%10.6lf to atom 0 sdj\n", cachi_screen[i] * sqrt(nbk.coulomb_constant),
-                         cachj_screen[j] * sqrt(nbk.coulomb_constant), r2, ij_born_radius, efac,
-                         fgbi, atomi_radius * temp5);
-                }
-#endif
-                // END CHECK
-                
                 cachj_psi[j] += cachj_radii[j] * temp5;
-
-                // CHECK
-#if 0
-                if (report && tj == 0 && j == 0) {
-                  printf("Contribute %10.6lf %10.6lf [ %10.6lf %10.6lf %10.6lf %10.6lf ] -> "
-                         "%10.6lf to atom 0 sdj\n", cachi_screen[i] * sqrt(nbk.coulomb_constant),
-                         cachj_screen[j] * sqrt(nbk.coulomb_constant), r2, ij_born_radius, efac,
-                         fgbi, cachj_radii[j] * temp5);
-                }
-#endif
-                // END CHECK
-                
                 cachi_xfrc[i] += fmag * dx;
                 cachi_yfrc[i] += fmag * dy;
                 cachi_zfrc[i] += fmag * dz;
@@ -884,6 +859,16 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     return egb_energy;
   }
 
+  // CHECK
+  if (report) {
+    printf("CPU force at A = [\n");
+    for (int i = 0; i < nbk.natom; i++) {
+      printf("  %10.6lf %10.6lf %10.6lf\n", xfrc[i], yfrc[i], zfrc[i]);
+    }
+    printf("];\n");
+  }
+  // END CHECK
+
   // A third pair of nested loops over all atoms is needed to fold in derivatives of the
   // effective Born radii to the forces on each atom.  Begin by updating the energy derivative
   // factors (sumdeijda) for each atom, then roll into the nested loops.
@@ -921,23 +906,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     }
     break;
   }  
-
-  // CHECK
-  if (report) {
-    printf("CPU sum_deijda = [\n");
-    int j = 0;
-    for (int i = 0; i < nbk.natom; i++) {
-      printf("  %12.6lf", sumdeijda[i]);
-      j++;
-      if (j == 6) {
-        printf("\n");
-        j = 0;
-      }
-    }
-    printf("];\n");
-  }
-  // END CHECK
-
   for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
     for (int stj = 0; stj <= sti; stj++) {
 
