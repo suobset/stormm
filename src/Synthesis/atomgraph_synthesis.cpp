@@ -3111,7 +3111,8 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
       {
         const int n_tiles = nbwu_list[i].getTileCount();
         nonbonded_abstracts.putHost(nbwu_list[i].getAbstract(insr_offset),
-                                    tile_groups_wu_abstract_length * i, 48);
+                                    tile_groups_wu_abstract_length * i,
+                                    tile_groups_wu_abstract_length);
         nbwu_instructions.putHost(nbwu_list[i].getTileInstructions(), insr_offset, n_tiles);
         insr_offset += roundUp(n_tiles, warp_size_int);
       }
@@ -3119,7 +3120,8 @@ void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthes
     case NbwuKind::SUPERTILES:
       {
         nonbonded_abstracts.putHost(nbwu_list[i].getAbstract(insr_offset),
-                                    supertile_wu_abstract_length * i, 5);
+                                    supertile_wu_abstract_length * i,
+                                    supertile_wu_abstract_length);
       }
       break;
     case NbwuKind::HONEYCOMB:

@@ -23,6 +23,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
     import_count{0},
     kind{NbwuKind::TILE_GROUPS},
     score{0},
+    init_accumulation{0},
     imports{std::vector<int>(small_block_max_imports)},
     import_system_indices{std::vector<int>(small_block_max_imports, 0)},
     import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
@@ -117,6 +118,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
     import_count{0},
     kind{NbwuKind::SUPERTILES},
     score{0},
+    init_accumulation{0},
     imports{},
     import_system_indices{std::vector<int>(1, 0)},
     import_size_keys{},
@@ -175,6 +177,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     import_count{0},
     kind{NbwuKind::TILE_GROUPS},
     score{0},
+    init_accumulation{0},
     imports{std::vector<int>(small_block_max_imports)},
     import_system_indices{std::vector<int>(small_block_max_imports)},
     import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
@@ -280,6 +283,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     import_count{0},
     kind{NbwuKind::SUPERTILES},
     score{0},
+    init_accumulation{0},
     imports{},
     import_system_indices{std::vector<int>(1)},
     import_size_keys{},
@@ -350,6 +354,11 @@ int NonbondedWorkUnit::getImportCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int NonbondedWorkUnit::getInitializationMask() const {
+  return init_accumulation;
+}
+
+//-------------------------------------------------------------------------------------------------
 int4 NonbondedWorkUnit::getTileLimits(const int index) const {
   const int absc_idx = (tile_instructions[index].x & 0xffff) / tile_length;
   const int ordi_idx = ((tile_instructions[index].x >> 16) & 0xffff) / tile_length;
@@ -382,11 +391,12 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
       for (int i = 0; i < 5; i++) {
         result[1 + small_block_max_imports + i] = import_size_keys[i];
       }
-      result[26] = instruction_start;
-      result[27] = instruction_start + tile_count;
+      result[small_block_max_imports + 6] = instruction_start;
+      result[small_block_max_imports + 7] = instruction_start + tile_count;
       for (int i = 0; i < import_count; i++) {
-        result[28 + i] = import_system_indices[i];
-      }    
+        result[small_block_max_imports + 8 + i] = import_system_indices[i];
+      }
+      result[(2 * small_block_max_imports) + 8] = init_accumulation;
     }
     return result;
   case NbwuKind::SUPERTILES:
@@ -395,6 +405,7 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
       result[i] = imports[i];
     }
     result[4] = (import_system_indices[0]);
+    result[5] = init_accumulation;
     return result;
   case NbwuKind::HONEYCOMB:
   case NbwuKind::UNKNOWN:
@@ -420,6 +431,11 @@ int NonbondedWorkUnit::getImportSystemIndex(const SeMaskSynthesisReader &ser,
     return findBin(ser.atom_counts, atom_index, ser.nsys - 1);
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void NonbondedWorkUnit::setInitializationMask(const int mask_in) {
+  init_accumulation = mask_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -468,6 +484,59 @@ bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
     return true;
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu,
+                                    const NbwuKind kind) {
+  const size_t small_block_max_imports_zu = static_cast<size_t>(small_block_max_imports);
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    {
+      const size_t nwu = all_wu->size();
+      NonbondedWorkUnit* all_wu_data = all_wu->data();
+      std::vector<int> import_counts(nwu);
+      std::vector<int> import_list(nwu * small_block_max_imports_zu);
+      int max_atom_idx = 0;
+      for (size_t i = 0; i < nwu; i++) {
+        import_counts[i] = all_wu_data[i].getImportCount();
+        const std::vector<int> tile_abstract = all_wu_data[i].getAbstract();
+        for (int j = 0; j < tile_abstract[0]; j++) {
+          max_atom_idx = std::max(max_atom_idx, tile_abstract[j + 1]);
+        }
+        for (size_t j = 0LLU; j < small_block_max_imports_zu; j++) {
+          import_list[j + (i * small_block_max_imports_zu)] = tile_abstract[j + 1LLU];
+        }
+      }
+      std::vector<bool> coverage(max_atom_idx + 1, false);
+      for (size_t i = 0; i < nwu; i++) {
+        uint init_mask = 0;
+        for (int j = 0; j < import_counts[i]; j++) {
+          const size_t j_zu = j;
+          const int jimp_start = import_list[j_zu + (i * small_block_max_imports_zu)];
+
+          // Check that there are no duplicate imports in any work unit.
+          for (int k = j + 1; k < import_counts[i]; k++) {
+            const size_t k_zu = k;
+            if (jimp_start == import_list[k_zu + (i * small_block_max_imports_zu)]) {
+              rtErr("Duplicate imports were detected in non-bonded work unit " +
+                    std::to_string(i) + ", slots " + std::to_string(j) + " and " +
+                    std::to_string(k) + ".", "setPropertyInitializationMasks");
+            }
+          }
+          if (coverage[jimp_start] == false) { 
+            coverage[jimp_start] = true;
+            init_mask |= (0x1 << j);
+          }
+        }
+        all_wu_data[i].setInitializationMask(init_mask);
+      }
+    }
+    break;
+  case NbwuKind::SUPERTILES:
+  case NbwuKind::HONEYCOMB:
+    break;
+  }
 }
      
 //-------------------------------------------------------------------------------------------------

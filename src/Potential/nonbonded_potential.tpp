@@ -630,7 +630,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       break;
     }
   }
-    
+
   // Compute inherent Generalized Born energies and initialize an array for solvent forces
   for (int i = 0; i < nbk.natom; i++) {
     const Tcalc atomi_q = nbk.charge[i];
@@ -656,35 +656,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     }
   }
 
-  // CHECK
-  const bool report = (nbk.natom == 36 &&
-                       fabs((nbk.charge[17] * sqrt(nbk.coulomb_constant)) - 7.32755128) < 1.0e-6);
-  if (report) {
-    printf("CPU gbeff result = [\n");
-    int j = 0;
-    for (int i = 0; i < nbk.natom; i++) {
-      printf("  %10.6lf", effective_gb_radii[i]);
-      j++;
-      if (j == 6) {
-        printf("\n");
-        j = 0;
-      }
-    }
-    printf("];\n");
-    printf("CPU sum_deijda init = [\n");
-    j = 0;
-    for (int i = 0; i < nbk.natom; i++) {
-      printf("  %10.6lf", sumdeijda[i]);
-      j++;
-      if (j == 6) {
-        printf("\n");
-        j = 0;
-      }
-    }
-    printf("];\n");
-  }
-  // END CHECK
-  
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.  However,
   // the tiling continues to add a degree of complexity.
@@ -858,16 +829,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   if (eval_force == EvaluateForce::NO) {
     return egb_energy;
   }
-
-  // CHECK
-  if (report) {
-    printf("CPU force at A = [\n");
-    for (int i = 0; i < nbk.natom; i++) {
-      printf("  %10.6lf %10.6lf %10.6lf\n", xfrc[i], yfrc[i], zfrc[i]);
-    }
-    printf("];\n");
-  }
-  // END CHECK
 
   // A third pair of nested loops over all atoms is needed to fold in derivatives of the
   // effective Born radii to the forces on each atom.  Begin by updating the energy derivative

@@ -135,6 +135,9 @@ public:
   /// \brief Get the number of tile_length atom imports needed for this work units.
   int getImportCount() const;
 
+  /// \brief Get the mask for initializing per-atom properties on any of the imported atom groups.
+  int getInitializationMask() const;
+
   /// \brief Get the abscissa and ordinate atom limits for a tile from within this work unit.
   ///        The abscissa limits are returned in the x and y members, the ordinate limits in the
   ///        z and w members.
@@ -151,6 +154,14 @@ public:
   ///                           the work unit will fit on a small thread block, having less than
   ///                           huge_nbwu_tiles tiles.  Otherwise no instruction start is needed.
   std::vector<int> getAbstract(int instruction_start = 0) const;
+
+  /// \brief Set the initialization mask.
+  ///
+  /// \param mask_in  The new mask to use.  If the jth bit of this mask is set to 1, the work
+  ///                 unit will perform initialization protocols on its jth set of atom imports,
+  ///                 i.e. the Born radii derivatives for those atoms will be contributed to the
+  ///                 force accumulators.
+  void setInitializationMask(int mask_in);
   
 private:
   int tile_count;                          ///< Number of tiles to be processed by this work unit
@@ -160,6 +171,14 @@ private:
                                            ///<   boundary conditions, there is a choice between
                                            ///<   TILE_GROUPS and SUPERTILES.
   int score;                               ///< The estimated effort score of this work unit
+  int init_accumulation;                   ///< Some calculations such as Generalized Born solvent
+                                           ///<   effects will require that certain properties be
+                                           ///<   initialized on a per-atom basis.  This mask, its
+                                           ///<   jth bit being set to 1 to indicate that the
+                                           ///<   property of interest should be computed for
+                                           ///<   imported group j, manages the problem of
+                                           ///<   initializing these properties and counting their
+                                           ///<   contributions once and only once.
   std::vector<int> imports;                ///< List of starting positions for atoms that must be
                                            ///<   cached in order to process all tiles in this
                                            ///<   work unit
@@ -206,6 +225,13 @@ private:
 bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
                            const std::vector<int> &system_tile_starts, int *import_count,
                            int *current_tile_count, const int ti, const int tj, const int sysid);
+
+/// \brief Set the masks directing each non-bonded work unit with exclusive rights to perform
+///        certain initializations that must only be performed once per atom.
+///
+/// \param all_wu  A list of non-bonded work units, presumably with blank initialization masks
+/// \param kind    The type of work units in the list
+void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu, NbwuKind kind);
 
 /// \brief Create a list of work units of a consistent size so as to optimize the load balancing
 ///        on a given resource (GPU, on or more CPUs, etc.).
