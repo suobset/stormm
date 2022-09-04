@@ -394,6 +394,7 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		    $(SRCDIR)/Random/hpc_random.cu \
 		    $(SRCDIR)/Structure/hpc_virtual_site_handling.cu \
+		    $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.cu \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
 
 # STORMM CUDA header files
@@ -433,6 +434,7 @@ STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		   $(SRCDIR)/Potential/hpc_valence_potential.o \
 		   $(SRCDIR)/Random/hpc_random.o \
 		   $(SRCDIR)/Structure/hpc_virtual_site_handling.o \
+		   $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.o \
 		   $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
 
 # Test programs using stormm
@@ -797,7 +799,7 @@ test.cuda.exe : $(STORMM_TEST_CUDA_PROGS)
 test : $(STORMM_TEST_PROGS)
 	for PROG in $(STORMM_TEST_PROGS) ; do \
 		echo "[STORMM] Execute $$PROG" ; \
-		$$PROG ; \
+		valgrind $$PROG ; \
 	done
 
 test.cuda : $(STORMM_TEST_CUDA_PROGS)

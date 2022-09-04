@@ -375,9 +375,12 @@ int main(const int argc, const char* argv[]) {
   section("Coordinate compilation and staging");
 
   // Section 3
-  section("Potential energy and force calculations");
+  section("Vacuum energy and force calculations");
 
   // Section 4
+  section("Generalized Born energy and force calculations");
+
+  // Section 5
   section("Virtual site placement");
 
   // Get the GPU specs.  Set of parameters for the work units and launch grids.  Preparing a cache
@@ -619,6 +622,7 @@ int main(const int argc, const char* argv[]) {
                            1.0e-6, 7.5e-4, 7.5e-3, do_tests);
   
   // Tweak the original synthesis to incorporate a Generalized Born model.
+  section(4);
   const NeckGeneralizedBornTable ngb_tables;
   const std::vector<ImplicitSolventModel> amber_isms = {
     ImplicitSolventModel::OBC_GB, ImplicitSolventModel::HCT_GB, ImplicitSolventModel::OBC_GB_II,
@@ -626,25 +630,54 @@ int main(const int argc, const char* argv[]) {
   const std::vector<AtomicRadiusSet> appropriate_ism_radii = {
     AtomicRadiusSet::AMBER6, AtomicRadiusSet::MBONDI2, AtomicRadiusSet::MBONDI,
     AtomicRadiusSet::BONDI, AtomicRadiusSet::MBONDI3 };
+
+  // The compiled topology synthesis must have some implicit solvent model set in order to trigger
+  // the initialization of the relevant counters.  Otherwise, one initialization for the whole
+  // series is fine.
+  poly_ag.setImplicitSolventModel(amber_isms[0], ngb_tables, appropriate_ism_radii[0]);
+  mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::DOUBLE, poly_ag); 
   for (size_t i = 0; i < amber_isms.size(); i++) {
     poly_ag.setImplicitSolventModel(amber_isms[i], ngb_tables, appropriate_ism_radii[i]);
     poly_ag.upload();
-    mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
-                                 PrecisionModel::DOUBLE, poly_ag);
     const std::string side_note = "GB model: " + getImplicitSolventModelName(amber_isms[i]) +
                                   " (" + getAtomicRadiusSetName(appropriate_ism_radii[i]) +
                                   " radii).";
     checkCompilationForces(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                            poly_se, AccumulationMethod::SPLIT, PrecisionModel::DOUBLE, gpu,
                            launcher, 3.5e-6, 2.0e-6, do_tests, side_note, false);
-    checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+    checkCompilationEnergies(&poly_ps_dbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                             poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6,
+                             1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
+                             1.0e-6, 1.0e-6, do_tests, false);
+    checkCompilationForces(&poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                           poly_se, AccumulationMethod::SPLIT, PrecisionModel::DOUBLE, gpu,
+                           launcher, 3.5e-6, 2.0e-6, do_tests, side_note, false);
+    checkCompilationEnergies(&poly_ps_sdbl, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
                              poly_se, PrecisionModel::DOUBLE, gpu, launcher, 1.0e-6, 1.0e-6,
                              1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6,
                              1.0e-6, 1.0e-6, do_tests, false);
   }
-  
+  mmctrl.primeWorkUnitCounters(launcher, EvaluateForce::YES, EvaluateEnergy::YES,
+                               PrecisionModel::SINGLE, poly_ag);
+  for (size_t i = 0; i < amber_isms.size(); i++) {
+    poly_ag.setImplicitSolventModel(amber_isms[i], ngb_tables, appropriate_ism_radii[i]);
+    poly_ag.upload();
+    const std::string side_note = "GB model: " + getImplicitSolventModelName(amber_isms[i]) +
+                                  " (" + getAtomicRadiusSetName(appropriate_ism_radii[i]) +
+                                  " radii).";
+    checkCompilationForces(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                           poly_se, AccumulationMethod::SPLIT, PrecisionModel::SINGLE, gpu,
+                           launcher, 9.0e-6, 2.5e-4, do_tests, side_note, false);
+    checkCompilationEnergies(&poly_ps, &mmctrl, &valence_tb_space, &nonbond_tb_space, poly_ag,
+                             poly_se, PrecisionModel::SINGLE, gpu, launcher, 1.5e-5, 1.5e-5,
+                             5.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 1.0e-6, 6.0e-6, 2.2e-5, 1.0e-6,
+                             1.0e-1, 3.5e-5, do_tests, false);
+  }
+
   // Read some topologies with virtual sites.  First, test the forces that appear to act on the
   // virtual sites.  Add restraints to these ligands.
+  section(5);
   const std::string brbz_top_name = topology_base + osc + "bromobenzene_vs_iso.top";
   const std::string lig1_top_name = topology_base + osc + "stereo_L1_vs.top";
   const std::string lig2_top_name = topology_base + osc + "symmetry_L1_vs.top";
