@@ -132,19 +132,41 @@ int ImplicitSolventWorkspace::getFixedPrecisionBits() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-ISWorkspaceKit<double> ImplicitSolventWorkspace::dpData(const HybridTargetLevel tier) {
-  return ISWorkspaceKit<double>(fp_bits, psi.data(tier), psi_overflow.data(tier),
-                                sum_deijda.data(tier), sum_deijda_overflow.data(tier),
-                                alt_psi.data(tier), alt_psi_overflow.data(tier),
-                                alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier));
+ISWorkspaceKit<double> ImplicitSolventWorkspace::dpData(const HybridTargetLevel tier,
+                                                        const CoordinateCycle orientation) {
+  switch (orientation) {
+  case CoordinateCycle::PAST:
+  case CoordinateCycle::FUTURE:
+    return ISWorkspaceKit<double>(fp_bits, alt_psi.data(tier), alt_psi_overflow.data(tier),
+                                  alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier),
+                                  psi.data(tier), psi_overflow.data(tier),
+                                  sum_deijda.data(tier), sum_deijda_overflow.data(tier));
+  case CoordinateCycle::PRESENT:
+    return ISWorkspaceKit<double>(fp_bits, psi.data(tier), psi_overflow.data(tier),
+                                  sum_deijda.data(tier), sum_deijda_overflow.data(tier),
+                                  alt_psi.data(tier), alt_psi_overflow.data(tier),
+                                  alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier));
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
-ISWorkspaceKit<float> ImplicitSolventWorkspace::spData(const HybridTargetLevel tier) {
-  return ISWorkspaceKit<float>(fp_bits, psi.data(tier), psi_overflow.data(tier),
-                               sum_deijda.data(tier), sum_deijda_overflow.data(tier),
-                               alt_psi.data(tier), alt_psi_overflow.data(tier),
-                               alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier));
+ISWorkspaceKit<float> ImplicitSolventWorkspace::spData(const HybridTargetLevel tier,
+                                                       const CoordinateCycle orientation) {
+  switch (orientation) {
+  case CoordinateCycle::PAST:
+  case CoordinateCycle::FUTURE:
+    return ISWorkspaceKit<float>(fp_bits, alt_psi.data(tier), alt_psi_overflow.data(tier),
+                                 alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier),
+                                 psi.data(tier), psi_overflow.data(tier),
+                                 sum_deijda.data(tier), sum_deijda_overflow.data(tier));
+  case CoordinateCycle::PRESENT:
+    return ISWorkspaceKit<float>(fp_bits, psi.data(tier), psi_overflow.data(tier),
+                                 sum_deijda.data(tier), sum_deijda_overflow.data(tier),
+                                 alt_psi.data(tier), alt_psi_overflow.data(tier),
+                                 alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier));
+  }
+  __builtin_unreachable();
 }
 
 #ifdef STORMM_USE_HPC

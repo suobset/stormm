@@ -16,7 +16,7 @@ using energy::StaticExclusionMask;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
 using math::sum;
-
+  
 /// \brief The maximum number of imported atoms in a "small" nonbonded block (256 threads)
 constexpr int small_block_max_atoms = 320;
 
@@ -57,25 +57,14 @@ public:
   ///
   ///        Static exclusion mask, tiny up to large work units:
   ///        This will be the majority of the cases with implicit-solvent systems.  In practice,
-  ///        the non-bonded work unit becomes a list of 28 integers representing the total number
-  ///        of tile imports (up to 20) followed by the starting locations of each tile's atoms to
-  ///        import (and convert to floating point representations) from within what may be a
-  ///        concatenated list of atoms for many systems.  Five integers following these import
-  ///        starting positions indicate the numbers of atoms to import in each tile (usually the
-  ///        tile length, but fewer if the tile is incomplete at the end of the system's list of
-  ///        atoms).  The number of atoms after each starting point is a matter of the tile_length
-  ///        constant, and to some degree this couples it to the block size used for smaller
-  ///        non-bonded work units.  There are then low and high limits on the tile computations to
-  ///        perform, indexing into a master list of uint2 tuples, each listing the abscissa atom
-  ///        start and ordinate atom starts in bits 1-16 and 17-32 of the x member (referring to
-  ///        an index of local atom imports) and the tile exclusion mask index (referring to an
-  ///        index of a separate master list out in main memory) in the y member.  These cases
-  ///        will run with a 256-thread block size.
+  ///        the non-bonded work unit becomes a list of 50 integers.  A complete description is
+  ///        available in the documentation for the getAbstract() member function of this object.
+  ///        These cases will run with a 256-thread block size.
   ///
   ///        Static exclusion mask, huge work units:
   ///        This will handle cases of implicit-solvent systems with sizes so large that millions
   ///        of smaller work units would be required to cover everything.  In practice, the
-  ///        non-bonded work unit is reduced to a list of 4 integers, now representing the lower
+  ///        non-bonded work unit is reduced to a list of 8 integers, now representing the lower
   ///        limits of the abscissa and ordinate atoms to import, and the numbers of atoms to
   ///        import along each axis, in a supertile for which the work unit is to compute all
   ///        interactions.  There is no meaningful list of all interactions in this case, as it
@@ -129,6 +118,15 @@ public:
                     int system_index);
   /// \}
 
+  /// \brief Take the default copy and move constructors as well as assignment operators for this
+  ///        object, which uses only Standard Template Library member variable types.
+  /// \{
+  NonbondedWorkUnit(const NonbondedWorkUnit &original) = default;
+  NonbondedWorkUnit(NonbondedWorkUnit &&original) = default;
+  NonbondedWorkUnit& operator=(const NonbondedWorkUnit &other) = default;
+  NonbondedWorkUnit& operator=(NonbondedWorkUnit &&other) = default;
+  /// \}
+  
   /// \brief Get the tile count of this work units.
   int getTileCount() const;
 
@@ -149,19 +147,69 @@ public:
   const std::vector<uint2>& getTileInstructions() const;
   
   /// \brief Get an abstract for this work unit, layed out to work within an AtomGraphSynthesis.
+  ///        For TILE_GROUPS-type work units serving systems in isolated boundary conditions, the
+  ///        non-bonded abstract has the following format:
+  ///
+  ///  Slot   Description
+  /// ------  -------------------------------------------------------------------------------------
+  ///      0  The total number of atom group imports for various tiles.  Each group is up to 16
+  ///         atoms, and all atoms pertain to a single system in the synthesis.
+  ///   1-20  Starting atom indices of each tile group in the topology / coordinate synthesis
+  ///         (the extent of this segment is set by small_block_max_imports)
+  ///  21-25  Counts of the numbers of atoms in each tile group, with four groups' counts packed
+  ///         into each int.  In this scheme, the tile length may be extended up to 128 atoms (256
+  ///         if these values are read as unsigned ints), but a tile length of 16 appears to be
+  ///         optimal for NVIDIA and probably other architectures as well.
+  ///  26-27  Starting and ending locations of the tile instruction list.  After reading up to 20
+  ///         tile atom groups, each work unit tries to combine the groups into different
+  ///         combinations of actual tiles.  The two interacting groups are given in the x-member
+  ///         of a uint2 tuple, while the starting location of exclusion bit masks for the tile
+  ///         is given in the y-member.  The difference between values in slots 26 and 27 indicates
+  ///         the number of tiles to perform, and is designed to be a multiple of eight if possible
+  ///         (anticipating blocks of four or eight warps, with one warp handling each tile).
+  ///  28-47  System indices within the synthesis to which the atoms in each tile group pertain
+  ///     48  Bitmask indicating whether the current work unit is the first to import a particular
+  ///         group of atoms and therefore can be tasked with contributing certain per-atom effects
+  ///         when accumulating forces or radii due to those atoms
+  ///  49-50  Lower and upper limits of atoms for which the work unit is tasked with initializing
+  ///         force or other property accumulators to have them ready for use in future iterations
+  ///         of the molecular mechanics force / energy evaluation cycle.  The integer in slot
+  ///         49 indicates the first atom of a contiguous list, and need to be an atom that the
+  ///         work unit imported for one of its tile computations.  The integer in slot 50 is a
+  ///         bit-packed value, with the low 16 bits indicating up to 65,504 (not 65,536) atoms
+  ///         following the first index.  The high 16 bits of the integer in slot 50 indicate
+  ///         whether to initialize psi, sum_deijda, and force X, Y, or Z accumulators for the
+  ///         next iteration of the cycle (one bit per accumulator), as well as whether to perform
+  ///         random number caching for up to 15 cycles.  These two slots of the work unit can be
+  ///         altered after the non-bonded work unit list is constructed.
   ///
   /// \param instruction_start  The starting point of instructions for this group of tiles, if
   ///                           the work unit will fit on a small thread block, having less than
   ///                           huge_nbwu_tiles tiles.  Otherwise no instruction start is needed.
   std::vector<int> getAbstract(int instruction_start = 0) const;
 
-  /// \brief Set the initialization mask.
+  /// \brief Set the initialization mask for atomic properties that contribute once to an
+  ///        accumulated sum, i.e. contributions of baseline atomic radii to the Generalized Born
+  ///        effective radii.
   ///
   /// \param mask_in  The new mask to use.  If the jth bit of this mask is set to 1, the work
   ///                 unit will perform initialization protocols on its jth set of atom imports,
   ///                 i.e. the Born radii derivatives for those atoms will be contributed to the
   ///                 force accumulators.
   void setInitializationMask(int mask_in);
+
+  /// \brief Set the atom index at which to begin accumulator refreshing.  The actual work done
+  ///        depends on the accumulator refresh code set by the next member function.
+  ///
+  /// \param index_in  The starting atom index relevant to this work unit
+  void setRefreshAtomIndex(int index_in);
+  
+  /// \brief Set the accumulator refreshing instructions for this work unit, i.e. "set X force
+  ///        accumulators to zero for this many atoms." The refreshing starts at the atom index
+  ///        set by the preceding member function.
+  ///
+  /// \param code_in  The refesh code to execute
+  void setRefreshWorkCode(int code_in);
   
 private:
   int tile_count;                          ///< Number of tiles to be processed by this work unit
@@ -179,6 +227,15 @@ private:
                                            ///<   imported group j, manages the problem of
                                            ///<   initializing these properties and counting their
                                            ///<   contributions once and only once.
+  int refresh_atom_start;                  ///< First atom at which to begin resetting accumulation
+                                           ///<   counters in some alternate force or intermediate
+                                           ///<   quantity array.  The non-bonded kernels will
+                                           ///<   spread out the work of initializing accumulators
+                                           ///<   for subsequent force and energy calculations.
+  int refresh_code;                        ///< Instructions for this work unit on what to reset
+                                           ///<   (bits 0-7), how many random number sets to
+                                           ///<   compute (bits 8-15) and how many atoms (starting
+                                           ///    from refresh_atom_start) to apply it to
   std::vector<int> imports;                ///< List of starting positions for atoms that must be
                                            ///<   cached in order to process all tiles in this
                                            ///<   work unit
@@ -233,6 +290,26 @@ bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
 /// \param kind    The type of work units in the list
 void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu, NbwuKind kind);
 
+/// \brief Obtain a code for initializing accumulators for use on subsequent cycles.
+///
+/// \param init_request
+/// \param cache_depth   The number of random numbers for influencing atomic motions in the X, Y,
+///                      and Z directions 
+int nonbondedWorkUnitInitCode(const InitializationTask init_request, const int cache_depth);
+
+/// \brief Distribute the total atom count over each non-bonded work unit to balance the effort of
+///        initializing accumulators and computing random numbers for the entire system or
+///        synthesis of systems.
+///
+/// \param result     The list of non-bonded work units, modified and returned
+/// \param natom      Total number of atoms to distribute (the atoms that each work unit will
+///                   initialize are not necessarily the atoms for which it computes interactions)
+/// \param init_code  Only the first 16 bits of this int are relevant.  This code indicates whether
+///                   the non-bonded work units are to initialize force accumulators, Generalized
+///                   Born intermediate accumulators, or random values.
+void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, int natom,
+                                    int init_code);
+  
 /// \brief Create a list of work units of a consistent size so as to optimize the load balancing
 ///        on a given resource (GPU, on or more CPUs, etc.).
 ///
@@ -240,14 +317,14 @@ void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu, Nbwu
 ///   - Take a single topology or a list of topologies
 ///   - Take one or more static exclusion masks corresponding to the input topologies
 ///   - Accept a target number of work units
-///   - Accept a GPU specifications from which to infer a target number of work units
+///   - Accept GPU specifications from which to infer a target number of work units
 ///
-/// \param ag_in                The input topology
-/// \param ag_list_in           List of topologies
-/// \param se_in                Static exclusion mask corresponding to the input topology
-/// \param se_list_in           List of static exclusion masks corresponding to each input
+/// \param se                   Static exclusion mask corresponding to the input topology
+/// \param poly_se              Synthesis of static exclusion masks corresponding to each input
 ///                             topology
-/// \param topology_indices_in  Indicies of the topologies referenced by each system
+/// \param init_request         Indicate a pattern for the non-bonded work units to initialize
+///                             accumulators for subsequent force and energy calculations.
+/// \param random_cache_depth   Number of random values to store for each atom in the synthesis
 /// \param target_nbwu_count    The target number of work units to produce.  The goal will be to
 ///                             get as close to this number without going over, or if the number
 ///                             must be exceeded due to absolute limits on the size of any one
@@ -256,9 +333,14 @@ void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu, Nbwu
 /// \param gpu                  GPU specifications (HPC compilation only)
 /// \{
 std::vector<NonbondedWorkUnit>
-buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
+buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
+                        InitializationTask init_request = InitializationTask::NONE,
+                        int random_cache_depth = 0);
 
-std::vector<NonbondedWorkUnit> buildNonbondedWorkUnits(const StaticExclusionMask &se);
+std::vector<NonbondedWorkUnit>
+buildNonbondedWorkUnits(const StaticExclusionMask &se,
+                        InitializationTask init_request = InitializationTask::NONE,
+                        int random_cache_depth = 0);
 /// \}
 
 } // namespace synthesis

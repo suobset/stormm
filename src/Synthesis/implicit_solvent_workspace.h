@@ -104,13 +104,17 @@ public:
 
   /// \brief Get the double-precision abstract, containing pointers to data on the host or device.
   ///
-  /// \param tier  Level at which to retrieve pointers (the CPU host, or GPU device)
-  ISWorkspaceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \param tier         Level at which to retrieve pointers (the CPU host, or GPU device)
+  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
+  ISWorkspaceKit<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                                CoordinateCycle orientation = CoordinateCycle::PRESENT);
 
   /// \brief Get the single-precision abstract, containing pointers to data on the host or device.
   ///
-  /// \param tier  Level at which to retrieve pointers (the CPU host, or GPU device)
-  ISWorkspaceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \param tier         Level at which to retrieve pointers (the CPU host, or GPU device)
+  /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
+  ISWorkspaceKit<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                               CoordinateCycle orientation = CoordinateCycle::PRESENT);
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the object's contents from the host to the GPU device.  This may be useful in
@@ -152,7 +156,7 @@ private:
   Hybrid<llint> sum_deijda;             ///< Sums of the energy derivative for each atom i making
                                         ///<   pair contributions with all other atoms j with
                                         ///<   respect to an order parameter
-  Hybrid<int> sum_deijda_overflow;      ///< Overflow accumulators for aum_deijda
+  Hybrid<int> sum_deijda_overflow;      ///< Overflow accumulators for sum_deijda
   Hybrid<llint> alt_psi;                ///< Alternate array for accumulating psi values--one can
                                         ///<   be in use while the other is being reset
   Hybrid<int> alt_psi_overflow;         ///< Overflow accumulators for the alternate psi array

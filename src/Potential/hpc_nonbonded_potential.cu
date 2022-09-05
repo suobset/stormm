@@ -1116,63 +1116,62 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<double, do
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgdsVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                 *gmem_r, *iswk);
+                                                 *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          ktgdsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
+          ktgdsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
           break;
         }
         break;
       case EvaluateForce::NO:
-        ktgdVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
-                                         *iswk);
+        ktgdVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
         break;
       }
       break;
     case ImplicitSolventModel::HCT_GB:
     case ImplicitSolventModel::OBC_GB:
     case ImplicitSolventModel::OBC_GB_II:
-      ktgdsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
+      ktgdsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk, *gmem_r);
       switch (eval_force) {
       case EvaluateForce::YES:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgdsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                             *gmem_r, *iswk);
+                                             *iswk, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          ktgdsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
+          ktgdsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
           break;
         }
-        ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
-                                                            *iswk);
+        ktgdsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                            *gmem_r);
         break;
       case EvaluateForce::NO:
-        ktgdGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r, *iswk);
+        ktgdGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk, *gmem_r);
         break;
       }
       break;
     case ImplicitSolventModel::NECK_GB:
     case ImplicitSolventModel::NECK_GB_II:
-      ktgdsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
-                                                        *iswk);
+      ktgdsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                        *gmem_r);
       switch (eval_force) {
       case EvaluateForce::YES:
         switch (eval_energy) {
         case EvaluateEnergy::YES:
           ktgdsGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                 *gmem_r, *iswk);
+                                                 *iswk, *gmem_r);
           break;
         case EvaluateEnergy::NO:
-          ktgdsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
+          ktgdsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
           break;
         }
         ktgdsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
-                                                                *gmem_r, *iswk);
+                                                                *iswk, *gmem_r);
         break;
       case EvaluateForce::NO:
-        ktgdGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
-                                         *iswk);
+        ktgdGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                         *gmem_r);
         break;
       }
       break;
@@ -1206,11 +1205,10 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             ktgfsVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                   *gmem_r, *iswk);
+                                                   *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            ktgfsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r,
-                                             *iswk);
+            ktgfsVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
             break;
           }
           break;
@@ -1218,23 +1216,21 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             ktgfVacuumForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                  *gmem_r, *iswk);
+                                                  *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            ktgfVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r,
-                                            *iswk);
+            ktgfVacuumForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r);
             break;
           }
           break;
         case AccumulationMethod::AUTOMATIC:
 
-          // This case was converted into SPLIT or FIXED by evaluating actual_force_sum
+          // This case was converted into SPLIT or WHOLE by evaluating actual_force_sum
           break;
         }
         break;
       case EvaluateForce::NO:
-        ktgfVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
-                                         *iswk);
+        ktgfVacuumEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r);
         break;
       }
       break;
@@ -1243,10 +1239,10 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
     case ImplicitSolventModel::OBC_GB_II:
       switch (actual_force_sum) {
       case AccumulationMethod::SPLIT:
-        ktgfsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
+        ktgfsCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk, *gmem_r);
         break;
       case AccumulationMethod::WHOLE:
-        ktgfCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r, *iswk);
+        ktgfCalculateGBRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk, *gmem_r);
         break;
       case AccumulationMethod::AUTOMATIC:
         break;
@@ -1257,35 +1253,35 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
         case AccumulationMethod::SPLIT:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            ktgfsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
-                                               *iswk);
+            ktgfsGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                               *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            ktgfsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
+            ktgfsGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
             break;
           }
-          ktgfsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
-                                                              *iswk);
+          ktgfsCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                              *gmem_r);
           break;
         case AccumulationMethod::WHOLE:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
-            ktgfGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
-                                              *iswk);
+            ktgfGBForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                              *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            ktgfGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r, *iswk);
+            ktgfGBForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
             break;
           }
-          ktgfCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
-                                                             *iswk);
+          ktgfCalculateGBDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                             *gmem_r);
           break;
         case AccumulationMethod::AUTOMATIC:
           break;
         }
         break;
       case EvaluateForce::NO:
-        ktgfGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r, *iswk);
+        ktgfGBEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk, *gmem_r);
         break;
       }
       break;
@@ -1293,12 +1289,12 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
     case ImplicitSolventModel::NECK_GB_II:
       switch (actual_force_sum) {
       case AccumulationMethod::SPLIT:
-        ktgfsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
-                                                          *iswk);
+        ktgfsCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                          *gmem_r);
         break;
       case AccumulationMethod::WHOLE:
-        ktgfCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *gmem_r,
-                                                         *iswk);
+        ktgfCalculateGBNeckRadii<<<gbr_bt.x, gbr_bt.y>>>(poly_nbk, *ctrl, *poly_psw, *iswk,
+                                                         *gmem_r);
         break;
       case AccumulationMethod::AUTOMATIC:
         break;
@@ -1310,37 +1306,35 @@ extern void launchNonbonded(const NbwuKind kind, const SyNonbondedKit<float, flo
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             ktgfsGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                   *gmem_r, *iswk);
+                                                   *iswk, *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            ktgfsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r,
-                                             *iswk);
+            ktgfsGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
             break;
           }
           ktgfsCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
-                                                                  *gmem_r, *iswk);
+                                                                  *iswk, *gmem_r);
           break;
         case AccumulationMethod::WHOLE:
           switch (eval_energy) {
           case EvaluateEnergy::YES:
             ktgfGBNeckForceEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw,
-                                                  *gmem_r, *iswk);
+                                                  *iswk, *gmem_r);
             break;
           case EvaluateEnergy::NO:
-            ktgfGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *gmem_r,
-                                            *iswk);
+            ktgfGBNeckForce<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *iswk, *gmem_r);
             break;
           }
           ktgfCalculateGBNeckDerivatives<<<gbd_bt.x, gbd_bt.y>>>(poly_nbk, *ctrl, *poly_psw,
-                                                                 *gmem_r, *iswk);
+                                                                 *iswk, *gmem_r);
           break;
         case AccumulationMethod::AUTOMATIC:
           break;
         }
         break;
       case EvaluateForce::NO:
-        ktgfGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *gmem_r,
-                                         *iswk);
+        ktgfGBNeckEnergy<<<bt.x, bt.y>>>(poly_nbk, poly_ser, *ctrl, *poly_psw, *scw, *iswk,
+                                         *gmem_r);
         break;
       }
       break;

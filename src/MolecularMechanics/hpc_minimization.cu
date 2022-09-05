@@ -16,6 +16,7 @@
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
+#include "Trajectory/trajectory_enumerators.h"
 #include "hpc_minimization.h"
 
 namespace stormm {
@@ -48,6 +49,7 @@ using synthesis::SyNonbondedKit;
 using synthesis::SyRestraintKit;
 using synthesis::SyValenceKit;
 using synthesis::VwuGoal;
+using trajectory::CoordinateCycle;
 
 #include "../Numerics/accumulation.cui"
 
@@ -228,6 +230,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
@@ -254,6 +257,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
@@ -269,6 +273,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
@@ -284,6 +289,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
@@ -303,6 +309,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       // One additional energy calculation to get the final energy
       sc->initialize(devc_tier, gpu);
       ScoreCardWriter scw_final = sc->data();
+      //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
                       &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
@@ -332,6 +339,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
 
         // First stage of the cycle: compute forces and obtain the conjugate gradient move.
         poly_ps->initializeForces(gpu, devc_tier);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
@@ -360,6 +368,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
                         gbd_lp);
@@ -376,6 +385,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
                         gbd_lp);
@@ -392,6 +402,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
           launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
         }
         sc->initialize(devc_tier, gpu);
+        //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
                         &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
                         gbd_lp);
@@ -412,6 +423,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       // One additional energy calculation to get the final energy
       sc->initialize(devc_tier, gpu);
       ScoreCardWriter scw_final = sc->data();
+      //ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
                       &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
                       gbd_lp);

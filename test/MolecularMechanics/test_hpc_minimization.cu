@@ -1040,7 +1040,7 @@ int main(const int argc, const char* argv[]) {
   testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
                   "Trp-cage only", PrintSituation::APPEND, snap_name, "trp_cage_", &timer);
   
-  // Run tests on small proteins
+  // Run tests on larger proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
 
