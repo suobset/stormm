@@ -27,7 +27,10 @@ struct PhaseSpaceWriter {
                    double* boxdim_in, double* xvel_in, double* yvel_in, double* zvel_in,
                    double* xfrc_in, double* yfrc_in, double* zfrc_in, double* xprv_in,
                    double* yprv_in, double* zprv_in, double* xnxt_in, double* ynxt_in,
-                   double* znxt_in);
+                   double* znxt_in, double* vxprv_in, double* vyprv_in, double* vzprv_in,
+                   double* vxnxt_in, double* vynxt_in, double* vznxt_in, double* fxprv_in,
+                   double* fyprv_in, double* fzprv_in, double* fxnxt_in, double* fynxt_in,
+                   double* fznxt_in);
 
   /// \brief Copy and move constructors.  The assignment operators are implicitly deleted.
   /// \{
@@ -56,7 +59,20 @@ struct PhaseSpaceWriter {
   double* zprv;                  ///< Prior Cartesian Z positions of all particles
   double* xnxt;                  ///< Next, upcoming Cartesian X positions of all particles
   double* ynxt;                  ///< Next, upcoming Cartesian Y positions of all particles
-  double* znxt;                  ///< Next, upcoming Cartesian Z positions of all particles
+  double* znxt;                  ///< Next, upcoming Cartesian Z positions of all particles 
+  double* vxprv;                 ///< Prior Cartesian X velocities for all particles
+  double* vyprv;                 ///< Prior Cartesian Y velocities for all particles
+  double* vzprv;                 ///< Prior Cartesian Z velocities for all particles
+  double* vxnxt;                 ///< Next (planned) Cartesian X velocities of particles
+  double* vynxt;                 ///< Next (planned) Cartesian Y velocities of particles
+  double* vznxt;                 ///< Next (planned) Cartesian Z velocities of particles
+  double* fxprv;                 ///< Prior Cartesian X forces acting on all particles
+  double* fyprv;                 ///< Prior Cartesian Y forces acting on all particles
+  double* fzprv;                 ///< Prior Cartesian Z forces acting on all particles
+  double* fxnxt;                 ///< Next (currently undergoing updates) forces acting on all
+                                 ///<   particles in the Cartesian X direction
+  double* fynxt;                 ///< Next forces on all particles in the Cartesian Y direction
+  double* fznxt;                 ///< Next forces on all particles in the Cartesian Z direction
 };
 
 /// \brief Collect constants and pointers to the components of a read-only PhaseSpace object.
@@ -71,7 +87,11 @@ struct PhaseSpaceReader {
                    const double* yvel_in, const double* zvel_in, const double* xfrc_in,
                    const double* yfrc_in, const double* zfrc_in, const double* xprv_in,
                    const double* yprv_in, const double* zprv_in, const double* xnxt_in,
-                   const double* ynxt_in, const double* znxt_in);
+                   const double* ynxt_in, const double* znxt_in, const double* vxprv_in,
+                   const double* vyprv_in, const double* vzprv_in, const double* vxnxt_in,
+                   const double* vynxt_in, const double* vznxt_in, const double* fxprv_in,
+                   const double* fyprv_in, const double* fzprv_in, const double* fxnxt_in,
+                   const double* fynxt_in, const double* fznxt_in);
 
   PhaseSpaceReader(const PhaseSpaceWriter &psw);
   /// \}
@@ -104,6 +124,19 @@ struct PhaseSpaceReader {
   const double* xnxt;            ///< Next, upcoming Cartesian X positions of all particles
   const double* ynxt;            ///< Next, upcoming Cartesian Y positions of all particles
   const double* znxt;            ///< Next, upcoming Cartesian Z positions of all particles
+  const double* vxprv;           ///< Prior Cartesian X velocities for all particles
+  const double* vyprv;           ///< Prior Cartesian Y velocities for all particles
+  const double* vzprv;           ///< Prior Cartesian Z velocities for all particles
+  const double* vxnxt;           ///< Next (planned) Cartesian X velocities of particles
+  const double* vynxt;           ///< Next (planned) Cartesian Y velocities of particles
+  const double* vznxt;           ///< Next (planned) Cartesian Z velocities of particles
+  const double* fxprv;           ///< Prior Cartesian X forces acting on all particles
+  const double* fyprv;           ///< Prior Cartesian Y forces acting on all particles
+  const double* fzprv;           ///< Prior Cartesian Z forces acting on all particles
+  const double* fxnxt;           ///< Next (currently undergoing updates) forces acting on all
+                                 ///<   particles in the Cartesian X direction
+  const double* fynxt;           ///< Next forces on all particles in the Cartesian Y direction
+  const double* fznxt;           ///< Next forces on all particles in the Cartesian Z direction
 };
 
 /// \brief An object to complement a topology and hold positions, velocities, and forces of all
@@ -288,8 +321,17 @@ public:
   /// \}
 
   /// \brief Initialize the forces (set them to zero)
+  ///
+  /// Overloaded:
+  ///   - Update forces for an arbitrary point in the time cycle
+  ///   - Update forces for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void initializeForces(CoordinateCycle orientation);
   void initializeForces();
-
+  /// \}
+  
   /// \brief Update the cycle position.
   ///
   /// Overloaded:
@@ -322,38 +364,86 @@ public:
   /// \brief Upload all information
   void upload();
 
-  /// \brief Upload the positional information for all stages of the time cycle
-  void uploadAllPositions();
+  /// \brief Upload positional information for one stage of the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Upload particle positions for a specific point in the time cycle
+  ///   - Upload particle positions for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void uploadPositions(CoordinateCycle orientation);
+  void uploadPositions();
+  /// \}
 
-  /// \brief Upload the relevant positions, based on the current position in the time cycle.
-  void uploadCurrentPositions();
-  
-  /// \brief Upload current transformation matrices
+  /// \brief Upload current transformation matrices.
   void uploadTransformations();
 
-  /// \brief Upload velocity information
+  /// \brief Upload velocity information for one stage of the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Upload velocities for a specific point in the time cycle
+  ///   - Upload velocities for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void uploadVelocities(CoordinateCycle orientation);
   void uploadVelocities();
+  /// \}
 
-  /// \brief Upload force information
+  /// \brief Upload force information for one stage of the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Upload forces for a specific point in the time cycle
+  ///   - Upload forces for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void uploadForces(CoordinateCycle orientation);
   void uploadForces();
+  /// \}
 
   /// \brief Download all information
   void download();
 
-  /// \brief Download the positional information for all stages of the time cycle
-  void downloadAllPositions();
+  /// \brief Download positional information for one stage of the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Download particle positions for a specific point in the time cycle
+  ///   - Download particle positions for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void downloadPositions(CoordinateCycle orientation);
+  void downloadPositions();
+  /// \}
 
-  /// \brief Download the relevant positions, based on the current position in the time cycle.
-  void downloadCurrentPositions();
-
-  /// \brief Download current transformation matrices
+  /// \brief Download current transformation matrices.
   void downloadTransformations();
 
-  /// \brief Download velocity information
+  /// \brief Download velocity information for one stage of the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Download velocities for a specific point in the time cycle
+  ///   - Download velocities for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void downloadVelocities(CoordinateCycle orientation);
   void downloadVelocities();
+  /// \}
 
-  /// \brief Download force information
+  /// \brief Download force information for one stage of the time cycle.
+  ///
+  /// Overloaded:
+  ///   - Download forces for a specific point in the time cycle
+  ///   - Download forces for the object's current position in the cycle
+  ///
+  /// \param orentation  A selected point in the time cycle (PAST, PRESENT, or FUTURE)
+  /// \{
+  void downloadForces(CoordinateCycle orientation);
   void downloadForces();
+  /// \}
 #endif
   /// \brief Get the abstract for this object, containing C-style pointers for the most rapid
   ///        access to any of its member variables.
@@ -397,16 +487,6 @@ private:
   Hybrid<double> x_coordinates;        ///< Cartesian X coordinates of all particles
   Hybrid<double> y_coordinates;        ///< Cartesian Y coordinates of all particles
   Hybrid<double> z_coordinates;        ///< Cartesian Z coordinates of all particles
-  Hybrid<double> box_space_transform;  ///< Matrix to transform coordinates into box space (3 x 3)
-  Hybrid<double> inverse_transform;    ///< Matrix to transform coordinates into real space (3 x 3)
-  Hybrid<double> box_dimensions;       ///< Three lengths and three angles defining the box
-                                       ///<   (lengths are given in Angstroms, angles in radians)
-  Hybrid<double> x_velocities;         ///< Cartesian X velocities of all particles
-  Hybrid<double> y_velocities;         ///< Cartesian Y velocities of all particles
-  Hybrid<double> z_velocities;         ///< Cartesian Z velocities of all particles
-  Hybrid<double> x_forces;             ///< Cartesian X forces acting on all particles
-  Hybrid<double> y_forces;             ///< Cartesian Y forces acting on all particles
-  Hybrid<double> z_forces;             ///< Cartesian Z forces acting on all particles 
 
   // The actual nature of the following arrays, as well as the [x,y,z]_coordinates themselves, can
   // change based on the CoordinateCycle position.
@@ -416,6 +496,32 @@ private:
   Hybrid<double> x_future_coordinates; ///< Upcoming step Cartesian X coordinates of all particles
   Hybrid<double> y_future_coordinates; ///< Upcoming step Cartesian Y coordinates of all particles
   Hybrid<double> z_future_coordinates; ///< Upcoming step Cartesian Z coordinates of all particles
+
+  // Transformation matrices are given directly after the coordinates in the overall order of data
+  Hybrid<double> box_space_transform;  ///< Matrix to transform coordinates into box space (3 x 3)
+  Hybrid<double> inverse_transform;    ///< Matrix to transform coordinates into real space (3 x 3)
+  Hybrid<double> box_dimensions;       ///< Three lengths and three angles defining the box
+                                       ///<   (lengths are given in Angstroms, angles in radians)
+
+  // Like coordinates, velocities and forces appear in PRESENT -> PAST -> FUTURE blocks
+  Hybrid<double> x_velocities;         ///< Cartesian X velocities of all particles
+  Hybrid<double> y_velocities;         ///< Cartesian Y velocities of all particles
+  Hybrid<double> z_velocities;         ///< Cartesian Z velocities of all particles
+  Hybrid<double> x_prior_velocities;   ///< Prior Cartesian X velocities of all particles
+  Hybrid<double> y_prior_velocities;   ///< Prior Cartesian Y velocities of all particles
+  Hybrid<double> z_prior_velocities;   ///< Prior Cartesian Z velocities of all particles
+  Hybrid<double> x_future_velocities;  ///< Planned Cartesian X velocities of all particles
+  Hybrid<double> y_future_velocities;  ///< Planned Cartesian Y velocities of all particles
+  Hybrid<double> z_future_velocities;  ///< Planned Cartesian Z velocities of all particles
+  Hybrid<double> x_forces;             ///< Cartesian X forces acting on all particles
+  Hybrid<double> y_forces;             ///< Cartesian Y forces acting on all particles
+  Hybrid<double> z_forces;             ///< Cartesian Z forces acting on all particles 
+  Hybrid<double> x_prior_forces;       ///< Prior Cartesian X forces acting on all particles
+  Hybrid<double> y_prior_forces;       ///< Prior Cartesian Y forces acting on all particles
+  Hybrid<double> z_prior_forces;       ///< Prior Cartesian Z forces acting on all particles
+  Hybrid<double> x_future_forces;      ///< Upcoming Cartesian X forces acting on all particles
+  Hybrid<double> y_future_forces;      ///< Upcoming Cartesian Y forces acting on all particles
+  Hybrid<double> z_future_forces;      ///< Upcoming Cartesian Z forces acting on all particles
 
   /// All of the above Hybrid objects are pointers into this single large array, segmented to hold
   /// each type of information with zero-padding to accommodate the HPC warp size.
