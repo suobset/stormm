@@ -173,11 +173,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
       pos += tile_sides_per_warp * warps_per_block;
     }
 #ifdef DO_GENERALIZED_BORN
-#  ifdef COMPUTE_ENERGY
-    TCALC gb_nrg = (TCALC)(0.0);
-#  endif
     while (pos < 7 * padded_import_count) {
       const int rel_pos = pos - (6 * padded_import_count);
+#  ifdef COMPUTE_ENERGY
+      TCALC gb_nrg = (TCALC)(0.0);
+#  endif
       if (rel_pos < import_count) {
         const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
         const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
@@ -226,15 +226,14 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
           sh_gbeff_radii[write_idx] = egbi;
 
           // In Generalized Born calculations, use this read of the charge value to cache it.
-          const TCALC atomq = __ldcs(&poly_nbk.charge[read_idx]);
-          __stwb(&gmem_r.charges[EXCL_GMEM_OFFSET + write_idx],
-                 atomq * SQRT_FUNC(poly_nbk.coulomb));
+          const TCALC atomq = __ldcs(&poly_nbk.charge[read_idx]) * SQRT_FUNC(poly_nbk.coulomb);
+          __stwb(&gmem_r.charges[EXCL_GMEM_OFFSET + write_idx], atomq);
           const uint init_mask = nbwu_map[(2 * small_block_max_imports) + 8];
           if ((init_mask >> rel_pos) & 0x1) {
             const TCALC expmkf = EXP_FUNC(-default_gb_kscale * poly_nbk.kappa * egbi) /
                                  poly_nbk.dielectric;
             const TCALC dielfac = (TCALC)(1.0) - expmkf;
-            const TCALC atmq2h = (TCALC)(0.5) * atomq * atomq * poly_nbk.coulomb;
+            const TCALC atmq2h = (TCALC)(0.5) * atomq * atomq;
             const TCALC atmqd2h = atmq2h * dielfac;
 #  ifdef COMPUTE_ENERGY
             gb_nrg -= atmqd2h / egbi;
@@ -294,6 +293,16 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #  endif
         }
       }
+#ifdef COMPUTE_ENERGY
+      // Generalized Born energy contributions must be logged in their respective system
+      // accumulators here, and re-initialized for each tile to follow.
+      for (int i = half_tile_length; i > 0; i >>= 1) {
+        gb_nrg += SHFL_DOWN(gb_nrg, i);
+      }
+      if (tile_lane_idx == 0 && rel_pos < import_count) {
+        sh_gb_acc[rel_pos] = gb_nrg;
+      }
+#endif
       pos += tile_sides_per_warp * warps_per_block;
     }
 #else // DO_GENERALIZED_BORN
@@ -393,7 +402,10 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #endif
 #ifdef COMPUTE_ENERGY
       TCALC elec_nrg = (TCALC)(0.0);
-      TCALC vdw_nrg = (TCALC)(0.0);
+      TCALC vdw_nrg  = (TCALC)(0.0);
+#  ifdef DO_GENERALIZED_BORN
+      TCALC gb_nrg   = (TCALC)(0.0);
+#  endif
 #endif
 #ifdef COMPUTE_FORCE
       TCALC t_xfrc = (TCALC)(0.0);
@@ -609,10 +621,12 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                   (ullint)(sh_gb_acc[rel_pos]));
 
         // CHECK
+#if 0
         if (sh_system_indices[rel_pos] <= 1) {
           const TCALC gb_contrib = (TCALC)(sh_gb_acc[rel_pos]) * scw.inverse_nrg_scale_f;
           printf("%d : Add %12.6lf\n", sh_system_indices[rel_pos], gb_contrib);
         }
+#endif
         // END CHECK
       }
       pos += blockDim.x;
