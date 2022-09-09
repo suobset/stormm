@@ -862,5 +862,49 @@ std::vector<PolyNumeric> readNumberSeries(const TextFile &tf, const int start_li
   return result;
 }
 
+//-------------------------------------------------------------------------------------------------
+llint readIntegerValue(const char* number_text, const int start_index, const int number_length) {
+  std::string buffer;
+  buffer.resize(number_length);
+  for (int i = start_index; i < number_length; i++) {
+    buffer[i - start_index] = number_text[i];
+  }
+  return strtoll(buffer.c_str(), nullptr, 10);
 }
+
+//-------------------------------------------------------------------------------------------------
+llint readIntegerValue(const std::string &number_text, const int start_index,
+                       const int number_length) {
+  std::string buffer = number_text;
+  buffer.resize(number_length);
+  return strtoll(buffer.c_str(), nullptr, 10);
 }
+
+//-------------------------------------------------------------------------------------------------
+llint readIntegerValue(const TextFile &tf, const int line_index, const int start_index,
+                       const int number_length) {
+  std::string buffer;
+  buffer.resize(number_length);
+
+  // Check that the request makes sense
+  if (line_index >= tf.getLineCount()) {
+    rtErr("Request for integer data on line " + std::to_string(line_index) + " is invalid for a "
+          "text file containining " + std::to_string(tf.getLineCount()) + " lines.",
+          "readIntegerValue");
+  }
+  const int lstart = tf.getLineLimits(line_index);
+  const int lend   = tf.getLineLimits(line_index + 1);
+  if (lstart + start_index + number_length > lend) {
+    rtErr("Request for integer data on line " + std::to_string(line_index) + " is invalid for a "
+          "line containining " + std::to_string(lend - lstart) + " characters.",
+          "readIntegerValue");
+  }
+  const char* number_ptr = tf.getTextPointer(tf.getLineLimits(line_index));
+  for (int i = start_index; i < number_length; i++) {
+    buffer[i - start_index] = number_ptr[i];
+  }
+  return strtoll(buffer.c_str(), nullptr, 10);
+}
+
+} // namespace parse
+} // namespace stormm

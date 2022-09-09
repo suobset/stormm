@@ -252,6 +252,7 @@ int MolecularMechanicsControls::getReductionWorkUnitProgress(const int counter_i
     case ReductionStage::GATHER:
       return gather_wu_progress.readHost(counter_index);
     case ReductionStage::SCATTER:
+    case ReductionStage::RESCALE:
       return scatter_wu_progress.readHost(counter_index);
     case ReductionStage::ALL_REDUCE:
       return all_reduce_wu_progress.readHost(counter_index);
@@ -263,6 +264,7 @@ int MolecularMechanicsControls::getReductionWorkUnitProgress(const int counter_i
     case ReductionStage::GATHER:
       return gather_wu_progress.readDevice(counter_index);
     case ReductionStage::SCATTER:
+    case ReductionStage::RESCALE:
       return scatter_wu_progress.readDevice(counter_index);
     case ReductionStage::ALL_REDUCE:
       return all_reduce_wu_progress.readDevice(counter_index);

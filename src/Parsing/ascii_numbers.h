@@ -44,24 +44,6 @@ void printNumberSeries(std::ofstream *foutp, const std::vector<PolyNumeric> &val
                        const std::string &task = std::string(""));
 /// \}
 
-/// \brief Extract an integer number from a character string.  This is not intended for the
-///        highest-performance applications and should be used in contexts where only a few such
-///        integers must be read in specailized formats.
-///
-/// Overloaded:
-///   - Accept a C-style character string
-///   - Accept a C++ string object
-///   - Accept a TextFile object
-///
-/// \param input_text     Text string containing
-/// \param line_index     The line of a text file on which to find the number (only used when
-///                       parsing a TextFile object)
-/// \param start_index    The starting index for reading the formatted number
-/// \param number_length  Number of characters to read and take as the numerical value
-llint readIntegerValue(const char* number_text, const int start_index, const int number_length) {
-
-}
-
 /// \brief Read a series of numbers from a TextFile object.  The numbers are expected to be found
 ///        in a fixed-column format described by the input arguments.
 ///
@@ -80,6 +62,28 @@ std::vector<PolyNumeric> readNumberSeries(const TextFile &tf, const int start_li
                                           const std::string &caller = std::string(""),
                                           const std::string &task = std::string(""));
 
+/// \brief Extract an integer number from a character string.  This is not intended for the
+///        highest-performance applications and should be used in contexts where only a few such
+///        integers must be read in specailized formats.
+///
+/// Overloaded:
+///   - Accept a C-style character string
+///   - Accept a C++ string object
+///   - Accept a TextFile object
+///
+/// \param input_text     Text string containing
+/// \param line_index     The line of a text file on which to find the number (only used when
+///                       parsing a TextFile object)
+/// \param start_index    The starting index for reading the formatted number
+/// \param number_length  Number of characters to read and take as the numerical value
+/// \{
+llint readIntegerValue(const char* number_text, int start_index, int number_length);
+
+llint readIntegerValue(const std::string &number_text, int start_index, int number_length);
+
+llint readIntegerValue(const TextFile &tf, int line_idex, int start_index, int number_length);
+/// \}
+  
 } // namespace parse
 } // namespace stormm
 

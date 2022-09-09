@@ -547,6 +547,7 @@ void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu,
     break;
   case NbwuKind::SUPERTILES:
   case NbwuKind::HONEYCOMB:
+  case NbwuKind::UNKNOWN:
     break;
   }
 }
