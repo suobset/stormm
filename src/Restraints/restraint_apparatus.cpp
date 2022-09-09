@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
@@ -480,7 +481,7 @@ const AtomGraph* RestraintApparatus::getTopologyPointer() const {
 
 //-------------------------------------------------------------------------------------------------
 RestraintKit<double, double2, double4>
-RestraintApparatus::getDoublePrecisionAbstract(const HybridTargetLevel tier) const {
+RestraintApparatus::dpData(const HybridTargetLevel tier) const {
   return RestraintKit<double,
                       double2, double4>(total_restraint_count, position_count, distance_count,
                                         angle_count, dihedral_count, time_based_restraints,
@@ -508,7 +509,7 @@ RestraintApparatus::getDoublePrecisionAbstract(const HybridTargetLevel tier) con
 
 //-------------------------------------------------------------------------------------------------
 RestraintKit<float, float2, float4>
-RestraintApparatus::getSinglePrecisionAbstract(const HybridTargetLevel tier) const {
+RestraintApparatus::spData(const HybridTargetLevel tier) const {
   return RestraintKit<float,
                       float2,
                       float4>(total_restraint_count, position_count, distance_count, angle_count,
@@ -638,7 +639,7 @@ std::vector<BoundedRestraint> RestraintApparatus::getRestraintList() const {
 
   // Get the abstract despite the fact that this is a member function--the Hybrid arrays cloister
   // the data slightly and the internal names are longer to write.
-  RestraintKit<double, double2, double4> current = getDoublePrecisionAbstract();
+  RestraintKit<double, double2, double4> current = dpData();
   std::vector<BoundedRestraint> result;
   result.reserve(total_restraint_count);
   for (size_t pos = 0; pos < position_count; pos++) {

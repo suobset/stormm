@@ -1,0 +1,513 @@
+#include "copyright.h"
+#include "Constants/fixed_precision.h"
+#include "Parsing/parse.h"
+#include "Reporting/error_format.h"
+#include "split_fixed_precision.h"
+
+namespace stormm {
+namespace numerics {
+
+using constants::getPrecisionModelName;
+using parse::strcmpCased;
+
+//-------------------------------------------------------------------------------------------------
+AccumulationMethod translateAccumulationMethod(const std::string &choice,
+                                                         const ExceptionResponse policy) {
+  if (strcmpCased(choice, std::string("split"))) {
+    return AccumulationMethod::SPLIT;
+  }
+  else if (strcmpCased(choice, std::string("whole"))) {    
+    return AccumulationMethod::WHOLE;
+  }
+  else if (strcmpCased(choice, std::string("automatic"))) {    
+    return AccumulationMethod::AUTOMATIC;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getAccumulationMethodName(const AccumulationMethod method) {
+  switch (method) {
+  case AccumulationMethod::SPLIT:
+    return std::string("SPLIT");
+  case AccumulationMethod::WHOLE:
+    return std::string("WHOLE");
+  case AccumulationMethod::AUTOMATIC:
+    return std::string("AUTOMATIC");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+AccumulationMethod chooseAccumulationMethod(const int frc_bits) {
+  if (frc_bits <= 24) {
+    return AccumulationMethod::SPLIT;
+  }
+  else {
+    return AccumulationMethod::WHOLE;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string fixedPrecisionRangeErrorMessage(const int choice, const int min_val,
+                                            const int max_val) {
+  if (choice < min_val) {
+    return std::string(" is too small, and would result in an inaccurate simulation.");
+  }
+  if (choice > max_val) {
+    return std::string(" is too large, and might overflow the 64-bit integer format.");
+  }
+  return std::string("");
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkGlobalPositionBits(const int choice) {
+  if (choice < min_globalpos_scale_bits || choice > max_globalpos_scale_bits) {
+    rtErr("Global position scaling is allowed in a fixed precision range of " +
+          std::to_string(min_globalpos_scale_bits) + " to " +
+          std::to_string(max_globalpos_scale_bits) + ".  A value of " +
+          std::to_string(choice) +
+          fixedPrecisionRangeErrorMessage(choice, min_globalpos_scale_bits,
+                                          max_globalpos_scale_bits), "checkGlobalPositionBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkLocalPositionBits(const int choice) {
+  if (choice < min_localpos_scale_bits || choice > max_localpos_scale_bits) {
+    rtErr("Local position scaling is allowed in a fixed precision range of " +
+          std::to_string(min_localpos_scale_bits) + " to " +
+          std::to_string(max_localpos_scale_bits) + " bits.  A value of " +
+          std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, min_localpos_scale_bits,
+                                                                   max_localpos_scale_bits),
+          "checkLocalPositionBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkVelocityBits(const int choice) {
+  if (choice < min_velocity_scale_bits || choice > max_velocity_scale_bits) {
+    rtErr("Velocity scaling is allowed in a fixed precision range of " +
+          std::to_string(min_velocity_scale_bits) + " to " +
+          std::to_string(max_velocity_scale_bits) + " bits.  A value of " +
+          std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, min_velocity_scale_bits,
+                                                                   max_velocity_scale_bits),
+          "checkVelocityBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkForceBits(const int choice) {
+  if (choice < min_force_scale_bits || choice > max_force_scale_bits) {
+    rtErr("Force accumulation is allowed in a fixed precision range of " +
+          std::to_string(min_force_scale_bits) + " to " +
+          std::to_string(max_force_scale_bits) + " bits.  A value of " + std::to_string(choice) +
+          fixedPrecisionRangeErrorMessage(choice, min_force_scale_bits, max_force_scale_bits),
+          "checkForceBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkEnergyBits(const int choice) {
+  if (choice < min_energy_scale_bits || choice > max_energy_scale_bits) {
+    rtErr("Energy accumulation is allowed in a fixed precision range of " +
+          std::to_string(min_energy_scale_bits) + " to " +
+          std::to_string(max_energy_scale_bits) + " bits.  A value of " + std::to_string(choice) +
+          fixedPrecisionRangeErrorMessage(choice, min_energy_scale_bits, max_energy_scale_bits),
+          "checkEnergyBits");
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void checkChargeMeshBits(const int choice, const PrecisionModel pmodel) {
+  if (choice < min_charge_mesh_scale_bits) {
+    rtErr("Charge mesh accumulation must take place with at least " +
+          std::to_string(min_charge_mesh_scale_bits) + " bits.  A values of " +
+          std::to_string(choice) +
+          fixedPrecisionRangeErrorMessage(choice, min_charge_mesh_scale_bits, 64),
+          "checkChargeMeshBits");
+  }
+  switch (pmodel) {
+  case PrecisionModel::SINGLE:
+    if (choice > 31) {
+      rtErr("Charge mesh accumulation in a " + getPrecisionModelName(pmodel) + " precision model "
+            "will take place with a 32-bit signed integer accumulation grid.  A value of " +
+            std::to_string(choice) + fixedPrecisionRangeErrorMessage(choice, 8, 31),
+            "checkChargeMeshBits");
+    }
+    break;
+  case PrecisionModel::DOUBLE:
+    if (choice > max_charge_mesh_scale_bits) {
+      rtErr("Charge mesh accumulation in a " + getPrecisionModelName(pmodel) + " precision model "
+            "will take place with a 64-bit signed integer accumulation grid.  A value of " +
+            std::to_string(choice) +
+            fixedPrecisionRangeErrorMessage(choice, 8, max_charge_mesh_scale_bits),
+            "checkChargeMeshBits");
+    }
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+int2 floatToInt63(const float fval) {
+  int2 result;
+  if (fabsf(fval) >= max_int_accumulation_f) {
+    const int spillover = fval / max_int_accumulation_f;
+    result.x = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
+    result.y = spillover;
+  }
+  else {
+    result.x = fval;
+    result.y = 0;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void floatToInt63(const float fval, int *primary, int *overflow) {
+  const int2 result = floatToInt63(fval);
+  *primary  = result.x;
+  *overflow = result.y;
+}
+
+//-------------------------------------------------------------------------------------------------
+void floatToInt63(const float* fval, int* primary, int* overflow, const size_t n_values,
+                  const double scale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    floatToInt63(fval[i] * scale, &primary[i], &overflow[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z, int* primary_x,
+                  int* overflow_x, int* primary_y, int* overflow_y, int* primary_z,
+                  int* overflow_z, const size_t n_values, const float scale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    floatToInt63(fval_x[i] * scale, &primary_x[i], &overflow_x[i]);
+    floatToInt63(fval_y[i] * scale, &primary_y[i], &overflow_y[i]);
+    floatToInt63(fval_z[i] * scale, &primary_z[i], &overflow_z[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+int95_t doubleToInt95(const double dval) {
+  int95_t result;
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    result.x = dval - (static_cast<double>(spillover) * max_llint_accumulation);
+    result.y = spillover;
+  }
+  else {
+    result.x = dval;
+    result.y = 0;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void doubleToInt95(const double dval, llint *primary, int *overflow) {
+  const int95_t result = doubleToInt95(dval);
+  *primary  = result.x;
+  *overflow = result.y;
+}
+
+//-------------------------------------------------------------------------------------------------
+void doubleToInt95(const double* dval, llint* primary, int* overflow, const size_t n_values,
+                   const double scale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    doubleToInt95(dval[i] * scale, &primary[i], &overflow[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void doubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
+                   llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
+                   llint* primary_z, int* overflow_z, const size_t n_values, const double scale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    doubleToInt95(dval_x[i] * scale, &primary_x[i], &overflow_x[i]);
+    doubleToInt95(dval_y[i] * scale, &primary_y[i], &overflow_y[i]);
+    doubleToInt95(dval_z[i] * scale, &primary_z[i], &overflow_z[i]);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+double int63ToDouble(const int primary, const int overflow) {
+  return (static_cast<double>(overflow) * max_int_accumulation) + static_cast<double>(primary);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToDouble(double* result, const int* primary, const int* overflow,
+                   const size_t n_values, const double descale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    result[i] = int63ToDouble(primary[i], overflow[i]) * descale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
+                   const std::vector<int> &overflow, const double descale) {
+  if (primary.size() != overflow.size()) {
+    rtErr("The primary and overflow vectors must have the same length.", "int63ToDouble");
+  }
+  if (primary.size() != result->size()) {
+    rtErr("The result must have the same length as the original, integral data.", "int63ToDouble");
+  }
+  int63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary, const Hybrid<int> &overflow,
+                   const double descale) {
+  if (primary.size() != overflow.size()) {
+    rtErr("The primary and overflow vectors must have the same length.", "int63ToDouble");
+  }
+  if (primary.size() != result->size()) {
+    rtErr("The result must have the same length as the original, integral data.", "int63ToDouble");
+  }
+  int63ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+float int63ToFloat(const int primary, const int overflow) {
+  return (static_cast<float>(overflow) * max_int_accumulation_f) + static_cast<float>(primary);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToFloat(float* result, const int* primary, const int* overflow, const size_t n_values,
+                  const float descale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    result[i] = int63ToFloat(primary[i], overflow[i]) * descale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
+                  const std::vector<int> &overflow, const float descale) {
+  if (primary.size() != overflow.size()) {
+    rtErr("The primary and overflow vectors must have the same length.  " +
+          std::to_string(primary.size()) + " != " + std::to_string(overflow.size()) + ".",
+          "int63ToFloat");
+  }
+  if (primary.size() != result->size()) {
+    rtErr("The result must have the same length as the original, integral data.  " +
+          std::to_string(result->size()) + " != " + std::to_string(primary.size()) + ".",
+          "int63ToFloat");
+  }
+  int63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary, const Hybrid<int> &overflow,
+                  const float descale) {
+  if (primary.size() != overflow.size()) {
+    rtErr("The primary and overflow vectors (" + std::string(primary.getLabel().name) + " and " +
+          std::string(overflow.getLabel().name) + ") must have the same length.  " +
+          std::to_string(primary.size()) + " != " + std::to_string(overflow.size()) + ".",
+          "int63ToFloat");
+  }
+  if (primary.size() != result->size()) {
+    rtErr("The result (" + std::string(result->getLabel().name) + ") must have the same length as "
+          "the original, integral data.  " + std::to_string(result->size()) + " != " +
+          std::to_string(primary.size()) + ".", "int63ToFloat");
+  }
+  int63ToFloat(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToDouble(double* result_x, double* result_y, double* result_z, const int* primary_x,
+                   const int* overflow_x, const int* primary_y, const int* overflow_y,
+                   const int* primary_z, const int* overflow_z, const size_t n_values,
+                   const double descale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    result_x[i] = int63ToDouble(primary_x[i], overflow_x[i]) * descale;
+    result_y[i] = int63ToDouble(primary_y[i], overflow_y[i]) * descale;
+    result_z[i] = int63ToDouble(primary_z[i], overflow_z[i]) * descale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                   std::vector<double> *result_z, const std::vector<int> &primary_x,
+                   const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                   const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                   const std::vector<int> &overflow_z, const size_t n_values,
+                   const double descale) {
+  int63ToDouble(result_x, primary_x, overflow_x, descale);
+  int63ToDouble(result_y, primary_y, overflow_y, descale);
+  int63ToDouble(result_z, primary_z, overflow_z, descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
+                   const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                   const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                   const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
+                   const size_t n_values, const double descale) {
+  int63ToDouble(result_x, primary_x, overflow_x, descale);
+  int63ToDouble(result_y, primary_y, overflow_y, descale);
+  int63ToDouble(result_z, primary_z, overflow_z, descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToFloat(float* result_x, float* result_y, float* result_z, const int* primary_x,
+                  const int* overflow_x, const int* primary_y, const int* overflow_y,
+                  const int* primary_z, const int* overflow_z, const size_t n_values,
+                  const float descale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    result_x[i] = int63ToFloat(primary_x[i], overflow_x[i]) * descale;
+    result_y[i] = int63ToFloat(primary_y[i], overflow_y[i]) * descale;
+    result_z[i] = int63ToFloat(primary_z[i], overflow_z[i]) * descale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
+                  std::vector<float> *result_z, const std::vector<int> &primary_x,
+                  const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                  const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                  const std::vector<int> &overflow_z, const size_t n_values,
+                  const float descale) {
+  int63ToFloat(result_x, primary_x, overflow_x, descale);
+  int63ToFloat(result_y, primary_y, overflow_y, descale);
+  int63ToFloat(result_z, primary_z, overflow_z, descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
+                  const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                  const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                  const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z,
+                  const size_t n_values, const float descale) {
+  int63ToFloat(result_x, primary_x, overflow_x, descale);
+  int63ToFloat(result_y, primary_y, overflow_y, descale);
+  int63ToFloat(result_z, primary_z, overflow_z, descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+double int63ToDouble(const int2 ival) {
+  return (static_cast<double>(ival.y) * max_int_accumulation) + static_cast<double>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
+float int63ToFloat(const int2 ival) {
+  return (static_cast<float>(ival.y) * max_int_accumulation_f) + static_cast<float>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
+double int95ToDouble(const llint primary, const int overflow) {
+  return (static_cast<double>(overflow) * max_llint_accumulation) + static_cast<double>(primary);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int95ToDouble(double* result, const llint* primary, const int* overflow,
+                   const size_t n_values, const double descale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    result[i] = int95ToDouble(primary[i], overflow[i]) * descale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void int95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
+                   const std::vector<int> &overflow, const size_t n_values, const double descale) {
+  if (primary.size() != overflow.size()) {
+    rtErr("The primary and overflow vectors must have the same length.", "int95ToDouble");
+  }
+  if (primary.size() != result->size()) {
+    rtErr("The result must have the same length as the original, integral data.", "int95ToDouble");
+  }
+  int95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
+                   const Hybrid<int> &overflow, const size_t n_values, const double descale) {
+  if (primary.size() != overflow.size()) {
+    rtErr("The primary and overflow vectors must have the same length.", "int95ToDouble");
+  }
+  if (primary.size() != result->size()) {
+    rtErr("The result must have the same length as the original, integral data.", "int95ToDouble");
+  }
+  int95ToDouble(result->data(), primary.data(), overflow.data(), primary.size(), descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int95ToDouble(double* result_x, double* result_y, double* result_z, const llint* primary_x,
+                   const int* overflow_x, const llint* primary_y, const int* overflow_y,
+                   const llint* primary_z, const int* overflow_z, const size_t n_values,
+                   const double descale) {
+  for (size_t i = 0LLU; i < n_values; i++) {
+    result_x[i] = int95ToDouble(primary_x[i], overflow_x[i]) * descale;
+    result_y[i] = int95ToDouble(primary_y[i], overflow_y[i]) * descale;
+    result_z[i] = int95ToDouble(primary_z[i], overflow_z[i]) * descale;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void int95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                   std::vector<double> *result_z, const std::vector<llint> &primary_x,
+                   const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
+                   const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
+                   const std::vector<int> &overflow_z, const size_t n_values,
+                   const double descale) {
+  int95ToDouble(result_x, primary_x, overflow_x, descale);
+  int95ToDouble(result_y, primary_y, overflow_y, descale);
+  int95ToDouble(result_z, primary_z, overflow_z, descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
+                   const Hybrid<llint> &primary_x, const Hybrid<int> &overflow_x,
+                   const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
+                   const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z,
+                   const size_t n_values, const double descale) {
+  int95ToDouble(result_x, primary_x, overflow_x, descale);
+  int95ToDouble(result_y, primary_y, overflow_y, descale);
+  int95ToDouble(result_z, primary_z, overflow_z, descale);
+}
+
+//-------------------------------------------------------------------------------------------------
+double int95ToDouble(const int95_t ival) {
+  return (static_cast<double>(ival.y) * max_llint_accumulation) + static_cast<double>(ival.x);
+}
+
+//-------------------------------------------------------------------------------------------------
+void splitAccumulation(const float fval, int *primary, int *overflow) {
+  int ival;
+  if (fabsf(fval) >= max_int_accumulation_f) {
+    const int spillover = fval / max_int_accumulation_f;
+    ival = fval - (static_cast<float>(spillover) * max_int_accumulation_f);
+    *overflow += spillover;
+  }
+  else {
+    ival = fval;
+  }
+  const int prim_old = *primary;
+  *primary += ival;
+  const int prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0 && (prim_old ^ ival) >= 0) {
+    *overflow += (1 - (2 * (ival < 0))) * 2;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void splitAccumulation(const double dval, llint *primary, int *overflow) {
+  llint ival;
+  if (fabs(dval) >= max_llint_accumulation) {
+    const int spillover = dval / max_llint_accumulation;
+    ival = dval - (static_cast<double>(spillover) * max_llint_accumulation);
+    *overflow += spillover;
+  }
+  else {
+    ival = dval;
+  }
+  const llint prim_old = *primary;
+  *primary += ival;
+  const llint prim_old_plus_ival = prim_old + ival;
+  if ((prim_old ^ prim_old_plus_ival) < 0LL && (prim_old ^ ival) >= 0LL) {
+    *overflow += (1 - (2 * (ival < 0LL))) * 2;
+  }
+}
+
+} // namespace numerics
+} // namespace stormm

@@ -2,6 +2,7 @@
 #ifndef STORMM_SYNTHESIS_ABSTRACTS_H
 #define STORMM_SYNTHESIS_ABSTRACTS_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph_enumerators.h"
@@ -28,16 +29,24 @@ template <typename T> struct SyValenceKit {
                         const T* cimp_keq_in, const T* cimp_phi_in, const int* cmap_dim_in,
                         const T* cmap_patches_in, const int* cmap_patch_bounds_in,
                         const int2* vwu_abstracts_in, const int* vwu_imports_in,
-                        const uint2* vwu_manip_in, const uint2* cbnd_insr_in,
-                        const uint2* angl_insr_in, const uint2* cdhe_insr_in,
-                        const uint* cdhe_ovrt_insr_in, const uint2* cmap_insr_in,
-                        const uint* infr14_insr_in, const uint* cbnd_acc_in,
-                        const uint* angl_acc_in, const uint* cdhe_acc_in, const uint* cmap_acc_in,
-                        const uint* infr14_acc_in);
+                        const uint2* cbnd_insr_in, const uint2* angl_insr_in,
+                        const uint2* cdhe_insr_in, const uint* cdhe_ovrt_insr_in,
+                        const uint2* cmap_insr_in, const uint* infr14_insr_in,
+                        const uint* cbnd_acc_in, const uint* angl_acc_in, const uint* cdhe_acc_in,
+                        const uint* cmap_acc_in, const uint* infr14_acc_in);
+
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyValenceKit(const SyValenceKit &original) = default;
+  SyValenceKit(SyValenceKit &&original) = default;
+  /// \}
 
   // Member variables (all public)
   const int nvwu;                ///< The number of valence work units
   const T coulomb;               ///< Coulomb's constant in kcal-A2/mol-e2
+
+  // Condensed valence parameter tables
   const T* bond_keq;             ///< Consensus table of harmonic bond stiffness constants
   const T* bond_leq;             ///< Consensus table of harmonic bond equilibrium lengths
   const T* angl_keq;             ///< Consensus table of harmonic angle stiffness constants
@@ -63,10 +72,10 @@ template <typename T> struct SyValenceKit {
   const int* cmap_dim;           ///< Dimensions for each member of the consensus table of CMAPs
   const T* cmap_patches;         ///< Consensus table of CMAP pre-computed surface patch data
   const int* cmap_patch_bounds;  ///< Bounds array for cmap_patches
+  
+  // Details of each work unit and instruction sets
   const int2* vwu_abstracts;     ///< Abstracts for all valence work units
   const int* vwu_imports;        ///< Imported atom tables for all valence work units
-  const uint2* vwu_manip;        ///< Manipulation masks (movement in x member, update in y member)
-                                 ///<   for all valence work units
   const uint2* cbnd_insr;        ///< Composite bond and Urey-Bradley instructions implemented by
                                  ///<   valence work units
   const uint2* angl_insr;        ///< Harmonic angle instructions implemented by valence work units
@@ -81,6 +90,7 @@ template <typename T> struct SyValenceKit {
   const uint* cdhe_acc;          ///< Composite dihedral energy accumulation masks
   const uint* cmap_acc;          ///< CMAP energy accumulation masks
   const uint* infr14_acc;        ///< Inferred 1:4 interaction energy accumulation masks
+
 };
 
 /// \brief Collect the critical restraint parameters and masking information for work unit-based
@@ -104,6 +114,13 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
                           const uint2* rangl_insr_in, const uint2* rdihe_insr_in,
                           const uint* rposn_acc_in, const uint* rbond_acc_in,
                           const uint* rangl_acc_in, const uint* rdihe_acc_in);
+
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyRestraintKit(const SyRestraintKit &original) = default;
+  SyRestraintKit(SyRestraintKit &&original) = default;
+  /// \}
 
   // Member variables (all public)
   const int2* rposn_step_bounds;  ///< Steps for initiating and completely applying positional
@@ -149,18 +166,27 @@ template <typename T, typename T2, typename T4> struct SyRestraintKit {
 ///        single system's AtomGraph, this merges the ImplicitSolventKit and NonbondedKit.  For
 ///        comparison, the SyValenceKit object merges the information for valence interactions,
 ///        constraints, and virtual sites abstracts from the single topology's set of abstracts. 
-template <typename T> struct SyNonbondedKit {
+template <typename T, typename T2> struct SyNonbondedKit {
 
   /// \brief The constructor takes a straight list of arguments for each member variable.
   explicit SyNonbondedKit(int nsys_in, UnitCellType unit_cell_in, int nnbwu_in,
                           const int* nbwu_abstracts_in, const uint2* nbwu_insr_in,
                           const int* atom_offsets, const int* atom_counts, T coulomb_in,
-                          T dielectric_in, T saltcon_in, ImplicitSolventModel igb_in,
-                          const T* charge_in, const int* lj_idx_in, const int* n_lj_types_in,
-                          const int* ljabc_offsets_in, const T* lja_coeff_in,
-                          const T* ljb_coeff_in, const T* ljc_coeff_in, const int* neck_gb_idx_in,
-                          const T* pb_radii_in, const T* gb_screen_in, const T* gb_alpha_in,
-                          const T* gb_beta_in, const T* gb_gamma_in);
+                          ImplicitSolventModel igb_in, int neck_table_size_in, T dielectric_in,
+                          T kappa_in, T saltcon_in, T gb_offset_in, T gb_neckscale_in,
+                          T gb_neckcut_in, const T* charge_in, const int* lj_idx_in,
+                          const int* n_lj_types_in, const int* ljabc_offsets_in,
+                          const T* lja_coeff_in, const T* ljb_coeff_in, const T* ljc_coeff_in,
+                          const int* neck_gb_idx_in, const T* pb_radii_in, const T* gb_screen_in,
+                          const T* gb_alpha_in, const T* gb_beta_in, const T* gb_gamma_in,
+                          const T2* neck_limits_in);
+
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyNonbondedKit(const SyNonbondedKit &original) = default;
+  SyNonbondedKit(SyNonbondedKit &&original) = default;
+  /// \}
 
   // Member variables (all public)
   const int nsys;                 ///< The total number of systems in the synthesis
@@ -174,10 +200,16 @@ template <typename T> struct SyNonbondedKit {
                                   ///<   tiles overrun the end of any one system)
   const T coulomb;                ///< Coulomb's constant (charges are stored in atomic units and
                                   ///<   converted to factor this in at the time they are cached)
-  const T dielectric;             ///< Solvent dielectric constant
-  const T saltcon;                ///< The salt concentration to use in GB calculations
   const ImplicitSolventModel igb; ///< The flavor of Generalized Born to use, i.e. Hawkins /
                                   ///<   Cramer / Truhlar
+  const int neck_table_size;      ///< Length of each side of the square "neck" GB limit tables
+  const T dielectric;             ///< Solvent dielectric constant
+  const T kappa;                  ///< Inverse of the Debye-Huckel length (based on the dielectic)
+  const T saltcon;                ///< The salt concentration to use in GB calculations
+  const T gb_offset;              ///< Offset for baseline Generalized Born radii (default 0.9,
+                                  ///<   larger for neck GB model II)
+  const T gb_neckscale;           ///< Neck function scaling parameter for neck GB
+  const T gb_neckcut;             ///< Cutoff for the "neck" GB function
   const T* charge;                ///< Partial charges for all atoms in the synthesis (one
                                   ///<   concatenated array, with each system's atoms padded by the
                                   ///<   warp size)
@@ -197,8 +229,49 @@ template <typename T> struct SyNonbondedKit {
   const T* gb_alpha;              ///< Generalized born alpha parameters (one parameter per atom)
   const T* gb_beta;               ///< Generalized born beta parameters (one parameter per atom)
   const T* gb_gamma;              ///< Generalized born gamma parameters (one parameter per atom)
+  const T2* neck_limits;          ///< Interlaced neck GB maximum separations and values tables
 };
 
+/// \brief Collect the virtual site details and constraint parameters of the topology synthesis
+///        into a single abstract.  This is designed to work in the context of the valence work
+///        units from the same topology synthesis, whether in a standalone function or as an extra
+///        step in a workflow that compute valence interactions and then moves particles.
+template <typename T2, typename T4> struct SyAtomUpdateKit {
+
+  /// \brief The constructor takes a list of parameter arrays.  Like other AtomGraphSynthesis
+  ///        abstracts, then actual numbers of parameters in each array, which are irrelevant to
+  ///        the implementation as long as the work unit instructions do not overrun the bounds,
+  ///        are omitted to save space on the constants imported as arguments to each kernel.
+  SyAtomUpdateKit(const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
+                  const T2* cnst_grp_params_in, const uint2* vste_insr_in,
+                  const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in);
+
+  /// \brief The copy and move constructors are taken at their default values for this abstract
+  ///        containing const elements.
+  /// \{
+  SyAtomUpdateKit(const SyAtomUpdateKit &original) = default;
+  SyAtomUpdateKit(SyAtomUpdateKit &&original) = default;
+  /// \}
+  
+  const T4* vs_params;        ///< Unique virtual site frames, with the first, second, and third
+                              ///<   dimension parameters in the 
+  const T4* settle_geom;      ///< Geometric considerations for SETTLE-constrained groups.  The
+                              ///<   SETTLE instructions will indicate which parameter set, and
+                              ///<   thus which index of this array to take.
+  const T2* settle_mass;      ///< Inverse mass considerations for SETTLE-constrained groups.  The
+                              ///<   SETTLE instructions will indicate which parameter set, and
+                              ///<   thus which index of this array to take.  
+  const T2* cnst_grp_params;  ///< Bond length (x member) and inverse mass (y member) information
+                              ///<   for hub-and-spoke constraint groups.
+
+  // Instruction sets for virtual sites and constraints
+  const uint2* vste_insr;     ///< Virtual site placement instructions
+  const uint2* sett_insr;     ///< SETLLE group constraints instructions
+  const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
+  const uint2* vwu_manip;     ///< Manipulation masks (movement in x member, update in y member)
+                              ///<   for all valence work units
+};
+  
 } // namespace synthesis
 } // namespace stormm
 

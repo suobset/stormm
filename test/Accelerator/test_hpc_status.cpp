@@ -3,7 +3,7 @@
 #include <cusolverDn.h>
 #include "../../src/Constants/behavior.h"
 #include "../../src/Accelerator/hybrid.h"
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Random/random.h"
 #include "../../src/UnitTesting/unit_test.h"
 

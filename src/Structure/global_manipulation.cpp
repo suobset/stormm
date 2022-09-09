@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "global_manipulation.h"
 #include "structure_utils.h"
 

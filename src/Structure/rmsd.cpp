@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "rmsd.h"
 #include "structure_utils.h"
 

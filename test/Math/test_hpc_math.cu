@@ -1,7 +1,7 @@
 // -*-c++-*-
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/hpc_bounds.h"
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/FileManagement/file_listing.h"
 #include "../../src/Math/summation.h"

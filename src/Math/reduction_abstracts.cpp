@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "reduction_abstracts.h"
 

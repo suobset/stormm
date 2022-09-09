@@ -2,6 +2,7 @@
 #ifndef STORMM_NML_CONFORMER_H
 #define STORMM_NML_CONFORMER_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_element.h"

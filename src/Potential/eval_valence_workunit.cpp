@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Math/vector_ops.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "eval_valence_workunit.h"
@@ -728,10 +729,9 @@ void evalValenceWorkUnits(const AtomGraph *ag, PhaseSpace *ps, const RestraintAp
                           const VwuGoal goal, const int step_number) {
   PhaseSpaceWriter psw = ps->data();
   evalValenceWorkUnits(ag->getDoublePrecisionValenceKit(), ag->getDoublePrecisionVirtualSiteKit(),
-                       ag->getDoublePrecisionNonbondedKit(), ra->getDoublePrecisionAbstract(),
-                       psw.xcrd, psw.ycrd, psw.zcrd, psw.umat, psw.invu, psw.unit_cell, psw.xfrc,
-                       psw.yfrc, psw.zfrc, ecard, sysid, vwu_list, eval_force, activity,
-                       step_number);
+                       ag->getDoublePrecisionNonbondedKit(), ra->dpData(), psw.xcrd, psw.ycrd,
+                       psw.zcrd, psw.umat, psw.invu, psw.unit_cell, psw.xfrc, psw.yfrc, psw.zfrc,
+                       ecard, sysid, vwu_list, eval_force, activity, step_number);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -810,10 +810,9 @@ void evalValenceWorkUnits(const AtomGraph &ag, const PhaseSpace &ps, const Restr
                           const VwuTask activity, const int step_number) {
   PhaseSpaceReader psr = ps.data();
   evalValenceWorkUnits(ag.getDoublePrecisionValenceKit(), ag.getDoublePrecisionVirtualSiteKit(),
-                       ag.getDoublePrecisionNonbondedKit(), ra.getDoublePrecisionAbstract(),
-                       psr.xcrd, psr.ycrd, psr.zcrd, psr.umat, psr.invu, psr.unit_cell, nullptr,
-                       nullptr, nullptr, ecard, sysid, vwu_list, EvaluateForce::NO, activity,
-                       step_number);
+                       ag.getDoublePrecisionNonbondedKit(), ra.dpData(), psr.xcrd, psr.ycrd,
+                       psr.zcrd, psr.umat, psr.invu, psr.unit_cell, nullptr, nullptr, nullptr,
+                       ecard, sysid, vwu_list, EvaluateForce::NO, activity, step_number);
 }
 
 } // namespace energy

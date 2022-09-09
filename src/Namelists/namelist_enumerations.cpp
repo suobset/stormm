@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "namelist_enumerations.h"
 
 namespace stormm {

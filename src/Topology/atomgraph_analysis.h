@@ -3,6 +3,7 @@
 #define STORMM_ATOMGRAPH_ANALYSIS_H
 
 #include <vector>
+#include "copyright.h"
 #include "atomgraph.h"
 
 namespace stormm {

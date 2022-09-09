@@ -2,6 +2,7 @@
 #ifndef STORMM_EVAL_SYNTHESIS_H
 #define STORMM_EVAL_SYNTHESIS_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/vector_ops.h"
@@ -30,6 +31,7 @@ using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
 using synthesis::SeMaskSynthesisReader;
 using synthesis::StaticExclusionMaskSynthesis;
+using synthesis::SyAtomUpdateKit;
 using synthesis::SyNonbondedKit;
 using synthesis::SyValenceKit;
 using synthesis::SyRestraintKit;
@@ -88,6 +90,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
 /// \param step_number  Number of the step in the simulation (relevant to restraint applications)
 template <typename Tcalc, typename Tcalc2, typename Tcalc4>
 void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
+                         const SyAtomUpdateKit<Tcalc2, Tcalc4> syauk,
                          const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
                          ScoreCard *ecard, EvaluateForce eval_force, VwuTask activity,
                          VwuGoal purpose, int step_number);
@@ -103,10 +106,11 @@ void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
 /// \param eval_elec_force  Flag to also carry out force evaluation of electrostatic interactions
 ///                         (energy is always evaluated in CPU functions)
 /// \param eval_vdw_force   Flag to also carry out force evaluation of van-der Waals interactions
-template <typename Tcalc>
-void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc> synbk, const SeMaskSynthesisReader syse,
-                               PsSynthesisWriter *psyw, ScoreCard *ecard,
-                               EvaluateForce eval_elec_force, EvaluateForce eval_vdw_force);
+template <typename Tcalc, typename Tcalc2>
+void evalSyNonbondedTileGroups(const SyNonbondedKit<Tcalc, Tcalc2> synbk,
+                               const SeMaskSynthesisReader syse, PsSynthesisWriter *psyw,
+                               ScoreCard *ecard, EvaluateForce eval_elec_force,
+                               EvaluateForce eval_vdw_force);
 
 /// \brief Evaluate the non-bonded energy with a particular precision level.  This will invoke
 ///        the proper C++ function.

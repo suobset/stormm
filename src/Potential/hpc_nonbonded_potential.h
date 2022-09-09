@@ -2,15 +2,18 @@
 #ifndef STORMM_NONBONDED_POTENTIAL_CUH
 #define STORMM_NONBONDED_POTENTIAL_CUH
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Constants/behavior.h"
 #include "MolecularMechanics/mm_controls.h"
 #include "Potential/energy_enumerators.h"
+#include "Synthesis/implicit_solvent_workspace.h"
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/static_mask_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
+#include "Topology/atomgraph_enumerators.h"
 #include "cacheresource.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
@@ -23,8 +26,10 @@ using card::KernelManager;
 using constants::PrecisionModel;
 using mm::MMControlKit;
 using mm::MolecularMechanicsControls;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
+using synthesis::ImplicitSolventWorkspace;
+using synthesis::ISWorkspaceKit;
 using synthesis::NbwuKind;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
@@ -32,6 +37,7 @@ using synthesis::SeMaskSynthesisReader;
 using synthesis::StaticExclusionMaskSynthesis;
 using synthesis::SyNonbondedKit;
 using synthesis::VwuGoal;
+using topology::ImplicitSolventModel;
 
 /// \brief Set the __shared__ memory configuration for various nonbonded interaction kernels
 void nonbondedKernelSetup();
@@ -45,10 +51,29 @@ void nonbondedKernelSetup();
 /// \param eval_frc  Whether the kernel shall evaluate forces
 /// \param eval_nrg  Whether the kernel shall evaluate energies
 /// \param acc_meth  Accumulation method for forces
+/// \param igb       The implicit solvent model to use (i.e. "NONE" in periodic boundary
+///                  conditions--otherwise NECK and non-NECK models are the relevant choices)
 cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKind kind,
                                                     EvaluateForce eval_frc,
                                                     EvaluateEnergy eval_nrg,
-                                                    ForceAccumulationMethod acc_meth);
+                                                    AccumulationMethod acc_meth,
+                                                    ImplicitSolventModel igb);
+
+/// \brief Obtain information on launch bounds and block-specific requirements for each version of
+///        the Born radii computation kernel.  Deposit the results in a developing object that
+///        will later record launch grid dimensions for managing the kernels.  This kernel's
+///        parameter descriptions follow from queryNonbondedKernelRequirements() above.
+cudaFuncAttributes queryBornRadiiKernelRequirements(PrecisionModel prec, NbwuKind kind,
+                                                    AccumulationMethod acc_meth,
+                                                    ImplicitSolventModel igb);
+
+/// \brief Obtain information on launch bounds and block-specific requirements for each version of
+///        the Born radii derivative computation kernel.  Deposit the results in a developing
+///        object that will later record launch grid dimensions for managing the kernels.  This
+///        kernel's parameter descriptions follow from queryNonbondedKernelRequirements() above.
+cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, NbwuKind kind,
+                                                         AccumulationMethod acc_meth,
+                                                         ImplicitSolventModel igb);
 
 /// \brief Evaluate nonbonded work units based on the strategy determined in the topology
 ///        synthesis.  All of the kernels launched by these functions will compute forces,
@@ -76,36 +101,47 @@ cudaFuncAttributes queryNonbondedKernelRequirements(PrecisionModel prec, NbwuKin
 ///                     entire synthesis)
 /// \param gmem_r       Abstract for thread block specific resources
 /// \param tb_space     Cache resources for the kernel launch
+/// \param iswk         Abstract for the implicit solvent accumulator workspace
+/// \param ism_space    Implicit solvent accumulators for connecting each of the Generalized Born
+///                     calculation stages
 /// \param eval_force   Whether to evaluate forces
 /// \param eval_energy  Whether to evaluate energies
-/// \param bt           Block and thread counts for the kernel, given the precision and force or
-///                     energy computation requirements (an "abstract" of the KernelManager object)
+/// \param acc_meth     Accumulation method for forces
+/// \param bt           Block and thread counts for the main kernel, given the precision and force
+///                     or energy computation requirements (a KernelManager object "abstract")
+/// \param gbr_bt       Block and thread counts for the Generalized Born radii computation kernel
+/// \param gbd_bt       Block and thread counts for the Generalized Born radii derivative
+///                     computation kernel
 /// \param launcher     Contains launch parameters for all kernels in STORMM
 /// \{
-void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double> &poly_nbk,
+void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                     CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
-                     const EvaluateEnergy eval_energy, const int2 bt);
+                     CacheResourceKit<double> *gmem_r, ISWorkspaceKit<double> *iswk,
+                     EvaluateForce eval_force, EvaluateEnergy eval_energy, const int2 bt,
+                     const int2 gbr_bt, const int2 gbd_bt);
 
-void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float> &poly_nbk,
+void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
                      PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                     CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, ForceAccumulationMethod force_sum, const int2 bt);
+                     CacheResourceKit<float> *gmem_r, ISWorkspaceKit<float> *iswk,
+                     EvaluateForce eval_force, EvaluateEnergy eval_energy,
+                     AccumulationMethod force_sum, const int2 bt, const int2 gbr_bt,
+                     const int2 gbd_bt);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      const StaticExclusionMaskSynthesis &poly_se,
                      MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                     ScoreCard *sc, CacheResource *tb_space, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, ForceAccumulationMethod force_sum,
+                     ScoreCard *sc, CacheResource *tb_space, ImplicitSolventWorkspace *ism_space,
+                     EvaluateForce eval_force, EvaluateEnergy eval_energy,
+                     AccumulationMethod force_sum, const KernelManager &launcher);
+
+void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                     const StaticExclusionMaskSynthesis &poly_se,
+                     MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                     ScoreCard *sc, CacheResource *tb_space, ImplicitSolventWorkspace *ism_space,
+                     EvaluateForce eval_force, EvaluateEnergy eval_energy,
                      const KernelManager &launcher);
-
-void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
-                     const StaticExclusionMaskSynthesis &poly_se,
-                     MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                     ScoreCard *sc, CacheResource *tb_space, EvaluateForce eval_force,
-                     EvaluateEnergy eval_energy, const KernelManager &launcher);
 /// \}
 
 } // namespace energy

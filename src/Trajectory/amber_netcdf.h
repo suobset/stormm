@@ -3,6 +3,7 @@
 #define STORMM_AMBER_NETCDF_H
 
 #include <netcdf.h>
+#include "copyright.h"
 
 namespace stormm {
 namespace trajectory {

@@ -2,6 +2,8 @@
 #ifndef STORMM_REDUCTION_ENUMERATORS_H
 #define STORMM_REDUCTION_ENUMERATORS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace math {
 

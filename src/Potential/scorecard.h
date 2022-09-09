@@ -2,9 +2,11 @@
 #ifndef STORMM_SCORECARD_H
 #define STORMM_SCORECARD_H
 
-#include "Constants/fixed_precision.h"
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/fixed_precision.h"
+#include "DataTypes/stormm_vector_types.h"
 #include "energy_enumerators.h"
 
 namespace stormm {
@@ -28,6 +30,13 @@ struct ScoreCardReader {
                   const double* running_accumulators_in, const double* squared_accumulators_in,
                   const llint* time_series_in);
 
+  /// \brief Take only the default copy constructor and copy assignemnt operator for this
+  ///        struct with const elements.
+  /// \{
+  ScoreCardReader(const ScoreCardReader &original) = default;
+  ScoreCardReader(ScoreCardReader &&original) = default;
+  /// \}
+  
   const int system_count;                  ///< Number of independent systems tracked
   const int data_stride;                   ///< Size of the StateVariable enumerator rounded up
                                            ///<   to the nearest multiple of the HPC warp size
@@ -57,6 +66,13 @@ struct ScoreCardWriter {
                   double inverse_nrg_scale_lf_in, llint* instantaneous_accumulators_in,
                   double* running_accumulators_in, double* squared_accumulators_in,
                   llint* time_series_in);
+
+  /// \brief Take only the default copy constructor and copy assignemnt operator for this
+  ///        struct with const elements.
+  /// \{
+  ScoreCardWriter(const ScoreCardWriter &original) = default;
+  ScoreCardWriter(ScoreCardWriter &&original) = default;
+  /// \}
 
   const int system_count;             ///< Number of independent systems tracked
   const int data_stride;              ///< Size of the StateVariable enumerator rounded up to the
@@ -88,6 +104,26 @@ public:
   ScoreCard(int system_count_in, int capacity_in = 16,
             int nrg_scale_bits_in = default_energy_scale_bits);
 
+  /// \brief Copy and move constructors help make the energy tracker a first-class C++ object.
+  ///        The defaults apply as there are no const member variables and no POINTER-kind Hybrid
+  ///        objects.
+  ///
+  /// \param original  The original energy tracking object to build from
+  /// \{
+  ScoreCard(const ScoreCard &original) = default;
+  ScoreCard(ScoreCard &&original) = default;
+  /// \}
+
+  /// \brief Copy and move assignment operators complete the support for integrating this energy
+  ///        tracker with Standard Template Library mechanics.  The defaults apply as there are no
+  ///        const member variables and no POINTER-kind Hybrid objects.
+  ///
+  /// \param other  Object to which the present ScoreCard shall be equated
+  /// \{
+  ScoreCard& operator=(const ScoreCard &other) = default;
+  ScoreCard& operator=(ScoreCard &&other) = default;
+  /// \}
+  
   /// \brief Get the number of systems that this object is tracking
   int getSystemCount() const;
 
@@ -98,6 +134,10 @@ public:
   ///        accumulator arrays.
   int getDataStride() const;
 
+  /// \brief Get the sample capacity (the number of individual energy measurements that the object
+  ///        is prepared to store).
+  int getSampleCapacity() const;
+  
   /// \brief Get the number of bits of fixed precision to which results are stored
   int getEnergyScaleBits() const;
 
@@ -132,7 +172,7 @@ public:
   /// \param new_capacity  The new capacity to allocate for
   void reserve(int new_capacity);
   
-  /// \brief Commit a result into one of the instantaneous state variable accumulators.  This is
+  /// \brief Place a result into one of the instantaneous state variable accumulators.  This is
   ///        for CPU activity; on the GPU, the contributions will occur as part of each energy
   ///        kernel using pointers.  This will automatically update running accumulators for
   ///        statistical tracking.  It is add + commit, below.
@@ -143,7 +183,9 @@ public:
   ///                      contrbution describes
   void contribute(StateVariable var, llint amount, int system_index = 0);
 
-  /// \brief Initialize some or all instantaneous state variable accumulators.
+  /// \brief Initialize some or all instantaneous state variable accumulators.  If all state
+  ///        variable accumulators are initialized in all systems, the sample counter will also be
+  ///        reset.
   ///
   /// Overloaded:
   ///   - Initialize a single state variable accumulator
@@ -183,19 +225,59 @@ public:
   ///
   /// Overloaded:
   ///   - Commit results for a single state variable
-  ///   - Commit results for a list of state variables
+  ///   - Commit results for a list of specific state variables
+  ///   - Commit results for all state variables
+  ///   - Commit results for a single system, or for all systems
   ///
   /// \param var           The state variable to which this contribution belongs, i.e. bond energy
   /// \param system_index  Index of the system (among a list of those being tracked) that the
   ///                      contrbution describes
   /// \{
-  void commit(StateVariable var, int system_index = 0);
-  void commit(const std::vector<StateVariable> &var, int system_index = 0);    
-  /// \}
+  void commit(StateVariable var, int system_index,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(const std::vector<StateVariable> &var, int system_index,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(StateVariable var,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(const std::vector<StateVariable> &var,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+
+  void commit(int system_index,
+              HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
   
+  void commit(HybridTargetLevel tier = HybridTargetLevel::HOST, const GpuDetails &gpu = null_gpu);
+  /// \}
+
+  /// \brief Compute total potential energies for all systems in the instantaneous accumulators as
+  ///        well as all time series accumulators.  This total is not automatically computed by
+  ///        various interaction evaluations, which only compute individual "components" of this
+  ///        quantity.
+  ///
+  /// \param tier  Perform this operation on the CPU host or GPU device
+  void computePotentialEnergy(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                              const GpuDetails &gpu = null_gpu);
+
+  /// \brief Compute total energies for all systems in the instantaneous accumulators as well as
+  ///        all time series accumulators.  This total is not automatically computed by various
+  ///        interaction evaluations, which only compute individual "components" of this quantity.
+  ///
+  /// \param tier  Perform this operation on the CPU host or GPU device
+  void computeTotalEnergy(HybridTargetLevel tier = HybridTargetLevel::HOST,
+                          const GpuDetails &gpu = null_gpu);
+
   /// \brief Increment the number of sampled steps.  This will automatically allocate additional
   ///        capacity if the sampled step count reaches the object's capacity.
   void incrementSampleCount();
+
+  /// \brief Reset the sample counter (this is implicitly done by initialize() if that function is
+  ///        called to operate on all start variables and all systems, on either the host or HPC
+  ///        device).
+  ///
+  /// \param count_in  The number of samples to set the object as having (default 0, full reset)
+  void resetSampleCount(int count_in = 0);
   
   /// \brief Report the total energy for all systems.  Each result will be summed in the internal
   ///        fixed-point accumulation before conversion to real values in units of kcal/mol.
@@ -252,7 +334,7 @@ public:
                              HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
-  /// \brief Report averaged results in kcal/mol, as a double-precision vector.
+  /// \brief Report standard deviations in kcal/mol, as a double-precision vector.
   ///
   /// Overloaded:
   ///   - Report results for all systems (the vector will be concatenated, with padding removed)
@@ -273,6 +355,29 @@ public:
                                 HybridTargetLevel tier = HybridTargetLevel::HOST);
   /// \}
 
+  /// \brief Report the energy history for one or more systems.
+  ///
+  /// Overloaded:
+  ///   - Report the total energy history, as recorded on either the host or GPU device
+  ///   - Report the history of a specific energy component
+  ///   - Report results for a specific system or as the mean and standard deviation (in the x and
+  ///     y components of a double2 tuple) of all systems
+  ///
+  /// \param system_index  Index of the system of interest within all of those being tracked
+  /// \param aspect        The type of energy or virial quantity of interest (if none is specified
+  ///                      the history of systems' total energy will be reported, taking elements
+  ///                      from all potential and kinetic energy sources)
+  /// \param tier          Level from which to extract the data
+  /// \{
+  std::vector<double> reportEnergyHistory(int system_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double> reportEnergyHistory(StateVariable aspect, int system_index,
+                                          HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double2> reportEnergyHistory(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  std::vector<double2> reportEnergyHistory(StateVariable aspect,
+                                           HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
 private:
   int system_count;                          ///< The number of systems in the collection (each
                                              ///<   system will get a separate set of accumulators
@@ -323,6 +428,34 @@ private:
   Hybrid<llint> time_series_accumulators;    ///< A history of values for each energy accumulator
                                              ///<   at each sampled time step.  This detailed
                                              ///<   array is resized as needed, or can be reserved.
+
+  /// \brief Sum the potential energy contributions for a single system arranged in some array of
+  ///        long long integers.
+  ///
+  /// Overloaded:
+  ///   - Sum the energy as a long long integer (native fixed-precision format)
+  ///   - Sum the energy and return a double-precision real number, scaled to units of kcal/mol
+  ///
+  /// \param nrg_data  Energies for the system.  The first element of the array will coorespond to
+  ///                  the first element of the StateVariable enumerator, i.e. BOND.
+  /// \{
+  llint sumPotentialEnergyAsLlint(const llint* nrg_data) const;
+  double sumPotentialEnergy(const llint* nrg_data) const;
+  /// \}
+
+  /// \brief Sum the total energy contributions for a single sustem arranged in some array of
+  ///        long long integers.  This adds kinetic energy to the usual potential contributions.
+  ///
+  /// Overloaded:
+  ///   - Sum the energy as a long long integer (native fixed-precision format)
+  ///   - Sum the energy and return a double-precision real number, scaled to units of kcal/mol
+  ///
+  /// \param nrg_data  Energies for the system.  The first element of the array will coorespond to
+  ///                  the first element of the StateVariable enumerator, i.e. BOND.
+  /// \{
+  llint sumTotalEnergyAsLlint(const llint* nrg_data) const;
+  double sumTotalEnergy(const llint* nrg_data) const;
+  /// \}
 };
 
 } // namespace energy

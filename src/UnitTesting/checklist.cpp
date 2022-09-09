@@ -1,4 +1,5 @@
 #include <cstring>
+#include "copyright.h"
 #include "Math/summation.h"
 #include "Parsing/parse.h"
 #include "Parsing/tabulation.h"

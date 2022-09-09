@@ -17,7 +17,6 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Chemistry/indigo.cpp \
 		   $(SRCDIR)/Chemistry/znumber.cpp \
 		   $(SRCDIR)/Constants/behavior.cpp \
-		   $(SRCDIR)/Constants/fixed_precision.cpp \
 		   $(SRCDIR)/Constants/generalized_born.cpp \
 		   $(SRCDIR)/FileManagement/directory_util.cpp \
 		   $(SRCDIR)/FileManagement/file_listing.cpp \
@@ -52,6 +51,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Namelists/nml_restraint.cpp \
 	           $(SRCDIR)/Namelists/nml_solvent.cpp \
 	           $(SRCDIR)/Namelists/user_settings.cpp \
+	           $(SRCDIR)/Numerics/split_fixed_precision.cpp \
 	           $(SRCDIR)/Parsing/ascii_numbers.cpp \
 	           $(SRCDIR)/Parsing/citation.cpp \
 		   $(SRCDIR)/Parsing/parse.cpp \
@@ -70,6 +70,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Reporting/code_dox.cpp \
 	           $(SRCDIR)/Reporting/display.cpp \
 		   $(SRCDIR)/Reporting/error_format.cpp \
+		   $(SRCDIR)/Reporting/summary_file.cpp \
 		   $(SRCDIR)/Restraints/bounded_restraint.cpp \
 		   $(SRCDIR)/Restraints/restraint_apparatus.cpp \
 		   $(SRCDIR)/Restraints/restraint_builder.cpp \
@@ -81,6 +82,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 		   $(SRCDIR)/Structure/structure_utils.cpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.cpp \
 		   $(SRCDIR)/Synthesis/atomgraph_synthesis.cpp \
+		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.cpp \
 		   $(SRCDIR)/Synthesis/phasespace_synthesis.cpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.cpp \
 		   $(SRCDIR)/Synthesis/static_mask_synthesis.cpp \
@@ -168,6 +170,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Namelists/nml_restraint.h \
 		     $(SRCDIR)/Namelists/nml_solvent.h \
 		     $(SRCDIR)/Namelists/user_settings.h \
+		     $(SRCDIR)/Numerics/split_fixed_precision.h \
 		     $(SRCDIR)/Parsing/ascii_numbers.h \
 		     $(SRCDIR)/Parsing/citation.h \
 	             $(SRCDIR)/Parsing/parse.h \
@@ -189,6 +192,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Reporting/code_dox.h \
 		     $(SRCDIR)/Reporting/display.h \
 	             $(SRCDIR)/Reporting/error_format.h \
+	             $(SRCDIR)/Reporting/summary_file.h \
 	             $(SRCDIR)/Restraints/bounded_restraint.h \
 	             $(SRCDIR)/Restraints/restraint_apparatus.h \
 	             $(SRCDIR)/Restraints/restraint_builder.h \
@@ -202,6 +206,7 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Structure/structure_utils.h \
 		     $(SRCDIR)/Structure/virtual_site_handling.h \
 		     $(SRCDIR)/Synthesis/atomgraph_synthesis.h \
+		     $(SRCDIR)/Synthesis/implicit_solvent_workspace.h \
 		     $(SRCDIR)/Synthesis/phasespace_synthesis.h \
 		     $(SRCDIR)/Synthesis/nonbonded_workunit.h \
 		     $(SRCDIR)/Synthesis/static_mask_synthesis.h \
@@ -264,6 +269,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Structure/local_arrangement.tpp \
 		   $(SRCDIR)/Structure/rmsd.tpp \
 		   $(SRCDIR)/Structure/virtual_site_handling.tpp \
+		   $(SRCDIR)/Synthesis/implicit_solvent_workspace.tpp \
 		   $(SRCDIR)/Synthesis/nonbonded_workunit.tpp \
 		   $(SRCDIR)/Synthesis/synthesis_abstracts.tpp \
 		   $(SRCDIR)/Topology/atomgraph.tpp \
@@ -282,7 +288,6 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Chemistry/indigo.o \
 		  $(SRCDIR)/Chemistry/znumber.o \
 		  $(SRCDIR)/Constants/behavior.o \
-		  $(SRCDIR)/Constants/fixed_precision.o \
 		  $(SRCDIR)/Constants/generalized_born.o \
 		  $(SRCDIR)/FileManagement/directory_util.o \
 		  $(SRCDIR)/FileManagement/file_listing.o \
@@ -317,6 +322,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 	          $(SRCDIR)/Namelists/nml_restraint.o \
 	          $(SRCDIR)/Namelists/nml_solvent.o \
 	          $(SRCDIR)/Namelists/user_settings.o \
+	          $(SRCDIR)/Numerics/split_fixed_precision.o \
 		  $(SRCDIR)/Parsing/ascii_numbers.o \
 	          $(SRCDIR)/Parsing/citation.o \
 	          $(SRCDIR)/Parsing/parse.o \
@@ -335,6 +341,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Reporting/code_dox.o \
 		  $(SRCDIR)/Reporting/display.o \
 	          $(SRCDIR)/Reporting/error_format.o \
+	          $(SRCDIR)/Reporting/summary_file.o \
 	          $(SRCDIR)/Restraints/bounded_restraint.o \
 	          $(SRCDIR)/Restraints/restraint_apparatus.o \
 	          $(SRCDIR)/Restraints/restraint_builder.o \
@@ -346,6 +353,7 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Structure/structure_utils.o \
 		  $(SRCDIR)/Structure/virtual_site_handling.o \
 		  $(SRCDIR)/Synthesis/atomgraph_synthesis.o \
+		  $(SRCDIR)/Synthesis/implicit_solvent_workspace.o \
 		  $(SRCDIR)/Synthesis/phasespace_synthesis.o \
 		  $(SRCDIR)/Synthesis/nonbonded_workunit.o \
 		  $(SRCDIR)/Synthesis/static_mask_synthesis.o \
@@ -385,11 +393,13 @@ STORMM_CUDA_FILES = $(SRCDIR)/Accelerator/hpc_config.cu \
 		    $(SRCDIR)/Potential/hpc_nonbonded_potential.cu \
 		    $(SRCDIR)/Potential/hpc_valence_potential.cu \
 		    $(SRCDIR)/Random/hpc_random.cu \
+		    $(SRCDIR)/Structure/hpc_virtual_site_handling.cu \
+		    $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.cu \
 		    $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cu
 
 # STORMM CUDA header files
 STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
-		      $(SRCDIR)/Accelerator/hpc_config.cuh \
+		      $(SRCDIR)/Accelerator/hpc_config.h \
 		      $(SRCDIR)/Accelerator/ptx_macros.h \
 		      $(SRCDIR)/Math/hpc_reduction.h \
 		      $(SRCDIR)/Math/hpc_summation.cuh \
@@ -398,16 +408,22 @@ STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		      $(SRCDIR)/Potential/hpc_scorecard.h \
 		      $(SRCDIR)/Potential/hpc_valence_potential.h \
 		      $(SRCDIR)/Random/hpc_random.cuh \
+		      $(SRCDIR)/Structure/hpc_virtual_site_handling.h \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.cuh
 
 # STORMM CUDA included files
 STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/Math/rounding.cui \
+			     $(SRCDIR)/Math/vector_formulas.cui \
 			     $(SRCDIR)/MolecularMechanics/line_movement.cui \
-			     $(SRCDIR)/Potential/accumulation.cui \
+			     $(SRCDIR)/Numerics/accumulation.cui \
 			     $(SRCDIR)/Potential/nonbonded_potential_tilegroups.cui \
-			     $(SRCDIR)/Potential/valence_potential.cui
+			     $(SRCDIR)/Potential/gbderivative_tilegroups.cui \
+			     $(SRCDIR)/Potential/gbradii_tilegroups.cui \
+			     $(SRCDIR)/Potential/valence_potential.cui \
+			     $(SRCDIR)/Structure/virtual_site_placement.cui \
+			     $(SRCDIR)/Structure/virtual_site_transmission.cui
 
 # STORMM CUDA object files
 STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
@@ -417,6 +433,8 @@ STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \
 		   $(SRCDIR)/Potential/hpc_scorecard.o \
 		   $(SRCDIR)/Potential/hpc_valence_potential.o \
 		   $(SRCDIR)/Random/hpc_random.o \
+		   $(SRCDIR)/Structure/hpc_virtual_site_handling.o \
+		   $(SRCDIR)/Synthesis/hpc_implicit_solvent_workspace.o \
 		   $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.o
 
 # Test programs using stormm
@@ -469,8 +487,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \

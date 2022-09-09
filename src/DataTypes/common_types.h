@@ -6,6 +6,7 @@
 #include <typeinfo>
 #include <typeindex>
 #include <sys/types.h>
+#include "copyright.h"
 #include "Reporting/error_format.h"
 
 namespace stormm {

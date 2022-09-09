@@ -2,23 +2,30 @@
 #include "../../src/Accelerator/hybrid.h"
 #include "../../src/Accelerator/gpu_details.h"
 #include "../../src/Accelerator/kernel_manager.h"
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/scaling.h"
+#include "../../src/DataTypes/mixed_types.h"
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Math/hpc_reduction.h"
 #include "../../src/Math/reduction_abstracts.h"
 #include "../../src/Math/reduction_bridge.h"
 #include "../../src/Math/reduction_enumerators.h"
 #include "../../src/Math/rounding.h"
-#include "../../src/Math/hpc_reduction.h"
+#include "../../src/Math/vector_ops.h"
 #include "../../src/MolecularMechanics/hpc_minimization.h"
 #include "../../src/MolecularMechanics/line_minimization.h"
 #include "../../src/MolecularMechanics/mm_controls.h"
 #include "../../src/MolecularMechanics/mm_evaluation.h"
+#include "../../src/Parsing/parse.h"
 #include "../../src/Potential/cacheresource.h"
 #include "../../src/Potential/hpc_nonbonded_potential.h"
 #include "../../src/Potential/hpc_valence_potential.h"
 #include "../../src/Potential/scorecard.h"
+#include "../../src/Random/random.h"
 #include "../../src/Reporting/error_format.h"
+#include "../../src/Structure/virtual_site_handling.h"
+#include "../../src/Structure/hpc_virtual_site_handling.h"
 #include "../../src/Synthesis/atomgraph_synthesis.h"
 #include "../../src/Synthesis/phasespace_synthesis.h"
 #include "../../src/Synthesis/static_mask_synthesis.h"
@@ -33,11 +40,15 @@
 
 using namespace stormm::card;
 using namespace stormm::constants;
+using namespace stormm::data_types;
 using namespace stormm::diskutil;
 using namespace stormm::energy;
 using namespace stormm::errors;
 using namespace stormm::math;
 using namespace stormm::mm;
+using namespace stormm::parse;
+using namespace stormm::random;
+using namespace stormm::structure;
 using namespace stormm::synthesis;
 using namespace stormm::testing;
 using namespace stormm::topology;
@@ -152,6 +163,180 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 }
 
 //-------------------------------------------------------------------------------------------------
+// Check that the components of the PhaseSpaceSynthesis relevant to conjugate gradient line
+// minimizations are consistent with respect to identical systems.
+//
+//-------------------------------------------------------------------------------------------------
+void checkLineMinimizationComponents(PhaseSpaceSynthesis *poly_ps, LineMinimization *line_record,
+                                     const std::vector<int> &mol_id_vec, const int step_number,
+                                     const std::string &stage) {
+  poly_ps->download();
+  line_record->download();
+  const PsSynthesisWriter poly_psw = poly_ps->data();
+  const LinMinWriter lmw = line_record->data();
+
+  // Check the components, system-by-system
+  const int nsys = mol_id_vec.size();
+  int n_unique_sys = maxValue(mol_id_vec) + 1;
+  std::vector<int> sys_copies(n_unique_sys, 0);
+  std::vector<std::vector<int>> sys_map(n_unique_sys);
+  for (int sysid = 0; sysid < nsys; sysid++) {
+    sys_copies[mol_id_vec[sysid]] += 1;
+  }
+  for (int i = 0; i < n_unique_sys; i++) {
+    sys_map[i].reserve(sys_copies[i]);
+  }
+  for (int sysid = 0; sysid < nsys; sysid++) {
+    sys_map[mol_id_vec[sysid]].push_back(sysid);
+  }
+  for (int i = 0; i < n_unique_sys; i++) {
+
+    // Check individual atoms
+    const int natom = poly_psw.atom_counts[sys_map[i][0]];
+    std::vector<double> x_crd(sys_copies[i], 0.0);
+    std::vector<double> y_crd(sys_copies[i], 0.0);
+    std::vector<double> z_crd(sys_copies[i], 0.0);
+    for (int atomcon = 0; atomcon < natom; atomcon++) {
+      for (int j = 0; j < sys_copies[i]; j++) {
+        const int sysid = sys_map[i][j];
+        const int atom_llim = poly_psw.atom_starts[sysid];
+        const int readidx = atom_llim + atomcon;
+        x_crd[j] = poly_psw.xcrd[readidx] + (max_llint_accumulation * poly_psw.xcrd_ovrf[readidx]);
+        y_crd[j] = poly_psw.ycrd[readidx] + (max_llint_accumulation * poly_psw.ycrd_ovrf[readidx]);
+        z_crd[j] = poly_psw.zcrd[readidx] + (max_llint_accumulation * poly_psw.zcrd_ovrf[readidx]);
+        x_crd[j] *= poly_psw.inv_gpos_scale;
+        y_crd[j] *= poly_psw.inv_gpos_scale;
+        z_crd[j] *= poly_psw.inv_gpos_scale;
+      }
+      addScalarToVector(&x_crd, -(mean(x_crd)));
+      addScalarToVector(&y_crd, -(mean(y_crd)));
+      addScalarToVector(&z_crd, -(mean(z_crd)));
+      const double dx_max = maxAbsValue(x_crd);
+      const double dy_max = maxAbsValue(y_crd);
+      const double dz_max = maxAbsValue(z_crd);
+      if (dx_max > small) {
+        printf("A maximum deviation of %12.8lf is observed in X coordinates of atom %4d, system "
+               "%4zu.  Step: %4d  Stage: %s\n", dx_max, atomcon, locateValue(x_crd, dx_max),
+               step_number, stage.c_str());
+        exit(1);
+      }
+      if (dy_max > small) {
+        printf("A maximum deviation of %12.8lf is observed in Y coordinates of atom %4d, system "
+               "%4zu.  Step: %4d  Stage: %s\n", dy_max, atomcon, locateValue(y_crd, dy_max),
+               step_number, stage.c_str());
+        exit(1);
+      }
+      if (dz_max > small) {
+        printf("A maximum deviation of %12.8lf is observed in Z coordinates of atom %4d, system "
+               "%4zu.  Step: %4d  Stage: %s\n", dz_max, atomcon, locateValue(z_crd, dz_max),
+               step_number, stage.c_str());
+        exit(1);
+      }
+    }
+
+    // Check the line minimization data
+    std::vector<double> l_move(sys_copies[i], 0.0);
+    std::vector<double> s_move(sys_copies[i], 0.0);
+    std::vector<double> mfac_a(sys_copies[i], 0.0);
+    std::vector<double> mfac_b(sys_copies[i], 0.0);
+    std::vector<double> mfac_c(sys_copies[i], 0.0);
+    std::vector<double> nrg_a(sys_copies[i], 0.0);
+    std::vector<double> nrg_b(sys_copies[i], 0.0);
+    std::vector<double> nrg_c(sys_copies[i], 0.0);
+    std::vector<double> nrg_d(sys_copies[i], 0.0);
+    for (int j = 0; j < sys_copies[i]; j++) {
+      const int sysid = sys_map[i][j];
+      l_move[j] = lmw.l_move[sysid];
+      s_move[j] = lmw.s_move[sysid];
+      mfac_a[j] = lmw.mfac_a[sysid];
+      mfac_b[j] = lmw.mfac_b[sysid];
+      mfac_c[j] = lmw.mfac_c[sysid];
+      nrg_a[j] = lmw.nrg_a[sysid];
+      nrg_b[j] = lmw.nrg_b[sysid];
+      nrg_c[j] = lmw.nrg_c[sysid];
+      nrg_d[j] = lmw.nrg_d[sysid];
+    }
+    addScalarToVector(&l_move, -mean(l_move));
+    addScalarToVector(&s_move, -mean(s_move));
+    addScalarToVector(&mfac_a, -mean(mfac_a));
+    addScalarToVector(&mfac_b, -mean(mfac_b));
+    addScalarToVector(&mfac_c, -mean(mfac_c));
+    addScalarToVector(&nrg_a, -mean(nrg_a));
+    addScalarToVector(&nrg_b, -mean(nrg_b));
+    addScalarToVector(&nrg_c, -mean(nrg_c));
+    addScalarToVector(&nrg_d, -mean(nrg_d));
+    const double dlmove_max = maxAbsValue(l_move);
+    const double dsmove_max = maxAbsValue(s_move);
+    const double dmfaca_max = maxAbsValue(mfac_a);
+    const double dmfacb_max = maxAbsValue(mfac_b);
+    const double dmfacc_max = maxAbsValue(mfac_c);
+    const double dnrga_max = maxAbsValue(nrg_a);
+    const double dnrgb_max = maxAbsValue(nrg_b);
+    const double dnrgc_max = maxAbsValue(nrg_c);
+    const double dnrgd_max = maxAbsValue(nrg_d);
+    if (dlmove_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in the L-move.  Step: %4d  Stage: %s\n",
+             dlmove_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dsmove_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in the S-move.  Step: %4d  Stage: %s\n",
+             dsmove_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dmfaca_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in M-fac (A).  Step: %4d  Stage: %s\n",
+             dmfaca_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dmfacb_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in M-fac (B).  Step: %4d  Stage: %s\n",
+             dmfacb_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dmfacc_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in M-fac (C).  Step: %4d  Stage: %s\n",
+             dmfacc_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dnrga_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (A).  Step: %4d  Stage: %s\n",
+             dnrga_max, step_number, stage.c_str());
+      printf("Nrg A = [\n");
+      int k = 0;
+      for (size_t j = 0; j < nrg_a.size(); j++) {
+        printf("  %10.4lf", nrg_a[j]);
+        k++;
+        if (k == 16) {
+          k = 0;
+          printf("\n");
+        }
+      }
+      if (k > 0) {
+        printf("\n");
+      }
+      printf("];\n");
+      exit(1);
+    }
+    if (dnrgb_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (B).  Step: %4d  Stage: %s\n",
+             dnrgb_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dnrgc_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (C).  Step: %4d  Stage: %s\n",
+             dnrgc_max, step_number, stage.c_str());
+      exit(1);
+    }
+    if (dnrgd_max > small) {
+      printf("A maximum deviation of %12.8lf is observed in energy (D).  Step: %4d  Stage: %s\n",
+             dnrgd_max, step_number, stage.c_str());
+      exit(1);
+    }
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
 // Perform energy minimization with meticulous checks to ensure that the process is consistent and
 // reproducible.
 //
@@ -190,12 +375,19 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                       const int frc_bits = 40, const int maxcyc = 500,
                       const bool enforce_same_track = true, const bool check_mm = true,
                       const double frc_tol = 1.0e-6, const double nrg_tol = 1.0e-6,
-                      const std::string &test_name = std::string(""), StopWatch *timer = nullptr) {
+                      const std::string &test_name = std::string(""), StopWatch *timer = nullptr,
+                      const ImplicitSolventModel ism_choice = ImplicitSolventModel::NONE) {
   AtomGraphSynthesis poly_ag(ag_ptr_vec, mol_id_vec, ExceptionResponse::SILENT, gpu, timer);
+  const NeckGeneralizedBornTable ngb_tables;
+  if (ism_choice != ImplicitSolventModel::NONE) {
+    const AtomicRadiusSet radii = (ism_choice == ImplicitSolventModel::NECK_GB_II) ?
+                                  AtomicRadiusSet::MBONDI3 : AtomicRadiusSet::BONDI;
+    poly_ag.setImplicitSolventModel(ism_choice, ngb_tables, radii);
+  }
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(), mol_id_vec);
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_ptr_vec, mol_id_vec, gpos_bits, 24, 40, frc_bits);
-  
+    
   // Create the minimization instructions
   MinimizeControls mincon;
   mincon.setTotalCycles(maxcyc);
@@ -208,29 +400,38 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
 
   // Track energies in the systems
   ScoreCard sc(mol_id_vec.size(), mincon.getTotalCycles(), 32);
-
+  
   // Obtain kernel launch parameters for the workload
   KernelManager launcher(gpu, poly_ag);
-  
+    
   // Lay out GPU cache resources
   const int2 vale_fe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::YES,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
   const int2 vale_xe_lp = launcher.getValenceKernelDims(prec, EvaluateForce::NO,
                                                         EvaluateEnergy::YES,
-                                                        ForceAccumulationMethod::SPLIT,
+                                                        AccumulationMethod::SPLIT,
                                                         VwuGoal::ACCUMULATE);
-  const int2 nonb_lp = launcher.getNonbondedKernelDims(prec,
-                                                       NbwuKind::TILE_GROUPS,
-                                                       EvaluateForce::YES, EvaluateEnergy::YES,
-                                                       ForceAccumulationMethod::SPLIT);
-  const int2 redu_lp = launcher.getReductionKernelDims(prec,
-                                                       ReductionGoal::CONJUGATE_GRADIENT,
+  const int2 vste_mv_lp = launcher.getVirtualSiteKernelDims(prec, VirtualSiteActivity::PLACEMENT);
+  const int2 vste_xm_lp = launcher.getVirtualSiteKernelDims(prec,
+                                                            VirtualSiteActivity::TRANSMIT_FORCES);
+  const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
+  const ImplicitSolventModel ism_type = poly_ag.getImplicitSolventModel();
+  const int2 nonb_lp = launcher.getNonbondedKernelDims(prec, nb_work_type, EvaluateForce::YES,
+                                                       EvaluateEnergy::YES,
+                                                       AccumulationMethod::SPLIT, ism_type);
+  const int2 gbr_lp = launcher.getBornRadiiKernelDims(prec, nb_work_type,
+                                                      AccumulationMethod::SPLIT, ism_type);
+  const int2 gbd_lp = launcher.getBornDerivativeKernelDims(prec, nb_work_type,
+                                                           AccumulationMethod::SPLIT, ism_type);
+  const int2 redu_lp = launcher.getReductionKernelDims(prec, ReductionGoal::CONJUGATE_GRADIENT,
                                                        ReductionStage::ALL_REDUCE);
   CacheResource valence_fe_tb_reserve(vale_fe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource valence_xe_tb_reserve(vale_xe_lp.x, maximum_valence_work_unit_atoms);
   CacheResource nonbond_tb_reserve(nonb_lp.x, small_block_max_atoms);
+  ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
+                                     poly_ag.getSystemAtomCounts(), prec);
   
   // Upload the synthesis and prime the pumps
   poly_ag.upload();
@@ -240,18 +441,23 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                                   poly_ag);
   mmctrl_xe.primeWorkUnitCounters(launcher, EvaluateForce::NO, EvaluateEnergy::YES, prec, poly_ag);
   
-  // Obtain the appropriate abstracts
+  // Obtain the appropriate abstracts.  Both precision modes are covered, even though in this test
+  // only one is used.
   const HybridTargetLevel devc = HybridTargetLevel::DEVICE;
   const SyValenceKit<double> d_poly_vk = poly_ag.getDoublePrecisionValenceKit(devc);
   const SyValenceKit<float>  f_poly_vk = poly_ag.getSinglePrecisionValenceKit(devc);
-  const SyNonbondedKit<double> d_poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc);
-  const SyNonbondedKit<float>  f_poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc);
+  const SyAtomUpdateKit<double2,
+                        double4> d_poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit(devc);
+  const SyAtomUpdateKit<float2,
+                        float4> f_poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit(devc);
+  const SyNonbondedKit<double, double2> d_poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc);
+  const SyNonbondedKit<float, float2>  f_poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc);
   const SeMaskSynthesisReader poly_ser = poly_se.data(devc);
   const SyRestraintKit<double,
                        double2, double4> d_poly_rk = poly_ag.getDoublePrecisionRestraintKit(devc);
   const SyRestraintKit<float,
                        float2, float4> f_poly_rk = poly_ag.getSinglePrecisionRestraintKit(devc);
-  const NbwuKind nb_work_type = poly_ag.getNonbondedWorkType();
+  const bool virtual_sites_present = (poly_ag.getVirtualSiteCount() > 0);
   MMControlKit<double> d_ctrl_fe = mmctrl_fe.dpData(devc);
   MMControlKit<double> d_ctrl_xe = mmctrl_xe.dpData(devc);
   MMControlKit<float>  f_ctrl_fe = mmctrl_fe.spData(devc);
@@ -264,15 +470,18 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
   CacheResourceKit<float> f_vale_fe_tbk = valence_fe_tb_reserve.spData(devc);
   CacheResourceKit<float> f_vale_xe_tbk = valence_xe_tb_reserve.spData(devc);
   CacheResourceKit<float> f_nonb_tbk = nonbond_tb_reserve.spData(devc);
+  ISWorkspaceKit<double> d_iswk = ism_space.dpData(devc);
+  ISWorkspaceKit<float>  f_iswk = ism_space.spData(devc);
   ReductionKit poly_redk(poly_ag, devc);
   ReductionBridge poly_rbg(poly_ag.getReductionWorkUnitCount());
   ConjGradSubstrate cgsbs(&poly_ps, &poly_rbg, devc);
-  LineMinimization line_record(poly_ag.getSystemCount());
-  line_record.primeMoveLengths(mmctrl_fe.getInitialMinimizationStep());
+  LineMinimization line_record(poly_ag.getSystemCount(), mmctrl_fe.getInitialMinimizationStep());
   LinMinWriter lmw = line_record.data(devc);
-
+  
   // Run minimizations
   const int meta_timings = (timer == nullptr) ? 0 : timer->addCategory(test_name);
+  const int pert_timings = (timer == nullptr) ? 0 : timer->addCategory("Structure perturbation");
+  const int chek_timings = (timer == nullptr) ? 0 : timer->addCategory("Check MM against CPU");
   if (timer != nullptr) {
     timer->assignTime(0);
   }
@@ -285,29 +494,85 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     poly_ps.initializeForces(gpu, devc);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_fe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_fe, &poly_psw, &scw, &d_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_fe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_fe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::YES, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                      nonb_lp);
+                      &f_iswk, EvaluateForce::YES, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_fe, &poly_psw, &scw, &f_vale_fe_tbk,
                     EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_fe_lp);
+                    AccumulationMethod::SPLIT, vale_fe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_fe.step += 1;
       break;
     }
 
+    // CHECK
+    if (i < 4 && poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+      cudaDeviceSynchronize();
+      const int nsys = poly_ag.getSystemCount();
+      const TrajectoryKind tforce = TrajectoryKind::FORCES; 
+      std::vector<double> test_cpu_total_e(nsys), test_gpu_total_e(nsys), test_force_mue(nsys);
+      const std::vector<double> test_gpu_gb_e =
+        sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, devc);
+      const std::vector<double> test_gpu_qq_e =
+        sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, devc);
+      printf("Track(%d) = [\n", i);
+      for (int j = 0; j < 8; j++) {
+        PhaseSpace chkj_ps = poly_ps.exportSystem(j, devc);
+        const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
+        chkj_ps.initializeForces();
+        ScoreCard tmp_sc(1, 1, 32);
+        const AtomGraph *jag_ptr = poly_ag.getSystemTopologyPointer(j);
+        StaticExclusionMask chkj_se(jag_ptr);
+        const RestraintApparatus *jra_ptr = poly_ag.getSystemRestraintPointer(j);
+        evalRestrainedMMGB(&chkj_ps, &tmp_sc, jag_ptr, ngb_tables, chkj_se, jra_ptr,
+                           EvaluateForce::YES, 0);
+        const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
+        test_cpu_total_e[j] = tmp_sc.reportTotalEnergy(0);
+        test_gpu_total_e[j] = sc.reportTotalEnergy(j, devc);
+        test_force_mue[j] = meanUnsignedError(cpu_frc, gpu_frc);
+        printf("  %12.4lf %18.4lf %12.4lf -> %12.4lf %12.4lf   %12.4lf %12.4lf\n",
+               test_cpu_total_e[j], test_gpu_total_e[j], test_force_mue[j], test_gpu_gb_e[j],
+               test_gpu_qq_e[j],
+               tmp_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, 0),
+               tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0));
+        for (int k = 0; k < 4; k++) {
+          printf("  %12.4lf %12.4lf %12.4lf   %12.4lf %12.4lf %12.4lf\n", cpu_frc[3 * k],
+                 cpu_frc[(3 * k) + 1], cpu_frc[(3 * k) + 2], gpu_frc[3 * k],
+                 gpu_frc[(3 * k) + 1], gpu_frc[(3 * k) + 2]);
+        }
+      }
+      printf("];\n");
+      exit(1);
+    }
+    // END CHECK
+    
     // Check the forces computed for a couple of systems.  This is somewhat redundant, but serves
     // as a sanity check in case other aspects of the energy minimization show problems.
     if (check_mm && (i & 0x1f) == 0) {
+      cudaDeviceSynchronize();
+      timer->assignTime(meta_timings);
       const int jlim = (3 * i) + 1;
       const TrajectoryKind tforce = TrajectoryKind::FORCES; 
       for (int j = 3 * i; j < jlim; j++) {
@@ -316,14 +581,23 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
         chkj_ps.initializeForces();
         ScoreCard tmp_sc(1, 1, 32);
-        StaticExclusionMask chkj_se(poly_ag.getSystemTopologyPointer(jmod));
-        evalNonbValeMM(&chkj_ps, &tmp_sc, poly_ag.getSystemTopologyPointer(jmod), chkj_se,
-                       EvaluateForce::YES, 0);
+        const AtomGraph *jag_ptr = poly_ag.getSystemTopologyPointer(jmod);
+        StaticExclusionMask chkj_se(jag_ptr);
+        if (jag_ptr->getImplicitSolventModel() == ImplicitSolventModel::NONE) {
+          evalNonbValeMM(&chkj_ps, &tmp_sc, jag_ptr, chkj_se, EvaluateForce::YES, 0);
+        }
+        else {
+          const RestraintApparatus *jra_ptr = poly_ag.getSystemRestraintPointer(jmod);
+          evalRestrainedMMGB(&chkj_ps, &tmp_sc, jag_ptr, ngb_tables, chkj_se, jra_ptr,
+                             EvaluateForce::YES, 0);
+        }
+        transmitVirtualSiteForces(&chkj_ps, jag_ptr);
         const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
         cpu_total_e[i / 32] = tmp_sc.reportTotalEnergy(0);
         gpu_total_e[i / 32] = sc.reportTotalEnergy(jmod, devc);
         force_mue[i / 32] = meanUnsignedError(cpu_frc, gpu_frc);
       }
+      timer->assignTime(chek_timings);
     }
     
     // Download and check the forces for each system to verify consistency.  If the forces are
@@ -368,22 +642,35 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Second stage of the cycle: advance once along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 0, redu_lp);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_xe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                      nonb_lp);
+                      &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                    AccumulationMethod::SPLIT, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_xe.step += 1;
       break;
     }
@@ -402,22 +689,35 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Third stage of the cycle: advance once more along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 1, redu_lp);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_xe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                      nonb_lp);
+                      &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                    AccumulationMethod::SPLIT, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_xe.step += 1;
       break;
     }
@@ -436,22 +736,35 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Final stage of the cycle: advance a final time along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 2, redu_lp);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, d_poly_nbk, poly_ser, &d_ctrl_xe, &poly_psw, &scw, &d_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp);
+                      &d_iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
       launchValence(d_poly_vk, d_poly_rk, &d_ctrl_xe, &poly_psw, &scw, &d_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_xm_lp);
+      }
       d_ctrl_xe.step += 1;
       break;
     case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
       launchNonbonded(nb_work_type, f_poly_nbk, poly_ser, &f_ctrl_xe, &poly_psw, &scw, &f_nonb_tbk,
-                      EvaluateForce::NO, EvaluateEnergy::YES, ForceAccumulationMethod::SPLIT,
-                      nonb_lp);
+                      &f_iswk, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(f_poly_vk, f_poly_rk, &f_ctrl_xe, &poly_psw, &scw, &f_vale_xe_tbk,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
-                    ForceAccumulationMethod::SPLIT, vale_xe_lp);
+                    AccumulationMethod::SPLIT, vale_xe_lp);
+      if (virtual_sites_present) {
+        launchTransmitVSiteForces(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_xm_lp);
+      }
       f_ctrl_xe.step += 1;
       break;
     }
@@ -470,7 +783,19 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Fit a cubic polynomial to guess the best overall advancement, and place the system there.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 3, redu_lp);
-
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &d_vale_xe_tbk, d_poly_vk, d_poly_auk, vste_mv_lp);
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      if (virtual_sites_present) {
+        launchVirtualSitePlacement(&poly_psw, &f_vale_xe_tbk, f_poly_vk, f_poly_auk, vste_mv_lp);
+      }
+      break;
+    }
+    
     // Download and check the particle advancement.
     if (enforce_same_track) {
       poly_ps.download();
@@ -514,16 +839,116 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
              "environment variable, currently set to " + oe.getStormmSourcePath() + ", for "
              "validity.  Subsequent tests will be skipped.", "test_hpc_minimization");
     }
-    const TestPriority do_snps = (snap_exists &&
-                                  do_tests == TestPriority::CRITICAL) ? TestPriority::CRITICAL :
-                                                                        TestPriority::ABORT;
+
+    // Single-precision minimizations can sometimes end up at different points, depending on the
+    // card.  While there seems to be only a handful of different results one can get, it is hard
+    // to check in that level of detail.  The results always seem to be self-consistent for the
+    // same card, however: the same system goes to the same state, regardless of which SMP it
+    // passed through.
+    const TestPriority do_snps = (snap_exists && do_tests == TestPriority::CRITICAL) ?
+                                 TestPriority::NON_CRITICAL : TestPriority::ABORT;
     const std::vector<double> final_e = sc.reportTotalEnergies(devc);
     const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
     snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-6, "Final energies of "
              "energy-minimized structures did not reach their expected values.  Test: " +
              test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",
              oe.takeSnapshot(), 1.0e-8, NumberFormat::STANDARD_REAL, psnap, do_snps);
+    const int n_unique_systems = maxValue(mol_id_vec) + 1;
+    const int nsystems = mol_id_vec.size();
+    bool consistent = true;
+    std::vector<CombineIDp> failures;
+    for (int i = 0; i < n_unique_systems; i++) {
+      int ncopies = 0;
+      for (int j = 0; j < nsystems; j++) {
+        ncopies += (mol_id_vec[j] == i);
+      }
+      if (ncopies > 0) {
+        std::vector<double> copy_e(ncopies);
+        ncopies = 0;
+        for (int j = 0; j < nsystems; j++) {
+          if (mol_id_vec[j] == i) {
+            copy_e[ncopies] = final_e[j];
+            ncopies++;
+          }
+        }
+        const double nrg_spread = variance(copy_e.data(), ncopies,
+                                           VarianceMethod::COEFFICIENT_OF_VARIATION);
+        consistent = (consistent && fabs(nrg_spread) < 2.0e-6);
+        if (fabs(nrg_spread) >= 2.0e-6) {
+          failures.push_back({ i, nrg_spread });
+        }
+      }
+    }
+    std::string err_msg("Divergent systems include:");
+    if (consistent == false) {
+      for (size_t i = 0; i < failures.size(); i++) {
+        const int natom = ag_ptr_vec[failures[i].x]->getAtomCount();
+        err_msg += " " + std::to_string(failures[i].x) + " (" + std::to_string(natom) +
+                   " atoms, " + realToString(failures[i].y, 11, 4, NumberFormat::SCIENTIFIC) +
+                   " kcal/mol)";
+        if (i < failures.size() - 1LLU) {
+          err_msg += ", ";
+        }
+      }
+    }
+    check(consistent, "The energies of systems originating at identical coordinates do not "
+          "end up at the same values.  " + err_msg, do_tests);
   }
+
+  // Perturb the structures and test the encapsulated energy minimization protocol.  Make a copy
+  // as a test against Heisenbugs.
+  if (timer != nullptr) {
+    timer->assignTime(0);
+  }
+  Xoshiro256ppGenerator xrs(38175335);
+  poly_ps.download();
+  PsSynthesisWriter host_psw = poly_ps.data();
+  for (int i = 0; i < host_psw.system_count; i++) {
+    const int jlim = host_psw.atom_starts[i] + host_psw.atom_counts[i];
+    for (int j = host_psw.atom_starts[i]; j < jlim; j++) {
+      host_psw.xcrd[j] += 0.1 * (0.5 - xrs.uniformRandomNumber());
+    }
+  }
+  poly_ps.upload();
+  PhaseSpaceSynthesis poly_ps_cpy(poly_ps);
+  poly_ps_cpy.upload();
+  
+  if (timer != nullptr) {
+    cudaDeviceSynchronize();
+    timer->assignTime(pert_timings);
+  }
+  mincon.setDiagnosticPrintFrequency(mincon.getTotalCycles() / 10);  
+  ScoreCard e_refine = launchMinimization(poly_ag, poly_se, &poly_ps, mincon, gpu, prec, timer,
+                                          test_name + " (II)");
+  cudaDeviceSynchronize();
+  e_refine.download();
+  e_refine.computePotentialEnergy();
+  e_refine.computeTotalEnergy();
+  std::vector<std::vector<double>> e_hist_a(poly_ps.getSystemCount());
+  for (int i = 0; i < poly_ps.getSystemCount(); i++) {
+    e_hist_a[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
+  }
+  e_refine = launchMinimization(poly_ag, poly_se, &poly_ps_cpy, mincon, gpu, prec, timer,
+                                test_name + " (III)");
+  cudaDeviceSynchronize();
+  e_refine.download();
+  e_refine.computePotentialEnergy();
+  e_refine.computeTotalEnergy();
+  std::vector<std::vector<double>> e_hist_b(poly_ps_cpy.getSystemCount());
+  std::vector<int> mismatch(poly_ps_cpy.getSystemCount(), 0);
+  const int npts = e_refine.getSampleSize();
+  for (int i = 0; i < poly_ps_cpy.getSystemCount(); i++) {
+    e_hist_b[i] = e_refine.reportEnergyHistory(i, HybridTargetLevel::HOST);
+    for (int j = 0; j < npts; j++) {
+      if (fabs(e_hist_b[i][j] - e_hist_a[i][j]) > stormm::constants::small) {
+        mismatch[i] += 1;
+      }
+    }
+  }
+  check(mismatch, RelationalOperator::EQUAL, std::vector<int>(poly_ps.getSystemCount(), 0),
+        "Mismatches were detected in back-to-back minimizations of the same batch of perturbed "
+        "starting coordinates.  Test: " + test_name + ".  Precision model: " +
+        getPrecisionModelName(prec) + ".", do_tests);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -549,7 +974,8 @@ void testCompilation(const std::vector<std::string> &top_names,
                      const int n_tiles, const double frc_tol, const double nrg_tol,
                      const TestEnvironment &oe, const GpuDetails &gpu,
                      const std::string &test_name, const PrintSituation psnap,
-                     const std::string &snap_name, const std::string &var_name, StopWatch *timer) {
+                     const std::string &snap_name, const std::string &var_name, StopWatch *timer,
+                     const ImplicitSolventModel ism_choice = ImplicitSolventModel::NONE) {
   const int mol_count = top_names.size();
   if (crd_names.size() != top_names.size()) {
     rtErr("A total of " + std::to_string(top_names.size()) + " topologies and " +
@@ -588,7 +1014,7 @@ void testCompilation(const std::vector<std::string> &top_names,
   std::vector<int> mol_id(total_mol);
   std::vector<int> d_nrg_target(total_mol);
   std::vector<int> f_nrg_target(total_mol);
-
+  
   // The test name determines the content of the target energy vector.  Codify the test name.
   for (int i = 0; i < n_tiles; i++) {
     for (int j = 0; j < tlen; j++) {
@@ -599,10 +1025,10 @@ void testCompilation(const std::vector<std::string> &top_names,
                                                                         PrintSituation::APPEND;
   metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, oe, x_psnap, snap_name, var_name,
                    PrecisionModel::DOUBLE, 40, 40, 100, false, true, frc_tol, nrg_tol,
-                   test_name + " (fp64)", timer);
+                   test_name + " (fp64)", timer, ism_choice);
   metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, oe, PrintSituation::APPEND,
                    snap_name, var_name, PrecisionModel::SINGLE, 28, 24, 500, false, true,
-                   10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer);
+                   10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer, ism_choice);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -614,7 +1040,7 @@ int main(const int argc, const char* argv[]) {
   HpcConfig gpu_config(ExceptionResponse::WARN);
   const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
   GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
-
+  
   // Kernel __shared__ memory configuration
   reductionKernelSetup();
   minimizationKernelSetup();
@@ -638,12 +1064,26 @@ int main(const int argc, const char* argv[]) {
   const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string dhfr_top_name = base_top_name + osc + "dhfr_cmap.top";
   const std::string dhfr_crd_name = base_crd_name + osc + "dhfr_cmap.inpcrd";
+  const std::string l1vs_top_name = base_top_name + osc + "stereo_L1_vs.top";
+  const std::string l1vs_crd_name = base_crd_name + osc + "stereo_L1_vs.inpcrd";
+  const std::string l2vs_top_name = base_top_name + osc + "symmetry_L1_vs.top";
+  const std::string l2vs_crd_name = base_crd_name + osc + "symmetry_L1_vs.inpcrd";
+  const std::string l3vs_top_name = base_top_name + osc + "bromobenzene_vs_iso.top";
+  const std::string l3vs_crd_name = base_crd_name + osc + "bromobenzene_vs_iso.inpcrd";
+  const std::string l4vs_top_name = base_top_name + osc + "drug_example_vs_iso.top";
+  const std::string l4vs_crd_name = base_crd_name + osc + "drug_example_vs_iso.inpcrd";
   const std::vector<std::string> lig_top = { alad_top_name, brbz_top_name, lig1_top_name,
                                              lig2_top_name };
   const std::vector<std::string> lig_crd = { alad_crd_name, brbz_crd_name, lig1_crd_name,
                                              lig2_crd_name };
   const std::vector<std::string> pro_top = { trpi_top_name, dhfr_top_name };
   const std::vector<std::string> pro_crd = { trpi_crd_name, dhfr_crd_name };
+  const std::vector<std::string> tvs_top = { l1vs_top_name, l2vs_top_name, trpi_top_name,
+                                             l4vs_top_name, brbz_top_name, l3vs_top_name,
+                                             lig1_top_name, lig2_top_name };
+  const std::vector<std::string> tvs_crd = { l1vs_crd_name, l2vs_crd_name, trpi_crd_name,
+                                             l4vs_crd_name, brbz_crd_name, l3vs_crd_name,
+                                             lig1_crd_name, lig2_crd_name };  
   const std::string snap_name = oe.getStormmSourcePath() + osc + "test" + osc +
                                 "MolecularMechanics" + osc + "min_energy.m";
   
@@ -651,19 +1091,29 @@ int main(const int argc, const char* argv[]) {
   testCompilation(lig_top, lig_crd, { 0, 1, 2, 3, 0, 1, 2, 3, 0, 3, 1, 2, 2, 1, 3, 0 },
                   256, 1.0e-5, 1.0e-5, oe, gpu, "Small molecules", PrintSituation::OVERWRITE,
                   snap_name, "small_mol_", &timer);
-
+  
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 1, 0, 1, 1, 1, 0, 0 }, 3, 1.0e-5, 1.0e-3, oe, gpu,
                   "Folded proteins", PrintSituation::APPEND, snap_name, "folded_pro_", &timer);
-
+  
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
                   "Trp-cage only", PrintSituation::APPEND, snap_name, "trp_cage_", &timer);
 
-  // Run tests on small proteins
+  // Run tests with various GB models
+  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
+                  "Trp-cage +GB", PrintSituation::APPEND, snap_name, "trp_cage_", &timer,
+                  ImplicitSolventModel::HCT_GB);
+  
+  // Run tests on larger proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
-  
+
+  // Run tests on systems with virtual sites
+  testCompilation(tvs_top, tvs_crd, { 0, 1, 2, 3, 4, 5, 6, 7, 4, 2, 3, 7, 5, 0, 6, 1 }, 4, 1.0e-5,
+                  6.0e-3, oe, gpu, "Molecules including some virtual sites",
+                  PrintSituation::APPEND, snap_name, "vste_", &timer);  
+
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

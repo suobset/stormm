@@ -2,6 +2,7 @@
 #ifndef STORMM_HPC_RANDOM_CUH
 #define STORMM_HPC_RANDOM_CUH
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"

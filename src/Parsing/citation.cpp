@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "citation.h"
 
 namespace stormm {

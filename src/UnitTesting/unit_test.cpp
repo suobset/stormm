@@ -4,6 +4,7 @@
 #include <typeinfo>
 #include <typeindex>
 #include <unistd.h>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
@@ -502,13 +503,21 @@ CheckResult snapshot(const std::string &filename, const std::vector<PolyNumeric>
       if (mismatch) {
         printf("Snapshot MISMATCH: ");
         std::string error_edit("  ");
-        error_edit += vectorAlignmentReport(ref_content, content, data_format,
-                                            comparison_tolerance);
+        if (urgency == TestPriority::CRITICAL) {
+          error_edit += vectorAlignmentReport(ref_content, content, data_format,
+                                              comparison_tolerance);
+        }
         const std::string parsed_msg = terminalFormat(error_message + error_edit,
                                                       "", "", 19, 0, 19);
         printf("%s\n", parsed_msg.c_str());
-        gbl_test_results.logResult(CheckResult::FAILURE);
-        return CheckResult::FAILURE;
+        if (urgency == TestPriority::NON_CRITICAL) {
+          gbl_test_results.logResult(CheckResult::IGNORED);
+          return CheckResult::IGNORED;
+        }
+        else if (urgency == TestPriority::CRITICAL) {
+          gbl_test_results.logResult(CheckResult::FAILURE);
+          return CheckResult::FAILURE;
+        }
       }
       else {
         gbl_test_results.logResult(CheckResult::SUCCESS);

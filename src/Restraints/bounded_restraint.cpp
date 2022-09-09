@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Chemistry/atommask.h"
 #include "Constants/symbol_values.h"
 #include "Parsing/parse.h"

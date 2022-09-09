@@ -2,6 +2,7 @@
 #ifndef STORMM_STRUCTURE_OPS_H
 #define STORMM_STRUCTURE_OPS_H
 
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"

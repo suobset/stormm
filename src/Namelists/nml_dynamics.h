@@ -2,6 +2,7 @@
 #ifndef STORMM_NML_DYNAMICS_H
 #define STORMM_NML_DYNAMICS_H
 
+#include "copyright.h"
 #include "Parsing/textfile.h"
 #include "input.h"
 #include "namelist_emulator.h"

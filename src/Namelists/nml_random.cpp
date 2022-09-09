@@ -1,6 +1,7 @@
 #include <cmath>
-#include "../../src/DataTypes/common_types.h"
-#include "../../src/Reporting/error_format.h"
+#include "copyright.h"
+#include "DataTypes/common_types.h"
+#include "Reporting/error_format.h"
 #include "namelist_element.h"
 #include "nml_random.h"
 

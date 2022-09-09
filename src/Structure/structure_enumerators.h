@@ -2,6 +2,8 @@
 #ifndef STORMM_STRUCTURE_ENUMERATORS_H
 #define STORMM_STRUCTURE_ENUMERATORS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace structure {
   
@@ -26,6 +28,12 @@ enum class RmsdMethod {
                   ///<   mass weighting
 };
 
+/// \brief Virtual site standalone functiosn and kernels call into two categories.
+enum class VirtualSiteActivity {
+  PLACEMENT,       ///< Place virtual sites after motion of the underlying frame atoms
+  TRANSMIT_FORCES  ///< Transmit forces accumulated on virtual sites to their frame atoms
+};
+  
 } // namespace structure
 } // namespace stormm
 

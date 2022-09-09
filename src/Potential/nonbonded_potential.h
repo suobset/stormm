@@ -2,6 +2,7 @@
 #ifndef STORMM_NONBONDED_POTENTIAL_H
 #define STORMM_NONBONDED_POTENTIAL_H
 
+#include "copyright.h"
 #include "Constants/generalized_born.h"
 #include "DataTypes/common_types.h"
 #include "Math/rounding.h"

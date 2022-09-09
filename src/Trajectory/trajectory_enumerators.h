@@ -3,6 +3,7 @@
 #define STORMM_TRAJECTORY_ENUMERATORS_H
 
 #include <string>
+#include "copyright.h"
 #include "FileManagement/file_util.h"
 #include "Parsing/textfile.h"
 
@@ -49,6 +50,18 @@ enum class TrajectoryKind {
   VELOCITIES,  // Velocities of particles
   FORCES       // Total forces on all particles (the two force arrays are summed in cases where
                //   the forces are partitioned)
+};
+
+/// \brief Enumerate the cycle of time for coordinates in objects that support iterative molecular
+///        dynamics.  With each time step, future coordinates are built based on past and present
+///        coordinates (and forces).  As the step advances, present recedes to past, future becomes
+///        present, and what was past becomes the staging ground for the forthcoming future
+///        configuration.
+enum class CoordinateCycle {
+  PAST,     ///< Set the prior positions arrays (x_prior_coordinates...) as holding the current
+            ///<   coordinates.
+  PRESENT,  ///< Set the typical positions arrays (x_coordinates...) as current
+  FUTURE    ///< Set the future positions arrays (x_future_coordinates...) as current
 };
   
 /// \brief Translate the CoordinateFileKind enumeration.

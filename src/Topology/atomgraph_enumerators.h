@@ -2,6 +2,7 @@
 #ifndef STORMM_ATOMGRAPH_ENUMERATORS_H
 #define STORMM_ATOMGRAPH_ENUMERATORS_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Parsing/citation.h"
 

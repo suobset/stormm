@@ -97,8 +97,8 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (files_exist == false) {
     rtWarn("Some required files were not found.  Check the ${STORMM_SOURCE} environment variable, "
-           "currently set to " + oe.getStormmSourcePath() + ", for validity.  Subsequent tests will "
-           "be skipped.", "test_chemical_features");
+           "currently set to " + oe.getStormmSourcePath() + ", for validity.  Subsequent tests "
+           "will be skipped.", "test_chemical_features");
   }
   std::vector<AtomGraph> sys_ag(nsys);
   std::vector<PhaseSpace> sys_ps(nsys);
@@ -302,8 +302,9 @@ int main(const int argc, const char* argv[]) {
   }
   if (rings_exist == false) {
     rtWarn("Topologies and coordinates for polycyclic test molecules, i.e. " + ring_top_names[0] +
-           " and " + ring_crd_names[0] + ", were not found.  Check the ${STORMM_SOURCE} environment "
-           "variable for validity.  Subsequent tests will be skipped.", "test_chemical_features");
+           " and " + ring_crd_names[0] + ", were not found.  Check the ${STORMM_SOURCE} "
+           "environment variable for validity.  Subsequent tests will be skipped.",
+           "test_chemical_features");
   }
   std::vector<AtomGraph> ring_ag(nring_mols);
   std::vector<PhaseSpace> ring_ps(nring_mols);

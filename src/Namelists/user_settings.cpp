@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "FileManagement/file_listing.h"
 #include "Namelists/namelist_emulator.h"
 #include "Namelists/namelist_element.h"
@@ -99,7 +100,8 @@ UserSettings::UserSettings(const int argc, const char* argv[], const AppName pro
     rtErr("The " + descriptor + " input file " + input_file + " was not found or could not be "
           "read.", "UserSettings");
   }
-  TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for STORMM executable", "UserSettings");
+  TextFile inp_tf(input_file, TextOrigin::DISK, "Input deck for STORMM executable",
+                  "UserSettings");
   int start_line = 0;
   file_io_input = FilesControls(inp_tf, &start_line, policy);
   start_line = 0;

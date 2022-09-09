@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 namespace stormm {
 namespace math {
 
@@ -260,16 +262,32 @@ template <typename T> double variance(const T* va, const size_t length,
   case VarianceMethod::VARIANCE:
     return ((dlength * s2) - (s1 * s1)) / (dlength * dlength);
   case VarianceMethod::STANDARD_DEVIATION:
-    if (length == 1) {
-      rtErr("Standard deviation is undefined for a single number.");
+    {
+      if (length == 1) {
+        rtErr("Standard deviation is undefined for a single number.");
+      }
+      const double sqrt_arg = ((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0));
+      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg);
     }
-    return sqrt(((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0)));
+    break;
   case VarianceMethod::ROOT_MEAN_SQUARED_DEVIATION:
-    return sqrt(((dlength * s2) - (s1 * s1))) / dlength;
+    {
+      const double sqrt_arg = (dlength * s2) - (s1 * s1);
+      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg) / dlength;
+    }
+    break;
   case VarianceMethod::COEFFICIENT_OF_VARIATION:
-    return sqrt(((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0))) / fabs(mvalue);
+    {
+      const double sqrt_arg = ((dlength * s2) - (s1 * s1)) / (dlength * (dlength - 1.0));
+      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg) / fabs(mvalue);
+    }
+    break;
   case VarianceMethod::NORMALIZED_RMSD:
-    return sqrt(((dlength * s2) - (s1 * s1))) / (dlength * fabs(mvalue));
+    {
+      const double sqrt_arg = (dlength * s2) - (s1 * s1);
+      return (sqrt_arg < 0.0) ? 0.0 : sqrt(sqrt_arg) / fabs(dlength * mvalue);
+    }
+    break;
   }
   __builtin_unreachable();
 }

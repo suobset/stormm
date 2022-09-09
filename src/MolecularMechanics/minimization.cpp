@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "minimization.h"
 
 namespace stormm {
@@ -20,9 +21,8 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph &ag, const RestraintApparatus
   return minimize<double, double,
                   double, double2, double4>(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc,
                                             psw.zfrc, psw.xvel, psw.yvel, psw.zvel, psw.xprv,
-                                            psw.yprv, psw.zprv, vk, nbk,
-                                            ra.getDoublePrecisionAbstract(), vsk, se.data(),
-                                            mincon, nrg_scale_bits);
+                                            psw.yprv, psw.zprv, vk, nbk, ra.dpData(), vsk,
+                                            se.data(), mincon, nrg_scale_bits);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -36,9 +36,8 @@ ScoreCard minimize(PhaseSpace *ps, const AtomGraph *ag, const StaticExclusionMas
   return minimize<double, double,
                   double, double2, double4>(psw.xcrd, psw.ycrd, psw.zcrd, psw.xfrc, psw.yfrc,
                                             psw.zfrc, psw.xvel, psw.yvel, psw.zvel, psw.xprv,
-                                            psw.yprv, psw.zprv, vk, nbk,
-                                            ra.getDoublePrecisionAbstract(), vsk, se.data(),
-                                            mincon, nrg_scale_bits);
+                                            psw.yprv, psw.zprv, vk, nbk, ra.dpData(), vsk,
+                                            se.data(), mincon, nrg_scale_bits);
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -6,6 +6,7 @@
 #include <cusolverDn.h>
 #include "cublas_v2.h"
 #endif
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "gpu_details.h"
 

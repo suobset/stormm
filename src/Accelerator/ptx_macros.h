@@ -1,11 +1,13 @@
+#include "copyright.h"
+
 #ifndef STORMM_PTX_MACROS_H
 #define STORMM_PTX_MACROS_H
 
 #ifdef STORMM_USE_CUDA
-#define SHFL_DOWN(a, b)  __shfl_down_sync(0xffffffff, a, b, 32);
-#define SHFL_XOR(a, b)   __shfl_xor_sync(0xffffffff, a, b, 32);
-#define SHFL_UP(a, b)    __shfl_up_sync(0xffffffff, a, b, 32);
-#define SHFL(a, b)       __shfl_sync(0xffffffff, a, b, 32);
+#define SHFL_DOWN(a, b)  __shfl_down_sync(0xffffffff, a, b, 32)
+#define SHFL_XOR(a, b)   __shfl_xor_sync(0xffffffff, a, b, 32)
+#define SHFL_UP(a, b)    __shfl_up_sync(0xffffffff, a, b, 32)
+#define SHFL(a, b)       __shfl_sync(0xffffffff, a, b, 32)
 
 #define WARP_REDUCE_DOWN(var) {                     \
   var += __shfl_down_sync(0xffffffff, var, 16, 32); \
@@ -18,10 +20,10 @@
 #endif
 
 #ifdef STORMM_USE_HIP
-#define SHFL_DOWN(a, b)        __shfl_down(0xffffffffffffffff, a, b, 64);
-#define SHFL_XOR(a, b)         __shfl_xor(0xffffffffffffffff, a, b, 64);
-#define SHFL_UP(a, b)          __shfl_up(0xffffffffffffffff, a, b, 64);
-#define SHFL(a, b)             __shfl(0xffffffffffffffff, a, b, 64);
+#define SHFL_DOWN(a, b)        __shfl_down(0xffffffffffffffff, a, b, 64)
+#define SHFL_XOR(a, b)         __shfl_xor(0xffffffffffffffff, a, b, 64)
+#define SHFL_UP(a, b)          __shfl_up(0xffffffffffffffff, a, b, 64)
+#define SHFL(a, b)             __shfl(0xffffffffffffffff, a, b, 64)
 
 #define WARP_REDUCE_DOWN(var) {                     \
   var += __shfl_down_sync(0xffffffff, var, 32, 64); \

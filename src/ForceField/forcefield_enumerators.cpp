@@ -1,4 +1,5 @@
 #include <string>
+#include "copyright.h"
 #include "forcefield_enumerators.h"
 
 namespace stormm {

@@ -2,6 +2,7 @@
 #ifndef STORMM_EVAL_VALENCE_WORKUNIT_H
 #define STORMM_EVAL_VALENCE_WORKUNIT_H
 
+#include "copyright.h"
 #include "Restraints/restraint_apparatus.h"
 #include "Synthesis/valence_workunit.h"
 #include "Topology/atomgraph.h"

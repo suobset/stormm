@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "Math/matrix_ops.h"

@@ -2,6 +2,7 @@
 #ifndef STORMM_ISOMERIZATION_H
 #define STORMM_ISOMERIZATION_H
 
+#include "copyright.h"
 #include "Chemistry/chemical_features.h"
 #include "Chemistry/chemistry_enumerators.h"
 #include "DataTypes/common_types.h"

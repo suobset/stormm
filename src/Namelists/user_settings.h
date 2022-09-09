@@ -2,6 +2,7 @@
 #ifndef STORMM_USER_SETTINGS_H
 #define STORMM_USER_SETTINGS_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_ffmorph.h"
@@ -37,10 +38,10 @@ using trajectory::CoordinateFileKind;
 constexpr char default_conformer_input_file[] = "cgen.in";
 /// \}
 
-/// \brief Enumerate the various apps using STORMM libraries, and which use this UserSettings object
-///        as a way to collect common namelists and other command line input.  This enumerator
-///        makes it possible to tailor the contents of UserSettings to a specific application, and
-///        to tune the behavior in response to particular inputs.
+/// \brief Enumerate the various apps using STORMM libraries, and which use this UserSettings
+///        object as a way to collect common namelists and other command line input.  This
+///        enumerator makes it possible to tailor the contents of UserSettings to a specific
+///        application, and to tune the behavior in response to particular inputs.
 enum class AppName {
   CONFORMER,  ///< The STORMM conformer generator
   DYNAMICS,   ///< The STORMM molecular dynamics program

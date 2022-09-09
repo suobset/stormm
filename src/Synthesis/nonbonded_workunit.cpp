@@ -1,4 +1,6 @@
+#include "copyright.h"
 #include "Constants/scaling.h"
+#include "Math/rounding.h"
 #include "Math/vector_ops.h"
 #include "nonbonded_workunit.h"
 
@@ -14,14 +16,15 @@ using energy::tile_lengths_per_supertile;
 using math::accumulateBitmask;
 using math::findBin;
 using math::reduceUniqueValues;
-
+using math::roundUp;
+  
 //-------------------------------------------------------------------------------------------------
 NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
                                      const std::vector<int3> &tile_list) :
     tile_count{static_cast<int>(tile_list.size())},
     import_count{0},
     kind{NbwuKind::TILE_GROUPS},
-    score{0},
+    score{0}, init_accumulation{0}, refresh_atom_start{0}, refresh_code{0},
     imports{std::vector<int>(small_block_max_imports)},
     import_system_indices{std::vector<int>(small_block_max_imports, 0)},
     import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
@@ -115,7 +118,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMask &se,
     tile_count{0},
     import_count{0},
     kind{NbwuKind::SUPERTILES},
-    score{0},
+    score{0}, init_accumulation{0}, refresh_atom_start{0}, refresh_code{0},
     imports{},
     import_system_indices{std::vector<int>(1, 0)},
     import_size_keys{},
@@ -173,7 +176,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     tile_count{static_cast<int>(tile_list.size())},
     import_count{0},
     kind{NbwuKind::TILE_GROUPS},
-    score{0},
+    score{0}, init_accumulation{0}, refresh_atom_start{0}, refresh_code{0},
     imports{std::vector<int>(small_block_max_imports)},
     import_system_indices{std::vector<int>(small_block_max_imports)},
     import_size_keys{std::vector<int>(small_block_max_imports / 4, 0)},
@@ -278,7 +281,7 @@ NonbondedWorkUnit::NonbondedWorkUnit(const StaticExclusionMaskSynthesis &se,
     tile_count{0},
     import_count{0},
     kind{NbwuKind::SUPERTILES},
-    score{0},
+    score{0}, init_accumulation{0}, refresh_atom_start{0}, refresh_code{0},
     imports{},
     import_system_indices{std::vector<int>(1)},
     import_size_keys{},
@@ -349,6 +352,11 @@ int NonbondedWorkUnit::getImportCount() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+int NonbondedWorkUnit::getInitializationMask() const {
+  return init_accumulation;
+}
+
+//-------------------------------------------------------------------------------------------------
 int4 NonbondedWorkUnit::getTileLimits(const int index) const {
   const int absc_idx = (tile_instructions[index].x & 0xffff) / tile_length;
   const int ordi_idx = ((tile_instructions[index].x >> 16) & 0xffff) / tile_length;
@@ -381,11 +389,14 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
       for (int i = 0; i < 5; i++) {
         result[1 + small_block_max_imports + i] = import_size_keys[i];
       }
-      result[26] = instruction_start;
-      result[27] = instruction_start + tile_count;
+      result[small_block_max_imports + 6] = instruction_start;
+      result[small_block_max_imports + 7] = instruction_start + tile_count;
       for (int i = 0; i < import_count; i++) {
-        result[28 + i] = import_system_indices[i];
-      }    
+        result[small_block_max_imports + 8 + i] = import_system_indices[i];
+      }
+      result[(2 * small_block_max_imports) +  8] = init_accumulation;
+      result[(2 * small_block_max_imports) +  9] = refresh_atom_start;
+      result[(2 * small_block_max_imports) + 10] = refresh_code;
     }
     return result;
   case NbwuKind::SUPERTILES:
@@ -394,6 +405,9 @@ std::vector<int> NonbondedWorkUnit::getAbstract(const int instruction_start) con
       result[i] = imports[i];
     }
     result[4] = (import_system_indices[0]);
+    result[5] = init_accumulation;
+    result[6] = refresh_atom_start;
+    result[7] = refresh_code;
     return result;
   case NbwuKind::HONEYCOMB:
   case NbwuKind::UNKNOWN:
@@ -419,6 +433,21 @@ int NonbondedWorkUnit::getImportSystemIndex(const SeMaskSynthesisReader &ser,
     return findBin(ser.atom_counts, atom_index, ser.nsys - 1);
   }
   __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void NonbondedWorkUnit::setInitializationMask(const int mask_in) {
+  init_accumulation = mask_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void NonbondedWorkUnit::setRefreshAtomIndex(int index_in) {
+  refresh_atom_start = index_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void NonbondedWorkUnit::setRefreshWorkCode(int code_in) {
+  refresh_code = code_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -468,10 +497,173 @@ bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
   }
   __builtin_unreachable();
 }
-     
+
+//-------------------------------------------------------------------------------------------------
+void setPropertyInitializationMasks(std::vector<NonbondedWorkUnit> *all_wu,
+                                    const NbwuKind kind) {
+  const size_t small_block_max_imports_zu = static_cast<size_t>(small_block_max_imports);
+  switch (kind) {
+  case NbwuKind::TILE_GROUPS:
+    {
+      const size_t nwu = all_wu->size();
+      NonbondedWorkUnit* all_wu_data = all_wu->data();
+      std::vector<int> import_counts(nwu);
+      std::vector<int> import_list(nwu * small_block_max_imports_zu);
+      int max_atom_idx = 0;
+      for (size_t i = 0; i < nwu; i++) {
+        import_counts[i] = all_wu_data[i].getImportCount();
+        const std::vector<int> tile_abstract = all_wu_data[i].getAbstract();
+        for (int j = 0; j < tile_abstract[0]; j++) {
+          max_atom_idx = std::max(max_atom_idx, tile_abstract[j + 1]);
+        }
+        for (size_t j = 0LLU; j < small_block_max_imports_zu; j++) {
+          import_list[j + (i * small_block_max_imports_zu)] = tile_abstract[j + 1LLU];
+        }
+      }
+      std::vector<bool> coverage(max_atom_idx + 1, false);
+      for (size_t i = 0; i < nwu; i++) {
+        uint init_mask = 0;
+        for (int j = 0; j < import_counts[i]; j++) {
+          const size_t j_zu = j;
+          const int jimp_start = import_list[j_zu + (i * small_block_max_imports_zu)];
+
+          // Check that there are no duplicate imports in any work unit.
+          for (int k = j + 1; k < import_counts[i]; k++) {
+            const size_t k_zu = k;
+            if (jimp_start == import_list[k_zu + (i * small_block_max_imports_zu)]) {
+              rtErr("Duplicate imports were detected in non-bonded work unit " +
+                    std::to_string(i) + ", slots " + std::to_string(j) + " and " +
+                    std::to_string(k) + ".", "setPropertyInitializationMasks");
+            }
+          }
+          if (coverage[jimp_start] == false) { 
+            coverage[jimp_start] = true;
+            init_mask |= (0x1 << j);
+          }
+        }
+        all_wu_data[i].setInitializationMask(init_mask);
+      }
+    }
+    break;
+  case NbwuKind::SUPERTILES:
+  case NbwuKind::HONEYCOMB:
+    break;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+int nonbondedWorkUnitInitCode(const InitializationTask init_request, const int cache_depth) {
+
+  // The following codes use the format X / Y / Z force accumulators (bits 0, 1, or 2,
+  // respectively), Generalized Born radii and derivative accumulators (bits 3 and 4), and the
+  // depth of the random numbers cache (bits 8 through 11).  This code will be shifted 16 bits to
+  // the left to accommodate the number of atoms that each work unit's initialization applies to.
+  switch (init_request) {
+  case InitializationTask::GENERAL_DYNAMICS:
+    return 7;
+  case InitializationTask::GB_DYNAMICS:
+    return 31;
+  case InitializationTask::GB_MINIMIZATION:
+    return 24;
+  case InitializationTask::LANGEVIN_DYNAMICS:
+    return (7 | (cache_depth << 8));
+  case InitializationTask::GB_LANGEVIN_DYNAMICS:
+    return (31 | (cache_depth << 8));
+  case InitializationTask::GENERAL_MINIMIZATION:
+  case InitializationTask::NONE:
+    return 0;
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, const int natom,
+                                    const int init_code) {
+
+  // Handle blank refresh instructions
+  NonbondedWorkUnit* res_ptr = result->data();
+  const int nnbwu = result->size();
+  if (init_code == 0) {
+    for (int i = 0; i < nnbwu; i++) {
+      res_ptr[i].setRefreshAtomIndex(0);
+      res_ptr[i].setRefreshWorkCode(0);
+    }
+    return;
+  }
+
+  // Distribute the work of refreshing accumulators over the non-bonded work units.
+  int n_task = 0;
+  for (int i = 0; i < 8; i++) {
+    if ((init_code >> i) & 0x1) {
+      n_task++;
+    }
+  }
+  const int n_atom_blocks = natom / small_block_size;
+  const bool compute_rng = ((init_code >> 8) > 0);
+  n_task += compute_rng;
+  if (n_task * n_atom_blocks < nnbwu) {
+
+    // If there are enough non-bonded work units to distribute just one set of initializations to
+    // each, do each task individually, starting with the random number computations (placing these
+    // at the front of the kernel gives more time for whatever queues the write instructions go
+    // into to drain by the end of the kernel.
+    int atom_idx = 0;
+    int nbwu_idx = 0;
+    int work_code = (init_code & 0xff00);
+    if (work_code > 0) {
+      while (atom_idx < natom) {
+        res_ptr[nbwu_idx].setRefreshAtomIndex(atom_idx);
+        const int nbatch = std::min(small_block_size, natom - atom_idx);
+        res_ptr[nbwu_idx].setRefreshWorkCode(work_code | (nbatch << 16));
+        atom_idx += small_block_size;
+        nbwu_idx++;
+      }
+    }
+
+    // Now distribute the initialization / refresh operations.
+    work_code = 1;
+    for (int i = 0; i < 8; i++) {
+      if ((init_code >> i) & 0x1) {
+        atom_idx = 0;
+        while (atom_idx < natom) {
+          res_ptr[nbwu_idx].setRefreshAtomIndex(atom_idx);
+          const int nbatch = std::min(small_block_size, natom - atom_idx);
+          res_ptr[nbwu_idx].setRefreshWorkCode(work_code | (nbatch << 16));
+          atom_idx += small_block_size;
+          nbwu_idx++;
+        }
+      }
+      work_code *= 2;
+    }
+  }
+  else {
+
+    // Otherwise, do not consider the middle-ground cases where the work might be more evenly
+    // distributed by assigning some combinations of tasks to various work units.  Every work
+    // unit gets an assignment to initialize a stretch of atoms according to the same work code.
+    // The overwhelming odds are that there are more than enough work units to spread the
+    // initialization work thin, not taking this path.
+    int work_code = (init_code & 0xffff);
+    if (work_code > 0) {
+      const int atom_blocks_per_wu = std::max((natom / small_block_size) / nnbwu, 1);
+      const int atoms_per_wu = atom_blocks_per_wu * small_block_size;
+      int atom_idx = 0;
+      int nbwu_idx = 0;
+      while (atom_idx < natom) {
+        res_ptr[nbwu_idx].setRefreshAtomIndex(atom_idx);
+        const int nbatch = std::min(atoms_per_wu, natom - atom_idx);
+        res_ptr[nbwu_idx].setRefreshWorkCode(work_code | (nbatch << 16));
+        atom_idx += atoms_per_wu;
+        nbwu_idx++;
+      }
+    }
+  }
+}
+
 //-------------------------------------------------------------------------------------------------
 std::vector<NonbondedWorkUnit>
-buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
+buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
+                        const InitializationTask init_request, const int random_cache_depth) {
   
   // Determine the optimal overall size for work units.  Given that this process is guided by
   // static (as opposed to forward) exclusion masks, this is a matter of how many atoms are
@@ -483,7 +675,9 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
     atom_counts[i]  = poly_ser.atom_counts[i];
     atom_offsets[i] = poly_ser.atom_offsets[i];
   }
-    
+  const int padded_natom = atom_offsets[poly_ser.nsys - 1] +
+                           roundUp(atom_counts[poly_ser.nsys - 1], warp_size_int);
+
   // Try work units of eight, sixteen, 32, and 64 tiles before going to the gargantuan,
   // 256-tile "huge" work units.
   const size_t tiny_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, tiny_nbwu_tiles);
@@ -491,31 +685,38 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
   const size_t medium_wu_count = estimateNonbondedWorkUnitCount(atom_counts, medium_nbwu_tiles);
   const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, large_nbwu_tiles);
   const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_tiles);
+  std::vector<NonbondedWorkUnit> result;
   if (tiny_wu_count < 2 * kilo) {
-    return enumerateNonbondedWorkUnits(poly_se, tiny_nbwu_tiles, tiny_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(poly_se, tiny_nbwu_tiles, tiny_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else if (small_wu_count < 4 * kilo) {
-    return enumerateNonbondedWorkUnits(poly_se, small_nbwu_tiles, small_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(poly_se, small_nbwu_tiles, small_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else if (medium_wu_count < 16 * kilo) {
-    return enumerateNonbondedWorkUnits(poly_se, medium_nbwu_tiles, medium_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(poly_se, medium_nbwu_tiles, medium_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else if (large_wu_count < 128 * kilo) {
-    return enumerateNonbondedWorkUnits(poly_se, large_nbwu_tiles, large_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(poly_se, large_nbwu_tiles, large_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else {    
-    return enumerateNonbondedWorkUnits(poly_se, huge_nbwu_tiles, huge_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(poly_se, huge_nbwu_tiles, huge_wu_count, atom_counts,
+                                         atom_offsets);
   }
+
+  // Add initialization instructions and return the result
+  const int init_code = nonbondedWorkUnitInitCode(init_request, random_cache_depth);
+  distributeInitializationRanges(&result, padded_natom, init_code);
+  return result;
 }
 
 //-------------------------------------------------------------------------------------------------
 std::vector<NonbondedWorkUnit>
-buildNonbondedWorkUnits(const StaticExclusionMask &se) {
+buildNonbondedWorkUnits(const StaticExclusionMask &se, const InitializationTask init_request,
+                        const int random_cache_depth) {
   const std::vector<int> atom_counts = { se.getAtomCount() };
   const std::vector<int> atom_offsets(1, 0);
   const size_t tiny_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, tiny_nbwu_tiles);
@@ -523,27 +724,32 @@ buildNonbondedWorkUnits(const StaticExclusionMask &se) {
   const size_t medium_wu_count = estimateNonbondedWorkUnitCount(atom_counts, medium_nbwu_tiles);
   const size_t large_wu_count  = estimateNonbondedWorkUnitCount(atom_counts, large_nbwu_tiles);
   const size_t huge_wu_count   = estimateNonbondedWorkUnitCount(atom_counts, huge_nbwu_tiles);
+  std::vector<NonbondedWorkUnit> result;
   if (tiny_wu_count < 2 * kilo) {
-    return enumerateNonbondedWorkUnits(se, tiny_nbwu_tiles, tiny_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(se, tiny_nbwu_tiles, tiny_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else if (small_wu_count < 4 * kilo) {
-    return enumerateNonbondedWorkUnits(se, small_nbwu_tiles, small_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(se, small_nbwu_tiles, small_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else if (medium_wu_count < 16 * kilo) {
-    return enumerateNonbondedWorkUnits(se, medium_nbwu_tiles, medium_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(se, medium_nbwu_tiles, medium_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else if (large_wu_count < 128 * kilo) {
-    return enumerateNonbondedWorkUnits(se, large_nbwu_tiles, large_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(se, large_nbwu_tiles, large_wu_count, atom_counts,
+                                         atom_offsets);
   }
   else {
-    return enumerateNonbondedWorkUnits(se, huge_nbwu_tiles, huge_wu_count, atom_counts,
-                                       atom_offsets);
+    result = enumerateNonbondedWorkUnits(se, huge_nbwu_tiles, huge_wu_count, atom_counts,
+                                         atom_offsets);
   }
-  __builtin_unreachable();
+
+  // Add initialization instructions and return the result
+  const int init_code = nonbondedWorkUnitInitCode(init_request, random_cache_depth);
+  distributeInitializationRanges(&result, se.getAtomCount(), init_code);
+  return result;
 }
 
 } // namespace synthesis

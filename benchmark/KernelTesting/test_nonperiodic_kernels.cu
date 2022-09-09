@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 #include "../../src/Accelerator/hybrid.h"
-#include "../../src/Accelerator/hpc_config.cuh"
+#include "../../src/Accelerator/hpc_config.h"
 #include "../../src/Accelerator/kernel_manager.h"
-#include "../../src/Constants/fixed_precision.h"
+#include "../../src/Constants/split_fixed_precision.h"
 #include "../../src/Constants/hpc_bounds.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -100,7 +100,7 @@ SystemCache directorySweep(const std::vector<std::string> &topol_path,
 void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
                        MolecularMechanicsControls *mmctrl, const GpuDetails &gpu,
                        StopWatch *timer, const PrecisionModel prec, const EvaluateForce eval_frc,
-                       const EvaluateEnergy eval_nrg, const ForceAccumulationMethod acc_meth,
+                       const EvaluateEnergy eval_nrg, const AccumulationMethod acc_meth,
                        const VwuGoal purpose) {
   std::vector<AtomGraph*> ag_vec(1, ag);
   std::vector<PhaseSpace> ps_vec(1, ps);
@@ -142,7 +142,8 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
   case PrecisionModel::DOUBLE:
     {
       const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
-      const SyNonbondedKit<double> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
+      const SyNonbondedKit<double,
+                           double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<double,
                            double2,
                            double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit(devc_tier);
@@ -178,7 +179,8 @@ void replicaProcessing(AtomGraph *ag, const PhaseSpace &ps, const int nrep,
   case PrecisionModel::SINGLE:
     {
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
-      const SyNonbondedKit<float> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
+      const SyNonbondedKit<float,
+                           float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<float,
                            float2,
                            float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit(devc_tier);
@@ -243,26 +245,26 @@ void runBatch(const std::string &batch_name, const GpuDetails &gpu, const TestEn
       const int ncopy = gpu.getSMPCount() * batch_multiplier[j];
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
       replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                         timer, PrecisionModel::SINGLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                        ForceAccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
+                        AccumulationMethod::WHOLE, VwuGoal::ACCUMULATE);
 
       // Only do double-precision calculations for low replica numbers--this can be strenuous on
       // many architectures, particularly in the non-bonded kernel.
       if (ncopy < 10) {
         replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                           timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::NO,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
         replicaProcessing(iag_ptr, sc.getCoordinateReference(i), ncopy, &mmctrl, gpu,
                           timer, PrecisionModel::DOUBLE, EvaluateForce::YES, EvaluateEnergy::YES,
-                          ForceAccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
+                          AccumulationMethod::SPLIT, VwuGoal::ACCUMULATE);
       }
     }
   }

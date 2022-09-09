@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include "copyright.h"
 #include "Reporting/error_format.h"
 #include "ascii_numbers.h"
 #include "parse.h"

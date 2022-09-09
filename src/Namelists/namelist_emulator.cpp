@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "Parsing/tabulation.h"
 #include "Reporting/display.h"
@@ -165,7 +166,8 @@ double NamelistEmulator::getRealValue(const std::string &keyword_query, const st
 }
 
 //-------------------------------------------------------------------------------------------------
-std::string NamelistEmulator::getStringValue(const std::string &keyword_query, const int index) const {
+std::string NamelistEmulator::getStringValue(const std::string &keyword_query,
+                                             const int index) const {
   const size_t p_index = findIndexByKeyword(keyword_query);
   if (p_index >= keywords.size()) {
     rtErr("Namelist \"" + title + "\" has no keyword \"" + keyword_query + "\".",

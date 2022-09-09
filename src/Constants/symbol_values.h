@@ -2,6 +2,8 @@
 #ifndef STORMM_SYMBOLS_H
 #define STORMM_SYMBOLS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace symbols {
 

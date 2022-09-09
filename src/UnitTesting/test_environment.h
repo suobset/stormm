@@ -4,12 +4,13 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "unit_test_enumerators.h"
 
 namespace stormm {
 namespace testing {
 
-/// \brief Object for parsing and storing environment as well as command-line input relevant to
+/// \brief Object for parsing as well as storing environment and command-line input relevant to
 ///        unit testing (Test Driven Development) in STORMM.  Environment variables will be sought,
 ///        but command-line inputs addressing the same information will take precedence.
 class TestEnvironment {

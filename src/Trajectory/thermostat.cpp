@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "thermostat.h"
 
 namespace stormm {

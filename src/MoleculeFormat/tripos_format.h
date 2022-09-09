@@ -2,8 +2,12 @@
 #define STORMM_TRIPOS_FORMAT_H
 
 #include <string>
+#include "copyright.h"
 #include "Topology/atomgraph.h"
 
+namespace stormm {
+namespace structure {
+    
 /// \brief The Tripos mol2 format, as annotated in the mol2 .pdf document found within this
 ///        source directory.
 struct TriposMol {
@@ -36,6 +40,9 @@ private:
   int set_count;                 ///< Number of sets in the molecule or system
   TriposMoleculeKind mol_kind;   ///< Classification of molecule (i.e. protein, DNA)
   TriposChargeKind charge_kind;  ///< Charge style used to develop the MM properties
-}
+};
+
+} // namespace structure
+} // namespace stormm
 
 #endif

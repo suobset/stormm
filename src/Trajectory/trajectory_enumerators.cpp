@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"

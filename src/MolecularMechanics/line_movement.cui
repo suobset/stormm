@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 __global__ void __launch_bounds__(small_block_size, 4)
 KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter scw,
             LinMinWriter lmw, int move_number) {
@@ -173,7 +175,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
         amat_inva[warp_idx + 28] = (warp_idx == 3);
       }
       __syncthreads();
-      
+
       // Perform Gauss-Jordan elimination on the A matrix and the identity matrix to obtain the
       // inverse matrix.  To expedite this, read the combined matrices into the first eight
       // threads and make row swaps explicit.  This requires at least eight threads per warp, but
@@ -250,6 +252,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 
       // With the coefficients for the equation, one thread solves for the location of the minimum
       // over the energy range.
+
       if (threadIdx.x == 0) {
         TCALC d_abcd[3];
         d_abcd[0] = (TCALC)(3.0) * abcd_coefs[0];
@@ -262,6 +265,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
             // Move the particles back to their starting points.  This line minimization did not
             // lead to any decreases in energy.
             move_factor = -sh_mvec[3];
+          }
+          else {
+            move_factor = (TCALC)(0.0);
           }
         }
         else {
@@ -282,7 +288,7 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
             }
           }
           else if (min_pos < sh_mvec[3]) {
-            
+
             // Make a final check that the minimum value of the function is an improvement over
             // the extrema.  Otherwise, move the particles to a point within the range scored by
             // the four data points.
@@ -305,11 +311,39 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
           }
         }
       }
+
+      // CHECK
+#if 0
+      if (threadIdx.x == 0) {
+        double min_nrg = sh_evec[0];
+        int min_loc = 0;
+        if (min_nrg > sh_evec[1]) {
+          min_nrg = sh_evec[1];
+          min_loc = 1;
+        }
+        if (min_nrg > sh_evec[2]) {
+          min_nrg = sh_evec[2];
+          min_loc = 2;
+        }
+        if (min_nrg > sh_evec[3]) {
+          min_nrg = sh_evec[3];
+          min_loc = 3;
+        }
+        move_factor = sh_mvec[min_loc] - sh_mvec[3];
+      }
+#endif
+      // END CHECK
     }
 
     // Broadcast the movement factor to all threads.
     if (threadIdx.x == 0) {
       sh_move_factor = move_factor;
+
+      // CHECK
+      if (fabs(move_factor) > 1000.0) {
+        printf("Wow... move factor = %18.4lf on WU %4d\n", move_factor, wu_idx);
+      }
+      // END CHECK
     }
     __syncthreads();
     move_factor = sh_move_factor;
@@ -332,9 +366,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 #ifdef TCALC_IS_DOUBLE
           const TCALC fx = ((TCALC)(poly_psw.xfrc_ovrf[gbl_pos]) * max_llint_accumulation) +
                             (TCALC)(poly_psw.xfrc[gbl_pos]);
-          const int95_t inc_dx = convertSplitFixedPrecision95(move_factor * fx);
+          const int95_t inc_dx = doubleToInt95(move_factor * fx);
           const int95_t current_x = { poly_psw.xcrd[gbl_pos], poly_psw.xcrd_ovrf[gbl_pos] };
-          const int95_t update_x = combineSplitFixedPrecision(inc_dx, current_x);
+          const int95_t update_x = splitFPSum(inc_dx, current_x);
           poly_psw.xcrd[gbl_pos] = update_x.x;
           poly_psw.xcrd_ovrf[gbl_pos] = update_x.y;
 #else
@@ -350,9 +384,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 #ifdef TCALC_IS_DOUBLE
           const TCALC fy = ((TCALC)(poly_psw.yfrc_ovrf[gbl_pos]) * max_llint_accumulation) +
                             (TCALC)(poly_psw.yfrc[gbl_pos]);
-          const int95_t inc_dy = convertSplitFixedPrecision95(move_factor * fy);
+          const int95_t inc_dy = doubleToInt95(move_factor * fy);
           const int95_t current_y = { poly_psw.ycrd[gbl_pos], poly_psw.ycrd_ovrf[gbl_pos] };
-          const int95_t update_y = combineSplitFixedPrecision(inc_dy, current_y);
+          const int95_t update_y = splitFPSum(inc_dy, current_y);
           poly_psw.ycrd[gbl_pos] = update_y.x;
           poly_psw.ycrd_ovrf[gbl_pos] = update_y.y;
 #else
@@ -368,9 +402,9 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
 #ifdef TCALC_IS_DOUBLE
           const TCALC fz = ((TCALC)(poly_psw.zfrc_ovrf[gbl_pos]) * max_llint_accumulation) +
                             (TCALC)(poly_psw.zfrc[gbl_pos]);
-          const int95_t inc_dz = convertSplitFixedPrecision95(move_factor * fz);
+          const int95_t inc_dz = doubleToInt95(move_factor * fz);
           const int95_t current_z = { poly_psw.zcrd[gbl_pos], poly_psw.zcrd_ovrf[gbl_pos] };
-          const int95_t update_z = combineSplitFixedPrecision(inc_dz, current_z);
+          const int95_t update_z = splitFPSum(inc_dz, current_z);
           poly_psw.zcrd[gbl_pos] = update_z.x;
           poly_psw.zcrd_ovrf[gbl_pos] = update_z.y;
 #else
@@ -379,6 +413,29 @@ KERNEL_NAME(PsSynthesisWriter poly_psw, ReductionKit redk, const ScoreCardWriter
         }
         pos += blockDim.x;
       }
+
+      // CHECK
+#if 0
+      __syncthreads();
+      pos = threadIdx.x;
+      while (pos < padded_natom) {
+        if (pos < natom) {
+          const int gbl_pos = wu_atom_start + pos;
+#ifndef TCALC_IS_DOUBLE
+          const double txloc = poly_psw.xcrd[gbl_pos] * poly_psw.inv_gpos_scale;
+          const double tyloc = poly_psw.ycrd[gbl_pos] * poly_psw.inv_gpos_scale;
+          const double tzloc = poly_psw.zcrd[gbl_pos] * poly_psw.inv_gpos_scale;
+          if (fabs(txloc) > 1000.0 || fabs(tyloc) > 1000.0 || fabs(tzloc) > 1000.0) {
+            printf("Atom %4d / %4d of system %4d is now at %18.4lf %18.4lf %18.4lf\n",
+                   pos, natom, wu_idx, txloc, tyloc, tzloc);
+          }
+#endif
+        }
+        pos += blockDim.x;
+      }
+      __syncthreads();
+#endif
+      // END CHECK
     }
   }
 }

@@ -7,6 +7,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "phasespace_synthesis.h"
 
@@ -17,9 +18,9 @@ using constants::large_block_size;
 
 /// \brief Transfer a subset of system coordinates (and perhaps box dimensions) data from specific
 ///        systems within a PhaseSpaceSynthesis object betwee the host and the accelerator device.
-///        PhaseSpaceSynthesis is a central object within STORMM and can be huge (multiple gigabytes
-///        worth of coordinate, velocity, and force data.  As such, it deserves a dedicated kernel
-///        for managing data transfer to and from the host.
+///        PhaseSpaceSynthesis is a central object within STORMM and can be huge (multiple
+///        gigabytes worth of coordinate, velocity, and force data.  As such, it deserves a
+///        dedicated kernel for managing data transfer to and from the host.
 ///
 /// \param destination  Collection of pointers to PhaseSpaceSynthesis data (this must be visible
 ///                     on the device, but could be device-only memory or host-mapped memory)

@@ -1,8 +1,10 @@
 // -*-c++-*-
+#include "copyright.h"
 #include "Accelerator/ptx_macros.h"
-#include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"
+#include "Constants/scaling.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Numerics/split_fixed_precision.h"
 #include "hpc_reduction.h"
 
 namespace stormm {
@@ -16,7 +18,7 @@ using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
 using data_types::int95_t;
 
-#include "Potential/accumulation.cui"
+#include "Numerics/accumulation.cui"
 
 //-------------------------------------------------------------------------------------------------
 // Perform an accumulation over the conjugate gradient work units' relevant atoms to obtain the
@@ -168,11 +170,18 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
       const size_t gbl_pos = atom_start_pos + pos;
       const llint ifx = xfrc[gbl_pos];
       xprv[gbl_pos] = ifx;
-      const double dfcgx = (double)(ifx) + (gam * (double)(x_cg_temp[gbl_pos]));
-      msum += (dfcgx * dfcgx);
-      const llint cg_x = __double2ll_rn(dfcgx);
-      x_cg_temp[gbl_pos] = cg_x;
-      xfrc[gbl_pos] = cg_x;
+      if (fabs(gam) > constants::verytiny) {
+        const double dfcgx = (double)(ifx) + (gam * (double)(x_cg_temp[gbl_pos]));
+        msum += (dfcgx * dfcgx);
+        const llint cg_x = __double2ll_rn(dfcgx);
+        x_cg_temp[gbl_pos] = cg_x;
+        xfrc[gbl_pos] = cg_x;
+      }
+      else {
+        const double dfcgx = (double)(ifx);
+        msum += (dfcgx * dfcgx);
+        x_cg_temp[gbl_pos] = ifx;
+      }
     }
     pos += blockDim.x;
   }
@@ -182,11 +191,18 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
       const size_t gbl_pos = atom_start_pos + rel_pos;
       const llint ify = yfrc[gbl_pos];
       yprv[gbl_pos] = ify;
-      const double dfcgy = (double)(ify) + (gam * (double)(y_cg_temp[gbl_pos]));
-      msum += (dfcgy * dfcgy);
-      const llint cg_y = __double2ll_rn(dfcgy);
-      y_cg_temp[gbl_pos] = cg_y;
-      yfrc[gbl_pos] = cg_y;
+      if (fabs(gam) > constants::verytiny) {
+        const double dfcgy = (double)(ify) + (gam * (double)(y_cg_temp[gbl_pos]));
+        msum += (dfcgy * dfcgy);
+        const llint cg_y = __double2ll_rn(dfcgy);
+        y_cg_temp[gbl_pos] = cg_y;
+        yfrc[gbl_pos] = cg_y;
+      }
+      else {
+        const double dfcgy = (double)(ify);
+        msum += (dfcgy * dfcgy);
+        y_cg_temp[gbl_pos] = ify;
+      }
     }
     pos += blockDim.x;
   }
@@ -196,11 +212,18 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
       const size_t gbl_pos = atom_start_pos + rel_pos;
       const llint ifz = zfrc[gbl_pos];
       zprv[gbl_pos] = ifz;
-      const double dfcgz = (double)(ifz) + (gam * (double)(z_cg_temp[gbl_pos]));
-      msum += (dfcgz * dfcgz);
-      const llint cg_z = __double2ll_rn(dfcgz);
-      z_cg_temp[gbl_pos] = cg_z;
-      zfrc[gbl_pos] = cg_z;
+      if (fabs(gam) > constants::verytiny) {
+        const double dfcgz = (double)(ifz) + (gam * (double)(z_cg_temp[gbl_pos]));
+        msum += (dfcgz * dfcgz);
+        const llint cg_z = __double2ll_rn(dfcgz);
+        z_cg_temp[gbl_pos] = cg_z;
+        zfrc[gbl_pos] = cg_z;
+      }
+      else {
+        const double dfcgz = (double)(ifz);
+        msum += (dfcgz * dfcgz);
+        z_cg_temp[gbl_pos] = ifz;
+      }
     }
     pos += blockDim.x;
   }
@@ -256,25 +279,36 @@ double conjGradScatter(const double gam, double* msum_collector, const int atom_
     const double  fz_part = ((double)(ifz_ovrf) * max_llint_accumulation) + (double)(ifz);
     const double cgz_part = ((double)(z_cg_temp_ovrf[tpos]) * max_llint_accumulation) +
                             (double)(z_cg_temp[tpos]);
-    const double dfcgx = fx_part + cgx_part;
-    const double dfcgy = fy_part + cgy_part;
-    const double dfcgz = fz_part + cgz_part;
-    msum += (dfcgx * dfcgx) + (dfcgy * dfcgy) + (dfcgz * dfcgz);
-    const int95_t cg_x = convertSplitFixedPrecision95(dfcgx);
-    const int95_t cg_y = convertSplitFixedPrecision95(dfcgy);
-    const int95_t cg_z = convertSplitFixedPrecision95(dfcgz);
-    x_cg_temp[tpos] = cg_x.x;
-    y_cg_temp[tpos] = cg_y.x;
-    z_cg_temp[tpos] = cg_z.x;
-    xfrc[tpos] = cg_x.x;
-    yfrc[tpos] = cg_y.x;
-    zfrc[tpos] = cg_z.x;
-    x_cg_temp_ovrf[tpos] = cg_x.y;
-    y_cg_temp_ovrf[tpos] = cg_y.y;
-    z_cg_temp_ovrf[tpos] = cg_z.y;
-    xfrc_ovrf[tpos] = cg_x.y;
-    yfrc_ovrf[tpos] = cg_y.y;
-    zfrc_ovrf[tpos] = cg_z.y;
+    if (fabs(gam) > constants::verytiny) {
+      const double dfcgx = fx_part + (gam * cgx_part);
+      const double dfcgy = fy_part + (gam * cgy_part);
+      const double dfcgz = fz_part + (gam * cgz_part);
+      msum += (dfcgx * dfcgx) + (dfcgy * dfcgy) + (dfcgz * dfcgz);
+      const int95_t cg_x = doubleToInt95(dfcgx);
+      const int95_t cg_y = doubleToInt95(dfcgy);
+      const int95_t cg_z = doubleToInt95(dfcgz);
+      x_cg_temp[tpos] = cg_x.x;
+      y_cg_temp[tpos] = cg_y.x;
+      z_cg_temp[tpos] = cg_z.x;
+      x_cg_temp_ovrf[tpos] = cg_x.y;
+      y_cg_temp_ovrf[tpos] = cg_y.y;
+      z_cg_temp_ovrf[tpos] = cg_z.y;
+      xfrc[tpos] = cg_x.x;
+      yfrc[tpos] = cg_y.x;
+      zfrc[tpos] = cg_z.x;
+      xfrc_ovrf[tpos] = cg_x.y;
+      yfrc_ovrf[tpos] = cg_y.y;
+      zfrc_ovrf[tpos] = cg_z.y;
+    }
+    else {
+      msum += ((fx_part * fx_part) + (fy_part * fy_part) + (fz_part * fz_part));
+      x_cg_temp[tpos] = ifx;
+      y_cg_temp[tpos] = ify;
+      z_cg_temp[tpos] = ifz;
+      x_cg_temp_ovrf[tpos] = ifx_ovrf;
+      y_cg_temp_ovrf[tpos] = ify_ovrf;
+      z_cg_temp_ovrf[tpos] = ifz_ovrf;
+    }
   }
   WARP_REDUCE_DOWN(msum);
   const int warp_idx = (threadIdx.x >> warp_bits);

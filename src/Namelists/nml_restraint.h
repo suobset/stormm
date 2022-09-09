@@ -2,6 +2,7 @@
 #ifndef STORMM_NML_RST_H
 #define STORMM_NML_RST_H
 
+#include "copyright.h"
 #include "input.h"
 #include "namelist_emulator.h"
 #include "namelist_enumerations.h"

@@ -9,6 +9,7 @@
 #ifdef STORMM_USE_HPC
 #include <vector_types.h>
 #endif
+#include "copyright.h"
 #include "Reporting/error_format.h"
 
 namespace stormm {

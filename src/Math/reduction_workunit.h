@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <vector>
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Accelerator/gpu_details.h"
 #include "DataTypes/common_types.h"

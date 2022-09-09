@@ -2,6 +2,7 @@
 #ifndef STORMM_AMBER_PMRTOP_UTIL_H
 #define STORMM_AMBER_PMRTOP_UTIL_H
 
+#include "copyright.h"
 #include "Parsing/citation.h"
 #include "Parsing/textfile.h"
 #include "Parsing/polynumeric.h"

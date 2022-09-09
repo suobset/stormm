@@ -5,6 +5,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"

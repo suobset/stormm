@@ -11,6 +11,7 @@
 #endif
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Constants/behavior.h"
 
 namespace stormm {

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <climits>
+#include "copyright.h"
 #include "Topology/atomgraph.h"
 #include "Trajectory/coordinateframe.h"
 #include "Trajectory/phasespace.h"

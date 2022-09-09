@@ -2,6 +2,7 @@
 #ifndef STORMM_COORDINATE_SERIES_H
 #define STORMM_COORDINATE_SERIES_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/fixed_precision.h"
 #include "Constants/hpc_bounds.h"

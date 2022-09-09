@@ -2,6 +2,8 @@
 #ifndef STORMM_HONEYCOMB_H
 #define STORMM_HONEYCOMB_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace trajectory {
 

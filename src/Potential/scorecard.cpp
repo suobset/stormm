@@ -1,7 +1,10 @@
 #include <cmath>
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
 #include "Math/rounding.h"
+#include "Math/vector_ops.h"
+#include "Math/statistics.h"
 #include "scorecard.h"
 #ifdef STORMM_USE_HPC
 #include "hpc_scorecard.h"
@@ -11,6 +14,9 @@ namespace stormm {
 namespace energy {
 
 using math::roundUp;
+using math::mean;
+using math::variance;
+using math::VarianceMethod;
 using numerics::default_energy_scale_f;
 using numerics::default_energy_scale_lf;
 using numerics::default_inverse_energy_scale_f;
@@ -111,6 +117,54 @@ ScoreCard::ScoreCard(const int system_count_in, const int capacity_in,
 }
 
 //-------------------------------------------------------------------------------------------------
+llint ScoreCard::sumPotentialEnergyAsLlint(const llint* nrg_data) const {
+  llint lacc = nrg_data[static_cast<size_t>(StateVariable::BOND)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ANGLE)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::UREY_BRADLEY)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CMAP)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
+  return lacc;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::sumPotentialEnergy(const llint* nrg_data) const {
+  return static_cast<double>(sumPotentialEnergyAsLlint(nrg_data)) * inverse_nrg_scale_lf;
+}
+
+//-------------------------------------------------------------------------------------------------
+llint ScoreCard::sumTotalEnergyAsLlint(const llint* nrg_data) const {
+  llint lacc = nrg_data[static_cast<size_t>(StateVariable::BOND)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ANGLE)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::UREY_BRADLEY)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::CMAP)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::RESTRAINT)];
+  lacc += nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
+  return lacc;
+}
+
+//-------------------------------------------------------------------------------------------------
+double ScoreCard::sumTotalEnergy(const llint* nrg_data) const {
+  const llint lacc = nrg_data[static_cast<size_t>(StateVariable::KINETIC)];
+  return static_cast<double>(sumTotalEnergyAsLlint(nrg_data)) * inverse_nrg_scale_lf;
+}
+
+//-------------------------------------------------------------------------------------------------
 int ScoreCard::getSystemCount() const {
   return system_count;
 }
@@ -123,6 +177,11 @@ int ScoreCard::getSampleSize() const {
 //-------------------------------------------------------------------------------------------------
 int ScoreCard::getDataStride() const {
   return data_stride;
+}
+
+//-------------------------------------------------------------------------------------------------
+int ScoreCard::getSampleCapacity() const {
+  return sample_capacity;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -185,7 +244,7 @@ void ScoreCard::contribute(const StateVariable var, const llint amount, const in
   running_accumulators.putHost(running_accumulators.readHost(slot) + dbl_amount, slot);
   squared_accumulators.putHost(squared_accumulators.readHost(slot) + dbl_amount * dbl_amount,
                                slot);
-  const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_index) *
+  const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_count) *
                                  static_cast<size_t>(sampled_step_count));
   time_series_accumulators.putHost(amount, ts_slot);
 }
@@ -286,34 +345,255 @@ void ScoreCard::add(const StateVariable var, const llint amount, const int syste
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::commit(const StateVariable var, const int system_index) {
-  const size_t slot = static_cast<int>(var) + (data_stride * system_index);
-  const llint amount = instantaneous_accumulators.readHost(slot);
-  const double dbl_amount = static_cast<double>(amount) * inverse_nrg_scale_lf;
-  running_accumulators.putHost(running_accumulators.readHost(slot) + dbl_amount, slot);
-  squared_accumulators.putHost(squared_accumulators.readHost(slot) + (dbl_amount * dbl_amount),
-                               slot);
-  const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_index) *
-                                 static_cast<size_t>(sampled_step_count));
-  time_series_accumulators.putHost(amount, ts_slot);
+void ScoreCard::commit(const StateVariable var, const int system_index,
+                       const HybridTargetLevel tier, const GpuDetails &gpu) {
+  if (sampled_step_count == sample_capacity) {
+    sample_capacity *= 2;
+    time_series_accumulators.resize(static_cast<size_t>(system_count * data_stride) *
+                                    static_cast<size_t>(sample_capacity));
+  }
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const size_t slot = static_cast<int>(var) + (data_stride * system_index);
+      const llint amount = instantaneous_accumulators.readHost(slot);
+      const double dbl_amount = static_cast<double>(amount) * inverse_nrg_scale_lf;
+      running_accumulators.putHost(running_accumulators.readHost(slot) + dbl_amount, slot);
+      squared_accumulators.putHost(squared_accumulators.readHost(slot) + (dbl_amount * dbl_amount),
+                                   slot);
+      const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_count) *
+                                     static_cast<size_t>(sampled_step_count));
+      time_series_accumulators.putHost(amount, ts_slot);
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
+    break;
+#endif
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScoreCard::commit(const std::vector<StateVariable> &var, const int system_index) {
-  const size_t nvar = var.size();
-  for (size_t i = 0LLU; i < nvar; i++) {
-    commit(var[i], system_index);
+void ScoreCard::commit(const std::vector<StateVariable> &var, const int system_index,
+                       const HybridTargetLevel tier, const GpuDetails &gpu) {
+  if (sampled_step_count == sample_capacity) {
+    sample_capacity *= 2;
+    time_series_accumulators.resize(static_cast<size_t>(system_count * data_stride) *
+                                    static_cast<size_t>(sample_capacity));
+  }
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      double* run_acc_ptr = running_accumulators.data();
+      double* sqd_acc_ptr = squared_accumulators.data();
+      llint* time_ser_ptr = time_series_accumulators.data();
+      const size_t nvar = var.size();
+      for (size_t i = 0LLU; i < nvar; i++) {
+        const size_t slot = static_cast<int>(var[i]) + (data_stride * system_index);
+        const llint amount = inst_acc_ptr[slot];
+        const double dbl_amount = static_cast<double>(amount) * inverse_nrg_scale_lf;
+        run_acc_ptr[slot] += dbl_amount;
+        sqd_acc_ptr[slot] += dbl_amount * dbl_amount;
+        const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_count) *
+                                       static_cast<size_t>(sampled_step_count));
+        time_ser_ptr[ts_slot] = amount;
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::commit(const StateVariable var, const HybridTargetLevel tier,
+                       const GpuDetails &gpu) {
+
+  // The ALL_STATES variable triggers the commit for all details
+  if (var == StateVariable::ALL_STATES) {
+    commit(tier, gpu);
+    return;
+  }
+  if (sampled_step_count == sample_capacity) {
+    sample_capacity *= 2;
+    time_series_accumulators.resize(static_cast<size_t>(system_count * data_stride) *
+                                    static_cast<size_t>(sample_capacity));
+  }
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      double* run_acc_ptr = running_accumulators.data();
+      double* sqd_acc_ptr = squared_accumulators.data();
+      llint* time_ser_ptr = time_series_accumulators.data();
+      for (int i = 0; i < system_count; i++) {
+        const size_t slot = static_cast<int>(var) + (data_stride * i);
+        const llint amount = inst_acc_ptr[slot];
+        const double dbl_amount = static_cast<double>(amount) * inverse_nrg_scale_lf;
+        run_acc_ptr[slot] += dbl_amount;
+        sqd_acc_ptr[slot] += dbl_amount * dbl_amount;
+        const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_count) *
+                                       static_cast<size_t>(sampled_step_count));
+        time_ser_ptr[ts_slot] = amount;
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::commit(const std::vector<StateVariable> &var, const HybridTargetLevel tier,
+                       const GpuDetails &gpu) {
+  if (sampled_step_count == sample_capacity) {
+    sample_capacity *= 2;
+    time_series_accumulators.resize(static_cast<size_t>(system_count * data_stride) *
+                                    static_cast<size_t>(sample_capacity));
+  }
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      double* run_acc_ptr = running_accumulators.data();
+      double* sqd_acc_ptr = squared_accumulators.data();
+      llint* time_ser_ptr = time_series_accumulators.data();
+      const int nvar = var.size();
+      for (int i = 0; i < system_count; i++) {
+        for (int j = 0; j < nvar; j++) {
+          const size_t slot = static_cast<int>(var[j]) + (data_stride * i);
+          const llint amount = inst_acc_ptr[slot];
+          const double dbl_amount = static_cast<double>(amount) * inverse_nrg_scale_lf;
+          run_acc_ptr[slot] += dbl_amount;
+          sqd_acc_ptr[slot] += dbl_amount * dbl_amount;
+          const size_t ts_slot = slot + (static_cast<size_t>(data_stride * system_count) *
+                                         static_cast<size_t>(sampled_step_count));
+          time_ser_ptr[ts_slot] = amount;
+        }
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    launchScoreCardCommit(var, -1, system_count, sampled_step_count,
+                          instantaneous_accumulators.data(tier), running_accumulators.data(tier),
+                          squared_accumulators.data(tier), time_series_accumulators.data(tier),
+                          gpu);
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::commit(int system_index, const HybridTargetLevel tier, const GpuDetails &gpu) {
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  std::vector<StateVariable> var_vec(nvar);
+  for (int i = 0; i < nvar; i++) {
+    var_vec[i] = static_cast<StateVariable>(i);
+  }
+  commit(var_vec, system_index, tier, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::commit(const HybridTargetLevel tier, const GpuDetails &gpu) {
+  const int nvar = static_cast<int>(StateVariable::ALL_STATES);
+  std::vector<StateVariable> var_vec(nvar);
+  for (int i = 0; i < nvar; i++) {
+    var_vec[i] = static_cast<StateVariable>(i);
+  }
+  commit(var_vec, tier, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::computePotentialEnergy(const HybridTargetLevel tier, const GpuDetails &gpu) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      const llint* tser_acc_ptr = time_series_accumulators.data();
+      const int pe_int = static_cast<int>(StateVariable::POTENTIAL_ENERGY);
+      const size_t pe_zu = static_cast<size_t>(pe_int);
+      for (int i = 0; i < system_count; i++) {
+        const llint* iptr = &inst_acc_ptr[i * data_stride];
+        instantaneous_accumulators.putHost(sumPotentialEnergyAsLlint(iptr),
+                                           (i * data_stride) + pe_int);
+        for (int j = 0; j < sampled_step_count; j++) {
+          const size_t sys_offset = static_cast<size_t>(data_stride * system_count) *
+                                    static_cast<size_t>(j) + static_cast<size_t>(data_stride * i);
+          time_series_accumulators.putHost(sumPotentialEnergyAsLlint(&tser_acc_ptr[sys_offset]),
+                                           sys_offset + pe_zu);
+        }
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    launchScoreCardEnergySum(system_count, sampled_step_count,
+                             instantaneous_accumulators.data(tier),
+                             time_series_accumulators.data(tier), running_accumulators.data(tier),
+                             squared_accumulators.data(tier), inverse_nrg_scale_lf, gpu);
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::computeTotalEnergy(const HybridTargetLevel tier, const GpuDetails &gpu) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const llint* inst_acc_ptr = instantaneous_accumulators.data();
+      const llint* tser_acc_ptr = time_series_accumulators.data();
+      const int te_int = static_cast<int>(StateVariable::TOTAL_ENERGY);
+      const size_t te_zu = static_cast<size_t>(te_int);
+      for (int i = 0; i < system_count; i++) {
+        instantaneous_accumulators.putHost(sumTotalEnergyAsLlint(&inst_acc_ptr[i * data_stride]),
+                                           (i * data_stride) + te_int);
+        for (int j = 0; j < sampled_step_count; j++) {
+          const size_t sys_offset = static_cast<size_t>(data_stride * system_count) *
+                                    static_cast<size_t>(j) + static_cast<size_t>(data_stride * i);
+          time_series_accumulators.putHost(sumTotalEnergyAsLlint(&tser_acc_ptr[sys_offset]),
+                                           sys_offset + te_zu);
+        }
+      }
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    launchScoreCardEnergySum(system_count, sampled_step_count,
+                             instantaneous_accumulators.data(tier),
+                             time_series_accumulators.data(tier), running_accumulators.data(tier),
+                             squared_accumulators.data(tier), inverse_nrg_scale_lf, gpu);
+    break;
+#endif
   }
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScoreCard::incrementSampleCount() {
   sampled_step_count += 1;
-  if (sampled_step_count == sample_capacity) {
-    sample_capacity *= 2;
-    time_series_accumulators.resize(static_cast<size_t>(system_count * data_stride) *
-                                    static_cast<size_t>(sample_capacity));
-  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScoreCard::resetSampleCount(const int count_in) {
+  sampled_step_count = count_in;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -324,34 +604,21 @@ std::vector<double> ScoreCard::reportTotalEnergies(const HybridTargetLevel tier)
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   for (int i = 0; i < system_count; i++) {
     const size_t info_start = (i * padded_nvar);
-    llint lacc = inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::BOND)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::ANGLE)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::UREY_BRADLEY)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::CMAP)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::VDW)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::ELECTROSTATIC)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
-    lacc += inst_acc_ptr[info_start + static_cast<size_t>(StateVariable::RESTRAINT)];
-    result[i] = inverse_nrg_scale_lf * static_cast<double>(lacc);
+    result[i] = sumTotalEnergy(&inst_acc_ptr[info_start]);
   }
   return result;
 }
@@ -364,32 +631,19 @@ double ScoreCard::reportTotalEnergy(const int system_index, const HybridTargetLe
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = &instantaneous_accumulators.data()[info_start];
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice(info_start, padded_nvar);
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = &instantaneous_accumulators.data()[info_start];
 #endif
-  llint lacc = inst_acc_ptr[static_cast<size_t>(StateVariable::BOND)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::ANGLE)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::PROPER_DIHEDRAL)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::IMPROPER_DIHEDRAL)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::UREY_BRADLEY)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::CHARMM_IMPROPER)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::CMAP)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::VDW)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::VDW_ONE_FOUR)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::ELECTROSTATIC)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::ELECTROSTATIC_ONE_FOUR)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::GENERALIZED_BORN)];
-  lacc += inst_acc_ptr[static_cast<size_t>(StateVariable::RESTRAINT)];
-  return inverse_nrg_scale_lf * static_cast<double>(lacc);
+  }
+  return sumTotalEnergy(inst_acc_ptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -397,20 +651,18 @@ std::vector<double> ScoreCard::reportInstantaneousStates(const HybridTargetLevel
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
   llint* inst_acc_ptr;
-#ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   std::vector<double> result(nvar * system_count);
   for (int i = 0; i < system_count; i++) {
     for (int j = 0; j < nvar; j++) {
@@ -429,18 +681,18 @@ std::vector<double> ScoreCard::reportInstantaneousStates(const int system_index,
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   std::vector<double> result(nvar);
   for (int i = 0; i < nvar; i++) {
     result[i] = inverse_nrg_scale_lf * static_cast<double>(inst_acc_ptr[offset + i]);
@@ -457,18 +709,18 @@ std::vector<double> ScoreCard::reportInstantaneousStates(const StateVariable asp
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   std::vector<double> result(system_count);
   for (int i = 0; i < system_count; i++) {
     const llint lacc = inst_acc_ptr[(i * padded_nvar) + aspect_no];
@@ -484,18 +736,16 @@ double ScoreCard::reportInstantaneousStates(const StateVariable aspect, const in
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
   llint lacc;
-#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     lacc = instantaneous_accumulators.readHost((system_index * padded_nvar) + aspect_no);
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     lacc = instantaneous_accumulators.readDevice((system_index * padded_nvar) + aspect_no);
     break;
-  }
-#else
-  lacc = instantaneous_accumulators.readHost((system_index * padded_nvar) + aspect_no);
 #endif
+  }
   return inverse_nrg_scale_lf * static_cast<double>(lacc);
 }
 
@@ -736,6 +986,78 @@ double ScoreCard::reportVarianceOfStates(const StateVariable aspect, const int s
   s2 = squared_accumulators.readHost(offset + aspect_no);
 #endif
   return sqrt((nsamp * s2) - (s1 * s1)) / sqrt(nsamp * (nsamp - 1.0));
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ScoreCard::reportEnergyHistory(const int system_index,
+                                                   const HybridTargetLevel tier) {
+  return reportEnergyHistory(StateVariable::TOTAL_ENERGY, system_index, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> ScoreCard::reportEnergyHistory(const StateVariable aspect,
+                                                   const int system_index,
+                                                   const HybridTargetLevel tier) {
+  std::vector<double> result(sampled_step_count);
+#ifdef STORMM_USE_HPC
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    break;
+  case HybridTargetLevel::DEVICE:
+    download();
+    break;
+  }
+#endif
+  const llint* ts_ptr = time_series_accumulators.data();
+  const size_t data_stride_zu = static_cast<size_t>(data_stride);
+  for (int i = 0; i < sampled_step_count; i++) {
+    const size_t info_start = static_cast<size_t>(system_index + (i * system_count)) *
+                              data_stride_zu;
+    result[i] = static_cast<double>(ts_ptr[info_start + static_cast<size_t>(aspect)]) *
+                inverse_nrg_scale_lf;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double2> ScoreCard::reportEnergyHistory(const HybridTargetLevel tier) {
+  return reportEnergyHistory(StateVariable::TOTAL_ENERGY, tier);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double2> ScoreCard::reportEnergyHistory(const StateVariable aspect,
+                                                    const HybridTargetLevel tier) {
+  std::vector<double2> result(sampled_step_count);
+#ifdef STORMM_USE_HPC
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    break;
+  case HybridTargetLevel::DEVICE:
+    download();
+    break;
+  }
+#endif
+  const llint* ts_ptr = time_series_accumulators.data();
+  const size_t data_stride_zu = static_cast<size_t>(data_stride);
+  std::vector<double> step_buffer(system_count);
+  for (int i = 0; i < sampled_step_count; i++) {
+    for (int j = 0; j < system_count; j++) {
+      const size_t info_start = static_cast<size_t>(j + (i * system_count)) * data_stride_zu;
+      if (aspect == StateVariable::TOTAL_ENERGY) {
+        step_buffer[j] = sumTotalEnergy(&ts_ptr[info_start]);
+      }
+      else if (aspect == StateVariable::POTENTIAL_ENERGY) {
+        step_buffer[j] = sumPotentialEnergy(&ts_ptr[info_start]);
+      }
+      else {
+        step_buffer[j] = static_cast<double>(ts_ptr[info_start + static_cast<size_t>(aspect)]) *
+                         inverse_nrg_scale_lf;
+      }
+    }
+    result[i].x = mean(step_buffer);
+    result[i].y = variance(step_buffer, VarianceMethod::STANDARD_DEVIATION);
+  }
+  return result;
 }
 
 } // namespace energy

@@ -3,6 +3,7 @@
 #define STORMM_GLOBAL_MANIPULATION_H
 
 #include <vector>
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "Topology/atomgraph.h"
 #include "Topology/atomgraph_abstracts.h"

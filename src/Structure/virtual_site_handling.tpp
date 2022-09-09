@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 namespace stormm {
 namespace structure {
 
@@ -162,9 +164,9 @@ void placeVirtualSites(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, const double* u
         const Tcalc p_vs_distance = vsk.dim1[param_idx];
         if (tcoord_is_sgnint) {
           const Tcalc disp_mult = p_vs_distance * invr * gpos_scale_factor;
-          xcrd[vsite_atom] = xcrd[parent_atom] + (disp_mult * dxm);
-          ycrd[vsite_atom] = ycrd[parent_atom] + (disp_mult * dym);
-          zcrd[vsite_atom] = zcrd[parent_atom] + (disp_mult * dzm);
+          xcrd[vsite_atom] = xcrd[parent_atom] + llround(disp_mult * dxm);
+          ycrd[vsite_atom] = ycrd[parent_atom] + llround(disp_mult * dym);
+          zcrd[vsite_atom] = zcrd[parent_atom] + llround(disp_mult * dzm);
         }
         else {
           xcrd[vsite_atom] = xcrd[parent_atom] + (p_vs_distance * dxm * invr);
@@ -662,13 +664,13 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
           F3[j] = f1fac * f23_t_pf2[j];          
         }
         if (tforce_is_sgnint) {
-          const Tforce f1_xpart = llround(((p_f2_factor * F1[0]) +
+          const Tforce f1_xpart = llround(((p_f2_factor * F1[0]) -
                                            (t_factor * ((abbcOabab * F2[0]) + F3[0]))) *
                                           force_scale_factor);
-          const Tforce f1_ypart = llround(((p_f2_factor * F1[1]) +
+          const Tforce f1_ypart = llround(((p_f2_factor * F1[1]) -
                                            (t_factor * ((abbcOabab * F2[1]) + F3[1]))) *
                                           force_scale_factor);
-          const Tforce f1_zpart = llround(((p_f2_factor * F1[2]) +
+          const Tforce f1_zpart = llround(((p_f2_factor * F1[2]) -
                                            (t_factor * ((abbcOabab * F2[2]) + F3[2]))) *
                                           force_scale_factor);
           const Tforce f3_xpart = llround(t_factor * F2[0] * force_scale_factor);
@@ -806,8 +808,10 @@ void transmitVirtualSiteForces(const Tcoord* xcrd, const Tcoord* ycrd, const Tco
         rj_f34[1] = rj_f4[1] - rj_f3[1];
         rj_f34[2] = rj_f4[2] - rj_f3[2];
         crossProduct(rj_f3, rj_f4, rm);
-        const Tcalc invr2_rm = 1.0 / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2]));
-        const Tcalc invr_rm  = sqrt(invr2_rm);
+        const Tcalc invr2_rm = (tcalc_is_double) ?
+                               1.0 / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2])) :
+                               value_one / ((rm[0] * rm[0]) + (rm[1] * rm[1]) + (rm[2] * rm[2]));
+        const Tcalc invr_rm  = (tcalc_is_double) ? sqrt(invr2_rm) : sqrtf(invr2_rm);
         const Tcalc cfx = vsk.dim3[pidx] * invr_rm * vs_frc[0];
         const Tcalc cfy = vsk.dim3[pidx] * invr_rm * vs_frc[1];
         const Tcalc cfz = vsk.dim3[pidx] * invr_rm * vs_frc[2];

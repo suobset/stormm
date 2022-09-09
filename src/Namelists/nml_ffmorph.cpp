@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "namelist_element.h"
 #include "nml_ffmorph.h"

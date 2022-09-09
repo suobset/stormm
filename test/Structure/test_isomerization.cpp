@@ -117,8 +117,8 @@ void checkRotationalSampling(const AtomGraph &ag, const PhaseSpace &ps,
   const bool snps_exist = (getDrivePathType(rcrd_snapshot) == DrivePathType::FILE);
   if (snps_exist == false && oe.takeSnapshot() == SnapshotOperation::COMPARE) {
     rtWarn("The snapshot file " + rcrd_snapshot + " was not found.  Check the ${STORMM_SOURCE} "
-           "environment variable, currently set to " + oe.getStormmSourcePath() + ", for validity.  "
-           "Subsequent tests will be skipped.", "test_isomerization");
+           "environment variable, currently set to " + oe.getStormmSourcePath() +
+           ", for validity.  Subsequent tests will be skipped.", "test_isomerization");
   }
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snp_var_name.size() > 0) {
@@ -200,8 +200,8 @@ void checkChiralSampling(const AtomGraph &ag, const PhaseSpace &ps,
   const bool snps_exist = (getDrivePathType(invcrd_snapshot) == DrivePathType::FILE);
   if (snps_exist == false && oe.takeSnapshot() == SnapshotOperation::COMPARE) {
     rtWarn("The snapshot file " + invcrd_snapshot + " was not found.  Check the ${STORMM_SOURCE} "
-           "environment variable, currently set to " + oe.getStormmSourcePath() + ", for validity.  "
-           "Subsequent tests will be skipped.", "test_isomerization");
+           "environment variable, currently set to " + oe.getStormmSourcePath() +
+           ", for validity.  Subsequent tests will be skipped.", "test_isomerization");
   }
   const TestPriority do_snps = (snps_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (snp_var_name.size() > 0) {

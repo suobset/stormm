@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "systemcache.h"
 #include "FileManagement/file_listing.h"
 #include "Math/summation.h"

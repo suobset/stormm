@@ -2,10 +2,11 @@
 #ifndef STORMM_REDUCTION_H
 #define STORMM_REDUCTION_H
 
-#include "Constants/fixed_precision.h"
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Synthesis/atomgraph_synthesis.h"
 #include "reduction_abstracts.h"
 #include "reduction_enumerators.h"
@@ -15,8 +16,7 @@ namespace stormm {
 namespace math {
 
 using numerics::max_llint_accumulation;
-using numerics::splitRealAccumulation;
-using numerics::splitRealConversion;
+using numerics::splitAccumulation;
 
 /// \brief Perform gathering operations for a normalization reduction.
 ///

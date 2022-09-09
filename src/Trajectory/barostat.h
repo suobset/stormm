@@ -3,6 +3,7 @@
 #define STORMM_BAROSTAT_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace trajectory {

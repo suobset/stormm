@@ -1,0 +1,291 @@
+// -*-c++-*-
+#ifndef STORMM_SPLIT_FIXED_PRECISION_H
+#define STORMM_SPLIT_FIXED_PRECISION_H
+
+#include <string>
+#include "copyright.h"
+#include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
+#include "Constants/scaling.h"
+#include "DataTypes/stormm_vector_types.h"
+
+namespace stormm {
+namespace numerics {
+
+using card::Hybrid;
+using constants::ExceptionResponse;
+using constants::PrecisionModel;
+using data_types::int95_t;
+  
+/// \brief Enumerate the choices for carrying out fixed-precision accumulation
+enum class AccumulationMethod {
+  SPLIT,     ///< Use split accumulation, stashing the low 32 bits in a locally cached int and the
+             ///<   high 32 bits in a secondary accumulator probably located further away in main
+             ///<   memory.  So long as most of the work happens in the low 32 bits, this reduces
+             ///<   local memory demand and overall memory bandwidth by a factor of two, lowers
+             ///<   GPU kernel register pressure on many architectures, and has shown 2.2 - 2.9x
+             ///<   the speed of accumulating in int64.
+  WHOLE,     ///< Sum fixed-precision numbers in int64 accumulators.  This is needed when the
+             ///<   fixed-precision work cannot be mostly confined to the low 32 bits.
+  AUTOMATIC  ///< Determine the accumulation method by looking at the number of fixed-precision
+             ///<   bits after the decimal and making some assumptions about typical molecular
+             ///<   mechanics forces.
+};
+
+/// \brief The maximum contributions for signed integer accumulation.  There is no long long
+///        integer form of the maximum long long integer accumulation as the number would wrap
+///        the format to become the negative of its intended value.  The long long integer
+///        representation of the maximum int accumulation is present to facilitate conversion to
+///        a unified 64-bit integer, but even that is only reliable on the CPU (the NVIDIA CUDA
+///        compiler seems to take type specifications of long long int as a suggestion, not a
+///        command, and this may relate to thread counts and register pressure as the compiler
+///        tries to optimize a kernel for given launch bounds).
+/// \{
+constexpr llint max_int_accumulation_ll = (1LL << (int_bit_count_int - 1));
+constexpr double max_int_accumulation   = max_int_accumulation_ll;
+constexpr float max_int_accumulation_f  = max_int_accumulation;
+constexpr double max_llint_accumulation = max_int_accumulation * max_int_accumulation * 2.0;
+constexpr float max_llint_accumulation_f  = max_llint_accumulation;
+/// \}
+
+/// \brief Translate a string specifying a force accumulation method into the numerical code.
+///
+/// \param method  The string to translate
+AccumulationMethod translateAccumulationMethod(const std::string &choice,
+                                                         ExceptionResponse policy);
+
+/// \brief Get a string for the name of a force accumulation method.
+///
+/// \param method  The method in question
+std::string getAccumulationMethodName(AccumulationMethod method);
+
+/// \brief Determine the best accumulation method based on the precision level of the forces.
+///
+/// \param frc_bits  Number of bits stored after the decimal in fixed-precision force
+///                  representations
+AccumulationMethod chooseAccumulationMethod(int frc_bits);
+
+/// \brief Produce an error message describing range violations in user choices for various
+///        fixed-precision methods.
+///
+/// \param choice   The selected number of bits in the precision model
+/// \param min_val  The minimum allowed number of bits
+/// \param max_val  The maximum allowed number of bits
+std::string fixedPrecisionRangeErrorMessage(int choice, int min_val, int max_val);
+
+/// \brief Check user input regarding the global position scaling.  Positions are represented in
+///        internal units of Angstroms.
+///
+/// \param choice  The fixed-precision bits for representing global positions of particles
+void checkGlobalPositionBits(int choice);
+
+/// \brief Check user input regarding the local position scaling.  Positions are represented in
+///        internal units of Angstroms.
+///
+/// \param choice  The fixed-precision bits for representing local positions of particles
+void checkLocalPositionBits(int choice);
+
+/// \brief Check user input regarding the fixed-precision velocity scaling.  Velocities are
+///        represented in units of Angstroms per sqrt(418.4) * femtoseconds.
+///
+/// \param choice  The fixed-precision bits for representing particle velocities
+void checkVelocityBits(int choice);
+
+/// \brief Check user input regarding the fixed-precision force accumulation.  Forces are
+///        represented in units of kcal/mol - Angstroms.
+///
+/// \param choice  The fixed-precision bits for representing forces acting on particles
+void checkForceBits(int choice);
+
+/// \brief Check user input regarding the fixed-precision energy accumulation.  Energies are
+///        represented in units of kcal/mol.
+///
+/// \param choice  The fixed-precision bits for representing energy contributions
+void checkEnergyBits(int choice);
+
+/// \brief Check user input regarding the fixed-precision charge denisty accumulation on the mesh.
+///        Charge density per grid point is represented in atomic units.
+///
+/// \param choice  The fixed-precision bits for performing charge density accumulation
+/// \param pmdoel  The fixed-precision model, which implies the accumulation range
+void checkChargeMeshBits(int choice, PrecisionModel pmodel);
+
+/// \brief Convert floating point numbers into fixed-precision representations with two integers.
+///        This is similar to splitRealAccumulation below, but will set the values rather than
+///        add new contributions.
+///
+/// Overloaded:
+///   - Convert a single-precision floating point number into two 32-bit signed integers.
+///   - Convert a double-precision floating point number into a 64-bit primary integer and a
+///     32-bit secondary / overflow integer.
+///   - Convert N values in a single array to one pair of integer arrays
+///   - Convert N values in three arays to three pairs of integer arrays
+///   - Return the fixed-precision representation or assign it directly to the corresponding
+///     locations in two appropriate arrays.
+///   - When working with arrays, accept C-style arrays, Standard Template Library Vectors, or
+///     Hybrid objects (the conversion must be done on the HOST side)
+///
+/// \param fval      Single-precision value to convert to fixed-precision
+/// \param dval      Double-precision value to convert to fixed-precision
+/// \param primary   The primary accumulator (the low 32 bits)
+/// \param overflow  The secondary accumulator (the high 31 bits)
+/// \param n_values  The number of values in any of the original real-number arrays
+/// \param scale     When submitting arrays for conversion, this
+/// \{
+int2 floatToInt63(const float fval);
+
+void floatToInt63(const float fval, int *primary, int *overflow);
+
+void floatToInt63(const float* fval, int* primary, int* overflow, size_t n_values,
+                  double scale = 1.0);
+
+void floatToInt63(const float* fval_x, const float* fval_y, const float* fval_z, int* primary_x,
+                  int* overflow_x, int* primary_y, int* overflow_y, int* primary_z,
+                  int* overflow_z, size_t n_values, double scale = 1.0);
+
+int95_t doubleToInt95(const double fval);
+
+void doubleToInt95(const double fval, llint *primary, int *overflow);
+
+void doubleToInt95(const double* dval, llint* primary, int* overflow, size_t n_values,
+                   double scale = 1.0);
+
+void doubleToInt95(const double* dval_x, const double* dval_y, const double* dval_z,
+                   llint* primary_x, int* overflow_x, llint* primary_y, int* overflow_y,
+                   llint* primary_z, int* overflow_z, size_t n_values, double scale = 1.0);
+/// \}
+
+/// \brief Convert numbers in split fixed precision to floating point reals.  Downscaling to the
+///        proper units is the responsibility of the developer.
+///
+/// Overloaded:
+///   - Convert two 32-bit integer values or a 64-bit / 32-bit combination into a float or double
+///     (64-bit primary accumulators will always convert to double, but the output can be recast
+///     as float)
+///   - Convert the corresponding fused tuples into either type (int95_t will be converted to
+///     double only)
+///   - Convert one array of numbers, or even three arrays, of a trusted length
+///   - Convert split fixed-precision integers in C-style arrays, Standard Template Library
+///     vectors, or Hybrid objects
+///
+/// \param primary   Primary accumulator (the maximum accumulation increment is inferred from the
+///                  size of the data type)
+/// \param overflow  Overflow accumulator
+/// \param result    Array to collect the results of the conversion
+/// \param n_values  Trusted length of result, as well as any primary and overflow arrays, when
+///                  working with C-style arrays in the conversion
+/// \{
+double int63ToDouble(int primary, int overflow);
+
+void int63ToDouble(double* result, const int* primary, const int* overflow, size_t n_values,
+                   double descale = 1.0);
+
+void int63ToDouble(std::vector<double> *result, const std::vector<int> &primary,
+                   const std::vector<int> &overflow, double descale = 1.0);
+
+void int63ToDouble(Hybrid<double> *result, const Hybrid<int> &primary,
+                   const Hybrid<int> &overflow, double descale = 1.0);
+
+float int63ToFloat(int primary, int overflow);
+
+void int63ToFloat(float* result, const int* primary, const int* overflow, size_t n_values,
+                  float descale = 1.0f);
+
+void int63ToFloat(std::vector<float> *result, const std::vector<int> &primary,
+                  const std::vector<int> &overflow, float descale = 1.0f);
+
+void int63ToFloat(Hybrid<float> *result, const Hybrid<int> &primary, const Hybrid<int> &overflow,
+                  float descale = 1.0f);
+
+void int63ToDouble(double* result_x, double* result_y, double* result_z, const int* primary_x,
+                   const int* overflow_x, const int* primary_y, const int* overflow_y,
+                   const int* primary_z, const int* overflow_z, size_t n_values,
+                   double descale = 1.0);
+
+void int63ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                   std::vector<double> *result_z, const std::vector<int> &primary_x,
+                   const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                   const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                   const std::vector<int> &overflow_z, size_t n_values, double descale = 1.0);
+
+void int63ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
+                   const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                   const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                   const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
+                   double descale = 1.0);
+
+void int63ToFloat(float* result_x, float* result_y, float* result_z, const int* primary_x,
+                  const int* overflow_x, const int* primary_y, const int* overflow_y,
+                  const int* primary_z, const int* overflow_z, size_t n_values,
+                  float descale = 1.0f);
+
+void int63ToFloat(std::vector<float> *result_x, std::vector<float> *result_y,
+                  std::vector<float> *result_z, const std::vector<int> &primary_x,
+                  const std::vector<int> &overflow_x, const std::vector<int> &primary_y,
+                  const std::vector<int> &overflow_y, const std::vector<int> &primary_z,
+                  const std::vector<int> &overflow_z, size_t n_values, float descale = 1.0f);
+
+void int63ToFloat(Hybrid<float> *result_x, Hybrid<float> *result_y, Hybrid<float> *result_z,
+                  const Hybrid<int> &primary_x, const Hybrid<int> &overflow_x,
+                  const Hybrid<int> &primary_y, const Hybrid<int> &overflow_y,
+                  const Hybrid<int> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
+                  float descale = 1.0f);
+
+double int63ToDouble(int2 ival);
+
+float int63ToFloat(int2 ival);
+
+double int95ToDouble(llint primary, int overflow);
+
+void int95ToDouble(double* result, const llint* primary, const int* overflow, size_t n_values,
+                   double descale = 1.0);
+
+void int95ToDouble(std::vector<double> *result, const std::vector<llint> &primary,
+                   const std::vector<int> &overflow, size_t n_values, double descale = 1.0);
+
+void int95ToDouble(Hybrid<double> *result, const Hybrid<llint> &primary,
+                   const Hybrid<int> &overflow, size_t n_values, double descale = 1.0);
+
+void int95ToDouble(double* result_x, double* result_y, double* result_z, const llint* primary_x,
+                   const int* overflow_x, const llint* primary_y, const int* overflow_y,
+                   const llint* primary_z, const int* overflow_z, size_t n_values,
+                   double descale = 1.0);
+
+void int95ToDouble(std::vector<double> *result_x, std::vector<double> *result_y,
+                   std::vector<double> *result_z, const std::vector<llint> &primary_x,
+                   const std::vector<int> &overflow_x, const std::vector<llint> &primary_y,
+                   const std::vector<int> &overflow_y, const std::vector<llint> &primary_z,
+                   const std::vector<int> &overflow_z, size_t n_values, double descale = 1.0);
+
+void int95ToDouble(Hybrid<double> *result_x, Hybrid<double> *result_y, Hybrid<double> *result_z,
+                   const Hybrid<llint> &primary_x, const Hybrid<int> &overflow_x,
+                   const Hybrid<llint> &primary_y, const Hybrid<int> &overflow_y,
+                   const Hybrid<llint> &primary_z, const Hybrid<int> &overflow_z, size_t n_values,
+                   double descale = 1.0);
+
+double int95ToDouble(int95_t ival);
+/// \}
+
+/// \brief Accumulate floating point numbers into fixed-precision representations with two
+///        integers.
+///
+/// Overloaded:
+///   - Convert a single-precision floating point number into two 32-bit signed integers.
+///   - Convert a double-precision floating point number into a 64-bit primary integer and a
+///     32-bit secondary / overflow integer.
+///
+/// \param fval      Single-precision value to convert to fixed-precision
+/// \param dval      Double-precision value to convert to fixed-precision
+/// \param primary   The primary accumulator (the low 32 bits)
+/// \param overflow  The secondary accumulator (the high 31 bits)
+/// \{
+void splitAccumulation(const float fval, int *primary, int *overflow);
+
+void splitAccumulation(const double fval, llint *primary, int *overflow);
+/// \}
+
+} // namespace numerics
+} // namespace stormm
+
+#endif
+

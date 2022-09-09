@@ -4,8 +4,11 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #endif
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/fixed_precision.h"
+#include "DataTypes/stormm_vector_types.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Reporting/error_format.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "hpc_phasespace_synthesis.h"
@@ -14,9 +17,16 @@
 namespace stormm {
 namespace synthesis {
 
+using data_types::int95_t;
 using numerics::globalpos_scale_nonoverflow_bits;
 using numerics::velocity_scale_nonoverflow_bits;
 using numerics::force_scale_nonoverflow_bits;
+using numerics::max_int_accumulation_f;
+using numerics::max_int_accumulation_ll;
+using numerics::max_llint_accumulation;
+  
+#include "Numerics/accumulation.cui"
+#include "Math/rounding.cui"
   
 //-------------------------------------------------------------------------------------------------
 __global__ void __launch_bounds__(large_block_size, 1)
@@ -297,6 +307,103 @@ kPsyPrimeConjugateGradient(PsSynthesisWriter psyw) {
 //-------------------------------------------------------------------------------------------------
 extern void psyPrimeConjugateGradient(PsSynthesisWriter *psyw, const GpuDetails &gpu) {
   kPsyPrimeConjugateGradient<<<gpu.getSMPCount(), gpu.getMaxThreadsPerBlock()>>>(*psyw);
+}
+
+//-------------------------------------------------------------------------------------------------
+__global__ void __launch_bounds__(large_block_size, 1)
+kPsyCopySystem(PhaseSpaceWriter psw, const PsSynthesisReader poly_psw, const int index) {
+  size_t pos = threadIdx.x + (blockIdx.x * blockDim.x);
+  const size_t atom_offset = poly_psw.atom_starts[index];
+  pos = splitFPToReal(psw.xcrd, pos,  0, &poly_psw.xcrd[atom_offset],
+                      &poly_psw.xcrd_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.ycrd, pos,  1, &poly_psw.ycrd[atom_offset],
+                      &poly_psw.ycrd_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.zcrd, pos,  2, &poly_psw.zcrd[atom_offset],
+                      &poly_psw.zcrd_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.xprv, pos,  3, &poly_psw.xprv[atom_offset],
+                      &poly_psw.xprv_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.yprv, pos,  4, &poly_psw.yprv[atom_offset],
+                      &poly_psw.yprv_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.zprv, pos,  5, &poly_psw.zprv[atom_offset],
+                      &poly_psw.zprv_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.xnxt, pos,  6, &poly_psw.xnxt[atom_offset],
+                      &poly_psw.xnxt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.ynxt, pos,  7, &poly_psw.ynxt[atom_offset],
+                      &poly_psw.ynxt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.znxt, pos,  8, &poly_psw.znxt[atom_offset],
+                      &poly_psw.znxt_ovrf[atom_offset], psw.natom, poly_psw.inv_gpos_scale);
+  pos = splitFPToReal(psw.xvel, pos,  9, &poly_psw.xvel[atom_offset],
+                      &poly_psw.xvel_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.yvel, pos, 10, &poly_psw.yvel[atom_offset],
+                      &poly_psw.yvel_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.zvel, pos, 11, &poly_psw.zvel[atom_offset],
+                      &poly_psw.zvel_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vxprv, pos, 12, &poly_psw.vxprv[atom_offset],
+                      &poly_psw.vxprv_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vyprv, pos, 13, &poly_psw.vyprv[atom_offset],
+                      &poly_psw.vyprv_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vzprv, pos, 14, &poly_psw.vzprv[atom_offset],
+                      &poly_psw.vzprv_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vxnxt, pos, 15, &poly_psw.vxnxt[atom_offset],
+                      &poly_psw.vxnxt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vynxt, pos, 16, &poly_psw.vynxt[atom_offset],
+                      &poly_psw.vynxt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.vznxt, pos, 17, &poly_psw.vznxt[atom_offset],
+                      &poly_psw.vznxt_ovrf[atom_offset], psw.natom, poly_psw.inv_vel_scale);
+  pos = splitFPToReal(psw.xfrc, pos, 18, &poly_psw.xfrc[atom_offset],
+                      &poly_psw.xfrc_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.yfrc, pos, 19, &poly_psw.yfrc[atom_offset],
+                      &poly_psw.yfrc_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.zfrc, pos, 20, &poly_psw.zfrc[atom_offset],
+                      &poly_psw.zfrc_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fxprv, pos, 21, &poly_psw.fxprv[atom_offset],
+                      &poly_psw.fxprv_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fyprv, pos, 22, &poly_psw.fyprv[atom_offset],
+                      &poly_psw.fyprv_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fzprv, pos, 23, &poly_psw.fzprv[atom_offset],
+                      &poly_psw.fzprv_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fxnxt, pos, 24, &poly_psw.fxnxt[atom_offset],
+                      &poly_psw.fxnxt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fynxt, pos, 25, &poly_psw.fynxt[atom_offset],
+                      &poly_psw.fynxt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+  pos = splitFPToReal(psw.fznxt, pos, 26, &poly_psw.fznxt[atom_offset],
+                      &poly_psw.fznxt_ovrf[atom_offset], psw.natom, poly_psw.inv_frc_scale);
+
+  // Copy the transformation matrices and box dimensions
+  const int mtrx_offset = devcRoundUp(9, warp_size_int) * index;
+  const int bdim_offset = devcRoundUp(6, warp_size_int) * index;
+  const int warp_idx = (threadIdx.x >> warp_bits);
+  const int lane_idx = (threadIdx.x & warp_bits_mask_int);
+  if (warp_idx == 0) {
+    int npos = lane_idx;
+    while (npos < 9) {
+      psw.umat[npos] = poly_psw.umat[mtrx_offset + npos];
+      npos += warp_size_int;
+    }
+  }
+  else if (warp_idx == 1) {
+    int npos = lane_idx;
+    while (npos < 9) {
+      psw.invu[npos] = poly_psw.invu[mtrx_offset + npos];
+      npos += warp_size_int;
+    }
+  }
+  else if (warp_idx == 2) {
+    int npos = lane_idx;
+    while (npos < 6) {
+      psw.boxdim[npos] = poly_psw.boxdims[bdim_offset + npos];
+      npos += warp_size_int;
+    }
+  }
+}
+  
+//-------------------------------------------------------------------------------------------------
+void PhaseSpaceSynthesis::extractSystem(PhaseSpaceWriter *psw, const int index,
+                                        const GpuDetails &gpu,
+                                        const HybridTargetLevel origin) const {
+  const PsSynthesisReader poly_psr = this->data(origin);
+  kPsyCopySystem<<<gpu.getSMPCount(), large_block_size>>>(*psw, poly_psr, index);
+  cudaDeviceSynchronize();
 }
   
 } // namespace synthesis

@@ -2,6 +2,7 @@
 #ifndef STORMM_AMBER_ASCII_H
 #define STORMM_AMBER_ASCII_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "Accelerator/hybrid.h"
 #include "Parsing/polynumeric.h"

@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "approx.h"
 
 namespace stormm {

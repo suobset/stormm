@@ -2,6 +2,7 @@
 #ifndef STORMM_STRUCTURE_RMSD_H
 #define STORMM_STRUCTURE_RMSD_H
 
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "Math/matrix_ops.h"
 #include "Math/rounding.h"

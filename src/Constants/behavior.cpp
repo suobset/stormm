@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "Parsing/parse.h"
 #include "Reporting/error_format.h"
 #include "behavior.h"

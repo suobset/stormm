@@ -1,4 +1,5 @@
 #include <string>
+#include "copyright.h"
 #include "Math/summation.h"
 #include "Math/vector_ops.h"
 #include "Parsing/parse.h"

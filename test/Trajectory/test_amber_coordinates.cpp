@@ -405,9 +405,10 @@ int main(const int argc, const char* argv[]) {
   // Report missing files
   if (missing_files) {
     rtWarn("One or more coordinate and topology files required by this test program were not "
-           "found, causing some tests to be skipped.  Make sure that the $STORMM_SOURCE environment "
-           "variable is set to the root directory with src/ and test/ subdirectories, then re-run "
-           "the tests to ensure that the libraries are working as intended.", "test_phasespace");
+           "found, causing some tests to be skipped.  Make sure that the $STORMM_SOURCE "
+           "environment variable is set to the root directory with src/ and test/ subdirectories, "
+           "then re-run the tests to ensure that the libraries are working as intended.",
+           "test_phasespace");
   }
   if (snps_exist == false && oe.takeSnapshot() != SnapshotOperation::SNAPSHOT) {
     rtWarn("One or more of the snapshot files required by this test program were not found, "
@@ -502,9 +503,9 @@ int main(const int argc, const char* argv[]) {
   const TestPriority do_stereo = (stereo_exists) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (stereo_exists == false) {
     rtWarn("Coordinate files for a highly stereo-isomerized ligand, " + stereo_crd_name + " and " +
-           stereo_trj_name + " were not found.  Check the ${STORMM_SOURCE} variable, currently set "
-           "to " + oe.getStormmSourcePath() + " to make sure it is valid.  Subsequent tests will be "
-           "skipped.", "test_amber_coordinates");
+           stereo_trj_name + " were not found.  Check the ${STORMM_SOURCE} variable, currently "
+           "set to " + oe.getStormmSourcePath() + " to make sure it is valid.  Subsequent tests "
+           "will be skipped.", "test_amber_coordinates");
   }
   const CoordinateFrame stro_cf = (stereo_exists) ? CoordinateFrame(stereo_crd_name) :
                                                     CoordinateFrame();

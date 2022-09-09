@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "series_ops.h"
 #include "vector_ops.h"

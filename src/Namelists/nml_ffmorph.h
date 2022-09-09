@@ -2,6 +2,7 @@
 #ifndef STORMM_NML_FFMORPH_H
 #define STORMM_NML_FFMORPH_H
 
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "ForceField/forcefield_element.h"
 #include "ForceField/forcefield_enumerators.h"

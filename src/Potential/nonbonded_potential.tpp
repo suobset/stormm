@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 namespace stormm {
 namespace energy {
 
@@ -368,7 +370,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
       // Access the supertile's map index: if zero, there are no exclusions to worry about
-      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
 
       // The outer loops can proceed until the branch about exclusions
@@ -444,7 +445,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
                 const Tcalc invr2 = invr * invr;
                 const Tcalc tmpsd = sj2 * invr2;
                 const Tcalc dumbo = gta +
-                                    tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd))); 
+                                    tmpsd * (gtb + tmpsd * (gtc + tmpsd * (gtd + tmpsd * gtdd)));
                 cachi_psi[i] -= sj * tmpsd * invr2 * dumbo;
               }
               else if (r > atomi_radius + sj) {
@@ -576,7 +577,7 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       }
     }
   }
-  
+
   // Make a second pass to finalize the effective GB radii
   for (int i = 0; i < nbk.natom; i++) {
     switch (isr.igb) {
@@ -629,15 +630,15 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       break;
     }
   }
-  
+
   // Compute inherent Generalized Born energies and initialize an array for solvent forces
   for (int i = 0; i < nbk.natom; i++) {
     const Tcalc atomi_q = nbk.charge[i];
     const Tcalc egbi = effective_gb_radii[i];
     const Tcalc atomi_radius = (tforce_is_sgnint) ? egbi / force_factor : egbi;
     const Tcalc expmkf = (tcalc_is_double) ?
-                         exp(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric :
-                         expf(-gb_kscale * isr.kappa * atomi_radius) / isr.dielectric;
+                         exp(-default_gb_kscale * isr.kappa * atomi_radius) / isr.dielectric :
+                         expf(-default_gb_kscale * isr.kappa * atomi_radius) / isr.dielectric;
     const Tcalc dielfac = v_one - expmkf;
     const Tcalc atmq2h = v_half * atomi_q * atomi_q * nbk.coulomb_constant;
     const Tcalc atmqd2h = atmq2h * dielfac;
@@ -646,15 +647,15 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
     egb_acc += static_cast<llint>(contrib * nrg_scale_factor);
     if (eval_force == EvaluateForce::YES) {
       if (tforce_is_sgnint) {
-        sumdeijda[i] = llround((atmqd2h - (gb_kscale * isr.kappa *
+        sumdeijda[i] = llround((atmqd2h - (default_gb_kscale * isr.kappa *
                                            atmq2h * expmkf * atomi_radius)) * force_factor);
       }
       else {
-        sumdeijda[i] = atmqd2h - (gb_kscale * isr.kappa * atmq2h * expmkf * atomi_radius);
+        sumdeijda[i] = atmqd2h - (default_gb_kscale * isr.kappa * atmq2h * expmkf * atomi_radius);
       }
     }
   }
-  
+
   // Due to the lack of exclusions, the Generalized Born reference calculation is a much simpler
   // pair of nested loops over all atoms without self-interactions or double-counting.  However,
   // the tiling continues to add a degree of complexity.
@@ -668,7 +669,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
       // Access the supertile's map index: if zero, there are no exclusions to worry about
-      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
 
       // The outer loops can proceed until the branch about exclusions
@@ -750,21 +750,21 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
               Tcalc efac, fgbi, fgbk, expmkf;
               if (tcalc_is_double) {
                 efac = exp(-r2 / (v_four * ij_born_radius));
-                fgbi = v_one / sqrt(r2 + ij_born_radius * efac);
-                fgbk = -isr.kappa * gb_kscale / fgbi;
+                fgbi = v_one / sqrt(r2 + (ij_born_radius * efac));
+                fgbk = -isr.kappa * default_gb_kscale / fgbi;
                 expmkf = exp(fgbk) / isr.dielectric;
               }
               else {
                 efac = expf(-r2 / (v_four * ij_born_radius));
-                fgbi = v_one / sqrtf(r2 + ij_born_radius * efac);
-                fgbk = -isr.kappa * gb_kscale / fgbi;
+                fgbi = v_one / sqrtf(r2 + (ij_born_radius * efac));
+                fgbk = -isr.kappa * default_gb_kscale / fgbi;
                 expmkf = expf(fgbk) / isr.dielectric;
               }
               const Tcalc dielfac = v_one - expmkf;
               contrib -= qiqj * dielfac * fgbi;
               if (eval_force == EvaluateForce::YES) {
                 const Tcalc temp4 = fgbi * fgbi * fgbi;
-                const Tcalc temp6 = qiqj * temp4 * (dielfac + fgbk * expmkf);
+                const Tcalc temp6 = qiqj * temp4 * (dielfac + (fgbk * expmkf));
                 const Tcalc fmag = temp6 * (v_one - (v_qrtr * efac));
                 const Tcalc temp5 = v_half * efac * temp6 * (ij_born_radius + (v_qrtr * r2));
                 cachi_psi[i] += atomi_radius * temp5;
@@ -829,9 +829,10 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
   if (eval_force == EvaluateForce::NO) {
     return egb_energy;
   }
-  
-  // A second pair of nested loops over all atoms is needed to fold in derivatives of the
-  // effective Born radii to the forces on each atom.
+
+  // A third pair of nested loops over all atoms is needed to fold in derivatives of the
+  // effective Born radii to the forces on each atom.  Begin by updating the energy derivative
+  // factors (sumdeijda) for each atom, then roll into the nested loops.
   switch (isr.igb) {
   case ImplicitSolventModel::HCT_GB:
   case ImplicitSolventModel::NONE:
@@ -864,9 +865,8 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       sumdeijda[i] = (tforce_is_sgnint) ? llround(sdi_current * sdi_multiplier * force_factor) :
                                           sdi_current * sdi_multiplier;
     }
-  }
-  
-  // One final tile-based loop
+    break;
+  }  
   for (int sti = 0; sti < ser.supertile_stride_count; sti++) {
     for (int stj = 0; stj <= sti; stj++) {
 
@@ -877,7 +877,6 @@ double evaluateGeneralizedBornEnergy(const NonbondedKit<Tcalc> nbk,
       const int nj_tiles = (stnj_atoms + tile_length - 1) / tile_length;
 
       // Access the supertile's map index: if zero, there are no exclusions to worry about
-      const int stij_map_index = ser.supertile_map_idx[(stj * ser.supertile_stride_count) + sti];
       const int diag_supertile = (sti == stj);
 
       // The outer loops can proceed until the branch about exclusions

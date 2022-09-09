@@ -3,6 +3,7 @@
 #define STORMM_THERMOSTAT_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace trajectory {

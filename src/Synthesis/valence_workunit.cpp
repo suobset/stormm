@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "Constants/hpc_bounds.h"
 #include "Math/statistics.h"
 #include "Math/summation.h"
@@ -50,7 +51,7 @@ ValenceDelegator::ValenceDelegator(const AtomGraph *ag_in, const RestraintAppara
   const ValenceKit<double> vk = ag_in->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_in->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_in->getDoublePrecisionConstraintKit();
-  const RestraintKit<double, double2, double4> rar = ra_in->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_in->dpData();
   
   // Allocate and fill the arrays
   allocate();
@@ -259,7 +260,7 @@ std::vector<int> ValenceDelegator::findForcePartners(const int atom_idx,
   result.reserve(32);
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   
   // Form a new call stack from the input.  Check that the call stack has not grown too large,
   // as this might indicate an infinite loop and some nonsensical feature of the topology.
@@ -674,7 +675,7 @@ void ValenceDelegator::allocate() {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   bond_affector_list.resize(2 * vk.nbond);
   bond_affector_bounds.resize(atom_count + 1, 0);
   angl_affector_list.resize(3 * vk.nangl);
@@ -1360,7 +1361,7 @@ void ValenceWorkUnit::storeInferred14Instructions(const std::vector<int> &parame
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storePositionalRestraintInstructions(const std::vector<int> &kr_param_map,
                                                            const std::vector<int> &xyz_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rposn_instructions.resize(rposn_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (kr_param_map.size() != xyz_param_map.size()) {
@@ -1397,7 +1398,7 @@ void ValenceWorkUnit::storePositionalRestraintInstructions(const std::vector<int
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeDistanceRestraintInstructions(const std::vector<int> &kr_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rbond_instructions.resize(rbond_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nbond) {
@@ -1417,7 +1418,7 @@ void ValenceWorkUnit::storeDistanceRestraintInstructions(const std::vector<int> 
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeAngleRestraintInstructions(const std::vector<int> &kr_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rangl_instructions.resize(rangl_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.nangl) {
@@ -1438,7 +1439,7 @@ void ValenceWorkUnit::storeAngleRestraintInstructions(const std::vector<int> &kr
 
 //-------------------------------------------------------------------------------------------------
 void ValenceWorkUnit::storeDihedralRestraintInstructions(const std::vector<int> &kr_param_map) {
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
   rdihe_instructions.resize(rdihe_term_count);
   const bool use_map = (kr_param_map.size() > 0LLU);
   if (use_map && static_cast<int>(kr_param_map.size()) != rar.ndihe) {
@@ -1475,6 +1476,10 @@ void ValenceWorkUnit::storeVirtualSiteInstructions(const std::vector<int> &param
     case VirtualSiteKind::FIXED_2:
     case VirtualSiteKind::FLEX_2:
     case VirtualSiteKind::NONE:
+
+      // The y member must be initialized here, to ensure that information written in previous
+      // passes cannot linger and pollute subsequent expressions given to the y member.
+      vste_instructions[pos].y = 0;
       break;
     case VirtualSiteKind::FIXED_3:
     case VirtualSiteKind::FLEX_3:
@@ -1886,23 +1891,6 @@ void ValenceWorkUnit::sortAtomSets() {
   // Check the atom import list to ensure that all entries are unique.
   for (int i = 1; i < imported_atom_count; i++) {
     if (atom_import_list[i] == atom_import_list[i - 1]) {
-
-      // CHECK
-      printf("Here are all the atoms:\n");
-      int k = 0;
-      for (int j = 0; j < imported_atom_count; j++) {
-        printf(" %4d", atom_import_list[j]);
-        k++;
-        if (k == 19) {
-          printf("\n");
-          k = 0;
-        }
-      }
-      if (k > 0) {
-        printf("\n");
-      }
-      // END CHECK
-      
       const int ires = ag_pointer->getResidueIndex(atom_import_list[i]);
       rtErr("A duplicate entry is present in the atom import list of work unit " +
             std::to_string(list_index) + " serving topology " + ag_pointer->getFileName() +
@@ -1960,7 +1948,7 @@ void ValenceWorkUnit::logActivities() {
   const ValenceKit<double> vk = ag_pointer->getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag_pointer->getDoublePrecisionVirtualSiteKit();
   const ConstraintKit<double> cnk = ag_pointer->getDoublePrecisionConstraintKit();
-  const RestraintKit<double, double2, double4> rar = ra_pointer->getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra_pointer->dpData();
 
   // Make a "straight table" based on the minimum and maximum imported atom indices.  Most work
   // units will involve a confined sequence of atoms from within the topology.  While it might
@@ -2470,6 +2458,33 @@ int optValenceKernelSubdivision(const std::vector<int> &atom_counts, const Preci
 int optValenceKernelSubdivision(const Hybrid<int> &atom_counts, const PrecisionModel prec,
                                 const EvaluateForce eval_frc, const GpuDetails &gpu) {
   return optValenceKernelSubdivision(atom_counts.data(), atom_counts.size(), prec, eval_frc, gpu);
+}
+
+//-------------------------------------------------------------------------------------------------
+int optVirtualSiteKernelSubdivision(const int2* vwu_abstracts, const int vwu_count) {
+  int nbig = 0;
+  int nsmall = 0;
+  for (int i = 0; i < vwu_count; i++) {
+    const int vsite_insr_idx = (i * vwu_abstract_length) + static_cast<int>(VwuAbstractMap::VSITE);
+    const int nvs_insr = vwu_abstracts[vsite_insr_idx].y - vwu_abstracts[vsite_insr_idx].x;
+    if (nvs_insr > (small_block_size / 2)) {
+      nbig++;
+    }
+    else {
+      nsmall++;
+    }
+  }
+  return (nbig > nsmall) ? 1 : 2;
+}
+
+//-------------------------------------------------------------------------------------------------
+int optVirtualSiteKernelSubdivision(const std::vector<int2> &vwu_abstracts, const int vwu_count) {
+  return optVirtualSiteKernelSubdivision(vwu_abstracts.data(), vwu_count);
+}
+
+//-------------------------------------------------------------------------------------------------
+int optVirtualSiteKernelSubdivision(const Hybrid<int2> &vwu_abstracts, const int vwu_count) {
+  return optVirtualSiteKernelSubdivision(vwu_abstracts.data(), vwu_count);
 }
 
 //-------------------------------------------------------------------------------------------------

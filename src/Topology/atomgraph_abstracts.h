@@ -2,6 +2,7 @@
 #ifndef STORMM_ATOMGRAPH_ABSTRACTS_H
 #define STORMM_ATOMGRAPH_ABSTRACTS_H
 
+#include "copyright.h"
 #include "atomgraph_enumerators.h"
 
 namespace stormm {

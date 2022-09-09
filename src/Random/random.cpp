@@ -2,6 +2,7 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "Parsing/polynumeric.h"
 #include "Reporting/error_format.h"

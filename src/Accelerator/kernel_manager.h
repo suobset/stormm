@@ -9,13 +9,15 @@
 #    include <cuda_runtime.h>
 #  endif
 #endif
+#include "copyright.h"
 #include "Constants/behavior.h"
-#include "Constants/fixed_precision.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/reduction.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Potential/energy_enumerators.h"
-#include "Synthesis/synthesis_enumerators.h"
+#include "Structure/structure_enumerators.h"
 #include "Synthesis/atomgraph_synthesis.h"
+#include "Synthesis/synthesis_enumerators.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "gpu_details.h"
 
@@ -28,12 +30,14 @@ using data_types::int2;
 #endif
 using energy::EvaluateForce;
 using energy::EvaluateEnergy;
-using numerics::ForceAccumulationMethod;
+using numerics::AccumulationMethod;
+using structure::VirtualSiteActivity;
 using synthesis::AtomGraphSynthesis;
 using synthesis::NbwuKind;
 using math::ReductionGoal;
 using math::ReductionStage;
 using synthesis::VwuGoal;
+using topology::ImplicitSolventModel;
 using topology::UnitCellType;
 
 /// \brief Encapsulate the operations to store and retrieve information about a kernel's format.
@@ -131,7 +135,7 @@ public:
   ///        when large blocks cannot use more than 32k registers in all.
   int getArchBlockMultiplier() const;
   
-  /// \brief Get the block and thread counts for the valence kernel.
+  /// \brief Get the block and thread counts for a valence kernel.
   ///
   /// \param prec        The type of floating point numbers in which the kernel shall work
   /// \param eval_force  Indication of whether the kernel will evaluate forces on atoms
@@ -139,15 +143,28 @@ public:
   /// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
   ///                    error in this context)
   int2 getValenceKernelDims(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth, VwuGoal purpose) const;
+                            AccumulationMethod acc_meth, VwuGoal purpose) const;
 
-  /// \brief Get the block and thread counts for the non-bonded kernel.  Parameters descriptions
+  /// \brief Get the block and thread counts for a non-bonded kernel.  Parameter descriptions
   ///        for this function follow from getValenceKernelDims() above, with the addition of:
   ///
   /// \param kind  The type of non-bonded work unit: tile groups, supertiles, or honeycomb
-  ///              being relevant
+  /// \param igb   Type of implicit solvent model to use ("NONE" in periodic boundary conditions)
   int2 getNonbondedKernelDims(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
-                              EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth) const;
+                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
+                              ImplicitSolventModel igb) const;
+
+  /// \brief Get the block and thread counts for a Born radii computation kernel.  Parameter
+  ///        descriptions for this function follow from getValenceKernelDims() and
+  ///        getNonbondedKernelDims(), above.
+  int2 getBornRadiiKernelDims(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                              ImplicitSolventModel igb) const;
+
+  /// \brief Get the block and thread counts for a Born derivative computation kernel.  Parameter
+  ///        descriptions for this function follow from getValenceKernelDims() and
+  ///        getNonbondedKernelDims(), above.
+  int2 getBornDerivativeKernelDims(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                                   ImplicitSolventModel igb) const;
 
   /// \brief Get the block and thread counts for a reduction kernel.
   ///
@@ -157,6 +174,16 @@ public:
   /// \param process  The reduction step to perform
   int2 getReductionKernelDims(PrecisionModel prec, ReductionGoal purpose,
                               ReductionStage process) const;
+
+  /// \brief Get the block and thread counts for a virtual site placement or force transmission
+  ///        kernel.
+  ///
+  /// \param prec     Implies a level of detail in the fixed-precision coordinate representation,
+  ///                 and specifies the precision in which to perform the placement or force
+  ///                 transmission operations
+  /// \param purpose  The process to perform with standalone virtual site kernels: place virtual
+  ///                 sites or transmit forces from them to frame atoms with mass
+  int2 getVirtualSiteKernelDims(PrecisionModel prec, VirtualSiteActivity purpose) const;
 
   /// \brief Get the GPU information for the active GPU.
   const GpuDetails& getGpu() const;
@@ -186,18 +213,41 @@ private:
   /// block multiplicity as the valence kernels, as the non-bonded kernels will always run at
   /// least two blocks per streaming multiprocessor.  This value does depend on the unit cell type
   /// of the topology synthesis at hand.
-  int nonbond_block_multiplier;
+  /// \{
+  int nonbond_block_multiplier_dp;
+  int nonbond_block_multiplier_sp;
+  /// \}
+  
+  /// Architecture-specific block multiplier for Generalized Born radii computation kernels, again
+  /// a provision for NVIDIA Turing cards.
+  /// \{
+  int gbradii_block_multiplier_dp;
+  int gbradii_block_multiplier_sp;
+  /// \}
 
+  /// Architecture-specific block multiplier for Generalized Born radii derivative computation
+  /// kernels, again a provision for NVIDIA Turing cards.
+  /// \{
+  int gbderiv_block_multiplier_dp;
+  int gbderiv_block_multiplier_sp;
+  /// \}
+  
   /// The workload-specific block multiplier for reduction kernels.  Like the valence kernels, the
   /// thread count per streaming multiprocessor will not go above 1024 (this time out of bandwidth
   /// limitations), but the block multiplicity (which starts at 4) could be increased.
   int reduction_block_multiplier;
+
+  /// The architecture-specific block multiplier for virtual site handling kernels.
+  /// \{
+  int virtual_site_block_multiplier_dp;
+  int virtual_site_block_multiplier_sp;
+  /// \}
   
   /// Store the resource requirements and selected launch parameters for a variety of kernels.
   /// Keys are determined according to the free functions further on in this library.
   std::map<std::string, KernelFormat> k_dictionary;
 
-  /// \brief Set the register, maximum block size, and threads counts for one of the valence
+  /// \brief Set the register, maximum block size, and thread counts for one of the valence
   ///        kernels.  This function complements getValenceKernelDims(), although the other
   ///        function reports numbers based on this functions input information and some further
   ///        analysis.
@@ -210,55 +260,89 @@ private:
   /// \param subdivision  Number of times that the basic valence kernel should be subdivided
   /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogValenceKernel(PrecisionModel prec, EvaluateForce eval_force, EvaluateEnergy eval_nrg,
-                            ForceAccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
+                            AccumulationMethod acc_meth, VwuGoal purpose, int subdivision,
                             const std::string &kernel_name = std::string(""));
 
-  /// \brief Set the register, maximum block size, and threads counts for one of the non-bonded
+  /// \brief Set the register, maximum block size, and thread counts for one of the non-bonded
   ///        kernels.  Parameter descriptions for this function follow from
-  ///        setValenceKernelAttributes() above, with the addition of:
+  ///        catalogValenceKernel() above, with the addition of:
   ///
-  /// \param kind         The type of non-bonded work unit: tile groups, supertiles, or honeycomb
-  ///                     being relevant
-  /// \param kernel_name  [Optional] Name of the kernel in the actual code
+  /// \param kind  Type of non-bonded work unit: tile groups, supertiles, or honeycomb
+  /// \param igb   Type of implicit solvent model to use ("NONE" in periodic boundary conditions)
   void catalogNonbondedKernel(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
-                              EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                              EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
+                              ImplicitSolventModel igb,
                               const std::string &kernel_name = std::string(""));
 
-  /// \brief Set the register, maximum block size, and threads counts for one of the reduction
+  /// \brief Set the register, maximum block size, and thread counts for one of the Generalized
+  ///        Born radius computation kernels.  Parameter descriptions for this function follow
+  ///        from catalogValenceKernel() and catalogNonbondedKernel() above.
+  void catalogBornRadiiKernel(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                              ImplicitSolventModel igb,
+                              const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the register, maximum block size, and thread counts for one of the Generalized
+  ///        Born derivative computation kernels.  Parameter descriptions for this function follow
+  ///        from catalogValenceKernel() and catalogNonbondedKernel() above.
+  void catalogBornDerivativeKernel(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                                   ImplicitSolventModel igb,
+                                   const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the register, maximum block size, and thread counts for one of the reduction
   ///        kernels.  Parameter descriptions for this function follow from
   ///        setValenceKernelAttributes() above, with the addition of:
   ///
-  /// \param prec         The precision model to expect in the coordinate arrays
   /// \param purpose      Reason for doing the reduction, i.e. conjugate gradient transformation
   /// \param process      How far to take the reduction operation
-  /// \param subdivision  Number of times that the basic reduction kernel should be subdivided
-  /// \param kernel_name  [Optional] Name of the kernel in the actual code
   void catalogReductionKernel(PrecisionModel prec, ReductionGoal purpose, ReductionStage process,
                               int subdivision, const std::string &kernel_name = std::string(""));
+
+  /// \brief Set the register, maximum block size, and thread counts for one of the virtual site
+  ///        placement kernels.  The first two parameters follow from getVirtualSiteKernelDims(),
+  ///        above.
+  ///
+  /// \param prec         The type of floating point numbers in which the kernel shall work
+  /// \param purpose      The process to perform with standalone virtual site kernels
+  /// \param subdivision  Number of times that the basic virtual site kernel should be subdivided
+  /// \param kernel_name  [Optional] Name of the kernel in the actual code
+  void catalogVirtualSiteKernel(PrecisionModel prec, VirtualSiteActivity purpose, int subdivision,
+                                const std::string &kernel_name = std::string(""));
 };
 
-/// \brief Obtain the workload-specific block multiplier for valence interaction kernels.  In
-///        most cases, this is 1, but if there are many small jobs or enough atoms, it may rise
-///        to 2.
-///
-/// \param gpu      Details of the GPU that will perform the calculations
-/// \param poly_ag  A collection of topologies describing the workload
-int valenceBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
+/// \brief Obtain the workload-specific block multiplier for valence interaction kernels.
+int valenceBlockMultiplier();
 
-/// \brief Obtain the architecture-specific block multiplier for valence interaction kernels.  In
-///        most cases, this is 1, but when no block may control more than half of the register
-///        space, it is 2.
+/// \brief Obtain the architecture-specific block multiplier for non-bonded interaction kernels.
 ///
 /// \param gpu        Details of the GPU that will perform the calculations
 /// \param unit_cell  The unit cell type of the systems to evaluate
-int nonbondedBlockMultiplier(const GpuDetails &gpu, UnitCellType unit_cell);
+/// \param prec       The type of floating point numbers in which the kernel shall work
+/// \param igb        The implicit solvent model that the kernel shall implement
+int nonbondedBlockMultiplier(const GpuDetails &gpu, UnitCellType unit_cell, PrecisionModel prec,
+                             ImplicitSolventModel igb);
+
+/// \brief Obtain the architecture-specific block multiplier for Generalized Born radii kernels.
+///
+/// \param gpu   Details of the GPU that will perform the calculations
+/// \param prec  The type of floating point numbers in which the kernel shall work
+int gbRadiiBlockMultiplier(const GpuDetails &gpu, PrecisionModel prec);
+
+/// \brief Obtain the architecture-specific block multiplier for Generalized Born derivative
+///        computation kernels.
+///
+/// \param gpu   Details of the GPU that will perform the calculations
+/// \param prec  The type of floating point numbers in which the kernel shall work
+int gbDerivativeBlockMultiplier(const GpuDetails &gpu, PrecisionModel prec);
 
 /// \brief Obtain the workload-specific block multiplier for reduction kernels.
+int reductionBlockMultiplier();
+
+/// \brief Obtain the workload-specific block multiplier for virtual site handling kernels.  The
+///        typical kernel will run on 256 threads.
 ///
-/// \param gpu      Details of the GPU that will perform the calculations
-/// \param poly_ag  A collection of topologies describing the workload
-int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &poly_ag);
-  
+/// \param prec  The type of floating point numbers in which the kernel shall work
+int virtualSiteBlockMultiplier(PrecisionModel prec);
+
 /// \brief Obtain a unique string identifier for one of the valence kernels.  Each identifier
 ///        begins with "vale_" and is then appended with letter codes for different aspects
 ///        according to the following system:
@@ -274,18 +358,21 @@ int reductionBlockMultiplier(const GpuDetails &gpu, const AtomGraphSynthesis &po
 ///                    error in this context)
 /// \param purpose     The intended action to take with computed forces
 std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
-                             EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth,
+                             EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
                              VwuGoal purpose);
 
 /// \brief Obtain a unique string identifier for one of the non-bonded kernels.  Each identifier
 ///        begins with "nonb_" and is then appended with letter codes for different aspects
 ///        according to the following system:
-///        - { d, f }        Perform calculations in double (d) or float (f) arithmetic
-///        - { tg, st, hc }  Use a "tile groups" or "supertiles" strategy for breaking down
-///                          systems with isolated boundary conditions, or a "honeycomb" strategy
-///                          for breaking down systems with periodic boundary conditions.
-///        - { e, f, fe }    Compute energies (e), forces (f), or both (ef)
-///        - { s, w }        Accumulate forces in split integers (s) or whole integers (w)
+///        - { d, f }           Perform calculations in double (d) or float (f) arithmetic
+///        - { tg, st, hc }     Use a "tile groups" or "supertiles" strategy for breaking down
+///                             systems with isolated boundary conditions, or a "honeycomb"
+///                             strategy for breaking down systems in periodic boundary conditions
+///        - { vac, gbs, gbn }  Perform calculations in vacuum, standard GB implicit solvent, or
+///                             "neck" GB implicit solvent (the latter two being relevant only for
+///                             systems in isolated boundary conditions
+///        - { e, f, fe }       Compute energies (e), forces (f), or both (ef)
+///        - { s, w }           Accumulate forces in split integers (s) or whole integers (w)
 ///
 /// \param prec        The type of floating point numbers in which the kernel shall work
 /// \param kind        The type of non-bonded work unit to evaluate
@@ -293,12 +380,36 @@ std::string valenceKernelKey(PrecisionModel prec, EvaluateForce eval_force,
 /// \param eval_nrg    Indication of whether to evaluate the energy of the system as a whole
 /// \param acc_meth    The force accumulation method (SPLIT or WHOLE, AUTOMATIC will produce an
 ///                    error in this context)
+/// \param igb         Type of implicit solvent model ("NONE" in periodic boundary conditions)
 std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce eval_force,
-                               EvaluateEnergy eval_nrg, ForceAccumulationMethod acc_meth);
+                               EvaluateEnergy eval_nrg, AccumulationMethod acc_meth,
+                               ImplicitSolventModel igb);
+
+/// \brief Encapsulate the work of encoding a Generalized Born computation kernel key, shared
+///        across radii and derivative computations.  Parameter descriptions, and the features of
+///        the key, follow from nonbondedKernelKey() above.
+std::string appendBornKernelKey(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                                ImplicitSolventModel igb);
+  
+/// \brief Obtain a unique string identifier for one of the Born radii computation kernels.  Each
+///        identifier begins with "gbrd_" and is then appended with letter codes for different
+///        aspects of the kernel, following the codes set forth in nonbondedKernelKey() above.
+///        Parameter descriptions also follow from nonbondedKernelKey().
+std::string bornRadiiKernelKey(PrecisionModel prec, NbwuKind kind, AccumulationMethod acc_meth,
+                               ImplicitSolventModel igb);
+
+/// \brief Obtain a unique string identifier for one of the Born radii computation kernels.  Each
+///        identifier begins with "gbrd_" and is then appended with letter codes for different
+///        aspects of the kernel, following the codes set forth in nonbondedKernelKey() above.
+///        Parameter descriptions also follow from nonbondedKernelKey().
+std::string bornDerivativeKernelKey(PrecisionModel prec, NbwuKind kind,
+                                    AccumulationMethod acc_meth, ImplicitSolventModel igb);
 
 /// \brief Obtain a unique string identifier for one of the reduction kernels.  Each identifier
 ///        begins with "redc_" and is then appended with letter codes for different aspects
 ///        according to the following system:
+///        - { d, f }        Perform calculations in double (d) or float (f) arithmetic
+///        - { cg }          Calculate the conjugate gradient vector
 ///        - { gt, sc, rd }  Perform a gathering, scattering, or combined all-reduce operation
 ///
 /// \param prec     The type of floating point numbers in which the kernel shall work
@@ -306,6 +417,16 @@ std::string nonbondedKernelKey(PrecisionModel prec, NbwuKind kind, EvaluateForce
 /// \param process  The reduction stage to perform
 std::string reductionKernelKey(PrecisionModel prec, ReductionGoal purpose, ReductionStage process);
 
+/// \brief Obtain a unique string identifier for one of the virtaul site handling kernels.  Each
+///        identifier begins with "vste_" and is then appended with letter codes for different
+///        activities according to the following system:
+///        - { d, f }    Perform calculations in double (d) or float (f) arithmetic
+///        - { pl, xm }  Place particles or transmit forces to atoms with mass
+///
+/// \param prec     The type of floating point numbers in which the kernel shall work
+/// \param purpose  The process to perform with standalone virtual site kernels
+std::string virtualSiteKernelKey(PrecisionModel prec, VirtualSiteActivity process);
+  
 } // namespace card
 } // namespace stormm
 

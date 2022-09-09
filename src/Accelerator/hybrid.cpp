@@ -1,6 +1,7 @@
 #include <vector>
 #include <algorithm>
 #include <string.h>
+#include "copyright.h"
 #include "Constants/scaling.h"
 #include "Constants/symbol_values.h"
 #include "hybrid.h"
@@ -295,6 +296,17 @@ void Ledger::printMemoryProfile(const int n_display, const llint display_thresho
                                                  "based on their targets.", "", "", 0, 0, 4);
     printf("%s\n", ptr_explanation.c_str());
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string getEnumerationName(HybridTargetLevel tier) {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    return std::string("Host");
+  case HybridTargetLevel::DEVICE:
+    return std::string("Device");
+  }
+  __builtin_unreachable();
 }
 
 } // namespace card

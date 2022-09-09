@@ -3,6 +3,7 @@
 #define STORMM_TEXTGUARD_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace parse {

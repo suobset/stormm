@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include "copyright.h"
 #include "FileManagement/directory_util.h"
 #include "FileManagement/file_listing.h"
 #include "FileManagement/file_util.h"
@@ -199,8 +200,8 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
     stormm_source_path = osc_str;
   }
 
-  // ${STORMM_HOME} needs to be understood from the command line or the environment.  The default is
-  // a last-ditch effort to infer it from the current working directory or the executable path.
+  // ${STORMM_HOME} needs to be understood from the command line or the environment.  The default
+  // is a last-ditch effort to infer it from the current working directory or the executable path.
   char tmp_c[512];
   const std::string exe_path(argv[0]);
   if (stormm_home_path.size() == 0 || stormm_source_path.size() == 0) {
@@ -228,7 +229,8 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       "test_hybrid";
     stormm_home_path = findStormmPath(exe_path, known_program);
     if (stormm_home_path.size() == 0) {
-      stormm_home_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path, known_program);
+      stormm_home_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path,
+                                        known_program);
     }
     if (stormm_home_path.size() > 0) {
       switch (verbose_level) {
@@ -246,8 +248,8 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
   if (stormm_source_path.size() == 0) {
     switch (verbose_level) {
     case TestVerbosity::FULL:
-      rtWarn("${STORMM_SOURCE} is not set in the shell environment.  Define this variable for best "
-             "results.", "TestEnvironment");
+      rtWarn("${STORMM_SOURCE} is not set in the shell environment.  Define this variable for "
+             "best results.", "TestEnvironment");
       break;
     case TestVerbosity::COMPACT:
     case TestVerbosity::FAILURE_ONLY:
@@ -257,7 +259,8 @@ TestEnvironment::TestEnvironment(const int argc, const char* argv[],
       osSeparator() + "test_parse.cpp";
     stormm_source_path = findStormmPath(exe_path, known_code);
     if (stormm_source_path.size() == 0) {
-      stormm_source_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path, known_code);
+      stormm_source_path = findStormmPath(std::string(tmp_c) + osSeparator() + exe_path,
+                                          known_code);
     }
     if (stormm_source_path.size() > 0) {
       switch (verbose_level) {

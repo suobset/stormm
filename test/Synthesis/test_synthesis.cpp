@@ -7,7 +7,6 @@
 #include "../../src/Chemistry/chemical_features.h"
 #include "../../src/Chemistry/chemistry_enumerators.h"
 #include "../../src/Constants/behavior.h"
-#include "../../src/Constants/fixed_precision.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/Constants/symbol_values.h"
 #include "../../src/DataTypes/mixed_types.h"
@@ -21,6 +20,7 @@
 #include "../../src/Math/summation.h"
 #include "../../src/Math/vector_ops.h"
 #include "../../src/Namelists/nml_files.h"
+#include "../../src/Numerics/split_fixed_precision.h"
 #include "../../src/Parsing/textfile.h"
 #include "../../src/Potential/scorecard.h"
 #include "../../src/Potential/static_exclusionmask.h"
@@ -142,8 +142,8 @@ void runValenceWorkUnitTests(const std::string &top_name, const std::string &crd
                             getDrivePathType(crd_name) == DrivePathType::FILE);
   if (files_exist == false) {
     rtWarn("The topology and input coordinates for a critical system appear to be missing.  Check "
-           "the ${STORMM_SOURCE} variable (currently " + oe.getStormmSourcePath() + ") to make sure "
-           "that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
+           "the ${STORMM_SOURCE} variable (currently " + oe.getStormmSourcePath() + ") to make "
+           "sure that " + top_name + " and " + crd_name + " valid paths.", "test_synthesis");
   }
   const TestPriority do_tests = (files_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
   AtomGraph ag  = (files_exist) ? AtomGraph(top_name, ExceptionResponse::SILENT) :
@@ -528,7 +528,7 @@ std::vector<std::vector<int>> getAtomForceContributors(const AtomGraph &ag,
                                                        const RestraintApparatus &ra) {
   const ValenceKit<double> vk = ag.getDoublePrecisionValenceKit();
   const VirtualSiteKit<double> vsk = ag.getDoublePrecisionVirtualSiteKit();
-  const RestraintKit<double, double2, double4> rar = ra.getDoublePrecisionAbstract();
+  const RestraintKit<double, double2, double4> rar = ra.dpData();
 
   // Initialize the result.  Every atom list includes the atom itself.
   std::vector<std::vector<int>> result(vk.natom, std::vector<int>());
@@ -1120,24 +1120,18 @@ int main(const int argc, const char* argv[]) {
       sysi_psw.xfrc[jlocal] = tx_frc;
       sysi_psw.yfrc[jlocal] = ty_frc;
       sysi_psw.zfrc[jlocal] = tz_frc;
-      splitRealConversion(tx_frc * highres_w.frc_scale, &highres_w.xfrc[j],
-                          &highres_w.xfrc_ovrf[j]);
-      splitRealConversion(ty_frc * highres_w.frc_scale, &highres_w.yfrc[j],
-                          &highres_w.yfrc_ovrf[j]);
-      splitRealConversion(tz_frc * highres_w.frc_scale, &highres_w.zfrc[j],
-                          &highres_w.zfrc_ovrf[j]);
+      doubleToInt95(tx_frc * highres_w.frc_scale, &highres_w.xfrc[j], &highres_w.xfrc_ovrf[j]);
+      doubleToInt95(ty_frc * highres_w.frc_scale, &highres_w.yfrc[j], &highres_w.yfrc_ovrf[j]);
+      doubleToInt95(tz_frc * highres_w.frc_scale, &highres_w.zfrc[j], &highres_w.zfrc_ovrf[j]);
       const double tx_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
       const double ty_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
       const double tz_vel = 64.0 * (0.5 - my_prng.uniformRandomNumber());
       sysi_psw.xvel[jlocal] = tx_vel;
       sysi_psw.yvel[jlocal] = ty_vel;
       sysi_psw.zvel[jlocal] = tz_vel;
-      splitRealConversion(tx_vel * highres_w.vel_scale, &highres_w.xvel[j],
-                          &highres_w.xvel_ovrf[j]);
-      splitRealConversion(ty_vel * highres_w.vel_scale, &highres_w.yvel[j],
-                          &highres_w.yvel_ovrf[j]);
-      splitRealConversion(tz_vel * highres_w.vel_scale, &highres_w.zvel[j],
-                          &highres_w.zvel_ovrf[j]);
+      doubleToInt95(tx_vel * highres_w.vel_scale, &highres_w.xvel[j], &highres_w.xvel_ovrf[j]);
+      doubleToInt95(ty_vel * highres_w.vel_scale, &highres_w.yvel[j], &highres_w.yvel_ovrf[j]);
+      doubleToInt95(tz_vel * highres_w.vel_scale, &highres_w.zvel[j], &highres_w.zvel_ovrf[j]);
     }
     const PhaseSpace sysi_rb = highres.exportSystem(i);
     const TrajectoryKind tjpos = TrajectoryKind::POSITIONS;

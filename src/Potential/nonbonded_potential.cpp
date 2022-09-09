@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "nonbonded_potential.h"
 
 namespace stormm {
@@ -87,8 +88,8 @@ double evaluateGeneralizedBornEnergy(const AtomGraph &ag, const StaticExclusionM
                                      const int system_index) {
   return evaluateGeneralizedBornEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(),
                                        ag.getDoublePrecisionImplicitSolventKit(),
-                                       ngb_tables.getDoublePrecisionAbstract(), ps->data(), ecard,
-                                       eval_force, system_index);
+                                       ngb_tables.dpData(), ps->data(), ecard, eval_force,
+                                       system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -98,8 +99,8 @@ double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionM
                                      const int system_index) {
   return evaluateGeneralizedBornEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(),
                                        ag->getDoublePrecisionImplicitSolventKit(),
-                                       ngb_tables.getDoublePrecisionAbstract(), ps->data(), ecard,
-                                       eval_force, system_index);
+                                       ngb_tables.dpData(), ps->data(), ecard, eval_force,
+                                       system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -138,8 +139,7 @@ double evaluateGeneralizedBornEnergy(const AtomGraph &ag, const StaticExclusionM
                                      const int system_index) {
   return evaluateGeneralizedBornEnergy(ag.getDoublePrecisionNonbondedKit(), se.data(),
                                        ag.getDoublePrecisionImplicitSolventKit(),
-                                       ngb_tables.getDoublePrecisionAbstract(),
-                                       cf.data(), ecard, system_index);
+                                       ngb_tables.dpData(), cf.data(), ecard, system_index);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -149,8 +149,7 @@ double evaluateGeneralizedBornEnergy(const AtomGraph *ag, const StaticExclusionM
                                      const int system_index) {
   return evaluateGeneralizedBornEnergy(ag->getDoublePrecisionNonbondedKit(), se.data(),
                                        ag->getDoublePrecisionImplicitSolventKit(),
-                                       ngb_tables.getDoublePrecisionAbstract(),
-                                       cf.data(), ecard, system_index);
+                                       ngb_tables.dpData(), cf.data(), ecard, system_index);
 }
 
 } // namespace energy

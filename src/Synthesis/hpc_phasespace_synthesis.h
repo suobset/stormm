@@ -2,6 +2,7 @@
 #ifndef STORMM_HPC_PHASE_SPACE_SYNTHESIS_H
 #define STORMM_HPC_PHASE_SPACE_SYNTHESIS_H
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "phasespace_synthesis.h"

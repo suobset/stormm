@@ -2,15 +2,16 @@
 #ifndef STORMM_ENERGY_ABSTRACTS_H
 #define STORMM_ENERGY_ABSTRACTS_H
 
+#include "copyright.h"
 #include "Constants/generalized_born.h"
 #include "Topology/atomgraph_abstracts.h"
 
 namespace stormm {
 namespace energy {
 
-using generalized_born_defaults::NeckGeneralizedBornKit;
 using topology::ImplicitSolventKit;
 using topology::ImplicitSolventModel;
+using namespace generalized_born_defaults;
 
 template <typename T> struct ImplicitSolventRecipe {
 

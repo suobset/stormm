@@ -3,6 +3,7 @@
 #define ERROR_FORMAT_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace errors {

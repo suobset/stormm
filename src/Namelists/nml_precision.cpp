@@ -1,4 +1,6 @@
+#include "copyright.h"
 #include "Constants/scaling.h"
+#include "Numerics/split_fixed_precision.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "namelist_element.h"
@@ -9,12 +11,6 @@ namespace namelist {
 
 using constants::CaseSensitivity;
 using constants::translatePrecisionModel;
-using numerics::default_globalpos_scale_bits;
-using numerics::default_localpos_scale_bits;
-using numerics::default_velocity_scale_bits;
-using numerics::default_force_scale_bits;
-using numerics::default_energy_scale_bits;
-using numerics::default_charge_mesh_scale_bits;
 using numerics::checkGlobalPositionBits;
 using numerics::checkLocalPositionBits;
 using numerics::checkVelocityBits;

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include "copyright.h"
 #include "textfile.h"
 #include "Reporting/error_format.h"
 

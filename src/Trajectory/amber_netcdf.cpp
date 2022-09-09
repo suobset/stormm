@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "FileManagement/file_util.h"
 #include "Topology/atomgraph_enumerators.h"
 #include "amber_netcdf.h"

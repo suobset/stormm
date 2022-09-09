@@ -516,9 +516,9 @@ int main(const int argc, const char* argv[]) {
     const std::string stormmsrc_base_name(std::string("${STORMM_SOURCE}") + osc + "test" + osc +
                                         "Topology");
     rtWarn("One or more topologies required by subsequent tests were not found.  Check the "
-           "$STORMM_SOURCE environment variable to make sure it indicates the location of the STORMM "
-           "source tree, with src/ and test/ as subdirectories.  This test program will skip "
-           "nearly all tests until files such as " + getBaseName(tip3p_top_name) + ", " +
+           "$STORMM_SOURCE environment variable to make sure it indicates the location of the "
+           "STORMM source tree, with src/ and test/ as subdirectories.  This test program will "
+           "skip nearly all tests until files such as " + getBaseName(tip3p_top_name) + ", " +
            getBaseName(tip4p_top_name) + ", and " + getBaseName(brbz_vs_top_name) +
            "can be found in directory " + stormmsrc_base_name + ".", "test_amber_prmtop");
   }
@@ -581,7 +581,8 @@ int main(const int argc, const char* argv[]) {
   check(nbrbz_phi, RelationalOperator::EQUAL, 30, "An incorrect number of total dihedrals is "
         "recorded in Amber prmtop file " + brbz.getFileName() + ".", top_check);
   const int ntrp_ang = (all_top_exist) ? trpcage_water.getDescriptor(SanderDescriptor::NTHETH) +
-                                         trpcage_water.getDescriptor(SanderDescriptor::NTHETA) : 0;  check(ntrp_ang, RelationalOperator::EQUAL, 565, "An incorrect total number of angles is "
+                                         trpcage_water.getDescriptor(SanderDescriptor::NTHETA) : 0;
+  check(ntrp_ang, RelationalOperator::EQUAL, 565, "An incorrect total number of angles is "
         "recorded in Amber prmtop file " + trpcage_water.getFileName() + ".", top_check);
   const int nt_bondh = (all_top_exist) ? tip3p.getDescriptor(SanderDescriptor::NBONH) : 0;
   check(nt_bondh, RelationalOperator::EQUAL, 768, "An incorrect number of bonds involving "

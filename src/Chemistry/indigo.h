@@ -3,6 +3,7 @@
 #define STORMM_INDIGO_H
 
 #include <map>
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/mixed_types.h"

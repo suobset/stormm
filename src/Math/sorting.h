@@ -2,6 +2,7 @@
 #ifndef STORMM_SORTING_H
 #define STORMM_SORTING_H
 
+#include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "parse.h"
 
 namespace stormm {

@@ -1,4 +1,6 @@
 //-*-c++-*-
+#include "copyright.h"
+
 namespace stormm {
 namespace synthesis {
 
@@ -132,6 +134,14 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
   if (stray_imports != 0) {
     rtErr("A total of " + std::to_string(stray_imports) + " tiles were not cleaned in the import "
           "coverage array.", "enumerateNonbondedWorkUnits");
+  }
+
+  // Set initialization masks for all work units, then return the result
+  if (target_tile_count == huge_nbwu_tiles) {
+    setPropertyInitializationMasks(&result, NbwuKind::SUPERTILES);
+  }
+  else {
+    setPropertyInitializationMasks(&result, NbwuKind::TILE_GROUPS);
   }
   return result;
 }

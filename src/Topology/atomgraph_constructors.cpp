@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdio>
 #include <climits>
+#include "copyright.h"
 #include "Math/series_ops.h"
 #include "Math/summation.h"
 #include "Reporting/error_format.h"

@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "namelist_enumerations.h"
 

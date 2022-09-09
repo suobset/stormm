@@ -1,5 +1,6 @@
 #include <vector>
 #include "../../src/Constants/behavior.h"
+#include "../../src/Constants/generalized_born.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/DataTypes/stormm_vector_types.h"
 #include "../../src/Accelerator/gpu_details.h"
@@ -28,6 +29,7 @@ using stormm::constants::verytiny;
 using stormm::data_types::double2;
 using stormm::data_types::double3;
 using stormm::data_types::double4;
+using stormm::data_types::float2;
 using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
@@ -36,6 +38,7 @@ using stormm::random::Xoroshiro128pGenerator;
 using stormm::restraints::BoundedRestraint;
 using stormm::restraints::RestraintApparatus;
 using namespace stormm::energy;
+using namespace stormm::generalized_born_defaults;
 using namespace stormm::synthesis;
 using namespace stormm::topology;
 using namespace stormm::trajectory;
@@ -80,12 +83,13 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // Get the valence abstract and prepare for energy calculations
   SyValenceKit<double> syvk = poly_ag.getDoublePrecisionValenceKit();
+  SyAtomUpdateKit<double2, double4> syauk = poly_ag.getDoublePrecisionAtomUpdateKit();
   SyRestraintKit<double, double2, double4> syrk = poly_ag.getDoublePrecisionRestraintKit();
   ScoreCard sc(poly_ps->getSystemCount(), 1, 32);
 
   // Bonds
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::BOND,
                                                 VwuGoal::ACCUMULATE, 0);
   const int nsys = poly_ps->getSystemCount();
@@ -109,7 +113,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Typical harmonic angles
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::ANGL,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> angl_nrg, angl_nrg_answer, angl_frc_deviations;
@@ -131,7 +135,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Cosine-based dihedrals
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::DIHE,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> dihe_nrg, impr_nrg, dihe_nrg_answer, impr_nrg_answer, dihe_frc_deviations;
@@ -159,7 +163,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // General 1:4 interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::INFR14,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> qq14_nrg, lj14_nrg, qq14_nrg_answer, lj14_nrg_answer, attn14_frc_deviations;
@@ -187,7 +191,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Urey-Bradley interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::UBRD,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> ubrd_nrg, ubrd_nrg_answer, ubrd_frc_deviations;
@@ -209,7 +213,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // CHARMM improper dihedral interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::CIMP,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> cimp_nrg, cimp_nrg_answer, cimp_frc_deviations;
@@ -231,7 +235,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // CMAP interactions
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::CMAP,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> cmap_nrg, cmap_nrg_answer, cmap_frc_deviations;
@@ -253,16 +257,16 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
 
   // Various restraints
   poly_ps->initializeForces();
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RPOSN,
                                                 VwuGoal::ACCUMULATE, 0);
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RBOND,
                                                 VwuGoal::ACCUMULATE, 0);
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RANGL,
                                                 VwuGoal::ACCUMULATE, 0);
-  evalSyValenceEnergy<double, double2, double4>(syvk, syrk, poly_ps->data(), &sc,
+  evalSyValenceEnergy<double, double2, double4>(syvk, syauk, syrk, poly_ps->data(), &sc,
                                                 EvaluateForce::YES, VwuTask::RDIHE,
                                                 VwuGoal::ACCUMULATE, 0);
   std::vector<double> rstr_nrg, rstr_nrg_answer, rstr_frc_deviations;
@@ -304,6 +308,9 @@ int main(const int argc, const char* argv[]) {
   section("Test molecular mechanics potential calculations");
 
   // Section 3
+  section("Apply implicit solvent models");
+  
+  // Section 4
   section("Traps for bad input");
   
   // Create some vectors of random numbers, then upload them and test what happens when perturbing
@@ -341,9 +348,9 @@ int main(const int argc, const char* argv[]) {
   else {
     rtWarn("The topology files for the TIP3P and TIP4P water boxes as well as two versions of the "
            "solvated Trp-cage miniprotein, ubiquitin, and two drug molecules must be available in "
-           "${STORMM_SOURCE}/test/ subdirectories Topology and Trajectory, respectively.  Check the "
-           "$STORMM_SOURCE environment variable to make sure that it is set properly.  A number of "
-           "tests will be skipped.", "test_atomgraph_synthesis");
+           "${STORMM_SOURCE}/test/ subdirectories Topology and Trajectory, respectively.  Check "
+           "the $STORMM_SOURCE environment variable to make sure that it is set properly.  A "
+           "number of tests will be skipped.", "test_atomgraph_synthesis");
   }
 
   // Set one of the Trp-cage systems to have a different topology source name.  This will trick
@@ -408,16 +415,16 @@ int main(const int argc, const char* argv[]) {
   }
   else {
     rtWarn("Coordinates for the periodic systems needed to accompany the first AtomGraphSynthesis "
-           "were not found.  Check the installation and the ${STORMM_SOURCE} environment variable.  "
-           "Subsequent tests will be skipped.\n");
+           "were not found.  Check the installation and the ${STORMM_SOURCE} environment "
+           "variable.  Subsequent tests will be skipped.\n");
   }
   const TestPriority do_per_eval = (coords_exist && files_exist) ? TestPriority::CRITICAL :
                                                                    TestPriority::ABORT;
   
-  const std::string base_pept_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Namelist" +
-                                         osc + "topol";
-  const std::string base_pept_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Namelist" +
-                                         osc + "coord";
+  const std::string base_pept_top_name = oe.getStormmSourcePath() + osc + "test" + osc +
+                                         "Namelist" + osc + "topol";
+  const std::string base_pept_crd_name = oe.getStormmSourcePath() + osc + "test" + osc +
+                                         "Namelist" + osc + "coord";
   const std::string brbz_vs_top_name = base_top_name + osc + "bromobenzene_vs.top";
   const std::string brbz_vs_crd_name = base_crd_name + osc + "bromobenzene_vs.inpcrd";
   std::vector<AtomGraph*> ag_list;
@@ -491,6 +498,7 @@ int main(const int argc, const char* argv[]) {
            "are the same as for other files needed by this test program.  Subsequent tests will "
            "be skipped.", "test_atomgraph_synthesis");
   }
+  const TestPriority do_new_tests = (new_exist) ? TestPriority::CRITICAL : TestPriority::ABORT;
 
   // Create some restraints and apply them, then check the synthesis implementation
   RestraintApparatus tiso_ra = assembleRestraints(&tiso_ag, tiso_ps);
@@ -508,8 +516,61 @@ int main(const int argc, const char* argv[]) {
                                               poly_agn_rst.getTopologyIndices());
   poly_agn_rst.loadNonbondedWorkUnits(poly_sen);
   PhaseSpaceSynthesis poly_psn(psn_list, agn_list, system_list);
-  checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_tests, EvaluateNonbonded::YES);
+  checkSynthesis(poly_agn_rst, poly_sen, &poly_psn, do_new_tests, EvaluateNonbonded::YES);
   
+  // Apply implicit solvent models to the synthesis
+  NeckGeneralizedBornTable ngb_tab;
+  poly_agn_rst.setImplicitSolventModel(ImplicitSolventModel::NECK_GB_II, ngb_tab,
+                                       AtomicRadiusSet::MBONDI3);
+  const int nsys = poly_agn_rst.getSystemCount();
+  std::vector<int> radius_mistakes(nsys, 0);
+  std::vector<int> sp_radius_mistakes(nsys, 0);
+  std::vector<int> abg_mistakes(nsys, 0);
+  std::vector<int> sp_abg_mistakes(nsys, 0);
+  const SyNonbondedKit<double, double2> ism_nbk = poly_agn_rst.getDoublePrecisionNonbondedKit();
+  const SyNonbondedKit<float, float2> ism_nbk_sp = poly_agn_rst.getSinglePrecisionNonbondedKit();
+  for (int i = 0; i < nsys; i++) {
+    AtomGraph *iag_ptr = poly_agn_rst.getSystemTopologyPointer(i);
+    const ImplicitSolventKit<double> isk = iag_ptr->getDoublePrecisionImplicitSolventKit();
+    const ImplicitSolventKit<float> isk_sp = iag_ptr->getSinglePrecisionImplicitSolventKit();
+    const int natom = iag_ptr->getAtomCount();
+    const int aoffs = ism_nbk.atom_offsets[i];
+    for (int j = 0; j < natom; j++) {
+      if (fabs(isk.pb_radii[j] - ism_nbk.pb_radii[aoffs + j]) > stormm::constants::tiny) {
+        radius_mistakes[i] += 1;
+      }
+      if (fabs(isk_sp.pb_radii[j] - ism_nbk_sp.pb_radii[aoffs + j]) > stormm::constants::tiny) {
+        sp_radius_mistakes[i] += 1;
+      }
+      if (fabs(isk.gb_alpha[j] - ism_nbk.gb_alpha[aoffs + j]) > stormm::constants::tiny ||
+          fabs(isk.gb_beta[j]  - ism_nbk.gb_beta[aoffs + j])  > stormm::constants::tiny ||
+          fabs(isk.gb_gamma[j] - ism_nbk.gb_gamma[aoffs + j]) > stormm::constants::tiny) {
+        abg_mistakes[i] += 1;
+      }
+      if (fabs(isk_sp.gb_alpha[j] - ism_nbk_sp.gb_alpha[aoffs + j]) > stormm::constants::tiny ||
+          fabs(isk_sp.gb_beta[j]  - ism_nbk_sp.gb_beta[aoffs + j])  > stormm::constants::tiny ||
+          fabs(isk_sp.gb_gamma[j] - ism_nbk_sp.gb_gamma[aoffs + j]) > stormm::constants::tiny) {
+        sp_abg_mistakes[i] += 1;
+      }
+    }
+  }
+  check(radius_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Radii entered "
+        "into the synthesis when setting all systems to MBondi3 disagree with the underlying "
+        "topologies.  Precision setting: " + getPrecisionModelName(PrecisionModel::DOUBLE) + ".",
+        do_new_tests);
+  check(sp_radius_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Radii entered "
+        "into the synthesis when setting all systems to MBondi3 disagree with the underlying "
+        "topologies.  Precision setting: " + getPrecisionModelName(PrecisionModel::SINGLE) + ".",
+        do_new_tests);
+  check(abg_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Alpha, Beta, and "
+        "Gamma atomic parameters entered into the synthesis when setting all systems to MBondi3 "
+        "disagree with the underlying topologies.  Precision setting: " +
+        getPrecisionModelName(PrecisionModel::DOUBLE) + ".", do_new_tests);
+  check(sp_abg_mistakes, RelationalOperator::EQUAL, std::vector<int>(nsys, 0), "Alpha, Beta, and "
+        "Gamma atomic parameters entered into the synthesis when setting all systems to MBondi3 "
+        "disagree with the underlying topologies.  Precision setting: " +
+        getPrecisionModelName(PrecisionModel::SINGLE) + ".", do_new_tests);
+
   // Summary evaluation
   if (oe.getDisplayTimingsOrder()) {
     timer.assignTime(0);

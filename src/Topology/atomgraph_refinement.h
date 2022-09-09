@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "copyright.h"
 #include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/parse.h"

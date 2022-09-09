@@ -2,6 +2,8 @@
 #ifndef STORMM_MIXED_TYPES_H
 #define STORMM_MIXED_TYPES_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace data_types {
 

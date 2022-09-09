@@ -2,6 +2,8 @@
 #ifndef STORMM_SYNTHESIS_ENUMERATORS_H
 #define STORMM_SYNTHESIS_ENUMERATORS_H
 
+#include "copyright.h"
+
 namespace stormm {
 namespace synthesis {
   
@@ -96,6 +98,30 @@ enum class VwuGoal {
                   ///<   the end of the calculation.  Atoms will move and their global positions
                   ///<   will be updated according to separate bit strings dictating which work
                   ///<   units are responsible for each update.
+};
+
+/// \brief In dynamics situations when speed is critical and the process is cyclical, non-bonded
+///        work units are tasked with initializations of the accumulators for subsequent cycles.
+///        The initializations are spread evenly over the non-bonded kernel's work units to place
+///        a balanced load on the memory bus during these relatively low-traffic phases of the
+///        molecular mechanics calculation.
+enum class InitializationTask {
+  GENERAL_DYNAMICS,      ///< Work units will initialize force accumulators for the subsequent
+                         ///<   cycle.
+  GB_DYNAMICS,           ///< Work units will initialize force accumulators as well as Generalized
+                         ///<   Born radii and radii derivative accumulators for the next cycle.
+  GENERAL_MINIMIZATION,  ///< Work units will not initialize any accumulators for the next cycle,
+                         ///<   as most work re-uses the same accumulators (there is no progression
+                         ///<   of the coordinate or force arrays in use). (Same as NONE.)
+  GB_MINIMIZATION,       ///< Work units will initialize only the Generalized Born radii and radii
+                         ///<   derivative accumulators for subsequent cycles.
+  LANGEVIN_DYNAMICS,     ///< Work units will initialize the force accumulators for the next cycle
+                         ///<   and perform a portion of the random number computations for the
+                         ///<   next N cycles, where N is a number between 1 and 15.
+  GB_LANGEVIN_DYNAMICS,  ///< Work units will initialize force and Generalized Born accumulators
+                         ///<   for the next cycle and perform a portion of the random number
+                         ///<   computations for the next N cycles (1 <= N <= 15).  
+  NONE                   ///< Work units perform no initializations or random number computations.
 };
 
 } // namespace synthesis

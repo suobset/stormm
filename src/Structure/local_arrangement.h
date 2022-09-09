@@ -3,6 +3,7 @@
 #define STORMM_LOCAL_ARRANGEMENT_H
 
 #include <cmath>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "DataTypes/common_types.h"
 #include "Math/rounding.h"

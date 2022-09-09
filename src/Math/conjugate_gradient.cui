@@ -47,15 +47,6 @@ KGATHER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ctr
       WARP_REDUCE_DOWN(gg);
       if (lane_idx == 0) {
         cgsbs.gg_buffer[result_pos] = gg;
-
-        // CHECK
-#if 0
-        const int sys_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::SYSTEM_ID)];
-        printf("GT %4d : Atoms %4d - %4d in system %4d -> %12.4lf at %4d\n", gtwu_idx, start_pos,
-               end_pos, sys_pos, gg, result_pos);
-               
-#endif
-        // END CHECK
       }
     }
     else if (warp_idx == 1) {
@@ -122,14 +113,6 @@ KSCATTER_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ct
       WARP_REDUCE_DOWN(gg);
       if (lane_idx == 0) {
         sh_gg_total = gg;
-
-        // CHECK
-#if 0
-        const int sys_pos = redk.rdwu_abstracts[wabs_pos + (int)(RdwuAbstractMap::SYSTEM_ID)];
-        printf("SC %4d : Atoms %4d - %4d in system %4d -> %12.4lf\n", scwu_idx,
-               atom_start_pos, atom_end_pos, sys_pos, gg);
-#endif
-        // END CHECK
       }
     }
     else if (warp_idx == 1) {
@@ -234,9 +217,9 @@ KRESCALE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> ct
                         (double)(cgsbs.yfrc[tpos]);
       const double fz = ((double)(cgsbs.zfrc_ovrf[tpos]) * max_llint_accumulation) +
                         (double)(cgsbs.zfrc[tpos]);
-      const int95_t norm_fx = convertSplitFixedPrecision95(fx * inv_factor);
-      const int95_t norm_fy = convertSplitFixedPrecision95(fy * inv_factor);
-      const int95_t norm_fz = convertSplitFixedPrecision95(fz * inv_factor);
+      const int95_t norm_fx = doubleToInt95(fx * inv_factor);
+      const int95_t norm_fy = doubleToInt95(fy * inv_factor);
+      const int95_t norm_fz = doubleToInt95(fz * inv_factor);
       cgsbs.xfrc[tpos] = norm_fx.x;
       cgsbs.yfrc[tpos] = norm_fy.x;
       cgsbs.zfrc[tpos] = norm_fz.x;
@@ -274,7 +257,6 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
   __shared__ double   gg_collector[small_block_size >> warp_bits];
   __shared__ double  dgg_collector[small_block_size >> warp_bits];
   __shared__ double msum_collector[small_block_size >> warp_bits];
-  __shared__ int sh_rdwu_idx;
 
   const int warp_idx = threadIdx.x >> warp_bits;
   const int lane_idx = (threadIdx.x & warp_bits_mask_int);
@@ -365,9 +347,9 @@ KALLREDUCE_NAME(ReductionKit redk, ConjGradSubstrate cgsbs, MMControlKit<TCALC> 
                         (double)(cgsbs.yfrc[tpos]);
       const double fz = ((double)(cgsbs.zfrc_ovrf[tpos]) * max_llint_accumulation) +
                         (double)(cgsbs.zfrc[tpos]);
-      const int95_t norm_fx = convertSplitFixedPrecision95(fx * inv_factor);
-      const int95_t norm_fy = convertSplitFixedPrecision95(fy * inv_factor);
-      const int95_t norm_fz = convertSplitFixedPrecision95(fz * inv_factor);
+      const int95_t norm_fx = doubleToInt95(fx * inv_factor);
+      const int95_t norm_fy = doubleToInt95(fy * inv_factor);
+      const int95_t norm_fz = doubleToInt95(fz * inv_factor);
       cgsbs.xfrc[tpos] = norm_fx.x;
       cgsbs.yfrc[tpos] = norm_fy.x;
       cgsbs.zfrc[tpos] = norm_fz.x;

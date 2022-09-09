@@ -2,6 +2,7 @@
 #ifndef STORMM_REDUCTION_BRIDGE_H
 #define STORMM_REDUCTION_BRIDGE_H
 
+#include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
 

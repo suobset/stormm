@@ -1,4 +1,6 @@
 // -*-c++-*-
+#include "copyright.h"
+
 namespace stormm {
 namespace mm {
 
@@ -286,9 +288,23 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
         }
       }
       else if (min_pos < mvec[3]) {
-        moveParticles<Tforce, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
-                                     UnitCellType::NONE, vsk, vk.natom,
-                                     (min_pos - mvec[3]) * move_scale, force_factor);
+
+        // Make a final check that the minimum value of the function is an improvement over
+        // the extrema. (This is only the value of the estimate function, not the actual value
+        // of the system energy.) Otherwise, move the particles to a point within the range
+        // scored by the four data points.
+        const double epred = (((((abcd_coefs[0] * min_pos) + abcd_coefs[1]) * min_pos) +
+                               abcd_coefs[2]) * min_pos) + abcd_coefs[3];
+        if (evec[0] < epred) {
+          moveParticles<Tforce, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
+                                       UnitCellType::NONE, vsk, vk.natom, -mvec[3] * move_scale,
+                                       force_factor);
+        }
+        else if (epred < evec[3]) {
+          moveParticles<Tforce, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
+                                       UnitCellType::NONE, vsk, vk.natom,
+                                       (min_pos - mvec[3]) * move_scale, force_factor);
+        }
       }
     }
     sc.incrementSampleCount();

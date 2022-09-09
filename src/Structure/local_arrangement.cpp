@@ -1,4 +1,5 @@
 #include <cmath>
+#include "copyright.h"
 #include "Math/vector_ops.h"
 #include "Reporting/error_format.h"
 #include "Topology/atomgraph_enumerators.h"

@@ -1,4 +1,5 @@
 #include <cstring>
+#include "copyright.h"
 #include "Constants/symbol_values.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/polynumeric.h"

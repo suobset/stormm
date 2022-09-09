@@ -3,6 +3,7 @@
 #define STORMM_NAMELIST_ENUMERATIONS_H
 
 #include <string>
+#include "copyright.h"
 
 namespace stormm {
 namespace namelist {

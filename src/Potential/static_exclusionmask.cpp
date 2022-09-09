@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "copyright.h"
 #include "static_exclusionmask.h"
 
 namespace stormm {

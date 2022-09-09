@@ -3,6 +3,7 @@
 #define	STORMM_RESTRAINT_BUILDER_H
 
 #include <vector>
+#include "copyright.h"
 #include "Chemistry/atommask.h"
 #include "bounded_restraint.h"
 

@@ -1,4 +1,5 @@
 #include <netcdf.h>
+#include "copyright.h"
 #include "FileManagement/file_listing.h"
 #include "netcdf_util.h"
 

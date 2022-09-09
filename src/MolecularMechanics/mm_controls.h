@@ -2,6 +2,7 @@
 #ifndef STORMM_MM_CONTROLS_H
 #define STORMM_MM_CONTROLS_H
 
+#include "copyright.h"
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/kernel_manager.h"
 #include "Accelerator/hybrid.h"
@@ -11,6 +12,7 @@
 #include "Namelists/nml_dynamics.h"
 #include "Namelists/nml_minimize.h"
 #include "Synthesis/atomgraph_synthesis.h"
+#include "Topology/atomgraph_enumerators.h"
 
 namespace stormm {
 namespace mm {
@@ -31,7 +33,8 @@ using namelist::default_rattle_tolerance;
 using namelist::DynamicsControls;
 using namelist::MinimizeControls;
 using synthesis::AtomGraphSynthesis;
-  
+using topology::ImplicitSolventModel;
+
 /// \brief The C-style, always writeable abstract for the MolecularMechanicsControls object.  To
 ///        not be able to modify this object's contents would be nonsensical, as it is intended to
 ///        to keep counters of the simulation time step as well as force evaluation work units.
@@ -41,8 +44,8 @@ template <typename T> struct MMControlKit {
   ///        left modifiable so that the object can be re-used over successive time steps.
   MMControlKit(int step_in, int sd_cycles_in, int max_cycles_in, T dt_in, T rattle_tol_in,
                T initial_step_in, int* vwu_progress_in, int* nbwu_progress_in,
-               int* pmewu_progress_in, int* gtwu_progress_in, int* scwu_progress_in,
-               int* rdwu_progress_in);
+               int* pmewu_progress_in, int* gbrwu_progress_in, int* gbdwu_progress_in,
+               int* gtwu_progress_in, int* scwu_progress_in, int* rdwu_progress_in);
 
   /// \brief The usual copy and move constructors for an abstract apply here.  
   /// \{
@@ -59,6 +62,8 @@ template <typename T> struct MMControlKit {
   int* vwu_progress;     ///< Progress counters for valence work units
   int* nbwu_progress;    ///< Progress counters for non-bonded work units
   int* pmewu_progress;   ///< Progress counters for PME long-ranged work units
+  int* gbrwu_progress;   ///< Progress counters for Generalized Born radii computations
+  int* gbdwu_progress;   ///< Progress counters for Generalized Born derivative computations
   int* gtwu_progress;    ///< Progress counters for gathering work units
   int* scwu_progress;    ///< Progress counters for scattering work units
   int* rdwu_progress;    ///< Progress counters for reduction work units
@@ -183,7 +188,7 @@ public:
   ///                  descriptors such as the non-bonded work unit type)
   void primeWorkUnitCounters(const KernelManager &launcher, EvaluateForce eval_frc,
                              EvaluateEnergy eval_nrg, PrecisionModel prec,
-                             const AtomGraphSynthesis &poly_ag);
+                             const AtomGraphSynthesis &poly_ag); 
 
   /// \brief Increment the step counter, moving the controls to a different progress counter.
   void incrementStep();
@@ -224,6 +229,12 @@ private:
   /// Progress counters for long-ranged, mesh-based PME work units
   Hybrid<int> pmewu_progress;
 
+  /// Progress counters for Generalized Born radii computation work units
+  Hybrid<int> gbrwu_progress;
+
+  /// Progress counters for Generalized Born derivative computation work units
+  Hybrid<int> gbdwu_progress;
+  
   /// Progress counters for gathering information across each system.
   Hybrid<int> gather_wu_progress;
 
@@ -236,7 +247,7 @@ private:
   Hybrid<int> all_reduce_wu_progress;
 
   /// ARRAY-kind Hybrid object targeted by the above POINTER-kind Hybrid objects
-  Hybrid<int> progress_data;
+  Hybrid<int> int_data;
 };
 
 } // namespace mm

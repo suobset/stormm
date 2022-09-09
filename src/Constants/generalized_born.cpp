@@ -1,3 +1,4 @@
+#include "copyright.h"
 #include "generalized_born.h"
 
 namespace stormm {
@@ -5,7 +6,7 @@ namespace generalized_born_defaults {
 
 //-------------------------------------------------------------------------------------------------
 NeckGeneralizedBornTable::NeckGeneralizedBornTable() :
-    table_size{21}, neck_cut{gb_neck_cut}, kscale{gb_kscale},
+    table_size{21}, neck_cut{default_gb_neck_cut}, kscale{default_gb_kscale},
     neck_max_separation{static_cast<size_t>(table_size * table_size), "gb_table_maxsep"},
     neck_max_value{static_cast<size_t>(table_size * table_size), "gb_table_maxval"},
     sp_neck_max_separation{static_cast<size_t>(table_size * table_size), "gb_table_maxsep"},
@@ -208,7 +209,7 @@ double NeckGeneralizedBornTable::getMaxValue(int i_type, int j_type) const {
 
 //-------------------------------------------------------------------------------------------------
 const NeckGeneralizedBornKit<double>
-NeckGeneralizedBornTable::getDoublePrecisionAbstract(const HybridTargetLevel tier) const {
+NeckGeneralizedBornTable::dpData(const HybridTargetLevel tier) const {
   return NeckGeneralizedBornKit<double>(table_size, neck_cut, kscale,
                                         neck_max_separation.data(tier),
                                         neck_max_value.data(tier));
@@ -216,7 +217,7 @@ NeckGeneralizedBornTable::getDoublePrecisionAbstract(const HybridTargetLevel tie
 
 //-------------------------------------------------------------------------------------------------
 const NeckGeneralizedBornKit<float>
-NeckGeneralizedBornTable::getSinglePrecisionAbstract(const HybridTargetLevel tier) const {
+NeckGeneralizedBornTable::spData(const HybridTargetLevel tier) const {
   return NeckGeneralizedBornKit<float>(table_size, neck_cut, kscale,
                                        sp_neck_max_separation.data(tier),
                                        sp_neck_max_value.data(tier));

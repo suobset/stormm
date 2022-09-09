@@ -3,6 +3,7 @@
 #define STORMM_POLYNUMERIC_H
 
 #include <vector>
+#include "copyright.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Reporting/error_format.h"
