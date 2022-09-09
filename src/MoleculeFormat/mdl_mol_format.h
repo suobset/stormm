@@ -55,7 +55,6 @@ struct MolObjBond {
 
 /// \brief A molecular or atomic property read from an MDL .mol or SDF file
 struct MolObjProperty {
-private:
   
 };
 
@@ -85,7 +84,7 @@ public:
   
   // Getter functions, some of which trigger complex filtering behavior
   double3 getCoordinate(int index) const;
-  std::vector<double3>getCoordinate() const;
+  std::vector<double3> getCoordinate() const;
   std::vector<double3> getCoordinates() const;
   int getAtomicNumber(int index) const;
   std::vector<int> getAtomicNumber() const;

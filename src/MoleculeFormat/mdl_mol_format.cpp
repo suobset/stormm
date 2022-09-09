@@ -34,7 +34,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   // comment (always three and only three distinct lines, even if left blank)
 
   // Read the counts line
-
+  
   // Read the atoms block
 
   // Read the bonds block
