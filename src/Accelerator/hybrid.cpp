@@ -303,8 +303,10 @@ std::string getEnumerationName(HybridTargetLevel tier) {
   switch (tier) {
   case HybridTargetLevel::HOST:
     return std::string("Host");
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     return std::string("Device");
+#endif
   }
   __builtin_unreachable();
 }

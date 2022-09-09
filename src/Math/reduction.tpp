@@ -190,6 +190,32 @@ void evalReduction(GenericRdSubstrate<T> *rsbs, const ReductionKit &redk,
       }
     }
     break;
+  case ReductionStage::RESCALE:
+    for (int i = 0; i < redk.nrdwu; i++) {
+      const int start_pos  = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_start_id];
+      const int end_pos    = redk.rdwu_abstracts[(i * rdwu_abstract_length) + atom_end_id];
+      const int result_pos = redk.rdwu_abstracts[(i * rdwu_abstract_length) + system_id];
+      const double xscale  = rsbs->x_buffer[result_pos];
+      for (int j = start_pos; j < end_pos; j++) {
+        const double dx = static_cast<double>(rsbs->x_read[j]);
+        rsbs->x_write[j] = static_cast<T>(dx * xscale);
+      }
+      if (rsbs->y_read != nullptr) {
+        const double yscale  = rsbs->y_buffer[result_pos];
+        for (int j = start_pos; j < end_pos; j++) {
+          const double dy = static_cast<double>(rsbs->y_read[j]);
+          rsbs->y_write[j] = static_cast<T>(dy * yscale);
+        }
+      }
+      if (rsbs->z_read != nullptr) {
+        const double zscale  = rsbs->z_buffer[result_pos];
+        for (int j = start_pos; j < end_pos; j++) {
+          const double dz = static_cast<double>(rsbs->z_read[j]);
+          rsbs->z_write[j] = static_cast<T>(dz * zscale);
+        }
+      }
+    }
+    break;
   case ReductionStage::ALL_REDUCE:
     switch (redk.rps) {
     case RdwuPerSystem::ONE:

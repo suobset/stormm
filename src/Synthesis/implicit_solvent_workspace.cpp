@@ -80,6 +80,13 @@ ImplicitSolventWorkspace::ImplicitSolventWorkspace(ImplicitSolventWorkspace &&or
 //-------------------------------------------------------------------------------------------------
 ImplicitSolventWorkspace&
 ImplicitSolventWorkspace::operator=(const ImplicitSolventWorkspace &other) {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Perform the customary copying operations
   fp_bits = other.fp_bits;
   padded_atom_count = other.padded_atom_count;
   psi = other.psi;
@@ -93,13 +100,21 @@ ImplicitSolventWorkspace::operator=(const ImplicitSolventWorkspace &other) {
   llint_data = other.llint_data;
   int_data = other.int_data;
 
-  // Repair the pointers
+  // Repair the pointers and return the result
   rebasePointers();
+  return *this;
 }
 
 //-------------------------------------------------------------------------------------------------
 ImplicitSolventWorkspace&
 ImplicitSolventWorkspace::operator=(ImplicitSolventWorkspace &&other) {
+
+  // Guard against self assignment
+  if (this == &other) {
+    return *this;
+  }
+
+  // Perform the customary move operations
   fp_bits = other.fp_bits;
   padded_atom_count = other.padded_atom_count;
   psi = std::move(other.psi);
@@ -112,6 +127,7 @@ ImplicitSolventWorkspace::operator=(ImplicitSolventWorkspace &&other) {
   alt_sum_deijda_overflow = std::move(other.alt_sum_deijda_overflow);
   llint_data = std::move(other.llint_data);
   int_data = std::move(other.int_data);
+  return *this;
 }
 
 //-------------------------------------------------------------------------------------------------
