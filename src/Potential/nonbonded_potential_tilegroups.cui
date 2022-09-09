@@ -237,7 +237,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
             const TCALC atmq2h = (TCALC)(0.5) * atomq * atomq * poly_nbk.coulomb;
             const TCALC atmqd2h = atmq2h * dielfac;
 #  ifdef COMPUTE_ENERGY
-            gb_nrg += (-atmqd2h / egbi) * scw.nrg_scale_f;
+            gb_nrg -= atmqd2h / egbi;
 #  endif
 #  ifdef COMPUTE_FORCE
 #    ifdef TCALC_IS_SINGLE
@@ -607,6 +607,13 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                               (int)(StateVariable::GENERALIZED_BORN);
         atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
                   (ullint)(sh_gb_acc[rel_pos]));
+
+        // CHECK
+        if (sh_system_indices[rel_pos] <= 1) {
+          const TCALC gb_contrib = (TCALC)(sh_gb_acc[rel_pos]) * scw.inverse_nrg_scale_f;
+          printf("%d : Add %12.6lf\n", sh_system_indices[rel_pos], gb_contrib);
+        }
+        // END CHECK
       }
       pos += blockDim.x;
     }

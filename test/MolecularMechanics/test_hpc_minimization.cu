@@ -375,8 +375,15 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                       const int frc_bits = 40, const int maxcyc = 500,
                       const bool enforce_same_track = true, const bool check_mm = true,
                       const double frc_tol = 1.0e-6, const double nrg_tol = 1.0e-6,
-                      const std::string &test_name = std::string(""), StopWatch *timer = nullptr) {
+                      const std::string &test_name = std::string(""), StopWatch *timer = nullptr,
+                      const ImplicitSolventModel ism_choice = ImplicitSolventModel::NONE) {
   AtomGraphSynthesis poly_ag(ag_ptr_vec, mol_id_vec, ExceptionResponse::SILENT, gpu, timer);
+  const NeckGeneralizedBornTable ngb_tables;
+  if (ism_choice != ImplicitSolventModel::NONE) {
+    const AtomicRadiusSet radii = (ism_choice == ImplicitSolventModel::NECK_GB_II) ?
+                                  AtomicRadiusSet::MBONDI3 : AtomicRadiusSet::BONDI;
+    poly_ag.setImplicitSolventModel(ism_choice, ngb_tables, radii);
+  }
   StaticExclusionMaskSynthesis poly_se(poly_ag.getTopologyPointers(), mol_id_vec);
   poly_ag.loadNonbondedWorkUnits(poly_se);
   PhaseSpaceSynthesis poly_ps(ps_vec, ag_ptr_vec, mol_id_vec, gpos_bits, 24, 40, frc_bits);
@@ -487,6 +494,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // First stage of the cycle: compute forces and obtain the conjugate gradient move.
     poly_ps.initializeForces(gpu, devc);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -518,6 +526,47 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       f_ctrl_fe.step += 1;
       break;
     }
+
+    // CHECK
+    if (i < 4 && poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
+      cudaDeviceSynchronize();
+      const int nsys = poly_ag.getSystemCount();
+      const TrajectoryKind tforce = TrajectoryKind::FORCES; 
+      std::vector<double> test_cpu_total_e(nsys), test_gpu_total_e(nsys), test_force_mue(nsys);
+      const std::vector<double> test_gpu_gb_e =
+        sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, devc);
+      const std::vector<double> test_gpu_qq_e =
+        sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, devc);
+      printf("Track(%d) = [\n", i);
+      for (int j = 0; j < 8; j++) {
+        PhaseSpace chkj_ps = poly_ps.exportSystem(j, devc);
+        const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
+        chkj_ps.initializeForces();
+        ScoreCard tmp_sc(1, 1, 32);
+        const AtomGraph *jag_ptr = poly_ag.getSystemTopologyPointer(j);
+        StaticExclusionMask chkj_se(jag_ptr);
+        const RestraintApparatus *jra_ptr = poly_ag.getSystemRestraintPointer(j);
+        evalRestrainedMMGB(&chkj_ps, &tmp_sc, jag_ptr, ngb_tables, chkj_se, jra_ptr,
+                           EvaluateForce::YES, 0);
+        const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
+        test_cpu_total_e[j] = tmp_sc.reportTotalEnergy(0);
+        test_gpu_total_e[j] = sc.reportTotalEnergy(j, devc);
+        test_force_mue[j] = meanUnsignedError(cpu_frc, gpu_frc);
+        printf("  %12.4lf %18.4lf %12.4lf -> %12.4lf %12.4lf   %12.4lf %12.4lf\n",
+               test_cpu_total_e[j], test_gpu_total_e[j], test_force_mue[j], test_gpu_gb_e[j],
+               test_gpu_qq_e[j],
+               tmp_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, 0),
+               tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0));
+        for (int k = 0; k < 4; k++) {
+          printf("  %12.4lf %12.4lf %12.4lf   %12.4lf %12.4lf %12.4lf\n", cpu_frc[3 * k],
+                 cpu_frc[(3 * k) + 1], cpu_frc[(3 * k) + 2], gpu_frc[3 * k],
+                 gpu_frc[(3 * k) + 1], gpu_frc[(3 * k) + 2]);
+        }
+      }
+      printf("];\n");
+      exit(1);
+    }
+    // END CHECK
     
     // Check the forces computed for a couple of systems.  This is somewhat redundant, but serves
     // as a sanity check in case other aspects of the energy minimization show problems.
@@ -534,7 +583,14 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
         ScoreCard tmp_sc(1, 1, 32);
         const AtomGraph *jag_ptr = poly_ag.getSystemTopologyPointer(jmod);
         StaticExclusionMask chkj_se(jag_ptr);
-        evalNonbValeMM(&chkj_ps, &tmp_sc, jag_ptr, chkj_se, EvaluateForce::YES, 0);
+        if (jag_ptr->getImplicitSolventModel() == ImplicitSolventModel::NONE) {
+          evalNonbValeMM(&chkj_ps, &tmp_sc, jag_ptr, chkj_se, EvaluateForce::YES, 0);
+        }
+        else {
+          const RestraintApparatus *jra_ptr = poly_ag.getSystemRestraintPointer(jmod);
+          evalRestrainedMMGB(&chkj_ps, &tmp_sc, jag_ptr, ngb_tables, chkj_se, jra_ptr,
+                             EvaluateForce::YES, 0);
+        }
         transmitVirtualSiteForces(&chkj_ps, jag_ptr);
         const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
         cpu_total_e[i / 32] = tmp_sc.reportTotalEnergy(0);
@@ -586,6 +642,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Second stage of the cycle: advance once along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 0, redu_lp);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -632,6 +689,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Third stage of the cycle: advance once more along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 1, redu_lp);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -678,6 +736,7 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
     
     // Final stage of the cycle: advance a final time along the line and recompute the energy.
     launchLineAdvance(prec, &poly_psw, poly_redk, scw, &lmw, 2, redu_lp);
+    ism_space.initialize(devc, CoordinateCycle::PRESENT, gpu);
     sc.initialize(devc, gpu);
     switch (prec) {
     case PrecisionModel::DOUBLE:
@@ -915,7 +974,8 @@ void testCompilation(const std::vector<std::string> &top_names,
                      const int n_tiles, const double frc_tol, const double nrg_tol,
                      const TestEnvironment &oe, const GpuDetails &gpu,
                      const std::string &test_name, const PrintSituation psnap,
-                     const std::string &snap_name, const std::string &var_name, StopWatch *timer) {
+                     const std::string &snap_name, const std::string &var_name, StopWatch *timer,
+                     const ImplicitSolventModel ism_choice = ImplicitSolventModel::NONE) {
   const int mol_count = top_names.size();
   if (crd_names.size() != top_names.size()) {
     rtErr("A total of " + std::to_string(top_names.size()) + " topologies and " +
@@ -954,7 +1014,7 @@ void testCompilation(const std::vector<std::string> &top_names,
   std::vector<int> mol_id(total_mol);
   std::vector<int> d_nrg_target(total_mol);
   std::vector<int> f_nrg_target(total_mol);
-
+  
   // The test name determines the content of the target energy vector.  Codify the test name.
   for (int i = 0; i < n_tiles; i++) {
     for (int j = 0; j < tlen; j++) {
@@ -965,10 +1025,10 @@ void testCompilation(const std::vector<std::string> &top_names,
                                                                         PrintSituation::APPEND;
   metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, oe, x_psnap, snap_name, var_name,
                    PrecisionModel::DOUBLE, 40, 40, 100, false, true, frc_tol, nrg_tol,
-                   test_name + " (fp64)", timer);
+                   test_name + " (fp64)", timer, ism_choice);
   metaMinimization(mol_ag_ptr, mol_ps, mol_id, gpu, do_tests, oe, PrintSituation::APPEND,
                    snap_name, var_name, PrecisionModel::SINGLE, 28, 24, 500, false, true,
-                   10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer);
+                   10.0 * frc_tol, 10.0 * nrg_tol, test_name + " (fp32)", timer, ism_choice);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1039,6 +1099,11 @@ int main(const int argc, const char* argv[]) {
   // Run tests on small proteins
   testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
                   "Trp-cage only", PrintSituation::APPEND, snap_name, "trp_cage_", &timer);
+
+  // Run tests with various GB models
+  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
+                  "Trp-cage +GB", PrintSituation::APPEND, snap_name, "trp_cage_", &timer,
+                  ImplicitSolventModel::HCT_GB);
   
   // Run tests on larger proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,

@@ -604,18 +604,18 @@ std::vector<double> ScoreCard::reportTotalEnergies(const HybridTargetLevel tier)
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   for (int i = 0; i < system_count; i++) {
     const size_t info_start = (i * padded_nvar);
     result[i] = sumTotalEnergy(&inst_acc_ptr[info_start]);
@@ -631,18 +631,18 @@ double ScoreCard::reportTotalEnergy(const int system_index, const HybridTargetLe
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = &instantaneous_accumulators.data()[info_start];
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice(info_start, padded_nvar);
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = &instantaneous_accumulators.data()[info_start];
 #endif
+  }
   return sumTotalEnergy(inst_acc_ptr);
 }
 
@@ -651,20 +651,18 @@ std::vector<double> ScoreCard::reportInstantaneousStates(const HybridTargetLevel
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
   llint* inst_acc_ptr;
-#ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   std::vector<double> result(nvar * system_count);
   for (int i = 0; i < system_count; i++) {
     for (int j = 0; j < nvar; j++) {
@@ -683,18 +681,18 @@ std::vector<double> ScoreCard::reportInstantaneousStates(const int system_index,
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   std::vector<double> result(nvar);
   for (int i = 0; i < nvar; i++) {
     result[i] = inverse_nrg_scale_lf * static_cast<double>(inst_acc_ptr[offset + i]);
@@ -711,18 +709,18 @@ std::vector<double> ScoreCard::reportInstantaneousStates(const StateVariable asp
   llint* inst_acc_ptr;
 #ifdef STORMM_USE_HPC
   std::vector<llint> devc_acc;
+#endif
   switch (tier) {
   case HybridTargetLevel::HOST:
     inst_acc_ptr = instantaneous_accumulators.data();
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     devc_acc = instantaneous_accumulators.readDevice();
     inst_acc_ptr = devc_acc.data();
     break;
-  }
-#else
-  inst_acc_ptr = instantaneous_accumulators.data();
 #endif
+  }
   std::vector<double> result(system_count);
   for (int i = 0; i < system_count; i++) {
     const llint lacc = inst_acc_ptr[(i * padded_nvar) + aspect_no];
@@ -738,18 +736,16 @@ double ScoreCard::reportInstantaneousStates(const StateVariable aspect, const in
   const int nvar = static_cast<int>(StateVariable::ALL_STATES);
   const int padded_nvar = roundUp(nvar, warp_size_int);
   llint lacc;
-#ifdef STORMM_USE_HPC
   switch (tier) {
   case HybridTargetLevel::HOST:
     lacc = instantaneous_accumulators.readHost((system_index * padded_nvar) + aspect_no);
     break;
+#ifdef STORMM_USE_HPC
   case HybridTargetLevel::DEVICE:
     lacc = instantaneous_accumulators.readDevice((system_index * padded_nvar) + aspect_no);
     break;
-  }
-#else
-  lacc = instantaneous_accumulators.readHost((system_index * padded_nvar) + aspect_no);
 #endif
+  }
   return inverse_nrg_scale_lf * static_cast<double>(lacc);
 }
 
