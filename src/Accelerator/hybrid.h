@@ -542,6 +542,11 @@ private:
   HybridLabel assignLabel(const char* tag);
 };
 
+/// \brief Produce a string indicating the Hybrid target level.
+///
+/// \param tier  Hybrid target level of interest
+std::string getEnumerationName(HybridTargetLevel tier);
+  
 } // namespace card
 } // namespace stormm
 

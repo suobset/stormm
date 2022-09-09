@@ -15,7 +15,7 @@
 /// \param primary   The first accumulator, which receives most of the traffic
 /// \param overflow  The emergency accumulator
 /// \{
-__device__ __forceinline__ void atomicSplit(const double dval, const int pos, llint* primary,
+__device__ __forceinline__ void atomicSplit(const double dval, const size_t pos, llint* primary,
                                             int* overflow) {
   llint ival;
   if (fabs(dval) >= max_llint_accumulation) {
@@ -33,7 +33,7 @@ __device__ __forceinline__ void atomicSplit(const double dval, const int pos, ll
   }
 }
 
-__device__ __forceinline__ void atomicSplit(const float fval, const int pos, int* primary,
+__device__ __forceinline__ void atomicSplit(const float fval, const size_t pos, int* primary,
                                             int* overflow) {
   int ival;
   if (fabsf(fval) >= max_int_accumulation_f) {
@@ -73,7 +73,7 @@ __device__ __forceinline__ void atomicSplit(const float fval, const int pos, int
 /// \param primary    Primary accumulator
 /// \param overflow   Secondary / emergency accumulator
 /// \{
-__device__ __forceinline__ void atomicSplit(const int95_t ival, const int pos, llint* primary,
+__device__ __forceinline__ void atomicSplit(const int95_t ival, const size_t pos, llint* primary,
                                             int* overflow) {
   const llint prim_old = atomicAdd((ullint*)&primary[pos], (ullint)(ival.x));
   const llint prim_old_plus_x = prim_old + ival.x;
@@ -85,7 +85,7 @@ __device__ __forceinline__ void atomicSplit(const int95_t ival, const int pos, l
   }
 }
 
-__device__ __forceinline__ void atomicSplit(const int2 ival, const int pos, int* primary,
+__device__ __forceinline__ void atomicSplit(const int2 ival, const size_t pos, int* primary,
                                             int* overflow) {
   const int prim_old = atomicAdd(&primary[pos], ival.x);
   const int prim_old_plus_x = prim_old + ival.x;
@@ -97,8 +97,8 @@ __device__ __forceinline__ void atomicSplit(const int2 ival, const int pos, int*
   }
 }
 
-__device__ __forceinline__ void atomicSplit(const llint ival_x, const int ival_y_in, const int pos,
-                                            llint* primary, int* overflow) {
+__device__ __forceinline__ void atomicSplit(const llint ival_x, const int ival_y_in,
+                                            const size_t pos, llint* primary, int* overflow) {
   const llint prim_old = atomicAdd((ullint*)&primary[pos], (ullint)(ival_x));
   const llint prim_old_plus_x = prim_old + ival_x;
   int ival_y = ival_y_in;
@@ -109,8 +109,8 @@ __device__ __forceinline__ void atomicSplit(const llint ival_x, const int ival_y
   }
 }
 
-__device__ __forceinline__ void atomicSplit(const int ival_x, const int ival_y_in, const int pos,
-                                            int* primary, int* overflow) {
+__device__ __forceinline__ void atomicSplit(const int ival_x, const int ival_y_in,
+                                            const size_t pos, int* primary, int* overflow) {
   const int prim_old = atomicAdd(&primary[pos], ival_x);
   const int prim_old_plus_x = prim_old + ival_x;
   int ival_y = ival_y_in;
@@ -186,6 +186,34 @@ __device__ __forceinline__ float splitFPToReal(const int2 isfp) {
 
 __device__ __forceinline__ float int63ToFloat(const int isfp_x, const int isfp_y) {
   return ((float)(isfp_y) * max_int_accumulation_f) + (float)(isfp_x);
+}
+
+__device__ __forceinline__
+size_t splitFPToReal(float* result, const size_t pos, const size_t iter, const int* isfp_x,
+                     const int* isfp_y, const size_t length, const float descale) {
+  const size_t padded_length = ((length + warp_size_zu - 1LLU) >> warp_bits) * warp_size_zu;
+  size_t rel_pos = pos - (iter * padded_length);
+  while (rel_pos < padded_length) {
+    if (rel_pos < length) {
+      result[rel_pos] = int63ToFloat(isfp_x[rel_pos], isfp_y[rel_pos]) * descale;
+    }
+    rel_pos += blockDim.x * gridDim.x;
+  }
+  return rel_pos + (iter * padded_length);
+}
+
+__device__ __forceinline__
+size_t splitFPToReal(double* result, const size_t pos, const size_t iter, const llint* isfp_x,
+                     const int* isfp_y, const size_t length, const double descale) {
+  const size_t padded_length = ((length + warp_size_zu - 1LLU) >> warp_bits) * warp_size_zu;
+  size_t rel_pos = pos - (iter * padded_length);
+  while (rel_pos < padded_length) {
+    if (rel_pos < length) {
+      result[rel_pos] = int95ToDouble(isfp_x[rel_pos], isfp_y[rel_pos]) * descale;
+    }
+    rel_pos += blockDim.x * gridDim.x;
+  }
+  return rel_pos + (iter * padded_length);
 }
 /// \}
 

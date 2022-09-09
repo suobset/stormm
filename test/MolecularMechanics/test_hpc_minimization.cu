@@ -790,6 +790,23 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
                                  TestPriority::NON_CRITICAL : TestPriority::ABORT;
     const std::vector<double> final_e = sc.reportTotalEnergies(devc);
     const std::string test_var = var_name + ((prec == PrecisionModel::DOUBLE) ? "d" : "f");
+
+    // CHECK
+    if (prec == PrecisionModel::SINGLE) {
+      printf("Energies = [\n");
+      int j = 0;
+      for (size_t i = 0; i < final_e.size(); i++) {
+        printf("  %16.8e", final_e[i]);
+        j++;
+        if (j == 8) {
+          printf("\n");
+          j = 0;
+        }
+      }
+      printf("];\n");
+    }
+    // END CHECK
+    
     snapshot(snap_name, polyNumericVector(final_e), test_var, 1.0e-6, "Final energies of "
              "energy-minimized structures did not reach their expected values.  Test: " +
              test_name + ".  Precision model: " + getPrecisionModelName(prec) + ".",

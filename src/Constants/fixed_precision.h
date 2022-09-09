@@ -49,9 +49,6 @@ constexpr double default_inverse_trajpos_scale_lf = 1.0 / default_trajpos_scale_
 constexpr float  default_inverse_trajpos_scale_f  = (float)1.0 / default_trajpos_scale_f;
 constexpr int    min_trajpos_scale_bits = 10;
 constexpr int    max_trajpos_scale_bits = 48;
-constexpr int    transform_scale_bits = 51;
-constexpr double transform_scale_lf   = 2251799813685248.0;
-constexpr float  transform_scale_f    = (float)transform_scale_lf;
 /// \}
 
 /// \brief Velocities are expressed in A / sqrt(418.4) fs, and as such the velocity scaling should
