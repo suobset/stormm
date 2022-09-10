@@ -92,6 +92,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Topology/atomgraph_constructors.cpp \
 	           $(SRCDIR)/Topology/atomgraph_detailers.cpp \
 	           $(SRCDIR)/Topology/atomgraph_getters.cpp \
+	           $(SRCDIR)/Topology/atomgraph_intake.cpp \
 	           $(SRCDIR)/Topology/atomgraph_setters.cpp \
 	           $(SRCDIR)/Topology/atomgraph_miscellaneous.cpp \
 	           $(SRCDIR)/Topology/atomgraph_abstracts.cpp \
@@ -103,6 +104,7 @@ STORMM_CPP_FILES = $(SRCDIR)/Accelerator/hybrid.cpp \
 	           $(SRCDIR)/Trajectory/amber_ascii.cpp \
 	           $(SRCDIR)/Trajectory/barostat.cpp \
 	           $(SRCDIR)/Trajectory/coordinateframe.cpp \
+	           $(SRCDIR)/Trajectory/coordinate_intake.cpp \
 	           $(SRCDIR)/Trajectory/phasespace.cpp \
 	           $(SRCDIR)/Trajectory/thermostat.cpp \
 	           $(SRCDIR)/Trajectory/trajectory_enumerators.cpp \
@@ -219,12 +221,14 @@ STORMM_CPP_HEADERS = $(SRCDIR)/Accelerator/hybrid.h \
 		     $(SRCDIR)/Topology/atomgraph_abstracts.h \
 		     $(SRCDIR)/Topology/atomgraph_analysis.h \
 		     $(SRCDIR)/Topology/atomgraph_enumerators.h \
+		     $(SRCDIR)/Topology/atomgraph_intake.h \
 		     $(SRCDIR)/Topology/atomgraph_refinement.h \
 		     $(SRCDIR)/Topology/topology_limits.h \
 		     $(SRCDIR)/Topology/topology_util.h \
 		     $(SRCDIR)/Trajectory/amber_ascii.h \
 		     $(SRCDIR)/Trajectory/barostat.h \
 		     $(SRCDIR)/Trajectory/coordinateframe.h \
+		     $(SRCDIR)/Trajectory/coordinate_intake.h \
 		     $(SRCDIR)/Trajectory/coordinate_series.h \
 		     $(SRCDIR)/Trajectory/phasespace.h \
 		     $(SRCDIR)/Trajectory/thermostat.h \
@@ -360,20 +364,22 @@ STORMM_CPP_OBJS = $(SRCDIR)/Accelerator/hybrid.o \
 		  $(SRCDIR)/Synthesis/systemcache.o \
 		  $(SRCDIR)/Synthesis/valence_workunit.o \
 		  $(SRCDIR)/Topology/amber_prmtop_util.o \
-		  $(SRCDIR)/Topology/atomgraph_constructors.o \
-		  $(SRCDIR)/Topology/atomgraph_detailers.o \
-		  $(SRCDIR)/Topology/atomgraph_getters.o \
-		  $(SRCDIR)/Topology/atomgraph_setters.o \
-		  $(SRCDIR)/Topology/atomgraph_miscellaneous.o \
 		  $(SRCDIR)/Topology/atomgraph_abstracts.o \
 		  $(SRCDIR)/Topology/atomgraph_analysis.o \
+		  $(SRCDIR)/Topology/atomgraph_constructors.o \
+		  $(SRCDIR)/Topology/atomgraph_detailers.o \
 		  $(SRCDIR)/Topology/atomgraph_enumerators.o \
+		  $(SRCDIR)/Topology/atomgraph_getters.o \
+		  $(SRCDIR)/Topology/atomgraph_intake.o \
+		  $(SRCDIR)/Topology/atomgraph_miscellaneous.o \
 		  $(SRCDIR)/Topology/atomgraph_refinement.o \
+		  $(SRCDIR)/Topology/atomgraph_setters.o \
 		  $(SRCDIR)/Topology/topology_limits.o \
 		  $(SRCDIR)/Topology/topology_util.o \
 		  $(SRCDIR)/Trajectory/amber_ascii.o \
 		  $(SRCDIR)/Trajectory/barostat.o \
 		  $(SRCDIR)/Trajectory/coordinateframe.o \
+		  $(SRCDIR)/Trajectory/coordinate_intake.o \
 		  $(SRCDIR)/Trajectory/phasespace.o \
 		  $(SRCDIR)/Trajectory/thermostat.o \
 		  $(SRCDIR)/Trajectory/trajectory_enumerators.o \

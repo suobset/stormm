@@ -296,11 +296,12 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
 #ifdef COMPUTE_ENERGY
       // Generalized Born energy contributions must be logged in their respective system
       // accumulators here, and re-initialized for each tile to follow.
+      llint egb_acc  = LLCONV_FUNC(gb_nrg * scw.nrg_scale_f);
       for (int i = half_tile_length; i > 0; i >>= 1) {
-        gb_nrg += SHFL_DOWN(gb_nrg, i);
+        egb_acc += SHFL_DOWN(egb_acc, i);
       }
       if (tile_lane_idx == 0 && rel_pos < import_count) {
-        sh_gb_acc[rel_pos] = gb_nrg;
+        sh_gb_acc[rel_pos] = egb_acc;
       }
 #endif
       pos += tile_sides_per_warp * warps_per_block;
@@ -619,15 +620,6 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, const SeMaskSynthesisR
                               (int)(StateVariable::GENERALIZED_BORN);
         atomicAdd((ullint*)&scw.instantaneous_accumulators[write_idx],
                   (ullint)(sh_gb_acc[rel_pos]));
-
-        // CHECK
-#if 0
-        if (sh_system_indices[rel_pos] <= 1) {
-          const TCALC gb_contrib = (TCALC)(sh_gb_acc[rel_pos]) * scw.inverse_nrg_scale_f;
-          printf("%d : Add %12.6lf\n", sh_system_indices[rel_pos], gb_contrib);
-        }
-#endif
-        // END CHECK
       }
       pos += blockDim.x;
     }

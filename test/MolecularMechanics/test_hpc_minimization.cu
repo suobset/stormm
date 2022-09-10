@@ -166,6 +166,12 @@ void mandateEquality(PhaseSpaceSynthesis *poly_ps, const AtomGraphSynthesis &pol
 // Check that the components of the PhaseSpaceSynthesis relevant to conjugate gradient line
 // minimizations are consistent with respect to identical systems.
 //
+// Arguments:
+//   poly_ps:      Compilation of coordinates and forces
+//   line_record:  Workspace for performing line minimizations
+//   mol_id_vec:   List of molecule IDs found in the synthesis poly_ps
+//   step_number:  Number of the minimization step
+//   stage:        Stage of teh Conjugate Gradient minimization cycle
 //-------------------------------------------------------------------------------------------------
 void checkLineMinimizationComponents(PhaseSpaceSynthesis *poly_ps, LineMinimization *line_record,
                                      const std::vector<int> &mol_id_vec, const int step_number,
@@ -527,47 +533,6 @@ void metaMinimization(const std::vector<AtomGraph*> &ag_ptr_vec,
       break;
     }
 
-    // CHECK
-    if (i < 4 && poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
-      cudaDeviceSynchronize();
-      const int nsys = poly_ag.getSystemCount();
-      const TrajectoryKind tforce = TrajectoryKind::FORCES; 
-      std::vector<double> test_cpu_total_e(nsys), test_gpu_total_e(nsys), test_force_mue(nsys);
-      const std::vector<double> test_gpu_gb_e =
-        sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, devc);
-      const std::vector<double> test_gpu_qq_e =
-        sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, devc);
-      printf("Track(%d) = [\n", i);
-      for (int j = 0; j < 8; j++) {
-        PhaseSpace chkj_ps = poly_ps.exportSystem(j, devc);
-        const std::vector<double> gpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
-        chkj_ps.initializeForces();
-        ScoreCard tmp_sc(1, 1, 32);
-        const AtomGraph *jag_ptr = poly_ag.getSystemTopologyPointer(j);
-        StaticExclusionMask chkj_se(jag_ptr);
-        const RestraintApparatus *jra_ptr = poly_ag.getSystemRestraintPointer(j);
-        evalRestrainedMMGB(&chkj_ps, &tmp_sc, jag_ptr, ngb_tables, chkj_se, jra_ptr,
-                           EvaluateForce::YES, 0);
-        const std::vector<double> cpu_frc = chkj_ps.getInterlacedCoordinates(tforce);
-        test_cpu_total_e[j] = tmp_sc.reportTotalEnergy(0);
-        test_gpu_total_e[j] = sc.reportTotalEnergy(j, devc);
-        test_force_mue[j] = meanUnsignedError(cpu_frc, gpu_frc);
-        printf("  %12.4lf %18.4lf %12.4lf -> %12.4lf %12.4lf   %12.4lf %12.4lf\n",
-               test_cpu_total_e[j], test_gpu_total_e[j], test_force_mue[j], test_gpu_gb_e[j],
-               test_gpu_qq_e[j],
-               tmp_sc.reportInstantaneousStates(StateVariable::GENERALIZED_BORN, 0),
-               tmp_sc.reportInstantaneousStates(StateVariable::ELECTROSTATIC, 0));
-        for (int k = 0; k < 4; k++) {
-          printf("  %12.4lf %12.4lf %12.4lf   %12.4lf %12.4lf %12.4lf\n", cpu_frc[3 * k],
-                 cpu_frc[(3 * k) + 1], cpu_frc[(3 * k) + 2], gpu_frc[3 * k],
-                 gpu_frc[(3 * k) + 1], gpu_frc[(3 * k) + 2]);
-        }
-      }
-      printf("];\n");
-      exit(1);
-    }
-    // END CHECK
-    
     // Check the forces computed for a couple of systems.  This is somewhat redundant, but serves
     // as a sanity check in case other aspects of the energy minimization show problems.
     if (check_mm && (i & 0x1f) == 0) {
@@ -1102,9 +1067,19 @@ int main(const int argc, const char* argv[]) {
 
   // Run tests with various GB models
   testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
-                  "Trp-cage +GB", PrintSituation::APPEND, snap_name, "trp_cage_", &timer,
-                  ImplicitSolventModel::HCT_GB);
-  
+                  "Trp-cage + HCT GB", PrintSituation::APPEND, snap_name, "trp_cage_gb_hct",
+                  &timer, ImplicitSolventModel::HCT_GB);
+
+  // Run tests with various GB models
+  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
+                  "Trp-cage + Neck II GB", PrintSituation::APPEND, snap_name, "trp_cage_gb_nk2",
+                  &timer, ImplicitSolventModel::NECK_GB_II);
+
+  // Run tests with various GB models
+  testCompilation(pro_top, pro_crd, { 0, 0, 0, 0, 0, 0, 0, 0 }, 8, 1.0e-5, 6.0e-5, oe, gpu,
+                  "Trp-cage + OBC GB", PrintSituation::APPEND, snap_name, "trp_cage_gb_obc",
+                  &timer, ImplicitSolventModel::OBC_GB);
+
   // Run tests on larger proteins
   testCompilation(pro_top, pro_crd, { 1, 1, 1, 1, 1, 1, 1, 1 }, 1, 1.0e-5, 6.0e-3, oe, gpu,
                   "DHFR only", PrintSituation::APPEND, snap_name, "dhfr_", &timer);
