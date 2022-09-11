@@ -130,6 +130,7 @@ public:
   ///
   /// \param tier         Do the zeroing on the host or on the GPU device
   /// \param orientation  Perform the zeroing on psi / sumdeijda or alt_psi / alt_sumdeijda arrays
+  /// \param gpu          Details of the GPU in use
   void initialize(HybridTargetLevel tier = HybridTargetLevel::HOST,
                   CoordinateCycle orientation = CoordinateCycle::PRESENT,
                   const GpuDetails &gpu = null_gpu);

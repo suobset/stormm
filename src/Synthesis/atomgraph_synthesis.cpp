@@ -481,6 +481,9 @@ AtomGraphSynthesis::AtomGraphSynthesis(const std::vector<AtomGraph*> &topologies
   // upon completion of this constructor.  The critical information is retained in an array of
   // abstracts.
   loadReductionWorkUnits();
+
+  // Apply an implicit solvent model if one is already present in the underlying topologies.
+  setImplicitSolventModel();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3673,6 +3676,78 @@ void AtomGraphSynthesis::download() {
 #endif
 
 //-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::importImplicitSolventAtomParameters(const int system_index) {
+  const int top_idx = topology_indices.readHost(system_index);
+  const AtomGraph *ag_ptr = topologies[top_idx];
+  const ImplicitSolventKit<double> isk = ag_ptr->getDoublePrecisionImplicitSolventKit();
+  const int imin = atom_offsets.readHost(system_index);
+  const int imax = imin + atom_counts.readHost(system_index);
+  int* neck_gb_indices_ptr = neck_gb_indices.data();
+  double* atomic_pb_radii_ptr = atomic_pb_radii.data();
+  double* gb_screen_ptr = gb_screening_factors.data();
+  double* gb_alpha_ptr = gb_alpha_parameters.data();
+  double* gb_beta_ptr = gb_beta_parameters.data();
+  double* gb_gamma_ptr = gb_gamma_parameters.data();
+  float* sp_atomic_pb_radii_ptr = sp_atomic_pb_radii.data();
+  float* sp_gb_screen_ptr = sp_gb_screening_factors.data();
+  float* sp_gb_alpha_ptr = sp_gb_alpha_parameters.data();
+  float* sp_gb_beta_ptr = sp_gb_beta_parameters.data();
+  float* sp_gb_gamma_ptr = sp_gb_gamma_parameters.data();
+  for (int i = imin; i < imax; i++) {
+    neck_gb_indices_ptr[i] = isk.neck_gb_idx[i - imin];
+    atomic_pb_radii_ptr[i] = isk.pb_radii[i - imin];
+    gb_screen_ptr[i] = isk.gb_screen[i - imin];
+    gb_alpha_ptr[i] = isk.gb_alpha[i - imin];
+    gb_beta_ptr[i] = isk.gb_beta[i - imin];
+    gb_gamma_ptr[i] = isk.gb_gamma[i - imin];
+    sp_atomic_pb_radii_ptr[i] = isk.pb_radii[i - imin];
+    sp_gb_screen_ptr[i] = isk.gb_screen[i - imin];
+    sp_gb_alpha_ptr[i] = isk.gb_alpha[i - imin];
+    sp_gb_beta_ptr[i] = isk.gb_beta[i - imin];
+    sp_gb_gamma_ptr[i] = isk.gb_gamma[i - imin];
+  }  
+}
+
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventNeckParameters() {
+  const NeckGeneralizedBornTable ngb_tab;
+  const NeckGeneralizedBornKit<double> ngbk = ngb_tab.dpData();
+  neck_table_size = ngbk.table_size;
+  neck_limit_tables.resize(neck_table_size * neck_table_size);
+  sp_neck_limit_tables.resize(neck_table_size * neck_table_size);
+  double2* neck_limit_ptr = neck_limit_tables.data();
+  float2* sp_neck_limit_ptr = sp_neck_limit_tables.data();
+  for (int i = 0; i < neck_table_size * neck_table_size; i++) {
+    neck_limit_ptr[i].x = ngbk.max_separation[i];
+    neck_limit_ptr[i].y = ngbk.max_value[i];
+    sp_neck_limit_ptr[i].x = ngbk.max_separation[i];
+    sp_neck_limit_ptr[i].y = ngbk.max_value[i];
+  }
+}
+ 
+//-------------------------------------------------------------------------------------------------
+void AtomGraphSynthesis::setImplicitSolventModel() {
+  
+  // The original GB settings from the input topologies will be imported into the synthesis.
+  switch (gb_style) {
+  case ImplicitSolventModel::NONE:
+    break;
+  case ImplicitSolventModel::HCT_GB:
+    for (int i = 0; i < system_count; i++) {
+      importImplicitSolventAtomParameters(i);
+    }
+    break;
+  case ImplicitSolventModel::NECK_GB:
+  case ImplicitSolventModel::NECK_GB_II:
+    for (int i = 0; i < system_count; i++) {
+      importImplicitSolventAtomParameters(i);
+    }
+    setImplicitSolventNeckParameters();
+    break;
+  }
+}
+ 
+//-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_in,
                                                  const NeckGeneralizedBornKit<double> &ngbk,
                                                  const std::vector<AtomicRadiusSet> &radii_sets_in,
@@ -3724,33 +3799,7 @@ void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_
                                        policy);
       top_rad_settings[top_idx] = radii_sets_in[i];
     }
-    const ImplicitSolventKit<double> isk = iag_ptr->getDoublePrecisionImplicitSolventKit();
-    const int jmin = atom_offsets.readHost(i);
-    const int jmax = jmin + atom_counts.readHost(i);
-    int* neck_gb_indices_ptr = neck_gb_indices.data();
-    double* atomic_pb_radii_ptr = atomic_pb_radii.data();
-    double* gb_screen_ptr = gb_screening_factors.data();
-    double* gb_alpha_ptr = gb_alpha_parameters.data();
-    double* gb_beta_ptr = gb_beta_parameters.data();
-    double* gb_gamma_ptr = gb_gamma_parameters.data();
-    float* sp_atomic_pb_radii_ptr = sp_atomic_pb_radii.data();
-    float* sp_gb_screen_ptr = sp_gb_screening_factors.data();
-    float* sp_gb_alpha_ptr = sp_gb_alpha_parameters.data();
-    float* sp_gb_beta_ptr = sp_gb_beta_parameters.data();
-    float* sp_gb_gamma_ptr = sp_gb_gamma_parameters.data();
-    for (int j = jmin; j < jmax; j++) {
-      neck_gb_indices_ptr[j] = isk.neck_gb_idx[j - jmin];
-      atomic_pb_radii_ptr[j] = isk.pb_radii[j - jmin];
-      gb_screen_ptr[j] = isk.gb_screen[j - jmin];
-      gb_alpha_ptr[j] = isk.gb_alpha[j - jmin];
-      gb_beta_ptr[j] = isk.gb_beta[j - jmin];
-      gb_gamma_ptr[j] = isk.gb_gamma[j - jmin];
-      sp_atomic_pb_radii_ptr[j] = isk.pb_radii[j - jmin];
-      sp_gb_screen_ptr[j] = isk.gb_screen[j - jmin];
-      sp_gb_alpha_ptr[j] = isk.gb_alpha[j - jmin];
-      sp_gb_beta_ptr[j] = isk.gb_beta[j - jmin];
-      sp_gb_gamma_ptr[j] = isk.gb_gamma[j - jmin];
-    }
+    importImplicitSolventAtomParameters(i);
   }
 
   // Load the neck Generalized Born tables, if applicable
@@ -3762,19 +3811,7 @@ void AtomGraphSynthesis::setImplicitSolventModel(const ImplicitSolventModel igb_
     break;
   case ImplicitSolventModel::NECK_GB:
   case ImplicitSolventModel::NECK_GB_II:
-    {
-      neck_table_size = ngbk.table_size;
-      neck_limit_tables.resize(neck_table_size * neck_table_size);
-      sp_neck_limit_tables.resize(neck_table_size * neck_table_size);
-      double2* neck_limit_ptr = neck_limit_tables.data();
-      float2* sp_neck_limit_ptr = sp_neck_limit_tables.data();
-      for (int i = 0; i < neck_table_size * neck_table_size; i++) {
-        neck_limit_ptr[i].x = ngbk.max_separation[i];
-        neck_limit_ptr[i].y = ngbk.max_value[i];
-        sp_neck_limit_ptr[i].x = ngbk.max_separation[i];
-        sp_neck_limit_ptr[i].y = ngbk.max_value[i];
-      }
-    }
+    setImplicitSolventNeckParameters();
     break;
   }
 }

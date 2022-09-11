@@ -480,20 +480,38 @@ bool addTileToWorkUnitList(int3* tile_list, int* import_coverage,
                            const std::vector<int> &system_tile_starts, int *import_count,
                            int *current_tile_count, const int ti, const int tj, const int sysid) {
   const int c_ic  = *import_count;
-  if (c_ic + 2 - import_coverage[ti + system_tile_starts[sysid]] -
-                 import_coverage[tj + system_tile_starts[sysid]] > small_block_max_imports) {
-    return false;
+  if (ti == tj) {
+    if (c_ic + 1 - import_coverage[ti + system_tile_starts[sysid]] > small_block_max_imports) {
+      return false;
+    }
+    else {
+      const size_t c_tile = *current_tile_count;
+      tile_list[c_tile].x = ti;
+      tile_list[c_tile].y = tj;
+      tile_list[c_tile].z = sysid;
+      *import_count = c_ic + 1 - import_coverage[ti + system_tile_starts[sysid]];
+      import_coverage[ti + system_tile_starts[sysid]] = 1;
+      *current_tile_count += 1;
+      return true;
+    }
   }
   else {
-    const size_t c_tile = *current_tile_count;
-    tile_list[c_tile].x = ti;
-    tile_list[c_tile].y = tj;
-    tile_list[c_tile].z = sysid;
-    *import_count = c_ic + 2 - import_coverage[ti] - import_coverage[tj];
-    import_coverage[ti + system_tile_starts[sysid]] = 1;
-    import_coverage[tj + system_tile_starts[sysid]] = 1;
-    *current_tile_count += 1;
-    return true;
+    if (c_ic + 2 - import_coverage[ti + system_tile_starts[sysid]] -
+                   import_coverage[tj + system_tile_starts[sysid]] > small_block_max_imports) {
+      return false;
+    }
+    else {
+      const size_t c_tile = *current_tile_count;
+      tile_list[c_tile].x = ti;
+      tile_list[c_tile].y = tj;
+      tile_list[c_tile].z = sysid;
+      *import_count = c_ic + 2 - import_coverage[ti + system_tile_starts[sysid]] -
+                                 import_coverage[tj + system_tile_starts[sysid]];
+      import_coverage[ti + system_tile_starts[sysid]] = 1;
+      import_coverage[tj + system_tile_starts[sysid]] = 1;
+      *current_tile_count += 1;
+      return true;
+    }
   }
   __builtin_unreachable();
 }
@@ -695,7 +713,7 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
     result = enumerateNonbondedWorkUnits(poly_se, small_nbwu_tiles, small_wu_count, atom_counts,
                                          atom_offsets);
   }
-  else if (medium_wu_count < 16 * kilo) {
+  else if (medium_wu_count < 8 * kilo) {
     result = enumerateNonbondedWorkUnits(poly_se, medium_nbwu_tiles, medium_wu_count, atom_counts,
                                          atom_offsets);
   }

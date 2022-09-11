@@ -473,7 +473,8 @@ STORMM_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
 			 $(TESTDIR)/bin/test_hpc_hybrid \
 			 $(TESTDIR)/bin/test_hpc_math \
 			 $(TESTDIR)/bin/test_hpc_synthesis \
-			 $(TESTDIR)/bin/test_hpc_minimization
+			 $(TESTDIR)/bin/test_hpc_minimization \
+			 $(TESTDIR)/bin/test_hpc_dynamics
 
 # Benchmark programs using stormm
 STORMM_BENCH_PROGS = $(BENCHDIR)/bin/valence
@@ -731,6 +732,15 @@ $(TESTDIR)/bin/test_hpc_minimization : $(LIBDIR)/libstormm_cuda.so \
 	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
 	  -o $(TESTDIR)/bin/test_hpc_minimization \
 	  $(TESTDIR)/MolecularMechanics/test_hpc_minimization.cu -L$(LIBDIR) -I$(SRCDIR) \
+	  $(CUDA_LINKS) -lstormm_cuda
+
+# Target: HPC molecular system synthesis and associated operations
+$(TESTDIR)/bin/test_hpc_dynamics : $(LIBDIR)/libstormm_cuda.so \
+				   $(TESTDIR)/MolecularMechanics/test_hpc_dynamics.cu
+	@echo "[STORMM]  Building test_hpc_dynamics..."
+	$(VB)$(CUCC) $(CUDA_FLAGS) $(CUDA_DEFINES) $(CUDA_ARCHS) \
+	  -o $(TESTDIR)/bin/test_hpc_dynamics \
+	  $(TESTDIR)/MolecularMechanics/test_hpc_dynamics.cu -L$(LIBDIR) -I$(SRCDIR) \
 	  $(CUDA_LINKS) -lstormm_cuda
 
 # Target: Benchmarking single, double, and fixed-precision computations of valence forces

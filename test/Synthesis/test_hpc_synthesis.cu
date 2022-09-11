@@ -406,9 +406,9 @@ int main(const int argc, const char* argv[]) {
   // worry about resizing it case by case, and does not contribute to cache pollution (individual
   // blocks' buffers are already padded by the warp size, hence each takes a set number of cache
   // lines to read).
-  HpcConfig gpu_config(ExceptionResponse::WARN);
-  std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
-  GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
+  const HpcConfig gpu_config(ExceptionResponse::WARN);
+  const std::vector<int> my_gpus = gpu_config.getGpuDevice(1);
+  const GpuDetails gpu = gpu_config.getGpuInfo(my_gpus[0]);
   int nblocks = gpu.getSMPCount();
   int nthreads = gpu.getMaxThreadsPerBlock();
   if (gpu.getArchMajor() == 6 && gpu.getArchMinor() == 1) {

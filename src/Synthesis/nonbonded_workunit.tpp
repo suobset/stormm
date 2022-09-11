@@ -28,6 +28,7 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
 
   // Assemble work units
   int current_tile_count = 0;
+  int import_count = 0;
   std::vector<int> import_coverage(total_tile_lengths, 0);
   for (int sysid = 0; sysid < system_count; sysid++) {
     const int system_tile_lengths = (atom_counts[sysid] + tile_length - 1) / tile_length;
@@ -44,7 +45,6 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
     int ordi_llim = 0;
     int ordi_hlim = std::min(ordi_llim + ordi_stride, system_tile_lengths);
     int absc_increment = 1;
-    int import_count = 0;
     while (ordi_llim < system_tile_lengths) {
       int istart, ilimit;
       if (absc_increment == 1) {
@@ -65,7 +65,7 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
           if (addTileToWorkUnitList(tile_list.data(), import_coverage.data(), system_tile_starts,
                                     &import_count, &current_tile_count, i, j, sysid)) {
             if (current_tile_count == target_tile_count) {
-
+              
               // This list of tiles has reached its target size and should be converted into a
               // work unit.
               result.emplace_back(se, tile_list);
@@ -78,7 +78,7 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
             }
           }
           else {
-
+            
             // Backtrack to the most recent multiple of the target batch size.
             const int nbatch = current_tile_count / small_block_tile_width;
             const int fallback_size = nbatch * small_block_tile_width;
@@ -106,7 +106,7 @@ enumerateNonbondedWorkUnits(const Tmask &se, const int target_tile_count,
                                     &import_count, &current_tile_count, tmp_tile_list[k].x,
                                     tmp_tile_list[k].y, tmp_tile_list[k].z);
             }
-
+            
             // Add the tile at hand, the one which was too much to add to the previous work unit
             // and thus triggered the backtracking.
             addTileToWorkUnitList(tile_list.data(), import_coverage.data(), system_tile_starts,

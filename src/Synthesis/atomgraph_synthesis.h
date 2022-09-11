@@ -348,9 +348,12 @@ public:
   ///                 only be represented once in this mask synthesis.
   void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
 
-  /// \brief Apply an implicit solvent model to the synthesis.
+  /// \brief Apply an implicit solvent model to the synthesis.  Any mode of operation other than
+  ///        taking the original topologies' parameters as is (calling this member function with
+  ///        no arguments) will cause changes ot the underlying topologies.
   ///
   /// Overloaded:
+  ///   - Take the implicit solvent models as described in the original topologies
   ///   - Apply specific atomic radius sets to each system
   ///   - Apply a common atomic radius set ot all systems
   ///   - Accept a GB neck model, its double-precision abstract, or no such model
@@ -365,6 +368,8 @@ public:
   /// \param policy         Indicator of what to do if the topology's PB radii to not meet the
   ///                       implicit solvent model requirements, or there is some other problem
   /// \{
+  void setImplicitSolventModel();
+  
   void setImplicitSolventModel(ImplicitSolventModel igb_in,
                                const NeckGeneralizedBornKit<double> &ngbk,
                                const std::vector<AtomicRadiusSet> &radii_sets_in,
@@ -1416,6 +1421,16 @@ private:
   ///
   /// \param gpu  Details of the GPU to employ in the calculations
   void loadReductionWorkUnits(const GpuDetails &gpu = null_gpu);
+
+  /// \brief Import atomic parameters for implicit solvent models based on one of the underlying
+  ///        topologies.
+  ///
+  /// \param system_index  Index of the system to import (loop over all systems to complete the
+  ///                      process)
+  void importImplicitSolventAtomParameters(int system_index);
+
+  /// \brief Impart the hard-wired "Neck" Generalized Born tables to the synthesis.
+  void setImplicitSolventNeckParameters();
 };
 
 } // namespace synthesis
