@@ -26,6 +26,8 @@ DynamicsControls::DynamicsControls(const TextFile &tf, int *start_line, bool *fo
 
   // Validate input
   validateStepCount();
+  validateTimeStep();
+  validateRattleTolerance();
 }
 
 //-------------------------------------------------------------------------------------------------

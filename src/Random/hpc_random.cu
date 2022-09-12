@@ -126,7 +126,7 @@ kSeedXoshiro256pp(ullint4* state_vector, const int n_seeds, const int n_generato
     ullint4 my_state = state_vector[seed_pos];
     for (int gen_pos = seed_pos + n_seeds; gen_pos < n_generators; gen_pos += n_seeds) {
 
-      // Execute the Xoroshiro128+ jump function on this seed.
+      // Execute the Xoroshiro256++ jump function on this seed.
       ullint s0 = 0LLU;
       ullint s1 = 0LLU;
       ullint s2 = 0LLU;

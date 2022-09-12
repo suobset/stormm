@@ -206,6 +206,8 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
                                               ser, rar, EvaluateForce::YES, 0, step);
     transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
                                             UnitCellType::NONE, vsk);
+    sc.commit(StateVariable::ALL_STATES);
+    sc.incrementSampleCount();
     evec[0] = sc.reportTotalEnergy();
     mvec[0] = 0.0;
 
@@ -307,8 +309,17 @@ ScoreCard minimize(Tcoord* xcrd, Tcoord* ycrd, Tcoord* zcrd, Tforce* xfrc, Tforc
         }
       }
     }
-    sc.incrementSampleCount();
   }
+  evalNonbValeRestMM<Tcoord, Tforce,
+                     Tcalc, Tcalc2, Tcalc4>(xcrd, ycrd, zcrd, nullptr, nullptr,
+                                            UnitCellType::NONE, xfrc, yfrc, zfrc, &sc, vk, nbk,
+                                            ser, rar, EvaluateForce::YES, 0,
+                                            mincon.getTotalCycles());
+  transmitVirtualSiteForces<Tcalc, Tcalc>(xcrd, ycrd, zcrd, xfrc, yfrc, zfrc, nullptr, nullptr,
+                                          UnitCellType::NONE, vsk);
+  sc.commit(StateVariable::ALL_STATES);
+  sc.incrementSampleCount();
+
   return sc;
 }
 

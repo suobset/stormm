@@ -4,6 +4,7 @@
 
 #include <string>
 #include "copyright.h"
+#include "Accelerator/hybrid.h"
 
 namespace stormm {
 namespace trajectory {
@@ -31,7 +32,12 @@ public:
   ThermostatKind getKind() const;
   
 private:
-  ThermostatKind kind;      ///< The type of thermostat
+  ThermostatKind kind;             ///< The type of thermostat
+  int total_atoms;                 ///< The total number of atoms, and thus the number of random
+                                   ///<   state vectors, for which this thermostat is responsible
+                                   ///<   (this gives the length of random_sv_bank)
+  Hybrid<ullint4> random_sv_bank;  ///< Bank of Xoshiro256++ state vectors for creating random
+                                   ///<   numbers.  Each atom has its own generator.
 };
 
 /// \brief Return the name of the thermostat choice (an enumerator string conversion function)

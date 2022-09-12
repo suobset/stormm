@@ -26,6 +26,7 @@ namespace mm {
 using data_types::isSignedIntegralScalarType;
 using energy::EvaluateForce;
 using energy::ScoreCard;
+using energy::StateVariable;
 using energy::StaticExclusionMask;
 using energy::StaticExclusionMaskReader;
 using math::invertSquareMatrix;
