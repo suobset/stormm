@@ -1,5 +1,9 @@
 #include "copyright.h"
 #include "Constants/scaling.h"
+#include "Parsing/parse.h"
+#include "Parsing/polynumeric.h"
+#include "Random/random.h"
+#include "Random/hpc_random.h"
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
 #include "thermostat.h"
@@ -7,18 +11,23 @@
 namespace stormm {
 namespace trajectory {
 
+using card::HybridKind;
+using parse::realToString;
+using parse::NumberFormat;
+  
 //-------------------------------------------------------------------------------------------------
 Thermostat::Thermostat() :
-    kind{ThermostatKind::NONE}, atom_count{0}, step_number{0}, random_seed{0},
-    random_cache_depth{0}, initial_evolution_step{0}, final_evolution_step{0},
-    common_temperature{true},
+    kind{ThermostatKind::NONE}, atom_count{0}, step_number{0},
+    random_seed{default_thermostat_random_seed},
+    random_cache_depth{default_thermostat_cache_depth},
+    initial_evolution_step{0}, final_evolution_step{0}, common_temperature{true},
     initial_temperature{default_simulation_temperature},
     final_temperature{default_simulation_temperature},
     initial_temperatures{HybridKind::ARRAY, "tstat_init_temp"},
     sp_initial_temperatures{HybridKind::ARRAY, "tstat_init_tempf"},
     final_temperatures{HybridKind::ARRAY, "tstat_final_temp"},
     sp_final_temperatures{HybridKind::ARRAY, "tstat_final_tempf"},
-    compartment_limits{}
+    compartment_limits{},
     random_sv{HybridKind::ARRAY, "tstat_rng_cache"}
 {}
 
@@ -28,6 +37,18 @@ Thermostat::Thermostat(const ThermostatKind kind_in) :
 {
   // Additional initializations
   kind = kind_in;  
+}
+
+//-------------------------------------------------------------------------------------------------
+Thermostat::Thermostat(const ThermostatKind kind_in, const double temperature_in) :
+    Thermostat()
+{
+  // Additional initializations
+  kind = kind_in;
+  initial_temperature = temperature_in;
+  final_temperature = temperature_in;
+  validateTemperature(initial_temperature);
+  validateTemperature(final_temperature);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -42,19 +63,26 @@ Thermostat::Thermostat(const ThermostatKind kind_in, const double initial_temper
   final_temperature = final_temperature_in;
   initial_evolution_step = initial_evolution_step_in;
   final_evolution_step = final_evolution_step_in;
+  validateTemperature(initial_temperature);
+  validateTemperature(final_temperature);
+  validateEvolutionWindow();
 }
 
 //-------------------------------------------------------------------------------------------------
 Thermostat::Thermostat(const ThermostatKind kind_in, const int atom_count_in,
                        const std::vector<int> &compartment_limits_in,
                        const std::vector<double> &initial_temperatures_in,
-                       const std::vector<double> &final_temperatures_in) :
+                       const std::vector<double> &final_temperatures_in,
+                       const int initial_evolution_step_in, const int final_evolution_step_in) :
     Thermostat()
 {
   // Additional initializations
   kind = kind_in;
   setAtomCount(atom_count_in);
   setCompartments(compartment_limits_in, initial_temperatures_in, final_temperatures_in);
+  initial_evolution_step = initial_evolution_step_in;
+  final_evolution_step = final_evolution_step_in;
+  validateEvolutionWindow();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -203,7 +231,7 @@ void Thermostat::setCompartments(const std::vector<int> &compartment_limits_in,
     const std::vector<int> zero_vec(1, 0);
     compartment_limits.insert(compartment_limits.begin(), zero_vec.begin(), zero_vec.end());
   }
-  else if (compartment_limits.back() != atom_count_in) {
+  else if (compartment_limits.back() != atom_count) {
     compartment_limits.push_back(atom_count);
   }
 
@@ -225,6 +253,8 @@ void Thermostat::setCompartments(const std::vector<int> &compartment_limits_in,
   double* dftemp_ptr = final_temperatures.data();
   float* fftemp_ptr = sp_final_temperatures.data();
   for (int i = 0; i < n_comp; i++) {
+    validateTemperature(initial_temperatures_in[i]);
+    validateTemperature(final_temperatures_in[i]);
     for (int j = compartment_limits[i]; j < compartment_limits[i + 1]; j++) {
       ditemp_ptr[j] = initial_temperatures_in[i];
       fitemp_ptr[j] = initial_temperatures_in[i];
@@ -241,6 +271,8 @@ void Thermostat::setTemperature(const double temp_init_in, const double temp_fin
   if (temp_final_in < 0.0) {
     final_temperature = initial_temperature;
   }
+  validateTemperature(initial_temperature);
+  validateTemperature(final_temperature);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -288,6 +320,8 @@ void Thermostat::setTemperature(const std::vector<double> &temp_init_in,
       double* dftemp_ptr = final_temperatures.data();
       float* fftemp_ptr = sp_final_temperatures.data();
       for (size_t i = 0LLU; i < n_comp; i++) {
+        validateTemperature(temp_init_in[i]);
+        validateTemperature(temp_final_in[i]);
         for (int j = compartment_limits[i]; j < compartment_limits[i + 1]; j++) {
           ditemp_ptr[j] = temp_init_in[i];
           fitemp_ptr[j] = temp_init_in[i];
@@ -310,28 +344,57 @@ void Thermostat::setTemperature(const std::vector<double> &temp_init_in,
 void Thermostat::setTemperature(const std::vector<double> &temp_init_in,
                                 const std::vector<double> &temp_final_in,
                                 const std::vector<int> &compartment_limits_in) {
-  (...)
+  setCompartments(compartment_limits_in, temp_init_in, temp_final_in);
 }
 
 //-------------------------------------------------------------------------------------------------
-void Thermostat::setFinalTemperature(const double temp_final_in) {
-  if (common_temperature) {
-    final_temperature = temp_final_in;    
-  }
-  else {
+void Thermostat::setInitialStep(const int step_in) {
+  initial_evolution_step = step_in;  
+}
 
-    // Test whether there is a consistent final temperature.  If so, set the common_temperature
-    // flag and resize the Hybrid objects containing per-particle temperatures to zero.
-    const size_t n_comp = compartment_limits.size();
-    bool all_same = true;
-    const Approx trial_temp(final_temperatures[0], constants::small);
-    for (int i = 1; i < n_comp; i++) {
-      all_same = (all_same && trial_temp.test(final_temperatures[i]));      
-    }
-    if (all_same) {
-      setCommonTemperature(true);
-    }
+//-------------------------------------------------------------------------------------------------
+void Thermostat::setFinalStep(const int step_in) {
+  final_evolution_step = step_in;  
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::setRandomCacheDepth(const int depth_in) {
+  random_cache_depth = depth_in;
+  validateRandomCacheDepth();
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::validateTemperature(const double temperature_in) {
+  if (temperature_in < 0.0 || temperature_in >= 1.0e5) {
+    rtErr("A temperature of " + realToString(temperature_in, 11, 4, NumberFormat::STANDARD_REAL) +
+          " is not a sensible choice.", "Thermostat", "validateTemperature");
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::validateEvolutionWindow() {
+  if (initial_evolution_step < 0) {
+    initial_evolution_step = 0;
+  }
+  if (final_evolution_step <= initial_evolution_step) {
+    final_evolution_step = initial_evolution_step;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::validateRandomCacheDepth() {
+  if (random_cache_depth > maximum_random_cache_depth) {
+
+    // A silent change occurs here.  The only effect that a bad cache depth could have is that the
+    // simulation runs at an imperceptibly different rate than the one that might be expected.
+    random_cache_depth = maximum_random_cache_depth;
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::initializeRandomStates(const int new_seed, const int scrub_cycles) {
+  random_seed = new_seed;
+  
 }
 
 #ifdef STORMM_USE_HPC

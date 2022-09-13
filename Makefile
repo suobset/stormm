@@ -413,6 +413,7 @@ STORMM_CUDA_HEADERS = $(SRCDIR)/Constants/hpc_bounds.h \
 		      $(SRCDIR)/Potential/hpc_nonbonded_potential.h \
 		      $(SRCDIR)/Potential/hpc_scorecard.h \
 		      $(SRCDIR)/Potential/hpc_valence_potential.h \
+		      $(SRCDIR)/Random/hpc_random.h \
 		      $(SRCDIR)/Random/hpc_random.cuh \
 		      $(SRCDIR)/Structure/hpc_virtual_site_handling.h \
 		      $(SRCDIR)/Synthesis/hpc_phasespace_synthesis.h \

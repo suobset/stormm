@@ -12,7 +12,7 @@ namespace trajectory {
 
 using card::Hybrid;
 using card::HybridTargetLevel;
-  
+
 /// \brief Enumerate the various thermostats available for simulations
 enum class ThermostatKind {
   NONE, ANDERSEN, LANGEVIN, BERENDSEN
@@ -22,10 +22,20 @@ enum class ThermostatKind {
 ///        memory use.
 constexpr int maximum_random_cache_depth = 15;
 
+/// \brief The default cache depth for a thermostat will give high efficiency in the number of
+///        write transactions issued for the 256-bit read required: eight bytes written for every
+///        byte read.
+constexpr int default_thermostat_cache_depth = 8;
+  
 /// \brief The default simulation temperature, chemistry's standard temperature and pressure (in
 ///        units of Kelvin).
 constexpr double default_simulation_temperature = 298.15;
 
+/// \brief The default random seed for thermostats.  This need not be the same random seed used
+///        for any other application--in fact, having it be distinct guards against generators in
+///        other parts of the program re-using the same sequence.
+constexpr int default_thermostat_random_seed = 1329440765;
+  
 /// \brief Store the parameters for a simulation thermostat.  Includes Berendsen, Andersen, and
 ///        Langevin methods.  This class can be assembled like many of the control objects, i.e.
 ///        MinimizationControls, based on namelists.
@@ -38,6 +48,7 @@ public:
   /// Overloaded:
   ///   - Construct a blank thermostat that applies no regulation
   ///   - Construct a specific type of thermostat with default settings
+  ///   - Accept a type of thermostat and a temperature to maintain
   ///   - Accept a temperature evolution profile
   ///   - Accept a total number of atoms and a compartmentalization plan
   ///
@@ -47,9 +58,14 @@ public:
   /// \{
   Thermostat();
   Thermostat(ThermostatKind kind_in);
+  Thermostat(ThermostatKind kind_in, double temperature_in);
   Thermostat(ThermostatKind kind_in, double init_temperature_in, double final_temperature_in,
              int initial_evolution_step_in, int final_evolution_step_in);
-  Thermostat(ThermostatKind kind_in, int atom_count_in, std::vector<int> &compartment_limits_in);
+  Thermostat(ThermostatKind kind_in, int atom_count_in,
+             const std::vector<int> &compartment_limits_in,
+             const std::vector<double> &initial_temperatures_in,
+             const std::vector<double> &final_temperatures_in, int initial_evolution_step_in,
+             int final_evolution_step_in);
   /// \}
 
   /// \brief Get the kind of thermostat
@@ -129,9 +145,9 @@ public:
   /// \param initial_temperatures_in  The final temperatures for each compartment.  The length of
   ///                                 this list must equal the number of compartments declined from
   ///                                 compartment_limits_in and the atom count.
-  void Thermostat::setCompartments(const std::vector<int> &compartment_limits_in,
-                                   const std::vector<double> &initial_temperatures_in,
-                                   const std::vector<double> &final_temperatures_in);
+  void setCompartments(const std::vector<int> &compartment_limits_in,
+                       const std::vector<double> &initial_temperatures_in,
+                       const std::vector<double> &final_temperatures_in);
   
   /// \brief Set the initial target temperature.
   ///
@@ -150,13 +166,12 @@ public:
   ///                         in setCompartments() above applies)
   /// \{
   void setTemperature(double temp_init_in, double temp_final_in = -1.0);
-  void setTemperature(std::vector<double> &temp_init_in);
-  void setTemperature(std::vector<double> &temp_init_in,
-                      std::vector<int> &compartment_limits_in);
+  void setTemperature(const std::vector<double> &temp_init_in,
+                      const std::vector<double> &temp_final_in);
+  void setTemperature(const std::vector<double> &temp_init_in,
+                      const std::vector<double> &temp_final_in,
+                      const std::vector<int> &compartment_limits_in);
   /// \}
-
-  /// \brief Set the equilibrium, final target temperature.
-  void setFinalTemperature(double temp_final_in);
 
   /// \brief Set the step at which temperature evolution, away from T(init), shall begin.
   ///
@@ -196,7 +211,8 @@ public:
   ///                      during construction of this Thermostat object
   /// \param scrub_cycles  Number of cycles of Xoshiro256++ generation to run in order to ensure
   ///                      that the newly seeded generators produce high-quality results
-  void initializeRandomStates(int new_seed, int scrub_cycles);
+  void initializeRandomStates(int new_seed = default_thermostat_random_seed,
+                              int scrub_cycles = 25);
 
   /// \brief Fill the random number cache for a subset of the atoms.
   ///

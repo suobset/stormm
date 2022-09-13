@@ -49,6 +49,9 @@ enum class RandomAlgorithm {
   XOSHIRO_256PP    ///< Xoshiro256++ generator (see below--high quality generator)
 };
 
+/// \brief The default random seed for STORMM
+constexpr int default_random_seed = 827493;
+  
 /// \brief Stores the state of a Ran2 pseudo-random number generator.  Member functions produce
 ///        random numbers along various distributions, as required.  While it is not as performant
 ///        to have a member function, these random number generators are intended for convenience
@@ -61,7 +64,7 @@ public:
   /// \brief Initialize the unit testing on-board pseudo-random number generator.
   ///
   /// \param igseed  The pseudo-randome number seed
-  Ran2Generator(int igseed = 827493);  
+  Ran2Generator(int igseed = default_random_seed);  
 
   /// \brief Return a single random number distributed over a uniform distribution.  This is an
   ///        internal generator based on an integer vector state which will provide reproducible
@@ -117,7 +120,7 @@ public:
   /// \param niter     Number of iterations to run through while equilibrating the generator
   /// \param state_in  State to accept
   /// \{
-  Xoroshiro128pGenerator(int igseed = 827493, int niter = 25);
+  Xoroshiro128pGenerator(int igseed = default_random_seed, int niter = 25);
   Xoroshiro128pGenerator(const ullint2 state_in);
   /// \}
   
@@ -184,7 +187,7 @@ public:
   /// \param igseed    The pseudo-randome number seed
   /// \param niter     Number of iterations to run through while equilibrating the generator
   /// \param state_in  State to accept
-  Xoshiro256ppGenerator(int igseed = 827493, int niter = 50);
+  Xoshiro256ppGenerator(int igseed = default_random_seed, int niter = 50);
   Xoshiro256ppGenerator(const ullint4 state_in);
 
   /// \brief Return a single random number distributed over a uniform distribution.  This is an
@@ -265,7 +268,8 @@ public:
   RandomNumberMill(size_t generators_in = 1LLU, size_t depth_in = 2LLU,
                    RandomAlgorithm style_in = RandomAlgorithm::XOSHIRO_256PP,
                    RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
-                   int igseed_in = 827493, int niter = 25, size_t bank_limit = constants::giga_zu);
+                   int igseed_in = default_random_seed, int niter = 25,
+                   size_t bank_limit = constants::giga_zu);
   /// \}
 
   /// \brief Get the number of (forward-jumped) generators.
