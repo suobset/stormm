@@ -1,9 +1,13 @@
 #include "copyright.h"
+#include "Constants/hpc_bounds.h"
 #include "Constants/scaling.h"
+#include "Math/rounding.h"
 #include "Parsing/parse.h"
 #include "Parsing/polynumeric.h"
 #include "Random/random.h"
+#ifdef STORMM_USE_HPC
 #include "Random/hpc_random.h"
+#endif
 #include "Reporting/error_format.h"
 #include "UnitTesting/approx.h"
 #include "thermostat.h"
@@ -12,9 +16,11 @@ namespace stormm {
 namespace trajectory {
 
 using card::HybridKind;
+using math::roundUp;
 using parse::realToString;
 using parse::NumberFormat;
 using random::initXoshiro256ppArray;
+using random::Xoshiro256ppGenerator;
 
 //-------------------------------------------------------------------------------------------------
 Thermostat::Thermostat() :
@@ -29,7 +35,7 @@ Thermostat::Thermostat() :
     final_temperatures{HybridKind::ARRAY, "tstat_final_temp"},
     sp_final_temperatures{HybridKind::ARRAY, "tstat_final_tempf"},
     compartment_limits{},
-    random_sv{HybridKind::ARRAY, "tstat_rng_cache"}
+    random_state_vector{HybridKind::ARRAY, "tstat_rng_cache"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -88,19 +94,28 @@ Thermostat::Thermostat(const ThermostatKind kind_in, const int atom_count_in,
 
 //-------------------------------------------------------------------------------------------------
 void Thermostat::allocateRandomStorage() {
+
+  // Do not allocate extra memory which will not be used by certain thermostats.  When seeding
+  // particle velocities, the process looks very much like applying an Andersen thermostat once at
+  // the outset of the simulation.  In that case, it is faster to have a single generator, driven
+  // by a single CPU thread, follow a similar strategy of creating up to 1024 generators and then
+  // seeding a series of atoms' velocities with each of them.  That velocity initialization process
+  // will get its own function, deferring to the array of generators for each atom in the case of
+  // Andersen and Langevin thermostats, or using a temporary array of generators, outside of the
+  // Thermostat object, in the cases of Berendesen or no thermostat.
   switch (kind) {
   case ThermostatKind::NONE:
   case ThermostatKind::BERENDSEN:
-    random_sv.resize(0);
+    random_state_vector.resize(0);
     random_cache.resize(0);
     sp_random_cache.resize(0);
     break;
   case ThermostatKind::ANDERSEN:
   case ThermostatKind::LANGEVIN:
     {
-      const size_t atom_count_zu = atom_count;
-      const size_t rc_depth_zu = random_cache_depth;
-      random_sv.resize(atom_count_zu);
+      const size_t atom_count_zu = roundUp(atom_count, warp_size_int);
+      const size_t rc_depth_zu = random_cache_depth * 3;
+      random_state_vector.resize(atom_count_zu);
       random_cache.resize(atom_count_zu * rc_depth_zu);
       sp_random_cache.resize(atom_count_zu * rc_depth_zu);
     }
@@ -390,12 +405,74 @@ void Thermostat::validateRandomCacheDepth() {
     // simulation runs at an imperceptibly different rate than the one that might be expected.
     random_cache_depth = maximum_random_cache_depth;
   }
+  switch (kind) {
+  case ThermostatKind::NONE:
+  case ThermostatKind::BERENDSEN:
+    random_cache_depth = 0;
+    break;
+  case ThermostatKind::ANDERSEN:
+  case ThermostatKind::LANGEVIN:
+    break;
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
-void Thermostat::initializeRandomStates(const int new_seed, const int scrub_cycles) {
+void Thermostat::initializeRandomStates(const int new_seed, const int scrub_cycles,
+                                        const GpuDetails &gpu) {
   random_seed = new_seed;
-  initXoshiro256ppArray(&random_sv, new_seed);
+#ifdef STORMM_USE_HPC
+  initXoshiro256ppArray(&random_state_vector, new_seed, scrub_cycles, gpu);
+#else
+  initXoshiro256ppArray(&random_state_vector, new_seed, scrub_cycles);
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::fillRandomCache(const size_t index_start, const size_t index_end,
+                                 const PrecisionModel mode) {
+
+  // Return immediately with a warning if a developer tries to issue random numbers for thermostats
+  // that do not use them.
+  switch (kind) {
+  case ThermostatKind::NONE:
+  case ThermostatKind::BERENDSEN:
+    rtWarn("The " + getThermostatName(kind) + " thermostat does not utilize random numbers.  No "
+           "production will occur.");
+    return;
+  case ThermostatKind::ANDERSEN:
+  case ThermostatKind::LANGEVIN:
+    break;
+  }  
+  const size_t padded_atom_count = roundUp(atom_count, warp_size_int);
+  Xoshiro256ppGenerator xrs;
+  for (int i = index_start; i < index_end; i++) {
+
+    // Set the state of the generator object to the current value in the array of generators.
+    xrs.setState(random_state_vector.readHost(i));
+
+    // Generate a series of random numbers with this seed, then store the resulting state.
+    // This is the most economical way to go about the process in terms of overall memory
+    // transactions--the state is 256 bits loaded and stored, and each random number is 32 or 64
+    // bits (depending on the mode), so best to store at least a handful of random numbers with
+    // each checkout of the state.  On the CPU, this process is complicated by the fact that
+    // every write of a random number result is going to be a cache miss.  On the GPU, the memory
+    // coalescence will be ideal.
+    size_t pos = i;
+    switch (mode) {
+    case PrecisionModel::DOUBLE:
+      for (int j = 0; j < 3 * random_cache_depth; j++) {
+        random_cache.putHost(xrs.uniformRandomNumber(), pos);
+        pos += padded_atom_count;
+      }
+      break;
+    case PrecisionModel::SINGLE:
+      for (int j = 0; j < 3 * random_cache_depth; j++) {
+        sp_random_cache.putHost(xrs.spUniformRandomNumber(), pos);
+        pos += padded_atom_count;
+      }
+      break;
+    }
+  }
 }
 
 #ifdef STORMM_USE_HPC
@@ -405,7 +482,7 @@ void Thermostat::upload() {
   sp_initial_temperatures.upload();
   final_temperatures.upload();
   sp_final_temperatures.upload();
-  random_sv.upload();
+  random_state_vector.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -414,7 +491,7 @@ void Thermostat::download() {
   sp_initial_temperatures.download();
   final_temperatures.download();
   sp_final_temperatures.download();
-  random_sv.download();
+  random_state_vector.download();
 }
 #endif
 

@@ -5,14 +5,18 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
+#include "Constants/behavior.h"
 
 namespace stormm {
 namespace trajectory {
 
+using card::GpuDetails;
 using card::Hybrid;
 using card::HybridTargetLevel;
-
+using constants::PrecisionModel;
+  
 /// \brief Enumerate the various thermostats available for simulations
 enum class ThermostatKind {
   NONE, ANDERSEN, LANGEVIN, BERENDSEN
@@ -212,13 +216,16 @@ public:
   /// \param scrub_cycles  Number of cycles of Xoshiro256++ generation to run in order to ensure
   ///                      that the newly seeded generators produce high-quality results
   void initializeRandomStates(int new_seed = default_thermostat_random_seed,
-                              int scrub_cycles = 25);
+                              int scrub_cycles = 25, const GpuDetails &gpu = null_gpu);
 
-  /// \brief Fill the random number cache for a subset of the atoms.
+  /// \brief Fill the random number cache for a subset of the atoms.  This CPU-based function is
+  ///        intended to mimic GPU functionality, but the GPU operations are expected to be fused
+  ///        with other kernels.
   ///
   /// \param index_start  Starting index in the list of all atoms
   /// \param index_end    Upper bound of atoms for which to cache random numbers
-  void fillRandomCache(int index_start, int index_end);
+  /// \param mode         Fill either the single-precision or double-precision cache arrays
+  void fillRandomCache(size_t index_start, size_t index_end, PrecisionModel mode);
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the thermostat's data from the host to the HPC device.  Because the GPU is
@@ -277,7 +284,7 @@ private:
   std::vector<int> compartment_limits;  
 
   /// Xoshiro256++ state vectors for creating random numbers, one per atom of the simulation
-  Hybrid<ullint4> random_sv;      
+  Hybrid<ullint4> random_state_vector;
 
   /// \brief Allocate space for the random state vector and random number cache
   Hybrid<double> random_cache;
