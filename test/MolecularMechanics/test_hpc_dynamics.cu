@@ -21,6 +21,7 @@
 #include "../../src/Trajectory/phasespace.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "../../src/UnitTesting/test_environment.h"
+#include "../../src/UnitTesting/unit_test.h"
 
 using namespace stormm::card;
 using namespace stormm::diskutil;
@@ -43,9 +44,9 @@ int main(const int argc, const char* argv[]) {
   // Read topology and starting coordinate files
   const char osc = osSeparator();
   const std::string base_crd_name = oe.getStormmSourcePath() + osc + "test" + osc + "Trajectory";
-  const std::string trpi_crd_name = base_crd_name + osc + "myoglobin.inpcrd";
+  const std::string trpi_crd_name = base_crd_name + osc + "trpcage.inpcrd";
   const std::string base_top_name = oe.getStormmSourcePath() + osc + "test" + osc + "Topology";
-  const std::string trpi_top_name = base_top_name + osc + "myoglobin.top";
+  const std::string trpi_top_name = base_top_name + osc + "trpcage.top";
   bool files_ok;
   AtomGraph trpi_ag = loadTopology(trpi_top_name, ExceptionResponse::WARN, TopologyKind::AMBER,
                                    &files_ok);
@@ -144,16 +145,12 @@ int main(const int argc, const char* argv[]) {
   }
   cudaDeviceSynchronize();
   timer.assignTime(xts_timings);
-
-  // CHECK
-  printf("There are %4d non-bonded work units.\n", trpi_poly_ag.getNonbondedWorkUnitCount());
-  printf("There are %4d valence    work units.\n", trpi_poly_ag.getValenceWorkUnitCount());
-  // END CHECK
   
-  // Display time
+  // Display timings and test results
   if (oe.getDisplayTimingsOrder()) {
     timer.printResults();
   }
-  
+  printTestSummary(oe.getVerbosity());
+
   return 0;
 }
