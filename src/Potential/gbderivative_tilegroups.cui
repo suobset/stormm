@@ -213,7 +213,22 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     // store the baseline GB radii and, if applicable, the neck GB indices. (The baseline radii
     // were stored while initializing sh_sum_deijda above.)
 #ifdef DO_NECK_CORRECTION
-    pos = loadTileProperty(pos, 6, nbwu_map, poly_nbk.neck_gb_idx, sh_neck_idx);
+    // Issue -1 "Neck" table indices to blank atoms.  This will indicate that they should not
+    // contribute to radii accumulations at all.
+    while (pos < 7 * padded_import_count) {
+      const int rel_pos = pos - (6 * padded_import_count);
+      if (rel_pos < import_count) {
+        const size_t read_idx = nbwu_map[rel_pos + 1] + tile_lane_idx;
+        const size_t write_idx = (rel_pos * tile_length) + tile_lane_idx;
+        if (tile_lane_idx < getTileSideAtomCount(nbwu_map, rel_pos)) {
+          sh_neck_idx[write_idx] = __ldcs(&poly_nbk.neck_gb_idx[read_idx]);
+        }
+        else {
+          sh_neck_idx[write_idx] = -1;
+        }
+      }
+      pos += tile_sides_per_warp * warps_per_block;
+    }
 #endif
     __syncthreads();
       
@@ -378,7 +393,8 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
 #ifdef DO_NECK_CORRECTION
         const int t_neck_idx = sh_neck_idx[read_idx];
         const int o_neck_idx = SHFL(t_neck_idx, crd_src_lane);
-        if (r < t_rad + o_rad + ((TCALC)(2.0) * poly_nbk.gb_offset) + poly_nbk.gb_neckcut) {
+        if (r < t_rad + o_rad + ((TCALC)(2.0) * poly_nbk.gb_offset) + poly_nbk.gb_neckcut &&
+            t_neck_idx >= 0 && o_neck_idx >= 0) {
 
           // First computation: atom I -> atom J
           const size_t to_table_idx = (poly_nbk.neck_table_size * o_neck_idx) + t_neck_idx;

@@ -95,7 +95,7 @@ __device__ int loadTileCoordinates(const int pos, const int iter, const int* nbw
       }
       else {
         fval = (float)(0.0);
-        __stwb(&write_crd[write_idx], (128 * rel_pos * tile_lane_idx) * gpos_scale);
+        __stwb(&write_crd[write_idx], (128 * (rel_pos + 8) * tile_lane_idx) * gpos_scale);
       }
     }
     else {
@@ -137,7 +137,7 @@ __device__ int loadTileCoordinates(const int pos, const int iter, const int* nbw
       }
       else {
         fval = 0.0;
-        const int95_t fake_val = doubleToInt95((128 * rel_pos * tile_lane_idx) * gpos_scale);
+        const int95_t fake_val = doubleToInt95((128 * (rel_pos + 8) * tile_lane_idx) * gpos_scale);
         __stwb(&write_crd[write_idx], fake_val.x);
         __stwb(&write_crd_ovrf[write_idx], fake_val.y);
       }
