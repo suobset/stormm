@@ -295,5 +295,120 @@ void RandomNumberMill<T>::initializeBank(const RandomNumberKind init_kind) {
   }
 }
 
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void fillRandomCache(ullint2* state_xy, ullint2* state_zw, T* cache, const size_t length,
+                     const size_t depth, const RandomAlgorithm method,
+                     const RandomNumberKind product, const size_t index_start,
+                     const size_t index_end) {
+  const size_t padded_atom_count = roundUp(length, warp_size_zu);
+  Xoroshiro128pGenerator xrs128p;
+  Xoshiro256ppGenerator xrs256pp;
+  const size_t ct = std::type_index(typeid(T)).hash_code();
+  const bool t_is_double = (ct == double_type_index);
+  for (int i = index_start; i < index_end; i++) {
+
+    // Set the state of the generator object to the current value in the array of generators.
+    // Next, generate a series of random numbers with this seed, then store the resulting state.
+    // This is the most economical way to go about the process in terms of overall memory
+    // transactions--the state is 256 bits loaded and stored, and each random number is 32 or 64
+    // bits (depending on the mode), so best to store at least a handful of random numbers with
+    // each checkout of the state.  On the CPU, this process is complicated by the fact that every
+    // write of a random number result is going to be a cache miss.  On the GPU, memory coalescence
+    // will be ideal.  Store the evolved state vector back in its original place.
+    size_t pos = i;
+    switch (method) {
+    case RandomAlgorithm::XOROSHIRO_128P:
+      {
+        xrs128p.setState(state_xy[i]);
+        if (t_is_double) {
+          switch (product) {
+          case RandomNumberKind::UNIFORM:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs128p.uniformRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          case RandomNumberKind::GAUSSIAN:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs128p.gaussianRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          }
+        }
+        else {
+          switch (product) {
+          case RandomNumberKind::UNIFORM:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs128p.spUniformRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          case RandomNumberKind::GAUSSIAN:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs128p.spGaussianRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          }
+        }
+        state_xy[i] = xrs128p.revealState();
+      }
+      break;
+    case RandomAlgorithm::XOSHIRO_256PP:
+      {
+        xrs256pp.setState({ state_xy[i].x, state_xy[i].y, state_zw[i].x, state_zw[i].y });
+        if (t_is_double) {
+          switch (product) {
+          case RandomNumberKind::UNIFORM:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs256pp.uniformRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          case RandomNumberKind::GAUSSIAN:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs256pp.gaussianRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          }
+        }
+        else {
+          switch (product) {
+          case RandomNumberKind::UNIFORM:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs256pp.spUniformRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          case RandomNumberKind::GAUSSIAN:
+            for (size_t j = 0; j < depth; j++) {
+              cache[pos] = xrs256pp.spGaussianRandomNumber();
+              pos += padded_atom_count;
+            }
+            break;
+          }
+        }
+        const ullint4 current_state = xrs256pp.revealState();
+        state_xy[i] = { current_state.x, current_state.y };
+        state_zw[i] = { current_state.x, current_state.y };
+      }
+      break;
+    }
+
+    // Store the evolved state vector back in its original place
+    switch (method) {
+    case RandomAlgorithm::XOROSHIRO_128P:
+      break;
+    case RandomAlgorithm::XOSHIRO_256PP:
+      {
+      }
+      break;
+    }
+  }
+}
+
 } // namespace random
 } // namespace stormm

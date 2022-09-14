@@ -19,7 +19,10 @@ using card::HybridKind;
 using math::roundUp;
 using parse::realToString;
 using parse::NumberFormat;
+using random::fillRandomCache;
 using random::initXoshiro256ppArray;
+using random::RandomAlgorithm;
+using random::RandomNumberKind;
 using random::Xoshiro256ppGenerator;
 
 //-------------------------------------------------------------------------------------------------
@@ -35,7 +38,8 @@ Thermostat::Thermostat() :
     final_temperatures{HybridKind::ARRAY, "tstat_final_temp"},
     sp_final_temperatures{HybridKind::ARRAY, "tstat_final_tempf"},
     compartment_limits{},
-    random_state_vector{HybridKind::ARRAY, "tstat_rng_cache"}
+    random_state_vector_xy{HybridKind::ARRAY, "tstat_rng_xycache"},
+    random_state_vector_zw{HybridKind::ARRAY, "tstat_rng_zwcache"}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -106,7 +110,8 @@ void Thermostat::allocateRandomStorage() {
   switch (kind) {
   case ThermostatKind::NONE:
   case ThermostatKind::BERENDSEN:
-    random_state_vector.resize(0);
+    random_state_vector_xy.resize(0);
+    random_state_vector_zw.resize(0);
     random_cache.resize(0);
     sp_random_cache.resize(0);
     break;
@@ -115,7 +120,8 @@ void Thermostat::allocateRandomStorage() {
     {
       const size_t atom_count_zu = roundUp(atom_count, warp_size_int);
       const size_t rc_depth_zu = random_cache_depth * 3;
-      random_state_vector.resize(atom_count_zu);
+      random_state_vector_xy.resize(atom_count_zu);
+      random_state_vector_zw.resize(atom_count_zu);
       random_cache.resize(atom_count_zu * rc_depth_zu);
       sp_random_cache.resize(atom_count_zu * rc_depth_zu);
     }
@@ -421,15 +427,16 @@ void Thermostat::initializeRandomStates(const int new_seed, const int scrub_cycl
                                         const GpuDetails &gpu) {
   random_seed = new_seed;
 #ifdef STORMM_USE_HPC
-  initXoshiro256ppArray(&random_state_vector, new_seed, scrub_cycles, gpu);
+  initXoshiro256ppArray(&random_state_vector_xy, &random_state_vector_zw, new_seed, scrub_cycles,
+                        gpu);
 #else
-  initXoshiro256ppArray(&random_state_vector, new_seed, scrub_cycles);
+  initXoshiro256ppArray(&random_state_vector_xy, &random_state_vector_zw, new_seed, scrub_cycles);
 #endif
 }
 
 //-------------------------------------------------------------------------------------------------
-void Thermostat::fillRandomCache(const size_t index_start, const size_t index_end,
-                                 const PrecisionModel mode) {
+void Thermostat::refresh(const size_t index_start, const size_t index_end,
+                         const PrecisionModel mode) {
 
   // Return immediately with a warning if a developer tries to issue random numbers for thermostats
   // that do not use them.
@@ -442,36 +449,18 @@ void Thermostat::fillRandomCache(const size_t index_start, const size_t index_en
   case ThermostatKind::ANDERSEN:
   case ThermostatKind::LANGEVIN:
     break;
-  }  
-  const size_t padded_atom_count = roundUp(atom_count, warp_size_int);
-  Xoshiro256ppGenerator xrs;
-  for (int i = index_start; i < index_end; i++) {
-
-    // Set the state of the generator object to the current value in the array of generators.
-    xrs.setState(random_state_vector.readHost(i));
-
-    // Generate a series of random numbers with this seed, then store the resulting state.
-    // This is the most economical way to go about the process in terms of overall memory
-    // transactions--the state is 256 bits loaded and stored, and each random number is 32 or 64
-    // bits (depending on the mode), so best to store at least a handful of random numbers with
-    // each checkout of the state.  On the CPU, this process is complicated by the fact that
-    // every write of a random number result is going to be a cache miss.  On the GPU, the memory
-    // coalescence will be ideal.
-    size_t pos = i;
-    switch (mode) {
-    case PrecisionModel::DOUBLE:
-      for (int j = 0; j < 3 * random_cache_depth; j++) {
-        random_cache.putHost(xrs.uniformRandomNumber(), pos);
-        pos += padded_atom_count;
-      }
-      break;
-    case PrecisionModel::SINGLE:
-      for (int j = 0; j < 3 * random_cache_depth; j++) {
-        sp_random_cache.putHost(xrs.spUniformRandomNumber(), pos);
-        pos += padded_atom_count;
-      }
-      break;
-    }
+  }
+  switch (mode) {
+  case PrecisionModel::DOUBLE:
+    fillRandomCache(random_state_vector_xy.data(), random_state_vector_zw.data(),
+                    random_cache.data(), atom_count, random_cache_depth * 3,
+                    RandomAlgorithm::XOSHIRO_256PP, RandomNumberKind::GAUSSIAN, 0, atom_count);
+    break;
+  case PrecisionModel::SINGLE:
+    fillRandomCache(random_state_vector_xy.data(), random_state_vector_zw.data(),
+                    sp_random_cache.data(), atom_count, random_cache_depth * 3,
+                    RandomAlgorithm::XOSHIRO_256PP, RandomNumberKind::GAUSSIAN, 0, atom_count);
+    break;
   }
 }
 
@@ -482,7 +471,8 @@ void Thermostat::upload() {
   sp_initial_temperatures.upload();
   final_temperatures.upload();
   sp_final_temperatures.upload();
-  random_state_vector.upload();
+  random_state_vector_xy.upload();
+  random_state_vector_zw.upload();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -491,7 +481,8 @@ void Thermostat::download() {
   sp_initial_temperatures.download();
   final_temperatures.download();
   sp_final_temperatures.download();
-  random_state_vector.download();
+  random_state_vector_xy.download();
+  random_state_vector_zw.download();
 }
 #endif
 

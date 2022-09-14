@@ -218,14 +218,15 @@ public:
   void initializeRandomStates(int new_seed = default_thermostat_random_seed,
                               int scrub_cycles = 25, const GpuDetails &gpu = null_gpu);
 
-  /// \brief Fill the random number cache for a subset of the atoms.  This CPU-based function is
+  /// \brief Fill or refill the random number cache for a subset of the atoms, advancing the
+  ///        thermostat's random number generators in the process.  This CPU-based function is
   ///        intended to mimic GPU functionality, but the GPU operations are expected to be fused
   ///        with other kernels.
   ///
   /// \param index_start  Starting index in the list of all atoms
   /// \param index_end    Upper bound of atoms for which to cache random numbers
   /// \param mode         Fill either the single-precision or double-precision cache arrays
-  void fillRandomCache(size_t index_start, size_t index_end, PrecisionModel mode);
+  void refresh(size_t index_start, size_t index_end, PrecisionModel mode);
 
 #ifdef STORMM_USE_HPC
   /// \brief Upload the thermostat's data from the host to the HPC device.  Because the GPU is
@@ -283,8 +284,11 @@ private:
   /// the values of the initial and final temperatures array, which are communicated to the GPU.
   std::vector<int> compartment_limits;  
 
-  /// Xoshiro256++ state vectors for creating random numbers, one per atom of the simulation
-  Hybrid<ullint4> random_state_vector;
+  /// Xoshiro256++ state vectors for creating random numbers, one per atom of the simulation.
+  /// These are stored in two ullint2 vectors to match the mechanics of templated random number
+  /// generator arrays, all based on the fact that most GPUs' largest loads and stores are 128-bit.
+  Hybrid<ullint2> random_state_vector_xy;
+  Hybrid<ullint2> random_state_vector_zw;
 
   /// \brief Allocate space for the random state vector and random number cache
   Hybrid<double> random_cache;

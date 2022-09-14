@@ -432,31 +432,37 @@ void initXoroshiro128pArray(Hybrid<ullint2> *state_vector, const int igseed,
 }
 
 //-------------------------------------------------------------------------------------------------
-void initXoshiro256ppArray(ullint4* state_vector, const int n_generators, const int igseed,
-                           const int scrub_cycles) {
+void initXoshiro256ppArray(ullint2* state_xy, ullint2* state_zw, const int n_generators,
+                           const int igseed, const int scrub_cycles) {
   Xoshiro256ppGenerator prng(igseed, scrub_cycles);
   const int n_seeds = std::min(max_xo_long_jumps, n_generators);
   for (int i = 0; i < n_seeds; i++) {
-    state_vector[i] = prng.revealState();
+    const ullint4 seeded_state = prng.revealState();
+    state_xy[i] = { seeded_state.x, seeded_state.y };
+    state_zw[i] = { seeded_state.x, seeded_state.y };
     for (int j = n_seeds + i; j < n_generators; j += n_seeds) {
       prng.jump();
-      state_vector[j] = prng.revealState();
+      const ullint4 jumped_state = prng.revealState();
+      state_xy[j] = { jumped_state.x, jumped_state.y };
+      state_zw[j] = { jumped_state.x, jumped_state.y };
     }
-    prng.setState(state_vector[i]);
+    prng.setState(seeded_state);
     prng.longJump();
   }
 }
 
 //-------------------------------------------------------------------------------------------------
-void initXoshiro256ppArray(std::vector<ullint4> *state_vector, const int igseed,
-                           const int scrub_cycles) {
-  initXoshiro256ppArray(state_vector->data(), state_vector->size(), igseed, scrub_cycles);
+void initXoshiro256ppArray(std::vector<ullint2> *state_xy, std::vector<ullint2> *state_zw,
+                           const int igseed, const int scrub_cycles) {
+  initXoshiro256ppArray(state_xy->data(), state_zw->data(), state_xy->size(), igseed,
+                        scrub_cycles);
 }
 
 //-------------------------------------------------------------------------------------------------
-void initXoshiro256ppArray(Hybrid<ullint4> *state_vector, const int igseed,
+void initXoshiro256ppArray(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw, const int igseed,
                            const int scrub_cycles) {
-  initXoshiro256ppArray(state_vector->data(), state_vector->size(), igseed, scrub_cycles);
+  initXoshiro256ppArray(state_xy->data(), state_zw->data(), state_xy->size(), igseed,
+                        scrub_cycles);
 }
 
 } // namespace random

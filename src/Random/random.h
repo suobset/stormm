@@ -5,6 +5,7 @@
 #include "copyright.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/scaling.h"
+#include "Constants/hpc_bounds.h"
 #include "DataTypes/common_types.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Math/rounding.h"
@@ -17,7 +18,8 @@ using card::HybridKind;
 using card::HybridTargetLevel;
 using constants::giga_zu;
 using data_types::isFloatingPointScalarType;
-  
+using math::roundUp;
+
 /// \brief Constants for the "ran2" pseudo-random number generator
 /// \{
 constexpr int im1 = 2147483563;
@@ -385,14 +387,26 @@ void initXoroshiro128pArray(Hybrid<ullint2> *state_vector, int igseed,
 /// \param scrub_cycles  Number of times to run the random number generator and discard results in
 ///                      order to raise the quality of random numbers coming out of it
 /// \{
-void initXoshiro256ppArray(ullint4* state_vector, int n_generators, int igseed,
+void initXoshiro256ppArray(ullint2* state_xy, ullint2* state_zw, int n_generators, int igseed,
                            int scrub_cycles = default_xoshiro256pp_scrub);
-void initXoshiro256ppArray(std::vector<ullint4> *state_vector, int igseed,
-                           int scrub_cycles = default_xoshiro256pp_scrub);
-void initXoshiro256ppArray(Hybrid<ullint4> *state_vector, int igseed,
+void initXoshiro256ppArray(std::vector<ullint2> *state_xy, std::vector<ullint2> *state_zw,
+                           int igseed, int scrub_cycles = default_xoshiro256pp_scrub);
+void initXoshiro256ppArray(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw, int igseed,
                            int scrub_cycles = default_xoshiro256pp_scrub);
 /// \}
 
+/// \brief Fill a cache of random numbers using a series (an array) of state vectors (generators).
+///        With each available type of state, only certain generators are available.
+///
+/// Overloaded:
+///   - Work with 128-bit generator states.
+///   - Work with 256-bit generator states.
+///   - An alternative form in the hpc_random library makes use of the eponymous GPU kernels.
+template <typename T>
+void fillRandomCache(ullint2* state_xy, ullint2* state_zw, T* cache, size_t length, size_t depth,
+                     RandomAlgorithm method, RandomNumberKind product, size_t index_start,
+                     size_t index_end);
+  
 } // namespace random
 } // namespace stormm
 
