@@ -8,7 +8,7 @@
 #include "../../src/Math/hpc_summation.cuh"
 #include "../../src/Reporting/error_format.h"
 #include "../../src/Random/random.h"
-#include "../../src/Random/hpc_random.cuh"
+#include "../../src/Random/hpc_random.h"
 #include "../../src/UnitTesting/unit_test.h"
 
 using stormm::constants::ExceptionResponse;
@@ -28,12 +28,14 @@ using stormm::diskutil::DrivePathType;
 using stormm::diskutil::getDrivePathType;
 using stormm::diskutil::osSeparator;
 using stormm::errors::rtWarn;
-using stormm::hpc_random::max_xo_long_jumps;
-using stormm::hpc_random::seedXoroshiro128p;
-using stormm::hpc_random::seedXoshiro256pp;
+using stormm::random::max_xo_long_jumps;
+using stormm::random::initXoroshiro128pArray;
+using stormm::random::initXoshiro256ppArray;
 using stormm::random::Ran2Generator;
 using stormm::random::Xoroshiro128pGenerator;
 using stormm::random::Xoshiro256ppGenerator;
+using stormm::random::default_xoroshiro128p_scrub;
+using stormm::random::default_xoshiro256pp_scrub;
 using namespace stormm::math;
 using namespace stormm::hpc_math;
 using namespace stormm::testing;
@@ -392,8 +394,28 @@ int main(const int argc, const char* argv[]) {
   const int n_cellulose_atoms = 408609;
   Hybrid<ullint2> rng128p_states(n_cellulose_atoms, "xoroshiro128p_state");
   Hybrid<ullint4> rng256pp_states(n_cellulose_atoms, "xoroshiro256pp_state");
-  seedXoroshiro128p(&rng128p_states, 8773925, gpu);
-  seedXoshiro256pp(&rng256pp_states, 4091832, gpu);
+  initXoroshiro128pArray(&rng128p_states, 8773925, default_xoroshiro128p_scrub, gpu);
+  initXoshiro256ppArray(&rng256pp_states, 4091832, default_xoshiro256pp_scrub, gpu);
+  std::vector<ullint2>cpu_rng128p_states(n_cellulose_atoms);
+  std::vector<ullint4> cpu_rng256pp_states(n_cellulose_atoms);
+  initXoroshiro128pArray(&cpu_rng128p_states, 8773925, default_xoroshiro128p_scrub);
+  initXoshiro256ppArray(&cpu_rng256pp_states, 4091832, default_xoshiro256pp_scrub);
+  int xrs128p_deviations = 0;
+  int xrs256pp_deviations = 0;
+  const ullint2* rng128p_st_ptr  = rng128p_states.data();
+  const ullint4* rng256pp_st_ptr = rng256pp_states.data();
+  for (int i = 0; i < n_cellulose_atoms; i++) {
+    xrs128p_deviations  += (cpu_rng128p_states[i].x != rng128p_st_ptr[i].x ||
+                            cpu_rng128p_states[i].y != rng128p_st_ptr[i].y);
+    xrs256pp_deviations += (cpu_rng256pp_states[i].x != rng256pp_st_ptr[i].x ||
+                            cpu_rng256pp_states[i].y != rng256pp_st_ptr[i].y ||
+                            cpu_rng256pp_states[i].z != rng256pp_st_ptr[i].z ||
+                            cpu_rng256pp_states[i].w != rng256pp_st_ptr[i].w);
+  }
+  check(xrs128p_deviations, RelationalOperator::EQUAL, 0, "Deviations were found between "
+        "CPU-initialized and GPU-initialized Xoroshiro128+ random number generator arrays.");
+  check(xrs256pp_deviations, RelationalOperator::EQUAL, 0, "Deviations were found between "
+        "CPU-initialized and GPU-initialized Xoshiro256++ random number generator arrays.");
   rng128p_states.download();
   rng256pp_states.download();
   Xoroshiro128pGenerator xrs128p_check(8773925);

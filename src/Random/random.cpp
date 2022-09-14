@@ -403,5 +403,61 @@ void Xoshiro256ppGenerator::fastForward(ullint4 stride) {
   state.w = s3;
 }
 
+//-------------------------------------------------------------------------------------------------
+void initXoroshiro128pArray(ullint2* state_vector, const int n_generators, const int igseed,
+                            const int scrub_cycles) {
+  Xoroshiro128pGenerator prng(igseed, scrub_cycles);
+  const int n_seeds = std::min(max_xo_long_jumps, n_generators);
+  for (int i = 0; i < n_seeds; i++) {
+    state_vector[i] = prng.revealState();
+    for (int j = n_seeds + i; j < n_generators; j += n_seeds) {
+      prng.jump();
+      state_vector[j] = prng.revealState();
+    }
+    prng.setState(state_vector[i]);
+    prng.longJump();
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void initXoroshiro128pArray(std::vector<ullint2> *state_vector, const int igseed,
+                            const int scrub_cycles) {
+  initXoroshiro128pArray(state_vector->data(), state_vector->size(), igseed, scrub_cycles);
+}
+
+//-------------------------------------------------------------------------------------------------
+void initXoroshiro128pArray(Hybrid<ullint2> *state_vector, const int igseed,
+                            const int scrub_cycles) {
+  initXoroshiro128pArray(state_vector->data(), state_vector->size(), igseed, scrub_cycles);
+}
+
+//-------------------------------------------------------------------------------------------------
+void initXoshiro256ppArray(ullint4* state_vector, const int n_generators, const int igseed,
+                           const int scrub_cycles) {
+  Xoshiro256ppGenerator prng(igseed, scrub_cycles);
+  const int n_seeds = std::min(max_xo_long_jumps, n_generators);
+  for (int i = 0; i < n_seeds; i++) {
+    state_vector[i] = prng.revealState();
+    for (int j = n_seeds + i; j < n_generators; j += n_seeds) {
+      prng.jump();
+      state_vector[j] = prng.revealState();
+    }
+    prng.setState(state_vector[i]);
+    prng.longJump();
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+void initXoshiro256ppArray(std::vector<ullint4> *state_vector, const int igseed,
+                           const int scrub_cycles) {
+  initXoshiro256ppArray(state_vector->data(), state_vector->size(), igseed, scrub_cycles);
+}
+
+//-------------------------------------------------------------------------------------------------
+void initXoshiro256ppArray(Hybrid<ullint4> *state_vector, const int igseed,
+                           const int scrub_cycles) {
+  initXoshiro256ppArray(state_vector->data(), state_vector->size(), igseed, scrub_cycles);
+}
+
 } // namespace random
 } // namespace stormm

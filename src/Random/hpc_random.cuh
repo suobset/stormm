@@ -7,7 +7,7 @@
 #include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {
-namespace hpc_random {
+namespace random {
 
 /// \brief Seeds a specified number of Xoroshiro128+ random number generator states in an array
 ///        using device resources to accelerate the production.  A preset number of non-zero
@@ -20,7 +20,7 @@ namespace hpc_random {
 /// \param n_seeds       The initial number of seeds in state_vector
 /// \param n_generators  The requested number of distinct pseudo-random number generators
 __global__ void __launch_bounds__(large_block_size, 1)
-kSeedXoroshiro128p(ullint2* state_vector, const int n_seeds, const int n_generators);
+kInitXoroshiro128pArray(ullint2* state_vector, int n_seeds, int n_generators);
 
 /// \brief Seeds a specified number of Xoshiro256+ random number generator states in an array
 ///        using device resources to accelerate the production.  A preset number of non-zero
@@ -33,9 +33,9 @@ kSeedXoroshiro128p(ullint2* state_vector, const int n_seeds, const int n_generat
 /// \param n_seeds       The initial number of seeds in state_vector
 /// \param n_generators  The requested number of distinct pseudo-random number generators
 __global__ void __launch_bounds__(large_block_size, 1)
-kSeedXoshiro256pp(ullint4* state_vector, const int n_seeds, const int n_generators);
+kInitXoshiro256ppArray(ullint4* state_vector, int n_seeds, int n_generators);
 
-} // namespace hpc_random
+} // namespace random
 } // namespace stormm
 
 #endif

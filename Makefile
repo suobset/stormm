@@ -429,6 +429,7 @@ STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/Potential/gbderivative_tilegroups.cui \
 			     $(SRCDIR)/Potential/gbradii_tilegroups.cui \
 			     $(SRCDIR)/Potential/valence_potential.cui \
+			     $(SRCDIR)/Random/xor_shift_rng.cui \
 			     $(SRCDIR)/Structure/virtual_site_placement.cui \
 			     $(SRCDIR)/Structure/virtual_site_transmission.cui
 

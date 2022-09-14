@@ -14,7 +14,8 @@ namespace trajectory {
 using card::HybridKind;
 using parse::realToString;
 using parse::NumberFormat;
-  
+using random::initXoshiro256ppArray;
+
 //-------------------------------------------------------------------------------------------------
 Thermostat::Thermostat() :
     kind{ThermostatKind::NONE}, atom_count{0}, step_number{0},
@@ -394,7 +395,7 @@ void Thermostat::validateRandomCacheDepth() {
 //-------------------------------------------------------------------------------------------------
 void Thermostat::initializeRandomStates(const int new_seed, const int scrub_cycles) {
   random_seed = new_seed;
-  
+  initXoshiro256ppArray(&random_sv, new_seed);
 }
 
 #ifdef STORMM_USE_HPC

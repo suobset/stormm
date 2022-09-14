@@ -51,7 +51,22 @@ enum class RandomAlgorithm {
 
 /// \brief The default random seed for STORMM
 constexpr int default_random_seed = 827493;
+
+/// \brief Numbers of "scrub cycles" expected to sufficiently randomize non-zero seeds in any of
+///        the various XOR-shift generators.
+/// \{
+constexpr int default_xoroshiro128p_scrub = 25;
+constexpr int default_xoshiro256pp_scrub  = 50;
+/// \}
   
+/// \brief The maximum number of long jumps to take with any of the scrambled linear pseudo-random
+///        number generators.  The CPU will take the long jumps, while individual GPU threads make
+///        standard jumps ahead in the pseudo-random sequence.  The CPU is 10-30 times faster
+///        than a single GPU thread, so this number could in fact scale with the number of state
+///        vectors being requested, but the optimization would be on the order of milliseconds
+///        and making this a constant makes it easier to reproduce the sequence at a given point.
+constexpr int max_xo_long_jumps = 1024;
+
 /// \brief Stores the state of a Ran2 pseudo-random number generator.  Member functions produce
 ///        random numbers along various distributions, as required.  While it is not as performant
 ///        to have a member function, these random number generators are intended for convenience
@@ -268,7 +283,7 @@ public:
   RandomNumberMill(size_t generators_in = 1LLU, size_t depth_in = 2LLU,
                    RandomAlgorithm style_in = RandomAlgorithm::XOSHIRO_256PP,
                    RandomNumberKind init_kind = RandomNumberKind::GAUSSIAN,
-                   int igseed_in = default_random_seed, int niter = 25,
+                   int igseed_in = default_random_seed, int niter = default_xoshiro256pp_scrub,
                    size_t bank_limit = constants::giga_zu);
   /// \}
 
@@ -331,6 +346,52 @@ private:
   ///                   uniform or a normal distribution
   void initializeBank(RandomNumberKind init_kind);
 };
+
+/// \brief Initialize an array of Xoroshiro128p generators using CPU-based code.
+///
+/// Overloaded:
+///   - Operate on a C-style array
+///   - Operate on a Standard Template Library Vector of RNG state vectors
+///   - Operate on a Hybrid object (HOST only--see the overloaded form in hpc_random.h for GPU
+///     functionality)
+///
+/// \brief state_vector  The array of RNG state vectors
+/// \brief n_generators  Trusted length of the state_vector array, the number of RN generators
+/// \brief igseed        Seed to apply in creating the first random number generator, from which
+///                      all others are long jumps plus short jumps 
+/// \param scrub_cycles  Number of times to run the random number generator and discard results in
+///                      order to raise the quality of random numbers coming out of it
+/// \{
+void initXoroshiro128pArray(ullint2* state_vector, int n_generators, int igseed,
+                            int scrub_cycles = default_xoroshiro128p_scrub);
+void initXoroshiro128pArray(std::vector<ullint2> *state_vector, int igseed,
+                            int scrub_cycles = default_xoroshiro128p_scrub);
+void initXoroshiro128pArray(Hybrid<ullint2> *state_vector, int igseed,
+                            int scrub_cycles = default_xoroshiro128p_scrub);
+/// \}
+
+/// \brief Initialize an array of Xoroshiro128p generators using CPU-based code.
+///
+/// Overloaded:
+///   - Operate on a C-style array
+///   - Operate on a Standard Template Library Vector of RNG state vectors
+///   - Operate on a Hybrid object (HOST only--see the overloaded form in hpc_random.h for GPU
+///     functionality)
+///
+/// \brief state_vector  The array of RNG state vectors
+/// \brief n_generators  Trusted length of the state_vector array, the number of RN generators
+/// \brief igseed        Seed to apply in creating the first random number generator, from which
+///                      all others are long jumps plus short jumps
+/// \param scrub_cycles  Number of times to run the random number generator and discard results in
+///                      order to raise the quality of random numbers coming out of it
+/// \{
+void initXoshiro256ppArray(ullint4* state_vector, int n_generators, int igseed,
+                           int scrub_cycles = default_xoshiro256pp_scrub);
+void initXoshiro256ppArray(std::vector<ullint4> *state_vector, int igseed,
+                           int scrub_cycles = default_xoshiro256pp_scrub);
+void initXoshiro256ppArray(Hybrid<ullint4> *state_vector, int igseed,
+                           int scrub_cycles = default_xoshiro256pp_scrub);
+/// \}
 
 } // namespace random
 } // namespace stormm
