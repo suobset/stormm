@@ -439,12 +439,12 @@ void initXoshiro256ppArray(ullint2* state_xy, ullint2* state_zw, const int n_gen
   for (int i = 0; i < n_seeds; i++) {
     const ullint4 seeded_state = prng.revealState();
     state_xy[i] = { seeded_state.x, seeded_state.y };
-    state_zw[i] = { seeded_state.x, seeded_state.y };
+    state_zw[i] = { seeded_state.z, seeded_state.w };
     for (int j = n_seeds + i; j < n_generators; j += n_seeds) {
       prng.jump();
       const ullint4 jumped_state = prng.revealState();
       state_xy[j] = { jumped_state.x, jumped_state.y };
-      state_zw[j] = { jumped_state.x, jumped_state.y };
+      state_zw[j] = { jumped_state.z, jumped_state.w };
     }
     prng.setState(seeded_state);
     prng.longJump();
