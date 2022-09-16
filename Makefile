@@ -280,6 +280,7 @@ STORMM_TPP_FILES = $(SRCDIR)/Accelerator/hybrid.tpp \
 		   $(SRCDIR)/Topology/atomgraph_abstracts.tpp \
 		   $(SRCDIR)/Topology/topology_util.tpp \
 		   $(SRCDIR)/Trajectory/coordinate_series.tpp \
+		   $(SRCDIR)/Trajectory/thermostat.tpp \
 		   $(SRCDIR)/UnitTesting/approx.tpp \
 		   $(SRCDIR)/UnitTesting/unit_test.tpp
 

@@ -16,6 +16,7 @@ namespace stormm {
 namespace trajectory {
 
 using card::HybridKind;
+using card::HybridTargetLevel;
 using math::roundUp;
 using parse::realToString;
 using parse::NumberFormat;
@@ -27,7 +28,7 @@ using random::Xoshiro256ppGenerator;
 
 //-------------------------------------------------------------------------------------------------
 Thermostat::Thermostat() :
-    kind{ThermostatKind::NONE}, atom_count{0}, step_number{0},
+  kind{ThermostatKind::NONE}, atom_count{0}, padded_atom_count{0}, step_number{0},
     random_seed{default_thermostat_random_seed},
     random_cache_depth{default_thermostat_cache_depth},
     initial_evolution_step{0}, final_evolution_step{0}, common_temperature{true},
@@ -182,6 +183,56 @@ int Thermostat::getFinalEvolutionStep() const {
 }
 
 //-------------------------------------------------------------------------------------------------
+ullint4 Thermostat::getGeneratorState(const int atom_index, const HybridTargetLevel tier) const {
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    {
+      const ullint2 xy_state = random_state_vector_xy.readHost(atom_index);
+      const ullint2 zw_state = random_state_vector_zw.readHost(atom_index);
+      return { xy_state.x, xy_state.y, zw_state.x, zw_state.y };
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    {
+      const ullint2 xy_state = random_state_vector_xy.readDevice(atom_index);
+      const ullint2 zw_state = random_state_vector_zw.readDevice(atom_index);
+      return { xy_state.x, xy_state.y, zw_state.x, zw_state.y };
+    }
+    break;
+#endif
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+double Thermostat::getCachedRandomResult(const PrecisionModel prec, const int atom_index,
+                                         const int cache_row, const HybridTargetLevel tier) const {
+  const size_t pos = (static_cast<size_t>(cache_row) * static_cast<size_t>(padded_atom_count)) +
+                     static_cast<size_t>(atom_index);
+  switch (tier) {
+  case HybridTargetLevel::HOST:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      return random_cache.readHost(pos);
+    case PrecisionModel::SINGLE:
+      return sp_random_cache.readHost(pos);
+    }
+    break;
+#ifdef STORMM_USE_HPC
+  case HybridTargetLevel::DEVICE:
+    switch (prec) {
+    case PrecisionModel::DOUBLE:
+      return random_cache.readDevice(pos);
+    case PrecisionModel::SINGLE:
+      return sp_random_cache.readDevice(pos);
+    }
+    break;
+#endif
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
 bool Thermostat::commonTemperature() const {
   return common_temperature;
 }
@@ -229,7 +280,49 @@ double Thermostat::getCurrentTemperatureTarget(const int atom_index) const {
   }
   __builtin_unreachable();
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+const ThermostatReader<double> Thermostat::dpData(const HybridTargetLevel tier) const {
+  return ThermostatReader<double>(kind, atom_count, padded_atom_count, step_number,
+                                  random_cache_depth, initial_evolution_step, final_evolution_step,
+                                  common_temperature, initial_temperature, final_temperature,
+                                  initial_temperatures.data(tier), final_temperatures.data(tier),
+                                  random_state_vector_xy.data(tier),
+                                  random_state_vector_zw.data(tier), random_cache.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+ThermostatWriter<double> Thermostat::dpData(const HybridTargetLevel tier) {
+  return ThermostatWriter<double>(kind, atom_count, padded_atom_count, step_number,
+                                  random_cache_depth, initial_evolution_step, final_evolution_step,
+                                  common_temperature, initial_temperature, final_temperature,
+                                  initial_temperatures.data(tier), final_temperatures.data(tier),
+                                  random_state_vector_xy.data(tier),
+                                  random_state_vector_zw.data(tier), random_cache.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+const ThermostatReader<float> Thermostat::spData(const HybridTargetLevel tier) const {
+  return ThermostatReader<float>(kind, atom_count, padded_atom_count, step_number,
+                                 random_cache_depth, initial_evolution_step, final_evolution_step,
+                                 common_temperature, initial_temperature, final_temperature,
+                                 sp_initial_temperatures.data(tier),
+                                 sp_final_temperatures.data(tier),
+                                 random_state_vector_xy.data(tier),
+                                 random_state_vector_zw.data(tier), sp_random_cache.data(tier));
+}
+
+//-------------------------------------------------------------------------------------------------
+ThermostatWriter<float> Thermostat::spData(const HybridTargetLevel tier) {
+  return ThermostatWriter<float>(kind, atom_count, padded_atom_count, step_number,
+                                 random_cache_depth, initial_evolution_step, final_evolution_step,
+                                 common_temperature, initial_temperature, final_temperature,
+                                 sp_initial_temperatures.data(tier),
+                                 sp_final_temperatures.data(tier),
+                                 random_state_vector_xy.data(tier),
+                                 random_state_vector_zw.data(tier), sp_random_cache.data(tier));
+}
+
 //-------------------------------------------------------------------------------------------------
 void Thermostat::setKind(const ThermostatKind kind_in) {
   kind = kind_in;
@@ -239,6 +332,7 @@ void Thermostat::setKind(const ThermostatKind kind_in) {
 //-------------------------------------------------------------------------------------------------
 void Thermostat::setAtomCount(int atom_count_in) {
   atom_count = atom_count_in;
+  padded_atom_count = roundUp(atom_count, warp_size_int);
   allocateRandomStorage();
 }
   
@@ -383,6 +477,7 @@ void Thermostat::setFinalStep(const int step_in) {
 void Thermostat::setRandomCacheDepth(const int depth_in) {
   random_cache_depth = depth_in;
   validateRandomCacheDepth();
+  allocateRandomStorage();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -423,14 +518,38 @@ void Thermostat::validateRandomCacheDepth() {
 }
 
 //-------------------------------------------------------------------------------------------------
-void Thermostat::initializeRandomStates(const int new_seed, const int scrub_cycles,
-                                        const GpuDetails &gpu) {
+void Thermostat::initializeRandomStates(const PrecisionModel prec, const int new_seed,
+                                        const int scrub_cycles, const GpuDetails &gpu) {
   random_seed = new_seed;
 #ifdef STORMM_USE_HPC
   initXoshiro256ppArray(&random_state_vector_xy, &random_state_vector_zw, new_seed, scrub_cycles,
                         gpu);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    fillRandomCache(&random_state_vector_xy, &random_state_vector_zw, &random_cache,
+                    padded_atom_count, random_cache_depth * 3, RandomAlgorithm::XOSHIRO_256PP,
+                    RandomNumberKind::GAUSSIAN, 0, atom_count, gpu);
+    break;
+  case PrecisionModel::SINGLE:
+    fillRandomCache(&random_state_vector_xy, &random_state_vector_zw, &sp_random_cache,
+                    padded_atom_count, random_cache_depth * 3, RandomAlgorithm::XOSHIRO_256PP,
+                    RandomNumberKind::GAUSSIAN, 0, atom_count, gpu);
+    break;
+  }
 #else
   initXoshiro256ppArray(&random_state_vector_xy, &random_state_vector_zw, new_seed, scrub_cycles);
+  switch (prec) {
+  case PrecisionModel::DOUBLE:
+    fillRandomCache(&random_state_vector_xy, &random_state_vector_zw, &random_cache,
+                    padded_atom_count, random_cache_depth * 3, RandomAlgorithm::XOSHIRO_256PP,
+                    RandomNumberKind::GAUSSIAN, 0, atom_count);
+    break;
+  case PrecisionModel::SINGLE:
+    fillRandomCache(&random_state_vector_xy, &random_state_vector_zw, &sp_random_cache,
+                    padded_atom_count, random_cache_depth * 3, RandomAlgorithm::XOSHIRO_256PP,
+                    RandomNumberKind::GAUSSIAN, 0, atom_count);
+    break;
+  }
 #endif
 }
 

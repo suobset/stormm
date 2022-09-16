@@ -119,7 +119,7 @@ __device__ __forceinline__ ullint4 xoshiro256pp_jump(const ullint4 input_sv) {
 ///
 /// \param xshft_state  Pointer to the state vector for the generator (modified and returned)
 /// \{
-__device__ __forceinline__ ullint xor_shift_next(ullint2 *xshft_state) {
+__device__ __forceinline__ ullint xoroshiro128p_shift_next(ullint2 *xshft_state) {
   ullint2 tmp = *xshft_state;
   const ullint s0 = tmp.x;
   ullint       s1 = tmp.y;
@@ -131,7 +131,7 @@ __device__ __forceinline__ ullint xor_shift_next(ullint2 *xshft_state) {
   return result;
 }
 
-__device__ __forceinline__ ullint xor_shift_next(ullint4 *xshft_state) {
+__device__ __forceinline__ ullint xoshiro256pp_shift_next(ullint4 *xshft_state) {
   ullint4 tmp = *xshft_state;
   const ullint sxsw = tmp.x + tmp.w;
   const ullint result = tmp.x + ((sxsw << 23) | (sxsw >> (64 - 23)));
@@ -156,27 +156,61 @@ __device__ __forceinline__ ullint xor_shift_next(ullint4 *xshft_state) {
 ///
 /// \param xshft_state  Pointer to the state vector for the generator (modified and returned)
 /// \{
-__device__ __forceinline__ double uniformRandomNumber(ullint2 *xshft_state) {
-  const ullint rndbits = xor_shift_next(xshft_state);
+__device__ __forceinline__ double xoroshiro128p_uniform(ullint2 *xshft_state) {
+  const ullint rndbits = xoroshiro128p_shift_next(xshft_state);
   const ullint realform = (((rndbits >> 12) & 0xfffffffffffffLLU) | 0x3ff0000000000000LLU);
   return __longlong_as_double((llint)(realform)) - 1.0;
 }
 
-__device__ __forceinline__ float uniformRandomNumberf(ullint2 *xshft_state) {
-  const ullint rndbits = xor_shift_next(xshft_state);
+__device__ __forceinline__ float xoroshiro128p_uniformf(ullint2 *xshft_state) {
+  const ullint rndbits = xoroshiro128p_shift_next(xshft_state);
   const uint realform = ((((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU) & 0xffffffff);
   return __uint_as_float(realform) - (float)(1.0);
 }
 
-__device__ __forceinline__ double uniformRandomNumber(ullint4 *xshft_state) {
-  const ullint rndbits = xor_shift_next(xshft_state);
+__device__ __forceinline__ double xoshiro256pp_uniform(ullint4 *xshft_state) {
+  const ullint rndbits = xoshiro256pp_shift_next(xshft_state);
   const ullint realform = (((rndbits >> 12) & 0xfffffffffffffLLU) | 0x3ff0000000000000LLU);
   return __longlong_as_double((llint)(realform)) - 1.0;
 }
 
-__device__ __forceinline__ float uniformRandomNumberf(ullint4 *xshft_state) {
-  const ullint rndbits = xor_shift_next(xshft_state);
+__device__ __forceinline__ float xoshiro256pp_uniformf(ullint4 *xshft_state) {
+  const ullint rndbits = xoshiro256pp_shift_next(xshft_state);
   const uint realform = (((rndbits >> 41) & 0x7fffffLLU) | 0x3f800000LLU);
   return __uint_as_float(realform) - (float)(1.0);
+}
+/// \}
+
+/// \brief Extract a random number on a normal distribution from a Xoroshiro128+ or Xoshiro256++
+///        state, advancing the state in the process.
+///
+/// Overloaded:
+///   - Return a double-precision real number from any generator
+///   - Return a single-precision real number from any generator
+///
+/// \param xshft_state  Pointer to the state vector for the generator (modified and returned)
+/// \{
+__device__ __forceinline__ double xoroshiro128p_normal(ullint2 *xshft_state) {
+  const double value_a = sqrt(-2.0 * log(xoroshiro128p_uniform(xshft_state)));
+  const double value_b = sin(symbols::twopi * xoroshiro128p_uniform(xshft_state));
+  return value_a * value_b;
+}
+
+__device__ __forceinline__ float xoroshiro128p_normalf(ullint2 *xshft_state) {
+  const float value_a = sqrtf(-2.0 * logf(xoroshiro128p_uniformf(xshft_state)));
+  const float value_b = sinf(symbols::twopi_f * xoroshiro128p_uniformf(xshft_state));
+  return value_a * value_b;
+}
+
+__device__ __forceinline__ double xoshiro256pp_normal(ullint4 *xshft_state) {
+  const double value_a = sqrt(-2.0 * log(xoshiro256pp_uniform(xshft_state)));
+  const double value_b = sin(symbols::twopi * xoshiro256pp_uniform(xshft_state));
+  return value_a * value_b;
+}
+
+__device__ __forceinline__ float xoshiro256pp_normalf(ullint4 *xshft_state) {
+  const float value_a = sqrtf(-2.0 * logf(xoshiro256pp_uniformf(xshft_state)));
+  const float value_b = sinf(symbols::twopi_f * xoshiro256pp_uniformf(xshft_state));
+  return value_a * value_b;
 }
 /// \}

@@ -397,17 +397,27 @@ void fillRandomCache(ullint2* state_xy, ullint2* state_zw, T* cache, const size_
       }
       break;
     }
-
-    // Store the evolved state vector back in its original place
-    switch (method) {
-    case RandomAlgorithm::XOROSHIRO_128P:
-      break;
-    case RandomAlgorithm::XOSHIRO_256PP:
-      {
-      }
-      break;
-    }
   }
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void fillRandomCache(std::vector<ullint2> *state_xy, std::vector<ullint2> *state_zw,
+                     std::vector<T> *cache, const size_t length, const size_t depth,
+                     const RandomAlgorithm method, const RandomNumberKind product,
+                     const size_t index_start, const size_t index_end) {
+  fillRandomCache(state_xy->data(), state_zw->data(), cache->data(), length, depth, method,
+                  product, index_start, index_end);
+}
+
+//-------------------------------------------------------------------------------------------------
+template <typename T>
+void fillRandomCache(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw, Hybrid<T> *cache,
+                     const size_t length, const size_t depth, const RandomAlgorithm method,
+                     const RandomNumberKind product, const size_t index_start,
+                     const size_t index_end) {
+  fillRandomCache(state_xy->data(), state_zw->data(), cache->data(), length, depth, method,
+                  product, index_start, index_end);
 }
 
 } // namespace random

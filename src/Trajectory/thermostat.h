@@ -39,7 +39,102 @@ constexpr double default_simulation_temperature = 298.15;
 ///        for any other application--in fact, having it be distinct guards against generators in
 ///        other parts of the program re-using the same sequence.
 constexpr int default_thermostat_random_seed = 1329440765;
+
+/// \brief Read-only abstract for the Thermostat object.
+template <typename T> struct ThermostatReader {
+
+  /// \brief The constructor takes the usual list of parent object attributes with pointers
+  ///        applicable on either the CPU host or GPU device.
+  ThermostatReader(ThermostatKind kind_in, int atom_count_in, int padded_atom_count_in,
+                   int step_in, int depth_in, int init_evolution_in, int end_evolution_in,
+                   bool common_temperature_in, T init_temperature_in, T final_temperature_in,
+                   const T* init_temperatures_in, const T* final_temperatures_in,
+                   const ullint2* state_xy_in, const ullint2* state_zw_in, const T* cache_in);
+
+  /// \brief The copy and move assignment operators will be implicitly deleted due to the presence
+  ///        of const member variables.
+  /// \{
+  ThermostatReader(const ThermostatReader &original) = default;
+  ThermostatReader(ThermostatReader &&original) = default;
+  /// \}
   
+  const ThermostatKind kind;       ///< The type of this thermostat, i.e. Andersen
+  const int atom_count;            ///< Number of atoms controlled by this thermostat
+  const int padded_atom_count;     ///<
+  const int step;                  ///< Current step number of the simulation
+  const int depth;                 ///< Depth of the cache (the true depth will be three times
+                                   ///<   higher, to serve each atom with Cartesian X, Y, and Z
+                                   ///<   influences)
+  const int init_evolution;        ///< The final step at which the thermostat target temperatures
+                                   ///<   come from init_temperature or the eponymous array, and
+                                   ///<   the first step at which temperature targets begin to
+                                   ///<   shift linearly towards final_temperature(s)
+  const int end_evolution;         ///< The first step at which the thermostat begins to target
+                                   ///<   final_temperature(s)
+  const bool common_temperature;   ///< Indicates whether the initial and final temperatures
+                                   ///<   targeted by this thermostat are similar across all atoms
+  const T init_temperature;        ///< Initial target temperature, common to all atoms (if it is
+                                   ///<   applicable)
+  const T final_temperature;       ///< Final target temperature, common to all atoms
+  const T* init_temperatures;      ///< Array of initial target temperatures for each atom (this,
+                                   ///<   and final_temperatures, will not be accessed if the
+                                   ///<   common_temperature member variable is set to TRUE)
+  const T* final_temperatures;     ///< Array of final target gemperatures for each atom
+  const ullint2* state_xy;         ///< First 128 bits of each 256-bit state vector
+  const ullint2* state_zw;         ///< Second 128 bits of each 256-bit state vector
+  const T* cache;                  ///< Cache of pre-computed random values (depth gives the number
+                                   ///<   of such values for each atom)
+};
+
+/// \brief Partially writeable abstract for the Thermostat object.  As with the MMControlKit struct
+///        (see the library header mm_controls.h), the step member variable is modifiable so that
+///        it can be updated without setting it in the parent object and regenerating the entire
+///        abstract.
+template <typename T> struct ThermostatWriter {
+
+  /// \brief The constructor takes the usual list of parent object attributes with pointers
+  ///        applicable on either the CPU host or GPU device.
+  ThermostatWriter(ThermostatKind kind_in, int atom_count_in, int padded_atom_count_in,
+                   int step_in, int depth_in, int init_evolution_in, int end_evolution_in,
+                   bool common_temperature_in, T init_temperature_in, T final_temperature_in,
+                   const T* init_temperatures_in, const T* final_temperatures_in,
+                   ullint2* state_xy_in, ullint2* state_zw_in, T* cache_in);
+
+  /// \brief The copy and move assignment operators will be implicitly deleted due to the presence
+  ///        of const member variables.
+  /// \{
+  ThermostatWriter(const ThermostatWriter &original) = default;
+  ThermostatWriter(ThermostatWriter &&original) = default;
+  /// \}
+  
+  const ThermostatKind kind;       ///< The type of this thermostat, i.e. Andersen
+  const int atom_count;            ///< Number of atoms controlled by this thermostat
+  const int padded_atom_count;     ///<
+  int step;                        ///< Current step number of the simulation
+  const int depth;                 ///< Depth of the cache (the true depth will be three times
+                                   ///<   higher, to serve each atom with Cartesian X, Y, and Z
+                                   ///<   influences)
+  const int init_evolution;        ///< The final step at which the thermostat target temperatures
+                                   ///<   come from init_temperature or the eponymous array, and
+                                   ///<   the first step at which temperature targets begin to
+                                   ///<   shift linearly towards final_temperature(s)
+  const int end_evolution;         ///< The first step at which the thermostat begins to target
+                                   ///<   final_temperature(s)
+  const bool common_temperature;   ///< Indicates whether the initial and final temperatures
+                                   ///<   targeted by this thermostat are similar across all atoms
+  const T init_temperature;        ///< Initial target temperature, common to all atoms (if it is
+                                   ///<   applicable)
+  const T final_temperature;       ///< Final target temperature, common to all atoms
+  const T* init_temperatures;      ///< Array of initial target temperatures for each atom (this,
+                                   ///<   and final_temperatures, will not be accessed if the
+                                   ///<   common_temperature member variable is set to TRUE)
+  const T* final_temperatures;     ///< Array of final target gemperatures for each atom
+  ullint2* state_xy;               ///< First 128 bits of each 256-bit state vector
+  ullint2* state_zw;               ///< Second 128 bits of each 256-bit state vector
+  T* cache;                        ///< Cache of pre-computed random values (depth gives the number
+                                   ///<   of such values for each atom)
+};
+
 /// \brief Store the parameters for a simulation thermostat.  Includes Berendsen, Andersen, and
 ///        Langevin methods.  This class can be assembled like many of the control objects, i.e.
 ///        MinimizationControls, based on namelists.
@@ -72,6 +167,18 @@ public:
              int final_evolution_step_in);
   /// \}
 
+  /// \brief The default copy and move constructors and assignment operators are best for this
+  ///        object with no POINTER-kind Hybrid objects.
+  ///
+  /// \param original  The object to copy or move
+  /// \param other     An object to clone or replace the present object with
+  /// \{
+  Thermostat(const Thermostat& original) = default;
+  Thermostat(Thermostat&& original) = default;
+  Thermostat& operator=(const Thermostat& original) = default;
+  Thermostat& operator=(Thermostat&& original) = default;
+  /// \}
+  
   /// \brief Get the kind of thermostat
   ThermostatKind getKind() const;
 
@@ -100,6 +207,27 @@ public:
   ///        the system itself may or may not be there by this time.
   int getFinalEvolutionStep() const;
 
+  /// \brief Get the generator state for a particular atom.  For retrieving large numbers of
+  ///        states, one should used the abstract.
+  ullint4 getGeneratorState(int atom_index,
+                            HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
+  /// \brief Get one of the cached random numbers.  This function returns the result as a
+  ///        double-precision real, but if a single-precision result is queried it will be
+  ///        converted to double and can then be put back in a float without changing its value.
+  ///        For retrieving large numbers of results, one should used the abstract.
+  ///
+  /// \param prec        Precision level of the result to retrieve--indicates whether to extract
+  ///                    the number from sp_random_cache or random_cache
+  /// \param atom_index  Index of the atom for which to get a result
+  /// \param cache_row   Row of the cache to query (the 0th row offers a result for Cartesian X
+  ///                    influence on the atom, the 4th row offers a result for the Carteisan Y
+  ///                    influence on the atom one cycle in the future)
+  /// \param tier        Indicate whether to take information from the CPU host or GPU device
+  double getCachedRandomResult(PrecisionModel prec, int atom_index,
+                               int cache_row,
+                               HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  
   /// \brief Indicate whether this thermostat applies a common target temperature to all atoms, or
   ///        (if otherwise) there is a list of target initial and final temperatures with shared
   ///        values among various subdivisions (compartments) of the atom set.
@@ -121,6 +249,20 @@ public:
   /// \param atom_index  Index of the atom of interest
   double getCurrentTemperatureTarget(int atom_index = 0) const;
 
+  /// \brief Get the abstract.
+  ///
+  /// Overloaded:
+  ///   - Get a reader for a const object
+  ///   - Get a (partially) writeable abstract for a non-const object
+  ///
+  /// \param tier  Indicate whether to take pointers to memory on the CPU host or on the GPU device
+  /// \{
+  const ThermostatReader<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  ThermostatWriter<double> dpData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  const ThermostatReader<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
+  ThermostatWriter<float> spData(HybridTargetLevel tier = HybridTargetLevel::HOST);
+  /// \}
+  
   /// \brief Set the type of thermostat.
   ///   
   /// \param kind_in  The type of thermostat to use
@@ -211,13 +353,15 @@ public:
   ///        thermostating.  This passes a call on to a general-purpose function for seeding the
   ///        generators and will recruit the GPU if available to expedite the process.
   ///
+  /// \param prec          Precision with which to compute random real number results
   /// \param new_seed      A new random number seed to apply, if different from the one used
   ///                      during construction of this Thermostat object
   /// \param scrub_cycles  Number of cycles of Xoshiro256++ generation to run in order to ensure
   ///                      that the newly seeded generators produce high-quality results
-  void initializeRandomStates(int new_seed = default_thermostat_random_seed,
+  /// \param gpu           Specifications of the GPU in use (if applicable)
+  void initializeRandomStates(PrecisionModel prec, int new_seed = default_thermostat_random_seed,
                               int scrub_cycles = 25, const GpuDetails &gpu = null_gpu);
-
+  
   /// \brief Fill or refill the random number cache for a subset of the atoms, advancing the
   ///        thermostat's random number generators in the process.  This CPU-based function is
   ///        intended to mimic GPU functionality, but the GPU operations are expected to be fused
@@ -247,6 +391,7 @@ private:
                                    ///<   state vectors, for which this thermostat is responsible
                                    ///<   (this times random_cache_depth gives the length of
                                    ///<   random_sv_bank)
+  int padded_atom_count;           ///< The total number of atoms padded by the warp size
   int step_number;                 ///< Number of the dynamics step, which should be consistent
                                    ///<   with any other record of the current simulation step.
                                    ///<   The thermostat, which will be included in any simulation
@@ -315,5 +460,7 @@ std::string getThermostatName(ThermostatKind kind);
 
 } // namespace trajectory
 } // namespace stormm
+
+#include "thermostat.tpp"
 
 #endif

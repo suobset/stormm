@@ -380,7 +380,7 @@ void initXoroshiro128pArray(Hybrid<ullint2> *state_vector, int igseed,
 ///   - Operate on a Hybrid object (HOST only--see the overloaded form in hpc_random.h for GPU
 ///     functionality)
 ///
-/// \brief state_vector  The array of RNG state vectors
+/// \brief state_xy      
 /// \brief n_generators  Trusted length of the state_vector array, the number of RN generators
 /// \brief igseed        Seed to apply in creating the first random number generator, from which
 ///                      all others are long jumps plus short jumps
@@ -396,17 +396,44 @@ void initXoshiro256ppArray(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw,
 /// \}
 
 /// \brief Fill a cache of random numbers using a series (an array) of state vectors (generators).
-///        With each available type of state, only certain generators are available.
+///        The second of two ullint2 state vectors may be supplied as nullptr if only 128-bit
+///        states are in use.
 ///
 /// Overloaded:
-///   - Work with 128-bit generator states.
-///   - Work with 256-bit generator states.
+///   - Work with 128-bit or 256-bit generator states.
+///   - Operate on C-style arrays, Standard Template Library Vectors, or Hybrid objects
 ///   - An alternative form in the hpc_random library makes use of the eponymous GPU kernels.
+///
+/// \param state_xy     First halves of each 256-bit generator state vector, or the array of
+///                     128-bit state vectors (state_zw should be the null pointer in this case)
+/// \param state_zw     Second havles of each 256-bit generator state vector, if required
+/// \param cache        Array of real-valued random number results to fill out (the template
+///                     parameter indicates the data type of this array)
+/// \param length       Trusted length of state_xy and state_zw
+/// \param depth        Quantity of random numbers for each generator to produce during checkout
+///                     from the state vector arrays.  The (warp size-padded) length parameter
+///                     times depth gives the size of the cache array.
+/// \param method       Method for generating random numbers (some XOR-shift technique)
+/// \param product      Shape of the random distribution over which to take results
+/// \param index_start  Starting index at which to begin drawing upon random number generators
+/// \param index_end    Upper bound of random number generators from which to draw results
+/// \{
 template <typename T>
 void fillRandomCache(ullint2* state_xy, ullint2* state_zw, T* cache, size_t length, size_t depth,
                      RandomAlgorithm method, RandomNumberKind product, size_t index_start,
                      size_t index_end);
-  
+
+template <typename T>
+void fillRandomCache(std::vector<ullint2> *state_xy, std::vector<ullint2> *state_zw,
+                     std::vector<T> *cache, size_t length, size_t depth, RandomAlgorithm method,
+                     RandomNumberKind product, size_t index_start, size_t index_end);
+
+template <typename T>
+void fillRandomCache(Hybrid<ullint2> *state_xy, Hybrid<ullint2> *state_zw, std::vector<T> *cache,
+                     size_t length, size_t depth, RandomAlgorithm method, RandomNumberKind product,
+                     size_t index_start, size_t index_end);
+/// \}
+
 } // namespace random
 } // namespace stormm
 
