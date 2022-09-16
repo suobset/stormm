@@ -3075,12 +3075,15 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se) {
+void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
+                                                const InitializationTask init_request,
+                                                const int random_cache_depth) {
   
   // Build a list of non-bonded work units from the exclusion mask.  Translate those work units
   // into non-bonded abstracts and instructions.  All work units are assumed to have the same
   // target tile count.
-  const std::vector<NonbondedWorkUnit> nbwu_list = buildNonbondedWorkUnits(poly_se);
+  const std::vector<NonbondedWorkUnit> nbwu_list = buildNonbondedWorkUnits(poly_se, init_request,
+                                                                           random_cache_depth);
   const int nbwu_count = nbwu_list.size();
   total_nonbonded_work_units = nbwu_count;
   int max_tile_count = 0;
@@ -3207,6 +3210,12 @@ int AtomGraphSynthesis::getSystemCount() const {
 //-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getAtomCount() const {
   return total_atoms;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getPaddedAtomCount() const {
+  return atom_offsets.readHost(system_count - 1) +
+         roundUp(atom_counts.readHost(system_count - 1), warp_size_int);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3372,6 +3381,21 @@ NbwuKind AtomGraphSynthesis::getNonbondedWorkType() const {
 //-------------------------------------------------------------------------------------------------
 int AtomGraphSynthesis::getNonbondedWorkUnitCount() const {
   return total_nonbonded_work_units;
+}
+
+//-------------------------------------------------------------------------------------------------
+int AtomGraphSynthesis::getRandomCacheDepth() const {
+  if (total_nonbonded_work_units == 0) {
+    rtWarn("No non-bonded work units have yet been constructed for this topology synthesis.  A "
+           "cache depth of zero will be assumed until the proper value can be read from the first "
+           "work unit.", "AtomGraphSynthesis", "getRandomCacheDepth");
+    return 0;
+  }
+  else {
+    const int refresh_code = nonbonded_abstracts.readHost((2 * small_block_max_imports) + 10);
+    return ((refresh_code >> 8) & 0xff);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

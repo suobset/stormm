@@ -16,6 +16,7 @@
 #include "Synthesis/nonbonded_workunit.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Synthesis/valence_workunit.h"
+#include "Trajectory/thermostat.h"
 #include "Trajectory/trajectory_enumerators.h"
 #include "hpc_minimization.h"
 
@@ -50,6 +51,9 @@ using synthesis::SyRestraintKit;
 using synthesis::SyValenceKit;
 using synthesis::VwuGoal;
 using trajectory::CoordinateCycle;
+using trajectory::Thermostat;
+using trajectory::ThermostatKind;
+using trajectory::ThermostatWriter;
 
 #include "../Numerics/accumulation.cui"
 
@@ -77,6 +81,10 @@ using trajectory::CoordinateCycle;
 extern void minimizationKernelSetup() {
   const cudaSharedMemConfig sms_eight = cudaSharedMemBankSizeEightByte;
   if (cudaFuncSetSharedMemConfig(kdLineAdvance, sms_eight) != cudaSuccess) {
+    rtErr("Error setting kdLineAdvance __shared__ memory bank size to eight bytes.",
+          "minimizationKernelSetup");
+  }
+  if (cudaFuncSetSharedMemConfig(kfLineAdvance, sms_eight) != cudaSuccess) {
     rtErr("Error setting kdLineAdvance __shared__ memory bank size to eight bytes.",
           "minimizationKernelSetup");
   }
@@ -190,6 +198,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   const ReductionKit redk(poly_ag, devc_tier);
   ConjGradSubstrate cgsbs(poly_psw, rbg, devc_tier);
 
+  // Conjugate gradient minimization does not use a thermostat in any respect, but such an object
+  // must be created in order to get its abstract as a placeholder.
+  Thermostat heat_bath(ThermostatKind::NONE);
+
   // Test whether there are virtual sites in the synthesis
   const bool virtual_sites_present = (poly_ag.getVirtualSiteCount() > 0);
   
@@ -223,6 +235,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       ISWorkspaceKit<double> iswk = ism_space->dpData(devc_tier);
       MMControlKit<double> ctrl_fe = mmctrl_fe->dpData(devc_tier);
       MMControlKit<double> ctrl_xe = mmctrl_xe->dpData(devc_tier);
+      ThermostatWriter<double> tstw = heat_bath.dpData(devc_tier);
       if (virtual_sites_present) {
         launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
       }
@@ -233,8 +246,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp, gbr_lp,
+                        gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
         if (virtual_sites_present) {
@@ -258,8 +272,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp,
+                        gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
@@ -274,8 +289,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp,
+                        gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
@@ -290,8 +306,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp,
+                        gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
@@ -310,8 +327,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       sc->initialize(devc_tier, gpu);
       ScoreCardWriter scw_final = sc->data();
       ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
-                      &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp, gbd_lp);
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw,
+                      &scw_final, &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES,
+                      nonb_lp, gbr_lp, gbd_lp);
       launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
       ctrl_xe.step += 1;
@@ -332,6 +350,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       ISWorkspaceKit<float> iswk = ism_space->spData(devc_tier);
       MMControlKit<float> ctrl_fe = mmctrl_fe->spData(devc_tier);
       MMControlKit<float> ctrl_xe = mmctrl_xe->spData(devc_tier);
+      ThermostatWriter<float> tstw = heat_bath.spData(devc_tier);
       if (virtual_sites_present) {
         launchVirtualSitePlacement(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_mv_lp);
       }
@@ -342,9 +361,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
         sc->initialize(devc_tier, gpu);
         ScoreCardWriter scw = sc->data(devc_tier);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::YES, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
-                        gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, acc_meth,
+                        nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                       vale_fe_lp);
@@ -369,9 +388,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
-                        gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
+                        nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         if (virtual_sites_present) {
@@ -386,9 +405,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
-                        gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
+                        nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         if (virtual_sites_present) {
@@ -403,9 +422,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         }
         sc->initialize(devc_tier, gpu);
         ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw, &nonb_tbr,
-                        &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
-                        gbd_lp);
+        launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
+                        &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
+                        nonb_lp, gbr_lp, gbd_lp);
         launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
                       EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
         if (virtual_sites_present) {
@@ -424,9 +443,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       sc->initialize(devc_tier, gpu);
       ScoreCardWriter scw_final = sc->data();
       ism_space->initialize(devc_tier, CoordinateCycle::PRESENT, gpu);
-      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &scw_final, &nonb_tbr,
-                      &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth, nonb_lp, gbr_lp,
-                      gbd_lp);
+      launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw,
+                      &scw_final, &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES,
+                      acc_meth, nonb_lp, gbr_lp, gbd_lp);
       launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
                     EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                     vale_xe_lp);

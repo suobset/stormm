@@ -14,6 +14,7 @@
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
 #include "Topology/atomgraph_enumerators.h"
+#include "Trajectory/thermostat.h"
 #include "cacheresource.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
@@ -38,6 +39,8 @@ using synthesis::StaticExclusionMaskSynthesis;
 using synthesis::SyNonbondedKit;
 using synthesis::VwuGoal;
 using topology::ImplicitSolventModel;
+using trajectory::Thermostat;
+using trajectory::ThermostatWriter;
 
 /// \brief Set the __shared__ memory configuration for various nonbonded interaction kernels
 void nonbondedKernelSetup();
@@ -96,6 +99,10 @@ cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, Nb
 /// \param mmctrl       Progress counters and run bounds
 /// \param poly_psw     Abstract for coordinates and forces of all systems
 /// \param poly_ps      Coordinate and force compilation for all systems
+/// \param tstw         Abstract for the thermostat (with time step number)
+/// \param heat_bath    Thermostat for keeping the system at a particular temperature, plus a
+///                     place to keep the official time step number (even if no thermostating is
+///                     applied to the system)
 /// \param scw          Abstract for the energy tracking on all systems
 /// \param sc           Energy tracking for all systems (this must be pre-sized to accommodate the
 ///                     entire synthesis)
@@ -116,32 +123,34 @@ cudaFuncAttributes queryBornDerivativeKernelRequirements(PrecisionModel prec, Nb
 /// \{
 void launchNonbonded(NbwuKind kind, const SyNonbondedKit<double, double2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<double> *ctrl,
-                     PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                     CacheResourceKit<double> *gmem_r, ISWorkspaceKit<double> *iswk,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy, const int2 bt,
-                     const int2 gbr_bt, const int2 gbd_bt);
+                     PsSynthesisWriter *poly_psw, ThermostatWriter<double> *tstw,
+                     ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
+                     ISWorkspaceKit<double> *iswk, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, const int2 bt, const int2 gbr_bt,
+                     const int2 gbd_bt);
 
 void launchNonbonded(NbwuKind kind, const SyNonbondedKit<float, float2> &poly_nbk,
                      const SeMaskSynthesisReader &poly_ser, MMControlKit<float> *ctrl,
-                     PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
-                     CacheResourceKit<float> *gmem_r, ISWorkspaceKit<float> *iswk,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy,
-                     AccumulationMethod force_sum, const int2 bt, const int2 gbr_bt,
-                     const int2 gbd_bt);
+                     PsSynthesisWriter *poly_psw, ThermostatWriter<float> *tstw,
+                     ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
+                     ISWorkspaceKit<float> *iswk, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, AccumulationMethod force_sum, const int2 bt,
+                     const int2 gbr_bt, const int2 gbd_bt);
 
 void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                      const StaticExclusionMaskSynthesis &poly_se,
                      MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                     ScoreCard *sc, CacheResource *tb_space, ImplicitSolventWorkspace *ism_space,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy,
-                     AccumulationMethod force_sum, const KernelManager &launcher);
-
-void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
-                     const StaticExclusionMaskSynthesis &poly_se,
-                     MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                     ScoreCard *sc, CacheResource *tb_space, ImplicitSolventWorkspace *ism_space,
-                     EvaluateForce eval_force, EvaluateEnergy eval_energy,
+                     Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                     ImplicitSolventWorkspace *ism_space, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, AccumulationMethod force_sum,
                      const KernelManager &launcher);
+
+void launchNonbonded(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
+                     const StaticExclusionMaskSynthesis &poly_se,
+                     MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                     Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                     ImplicitSolventWorkspace *ism_space, EvaluateForce eval_force,
+                     EvaluateEnergy eval_energy, const KernelManager &launcher);
 /// \}
 
 } // namespace energy

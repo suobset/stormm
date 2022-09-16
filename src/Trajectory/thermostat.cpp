@@ -202,6 +202,7 @@ ullint4 Thermostat::getGeneratorState(const int atom_index, const HybridTargetLe
     break;
 #endif
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -464,12 +465,12 @@ void Thermostat::setTemperature(const std::vector<double> &temp_init_in,
 }
 
 //-------------------------------------------------------------------------------------------------
-void Thermostat::setInitialStep(const int step_in) {
+void Thermostat::setInitialEvolutionStep(const int step_in) {
   initial_evolution_step = step_in;  
 }
 
 //-------------------------------------------------------------------------------------------------
-void Thermostat::setFinalStep(const int step_in) {
+void Thermostat::setFinalEvolutionStep(const int step_in) {
   final_evolution_step = step_in;  
 }
 
@@ -478,6 +479,16 @@ void Thermostat::setRandomCacheDepth(const int depth_in) {
   random_cache_depth = depth_in;
   validateRandomCacheDepth();
   allocateRandomStorage();
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::incrementStep() {
+  step_number += 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::decrementStep() {
+  step_number -= 1;
 }
 
 //-------------------------------------------------------------------------------------------------

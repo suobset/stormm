@@ -178,10 +178,10 @@ public:
   ///         work unit imported for one of its tile computations.  The integer in slot 50 is a
   ///         bit-packed value, with the low 16 bits indicating up to 65,504 (not 65,536) atoms
   ///         following the first index.  The high 16 bits of the integer in slot 50 indicate
-  ///         whether to initialize psi, sum_deijda, and force X, Y, or Z accumulators for the
-  ///         next iteration of the cycle (one bit per accumulator), as well as whether to perform
-  ///         random number caching for up to 15 cycles.  These two slots of the work unit can be
-  ///         altered after the non-bonded work unit list is constructed.
+  ///         whether to initialize force X, Y, or Z as well as psi or sum_deijda accumulators for
+  ///         the next iteration of the cycle (one bit per accumulator), as well as whether to
+  ///         perform random number caching for up to 15 cycles.  These two slots of the work unit
+  ///         can be altered after the non-bonded work unit list is constructed.
   ///
   /// \param instruction_start  The starting point of instructions for this group of tiles, if
   ///                           the work unit will fit on a small thread block, having less than

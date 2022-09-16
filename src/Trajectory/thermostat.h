@@ -45,8 +45,8 @@ template <typename T> struct ThermostatReader {
 
   /// \brief The constructor takes the usual list of parent object attributes with pointers
   ///        applicable on either the CPU host or GPU device.
-  ThermostatReader(ThermostatKind kind_in, int atom_count_in, int padded_atom_count_in,
-                   int step_in, int depth_in, int init_evolution_in, int end_evolution_in,
+  ThermostatReader(ThermostatKind kind_in, int natom_in, int padded_natom_in, int step_in,
+                   int depth_in, int init_evolution_in, int end_evolution_in,
                    bool common_temperature_in, T init_temperature_in, T final_temperature_in,
                    const T* init_temperatures_in, const T* final_temperatures_in,
                    const ullint2* state_xy_in, const ullint2* state_zw_in, const T* cache_in);
@@ -59,8 +59,8 @@ template <typename T> struct ThermostatReader {
   /// \}
   
   const ThermostatKind kind;       ///< The type of this thermostat, i.e. Andersen
-  const int atom_count;            ///< Number of atoms controlled by this thermostat
-  const int padded_atom_count;     ///<
+  const int natom;                 ///< Number of atoms controlled by this thermostat
+  const int padded_natom;          ///< The number of atoms padded by the warp size
   const int step;                  ///< Current step number of the simulation
   const int depth;                 ///< Depth of the cache (the true depth will be three times
                                    ///<   higher, to serve each atom with Cartesian X, Y, and Z
@@ -94,8 +94,8 @@ template <typename T> struct ThermostatWriter {
 
   /// \brief The constructor takes the usual list of parent object attributes with pointers
   ///        applicable on either the CPU host or GPU device.
-  ThermostatWriter(ThermostatKind kind_in, int atom_count_in, int padded_atom_count_in,
-                   int step_in, int depth_in, int init_evolution_in, int end_evolution_in,
+  ThermostatWriter(ThermostatKind kind_in, int natom_in, int padded_natom_in, int step_in,
+                   int depth_in, int init_evolution_in, int end_evolution_in,
                    bool common_temperature_in, T init_temperature_in, T final_temperature_in,
                    const T* init_temperatures_in, const T* final_temperatures_in,
                    ullint2* state_xy_in, ullint2* state_zw_in, T* cache_in);
@@ -108,8 +108,8 @@ template <typename T> struct ThermostatWriter {
   /// \}
   
   const ThermostatKind kind;       ///< The type of this thermostat, i.e. Andersen
-  const int atom_count;            ///< Number of atoms controlled by this thermostat
-  const int padded_atom_count;     ///<
+  const int natom;                 ///< Number of atoms controlled by this thermostat
+  const int padded_natom;          ///< The number of atoms padded by the warp size
   int step;                        ///< Current step number of the simulation
   const int depth;                 ///< Depth of the cache (the true depth will be three times
                                    ///<   higher, to serve each atom with Cartesian X, Y, and Z
@@ -322,12 +322,12 @@ public:
   /// \brief Set the step at which temperature evolution, away from T(init), shall begin.
   ///
   /// \param step_in  The step setting
-  void setInitialStep(int step_in);
+  void setInitialEvolutionStep(int step_in);
   
   /// \brief Set the step at which temperature evolution, away from T(final), shall begin.
   ///
   /// \param step_in  The step setting
-  void setFinalStep(int step_in);
+  void setFinalEvolutionStep(int step_in);
   
   /// \brief Set the random number cache depth.  This value is kept on a tight leash, as it can
   ///        easily lead to allocating too much memory.  A hundred-thousand atom system with cache
@@ -335,6 +335,14 @@ public:
   ///
   /// \param depth_in  The depth to take
   void setRandomCacheDepth(int depth_in);
+
+  /// \brief Increase the step count by one.  This will advance the simulation's official step
+  ///        counter.
+  void incrementStep();
+
+  /// \brief Decrease the step count by one.  This will cause the simulation's official step
+  ///        counter to backtrack.
+  void decrementStep();
 
   /// \brief Validate the initial or final target temperature.
   void validateTemperature(double temperature_in);

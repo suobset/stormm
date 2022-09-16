@@ -17,23 +17,23 @@ ImplicitSolventWorkspace::ImplicitSolventWorkspace(const Hybrid<int> &atom_start
                       roundUp(atom_counts.readHost(atom_starts.size() - 1LLU), warp_size_int)},
     psi{HybridKind::POINTER, "isw_eff_gbrad"},
     psi_overflow{HybridKind::POINTER, "isw_eff_gbrad_ovrf"},
-    alt_psi{HybridKind::POINTER, "alt_eff_gbrad"},
-    alt_psi_overflow{HybridKind::POINTER, "alt_eff_gbrad_ovrf"},
+    nxt_psi{HybridKind::POINTER, "nxt_eff_gbrad"},
+    nxt_psi_overflow{HybridKind::POINTER, "nxt_eff_gbrad_ovrf"},
     sum_deijda{HybridKind::POINTER, "isw_sumdeijda"},
     sum_deijda_overflow{HybridKind::POINTER, "isw_sumdeijda_ovrf"},
-    alt_sum_deijda{HybridKind::POINTER, "alt_sumdeijda"},
-    alt_sum_deijda_overflow{HybridKind::POINTER, "alt_sumdeijda_ovrf"},
+    nxt_sum_deijda{HybridKind::POINTER, "nxt_sumdeijda"},
+    nxt_sum_deijda_overflow{HybridKind::POINTER, "nxt_sumdeijda_ovrf"},
     llint_data{4LLU * static_cast<size_t>(padded_atom_count), "isw_llint_data"},
     int_data{4LLU * static_cast<size_t>(padded_atom_count), "isw_int_data"}
 {
   psi.setPointer(&llint_data,                                       0LLU, padded_atom_count);
-  alt_psi.setPointer(&llint_data,                      padded_atom_count, padded_atom_count);
+  nxt_psi.setPointer(&llint_data,                      padded_atom_count, padded_atom_count);
   sum_deijda.setPointer(&llint_data,            2LLU * padded_atom_count, padded_atom_count);
-  alt_sum_deijda.setPointer(&llint_data,        3LLU * padded_atom_count, padded_atom_count);
+  nxt_sum_deijda.setPointer(&llint_data,        3LLU * padded_atom_count, padded_atom_count);
   psi_overflow.setPointer(&int_data,                                0LLU, padded_atom_count);
-  alt_psi_overflow.setPointer(&int_data,               padded_atom_count, padded_atom_count);
+  nxt_psi_overflow.setPointer(&int_data,               padded_atom_count, padded_atom_count);
   sum_deijda_overflow.setPointer(&int_data,     2LLU * padded_atom_count, padded_atom_count);
-  alt_sum_deijda_overflow.setPointer(&int_data, 3LLU * padded_atom_count, padded_atom_count);
+  nxt_sum_deijda_overflow.setPointer(&int_data, 3LLU * padded_atom_count, padded_atom_count);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -49,12 +49,12 @@ ImplicitSolventWorkspace::ImplicitSolventWorkspace(const ImplicitSolventWorkspac
     padded_atom_count{original.padded_atom_count},
     psi{original.psi},
     psi_overflow{original.psi_overflow},
-    alt_psi{original.alt_psi},
-    alt_psi_overflow{original.alt_psi_overflow},
+    nxt_psi{original.nxt_psi},
+    nxt_psi_overflow{original.nxt_psi_overflow},
     sum_deijda{original.sum_deijda},
     sum_deijda_overflow{original.sum_deijda_overflow},
-    alt_sum_deijda{original.alt_sum_deijda},
-    alt_sum_deijda_overflow{original.alt_sum_deijda_overflow},
+    nxt_sum_deijda{original.nxt_sum_deijda},
+    nxt_sum_deijda_overflow{original.nxt_sum_deijda_overflow},
     llint_data{original.llint_data},
     int_data{original.int_data}
 {
@@ -67,12 +67,12 @@ ImplicitSolventWorkspace::ImplicitSolventWorkspace(ImplicitSolventWorkspace &&or
     padded_atom_count{original.padded_atom_count},
     psi{std::move(original.psi)},
     psi_overflow{std::move(original.psi_overflow)},
-    alt_psi{std::move(original.alt_psi)},
-    alt_psi_overflow{std::move(original.alt_psi_overflow)},
+    nxt_psi{std::move(original.nxt_psi)},
+    nxt_psi_overflow{std::move(original.nxt_psi_overflow)},
     sum_deijda{std::move(original.sum_deijda)},
     sum_deijda_overflow{std::move(original.sum_deijda_overflow)},
-    alt_sum_deijda{std::move(original.alt_sum_deijda)},
-    alt_sum_deijda_overflow{std::move(original.alt_sum_deijda_overflow)},
+    nxt_sum_deijda{std::move(original.nxt_sum_deijda)},
+    nxt_sum_deijda_overflow{std::move(original.nxt_sum_deijda_overflow)},
     llint_data{original.llint_data},
     int_data{original.int_data}
 {}
@@ -91,12 +91,12 @@ ImplicitSolventWorkspace::operator=(const ImplicitSolventWorkspace &other) {
   padded_atom_count = other.padded_atom_count;
   psi = other.psi;
   psi_overflow = other.psi_overflow;
-  alt_psi = other.alt_psi;
-  alt_psi_overflow = other.alt_psi_overflow;
+  nxt_psi = other.nxt_psi;
+  nxt_psi_overflow = other.nxt_psi_overflow;
   sum_deijda = other.sum_deijda;
   sum_deijda_overflow = other.sum_deijda_overflow;
-  alt_sum_deijda = other.alt_sum_deijda;
-  alt_sum_deijda_overflow = other.alt_sum_deijda_overflow;
+  nxt_sum_deijda = other.nxt_sum_deijda;
+  nxt_sum_deijda_overflow = other.nxt_sum_deijda_overflow;
   llint_data = other.llint_data;
   int_data = other.int_data;
 
@@ -119,12 +119,12 @@ ImplicitSolventWorkspace::operator=(ImplicitSolventWorkspace &&other) {
   padded_atom_count = other.padded_atom_count;
   psi = std::move(other.psi);
   psi_overflow = std::move(other.psi_overflow);
-  alt_psi = std::move(other.alt_psi);
-  alt_psi_overflow = std::move(other.alt_psi_overflow);
+  nxt_psi = std::move(other.nxt_psi);
+  nxt_psi_overflow = std::move(other.nxt_psi_overflow);
   sum_deijda = std::move(other.sum_deijda);
   sum_deijda_overflow = std::move(other.sum_deijda_overflow);
-  alt_sum_deijda = std::move(other.alt_sum_deijda);
-  alt_sum_deijda_overflow = std::move(other.alt_sum_deijda_overflow);
+  nxt_sum_deijda = std::move(other.nxt_sum_deijda);
+  nxt_sum_deijda_overflow = std::move(other.nxt_sum_deijda_overflow);
   llint_data = std::move(other.llint_data);
   int_data = std::move(other.int_data);
   return *this;
@@ -134,12 +134,12 @@ ImplicitSolventWorkspace::operator=(ImplicitSolventWorkspace &&other) {
 void ImplicitSolventWorkspace::rebasePointers() {
   psi.swapTarget(&llint_data);
   psi_overflow.swapTarget(&int_data);
-  alt_psi.swapTarget(&llint_data);
-  alt_psi_overflow.swapTarget(&int_data);
+  nxt_psi.swapTarget(&llint_data);
+  nxt_psi_overflow.swapTarget(&int_data);
   sum_deijda.swapTarget(&llint_data);
   sum_deijda_overflow.swapTarget(&int_data);
-  alt_sum_deijda.swapTarget(&llint_data);
-  alt_sum_deijda_overflow.swapTarget(&int_data);
+  nxt_sum_deijda.swapTarget(&llint_data);
+  nxt_sum_deijda_overflow.swapTarget(&int_data);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -153,15 +153,15 @@ ISWorkspaceKit<double> ImplicitSolventWorkspace::dpData(const HybridTargetLevel 
   switch (orientation) {
   case CoordinateCycle::PAST:
   case CoordinateCycle::FUTURE:
-    return ISWorkspaceKit<double>(fp_bits, alt_psi.data(tier), alt_psi_overflow.data(tier),
-                                  alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier),
+    return ISWorkspaceKit<double>(fp_bits, nxt_psi.data(tier), nxt_psi_overflow.data(tier),
+                                  nxt_sum_deijda.data(tier), nxt_sum_deijda_overflow.data(tier),
                                   psi.data(tier), psi_overflow.data(tier),
                                   sum_deijda.data(tier), sum_deijda_overflow.data(tier));
   case CoordinateCycle::PRESENT:
     return ISWorkspaceKit<double>(fp_bits, psi.data(tier), psi_overflow.data(tier),
                                   sum_deijda.data(tier), sum_deijda_overflow.data(tier),
-                                  alt_psi.data(tier), alt_psi_overflow.data(tier),
-                                  alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier));
+                                  nxt_psi.data(tier), nxt_psi_overflow.data(tier),
+                                  nxt_sum_deijda.data(tier), nxt_sum_deijda_overflow.data(tier));
   }
   __builtin_unreachable();
 }
@@ -172,15 +172,15 @@ ISWorkspaceKit<float> ImplicitSolventWorkspace::spData(const HybridTargetLevel t
   switch (orientation) {
   case CoordinateCycle::PAST:
   case CoordinateCycle::FUTURE:
-    return ISWorkspaceKit<float>(fp_bits, alt_psi.data(tier), alt_psi_overflow.data(tier),
-                                 alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier),
+    return ISWorkspaceKit<float>(fp_bits, nxt_psi.data(tier), nxt_psi_overflow.data(tier),
+                                 nxt_sum_deijda.data(tier), nxt_sum_deijda_overflow.data(tier),
                                  psi.data(tier), psi_overflow.data(tier),
                                  sum_deijda.data(tier), sum_deijda_overflow.data(tier));
   case CoordinateCycle::PRESENT:
     return ISWorkspaceKit<float>(fp_bits, psi.data(tier), psi_overflow.data(tier),
                                  sum_deijda.data(tier), sum_deijda_overflow.data(tier),
-                                 alt_psi.data(tier), alt_psi_overflow.data(tier),
-                                 alt_sum_deijda.data(tier), alt_sum_deijda_overflow.data(tier));
+                                 nxt_psi.data(tier), nxt_psi_overflow.data(tier),
+                                 nxt_sum_deijda.data(tier), nxt_sum_deijda_overflow.data(tier));
   }
   __builtin_unreachable();
 }
@@ -213,10 +213,10 @@ void ImplicitSolventWorkspace::initialize(const HybridTargetLevel tier,
       switch (orientation) {
       case CoordinateCycle::PAST:
       case CoordinateCycle::FUTURE:
-        psi_ptr = alt_psi.data();
-        psi_ovrf_ptr = alt_psi_overflow.data();
-        sum_deijda_ptr = alt_sum_deijda.data();
-        sum_deijda_ovrf_ptr = alt_sum_deijda_overflow.data();
+        psi_ptr = nxt_psi.data();
+        psi_ovrf_ptr = nxt_psi_overflow.data();
+        sum_deijda_ptr = nxt_sum_deijda.data();
+        sum_deijda_ovrf_ptr = nxt_sum_deijda_overflow.data();
         break;
       case CoordinateCycle::PRESENT:
         psi_ptr = psi.data();

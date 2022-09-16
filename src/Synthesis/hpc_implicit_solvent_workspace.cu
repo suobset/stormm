@@ -37,10 +37,10 @@ void ImplicitSolventWorkspace::launchInitialization(const GpuDetails &gpu,
   switch (orientation) {
   case CoordinateCycle::PAST:
   case CoordinateCycle::FUTURE:
-    kInitISWorkspace<<<nsmp, large_block_size>>>(alt_psi.data(devc_tier),
-                                                 alt_psi_overflow.data(devc_tier),
-                                                 alt_sum_deijda.data(devc_tier),
-                                                 alt_sum_deijda_overflow.data(devc_tier),
+    kInitISWorkspace<<<nsmp, large_block_size>>>(nxt_psi.data(devc_tier),
+                                                 nxt_psi_overflow.data(devc_tier),
+                                                 nxt_sum_deijda.data(devc_tier),
+                                                 nxt_sum_deijda_overflow.data(devc_tier),
                                                  padded_atom_count);
     break;
   case CoordinateCycle::PRESENT:

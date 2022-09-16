@@ -33,6 +33,7 @@
 #include "../../src/Topology/atomgraph_abstracts.h"
 #include "../../src/Topology/atomgraph_enumerators.h"
 #include "../../src/Trajectory/phasespace.h"
+#include "../../src/Trajectory/thermostat.h"
 #include "../../src/UnitTesting/unit_test.h"
 #include "../../src/UnitTesting/stopwatch.h"
 #include "assemble_restraints.h"
@@ -95,6 +96,7 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   const TrajectoryKind frcid = TrajectoryKind::FORCES;
   ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
                                      poly_ag.getSystemAtomCounts(), prec);
+  Thermostat heat_bath(ThermostatKind::NONE);
 
   // Clear forces.  Perform calculations for valence interactions and restraints.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
@@ -135,8 +137,8 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   // Clear forces again.  Compute non-bonded interactions.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
-  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space, &ism_space,
-                  EvaluateForce::YES, EvaluateEnergy::NO, facc_method, launcher);
+  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &heat_bath, &sc, nonbond_tb_space,
+                  &ism_space, EvaluateForce::YES, EvaluateEnergy::NO, facc_method, launcher);
   if (poly_ag.getImplicitSolventModel() != ImplicitSolventModel::NONE) {
     ism_space.download();
   }
@@ -273,9 +275,11 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                 launcher);
   ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
                                      poly_ag.getSystemAtomCounts(), prec);
+  Thermostat heat_bath(ThermostatKind::NONE);
   const NeckGeneralizedBornTable ngb_tables;
-  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &sc, nonbond_tb_space, &ism_space,
-                  EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT, launcher);
+  launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &heat_bath, &sc, nonbond_tb_space,
+                  &ism_space, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,
+                  launcher);
   sc.download();
   std::vector<double> cpu_bond(nsys), gpu_bond(nsys), cpu_angl(nsys), gpu_angl(nsys);
   std::vector<double> cpu_dihe(nsys), gpu_dihe(nsys), cpu_impr(nsys), gpu_impr(nsys);

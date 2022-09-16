@@ -114,8 +114,12 @@ public:
   /// \brief Get the number of systems that this synthesis describes
   int getSystemCount() const;
 
-  /// \brief Get the total number of atoms, summed over all systems, including replicas
+  /// \brief Get the total number of atoms, summed over all systems, including replicas.  This
+  ///        does not include padding.
   int getAtomCount() const;
+
+  /// \brief Get the entire padded number of atoms covering all systems.
+  int getPaddedAtomCount() const;
 
   /// \brief Get the total number of virtual sites across all systems, including replicas
   int getVirtualSiteCount() const;
@@ -260,6 +264,11 @@ public:
   /// \brief Get the number of non-bonded work units serving systems in this synthesis.
   int getNonbondedWorkUnitCount() const;
 
+  /// \brief Get the depth of the random numbers cache that the non-bonded work units of this
+  ///        topology synthesis will try to fill.  This will raise a warning and return zero if
+  ///        no cache depth has yet been set.
+  int getRandomCacheDepth() const;
+  
   /// \brief Get the number of reduction work units spanning all systems.
   int getReductionWorkUnitCount() const;
 
@@ -343,10 +352,16 @@ public:
   ///        was a consideration when developing the valence work units).  Load the instructions
   ///        into the topology synthesis for availability on the GPU.
   ///
-  /// \param poly_se  Synthesis of static exclusion masks for a compilation of systems in
-  ///                 isolated boundary conditions.  Each topology in the AtomGraphSynthesis need
-  ///                 only be represented once in this mask synthesis.
-  void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se);
+  /// \param poly_se              Synthesis of static exclusion masks for a compilation of systems
+  ///                             in isolated boundary conditions.
+  /// \param init_request         Indicate a pattern for the non-bonded work units to initialize
+  ///                             accumulators for subsequent force and energy calculations.
+  /// \param random_cache_depth   Number of random values to store for each atom in the synthesis
+  ///                             (the actual number of values stored is multiplied by three, for
+  ///                             Cartesian X, Y, and Z contributions)
+  void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
+                              InitializationTask init_request = InitializationTask::NONE,
+                              int random_cache_depth = 0);
 
   /// \brief Apply an implicit solvent model to the synthesis.  Any mode of operation other than
   ///        taking the original topologies' parameters as is (calling this member function with
@@ -1263,7 +1278,7 @@ private:
   ///
   /// NbwuKind: DOMAIN
   /// Abstracts for domain decompositions in neighbor list-based periodic systems.  Each abstract
-  /// is a series of 32 integers, 30 of which are used.
+  /// is a series of 64 integers, 50 of which are used.
   Hybrid<int> nonbonded_abstracts;
 
   /// Instructions for the non-bonded work.  Each element is an instruction to do one non-bonded
