@@ -101,8 +101,9 @@ void checkCompilationForces(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCont
   // Clear forces.  Perform calculations for valence interactions and restraints.
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
-  launchValence(prec, poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::YES,
-                EvaluateEnergy::NO, VwuGoal::ACCUMULATE, facc_method, launcher);
+  launchValence(prec, poly_ag, mmctrl, poly_ps, &heat_bath, &sc, valence_tb_space,
+                EvaluateForce::YES, EvaluateEnergy::NO, VwuGoal::ACCUMULATE, facc_method,
+                launcher);
   int total_restraints = 0;
   for (int i = 0; i < nsys; i++) {
     PhaseSpace host_result = poly_ps->exportSystem(i, HybridTargetLevel::HOST);
@@ -268,14 +269,14 @@ void checkCompilationEnergies(PhaseSpaceSynthesis *poly_ps, MolecularMechanicsCo
                               const TestPriority do_tests, const bool do_valence_tests = true) {
   const int nsys = poly_ps->getSystemCount();
   ScoreCard sc(nsys, 1, 32);
+  Thermostat heat_bath(ThermostatKind::NONE);
   poly_ps->initializeForces(gpu, HybridTargetLevel::DEVICE);
   mmctrl->incrementStep();
-  launchValence(prec, poly_ag, mmctrl, poly_ps, &sc, valence_tb_space, EvaluateForce::NO,
-                EvaluateEnergy::YES, VwuGoal::ACCUMULATE, AccumulationMethod::SPLIT,
-                launcher);
+  launchValence(prec, poly_ag, mmctrl, poly_ps, &heat_bath, &sc, valence_tb_space,
+                EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                AccumulationMethod::SPLIT, launcher);
   ImplicitSolventWorkspace ism_space(poly_ag.getSystemAtomOffsets(),
                                      poly_ag.getSystemAtomCounts(), prec);
-  Thermostat heat_bath(ThermostatKind::NONE);
   const NeckGeneralizedBornTable ngb_tables;
   launchNonbonded(prec, poly_ag, poly_se, mmctrl, poly_ps, &heat_bath, &sc, nonbond_tb_space,
                   &ism_space, EvaluateForce::NO, EvaluateEnergy::YES, AccumulationMethod::SPLIT,

@@ -236,15 +236,16 @@ template <typename T, typename T2> struct SyNonbondedKit {
 ///        into a single abstract.  This is designed to work in the context of the valence work
 ///        units from the same topology synthesis, whether in a standalone function or as an extra
 ///        step in a workflow that compute valence interactions and then moves particles.
-template <typename T2, typename T4> struct SyAtomUpdateKit {
+template <typename T, typename T2, typename T4> struct SyAtomUpdateKit {
 
   /// \brief The constructor takes a list of parameter arrays.  Like other AtomGraphSynthesis
   ///        abstracts, then actual numbers of parameters in each array, which are irrelevant to
   ///        the implementation as long as the work unit instructions do not overrun the bounds,
   ///        are omitted to save space on the constants imported as arguments to each kernel.
-  SyAtomUpdateKit(const T4* vs_params_in, const T4* settle_geom_in, const T2* settle_mass_in,
-                  const T2* cnst_grp_params_in, const uint2* vste_insr_in,
-                  const uint2* sett_insr_in, const uint2* cnst_insr_in, const uint2* vwu_manip_in);
+  SyAtomUpdateKit(const T* inv_masses_in, const T4* vs_params_in, const T4* settle_geom_in,
+                  const T2* settle_mass_in, const T2* cnst_grp_params_in,
+                  const uint2* vste_insr_in, const uint2* sett_insr_in, const uint2* cnst_insr_in,
+                  const uint2* vwu_manip_in);
 
   /// \brief The copy and move constructors are taken at their default values for this abstract
   ///        containing const elements.
@@ -252,7 +253,11 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
   SyAtomUpdateKit(const SyAtomUpdateKit &original) = default;
   SyAtomUpdateKit(SyAtomUpdateKit &&original) = default;
   /// \}
-  
+
+  // General information relevant to moving particles
+  const T* inv_masses;        ///< Inverse masses of all particles
+
+  // Parameters and instruction sets for virtual sites and constraints
   const T4* vs_params;        ///< Unique virtual site frames, with the first, second, and third
                               ///<   dimension parameters in the 
   const T4* settle_geom;      ///< Geometric considerations for SETTLE-constrained groups.  The
@@ -263,13 +268,13 @@ template <typename T2, typename T4> struct SyAtomUpdateKit {
                               ///<   thus which index of this array to take.  
   const T2* cnst_grp_params;  ///< Bond length (x member) and inverse mass (y member) information
                               ///<   for hub-and-spoke constraint groups.
-
-  // Instruction sets for virtual sites and constraints
   const uint2* vste_insr;     ///< Virtual site placement instructions
   const uint2* sett_insr;     ///< SETLLE group constraints instructions
   const uint2* cnst_insr;     ///< Hub-and-spoke constraint instructions  
   const uint2* vwu_manip;     ///< Manipulation masks (movement in x member, update in y member)
                               ///<   for all valence work units
+
+  // Inverse masses of all atoms
 };
   
 } // namespace synthesis

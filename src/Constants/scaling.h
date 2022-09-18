@@ -54,6 +54,13 @@ constexpr size_t ushort_byte_count_zu = sizeof(unsigned short int);
 constexpr size_t ushort_bit_count_zu = ushort_byte_count_zu * 8LLU;
 /// \}
 
+/// \brief Conversion factor for obtaining the velocity change after a time interval (in units of
+///        femtoseconds).
+/// \{
+constexpr double time_step_factor = 0.0204548282808729546544679323005766491405665874481201171875;
+constexpr float time_step_factor_f = time_step_factor;
+/// \}
+
 } // namespace constants
 } // namespace stormm
 

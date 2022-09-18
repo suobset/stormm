@@ -17,6 +17,7 @@
 #include "Synthesis/phasespace_synthesis.h"
 #include "Synthesis/synthesis_abstracts.h"
 #include "Synthesis/synthesis_enumerators.h"
+#include "Trajectory/thermostat.h"
 #include "cacheresource.h"
 #include "energy_enumerators.h"
 #include "scorecard.h"
@@ -33,10 +34,13 @@ using numerics::AccumulationMethod;
 using synthesis::AtomGraphSynthesis;
 using synthesis::PhaseSpaceSynthesis;
 using synthesis::PsSynthesisWriter;
-using synthesis::SyValenceKit;
+using synthesis::SyAtomUpdateKit;
 using synthesis::SyRestraintKit;
+using synthesis::SyValenceKit;
 using synthesis::VwuGoal;
-
+using trajectory::Thermostat;
+using trajectory::ThermostatWriter;
+  
 /// \brief Set the __shared__ memory configuration for various valence interaction kernels.
 void valenceKernelSetup();
 
@@ -78,9 +82,12 @@ cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateF
 ///   - Move particles, or instead accumulate forces, energies, or both
 ///
 /// \param poly_vk      Valence parameters based on consensus tables from a topology synthesis
+/// \param poly_auk     Abstract of the topology critical for atom movement
 /// \param poly_ag      Compiled topologies of all systems
 /// \param poly_psw     Abstract for coordinates and forces of all systems
 /// \param poly_ps      Coordinates, velocities, and forces of all systems
+/// \param tstw         Abstract of the thermostat
+/// \param heat_bath    Thermostat for keeping each system at a particular temperature
 /// \param gmem_r       Exclusive space in global memory arrays reserved for each thread block, to
 /// \param scw          Abstract for the energy tracking on all systems
 /// \param sc           Energy tracking for all systems (this must be pre-sized to accommodate the
@@ -97,27 +104,32 @@ cudaFuncAttributes queryValenceKernelRequirements(PrecisionModel prec, EvaluateF
 /// \{
 void launchValence(const SyValenceKit<double> &poly_vk,
                    const SyRestraintKit<double, double2, double4> &poly_rk,
-                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                   MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                   ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
                    CacheResourceKit<double> *gmem_r, EvaluateForce eval_force,
                    EvaluateEnergy eval_energy, VwuGoal purpose, const int2 bt);
 
 void launchValence(const SyValenceKit<float> &poly_vk,
                    const SyRestraintKit<float, float2, float4> &poly_rk,
-                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw, ScoreCardWriter *scw,
+                   MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
+                   const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                   ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
                    CacheResourceKit<float> *gmem_r, EvaluateForce eval_force,
-                   EvaluateEnergy eval_energy, VwuGoal purpose,
-                   AccumulationMethod force_sum, const int2 bt);
+                   EvaluateEnergy eval_energy, VwuGoal purpose, AccumulationMethod force_sum,
+                   const int2 bt);
   
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
-                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
-                   CacheResource *tb_space, EvaluateForce eval_force, EvaluateEnergy eval_energy,
-                   VwuGoal purpose, AccumulationMethod force_sum,
-                   const KernelManager &launcher);
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   AccumulationMethod force_sum, const KernelManager &launcher);
 
 void launchValence(PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
-                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps, ScoreCard *sc,
-                   CacheResource *tb_space, EvaluateForce eval_force, EvaluateEnergy eval_energy,
-                   VwuGoal purpose, const KernelManager &launcher);
+                   MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
+                   Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                   EvaluateForce eval_force, EvaluateEnergy eval_energy, VwuGoal purpose,
+                   const KernelManager &launcher);
 /// \}
   
 } // namespace energy

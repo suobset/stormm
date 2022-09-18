@@ -147,6 +147,38 @@ __device__ __forceinline__ ullint xoshiro256pp_shift_next(ullint4 *xshft_state) 
 }
 /// \}
 
+/// \brief Advance the state of one of the XOR-shift random number generators, but do not take the
+///        extra computations to return a bitstring.
+///
+/// Overloaded:
+///   - Accept a Xoroshiro128+ state
+///   - Accept a Xoshiro256++ state
+///
+/// \param xshft_state  Pointer to the state vector for the generator (modified and returned)
+/// \{
+__device__ __forceinline__ void xoroshiro128p_shift_tick(ullint2 *xshft_state) {
+  ullint2 tmp = *xshft_state;
+  const ullint s0 = tmp.x;
+  ullint       s1 = tmp.y;
+  s1 ^= s0;
+  tmp.x = (((s0 << 24) | (s0 >> (64 - 24))) ^ s1 ^ (s1 << 16));
+  tmp.y =  ((s1 << 37) | (s1 >> (64 - 37)));
+  *xshft_state = tmp;
+}
+
+__device__ __forceinline__ void xoshiro256pp_shift_tick(ullint4 *xshft_state) {
+  ullint4 tmp = *xshft_state;
+  const ullint t = (tmp.y << 17);
+  tmp.z ^= tmp.x;
+  tmp.w ^= tmp.y;
+  tmp.y ^= tmp.z;
+  tmp.x ^= tmp.w;
+  tmp.z ^= t;
+  tmp.w = ((tmp.w << 45) | (tmp.w >> (64 - 45)));
+  *xshft_state = tmp;
+}
+/// \}
+
 /// \brief Extract a random number on a uniform distribution from a Xoroshiro128+ or Xoshiro256++
 ///        state, advancing the state in the process.
 ///

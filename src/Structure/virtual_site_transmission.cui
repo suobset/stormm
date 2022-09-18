@@ -11,7 +11,8 @@
 #ifdef VSITE_STANDALONE
 __global__ void __launch_bounds__(small_block_size, VSITE_STANDALONE_BLOCK_MULTIPLIER)
 KERNEL_NAME(PsSynthesisWriter poly_psw, const SyValenceKit<TCALC> poly_vk,
-            const SyAtomUpdateKit<TCALC2, TCALC4> poly_auk, CacheResourceKit<TCALC> gmem_r) {
+            const SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk,
+            CacheResourceKit<TCALC> gmem_r) {
   __shared__ llint sh_xfrc[maximum_valence_work_unit_atoms];
   __shared__ llint sh_yfrc[maximum_valence_work_unit_atoms];
   __shared__ llint sh_zfrc[maximum_valence_work_unit_atoms];

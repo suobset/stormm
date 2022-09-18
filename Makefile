@@ -432,7 +432,8 @@ STORMM_CUDA_INCLUDED_FILES = $(SRCDIR)/Math/conjugate_gradient.cui \
 			     $(SRCDIR)/Potential/valence_potential.cui \
 			     $(SRCDIR)/Random/xor_shift_rng.cui \
 			     $(SRCDIR)/Structure/virtual_site_placement.cui \
-			     $(SRCDIR)/Structure/virtual_site_transmission.cui
+			     $(SRCDIR)/Structure/virtual_site_transmission.cui \
+			     $(SRCDIR)/Trajectory/thermostat_utilities.cui
 
 # STORMM CUDA object files
 STORMM_CUDA_OBJS = $(SRCDIR)/Accelerator/hpc_config.o \

@@ -28,6 +28,9 @@
 __global__ void __launch_bounds__(VALENCE_KERNEL_THREAD_COUNT, VALENCE_BLOCK_MULTIPLICITY)
 KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC2, TCALC4> poly_rk,
             MMControlKit<TCALC> ctrl, PsSynthesisWriter poly_psw,
+#ifdef UPDATE_ATOMS            
+            SyAtomUpdateKit<TCALC, TCALC2, TCALC4> poly_auk, ThermostatWriter<TCALC> tstw,
+#endif
 #ifdef COMPUTE_ENERGY
             ScoreCardWriter scw,
 #endif
@@ -153,53 +156,11 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       }
       pos += blockDim.x;
     }
-#ifdef UPDATE_ATOMS
-    // Import velocities into the local, block-exclusive L1-resident arrays
-    while (pos < 6 * import_stride) {
-      const int rel_pos = pos - (5 * import_stride);
-      if (rel_pos < import_count) {
-        const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
-        __stwb(&gmem_r.xvel[write_idx], __ldcs(&poly_psw.xvel[read_idx]));
-#ifndef TCALC_IS_SINGLE
-        __stwb(&gmem_r.xvel_ovrf[write_idx], __ldcs(&poly_psw.xvel_ovrf[read_idx]));
-#endif
-      }
-      pos += blockDim.x;
-    }
-    while (pos < 7 * import_stride) {
-      const int rel_pos = pos - (6 * import_stride);
-      if (rel_pos < import_count) {
-        const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
-        __stwb(&gmem_r.yvel[write_idx], __ldcs(&poly_psw.yvel[read_idx]));
-#ifndef TCALC_IS_SINGLE
-        __stwb(&gmem_r.yvel_ovrf[write_idx], __ldcs(&poly_psw.yvel_ovrf[read_idx]));
-#endif
-      }
-      pos += blockDim.x;
-    }
-    while (pos < 8 * import_stride) {
-      const int rel_pos = pos - (7 * import_stride);
-      if (rel_pos < import_count) {
-        const size_t read_idx  = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
-        const size_t write_idx = EXCL_GMEM_OFFSET + rel_pos;
-        __stwb(&gmem_r.zvel[write_idx], __ldcs(&poly_psw.zvel[read_idx]));
-#ifndef TCALC_IS_SINGLE
-        __stwb(&gmem_r.zvel_ovrf[write_idx], __ldcs(&poly_psw.zvel_ovrf[read_idx]));
-#endif
-      }
-      pos += blockDim.x;
-    }
-#else
-    // Advance the position counter to keep pace with the following loop limits
-    pos += 3 * import_stride;
-#endif
 #ifdef COMPUTE_FORCE
     // Initialize the force accumulators, including the GMEM-based, non-shared force accumulators
     // that will have their atomic operations occur in L2.
-    while (pos < 9 * import_stride) {
-      const int rel_pos = pos - (8 * import_stride);
+    while (pos < 6 * import_stride) {
+      const int rel_pos = pos - (5 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
         sh_xfrc_overflow[rel_pos] = 0;
@@ -210,8 +171,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       }
       pos += blockDim.x;
     }
-    while (pos < 10 * import_stride) {
-      const int rel_pos = pos - (9 * import_stride);
+    while (pos < 7 * import_stride) {
+      const int rel_pos = pos - (6 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
         sh_yfrc_overflow[rel_pos] = 0;
@@ -222,8 +183,8 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
       }
       pos += blockDim.x;
     }
-    while (pos < 11 * import_stride) {
-      const int rel_pos = pos - (10 * import_stride);
+    while (pos < 8 * import_stride) {
+      const int rel_pos = pos - (7 * import_stride);
       if (rel_pos < import_count) {
 #  ifdef SPLIT_FORCE_ACCUMULATION
         sh_zfrc_overflow[rel_pos] = 0;
@@ -2027,8 +1988,80 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     pos = threadIdx.x;
     while (pos < import_stride) {
       if (pos < import_count) {
-#  ifdef SPLIT_FORCE_ACCUMULATION
+#  ifdef UPDATE_ATOMS
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+        const TCALC rxfrc = int63ToFloat(sh_xfrc[pos], sh_xfrc_overflow[pos]) *
+                            poly_psw.inv_frc_scale_f;
+#      else
+        const TCALC rxfrc = int95ToDouble(sh_xfrc[pos], sh_xfrc_overflow[pos]) *
+                            poly_psw.inv_frc_scale;
+#      endif
+#    else
+        const TCALC rxfrc = (TCALC)(sh_xfrc[pos]) * poly_psw.inv_frc_scale_f;
+#    endif
+        const size_t gbl_read_idx = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
+
+        // Carry out the first Velocity-Verlet velocity update.  The "inverse half mass time step"
+        // factor (hmdt) is pre-scaled by the velocity scaling factor for convenience.  Virtual
+        // sites have no mass, but their inverse masses have been preset to zero so motion of
+        // virtual sites at this stage is nullified.
+        const TCALC inv_mass = __ldcs(&poly_auk.inv_masses[gbl_read_idx]);
+        const TCALC hmdt = (TCALC)(0.5) * tstw.dt_factor * inv_mass * poly_psw.vel_scale_f;
+        TCALC vx_delta;
+        switch (tstw.kind) {
+        case ThermostatKind::LANGEVIN:
+          {
+            // Calculate the Langevin parameters for the current temperature.
+            const TCALC current_temp = getCurrentTemperature(tstw, gbl_read_idx);
+            const TCALC sdfac = SQRT_FUNC(tstw.gamma_ln * boltzmann_constant * current_temp /
+                                          tstw.dt_factor);
+            const size_t cache_idx = ((size_t)(tstw.step % tstw.depth) *
+                                      (size_t)(tstw.natom)) + gbl_read_idx;
+            const TCALC bump_frc = (fabs(inv_mass) > (TCALC)(1.0e-8)) ?
+                                   (sdfac / inv_mass) * __ldca(&tstw.cache[cache_idx]) :
+                                   (TCALC)(0.0);
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+            const int2 ibump_frc  = floatToInt63(bump_frc * poly_psw.frc_scale_f);
+            const int2 frc_update = splitFPSum(ibump_frc, sh_xfrc[pos],
+                                               sh_xfrc_overflow[pos]);
+#      else
+            const int95_t ibump_frc  = doubleToInt95(bump_frc * poly_psw.frc_scale);
+            const int95_t frc_update = splitFPSum(ibump_frc, sh_xfrc[pos],
+                                                  sh_xfrc_overflow[pos]);
+#      endif
+            sh_xfrc[pos]          = frc_update.x;
+            sh_xfrc_overflow[pos] = frc_update.y;
+#    else
+            sh_xfrc[pos] += LLCONV_FUNC(bump_frc * poly_psw.frc_scale_f);
+#    endif
+            vx_delta = hmdt * (rxfrc + bump_frc);
+          }
+          break;
+        case ThermostatKind::NONE:
+        case ThermostatKind::ANDERSEN:
+        case ThermostatKind::BERENDSEN:
+          vx_delta = hmdt * rxfrc;
+          break;
+        }
+
+        // Store the updated velocities so that constraints may be applied or that kinetic energy
+        // may be computed.
+        const size_t lcl_write_idx = EXCL_GMEM_OFFSET + pos;
 #    ifdef TCALC_IS_SINGLE
+        __stwb(&gmem_r.xvel[lcl_write_idx],
+               __ldcs(&poly_psw.xvel[gbl_read_idx]) + LLCONV_FUNC(vx_delta));
+#    else
+        const int95_t ivx_delta = doubleToInt95(vx_delta);
+        const int95_t ivx_update = splitFPSum(ivx_delta, __ldcs(&poly_psw.xvel[gbl_read_idx]),
+                                              __ldcs(&poly_psw.xvel_ovrf[gbl_read_idx]));
+        __stwb(&gmem_r.xvel[lcl_write_idx],      ivx_update.x);
+        __stwb(&gmem_r.xvel_ovrf[lcl_write_idx], ivx_update.y);
+#    endif
+#  else // UPDATE_ATOMS
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
         // The conversion to double-precision is needed in order to ensure that all 32 bits of the
         // overflow can be conserved, in order to convert this overflow into a proper 64-bit
         // integer.  Trying any other method that stays within the integer space seems to fail on
@@ -2036,15 +2069,12 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         // multiplying by (int)(2^31) = -2147483647 instead of (long long int)(2^31) = 2147483648.
         llint ixfrc = __double2ll_rn((double)(sh_xfrc_overflow[pos]) * max_int_accumulation);
         ixfrc += sh_xfrc[pos];
-#    else
+#      else
         const int95_t ixfrc = { sh_xfrc[pos], sh_xfrc_overflow[pos] };
-#    endif
-#  else // SPLIT_FORCE_ACCUMULATION
+#      endif
+#    else
         const llint ixfrc = sh_xfrc[pos];
-#  endif
-#  ifdef UPDATE_ATOMS
-
-#  else // UPDATE_ATOMS
+#    endif
 #    ifdef COMPUTE_FORCE
         // Contribute forces to global accumulators.  If the calculation was done in single
         // precision, there will, at this time, be one recombined 64-bit integer containing the
@@ -2064,19 +2094,88 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     while (pos < 2 * import_stride) {
       const int rel_pos = pos - import_stride;
       if (rel_pos < import_count) {
-#  ifdef SPLIT_FORCE_ACCUMULATION
+#  ifdef UPDATE_ATOMS
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+        const TCALC ryfrc = int63ToFloat(sh_yfrc[rel_pos], sh_yfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale_f;
+#      else
+        const TCALC ryfrc = int95ToDouble(sh_yfrc[rel_pos], sh_yfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale;
+#      endif
+#    else
+        const TCALC ryfrc = (TCALC)(sh_yfrc[rel_pos]) * poly_psw.inv_frc_scale_f;
+#    endif
+        const size_t gbl_read_idx = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
+
+        // Carry out the first Velocity-Verlet velocity update.  The "inverse half mass time step"
+        // factor (hmdt) is pre-scaled by the velocity scaling factor for convenience.  Virtual
+        // sites have no mass, but their inverse masses have been preset to zero so motion of
+        // virtual sites at this stage is nullified.
+        TCALC vy_delta;
+        const TCALC inv_mass = __ldcs(&poly_auk.inv_masses[gbl_read_idx]);
+        const TCALC hmdt = (TCALC)(0.5) * tstw.dt_factor * inv_mass * poly_psw.vel_scale_f;
+        switch (tstw.kind) {
+        case ThermostatKind::LANGEVIN:
+          {
+            // Calculate the Langevin parameters for the current temperature.
+            const TCALC current_temp = getCurrentTemperature(tstw, gbl_read_idx);
+            const TCALC sdfac = SQRT_FUNC(tstw.gamma_ln * boltzmann_constant * current_temp /
+                                          tstw.dt_factor);
+            const size_t cache_idx = ((size_t)((tstw.step % tstw.depth) + 1) *
+                                      (size_t)(tstw.natom)) + gbl_read_idx;
+            const TCALC bump_frc = (fabs(inv_mass) > (TCALC)(1.0e-8)) ?
+                                   (sdfac / inv_mass) * __ldca(&tstw.cache[cache_idx]) :
+                                   (TCALC)(0.0);
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+            const int2 ibump_frc  = floatToInt63(bump_frc * poly_psw.frc_scale_f);
+            const int2 frc_update = splitFPSum(ibump_frc, sh_yfrc[rel_pos],
+                                               sh_yfrc_overflow[rel_pos]);
+#      else
+            const int95_t ibump_frc  = doubleToInt95(bump_frc * poly_psw.frc_scale);
+            const int95_t frc_update = splitFPSum(ibump_frc, sh_yfrc[rel_pos],
+                                                  sh_yfrc_overflow[rel_pos]);
+#      endif
+            sh_yfrc[rel_pos]          = frc_update.x;
+            sh_yfrc_overflow[rel_pos] = frc_update.y;
+#    else
+            sh_yfrc[rel_pos] += LLCONV_FUNC(bump_frc * poly_psw.frc_scale_f);
+#    endif
+            vy_delta = hmdt * (ryfrc + bump_frc);
+          }
+          break;
+        case ThermostatKind::NONE:
+        case ThermostatKind::ANDERSEN:
+        case ThermostatKind::BERENDSEN:
+          vy_delta = hmdt * ryfrc;
+          break;
+        }
+
+        // Store the updated velocities so that constraints may be applied or that kinetic energy
+        // may be computed.
+        const size_t lcl_write_idx = EXCL_GMEM_OFFSET + rel_pos;
 #    ifdef TCALC_IS_SINGLE
+        __stwb(&gmem_r.yvel[lcl_write_idx],
+               __ldcs(&poly_psw.yvel[gbl_read_idx]) + LLCONV_FUNC(vy_delta));
+#    else
+        const int95_t ivy_delta = doubleToInt95(vy_delta);
+        const int95_t ivy_update = splitFPSum(ivy_delta, __ldcs(&poly_psw.yvel[gbl_read_idx]),
+                                              __ldcs(&poly_psw.yvel_ovrf[gbl_read_idx]));
+        __stwb(&gmem_r.yvel[lcl_write_idx],      ivy_update.x);
+        __stwb(&gmem_r.yvel_ovrf[lcl_write_idx], ivy_update.y);
+#    endif
+#  else // UPDATE_ATOMS
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
         llint iyfrc = __double2ll_rn((double)(sh_yfrc_overflow[rel_pos]) * max_int_accumulation);
         iyfrc += sh_yfrc[rel_pos];
-#    else
+#      else
         const int95_t iyfrc = { sh_yfrc[rel_pos], sh_yfrc_overflow[rel_pos] };
-#    endif
-#  else // SPLIT_FORCE_ACCUMULATION
+#      endif
+#    else
         const llint iyfrc = sh_yfrc[rel_pos];
-#  endif
-#  ifdef UPDATE_ATOMS
-
-#  else // UPDATE_ATOMS
+#    endif
 #    ifdef COMPUTE_FORCE
         // Contribute forces to global accumulators.  See the documentation of the Cartesian X
         // force handling above to understand these pre-processor directives.
@@ -2094,19 +2193,88 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     while (pos < 3 * import_stride) {
       const int rel_pos = pos - (2 * import_stride);
       if (rel_pos < import_count) {
-#  ifdef SPLIT_FORCE_ACCUMULATION
+#  ifdef UPDATE_ATOMS
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+        const TCALC rzfrc = int63ToFloat(sh_zfrc[rel_pos], sh_zfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale_f;
+#      else
+        const TCALC rzfrc = int95ToDouble(sh_zfrc[rel_pos], sh_zfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale;
+#      endif
+#    else
+        const TCALC rzfrc = (TCALC)(sh_zfrc[rel_pos]) * poly_psw.inv_frc_scale_f;
+#    endif
+        const size_t gbl_read_idx = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
+
+        // Carry out the first Velocity-Verlet velocity update.  The "inverse half mass time step"
+        // factor (hmdt) is pre-scaled by the velocity scaling factor for convenience.  Virtual
+        // sites have no mass, but their inverse masses have been preset to zero so motion of
+        // virtual sites at this stage is nullified.
+        TCALC vz_delta;
+        const TCALC inv_mass = __ldcs(&poly_auk.inv_masses[gbl_read_idx]);
+        const TCALC hmdt = (TCALC)(0.5) * tstw.dt_factor * inv_mass * poly_psw.vel_scale_f;
+        switch (tstw.kind) {
+        case ThermostatKind::LANGEVIN:
+          {
+            // Calculate the Langevin parameters for the current temperature.
+            const TCALC current_temp = getCurrentTemperature(tstw, gbl_read_idx);
+            const TCALC sdfac = SQRT_FUNC(tstw.gamma_ln * boltzmann_constant * current_temp /
+                                          tstw.dt_factor);
+            const size_t cache_idx = ((size_t)((tstw.step % tstw.depth) + 2) *
+                                      (size_t)(tstw.natom)) + gbl_read_idx;
+            const TCALC bump_frc = (fabs(inv_mass) > (TCALC)(1.0e-8)) ?
+                                   (sdfac / inv_mass) * __ldca(&tstw.cache[cache_idx]) :
+                                   (TCALC)(0.0);
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+            const int2 ibump_frc  = floatToInt63(bump_frc * poly_psw.frc_scale_f);
+            const int2 frc_update = splitFPSum(ibump_frc, sh_zfrc[rel_pos],
+                                               sh_zfrc_overflow[rel_pos]);
+#      else
+            const int95_t ibump_frc  = doubleToInt95(bump_frc * poly_psw.frc_scale);
+            const int95_t frc_update = splitFPSum(ibump_frc, sh_zfrc[rel_pos],
+                                                  sh_zfrc_overflow[rel_pos]);
+#      endif
+            sh_zfrc[rel_pos]          = frc_update.x;
+            sh_zfrc_overflow[rel_pos] = frc_update.y;
+#    else
+            sh_zfrc[rel_pos] += LLCONV_FUNC(bump_frc * poly_psw.frc_scale_f);
+#    endif
+            vz_delta = hmdt * (rzfrc + bump_frc);
+          }
+          break;
+        case ThermostatKind::NONE:
+        case ThermostatKind::ANDERSEN:
+        case ThermostatKind::BERENDSEN:
+          vz_delta = hmdt * rzfrc;
+          break;
+        }
+
+        // Store the updated velocities so that constraints may be applied or that kinetic energy
+        // may be computed.
+        const size_t lcl_write_idx = EXCL_GMEM_OFFSET + rel_pos;
 #    ifdef TCALC_IS_SINGLE
+        __stwb(&gmem_r.zvel[lcl_write_idx],
+               __ldcs(&poly_psw.zvel[gbl_read_idx]) + LLCONV_FUNC(vz_delta));
+#    else
+        const int95_t ivz_delta = doubleToInt95(vz_delta);
+        const int95_t ivz_update = splitFPSum(ivz_delta, __ldcs(&poly_psw.zvel[gbl_read_idx]),
+                                              __ldcs(&poly_psw.zvel_ovrf[gbl_read_idx]));
+        __stwb(&gmem_r.zvel[lcl_write_idx],      ivz_update.x);
+        __stwb(&gmem_r.zvel_ovrf[lcl_write_idx], ivz_update.y);
+#    endif
+#  else // UPDATE_ATOMS
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
         llint izfrc = __double2ll_rn((double)(sh_zfrc_overflow[rel_pos]) * max_int_accumulation);
         izfrc += sh_zfrc[rel_pos];
-#    else
+#      else
         const int95_t izfrc = { sh_zfrc[rel_pos], sh_zfrc_overflow[rel_pos] };
-#    endif
-#  else // SPLIT_FORCE_ACCUMULATION
+#      endif
+#    else
         const llint izfrc = sh_zfrc[rel_pos];
-#  endif
-#  ifdef UPDATE_ATOMS
-
-#  else // UPDATE_ATOMS
+#    endif
 #    ifdef COMPUTE_FORCE
         // Contribute forces to global accumulators.  See the documentation of the Cartesian X
         // force handling above to understand these pre-processor directives.
@@ -2117,11 +2285,284 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
         atomicSplit(izfrc, write_idx, poly_psw.zfrc, poly_psw.zfrc_ovrf);
 #      endif
 #    endif
-#  endif
+#  endif // UPDATE_ATOMS
       }
       pos += blockDim.x;
     }
-#endif
+#  ifdef UPDATE_ATOMS
+    // The following code is only needed to carry out molecular dynamics.
+    __syncthreads();
+
+    // Apply velocity constraints and, if desired, compute the kinetic kenergy.  This is also the
+    // stage at which many MD packages record velocities for trajectory analysis or checkpointing.
+    __syncthreads();
+
+    // Apply the second Velocity Verlet step: the second half of the velocity update, followed by
+    // computation of new positions.
+    pos = threadIdx.x;
+    while (pos < import_stride) {
+      const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
+      const int manip_segment = (pos >> warp_bits);
+      const int manip_bitpos  = (pos & warp_bits_mask_int);
+      const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
+      if (pos < import_count && ((manip_mask.y >> manip_bitpos) & 0x1)) {
+        const size_t lcl_read_idx = EXCL_GMEM_OFFSET + pos;
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+        const TCALC rxfrc = int63ToFloat(sh_xfrc[pos], sh_xfrc_overflow[pos]) *
+                            poly_psw.inv_frc_scale_f;
+#      else
+        const TCALC rxfrc = int95ToDouble(sh_xfrc[pos], sh_xfrc_overflow[pos]) *
+                            poly_psw.inv_frc_scale;
+#      endif
+#    else
+        const TCALC rxfrc = (TCALC)(sh_xfrc[pos]) * poly_psw.inv_frc_scale_f;
+#    endif
+        const size_t gbl_write_idx = __ldca(&poly_vk.vwu_imports[import_llim + pos]);
+
+        // Carry out the second Velocity-Verlet velocity update, then store the force back into
+        // its global accumulator if that is the responsibility of this work unit.
+        const TCALC inv_mass = __ldcs(&poly_auk.inv_masses[gbl_write_idx]);
+        const TCALC hmdt = (TCALC)(0.5) * tstw.dt_factor * inv_mass * poly_psw.vel_scale_f;
+        TCALC vx_update;
+        switch (tstw.kind) {
+        case ThermostatKind::LANGEVIN:
+          {
+            // The Langevin bump force has already been added the the accumulated forces, and the
+            // velocity must be multiplied by a real-valued factor so read it from the local cache
+            // and convert it directly to a real number.
+#    ifdef TCALC_IS_SINGLE
+            vx_update = (TCALC)(__ldca(&gmem_r.xvel[lcl_read_idx]));
+#    else
+            vx_update = int95ToDouble(__ldca(&gmem_r.xvel[lcl_read_idx]),
+                                      __ldca(&gmem_r.xvel_ovrf[lcl_read_idx]));
+#    endif
+            vx_update = (vx_update * tstw.ln_explicit) + (hmdt * rxfrc);
+#    ifdef TCALC_IS_SINGLE
+            __stcs(&poly_psw.vxnxt[gbl_write_idx], LLCONV_FUNC(vx_update));
+#    else
+            const int95_t ivx_update = doubleToInt95(vx_update);
+            __stcs(&poly_psw.vxnxt[gbl_write_idx],      ivx_update.x);
+            __stcs(&poly_psw.vxnxt_ovrf[gbl_write_idx], ivx_update.y);
+#    endif
+          }
+          break;
+        case ThermostatKind::NONE:
+        case ThermostatKind::ANDERSEN:
+        case ThermostatKind::BERENDSEN:
+          {
+            // For all thermostats but Langevin, including the case of no thermostat when energy
+            // conservation is scrutinized, the velocity update is additive.  Convert the small to
+            // the fixed-precision format for best conservation of information.
+            const TCALC vx_delta = hmdt * rxfrc;
+#    ifdef TCALC_IS_SINGLE
+            const llint ivx_delta = LLCONV_FUNC(vx_delta);
+            const llint ivx_update = __ldca(&gmem_r.xvel[lcl_read_idx]) + ivx_delta;
+            __stcs(&poly_psw.vxnxt[gbl_write_idx], ivx_update);
+            vx_update = (TCALC)(ivx_update);
+#    else
+            const int95_t ivx_delta  = doubleToInt95(vx_delta);
+            const int95_t ivx_update = splitFPSum(ivx_delta, __ldca(&gmem_r.xvel[lcl_read_idx]),
+                                                  __ldca(&gmem_r.xvel_ovrf[lcl_read_idx]));
+            __stcs(&poly_psw.vxnxt[gbl_write_idx],      ivx_update.x);
+            __stcs(&poly_psw.vxnxt_ovrf[gbl_write_idx], ivx_update.y);
+            vx_update = int95ToDouble(ivx_update.x, ivx_update.y);
+#    endif
+          }
+          break;
+        }
+
+        // The updated velocity is currently inflated by the fixed-precision scaling.  Remove that
+        // and apply the positional scaling inflation factor to get the positional delta, then
+        // update the locally cached positions and velocities for this particle.
+        const TCALC xpos_delta = vx_update * poly_psw.inv_vel_scale_f * poly_psw.gpos_scale_f *
+                                 tstw.dt_factor;
+#    ifdef TCALC_IS_SINGLE
+        const llint ixpos_delta = LLCONV_FUNC(xpos_delta);
+        __stcs(&poly_psw.xnxt[gbl_write_idx], __ldcs(&poly_psw.xcrd[gbl_write_idx]) + ixpos_delta);
+#    else
+        const int95_t ixpos_delta = doubleToInt95(xpos_delta);
+        const int95_t ixpos_update = splitFPSum(ixpos_delta, __ldcs(&poly_psw.xcrd[gbl_write_idx]),
+                                                __ldcs(&poly_psw.xcrd_ovrf[gbl_write_idx]));
+        __stcs(&poly_psw.xnxt[gbl_write_idx],      ixpos_update.x);
+        __stcs(&poly_psw.xnxt_ovrf[gbl_write_idx], ixpos_update.y);
+#    endif
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 2 * import_stride) {
+      const int rel_pos = pos - import_stride;
+      const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
+      const int manip_segment = (rel_pos >> warp_bits);
+      const int manip_bitpos  = (rel_pos & warp_bits_mask_int);
+      const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
+      if (rel_pos < import_count && ((manip_mask.y >> manip_bitpos) & 0x1)) {
+        const size_t lcl_read_idx = EXCL_GMEM_OFFSET + rel_pos;
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+        const TCALC ryfrc = int63ToFloat(sh_yfrc[rel_pos], sh_yfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale_f;
+#      else
+        const TCALC ryfrc = int95ToDouble(sh_yfrc[rel_pos], sh_yfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale;
+#      endif
+#    else
+        const TCALC ryfrc = (TCALC)(sh_yfrc[rel_pos]) * poly_psw.inv_frc_scale_f;
+#    endif
+        const size_t gbl_write_idx = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
+
+        // Carry out the second Velocity-Verlet velocity update, then store the force back into
+        // its global accumulator if that is the responsibility of this work unit.
+        const TCALC inv_mass = __ldcs(&poly_auk.inv_masses[gbl_write_idx]);
+        const TCALC hmdt = (TCALC)(0.5) * tstw.dt_factor * inv_mass * poly_psw.vel_scale_f;
+        TCALC vy_update;
+        switch (tstw.kind) {
+        case ThermostatKind::LANGEVIN:
+          {
+#    ifdef TCALC_IS_SINGLE
+            vy_update = (TCALC)(__ldca(&gmem_r.yvel[lcl_read_idx]));
+#    else
+            vy_update = int95ToDouble(__ldca(&gmem_r.yvel[lcl_read_idx]),
+                                      __ldca(&gmem_r.yvel_ovrf[lcl_read_idx]));
+#    endif
+            vy_update = (vy_update * tstw.ln_explicit) + (hmdt * ryfrc);
+#    ifdef TCALC_IS_SINGLE
+            __stcs(&poly_psw.vynxt[gbl_write_idx], LLCONV_FUNC(vy_update));
+#    else
+            const int95_t ivy_update = doubleToInt95(vy_update);
+            __stcs(&poly_psw.vynxt[gbl_write_idx],      ivy_update.x);
+            __stcs(&poly_psw.vynxt_ovrf[gbl_write_idx], ivy_update.y);
+#    endif
+          }
+          break;
+        case ThermostatKind::NONE:
+        case ThermostatKind::ANDERSEN:
+        case ThermostatKind::BERENDSEN:
+          {
+            const TCALC vy_delta = hmdt * ryfrc;
+#    ifdef TCALC_IS_SINGLE
+            const llint ivy_delta = LLCONV_FUNC(vy_delta);
+            const llint ivy_update = __ldca(&gmem_r.yvel[lcl_read_idx]) + ivy_delta;
+            __stcs(&poly_psw.vynxt[gbl_write_idx], ivy_update);
+            vy_update = (TCALC)(ivy_update);
+#    else
+            const int95_t ivy_delta  = doubleToInt95(vy_delta);
+            const int95_t ivy_update = splitFPSum(ivy_delta, __ldca(&gmem_r.yvel[lcl_read_idx]),
+                                                  __ldca(&gmem_r.yvel_ovrf[lcl_read_idx]));
+            __stcs(&poly_psw.vynxt[gbl_write_idx],      ivy_update.x);
+            __stcs(&poly_psw.vynxt_ovrf[gbl_write_idx], ivy_update.y);
+            vy_update = int95ToDouble(ivy_update.x, ivy_update.y);
+#    endif
+          }
+          break;
+        }
+
+        // Update the particle's position for the next time step.
+        const TCALC ypos_delta = vy_update * poly_psw.inv_vel_scale_f * poly_psw.gpos_scale_f *
+                                 tstw.dt_factor;
+#    ifdef TCALC_IS_SINGLE
+        const llint iypos_delta = LLCONV_FUNC(ypos_delta);
+        __stcs(&poly_psw.ynxt[gbl_write_idx], __ldcs(&poly_psw.ycrd[gbl_write_idx]) + iypos_delta);
+#    else
+        const int95_t iypos_delta = doubleToInt95(ypos_delta);
+        const int95_t iypos_update = splitFPSum(iypos_delta, __ldcs(&poly_psw.ycrd[gbl_write_idx]),
+                                                __ldcs(&poly_psw.ycrd_ovrf[gbl_write_idx]));
+        __stcs(&poly_psw.ynxt[gbl_write_idx],      iypos_update.x);
+        __stcs(&poly_psw.ynxt_ovrf[gbl_write_idx], iypos_update.y);
+#    endif
+      }
+      pos += blockDim.x;
+    }
+    while (pos < 3 * import_stride) {
+      const int rel_pos = pos - (2 * import_stride);
+      const int manip_llim    = vwu_map[(size_t)(VwuAbstractMap::MANIPULATE)].x;
+      const int manip_segment = (rel_pos >> warp_bits);
+      const int manip_bitpos  = (rel_pos & warp_bits_mask_int);
+      const uint2 manip_mask = poly_auk.vwu_manip[manip_llim + manip_segment];
+      if (rel_pos < import_count && ((manip_mask.y >> manip_bitpos) & 0x1)) {
+        const size_t lcl_read_idx = EXCL_GMEM_OFFSET + rel_pos;
+#    ifdef SPLIT_FORCE_ACCUMULATION
+#      ifdef TCALC_IS_SINGLE
+        const TCALC rzfrc = int63ToFloat(sh_zfrc[rel_pos], sh_zfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale_f;
+#      else
+        const TCALC rzfrc = int95ToDouble(sh_zfrc[rel_pos], sh_zfrc_overflow[rel_pos]) *
+                            poly_psw.inv_frc_scale;
+#      endif
+#    else
+        const TCALC rzfrc = (TCALC)(sh_zfrc[rel_pos]) * poly_psw.inv_frc_scale_f;
+#    endif
+        const size_t gbl_write_idx = __ldca(&poly_vk.vwu_imports[import_llim + rel_pos]);
+
+        // Carry out the second Velocity-Verlet velocity update, then store the force back into
+        // its global accumulator if that is the responsibility of this work unit.
+        const TCALC inv_mass = __ldcs(&poly_auk.inv_masses[gbl_write_idx]);
+        const TCALC hmdt = (TCALC)(0.5) * tstw.dt_factor * inv_mass * poly_psw.vel_scale_f;
+        TCALC vz_update;
+        switch (tstw.kind) {
+        case ThermostatKind::LANGEVIN:
+          {
+#    ifdef TCALC_IS_SINGLE
+            vz_update = (TCALC)(__ldca(&gmem_r.zvel[lcl_read_idx]));
+#    else
+            vz_update = int95ToDouble(__ldca(&gmem_r.zvel[lcl_read_idx]),
+                                      __ldca(&gmem_r.zvel_ovrf[lcl_read_idx]));
+#    endif
+            vz_update = (vz_update * tstw.ln_explicit) + (hmdt * rzfrc);
+#    ifdef TCALC_IS_SINGLE
+            __stcs(&poly_psw.vznxt[gbl_write_idx], LLCONV_FUNC(vz_update));
+#    else
+            const int95_t ivz_update = doubleToInt95(vz_update);
+            __stcs(&poly_psw.vznxt[gbl_write_idx],      ivz_update.x);
+            __stcs(&poly_psw.vznxt_ovrf[gbl_write_idx], ivz_update.y);
+#    endif
+          }
+          break;
+        case ThermostatKind::NONE:
+        case ThermostatKind::ANDERSEN:
+        case ThermostatKind::BERENDSEN:
+          {
+            const TCALC vz_delta = hmdt * rzfrc;
+#    ifdef TCALC_IS_SINGLE
+            const llint ivz_delta = LLCONV_FUNC(vz_delta);
+            const llint ivz_update = __ldca(&gmem_r.zvel[lcl_read_idx]) + ivz_delta;
+            __stcs(&poly_psw.vznxt[gbl_write_idx], ivz_update);
+            vz_update = (TCALC)(ivz_update);
+#    else
+            const int95_t ivz_delta  = doubleToInt95(vz_delta);
+            const int95_t ivz_update = splitFPSum(ivz_delta, __ldca(&gmem_r.zvel[lcl_read_idx]),
+                                                  __ldca(&gmem_r.zvel_ovrf[lcl_read_idx]));
+            __stcs(&poly_psw.vznxt[gbl_write_idx],      ivz_update.x);
+            __stcs(&poly_psw.vznxt_ovrf[gbl_write_idx], ivz_update.y);
+            vz_update = int95ToDouble(ivz_update.x, ivz_update.y);
+#    endif
+          }
+          break;
+        }
+
+        // Update the particle's position for the next time step.
+        const TCALC zpos_delta = vz_update * poly_psw.inv_vel_scale_f * poly_psw.gpos_scale_f *
+                                 tstw.dt_factor;
+#    ifdef TCALC_IS_SINGLE
+        const llint izpos_delta = LLCONV_FUNC(zpos_delta);
+        __stcs(&poly_psw.znxt[gbl_write_idx], __ldcs(&poly_psw.zcrd[gbl_write_idx]) + izpos_delta);
+#    else
+        const int95_t izpos_delta = doubleToInt95(zpos_delta);
+        const int95_t izpos_update = splitFPSum(izpos_delta, __ldcs(&poly_psw.zcrd[gbl_write_idx]),
+                                                __ldcs(&poly_psw.zcrd_ovrf[gbl_write_idx]));
+        __stcs(&poly_psw.znxt[gbl_write_idx],      izpos_update.x);
+        __stcs(&poly_psw.znxt_ovrf[gbl_write_idx], izpos_update.y);
+#    endif
+      }
+      pos += blockDim.x;
+    }
+    __syncthreads();
+
+    // Apply positional constraints.
+    __syncthreads();
+#  endif
+#endif // UPDATE_ATOMS or COMPUTE_FORCE
+    
     // Proceed to the next valence work unit, incrementing one of a series of global counters
     // based on the current step number stored in the PhaseSpaceSynthesis object.  The CPU will
     // update the step counter just prior to launching this kernel so that the correct step number

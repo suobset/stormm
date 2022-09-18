@@ -474,7 +474,7 @@ void synthesisVwuEvaluation(const SyValenceKit<Tcalc> syvk,
 //-------------------------------------------------------------------------------------------------
 template <typename Tcalc, typename Tcalc2, typename Tcalc4>
 void evalSyValenceEnergy(const SyValenceKit<Tcalc> syvk,
-                         const SyAtomUpdateKit<Tcalc2, Tcalc4> syauk,
+                         const SyAtomUpdateKit<Tcalc, Tcalc2, Tcalc4> syauk,
                          const SyRestraintKit<Tcalc, Tcalc2, Tcalc4> syrk, PsSynthesisWriter psyw,
                          ScoreCard *ecard, const EvaluateForce eval_force, const VwuTask activity,
                          const VwuGoal purpose, const int step_number) {

@@ -17,7 +17,9 @@ namespace trajectory {
 
 using card::HybridKind;
 using card::HybridTargetLevel;
+using constants::time_step_factor;
 using math::roundUp;
+using namelist::default_dynamics_time_step;
 using parse::realToString;
 using parse::NumberFormat;
 using random::fillRandomCache;
@@ -34,6 +36,10 @@ Thermostat::Thermostat() :
     initial_evolution_step{0}, final_evolution_step{0}, common_temperature{true},
     initial_temperature{default_simulation_temperature},
     final_temperature{default_simulation_temperature},
+    langevin_frequency{default_langevin_frequency},
+    scaled_langevin_freq{langevin_frequency / time_step_factor},
+    time_step{default_dynamics_time_step},
+    scaled_time_step{time_step * time_step_factor},
     initial_temperatures{HybridKind::ARRAY, "tstat_init_temp"},
     sp_initial_temperatures{HybridKind::ARRAY, "tstat_init_tempf"},
     final_temperatures{HybridKind::ARRAY, "tstat_final_temp"},
@@ -283,10 +289,32 @@ double Thermostat::getCurrentTemperatureTarget(const int atom_index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
+double Thermostat::getLangevinCollisionFrequency() const {
+  return langevin_frequency;
+}
+
+//-------------------------------------------------------------------------------------------------
+double Thermostat::getLangevinImplicitFactor() const {
+  return 1.0 / (1.0 + (scaled_langevin_freq * 0.5 * scaled_time_step));
+}
+
+//-------------------------------------------------------------------------------------------------
+double Thermostat::getLangevinExplicitFactor() const {
+  return 1.0 - (scaled_langevin_freq * 0.5 * scaled_time_step);
+}
+
+//-------------------------------------------------------------------------------------------------
+double Thermostat::getTimeStep() const {
+  return time_step;
+}
+
+//-------------------------------------------------------------------------------------------------
 const ThermostatReader<double> Thermostat::dpData(const HybridTargetLevel tier) const {
   return ThermostatReader<double>(kind, atom_count, padded_atom_count, step_number,
                                   random_cache_depth, initial_evolution_step, final_evolution_step,
                                   common_temperature, initial_temperature, final_temperature,
+                                  scaled_time_step, scaled_langevin_freq,
+                                  getLangevinImplicitFactor(), getLangevinExplicitFactor(),
                                   initial_temperatures.data(tier), final_temperatures.data(tier),
                                   random_state_vector_xy.data(tier),
                                   random_state_vector_zw.data(tier), random_cache.data(tier));
@@ -297,6 +325,8 @@ ThermostatWriter<double> Thermostat::dpData(const HybridTargetLevel tier) {
   return ThermostatWriter<double>(kind, atom_count, padded_atom_count, step_number,
                                   random_cache_depth, initial_evolution_step, final_evolution_step,
                                   common_temperature, initial_temperature, final_temperature,
+                                  scaled_time_step, scaled_langevin_freq,
+                                  getLangevinImplicitFactor(), getLangevinExplicitFactor(),
                                   initial_temperatures.data(tier), final_temperatures.data(tier),
                                   random_state_vector_xy.data(tier),
                                   random_state_vector_zw.data(tier), random_cache.data(tier));
@@ -307,6 +337,8 @@ const ThermostatReader<float> Thermostat::spData(const HybridTargetLevel tier) c
   return ThermostatReader<float>(kind, atom_count, padded_atom_count, step_number,
                                  random_cache_depth, initial_evolution_step, final_evolution_step,
                                  common_temperature, initial_temperature, final_temperature,
+                                 scaled_time_step, scaled_langevin_freq,
+                                 getLangevinImplicitFactor(), getLangevinExplicitFactor(),
                                  sp_initial_temperatures.data(tier),
                                  sp_final_temperatures.data(tier),
                                  random_state_vector_xy.data(tier),
@@ -318,6 +350,8 @@ ThermostatWriter<float> Thermostat::spData(const HybridTargetLevel tier) {
   return ThermostatWriter<float>(kind, atom_count, padded_atom_count, step_number,
                                  random_cache_depth, initial_evolution_step, final_evolution_step,
                                  common_temperature, initial_temperature, final_temperature,
+                                 scaled_time_step, scaled_langevin_freq,
+                                 getLangevinImplicitFactor(), getLangevinExplicitFactor(),
                                  sp_initial_temperatures.data(tier),
                                  sp_final_temperatures.data(tier),
                                  random_state_vector_xy.data(tier),
@@ -479,6 +513,18 @@ void Thermostat::setRandomCacheDepth(const int depth_in) {
   random_cache_depth = depth_in;
   validateRandomCacheDepth();
   allocateRandomStorage();
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::setLangevinCollisionFrequency(const double frequency_in) {
+  langevin_frequency = frequency_in;
+  scaled_langevin_freq = langevin_frequency / time_step_factor;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Thermostat::setTimeStep(const double time_step_in) {
+  time_step = time_step_in;
+  scaled_time_step = time_step * time_step_factor;
 }
 
 //-------------------------------------------------------------------------------------------------

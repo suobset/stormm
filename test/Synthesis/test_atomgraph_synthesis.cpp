@@ -83,7 +83,7 @@ void checkSynthesis(const AtomGraphSynthesis &poly_ag, const StaticExclusionMask
   
   // Get the valence abstract and prepare for energy calculations
   SyValenceKit<double> syvk = poly_ag.getDoublePrecisionValenceKit();
-  SyAtomUpdateKit<double2, double4> syauk = poly_ag.getDoublePrecisionAtomUpdateKit();
+  SyAtomUpdateKit<double, double2, double4> syauk = poly_ag.getDoublePrecisionAtomUpdateKit();
   SyRestraintKit<double, double2, double4> syrk = poly_ag.getDoublePrecisionRestraintKit();
   ScoreCard sc(poly_ps->getSystemCount(), 1, 32);
 

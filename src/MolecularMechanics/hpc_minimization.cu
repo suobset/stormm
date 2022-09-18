@@ -223,10 +223,10 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
   case PrecisionModel::DOUBLE:
     {
       const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
-      const SyAtomUpdateKit<double2,
-                            double4> poly_auk = poly_ag.getDoublePrecisionAtomUpdateKit(devc_tier);
-      const SyNonbondedKit<double,
-                           double2> poly_nbk = poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(devc_tier);
+      const SyNonbondedKit<double, double2> poly_nbk =
+        poly_ag.getDoublePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<double, double2, double4> poly_rk =
         poly_ag.getDoublePrecisionRestraintKit(devc_tier);
       CacheResourceKit<double> vale_fe_tbr = vale_fe_cache->dpData(devc_tier);
@@ -249,7 +249,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, nonb_lp, gbr_lp,
                         gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
+        launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, poly_auk, &tstw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_fe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_fe_tbr, poly_vk, poly_auk, vste_xm_lp);
@@ -275,8 +275,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp,
                         gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
         }
@@ -292,8 +292,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp,
                         gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
         }
@@ -309,8 +309,8 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, nonb_lp, gbr_lp,
                         gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
         }
@@ -330,18 +330,19 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw,
                       &scw_final, &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES,
                       nonb_lp, gbr_lp, gbd_lp);
-      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
-                    EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, vale_xe_lp);
+      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw_final,
+                    &vale_xe_tbr, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                    vale_xe_lp);
       ctrl_xe.step += 1;
     }
     break;
   case PrecisionModel::SINGLE:
     {
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
-      const SyAtomUpdateKit<float2,
-                            float4> poly_auk = poly_ag.getSinglePrecisionAtomUpdateKit(devc_tier);
-      const SyNonbondedKit<float,
-                           float2> poly_nbk = poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(devc_tier);
+      const SyNonbondedKit<float, float2> poly_nbk =
+        poly_ag.getSinglePrecisionNonbondedKit(devc_tier);
       const SyRestraintKit<float, float2, float4> poly_rk =
         poly_ag.getSinglePrecisionRestraintKit(devc_tier);
       CacheResourceKit<float> vale_fe_tbr = vale_fe_cache->spData(devc_tier);
@@ -364,7 +365,7 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_fe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::YES, EvaluateEnergy::YES, acc_meth,
                         nonb_lp, gbr_lp, gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, &scw, &vale_fe_tbr,
+        launchValence(poly_vk, poly_rk, &ctrl_fe, &poly_psw, poly_auk, &tstw, &scw, &vale_fe_tbr,
                       EvaluateForce::YES, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
                       vale_fe_lp);
         if (virtual_sites_present) {
@@ -391,8 +392,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
                         nonb_lp, gbr_lp, gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_xe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
         }
@@ -408,8 +410,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
                         nonb_lp, gbr_lp, gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_xe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
         }
@@ -425,8 +428,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
         launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw, &scw,
                         &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES, acc_meth,
                         nonb_lp, gbr_lp, gbd_lp);
-        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw, &vale_xe_tbr, EvaluateForce::NO,
-                      EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth, vale_xe_lp);
+        launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw, &vale_xe_tbr,
+                      EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
+                      vale_xe_lp);
         if (virtual_sites_present) {
           launchTransmitVSiteForces(&poly_psw, &vale_xe_tbr, poly_vk, poly_auk, vste_xm_lp);
         }
@@ -446,9 +450,9 @@ extern void launchMinimization(const PrecisionModel prec, const AtomGraphSynthes
       launchNonbonded(nb_work_type, poly_nbk, poly_ser, &ctrl_xe, &poly_psw, &tstw,
                       &scw_final, &nonb_tbr, &iswk, EvaluateForce::NO, EvaluateEnergy::YES,
                       acc_meth, nonb_lp, gbr_lp, gbd_lp);
-      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, &scw_final, &vale_xe_tbr,
-                    EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE, acc_meth,
-                    vale_xe_lp);
+      launchValence(poly_vk, poly_rk, &ctrl_xe, &poly_psw, poly_auk, &tstw, &scw_final,
+                    &vale_xe_tbr, EvaluateForce::NO, EvaluateEnergy::YES, VwuGoal::ACCUMULATE,
+                    acc_meth, vale_xe_lp);
       ctrl_xe.step += 1;
     }
     break;

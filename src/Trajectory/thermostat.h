@@ -8,6 +8,7 @@
 #include "Accelerator/gpu_details.h"
 #include "Accelerator/hybrid.h"
 #include "Constants/behavior.h"
+#include "Namelists/nml_dynamics.h"
 
 namespace stormm {
 namespace trajectory {
@@ -29,7 +30,10 @@ constexpr int maximum_random_cache_depth = 15;
 /// \brief The default cache depth for a thermostat will give high efficiency in the number of
 ///        write transactions issued for the 256-bit read required: eight bytes written for every
 ///        byte read.
-constexpr int default_thermostat_cache_depth = 8;
+constexpr int default_thermostat_cache_depth = 2;
+
+/// \brief The default Langevin thermostat collision frequency, in events per femtosecond.
+constexpr double default_langevin_frequency = 0.0;
   
 /// \brief The default simulation temperature, chemistry's standard temperature and pressure (in
 ///        units of Kelvin).
@@ -48,6 +52,7 @@ template <typename T> struct ThermostatReader {
   ThermostatReader(ThermostatKind kind_in, int natom_in, int padded_natom_in, int step_in,
                    int depth_in, int init_evolution_in, int end_evolution_in,
                    bool common_temperature_in, T init_temperature_in, T final_temperature_in,
+                   T dt_factor_in, T gamma_ln_in, T ln_implicit_in, T ln_explicit_in,
                    const T* init_temperatures_in, const T* final_temperatures_in,
                    const ullint2* state_xy_in, const ullint2* state_zw_in, const T* cache_in);
 
@@ -58,32 +63,42 @@ template <typename T> struct ThermostatReader {
   ThermostatReader(ThermostatReader &&original) = default;
   /// \}
   
-  const ThermostatKind kind;       ///< The type of this thermostat, i.e. Andersen
-  const int natom;                 ///< Number of atoms controlled by this thermostat
-  const int padded_natom;          ///< The number of atoms padded by the warp size
-  const int step;                  ///< Current step number of the simulation
-  const int depth;                 ///< Depth of the cache (the true depth will be three times
-                                   ///<   higher, to serve each atom with Cartesian X, Y, and Z
-                                   ///<   influences)
-  const int init_evolution;        ///< The final step at which the thermostat target temperatures
-                                   ///<   come from init_temperature or the eponymous array, and
-                                   ///<   the first step at which temperature targets begin to
-                                   ///<   shift linearly towards final_temperature(s)
-  const int end_evolution;         ///< The first step at which the thermostat begins to target
-                                   ///<   final_temperature(s)
-  const bool common_temperature;   ///< Indicates whether the initial and final temperatures
-                                   ///<   targeted by this thermostat are similar across all atoms
-  const T init_temperature;        ///< Initial target temperature, common to all atoms (if it is
-                                   ///<   applicable)
-  const T final_temperature;       ///< Final target temperature, common to all atoms
-  const T* init_temperatures;      ///< Array of initial target temperatures for each atom (this,
-                                   ///<   and final_temperatures, will not be accessed if the
-                                   ///<   common_temperature member variable is set to TRUE)
-  const T* final_temperatures;     ///< Array of final target gemperatures for each atom
-  const ullint2* state_xy;         ///< First 128 bits of each 256-bit state vector
-  const ullint2* state_zw;         ///< Second 128 bits of each 256-bit state vector
-  const T* cache;                  ///< Cache of pre-computed random values (depth gives the number
-                                   ///<   of such values for each atom)
+  const ThermostatKind kind;      ///< The type of this thermostat, i.e. Andersen
+  const int natom;                ///< Number of atoms controlled by this thermostat
+  const int padded_natom;         ///< The number of atoms padded by the warp size
+  const int step;                 ///< Current step number of the simulation
+  const int depth;                ///< Depth of the cache (the true depth will be three times
+                                  ///<   higher, to serve each atom with Cartesian X, Y, and Z
+                                  ///<   influences)
+  const int init_evolution;       ///< The final step at which the thermostat target temperatures
+                                  ///<   come from init_temperature or the eponymous array, and
+                                  ///<   the first step at which temperature targets begin to
+                                  ///<   shift linearly towards final_temperature(s)
+  const int end_evolution;        ///< The first step at which the thermostat begins to target
+                                  ///<   final_temperature(s)
+  const bool common_temperature;  ///< Indicates whether the initial and final temperatures
+                                  ///<   targeted by this thermostat are similar across all atoms
+  const T init_temperature;       ///< Initial target temperature, common to all atoms (if it is
+                                  ///<   applicable)
+  const T final_temperature;      ///< Final target temperature, common to all atoms
+  const T dt_factor;              ///< The time step, scaled to translate forces in in kcal/mol-A
+                                  ///<   into movements in Angstroms per fs or Angstroms
+  const T gamma_ln;               ///< The "Gamma" factor for the Langevin thermostat, giving the
+                                  ///<   number of collisions per femtosecond scaled by the
+                                  ///<   conversion factor for taking forces in kcal/mol-A into
+                                  ///<   Angstroms per femtosecond.
+  const T ln_implicit;            ///< Implicit Langevin factor, applied in the first velocity
+                                  ///<   Verlet update after new forces have been computed
+  const T ln_explicit;            ///< Explicit Langevin factor, applied in the second velocity
+                                  ///<   Verlet update as new coordinates are determined
+  const T* init_temperatures;     ///< Array of initial target temperatures for each atom (this,
+                                  ///<   and final_temperatures, will not be accessed if the
+                                  ///<   common_temperature member variable is set to TRUE)
+  const T* final_temperatures;    ///< Array of final target gemperatures for each atom
+  const ullint2* state_xy;        ///< First 128 bits of each 256-bit state vector
+  const ullint2* state_zw;        ///< Second 128 bits of each 256-bit state vector
+  const T* cache;                 ///< Cache of pre-computed random values (depth gives the number
+                                  ///<   of such values for each atom)
 };
 
 /// \brief Partially writeable abstract for the Thermostat object.  As with the MMControlKit struct
@@ -97,6 +112,7 @@ template <typename T> struct ThermostatWriter {
   ThermostatWriter(ThermostatKind kind_in, int natom_in, int padded_natom_in, int step_in,
                    int depth_in, int init_evolution_in, int end_evolution_in,
                    bool common_temperature_in, T init_temperature_in, T final_temperature_in,
+                   T dt_factor_in, T gamma_ln_in, T ln_implicit_in, T ln_explicit_in,
                    const T* init_temperatures_in, const T* final_temperatures_in,
                    ullint2* state_xy_in, ullint2* state_zw_in, T* cache_in);
 
@@ -107,32 +123,42 @@ template <typename T> struct ThermostatWriter {
   ThermostatWriter(ThermostatWriter &&original) = default;
   /// \}
   
-  const ThermostatKind kind;       ///< The type of this thermostat, i.e. Andersen
-  const int natom;                 ///< Number of atoms controlled by this thermostat
-  const int padded_natom;          ///< The number of atoms padded by the warp size
-  int step;                        ///< Current step number of the simulation
-  const int depth;                 ///< Depth of the cache (the true depth will be three times
-                                   ///<   higher, to serve each atom with Cartesian X, Y, and Z
-                                   ///<   influences)
-  const int init_evolution;        ///< The final step at which the thermostat target temperatures
-                                   ///<   come from init_temperature or the eponymous array, and
-                                   ///<   the first step at which temperature targets begin to
-                                   ///<   shift linearly towards final_temperature(s)
-  const int end_evolution;         ///< The first step at which the thermostat begins to target
-                                   ///<   final_temperature(s)
-  const bool common_temperature;   ///< Indicates whether the initial and final temperatures
-                                   ///<   targeted by this thermostat are similar across all atoms
-  const T init_temperature;        ///< Initial target temperature, common to all atoms (if it is
-                                   ///<   applicable)
-  const T final_temperature;       ///< Final target temperature, common to all atoms
-  const T* init_temperatures;      ///< Array of initial target temperatures for each atom (this,
-                                   ///<   and final_temperatures, will not be accessed if the
-                                   ///<   common_temperature member variable is set to TRUE)
-  const T* final_temperatures;     ///< Array of final target gemperatures for each atom
-  ullint2* state_xy;               ///< First 128 bits of each 256-bit state vector
-  ullint2* state_zw;               ///< Second 128 bits of each 256-bit state vector
-  T* cache;                        ///< Cache of pre-computed random values (depth gives the number
-                                   ///<   of such values for each atom)
+  const ThermostatKind kind;      ///< The type of this thermostat, i.e. Andersen
+  const int natom;                ///< Number of atoms controlled by this thermostat
+  const int padded_natom;         ///< The number of atoms padded by the warp size
+  int step;                       ///< Current step number of the simulation
+  const int depth;                ///< Depth of the cache (the true depth will be three times
+                                  ///<   higher, to serve each atom with Cartesian X, Y, and Z
+                                  ///<   influences)
+  const int init_evolution;       ///< The final step at which the thermostat target temperatures
+                                  ///<   come from init_temperature or the eponymous array, and
+                                  ///<   the first step at which temperature targets begin to
+                                  ///<   shift linearly towards final_temperature(s)
+  const int end_evolution;        ///< The first step at which the thermostat begins to target
+                                  ///<   final_temperature(s)
+  const bool common_temperature;  ///< Indicates whether the initial and final temperatures
+                                  ///<   targeted by this thermostat are similar across all atoms
+  const T init_temperature;       ///< Initial target temperature, common to all atoms (if it is
+                                  ///<   applicable)
+  const T final_temperature;      ///< Final target temperature, common to all atoms
+  const T dt_factor;              ///< The time step, scaled to translate forces in in kcal/mol-A
+                                  ///<   into movements in Angstroms per fs or Angstroms
+  const T gamma_ln;               ///< The "Gamma" factor for the Langevin thermostat, giving the
+                                  ///<   number of collisions per femtosecond scaled by the
+                                  ///<   conversion factor for taking forces in kcal/mol-A into
+                                  ///<   Angstroms per femtosecond.
+  const T ln_implicit;            ///< Implicit Langevin factor, applied in the first velocity
+                                  ///<   Verlet update after new forces have been computed
+  const T ln_explicit;            ///< Explicit Langevin factor, applied in the second velocity
+                                  ///<   Verlet update as new coordinates are determined
+  const T* init_temperatures;     ///< Array of initial target temperatures for each atom (this,
+                                  ///<   and final_temperatures, will not be accessed if the
+                                  ///<   common_temperature member variable is set to TRUE)
+  const T* final_temperatures;    ///< Array of final target gemperatures for each atom
+  ullint2* state_xy;              ///< First 128 bits of each 256-bit state vector
+  ullint2* state_zw;              ///< Second 128 bits of each 256-bit state vector
+  T* cache;                       ///< Cache of pre-computed random values (depth gives the number
+                                  ///<   of such values for each atom)
 };
 
 /// \brief Store the parameters for a simulation thermostat.  Includes Berendsen, Andersen, and
@@ -249,6 +275,20 @@ public:
   /// \param atom_index  Index of the atom of interest
   double getCurrentTemperatureTarget(int atom_index = 0) const;
 
+  /// \brief Get the collision frequency for the Langevin thermostat (in units of femtoseconds).
+  double getLangevinCollisionFrequency() const;
+
+  /// \brief Get the "implicit" Langevin factor, the portion of the velocity update to apply
+  ///        immediately after forces have been computed.
+  double getLangevinImplicitFactor() const;
+
+  /// \brief Get the "explicit" Langevin factor, the portion of the velocity update to apply
+  ///        on the second half of the update, as new particle positions are being computed.
+  double getLangevinExplicitFactor() const;
+  
+  /// \brief Get the time step, in units of femtoseconds.
+  double getTimeStep() const;
+
   /// \brief Get the abstract.
   ///
   /// Overloaded:
@@ -336,6 +376,17 @@ public:
   /// \param depth_in  The depth to take
   void setRandomCacheDepth(int depth_in);
 
+  /// \brief Set the collision frequency for the Langevin thermostat.  This will also set the
+  ///        scaled form of the value.
+  ///
+  /// \param frequency_in  The collision frequency to take, in events per femtosecond
+  void setLangevinCollisionFrequency(double frequency_in);
+
+  /// \brief Set the time step.  This will also set the scaled form of the value.
+  ///
+  /// \param time_step_in  The time step to take, in units of femtoseconds
+  void setTimeStep(double time_step_in);
+  
   /// \brief Increase the step count by one.  This will advance the simulation's official step
   ///        counter.
   void incrementStep();
@@ -414,6 +465,15 @@ private:
                                    ///<   and final temperatures.
   double initial_temperature;      ///< Initial temperature to apply to all particles
   double final_temperature;        ///< Final temperature to apply to all particles
+  double langevin_frequency;       ///< Frequency of collisions between all particles managed by
+                                   ///<   this thermostat and a Langevin bath
+  double scaled_langevin_freq;     ///< Langevin frequency scaled by the conversion factor taking
+                                   ///<   forces in kcal/mol-A into motions in units of A and fs
+  double time_step;                ///< Simulation time step (the thermostat is also the official
+                                   ///<   reference of this information in various C++ functions
+                                   ///<   and GPU kernels)
+  double scaled_time_step;         ///< Time step scaled by the conversion factor taking forces in
+                                   ///<   kcal/mol-A into motions in units of A and fs
 
   /// Temperatures to apply from step 0 to the initiation of any requested evolution, across
   ///   various compartments of the simulation.  Different compartments, i.e. systems, or

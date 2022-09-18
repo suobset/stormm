@@ -329,14 +329,14 @@ public:
   ///        site positions based on work units stored in this object.
   ///
   /// \param tier  Level at which to obtain pointers for the abstract
-  SyAtomUpdateKit<double2, double4>
+  SyAtomUpdateKit<double, double2, double4>
   getDoublePrecisionAtomUpdateKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
   /// \brief Get a minimal kit with single-precision real numbers for updating atom and virtual
   ///        site positions based on work units stored in this object.
   ///
   /// \param tier  Level at which to obtain pointers for the abstract
-  SyAtomUpdateKit<float2, float4>
+  SyAtomUpdateKit<float, float2, float4>
   getSinglePrecisionAtomUpdateKit(HybridTargetLevel tier = HybridTargetLevel::HOST) const;
 
 #ifdef STORMM_USE_HPC

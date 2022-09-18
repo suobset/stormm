@@ -40,6 +40,7 @@ using numerics::max_llint_accumulation;
 using numerics::max_llint_accumulation_f;
 using symbols::asymptotic_to_one_f;
 using symbols::asymptotic_to_one_lf;
+using symbols::boltzmann_constant;
 using symbols::inverse_one_minus_asymptote_f;
 using symbols::inverse_one_minus_asymptote_lf;
 using symbols::near_to_one_f;
@@ -53,11 +54,13 @@ using synthesis::maximum_valence_work_unit_atoms;
 using synthesis::VwuAbstractMap;
 using synthesis::VwuGoal;
 using synthesis::vwu_abstract_length;
+using trajectory::ThermostatKind;
 using topology::TorsionKind;
   
 #include "Numerics/accumulation.cui"
 #include "Math/rounding.cui"
 #include "Math/vector_formulas.cui"
+#include "Trajectory/thermostat_utilities.cui"
 
 //-------------------------------------------------------------------------------------------------
 // Compute an angle based on the value of its cosine, with the understanding that a fallback
@@ -507,57 +510,6 @@ extern void valenceKernelSetup() {
 }
 
 //-------------------------------------------------------------------------------------------------
-#if 0
-int2 testValenceKernelSubdivision(const int max_threads, const int smp_count, const int vwu_size,
-                                  const int vwu_count) {
-  const std::vector<int> block_size_options = { 128, 160, 192, 224, 256, 288, 320, 384, 448, 512,
-                                                768, 896, 1024 };
-  const int n_options = block_size_options.size();
-  const double dvwu_count   = static_cast<double>(vwu_count);
-  const double dmax_threads = static_cast<double>(max_threads);
-  double best_eff = 0.0;
-  int best_block_size = max_threads;
-  int best_block_mult = 1;
-  for (size_t i = 0; i < n_options; i++) {
-    const int tmp_bdim = block_size_options[i];
-
-    // In some cases, the valence work unit size can be slightly greater than the thread count
-    // per block, i.e. 1024 atoms and 896 threads in some of the kernels that compute forces and
-    // energies.  However, if the number of atoms is approaching the number of threads per block,
-    // efficiency will already be fairly high.
-    if (vwu_size > tmp_bdim || tmp_bdim > max_threads) {
-      continue;
-    }
-    const int tmp_mult    = (max_threads / tmp_bdim);
-    const int tmp_blocks  = tmp_mult * smp_count;
-    const double tmp_batches = static_cast<double>((vwu_count + tmp_blocks - 1) / tmp_blocks);
-    const double sm_eff  = static_cast<double>(tmp_bdim * tmp_mult) / dmax_threads;
-
-    // The efficiency within an individual valence work unit is estimated as the number of tasks
-    // (five task estimates per atom) divided by the number of threads available to work on them,
-    // cycling until each task can be done by one of the threads.  If there are more tasks than
-    // threads, this implies threads do additional batches of work, and the idle threads in the
-    // final batch are less an dless inefficiency as the workload grows.  The more batches a single
-    // thread performs, the less memory reading ratio is also carries, so the threads' batch count
-    // is given a minor bonus in the estimated score.
-    const int vwu_batches = ((5 * vwu_size) + tmp_bdim - 1) / tmp_bdim;
-    const double vwu_eff = (static_cast<double>(5 * vwu_size) /
-                            static_cast<double>(vwu_batches * tmp_bdim)) *
-                           static_cast<double>(vwu_batches + 5) /
-                           static_cast<double>(vwu_batches + 6);
-    const double net_eff = sm_eff * vwu_eff * dvwu_count / (tmp_batches *
-                                                            static_cast<double>(tmp_blocks));
-    if (net_eff >= best_eff) {
-      best_eff = net_eff;
-      best_block_size = tmp_bdim;
-      best_block_mult = tmp_mult;
-    }
-  }
-  return { best_block_mult, best_block_size };
-}
-#endif
-
-//-------------------------------------------------------------------------------------------------
 extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel prec,
                                                          const EvaluateForce eval_frc,
                                                          const EvaluateEnergy eval_nrg,
@@ -707,9 +659,10 @@ extern cudaFuncAttributes queryValenceKernelRequirements(const PrecisionModel pr
 extern void launchValence(const SyValenceKit<double> &poly_vk,
                           const SyRestraintKit<double, double2, double4> &poly_rk,
                           MMControlKit<double> *ctrl, PsSynthesisWriter *poly_psw,
-                          ScoreCardWriter *scw, CacheResourceKit<double> *gmem_r,
-                          const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                          const VwuGoal purpose, const int2 bt) {
+                          const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                          ThermostatWriter<double> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<double> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose, const int2 bt) {
   switch (purpose) {
   case VwuGoal::ACCUMULATE:
 
@@ -743,11 +696,12 @@ extern void launchValence(const SyValenceKit<double> &poly_vk,
     // kernel.
     switch (eval_energy) {
     case EvaluateEnergy::YES:
-      kdsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                 *gmem_r);
+      kdsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                 *tstw, *scw, *gmem_r);
       break;
     case EvaluateEnergy::NO:
-      kdsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+      kdsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
+                                           *gmem_r);
       break;
     }
     break;
@@ -758,10 +712,11 @@ extern void launchValence(const SyValenceKit<double> &poly_vk,
 extern void launchValence(const SyValenceKit<float> &poly_vk,
                           const SyRestraintKit<float, float2, float4> &poly_rk,
                           MMControlKit<float> *ctrl, PsSynthesisWriter *poly_psw,
-                          ScoreCardWriter *scw, CacheResourceKit<float> *gmem_r,
-                          const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
-                          const VwuGoal purpose, const AccumulationMethod force_sum,
-                          const int2 bt) {
+                          const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                          ThermostatWriter<float> *tstw, ScoreCardWriter *scw,
+                          CacheResourceKit<float> *gmem_r, const EvaluateForce eval_force,
+                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
+                          const AccumulationMethod force_sum, const int2 bt) {
   AccumulationMethod refined_force_sum;
   switch (force_sum) {
   case AccumulationMethod::SPLIT:
@@ -813,7 +768,7 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     }
     break;
   case VwuGoal::MOVE_PARTICLES:
-
+    
     // When the goal is to move particles, evaluating the force is obligatory, but the manner in
     // which forces are accumulated is still important.  Whether to accumulate energies while
     // evaluating forces and moving the particles remains a consideration in choosing the proper
@@ -822,22 +777,24 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
     case AccumulationMethod::SPLIT:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                   *gmem_r);
+        kfsValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                   *tstw, *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kfsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+        kfsValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
+                                             *gmem_r);
         break;
       }
       break;
     case AccumulationMethod::WHOLE:
       switch (eval_energy) {
       case EvaluateEnergy::YES:
-        kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *scw,
-                                                  *gmem_r);
+        kfValenceEnergyAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk,
+                                                  *tstw, *scw, *gmem_r);
         break;
       case EvaluateEnergy::NO:
-        kfValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, *gmem_r);
+        kfValenceAtomUpdate<<<bt.x, bt.y>>>(poly_vk, poly_rk, *ctrl, *poly_psw, poly_auk, *tstw,
+                                            *gmem_r);
         break;
       }
       break;
@@ -851,9 +808,10 @@ extern void launchValence(const SyValenceKit<float> &poly_vk,
 //-------------------------------------------------------------------------------------------------
 extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                           MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                          ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
-                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                          const AccumulationMethod force_sum, const KernelManager &launcher) {
+                          Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                          const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                          const VwuGoal purpose, const AccumulationMethod force_sum,
+                          const KernelManager &launcher) {
   const HybridTargetLevel tier = HybridTargetLevel::DEVICE;
   PsSynthesisWriter poly_psw = poly_ps->data(tier);
   ScoreCardWriter scw = sc->data(tier);
@@ -863,24 +821,29 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
   case PrecisionModel::DOUBLE:
     {
       const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(tier);
-      const SyRestraintKit<double,
-                           double2,
-                           double4> poly_rk = poly_ag.getDoublePrecisionRestraintKit(tier);
+      const SyRestraintKit<double, double2, double4> poly_rk =
+        poly_ag.getDoublePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
+        poly_ag.getDoublePrecisionAtomUpdateKit(tier);
       MMControlKit<double> ctrl = mmctrl->dpData(tier);
+      ThermostatWriter tstw = heat_bath->dpData(tier);
       CacheResourceKit<double> gmem_r = tb_space->dpData(tier);
-      launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
-                    purpose, bt);
+      launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r, eval_force,
+                    eval_energy, purpose, bt);
     }
     break;
   case PrecisionModel::SINGLE:
     {
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(tier);
-      const SyRestraintKit<float,
-                           float2, float4> poly_rk = poly_ag.getSinglePrecisionRestraintKit(tier);
+      const SyRestraintKit<float, float2, float4> poly_rk =
+        poly_ag.getSinglePrecisionRestraintKit(tier);
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
+        poly_ag.getSinglePrecisionAtomUpdateKit(tier);
       MMControlKit<float> ctrl = mmctrl->spData(tier);
+      ThermostatWriter tstw = heat_bath->spData(tier);
       CacheResourceKit<float> gmem_r = tb_space->spData(tier);
-      launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, &scw, &gmem_r, eval_force, eval_energy,
-                    purpose, force_sum, bt);
+      launchValence(poly_vk, poly_rk, &ctrl, &poly_psw, poly_auk, &tstw, &scw, &gmem_r, eval_force,
+                    eval_energy, purpose, force_sum, bt);
     }
     break;
   }
@@ -889,16 +852,16 @@ extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &p
 //-------------------------------------------------------------------------------------------------
 extern void launchValence(const PrecisionModel prec, const AtomGraphSynthesis &poly_ag,
                           MolecularMechanicsControls *mmctrl, PhaseSpaceSynthesis *poly_ps,
-                          ScoreCard *sc, CacheResource *tb_space, const EvaluateForce eval_force,
-                          const EvaluateEnergy eval_energy, const VwuGoal purpose,
-                          const KernelManager &launcher) {
+                          Thermostat *heat_bath, ScoreCard *sc, CacheResource *tb_space,
+                          const EvaluateForce eval_force, const EvaluateEnergy eval_energy,
+                          const VwuGoal purpose, const KernelManager &launcher) {
   if (prec == PrecisionModel::DOUBLE || poly_ps->getForceAccumulationBits() <= 24) {
-    launchValence(prec, poly_ag, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy, purpose,
-                  AccumulationMethod::SPLIT, launcher);
+    launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
+                  purpose, AccumulationMethod::SPLIT, launcher);
   }
   else {
-    launchValence(prec, poly_ag, mmctrl, poly_ps, sc, tb_space, eval_force, eval_energy, purpose,
-                  AccumulationMethod::WHOLE, launcher);
+    launchValence(prec, poly_ag, mmctrl, poly_ps, heat_bath, sc, tb_space, eval_force, eval_energy,
+                  purpose, AccumulationMethod::WHOLE, launcher);
   }
 }
 

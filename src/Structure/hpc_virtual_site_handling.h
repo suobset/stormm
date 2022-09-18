@@ -50,11 +50,13 @@ cudaFuncAttributes queryVirtualSiteKernelRequirements(PrecisionModel prec,
 /// \{
 void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
                                 const SyValenceKit<double> &poly_vk,
-                                const SyAtomUpdateKit<double2, double4> &poly_auk, const int2 bt);
+                                const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                                const int2 bt);
 
 void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
                                 const SyValenceKit<float> &poly_vk,
-                                const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt);
+                                const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                                const int2 bt);
 /// \}
 
 /// \brief Transmit forces acting on virtual sites to frame atoms with mass.  This process is
@@ -66,11 +68,13 @@ void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<fl
 /// \{
 void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
                                const SyValenceKit<double> &poly_vk,
-                               const SyAtomUpdateKit<double2, double4> &poly_auk, const int2 bt);
+                               const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                               const int2 bt);
 
 void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
                                const SyValenceKit<float> &poly_vk,
-                               const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt);
+                               const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                               const int2 bt);
 /// \}
   
 /// \brief Launch a standalone kernel to place virtual sites or to transmit forces from virtual

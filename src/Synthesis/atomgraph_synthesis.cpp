@@ -3556,10 +3556,12 @@ AtomGraphSynthesis::getSinglePrecisionNonbondedKit(const HybridTargetLevel tier)
 }
 
 //-------------------------------------------------------------------------------------------------
-SyAtomUpdateKit<double2, double4>
+SyAtomUpdateKit<double, double2, double4>
 AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
-  return SyAtomUpdateKit<double2,
-                         double4>(virtual_site_parameters.data(tier),
+  return SyAtomUpdateKit<double,
+                         double2,
+                         double4>(inverse_atomic_masses.data(tier),
+                                  virtual_site_parameters.data(tier),
                                   settle_group_geometry.data(tier), settle_group_masses.data(tier),
                                   constraint_group_params.data(tier), vste_instructions.data(tier),
                                   sett_instructions.data(tier), cnst_instructions.data(tier),
@@ -3567,10 +3569,12 @@ AtomGraphSynthesis::getDoublePrecisionAtomUpdateKit(const HybridTargetLevel tier
 }
 
 //-------------------------------------------------------------------------------------------------
-SyAtomUpdateKit<float2, float4>
+SyAtomUpdateKit<float, float2, float4>
 AtomGraphSynthesis::getSinglePrecisionAtomUpdateKit(const HybridTargetLevel tier) const {
-  return SyAtomUpdateKit<float2,
-                         float4>(sp_virtual_site_parameters.data(tier),
+  return SyAtomUpdateKit<float,
+                         float2,
+                         float4>(sp_inverse_atomic_masses.data(tier),
+                                 sp_virtual_site_parameters.data(tier),
                                  sp_settle_group_geometry.data(tier),
                                  sp_settle_group_masses.data(tier),
                                  sp_constraint_group_params.data(tier),

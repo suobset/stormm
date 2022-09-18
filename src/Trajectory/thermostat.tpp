@@ -10,6 +10,8 @@ ThermostatReader<T>::ThermostatReader(const ThermostatKind kind_in, const int na
                                       const int padded_natom_in, const int step_in,
                                       const int depth_in, const int init_evolution_in,
                                       const int end_evolution_in, const bool common_temperature_in,
+                                      const T dt_factor_in, const T gamma_ln_in,
+                                      const T ln_implicit_in, const T ln_explicit_in,
                                       const T init_temperature_in, const T final_temperature_in,
                                       const T* init_temperatures_in,
                                       const T* final_temperatures_in, const ullint2* state_xy_in,
@@ -17,9 +19,10 @@ ThermostatReader<T>::ThermostatReader(const ThermostatKind kind_in, const int na
     kind{kind_in}, natom{natom_in}, padded_natom{padded_natom_in}, step{step_in}, depth{depth_in},
     init_evolution{init_evolution_in}, end_evolution{end_evolution_in},
     common_temperature{common_temperature_in}, init_temperature{init_temperature_in},
-    final_temperature{final_temperature_in}, init_temperatures{init_temperatures_in},
-    final_temperatures{final_temperatures_in}, state_xy{state_xy_in}, state_zw{state_zw_in},
-    cache{cache_in}
+    final_temperature{final_temperature_in}, dt_factor{dt_factor_in}, gamma_ln{gamma_ln_in},
+    ln_implicit{ln_implicit_in}, ln_explicit{ln_explicit_in},
+    init_temperatures{init_temperatures_in}, final_temperatures{final_temperatures_in},
+    state_xy{state_xy_in}, state_zw{state_zw_in}, cache{cache_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
@@ -28,6 +31,8 @@ ThermostatWriter<T>::ThermostatWriter(const ThermostatKind kind_in, const int na
                                       const int padded_natom_in, const int step_in,
                                       const int depth_in, const int init_evolution_in,
                                       const int end_evolution_in, const bool common_temperature_in,
+                                      const T dt_factor_in, const T gamma_ln_in,
+                                      const T ln_implicit_in, const T ln_explicit_in,
                                       const T init_temperature_in,
                                       const T final_temperature_in, const T* init_temperatures_in,
                                       const T* final_temperatures_in, ullint2* state_xy_in,
@@ -35,9 +40,10 @@ ThermostatWriter<T>::ThermostatWriter(const ThermostatKind kind_in, const int na
     kind{kind_in}, natom{natom_in}, padded_natom{padded_natom_in}, step{step_in}, depth{depth_in},
     init_evolution{init_evolution_in}, end_evolution{end_evolution_in},
     common_temperature{common_temperature_in}, init_temperature{init_temperature_in},
-    final_temperature{final_temperature_in}, init_temperatures{init_temperatures_in},
-    final_temperatures{final_temperatures_in}, state_xy{state_xy_in}, state_zw{state_zw_in},
-    cache{cache_in}
+    final_temperature{final_temperature_in}, dt_factor{dt_factor_in}, gamma_ln{gamma_ln_in},
+    ln_implicit{ln_implicit_in}, ln_explicit{ln_explicit_in},
+    init_temperatures{init_temperatures_in}, final_temperatures{final_temperatures_in},
+    state_xy{state_xy_in}, state_zw{state_zw_in}, cache{cache_in}
 {}
 
 } // namespace trajectory

@@ -10,14 +10,20 @@
 namespace stormm {
 namespace namelist {
 
-/// \brief Default values for molecular dynamics
-/// \{
+/// \brief Default number of molecular dynamics cycles
 constexpr int default_dynamics_nstlim = 100;
+
+/// \brief Default time step for molecular dynamics, in femtoseconds
 constexpr double default_dynamics_time_step = 1.0;
+
+/// \brief Default tolerance for RATTLE bond constraints
 constexpr double default_rattle_tolerance = 1.0e-6;
+
+/// \brief The minimum molecular dynamics time step, in units of femtoseconds
 constexpr double minimum_dynamics_time_step = 0.015625;
+
+/// \brief The tightest possible RATTLE tolerance
 constexpr double minimum_rattle_tolerance = 1.0e-9;
-/// \}
 
 /// \brief Object to encapsulate molecular dynamics control information.  Like other namelist
 ///        encapsualtors, this object can take input file data as part of its construction, or

@@ -120,28 +120,32 @@ extern cudaFuncAttributes queryVirtualSiteKernelRequirements(const PrecisionMode
 //-------------------------------------------------------------------------------------------------
 void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
                                 const SyValenceKit<double> &poly_vk,
-                                const SyAtomUpdateKit<double2, double4> &poly_auk, const int2 bt) {
+                                const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                                const int2 bt) {
   kdPlaceVirtualSites<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
 }
 
 //-------------------------------------------------------------------------------------------------
 void launchVirtualSitePlacement(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
                                 const SyValenceKit<float> &poly_vk,
-                                const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt) {
+                                const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                                const int2 bt) {
   kfPlaceVirtualSites<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
 }
 
 //-------------------------------------------------------------------------------------------------
 void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<double> *gmem_r,
                                const SyValenceKit<double> &poly_vk,
-                               const SyAtomUpdateKit<double2, double4> &poly_auk, const int2 bt) {
+                               const SyAtomUpdateKit<double, double2, double4> &poly_auk,
+                               const int2 bt) {
   kdTransmitVSiteForces<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
 }
 
 //-------------------------------------------------------------------------------------------------
 void launchTransmitVSiteForces(PsSynthesisWriter *poly_psw, CacheResourceKit<float> *gmem_r,
                                const SyValenceKit<float> &poly_vk,
-                               const SyAtomUpdateKit<float2, float4> &poly_auk, const int2 bt) {
+                               const SyAtomUpdateKit<float, float2, float4> &poly_auk,
+                               const int2 bt) {
   kfTransmitVSiteForces<<<bt.x, bt.y>>>(*poly_psw, poly_vk, poly_auk, *gmem_r);
 }
 
@@ -162,7 +166,7 @@ void launchVirtualSiteHandling(const PrecisionModel prec, const VirtualSiteActiv
     {
       CacheResourceKit<double> gmem_r = tb_space->dpData(devc_tier);
       const SyValenceKit<double> poly_vk = poly_ag.getDoublePrecisionValenceKit(devc_tier);
-      const SyAtomUpdateKit<double2, double4> poly_auk =
+      const SyAtomUpdateKit<double, double2, double4> poly_auk =
         poly_ag.getDoublePrecisionAtomUpdateKit(devc_tier);
       switch (purpose) {
       case VirtualSiteActivity::PLACEMENT:
@@ -178,7 +182,7 @@ void launchVirtualSiteHandling(const PrecisionModel prec, const VirtualSiteActiv
     {
       CacheResourceKit<float> gmem_r = tb_space->spData(devc_tier);
       const SyValenceKit<float> poly_vk = poly_ag.getSinglePrecisionValenceKit(devc_tier);
-      const SyAtomUpdateKit<float2, float4> poly_auk =
+      const SyAtomUpdateKit<float, float2, float4> poly_auk =
         poly_ag.getSinglePrecisionAtomUpdateKit(devc_tier);
       switch (purpose) {
       case VirtualSiteActivity::PLACEMENT:

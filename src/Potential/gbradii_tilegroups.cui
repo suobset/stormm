@@ -128,7 +128,7 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
     }
 #endif
     __syncthreads();
-    
+
     // Loop over tile instructions
     pos = nbwu_map[small_block_max_imports + 6] + warp_idx;
     while (pos < nbwu_map[small_block_max_imports + 7]) {
