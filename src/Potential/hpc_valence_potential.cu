@@ -344,6 +344,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #        define KERNEL_NAME kfsValenceForceEnergyAccumulation
 #          include "valence_potential.cui"
 #        undef KERNEL_NAME
+#        undef VALENCE_KERNEL_THREAD_COUNT
+#        define VALENCE_KERNEL_THREAD_COUNT 384
 #        define UPDATE_ATOMS
 #          define KERNEL_NAME kfsValenceEnergyAtomUpdate
 #            include "valence_potential.cui"
@@ -368,6 +370,8 @@ float2 computeRestraintMixtureF(const int step_number, const int init_step, cons
 #      define KERNEL_NAME kfValenceForceEnergyAccumulation
 #        include "valence_potential.cui"
 #      undef KERNEL_NAME
+#      undef VALENCE_KERNEL_THREAD_COUNT
+#      define VALENCE_KERNEL_THREAD_COUNT 384
 #      define UPDATE_ATOMS
 #        define KERNEL_NAME kfValenceEnergyAtomUpdate
 #          include "valence_potential.cui"
