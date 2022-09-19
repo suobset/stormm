@@ -83,7 +83,7 @@ int main(const int argc, const char* argv[]) {
   AtomGraphSynthesis trpi_poly_ag(trpi_ag_vec, trpi_tiling, ExceptionResponse::WARN, gpu, &timer);
   StaticExclusionMaskSynthesis trpi_poly_se(trpi_poly_ag.getTopologyPointers(),
                                             trpi_poly_ag.getTopologyIndices());
-  trpi_poly_ag.loadNonbondedWorkUnits(trpi_poly_se, InitializationTask::GB_LANGEVIN_DYNAMICS, 2,
+  trpi_poly_ag.loadNonbondedWorkUnits(trpi_poly_se, InitializationTask::GB_LANGEVIN_DYNAMICS, 15,
                                       gpu);
   PhaseSpaceSynthesis trpi_poly_ps(trpi_ps_vec, trpi_ag_vec, trpi_tiling);
   trpi_poly_ag.upload();

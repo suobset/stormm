@@ -409,16 +409,11 @@ KERNEL_NAME(const SyNonbondedKit<TCALC, TCALC2> poly_nbk, MMControlKit<TCALC> ct
       // time step, then do a loop based on each unique thread in the launch grid, taking into
       // account that there may not be enough work units to cover the entire launch grid.
       const int nrand = ((refresh_code >> 8) & 0xff);
-      if (nrand > 0 && gbrwu_idx < gridDim.x) {
-        const int cyc_no = (tstw.step % nrand);
-        const int atom_range = (tstw.natom + (nrand - 1)) / nrand;
-        const int rseg_start = cyc_no * atom_range;
-        pos = rseg_start + threadIdx.x + (gbrwu_idx * blockDim.x);
-        const int rseg_end   = ((cyc_no + 1) * atom_range >= tstw.natom) ?
-                               tstw.natom : (cyc_no + 1) * atom_range;
+      if (nrand > 0 && gbrwu_idx < gridDim.x && (tstw.step % nrand) == 0) {
+        pos = threadIdx.x + (gbrwu_idx * blockDim.x);
         const int rng_stride = (poly_nbk.nnbwu < gridDim.x) ? poly_nbk.nnbwu * blockDim.x :
                                                               gridDim.x * blockDim.x;
-        while (pos < rseg_end) {
+        while (pos < tstw.natom) {
           const ullint2 xys = __ldcv(&tstw.state_xy[pos]);
           const ullint2 zws = __ldcv(&tstw.state_zw[pos]);
           ullint4 xor_state = { xys.x, xys.y, zws.x, zws.y };
