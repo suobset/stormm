@@ -359,9 +359,11 @@ public:
   /// \param random_cache_depth   Number of random values to store for each atom in the synthesis
   ///                             (the actual number of values stored is multiplied by three, for
   ///                             Cartesian X, Y, and Z contributions)
+  /// \param gpu                  Details of the GPU in use (this may change the profile of the
+  ///                             workload)
   void loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
                               InitializationTask init_request = InitializationTask::NONE,
-                              int random_cache_depth = 0);
+                              int random_cache_depth = 0, const GpuDetails &gpu = null_gpu);
 
   /// \brief Apply an implicit solvent model to the synthesis.  Any mode of operation other than
   ///        taking the original topologies' parameters as is (calling this member function with

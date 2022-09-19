@@ -597,11 +597,11 @@ int nonbondedWorkUnitInitCode(const InitializationTask init_request, const int c
 
 //-------------------------------------------------------------------------------------------------
 void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, const int natom,
-                                    const int init_code) {
+                                    const int init_code, const GpuDetails &gpu) {
 
   // Handle blank refresh instructions
   NonbondedWorkUnit* res_ptr = result->data();
-  const int nnbwu = result->size();
+  int nnbwu = result->size();
   if (init_code == 0) {
     for (int i = 0; i < nnbwu; i++) {
       res_ptr[i].setRefreshAtomIndex(0);
@@ -617,8 +617,27 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
       n_task++;
     }
   }
-  const int n_atom_blocks = natom / small_block_size;
+  const int n_atom_blocks = (natom + small_block_size - 1) / small_block_size;
   const bool compute_rng = ((init_code >> 8) > 0);
+  if (compute_rng && gpu.getGpuSupported()) {
+
+    // A non-null GPU was detected and will affect the profile of the workload.  If there are
+    // enough blocks in the launch grid relative to the number of work units, expand the list of
+    // non-bonded work units with a complement devoted to computing random numbers.
+    if (nnbwu + n_atom_blocks < 2 * gpu.getSMPCount()) {
+      const StaticExclusionMaskSynthesis blank_se;
+      NonbondedWorkUnit blank_nbwu(blank_se, {});
+      result->resize(nnbwu + n_atom_blocks, blank_nbwu);
+      res_ptr = result->data();
+      for (int i = nnbwu + n_atom_blocks - 1; i >= nnbwu; i--) {
+        res_ptr[i] = res_ptr[i - nnbwu];
+      }
+      for (int i = 0; i < n_atom_blocks; i++) {
+        res_ptr[i] = blank_nbwu;
+      }
+    }
+    nnbwu += n_atom_blocks;
+  }
   n_task += compute_rng;
   if (n_task * n_atom_blocks < nnbwu) {
 
@@ -682,7 +701,8 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, cons
 //-------------------------------------------------------------------------------------------------
 std::vector<NonbondedWorkUnit>
 buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
-                        const InitializationTask init_request, const int random_cache_depth) {
+                        const InitializationTask init_request, const int random_cache_depth,
+                        const GpuDetails &gpu) {
   
   // Determine the optimal overall size for work units.  Given that this process is guided by
   // static (as opposed to forward) exclusion masks, this is a matter of how many atoms are
@@ -728,7 +748,7 @@ buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
 
   // Add initialization instructions and return the result
   const int init_code = nonbondedWorkUnitInitCode(init_request, random_cache_depth);
-  distributeInitializationRanges(&result, padded_natom, init_code);
+  distributeInitializationRanges(&result, padded_natom, init_code, gpu);
   return result;
 }
 

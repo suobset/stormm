@@ -3,6 +3,7 @@
 #define STORMM_NONBONDED_WORKUNIT_H
 
 #include "copyright.h"
+#include "Accelerator/gpu_details.h"
 #include "Math/summation.h"
 #include "Topology/atomgraph.h"
 #include "Potential/static_exclusionmask.h"
@@ -12,6 +13,7 @@
 namespace stormm {
 namespace synthesis {
 
+using card::GpuDetails;
 using energy::StaticExclusionMask;
 using energy::tile_length;
 using energy::tile_lengths_per_supertile;
@@ -307,8 +309,11 @@ int nonbondedWorkUnitInitCode(const InitializationTask init_request, const int c
 /// \param init_code  Only the first 16 bits of this int are relevant.  This code indicates whether
 ///                   the non-bonded work units are to initialize force accumulators, Generalized
 ///                   Born intermediate accumulators, or random values.
+/// \param gpu        GPU specifications (HPC compilation only, feeding this an argument of
+///                   null_gpu will not result in the program taking special considerations for the
+///                   size of the workload)
 void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, int natom,
-                                    int init_code);
+                                    int init_code, const GpuDetails &gpu = null_gpu);
   
 /// \brief Create a list of work units of a consistent size so as to optimize the load balancing
 ///        on a given resource (GPU, on or more CPUs, etc.).
@@ -335,7 +340,7 @@ void distributeInitializationRanges(std::vector<NonbondedWorkUnit> *result, int 
 std::vector<NonbondedWorkUnit>
 buildNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
                         InitializationTask init_request = InitializationTask::NONE,
-                        int random_cache_depth = 0);
+                        int random_cache_depth = 0, const GpuDetails &gpu = null_gpu);
 
 std::vector<NonbondedWorkUnit>
 buildNonbondedWorkUnits(const StaticExclusionMask &se,

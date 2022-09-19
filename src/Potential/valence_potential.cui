@@ -2294,13 +2294,14 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     __syncthreads();
 
     // Transfer forces from virtual particles to their frame atoms, which have mass.
-    if (vwu_task_count[VwuAbstractMap::VSITE] > 0) {
+    if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] > 0) {
       __syncthreads();
     }
     
     // Apply velocity constraints and, if desired, compute the kinetic kenergy.  This is also the
     // stage at which many MD packages record velocities for trajectory analysis or checkpointing.
-    if (vwu_task_count[VwuAbstractMap::SETTLE] + vwu_task_count[VwuAbstractMap::CGROUP] > 0) {
+    if (vwu_task_count[(size_t)(VwuAbstractMap::SETTLE)] +
+        vwu_task_count[(size_t)(VwuAbstractMap::CGROUP)] > 0) {
       __syncthreads();
     }
 #    ifdef COMPUTE_ENERGY
@@ -2569,12 +2570,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     __syncthreads();
 
     // Apply positional constraints.
-    if (vwu_task_count[VwuAbstractMap::SETTLE] + vwu_task_count[VwuAbstractMap::CGROUP] > 0) {
+    if (vwu_task_count[(size_t)(VwuAbstractMap::SETTLE)] +
+        vwu_task_count[(size_t)(VwuAbstractMap::CGROUP)] > 0) {
       __syncthreads();
     }
 
     // Update virtual site positions.
-    if (vwu_task_count[VwuAbstractMap::VSITE] > 0) {
+    if (vwu_task_count[(size_t)(VwuAbstractMap::VSITE)] > 0) {
     }    
 #  endif
 #endif // UPDATE_ATOMS or COMPUTE_FORCE

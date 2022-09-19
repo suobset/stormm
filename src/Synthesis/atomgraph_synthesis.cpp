@@ -3077,13 +3077,15 @@ void AtomGraphSynthesis::loadValenceWorkUnits(const int vwu_atom_limit) {
 //-------------------------------------------------------------------------------------------------
 void AtomGraphSynthesis::loadNonbondedWorkUnits(const StaticExclusionMaskSynthesis &poly_se,
                                                 const InitializationTask init_request,
-                                                const int random_cache_depth) {
+                                                const int random_cache_depth,
+                                                const GpuDetails &gpu) {
   
   // Build a list of non-bonded work units from the exclusion mask.  Translate those work units
   // into non-bonded abstracts and instructions.  All work units are assumed to have the same
   // target tile count.
   const std::vector<NonbondedWorkUnit> nbwu_list = buildNonbondedWorkUnits(poly_se, init_request,
-                                                                           random_cache_depth);
+                                                                           random_cache_depth,
+                                                                           gpu);
   const int nbwu_count = nbwu_list.size();
   total_nonbonded_work_units = nbwu_count;
   int max_tile_count = 0;
