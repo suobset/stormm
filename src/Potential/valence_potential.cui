@@ -2293,9 +2293,19 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     // The following code is only needed to carry out molecular dynamics.
     __syncthreads();
 
+    // Transfer forces from virtual particles to their frame atoms, which have mass.
+    if (vwu_task_count[VwuAbstractMap::VSITE] > 0) {
+      __syncthreads();
+    }
+    
     // Apply velocity constraints and, if desired, compute the kinetic kenergy.  This is also the
     // stage at which many MD packages record velocities for trajectory analysis or checkpointing.
+    if (vwu_task_count[VwuAbstractMap::SETTLE] + vwu_task_count[VwuAbstractMap::CGROUP] > 0) {
+      __syncthreads();
+    }
+#    ifdef COMPUTE_ENERGY
     __syncthreads();
+#    endif
 
     // Apply the second Velocity Verlet step: the second half of the velocity update, followed by
     // computation of new positions.
@@ -2559,7 +2569,13 @@ KERNEL_NAME(const SyValenceKit<TCALC> poly_vk, const SyRestraintKit<TCALC, TCALC
     __syncthreads();
 
     // Apply positional constraints.
-    __syncthreads();
+    if (vwu_task_count[VwuAbstractMap::SETTLE] + vwu_task_count[VwuAbstractMap::CGROUP] > 0) {
+      __syncthreads();
+    }
+
+    // Update virtual site positions.
+    if (vwu_task_count[VwuAbstractMap::VSITE] > 0) {
+    }    
 #  endif
 #endif // UPDATE_ATOMS or COMPUTE_FORCE
     

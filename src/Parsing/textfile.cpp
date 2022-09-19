@@ -96,7 +96,7 @@ int TextFile::getLineLimits(const int index) const {
 }
 
 //-------------------------------------------------------------------------------------------------
-char TextFile::getText(const int index) const {
+char TextFile::getChar(const int index) const {
   return text[index];
 }
 
@@ -108,6 +108,31 @@ const char* TextFile::getTextPointer(const int index) const {
 //-------------------------------------------------------------------------------------------------
 const TextFileReader TextFile::data() const {
   return TextFileReader(line_count, line_limits.data(), text.data(), orig_file);
+}
+
+//-------------------------------------------------------------------------------------------------
+std::string TextFile::extractString(const int line_number, const int start_pos,
+                                    const int string_length) const {
+  if (line_number >= line_count || line_number < 0) {
+    rtErr("The text file originating in " + orig_file + " has " + std::to_string(line_count) +
+          " lines and cannot return text from line " + std::to_string(line_number) + ".",
+          "TextFile", "extractText");
+  }
+  const int available_chars = line_limits[line_number + 1] - line_limits[line_number];
+  if (start_pos >= available_chars || start_pos + string_length >= available_chars) {
+    rtErr("Line " + std::to_string(line_number) + " of text file " + orig_file + " has " +
+          std::to_string(available_chars) + " characters (requested starting position " +
+          std::to_string(start_pos) + ", length " + std::to_string(string_length) + ").",
+          "TextFile", "extractText");
+  }
+  const int actual_length = (string_length < 0) ? available_chars - start_pos : string_length;
+  std::string buffer;
+  buffer.resize(actual_length);
+  const char* text_ptr = &text[line_limits[line_number] + start_pos];
+  for (int i = 0; i < actual_length; i++) {
+    buffer[i] = text_ptr[i];
+  }
+  return buffer;
 }
 
 //-------------------------------------------------------------------------------------------------

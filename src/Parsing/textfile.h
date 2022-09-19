@@ -84,7 +84,7 @@ public:
   /// \brief Get one character of a text file after converting it to a character vector in memory.
   ///
   /// \param index   The character index, as ascertained by line limits and some offset
-  char getText(int index) const;
+  char getChar(int index) const;
 
   /// \brief Get a char* to a specific index in the object
   ///
@@ -92,10 +92,17 @@ public:
   const char* getTextPointer(int index) const;
 
   /// \brief Get an abstract of a text file's CPU-RAM representation, for ease of use.
-  ///
-  /// \param tf   The text file, as read into memory
   const TextFileReader data() const;
 
+  /// \brief Extract a string based on a line number, starting position, and length.
+  ///
+  /// \param line_number    The line number where the text shall be found
+  /// \param start_pos      Starting position on the line to begin reading (defaults to the start
+  ///                       of the line)
+  /// \param string_length  Length of the string to extract.  A value of -1 indicates that reading
+  ///                       shall continue until the end of the line.
+  std::string extractString(int line_number, int start_pos = 0, int string_length = -1) const;
+  
 private:
 
   /// Name of the file that was read

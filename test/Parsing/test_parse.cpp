@@ -1,4 +1,5 @@
 #include "../../src/FileManagement/file_listing.h"
+#include "../../src/Parsing/ascii_numbers.h"
 #include "../../src/Parsing/parse.h"
 #include "../../src/Parsing/polynumeric.h"
 #include "../../src/Reporting/error_format.h"
@@ -59,8 +60,8 @@ int main(const int argc, const char* argv[]) {
         "number of lines.", sfile_check);
   const int llim5 = (sfile_exists) ? tf.getLineLimits(5) : 0;
   check(llim5, RelationalOperator::EQUAL, 150, "TextFile line limits are incorrect.", sfile_check);
-  const char gt54 = (sfile_exists) ? tf.getText(54) : ' ';
-  const char gt56 = (sfile_exists) ? tf.getText(56) : ' ';
+  const char gt54 = (sfile_exists) ? tf.getChar(54) : ' ';
+  const char gt56 = (sfile_exists) ? tf.getChar(56) : ' ';
   check(gt54 == 'e' && gt56 == 't', "TextFile contains incorrect text.", sfile_check);
   const TextFileReader tfr = tf.data();
   check(tfr.line_count, RelationalOperator::EQUAL, tf.getLineCount(), "TextFileReader nested "
@@ -269,7 +270,7 @@ int main(const int argc, const char* argv[]) {
                     spreadsheet.getFileName() + " passes despite the numbers having general "
                     "format.", pfile_check);
 
-  // Finally, try char4 data and operator overloading
+  // Try char4 data and operator overloading
   const std::vector<PolyNumeric> pn_chrs = (pfile_exists) ?
     amberPrmtopData(spreadsheet, 23, NumberFormat::CHAR4, 20, 4, 98) : blank_pn;
   std::string pn_example = (pfile_exists) ? char4ToString(pn_chrs[47].c4) : std::string("");
@@ -280,6 +281,23 @@ int main(const int argc, const char* argv[]) {
   check(pn_example, RelationalOperator::EQUAL, "CD1 HD1 ", "Operator += overloading produces "
         "incorrect results.", pfile_check);
 
+  // Try reading single numbers from formatted data
+  check(0.578, RelationalOperator::EQUAL, Approx(readRealValue("670.578924", 2, 5)), "Real value "
+        "reading from a character string fails.");
+  check(789, RelationalOperator::EQUAL, Approx(readRealValue("670.578924", 5, 3)), "Integer value "
+        "reading from a character string fails.");
+  const std::string sv_number("91855.293");
+  check(55.2, RelationalOperator::EQUAL, Approx(readRealValue(sv_number, 3, 4)), "Real value "
+        "reading from a Standard Template Library string fails.");
+  check(185, RelationalOperator::EQUAL, Approx(readIntegerValue(sv_number, 1, 3)), "Integer value "
+        "reading from a Standard Template Library string fails.");
+  const std::string tf_base("Blah blah\n   0.5 456105\nThis is a text line.\n");
+  const TextFile sv_tf(tf_base, TextOrigin::RAM);
+  check(456, RelationalOperator::EQUAL, Approx(readRealValue(sv_tf, 1, 7, 3)), "Integer value "
+        "interpretation from a TextFile object fails.");
+  check(0.5, RelationalOperator::EQUAL, Approx(readRealValue(sv_tf, 1, 2, 4)), "Integer value "
+        "interpretation from a TextFile object fails.");
+  
   // Test custom string comparison functions
   section(6);
   const std::string tw_a("ThisWord");

@@ -6,6 +6,7 @@
 #include <vector>
 #include "copyright.h"
 #include "DataTypes/stormm_vector_types.h"
+#include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
 
 namespace stormm {
@@ -98,38 +99,25 @@ public:
 
 private:
 
-  /// The number of atoms in the molecule
-  int atom_count;
-
-  /// The number of bonds of all types between atoms in the system
-  int bond_count;
-
-  /// The number of S-groups
-  int sgroup_count;
-
-  /// The number of three-dimensional constraints
-  int constraint_count;
+  // Items describing quantities of information (most of them from the counts line)
+  int atom_count;             ///< The number of atoms in the molecule
+  int bond_count;             ///< Number of bonds of all types between atoms in the system
+  int list_count;             ///< The number of atom lists
+  int stext_entry_count;      ///< The number of S-text entries
+  int properties_count;       ///< The number of additional properties (the default, and expected,
+                              ///<   value is 999)
+  int sgroup_count;           ///< The number of S-groups
+  int constraint_count;       ///< The number of three-dimensional constraints
+  MolObjChirality chirality;  ///< The molecule's chirality (assumes only one significant center)
+  int registry_number;        ///< The molecule registry number
  
-  /// The molecule's chirality (assumes only one significant center)
-  MolObjChirality chirality;
-
-  /// The molecule registry number
-  int registry_number;
- 
-  /// Cartesian coordinates of all atoms
-  std::vector<double3> coordinates;
-
-  /// Symbols for all atoms
-  std::vector<char4> atomic_symbols;
-
-  /// Atomic numbers for all atoms
-  std::vector<int> atomic_numbers;
-
-  /// Formal charges for all atoms
-  std::vector<double> formal_charges;
-
-  /// Isotope numbers shifting each atoms nuclear mass ~1 Dalton from the most common isotopic mass
-  std::vector<int> isotopic_shifts;
+  // Atomic properties
+  std::vector<double3> coordinates;          ///< Cartesian coordinates of all atoms
+  std::vector<char4> atomic_symbols;         ///< Symbols for all atoms
+  std::vector<int> atomic_numbers;           ///< Atomic numbers for all atoms
+  std::vector<double> formal_charges;        ///< Formal charges for all atoms
+  std::vector<int> isotopic_shifts;          ///< Isotope numbers shifting each atoms nuclear mass
+                                             ///<   (~1 Dalton from the most common isotopic mass)
 
   /// Bonds between atoms
   std::vector<MolObjBond> bonds;
@@ -137,19 +125,26 @@ private:
   /// Properties
   std::vector<MolObjProperty> properties;
 
-  /// Title (first line from the file)
+  /// Title (first line from the file header)
   std::string title;
 
-  /// Details of the software that generated this MDL .mol file
+  /// Details of the software that generated this MDL .mol file (second line of the header)
   std::string software_details;
 
-  /// General comments for the file
+  /// General comments for the file (third line of the file header)
   std::string general_comment;
 };
 
 /// \brief Overload the + operator to concatenate vectors of MDL and SDF bonds.
 std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 				  const std::vector<MolObjBond> &rhs);
+
+/// \brief Find the version stamp in an MDL MOL file (or a part of an SD file, .sdf).  Assume the
+///        legacy V2000 if no version is found.
+///
+/// \param text   Text to search, probably from the fourth line of the MOL file or SD entry
+/// \param nchar  The number of characters on the line
+int findMolObjVersion(const char* text, const int nchar);
 
 } // namespace structure
 } // namespace stormm

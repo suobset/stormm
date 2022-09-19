@@ -83,7 +83,19 @@ llint readIntegerValue(const std::string &number_text, int start_index, int numb
 
 llint readIntegerValue(const TextFile &tf, int line_idex, int start_index, int number_length);
 /// \}
-  
+
+/// \brief Read a real-valued number from a character string.  This is not intended for the
+///        highest-performance applications and should be used in contexts where only a few such
+///        integers must be read in specialized formats.  Overloading and parameters for this
+///        function follow from readIntegerValue() above.
+/// \{
+double readRealValue(const char* number_text, int start_index, int number_length);
+
+double readRealValue(const std::string &number_text, int start_index, int number_length);
+
+double readRealValue(const TextFile &tf, int line_idex, int start_index, int number_length);
+/// \}
+
 } // namespace parse
 } // namespace stormm
 
