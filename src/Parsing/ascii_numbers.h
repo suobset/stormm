@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "polynumeric.h"
 #include "parse.h"
 
 namespace stormm {

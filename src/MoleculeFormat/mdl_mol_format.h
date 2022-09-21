@@ -79,6 +79,45 @@ public:
   MolObjBond& operator=(const MolObjBond &original) = default;
   MolObjBond& operator=(MolObjBond &&original) = default;
   /// \}
+
+  /// \brief Get the first atom in the bond.  Having separate functions for each atom is a more
+  ///        intuitive way to offer the getter functions, whereas in a BoundedRestraint object the
+  ///        atom index getter takes an argument for the first, second, third, or fourth atom.
+  int getFirstAtom() const;
+
+  /// \brief Get the second atom in the bond.
+  int getSecondAtom() const;
+
+  /// \brief Get the order of the bond.
+  MolObjBondOrder getOrder() const;
+
+  /// \brief Get the order of the bond.
+  MolObjStereo getStereochemistry() const;
+
+  /// \brief Get the ring status--is the bond known to be part of a ring?
+  MolObjRingState getRingStatus() const;
+
+  /// \brief Get the reactive potential of the bond.
+  MolObjReactionCenter getReactivity() const;
+
+  /// \brief Set the index of the first atom in the bond.
+  void setFirstAtom(int index_in);
+
+  /// \brief Set the index of the second atom in the bond.
+  void setSecondAtom(int index_in);
+
+  /// \brief Set the order of the bond, perhaps after computations with an associated
+  ///        ChemicalFeatures object.
+  void setOrder(MolObjBondOrder order_in);
+
+  /// \brief Set the stereochemical details of the bond.
+  void setStereochemistry(MolObjStereo stereo_in);
+
+  /// \brief Mark the status of the bond with respect to any ring features.
+  void setRingStatus(MolObjRingState status_in);
+
+  /// \brief Mark the reactive potential of the bond.
+  void setReactivity(MolObjReactionCenter potential_in);
   
 private:
   int i_atom;                       ///< The first atom in the bond

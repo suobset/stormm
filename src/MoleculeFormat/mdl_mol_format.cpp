@@ -10,13 +10,13 @@ using parse::TextFileReader;
 
 //-------------------------------------------------------------------------------------------------
 MolObjBond::MolObjBond() :
-    i_atom{-1}, j_atom{-1}, order{MolObjBondOrder:SINGLE}, stereo{MolObjStereo::NOT_STEREO},
+    i_atom{-1}, j_atom{-1}, order{MolObjBondOrder::SINGLE}, stereo{MolObjStereo::NOT_STEREO},
     ring_state{MolObjRingState::EITHER}, reactivity{MolObjReactionCenter::NON_CENTER}
 {}
 
 //-------------------------------------------------------------------------------------------------
 MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in) :
-    i_atom{i_atom_in}, j_atom{j_atom_in}, order{MolObjBondOrder:SINGLE},
+    i_atom{i_atom_in}, j_atom{j_atom_in}, order{MolObjBondOrder::SINGLE},
     stereo{MolObjStereo::NOT_STEREO}, ring_state{MolObjRingState::EITHER},
     reactivity{MolObjReactionCenter::NON_CENTER}
 {}
@@ -28,6 +28,66 @@ MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in, const MolObjBon
     i_atom{i_atom_in}, j_atom{j_atom_in}, order{order_in}, stereo{stereo_in},
     ring_state{ring_state_in}, reactivity{reactivity_in}
 {}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjBond::getFirstAtom() const {
+  return i_atom;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MolObjBond::getSecondAtom() const {
+  return j_atom;
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBondOrder MolObjBond::getOrder() const {
+  return order;
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjStereo MolObjBond::getStereochemistry() const {
+  return stereo;
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjRingState MolObjBond::getRingStatus() const {
+  return ring_state;
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjReactionCenter MolObjBond::getReactivity() const {
+  return reactivity;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjBond::setFirstAtom(const int index_in) {
+  i_atom = index_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjBond::setSecondAtom(const int index_in) {
+  j_atom = index_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjBond::setOrder(const MolObjBondOrder order_in) {
+  order = order_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjBond::setStereochemistry(const MolObjStereo stereo_in) {
+  stereo = stereo_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjBond::setRingStatus(const MolObjRingState status_in) {
+  ring_state = status_in;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MolObjBond::setReactivity(const MolObjReactionCenter potential_in) {
+  reactivity = potential_in;
+}
 
 //-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
@@ -79,7 +139,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
     const char* counts_line_ptr = &tfr.text[tfr.line_limits[line_start + 3]];
     atom_count   = readIntegerValue(counts_line_ptr, 0, 3);
     bond_count   = readIntegerValue(counts_line_ptr, 3, 3);
-    list_count = readIntegerValue(counts_line_ptr, 6, 3);
+    list_count   = readIntegerValue(counts_line_ptr, 6, 3);
     const int chir_num = readIntegerValue(counts_line_ptr, 12, 3);
     if (chir_num == 0) {
       chirality = MolObjChirality::ACHIRAL;
@@ -261,6 +321,7 @@ int MdlMolObj::interpretValenceNumber(const int count_in) {
           "case for one atom in MDL MOL entry \"" + title + "\".", "MdlMolObj",
           "interpretValenceNumber");
   }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

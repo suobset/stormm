@@ -890,7 +890,6 @@ int countWords(const char* line, const int start_pos, const int length) {
   bool on_word = false;
   for (int i = start_pos; i < end_pos; i++) {
     if (line[i] != ' ') {
-      text_found = true;
       if (on_word == false) {
         on_word = true;
       }
@@ -917,7 +916,7 @@ int countWords(const std::string &line, const int start_pos, const int length) {
   else {
     return countWords(line.c_str(), start_pos, length);
   }
-  _builtin_unreachable();
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -930,7 +929,7 @@ int countWords(const TextFile &tf, const int line, const int start_pos, const in
     return 0;
   }
   else {
-    return countWords(line.c_str(), start_pos, length);
+    return countWords(tf.getLinePointer(line), start_pos, length);
   }
   __builtin_unreachable();
 }

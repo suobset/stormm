@@ -900,6 +900,10 @@ llint readIntegerValue(const TextFile &tf, const int line_index, const int start
           "readIntegerValue");
   }
   const char* number_ptr = tf.getTextPointer(tf.getLineLimits(line_index));
+  if (verifyNumberFormat(number_ptr, NumberFormat::INTEGER, start_index, number_length) == false) {
+    rtErr("Request for integer data on line " + std::to_string(line_index) + " encounters an "
+          "invalid format.", "readIntegerValue");
+  }
   const int ilim = start_index + number_length;
   for (int i = start_index; i < ilim; i++) {
     buffer[i - start_index] = number_ptr[i];
@@ -945,6 +949,13 @@ double readRealValue(const TextFile &tf, const int line_index, const int start_i
           "readRealValue");
   }
   const char* number_ptr = tf.getTextPointer(tf.getLineLimits(line_index));
+  if (verifyNumberFormat(number_ptr, NumberFormat::STANDARD_REAL, start_index,
+                         number_length) == false &&
+      verifyNumberFormat(number_ptr, NumberFormat::STANDARD_REAL, start_index,
+                         number_length) == false) {
+    rtErr("Request for real-valued data on line " + std::to_string(line_index) + " encounters an "
+          "invalid format.", "readIntegerValue");
+  }
   const int ilim = start_index + number_length;
   for (int i = start_index; i < ilim; i++) {
     buffer[i - start_index] = number_ptr[i];
@@ -952,5 +963,7 @@ double readRealValue(const TextFile &tf, const int line_index, const int start_i
   return strtod(buffer.c_str(), nullptr);
 }
 
+//-------------------------------------------------------------------------------------------------
+  
 } // namespace parse
 } // namespace stormm
