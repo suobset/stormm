@@ -87,6 +87,7 @@ bool verifyNumberFormat(const char* a, const NumberFormat cform, const int read_
   bool dot_found = false;
   int signs_found = 0;
   int minus_found = 0;
+  int digit_found = 0;
   for (int i = 0; i < width; i++) {
     if (buffer[i] == 'E' || buffer[i] == 'e') {
       problem = (problem || e_found);
@@ -140,6 +141,40 @@ bool verifyNumberFormat(const char* a, const NumberFormat cform, const int read_
   }
 
   return (problem == false);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool verifyContents(const char* line, const int start_pos, const int length,
+                    const NumberFormat fmt) {
+  return verifyNumberFormat(line, fmt, start_pos, length);
+}
+
+//-------------------------------------------------------------------------------------------------
+bool verifyContents(const std::string &line, const int start_pos, const int length,
+                    const NumberFormat fmt) {
+  const int line_length = line.size();
+  if (start_pos >= line_length || start_pos + length >= line_length) {
+    return false;
+  }
+  else {
+    return verifyNumberFormat(line.c_str(), fmt, start_pos, length);
+  }
+}
+
+//-------------------------------------------------------------------------------------------------
+bool verifyContents(const TextFile &tf, const int line, const int start_pos, const int length,
+                    const NumberFormat fmt) {
+  if (line >= tf.getLineCount()) {
+    return false;
+  }
+  const int line_length = tf.getLineLength(line);
+  if (start_pos >= line_length || start_pos + length >= line_length) {
+    return false;
+  }
+  else {
+    return verifyNumberFormat(tf.getLinePointer(line), fmt, start_pos, length);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -846,6 +881,58 @@ int countDelimiters(const std::string &text, const std::vector<char> &delms) {
     }
   }
   return nd;
+}
+
+//-------------------------------------------------------------------------------------------------
+int countWords(const char* line, const int start_pos, const int length) {
+  const int end_pos = start_pos + length;
+  int word_count = 0;
+  bool on_word = false;
+  for (int i = start_pos; i < end_pos; i++) {
+    if (line[i] != ' ') {
+      text_found = true;
+      if (on_word == false) {
+        on_word = true;
+      }
+    }
+    else {
+      if (on_word) {
+        on_word = false;
+        word_count++;
+      }
+    }
+  }
+  if (on_word) {
+    word_count++;
+  }
+  return word_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int countWords(const std::string &line, const int start_pos, const int length) {
+  const int line_length = line.size();
+  if (start_pos >= line_length || start_pos + length >= line_length) {
+    return 0;
+  }
+  else {
+    return countWords(line.c_str(), start_pos, length);
+  }
+  _builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+int countWords(const TextFile &tf, const int line, const int start_pos, const int length) {
+  if (line >= tf.getLineCount()) {
+    return 0;
+  }
+  const int line_length = tf.getLineLength(line);
+  if (start_pos >= line_length || start_pos + length >= line_length) {
+    return 0;
+  }
+  else {
+    return countWords(line.c_str(), start_pos, length);
+  }
+  __builtin_unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------

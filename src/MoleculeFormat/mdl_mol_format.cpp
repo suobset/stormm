@@ -9,6 +9,27 @@ using parse::readRealValue;
 using parse::TextFileReader;
 
 //-------------------------------------------------------------------------------------------------
+MolObjBond::MolObjBond() :
+    i_atom{-1}, j_atom{-1}, order{MolObjBondOrder:SINGLE}, stereo{MolObjStereo::NOT_STEREO},
+    ring_state{MolObjRingState::EITHER}, reactivity{MolObjReactionCenter::NON_CENTER}
+{}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in) :
+    i_atom{i_atom_in}, j_atom{j_atom_in}, order{MolObjBondOrder:SINGLE},
+    stereo{MolObjStereo::NOT_STEREO}, ring_state{MolObjRingState::EITHER},
+    reactivity{MolObjReactionCenter::NON_CENTER}
+{}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in, const MolObjBondOrder order_in,
+                       const MolObjStereo stereo_in, const MolObjRingState ring_state_in,
+                       const MolObjReactionCenter reactivity_in) :
+    i_atom{i_atom_in}, j_atom{j_atom_in}, order{order_in}, stereo{stereo_in},
+    ring_state{ring_state_in}, reactivity{reactivity_in}
+{}
+
+//-------------------------------------------------------------------------------------------------
 MdlMolObj::MdlMolObj():
     atom_count{0}, bond_count{0}, list_count{0}, sgroup_count{0}, constraint_count{0},
     chirality{MolObjChirality::ACHIRAL}, registry_number{-1}, coordinates{}, atomic_symbols{},

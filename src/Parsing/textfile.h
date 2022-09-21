@@ -87,11 +87,16 @@ public:
   /// \param index   The character index, as ascertained by line limits and some offset
   char getChar(int index) const;
 
-  /// \brief Get a char* to a specific index in the object
+  /// \brief Get a char pointer to a specific index in the object.
   ///
   /// \param index   The character index, as ascertained by line limits and some offset
   const char* getTextPointer(int index) const;
 
+  /// \brief Get a char pointer to a specific line in the object.
+  ///
+  /// \param line_index  The line index
+  const char* getLinePointer(int line_index) const;
+  
   /// \brief Get an abstract of a text file's CPU-RAM representation, for ease of use.
   const TextFileReader data() const;
 
