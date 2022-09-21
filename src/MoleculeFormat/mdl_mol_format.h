@@ -60,10 +60,26 @@ public:
 
   /// \brief The constructor can take all member variables, or just the atoms so that more
   ///        information can be filled in later.
+  ///
+  /// Overloaded:
+  ///   - Construct a blank object with -1 atom indices to indicate its invalid nature
+  ///   - Construct an object with just the atom indices
+  ///   - Construct a complete object with all details pre-loaded
+  /// \{
+  MolObjBond();
   MolObjBond(int i_atom_in, int j_atom_in);
   MolObjBond(int i_atom_in, int j_atom_in, MolObjBondOrder order_in, MolObjStereo stereo_in,
              MolObjRingState ring_state_in, MolObjReactionCenter reactivity_in);
+  /// \}
 
+  /// \brief The default copy and move constructors as well as assignment operators are adequate.
+  /// \{
+  MolObjBond(const MolObjBond &original) = default;
+  MolObjBond(MolObjBond &&original) = default;
+  MolObjBond& operator=(const MolObjBond &original) = default;
+  MolObjBond& operator=(MolObjBond &&original) = default;
+  /// \}
+  
 private:
   int i_atom;                       ///< The first atom in the bond
   int j_atom;                       ///< The second atom in the bond
@@ -71,7 +87,6 @@ private:
   MolObjStereo stereo;              ///< Indicator of the bond stereochemistry
   MolObjRingState ring_state;       ///< Indicator of whether the atom is part of a ring
   MolObjReactionCenter reactivity;  ///< Indicator of a bond as a center of reactivity
-  int xxx_data;                     ///< Currently unused
 };
 
 /// \brief A molecular or atomic property read from an MDL .mol or SDF file

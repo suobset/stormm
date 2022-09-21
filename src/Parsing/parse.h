@@ -80,6 +80,31 @@ bool operator!=(const char4 lhs, const char4 rhs);
 ///                    string)
 bool verifyNumberFormat(const char* a, NumberFormat cform, int read_begin = 0, int len = 0);
 
+/// \brief Some text or input files may contain missing or blank entries.  Check that the space
+///        to be read for input contains data of the appropriate type.  This function feeds into
+///        verifyNumberFormat() above, but may apply additional checks on the length of the
+///        available data and return false if there is nothing to examine.
+///
+/// Overloaded:
+///   - Inspect a C-style array of characters
+///   - Inspect a Standard Template Library string object
+///   - Inspect a TextFile object with a line number, starting position, and length
+///
+/// \param line       The line data as a std::string object, a C-style array of characters, or the
+///                   number of the line in a TextFile object
+/// \param tf         Text file object committed to RAM with the data of interest
+/// \param start_pos  Position of the first character on the line to read
+/// \param length     Length of the character string to analyze
+/// \param fmt        Format of the text to search for
+/// \{
+bool verifyContents(const char* line, int start_pos, int length,
+                    NumberFormat fmt = NumberFormat::CHAR4);
+bool verifyContents(const std::string &line, int start_pos, int length,
+                    NumberFormat fmt = NumberFormat::CHAR4);
+bool verifyContents(const TextFile &tf, int line, int start_pos, int length,
+                    NumberFormat fmt = NumberFormat::CHAR4);
+/// \}
+
 /// \brief Convert one or more characters to uppercase, if they are letters between 'a' and 'z'.
 ///        Otherwise, return the original character(s).
 ///
@@ -309,6 +334,24 @@ std::vector<int> resolveScopes(const std::string &input_text,
 /// \param delims  A list of delimiters (one character each)
 int countDelimiters(const std::string &text, const std::vector<char> &delms);
 
+/// \brief Count the number of words delimited by white space in an array of characters.
+///
+/// Overloaded:
+///   - Accept a C-style array of char data
+///   - Accept a Standard Template Library string object
+///   - Accept a TextFile object with a line, starting position, and range
+///
+/// \param line       The line data as a std::string object, a C-style array of characters, or the
+///                   number of the line in a TextFile object
+/// \param tf         Text file object committed to RAM with the data of interest
+/// \param start_pos  Position of the first character on the line to read
+/// \param length     Length of the character string to analyze
+/// \{
+int countWords(const char* line, const int start_pos, const int length);
+int countWords(const std::string &line, const int start_pos, const int length);
+int countWords(const TextFile &tf, const int line, const int start_pos, const int length);
+/// \}
+  
 /// \brief Separate a sequece of ascii characters into words, using whitespace as the delimiter.
 ///
 /// Overloaded:
