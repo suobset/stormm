@@ -78,9 +78,15 @@ public:
 
   /// \brief Get one of the line limits of a text file converted to a character vector in memory.
   ///
-  /// \param index   The line index.  The array contains one more indices than the text file had
-  ///                lines, to allow the end of the last line to be determined.
+  /// \param index   The line index.  The array of limits contains one more indices than the text
+  ///                file has lines, to allow the end of the last line to be determined.
   int getLineLimits(int index) const;
+
+  /// \brief Get the length of a line.  A bounds check will be applied to the line index number.
+  ///
+  /// \param index   The line index.  The array of limits contains one more indices than the text
+  ///                file has lines, to allow the end of the last line to be determined.
+  int getLineLength(int index) const;
 
   /// \brief Get one character of a text file after converting it to a character vector in memory.
   ///
