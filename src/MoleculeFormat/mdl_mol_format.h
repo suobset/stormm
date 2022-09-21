@@ -30,6 +30,11 @@ enum class MolObjStereo {
   NOT_STEREO = 0, UP = 1, CIS_OR_TRANS = 3, EITHER = 4, DOWN = 6
 };
 
+/// \brief Enumerate different steroe parity settings for an atom
+enum class MolObjAtomStereo {
+  NOT_STEREO = 0, ODD = 1, EVEN = 2, UNMARKED = 3
+};
+
 /// \brief Enumerate states in which a bond participates in a ring system or just a chain
 enum class MolObjRingState {
   EITHER = 0, RING = 1, CHAIN = 2
@@ -42,10 +47,24 @@ enum class MolObjReactionCenter {
   BOND_FORMATION_AND_ORDER_CHANGE = 12, CENTER_WITH_FORMATION_AND_ORDER_CHANGE = 13
 };
 
+/// \brief Enumerate the outcomes for stereochemistry during a reaction
+enum class StereoChemicalRetention {
+  NOT_APPLIED = 0, INVERTED = 1, RETAINED = 2
+};
+  
 /// \brief A bond, as presented in the MDL molecule file format.  This unguarded struct will be
 ///        returned to the developer from a private array inside of the MdlMolObj object, so
 ///        further protection would be a hindrance.
-struct MolObjBond {
+class MolObjBond {
+public:
+
+  /// \brief The constructor can take all member variables, or just the atoms so that more
+  ///        information can be filled in later.
+  MolObjBond(int i_atom_in, int j_atom_in);
+  MolObjBond(int i_atom_in, int j_atom_in, MolObjBondOrder order_in, MolObjStereo stereo_in,
+             MolObjRingState ring_state_in, MolObjReactionCenter reactivity_in);
+
+private:
   int i_atom;                       ///< The first atom in the bond
   int j_atom;                       ///< The second atom in the bond
   MolObjBondOrder order;            ///< The bond order (single, double, aromatic, etc.)
@@ -112,12 +131,32 @@ private:
   int registry_number;        ///< The molecule registry number
  
   // Atomic properties
-  std::vector<double3> coordinates;          ///< Cartesian coordinates of all atoms
-  std::vector<char4> atomic_symbols;         ///< Symbols for all atoms
-  std::vector<int> atomic_numbers;           ///< Atomic numbers for all atoms
-  std::vector<double> formal_charges;        ///< Formal charges for all atoms
-  std::vector<int> isotopic_shifts;          ///< Isotope numbers shifting each atoms nuclear mass
-                                             ///<   (~1 Dalton from the most common isotopic mass)
+  std::vector<double3> coordinates;         ///< Cartesian coordinates of all atoms
+  std::vector<char4> atomic_symbols;        ///< Symbols for all atoms
+  std::vector<int> atomic_numbers;          ///< Atomic numbers for all atoms
+  std::vector<double> formal_charges;       ///< Formal charges for all atoms
+  std::vector<bool> doublet_radicals;       ///< Indications that any atom contains a radical in
+                                            ///<   doublet excitation state
+  std::vector<int> isotopic_shifts;         ///< Isotope numbers shifting each atoms nuclear mass
+                                            ///<   (~1 Dalton from the most common isotopic mass)
+  std::vector<MolObjAtomStereo> parities;   ///< Stereochemical parity of each atom
+  std::vector<int> implicit_hydrogens;      ///< The number of implicit hydrogens that may be
+                                            ///<   considered to reside bonded to a particular atom
+                                            ///<   (in addition to those that are explicitly drawn)
+  std::vector<bool> stereo_considerations;  ///< Indications of whether each atom has steroisomeric
+                                            ///<   considerations.  Having stereochemistry at both
+                                            ///<   ends of a double bond indicates that the
+                                            ///<   double-bond affects the structural properties
+                                            ///<   of the molecule.
+  std::vector<int> valence_connections;     ///< The number of bonds made by each atom to others
+                                            ///<   in the same molecule
+  std::vector<int> atom_atom_mapping_count; ///< The number of atoms mapped to this one in a
+                                            ///<   chemical reaction
+  std::vector<bool> exact_change_enforced;  ///< Flags to indicate that the changes on an atom
+                                            ///<   must be exactly as described in the reaction
+  
+  ///< Indication of whether stereochemistry is inverted or retained in a chemical reaction
+  std::vector<StereoChemicalRetention> orientation_stability;
 
   /// Bonds between atoms
   std::vector<MolObjBond> bonds;
@@ -133,6 +172,45 @@ private:
 
   /// General comments for the file (third line of the file header)
   std::string general_comment;
+
+  /// \brief Allocate space for information in amounts described on the MOL entry's counts line.
+  void allocate();
+
+  /// \brief Interpret the formal charge of an atom based on an integer code.  A doublet radical
+  ///        can also emerge from this analysis.
+  ///
+  /// \param charge_in           The charge code to interpret
+  /// \param is_doublet_radical  Flag to indicate code 4, no net charge but a double radical
+  double interpretFormalCharge(int charge_in, bool *is_doublet_radical);
+
+  /// \brief Interpret the stereochemical parity of an atom based on an integral numeric code.
+  ///
+  /// \param setting_in  The code to parse
+  MolObjAtomStereo interpretStereoParity(int setting_in);
+
+  /// \brief Interpret the implicit hydrogen count for an atom.
+  ///
+  /// \param nh_in  The number of hydrogens that can be inferred around the atom's structure.
+  ///               This number is decremented by one, meaning that 1 implies no implicit hydrogen
+  ///               content.
+  int interpretImplicitHydrogenContent(int nh_in);
+
+  /// \brief Interpret a boolean value from an integer.
+  ///
+  /// \param code_in  The code to translate.  This one is simple: 1 = TRUE, 0 = FALSE
+  /// \param desc     Description of the activity, for error tracing purposes
+  bool interpretBooleanValue(int value_in, const std::string &desc);
+
+  /// \brief Translate the count of valence interactions for a particular atom.
+  ///
+  /// \param count_in  The count to translate.  The input is typically unchanged, but for the fact
+  ///                  that 0 and 15 both translate to no valence interactions.
+  int interpretValenceNumber(int count_in);
+
+  /// \brief Interpret the stability of stereochemical arrangements listed for each atom.
+  ///
+  /// \param code_in  A numeric code to be translated into inversion or retention options
+  StereoChemicalRetention interpretStereoStability(int code_in);
 };
 
 /// \brief Overload the + operator to concatenate vectors of MDL and SDF bonds.

@@ -79,7 +79,7 @@ int main(const int argc, const char* argv[]) {
   std::vector<PhaseSpace> trpi_ps_vec(1, loadPhaseSpace(trpi_crd_name, ExceptionResponse::WARN,
                                       CoordinateFileKind::AMBER_ASCII_RST, &files_ok));
   const std::vector<AtomGraph*> trpi_ag_vec(1, &trpi_ag);
-  const std::vector<int> trpi_tiling(100, 0);
+  const std::vector<int> trpi_tiling(1, 0);
   AtomGraphSynthesis trpi_poly_ag(trpi_ag_vec, trpi_tiling, ExceptionResponse::WARN, gpu, &timer);
   StaticExclusionMaskSynthesis trpi_poly_se(trpi_poly_ag.getTopologyPointers(),
                                             trpi_poly_ag.getTopologyIndices());
@@ -182,8 +182,6 @@ int main(const int argc, const char* argv[]) {
     launchValence(trpi_poly_vk, trpi_poly_rk, &trpi_ctrl, &trpi_poly_psw, trpi_poly_auk,
                   &trpi_tstw, &trpi_scw, &trpi_vale_r, EvaluateForce::YES, EvaluateEnergy::NO,
                   VwuGoal::MOVE_PARTICLES, AccumulationMethod::SPLIT, vale_lp);
-    trpi_poly_ps.initializeForces(gpu, HybridTargetLevel::DEVICE);
-    trpi_isw.initialize(HybridTargetLevel::DEVICE, CoordinateCycle::PRESENT, gpu);
     trpi_ctrl.step += 1;
   }
   cudaDeviceSynchronize();

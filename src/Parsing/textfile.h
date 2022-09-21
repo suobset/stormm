@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "DataTypes/stormm_vector_types.h"
 
 namespace stormm {
 namespace parse {
@@ -102,6 +103,16 @@ public:
   /// \param string_length  Length of the string to extract.  A value of -1 indicates that reading
   ///                       shall continue until the end of the line.
   std::string extractString(int line_number, int start_pos = 0, int string_length = -1) const;
+
+  /// \brief Extract a char4 tuple based on a line number, starting position, and length.
+  ///
+  /// \param line_number    The line number where the text shall be found
+  /// \param start_pos      Starting position on the line to begin reading (defaults to the start
+  ///                       of the line)
+  /// \param string_length  Length of the string to extract.  The default value of 4 will try to
+  ///                       read four characters, but shorter values will leave blank space at the
+  ///                       end of the tuple.
+  char4 extractChar4(int line_number, int start_pos, int string_length) const;
   
 private:
 
@@ -133,6 +144,16 @@ private:
   /// \param text_in  The text to parse.  See setFileName and above in the TextFile documentation
   ///                 to understand how this could be either of two constructor inputs.
   void linesFromString(const std::string &text_in);
+
+  /// \brief Check that a certain number of characters can be extracted from one line at the
+  ///        specified positions.
+  ///
+  /// \param line_number    Number of the line to access
+  /// \param start_pos      Starting position on the line to begin reading (defaults to the start
+  ///                       of the line)
+  /// \param string_length  Length of the character string to read (default -1 implies reading to
+  ///                       the end of the line)
+  int checkAvailableLength(int line_number, int start_pos = 0, int string_length = -1) const;
 };
 
 } // namespace parse

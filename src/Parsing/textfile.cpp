@@ -113,19 +113,7 @@ const TextFileReader TextFile::data() const {
 //-------------------------------------------------------------------------------------------------
 std::string TextFile::extractString(const int line_number, const int start_pos,
                                     const int string_length) const {
-  if (line_number >= line_count || line_number < 0) {
-    rtErr("The text file originating in " + orig_file + " has " + std::to_string(line_count) +
-          " lines and cannot return text from line " + std::to_string(line_number) + ".",
-          "TextFile", "extractText");
-  }
-  const int available_chars = line_limits[line_number + 1] - line_limits[line_number];
-  if (start_pos >= available_chars || start_pos + string_length >= available_chars) {
-    rtErr("Line " + std::to_string(line_number) + " of text file " + orig_file + " has " +
-          std::to_string(available_chars) + " characters (requested starting position " +
-          std::to_string(start_pos) + ", length " + std::to_string(string_length) + ").",
-          "TextFile", "extractText");
-  }
-  const int actual_length = (string_length < 0) ? available_chars - start_pos : string_length;
+  const int actual_length = checkAvailableLength(line_number, start_pos, string_length);
   std::string buffer;
   buffer.resize(actual_length);
   const char* text_ptr = &text[line_limits[line_number] + start_pos];
@@ -133,6 +121,15 @@ std::string TextFile::extractString(const int line_number, const int start_pos,
     buffer[i] = text_ptr[i];
   }
   return buffer;
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 TextFile::extractChar4(const int line_number, const int start_pos,
+                             const int string_length) const {
+  const int actual_length = checkAvailableLength(line_number, start_pos, string_length);
+  const char* text_ptr = &text[line_limits[line_number] + start_pos];
+  return { (actual_length > 0) ? text_ptr[0] : ' ', (actual_length > 1) ? text_ptr[1] : ' ',
+           (actual_length > 2) ? text_ptr[2] : ' ', (actual_length > 3) ? text_ptr[3] : ' ' };
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -172,6 +169,24 @@ void TextFile::linesFromString(const std::string &text_in) {
 
   // Ensure that the final line limit is catalogged
   line_limits[line_count] = n_tx;
+}
+
+//-------------------------------------------------------------------------------------------------
+int TextFile::checkAvailableLength(const int line_number, const int start_pos,
+                                   const int string_length) const {
+  if (line_number >= line_count || line_number < 0) {
+    rtErr("The text file originating in " + orig_file + " has " + std::to_string(line_count) +
+          " lines and cannot return text from line " + std::to_string(line_number) + ".",
+          "TextFile", "checkAvailableLength");
+  }
+  const int available_chars = line_limits[line_number + 1] - line_limits[line_number];
+  if (start_pos >= available_chars || start_pos + string_length >= available_chars) {
+    rtErr("Line " + std::to_string(line_number) + " of text file " + orig_file + " has " +
+          std::to_string(available_chars) + " characters (requested starting position " +
+          std::to_string(start_pos) + ", length " + std::to_string(string_length) + ").",
+          "TextFile", "checkAvailableLength");
+  }
+  return ((string_length < 0) ? available_chars - start_pos : string_length);
 }
 
 } // namespace parse
