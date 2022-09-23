@@ -1,3 +1,5 @@
+#include "copyright.h"
+#include <vector>
 #include "../../src/Constants/behavior.h"
 #include "../../src/Constants/scaling.h"
 #include "../../src/FileManagement/file_listing.h"
@@ -50,6 +52,8 @@ int main(const int argc, const char* argv[]) {
   check(sulf_a.getAtomicNumbers(), RelationalOperator::EQUAL, sulf_a_znumbers, "Atomic numbers "
         "inferred for an MDL MOL entry do notmeet expectations.", do_tests);
 
+  std::vector<M
+  
   // Print results
   printTestSummary(oe.getVerbosity());
 

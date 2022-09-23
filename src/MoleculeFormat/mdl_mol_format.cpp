@@ -616,10 +616,29 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
                                              const CaseSensitivity capitalization,
                                              const ExceptionResponse policy) {
   std::vector<MdlMolObj> result;
-  const int nlines = tf.getLineCount();
-  for (int i = 0; i < nlines; i++) {
-    
+  const TextFileReader tfr = tf.data();
+  int nsection = 0;
+  int last_delimiter_line = 0;
+  std::vector<int2> mol_entry_limits;
+  for (int i = 0; i < tfr.line_count; i++) {
+    if (tfr.line_lengths[i] >= 4 && tfr.text[tfr.line_limits[i]] == '$' &&
+        tfr.text[tfr.line_limits[i] + 1] == '$' && tfr.text[tfr.line_limits[i] + 2] == '$' &&
+        tfr.text[tfr.line_limits[i] + 3] == '$') {
+
+      // A MOL entry must have at least four lines, so any text preceding a $$$$ marker must be at
+      // least four lines long to count as a valid entry worth parsing
+      if (i - last_delimiter_line >= 4) {
+        mol_entry_limits.push_back({ last_delimiter_line, i });
+        nsection++;
+      }
+      last_delimiter_line = i;
+    }
   }
+
+  // CHECK
+  printf("Found %d MOL entries.\n", nsection);
+  // END CHECK
+
   return result;
 }
                                              

@@ -388,13 +388,16 @@ int findMolObjVersion(const char* text, const int nchar);
 /// \param policy          Course of action to take if errors are encountered when inferring
 ///                        atomic elements
 /// \{
-std::vector<MdlMolObj> readStructureDataFile(const std::string &file_name,
-                                             const CaseSensitivity capitalization,
-                                             const ExceptionResponse policy);
+std::vector<MdlMolObj>
+readStructureDataFile(const std::string &file_name,
+                      const CaseSensitivity capitalization = CaseSensitivity::YES,
+                      const ExceptionResponse policy = ExceptionResponse::WARN);
 
-std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
-                                             const CaseSensitivity capitalization,
-                                             const ExceptionResponse policy);
+std::vector<MdlMolObj>
+readStructureDataFile(const TextFile &tf,
+                      const CaseSensitivity capitalization = CaseSensitivity::YES,
+                      const ExceptionResponse policy = ExceptionResponse::WARN);
+
 /// \}
   
 } // namespace structure
