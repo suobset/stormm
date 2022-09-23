@@ -44,4 +44,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-${STORMM_HOME}/apps/bin/dynamics.omni -i cgen.in -warn
+${STORMM_HOME}/apps/bin/dynamics.stormm -i cgen.in -warn

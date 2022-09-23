@@ -29,7 +29,9 @@ int main(const int argc, const char* argv[]) {
   // Open an MDL MOL file with a single entry in V2000 format
   const std::string base_name = oe.getStormmSourcePath() + osc + "test" + osc + "MoleculeFormat";
   const std::string mdl_name = base_name + osc + "sulfonamide.mol";
-  const bool files_ready = (getDrivePathType(mdl_name) == DrivePathType::FILE);
+  const std::string sdf_name = base_name + osc + "sulfonamide_rots.sdf";
+  const bool files_ready = (getDrivePathType(mdl_name) == DrivePathType::FILE &&
+                            getDrivePathType(sdf_name) == DrivePathType::FILE);
   const TestPriority do_tests = (files_ready) ? TestPriority::CRITICAL : TestPriority::ABORT;
   if (files_ready == false) {
     rtWarn("Files for MDL MOL format molecules were not found.  Check the STORMM source path, "
@@ -51,8 +53,14 @@ int main(const int argc, const char* argv[]) {
   const std::vector<int> sulf_a_znumbers = { 6, 7, 16, 8, 8, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
   check(sulf_a.getAtomicNumbers(), RelationalOperator::EQUAL, sulf_a_znumbers, "Atomic numbers "
         "inferred for an MDL MOL entry do notmeet expectations.", do_tests);
-
-  std::vector<M
+  std::vector<MdlMolObj> sulf_rtm = readStructureDataFile(sdf_name);
+  const std::vector<double> sulf_rtm_c_xcrds = {  2.2071,  1.4262, -0.0626, -0.5187,  0.1066,
+                                                 -1.1940, -1.9484,  1.8501,  3.2455,  2.1797,
+                                                  1.4358, -1.8772, -0.5739, -2.5472, -2.6168,
+                                                 -1.2508 };
+  check(sulf_rtm[2].getCoordinates(CartesianDimension::X), RelationalOperator::EQUAL,
+        Approx(sulf_rtm_c_xcrds).margin(verytiny), "Coordinates for an MDL MOL entry within an "
+        "SD file were not taken up as expected.  The X coordinate values do not match.", do_tests);
   
   // Print results
   printTestSummary(oe.getVerbosity());

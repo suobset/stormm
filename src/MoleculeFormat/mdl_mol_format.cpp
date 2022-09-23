@@ -111,7 +111,7 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   // Default line end of -1 indicates reading to the end of the file
   int line_end = (line_end_in < 0) ? tf.getLineCount() : line_end_in;
 
-  // Identify the next delimiter (a $$$$ marking at the beginning of the line)
+  // Identify the end of the formatting ("M  END")
   const TextFileReader tfr = tf.data();
   int next_delim_loc = line_start;
   bool found = false;
@@ -616,9 +616,11 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
                                              const CaseSensitivity capitalization,
                                              const ExceptionResponse policy) {
   std::vector<MdlMolObj> result;
+
+  // Find the limits for different MDL MOL entries
   const TextFileReader tfr = tf.data();
   int nsection = 0;
-  int last_delimiter_line = 0;
+  int last_delimiter_line = -1;
   std::vector<int2> mol_entry_limits;
   for (int i = 0; i < tfr.line_count; i++) {
     if (tfr.line_lengths[i] >= 4 && tfr.text[tfr.line_limits[i]] == '$' &&
@@ -627,17 +629,23 @@ std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
 
       // A MOL entry must have at least four lines, so any text preceding a $$$$ marker must be at
       // least four lines long to count as a valid entry worth parsing
-      if (i - last_delimiter_line >= 4) {
-        mol_entry_limits.push_back({ last_delimiter_line, i });
+      if ((last_delimiter_line >=  0 && i - last_delimiter_line >= 4) ||
+          (last_delimiter_line == -1 && i >= 4)) {
+        mol_entry_limits.push_back({ last_delimiter_line + 1, i });
         nsection++;
       }
       last_delimiter_line = i;
     }
   }
+  if (tfr.line_count - last_delimiter_line >= 4) {
+    mol_entry_limits.push_back({ last_delimiter_line, tfr.line_count });
+  }
 
-  // CHECK
-  printf("Found %d MOL entries.\n", nsection);
-  // END CHECK
+  // Parse each MDL MOL entry
+  result.reserve(nsection);
+  for (int i = 0; i < nsection; i++) {
+    result.emplace_back(tf, mol_entry_limits[i].x, mol_entry_limits[i].y, capitalization, policy);
+  }
 
   return result;
 }

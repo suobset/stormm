@@ -29,4 +29,4 @@ cat >> cgen.in << EOF
 
 EOF
 
-valgrind ${STORMM_HOME}/apps/bin/conformer.omni -i cgen.in -warn
+valgrind ${STORMM_HOME}/apps/bin/conformer.stormm -i cgen.in -warn

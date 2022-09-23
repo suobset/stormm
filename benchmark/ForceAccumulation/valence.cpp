@@ -73,7 +73,7 @@ T3 bond_force(T3 crd1, T3 crd2, T equil, T stiff) {
 //-------------------------------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------------------------------
-int main(int argc, char* argv[]) {
+int main(const int argc, const char* argv[]) {
 
   // Baseline variables
   TestEnvironment oe(argc, argv);

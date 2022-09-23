@@ -13,7 +13,9 @@ using parse::NumberFormat;
 //-------------------------------------------------------------------------------------------------
 DynamicsControls::DynamicsControls(const ExceptionResponse policy_in) :
   policy{policy_in},
-  nstlim{default_dynamics_nstlim}
+  nstlim{default_dynamics_nstlim},
+  time_step{default_dynamics_time_step},
+  rattle_tolerance{default_rattle_tolerance}
 {}
 
 //-------------------------------------------------------------------------------------------------

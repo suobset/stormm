@@ -33,8 +33,8 @@ int main(int argc, const char* argv[]) {
   // Read information from the command line and initialize the UserSettings object
   UserSettings ui(argc, argv, AppName::FFREFINE);
   
-  // Read topologies and coordinate files.  Assemble critical deatils about each system.
-  SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(), MapRotatableGroups::NO,
+  // Read topologies and coordinate files.  Assemble critical details about each system.
+  SystemCache sc(ui.getFilesNamelistInfo(), ui.getExceptionBehavior(), MapRotatableGroups::YES,
                  &timer);
 
   // Perform minimizations as requested.
