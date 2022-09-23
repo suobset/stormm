@@ -181,11 +181,15 @@ public:
   ///   - Constructors based on a file name (string or const char* array)
   ///   - Constructor based on a TextFile object from an SDF container previously committed to RAM
   ///
-  /// \param filename    Name of the file to read, containing one MDL file
-  /// \param tf          Text file data previously read into memory (this is the way to handle an
-  ///                    SDF file)
-  /// \param line_start  The first line at which to begin reading the TextFile object
-  /// \param line_end    The last relevant line of the TextFile object at which reading will stop
+  /// \param filename        Name of the file to read, containing one MDL file
+  /// \param tf              Text file data previously read into memory (this is the way to handle
+  ///                        an SDF file)
+  /// \param line_start      The irst line at which to begin reading the TextFile object
+  /// \param line_end        Last relevant line of the TextFile object at which reading will stop
+  /// \param capitalization  Indicate whether atomic symbol capitalization can be ignored when
+  ///                        assigning elements to each atom
+  /// \param policy          Course of action to take if errors are encountered when inferring
+  ///                        atomic elements
   /// \{
   MdlMolObj();
   MdlMolObj(const std::string &filename);
@@ -370,6 +374,29 @@ std::vector<MolObjBond> operator+(const std::vector<MolObjBond> &lhs,
 /// \param nchar  The number of characters on the line
 int findMolObjVersion(const char* text, const int nchar);
 
+/// \brief Read a structure data file (.sdf extension) containing one or more MDL MOL entries.
+///        Return the results as a Standard Template Library vector of MDL MOL objects.
+///
+/// Overloaded:
+///   - Take a file name
+///   - Take a pre-converted TextFile object
+///
+/// \param tf       
+/// \param file_name
+/// \param capitalization  Indicate whether atomic symbol capitalization can be ignored when
+///                        assigning elements to each atom
+/// \param policy          Course of action to take if errors are encountered when inferring
+///                        atomic elements
+/// \{
+std::vector<MdlMolObj> readStructureDataFile(const std::string &file_name,
+                                             const CaseSensitivity capitalization,
+                                             const ExceptionResponse policy);
+
+std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
+                                             const CaseSensitivity capitalization,
+                                             const ExceptionResponse policy);
+/// \}
+  
 } // namespace structure
 } // namespace stormm
 
