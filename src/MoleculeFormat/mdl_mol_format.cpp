@@ -610,6 +610,13 @@ int findMolObjVersion(const char* text, const int nchar) {
   }
   return 2000;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::vector<MdlMolObj> readStructureDataFile(const TextFile &tf,
+                                             const CaseSensitivity capitalization,
+                                             const ExceptionResponse policy) {
+
+}
+                                             
 } // namespace structure
 } // namespace stormm
