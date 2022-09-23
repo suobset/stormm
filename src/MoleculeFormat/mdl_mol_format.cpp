@@ -4,26 +4,30 @@
 namespace stormm {
 namespace structure {
 
+using parse::NumberFormat;
 using parse::readIntegerValue;
 using parse::readRealValue;
 using parse::TextFileReader;
-
+using parse::verifyContents;
+using trajectory::CoordinateFrameWriter;
+using trajectory::PhaseSpaceWriter;
+  
 //-------------------------------------------------------------------------------------------------
 MolObjBond::MolObjBond() :
-    i_atom{-1}, j_atom{-1}, order{MolObjBondOrder::SINGLE}, stereo{MolObjStereo::NOT_STEREO},
+    i_atom{-1}, j_atom{-1}, order{MolObjBondOrder::SINGLE}, stereo{MolObjBondStereo::NOT_STEREO},
     ring_state{MolObjRingState::EITHER}, reactivity{MolObjReactionCenter::NON_CENTER}
 {}
 
 //-------------------------------------------------------------------------------------------------
 MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in) :
     i_atom{i_atom_in}, j_atom{j_atom_in}, order{MolObjBondOrder::SINGLE},
-    stereo{MolObjStereo::NOT_STEREO}, ring_state{MolObjRingState::EITHER},
+    stereo{MolObjBondStereo::NOT_STEREO}, ring_state{MolObjRingState::EITHER},
     reactivity{MolObjReactionCenter::NON_CENTER}
 {}
 
 //-------------------------------------------------------------------------------------------------
 MolObjBond::MolObjBond(const int i_atom_in, const int j_atom_in, const MolObjBondOrder order_in,
-                       const MolObjStereo stereo_in, const MolObjRingState ring_state_in,
+                       const MolObjBondStereo stereo_in, const MolObjRingState ring_state_in,
                        const MolObjReactionCenter reactivity_in) :
     i_atom{i_atom_in}, j_atom{j_atom_in}, order{order_in}, stereo{stereo_in},
     ring_state{ring_state_in}, reactivity{reactivity_in}
@@ -45,7 +49,7 @@ MolObjBondOrder MolObjBond::getOrder() const {
 }
 
 //-------------------------------------------------------------------------------------------------
-MolObjStereo MolObjBond::getStereochemistry() const {
+MolObjBondStereo MolObjBond::getStereochemistry() const {
   return stereo;
 }
 
@@ -75,7 +79,7 @@ void MolObjBond::setOrder(const MolObjBondOrder order_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-void MolObjBond::setStereochemistry(const MolObjStereo stereo_in) {
+void MolObjBond::setStereochemistry(const MolObjBondStereo stereo_in) {
   stereo = stereo_in;
 }
 
@@ -100,7 +104,8 @@ MdlMolObj::MdlMolObj():
 {}
 
 //-------------------------------------------------------------------------------------------------
-MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_end_in):
+MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_end_in,
+                     const CaseSensitivity capitalization, const ExceptionResponse policy):
   MdlMolObj()
 {
   // Default line end of -1 indicates reading to the end of the file
@@ -112,8 +117,9 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
   bool found = false;
   while (found == false && next_delim_loc < line_end) {
     const char* lptr = &tfr.text[tfr.line_limits[next_delim_loc]];
-    if (tfr.line_limits[next_delim_loc + 1] - tfr.line_limits[next_delim_loc] >= 4 &&
-        lptr[0] == '$' && lptr[1] == '$' && lptr[2] == '$' && lptr[3] == '$') {
+    if (tfr.line_limits[next_delim_loc + 1] - tfr.line_limits[next_delim_loc] >= 6 &&
+        lptr[0] == 'M' && lptr[1] == ' ' && lptr[2] == ' ' && lptr[3] == 'E' && lptr[4] == 'N' &&
+        lptr[5] == 'D') {
       found = true;
     }
     else {
@@ -136,24 +142,33 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
 
   // Read the counts line
   if (version == 2000) {
+    const int counts_line_idx = line_start + 3;
     const char* counts_line_ptr = &tfr.text[tfr.line_limits[line_start + 3]];
     atom_count   = readIntegerValue(counts_line_ptr, 0, 3);
     bond_count   = readIntegerValue(counts_line_ptr, 3, 3);
-    list_count   = readIntegerValue(counts_line_ptr, 6, 3);
-    const int chir_num = readIntegerValue(counts_line_ptr, 12, 3);
-    if (chir_num == 0) {
-      chirality = MolObjChirality::ACHIRAL;
+    if (verifyContents(tf, counts_line_idx, 6, 3, NumberFormat::INTEGER)) {
+      list_count   = readIntegerValue(counts_line_ptr, 6, 3);
     }
-    else if (chir_num == 1) {
-      chirality = MolObjChirality::CHIRAL;
+    if (verifyContents(tf, counts_line_idx, 12, 3, NumberFormat::INTEGER)) {
+      const int chir_num = readIntegerValue(counts_line_ptr, 12, 3);
+      if (chir_num == 0) {
+        chirality = MolObjChirality::ACHIRAL;
+      }
+      else if (chir_num == 1) {
+        chirality = MolObjChirality::CHIRAL;
+      }
+      else {
+        rtErr("Invalid chirality setting detected at line " + std::to_string(counts_line_idx) +
+              " in .sdf or MDL MOL file " + tf.getFileName() + ".", "MdlMolObj");
+      }
     }
-    else {
-      rtErr("Invalid chirality setting detected at line " + std::to_string(line_start + 3) +
-            " in .sdf or MDL MOL file " + tf.getFileName() + ".", "MdlMolObj");
+    if (verifyContents(tf, counts_line_idx, 15, 3, NumberFormat::INTEGER)) {
+      stext_entry_count = readIntegerValue(counts_line_ptr, 15, 3);
     }
-    stext_entry_count = readIntegerValue(counts_line_ptr, 15, 3);
-    properties_count  = readIntegerValue(counts_line_ptr, 30, 3);
-
+    if (verifyContents(tf, counts_line_idx, 30, 3, NumberFormat::INTEGER)) {
+      properties_count  = readIntegerValue(counts_line_ptr, 30, 3);
+    }
+    
     // Validation
     if (atom_count > 255) {
       rtErr("A V2000 MOL format entry cannot contain more than 255 atoms.", "MdlMolObj");
@@ -171,43 +186,96 @@ MdlMolObj::MdlMolObj(const TextFile &tf, const int line_start, const int line_en
       coordinates[iatm] = { readRealValue(atom_line_ptr,  0, 10),
                             readRealValue(atom_line_ptr, 10, 10),
                             readRealValue(atom_line_ptr, 20, 10) };
-      atomic_symbols[iatm] = tf.extractChar4(i, 31, 3);
-      isotopic_shifts[iatm] = readIntegerValue(atom_line_ptr, 34, 2);
-      if (isotopic_shifts[iatm] > 4 || isotopic_shifts[iatm] < -3) {
-        rtErr("A V2000 MOL format entry should not describe an isotopic shift outside the range "
-              "[-3, 4].  Shift found: " + std::to_string(isotopic_shifts[iatm]) +
-              ".  Title of entry: \"" + title + "\".", "MdlMolObj");
+      if (verifyContents(tf, i, 31, 3, NumberFormat::CHAR4)) {
+        atomic_symbols[iatm] = tf.extractChar4(i, 31, 3);
+      }
+      if (verifyContents(tf, i, 34, 2, NumberFormat::INTEGER)) {
+        isotopic_shifts[iatm] = readIntegerValue(atom_line_ptr, 34, 2);
+        if (isotopic_shifts[iatm] > 4 || isotopic_shifts[iatm] < -3) {
+          rtErr("A V2000 MOL format entry should not describe an isotopic shift outside the range "
+                "[-3, 4].  Shift found: " + std::to_string(isotopic_shifts[iatm]) +
+                ".  Title of entry: \"" + title + "\".", "MdlMolObj");
+        }
       }
       
       // Standard Template Library vector<bool> works differently from other vectors.  Set its
       // contents in a different manner.
-      bool dblt_flag;
-      formal_charges[iatm] = interpretFormalCharge(readIntegerValue(atom_line_ptr, 36, 3),
-                                                   &dblt_flag);
-      doublet_radicals[iatm] = dblt_flag;
-      parities[iatm] = interpretStereoParity(readIntegerValue(atom_line_ptr, 39, 3));
-      implicit_hydrogens[iatm] =
-        interpretImplicitHydrogenContent(readIntegerValue(atom_line_ptr, 42, 3));
-      stereo_considerations[iatm] =
-        interpretBooleanValue(readIntegerValue(atom_line_ptr, 45, 3),
-                              "interpreting stereochemical considerations");
-      valence_connections[iatm] = interpretValenceNumber(readIntegerValue(atom_line_ptr, 48, 3));
-      if (readIntegerValue(atom_line_ptr, 51, 3) == 1 && implicit_hydrogens[iatm] > 0) {
-        rtErr("The H0 designation, indicating that implicit hydrogens are not allowed on atom " +
-              std::to_string(iatm + 1) + " of MDL MOL entry \"" +  title + "\", is present but "
-              "the number of implicit hydrogens has also been indicated as " +
-              std::to_string(implicit_hydrogens[iatm]) + ".", "MdlMolObj");
+      if (verifyContents(tf, i, 36, 3, NumberFormat::INTEGER)) {
+        bool dblt_flag;
+        formal_charges[iatm] = interpretFormalCharge(readIntegerValue(atom_line_ptr, 36, 3),
+                                                     &dblt_flag);
+        doublet_radicals[iatm] = dblt_flag;
       }
-      atom_atom_mapping_count[iatm] = readIntegerValue(atom_line_ptr, 60, 3);
-      orientation_stability[iatm] =
-        interpretStereoStability(readIntegerValue(atom_line_ptr, 63, 3));
-      exact_change_enforced[iatm] = interpretBooleanValue(readIntegerValue(atom_line_ptr, 66, 3),
-                                                          "interpreting exact change flag");
+      if (verifyContents(tf, i, 39, 3, NumberFormat::INTEGER)) {
+        parities[iatm] = interpretStereoParity(readIntegerValue(atom_line_ptr, 39, 3));
+      }
+      if (verifyContents(tf, i, 42, 3, NumberFormat::INTEGER)) {
+        implicit_hydrogens[iatm] =
+          interpretImplicitHydrogenContent(readIntegerValue(atom_line_ptr, 42, 3));
+      }
+      if (verifyContents(tf, i, 45, 3, NumberFormat::INTEGER)) {
+        stereo_considerations[iatm] =
+          interpretBooleanValue(readIntegerValue(atom_line_ptr, 45, 3),
+                                "interpreting stereochemical considerations");
+      }
+      if (verifyContents(tf, i, 48, 3, NumberFormat::INTEGER)) {
+        valence_connections[iatm] = interpretValenceNumber(readIntegerValue(atom_line_ptr, 48, 3));
+      }
+      if (verifyContents(tf, i, 51, 3, NumberFormat::INTEGER)) {
+        if (readIntegerValue(atom_line_ptr, 51, 3) == 1 && implicit_hydrogens[iatm] > 0) {
+          rtErr("The H0 designation, indicating that implicit hydrogens are not allowed on atom " +
+                std::to_string(iatm + 1) + " of MDL MOL entry \"" +  title + "\", is present but "
+                "the number of implicit hydrogens has also been indicated as " +
+                std::to_string(implicit_hydrogens[iatm]) + ".", "MdlMolObj");
+        }
+      }
+      if (verifyContents(tf, i, 60, 3, NumberFormat::INTEGER)) {
+        atom_atom_mapping_count[iatm] = readIntegerValue(atom_line_ptr, 60, 3);
+      }
+      if (verifyContents(tf, i, 63, 3, NumberFormat::INTEGER)) {
+        orientation_stability[iatm] =
+          interpretStereoStability(readIntegerValue(atom_line_ptr, 63, 3));
+      }
+      if (verifyContents(tf, i, 66, 3, NumberFormat::INTEGER)) {
+        exact_change_enforced[iatm] = interpretBooleanValue(readIntegerValue(atom_line_ptr, 66, 3),
+                                                            "interpreting exact change flag");
+      }
+      iatm++;
     }
   }
 
   // Read the bonds block
   if (version == 2000) {
+    const int bond_line_start = line_start + 4 + atom_count;
+    for (int pos = 0; pos < bond_count; pos++) {
+      const char* bond_line_ptr = &tfr.text[tfr.line_limits[bond_line_start + pos]];
+      const MolObjBondOrder bnd_order = (verifyContents(tf, bond_line_start + pos, 6, 3)) ?
+                                        interpretBondOrder(readIntegerValue(bond_line_ptr, 6, 3)) :
+                                        default_mdl_bond_order;
+      const MolObjBondStereo bnd_stereo = (verifyContents(tf, bond_line_start + pos, 9, 3)) ?
+        interpretBondStereochemistry(readIntegerValue(bond_line_ptr, 9, 3)) :
+        default_mdl_bond_stereochemistry;
+      const MolObjRingState ring_status = (verifyContents(tf, bond_line_start + pos, 12, 3)) ?
+        interpretRingState(readIntegerValue(bond_line_ptr, 12, 3)) :
+        default_mdl_ring_status;
+      const MolObjReactionCenter reax_potential = (verifyContents(tf, bond_line_start + pos,
+                                                                  15, 3)) ?
+        interpretBondReactivePotential(readIntegerValue(bond_line_ptr, 15, 3)) :
+        default_mdl_bond_reactivity;
+      bonds[pos] = MolObjBond(readIntegerValue(bond_line_ptr, 0, 3),
+                              readIntegerValue(bond_line_ptr, 3, 3), bnd_order, bnd_stereo,
+                              ring_status, reax_potential);
+    }
+  }
+
+  // Make some basic inferences
+  const std::vector<int> tmp_znum = symbolToZNumber(atomic_symbols, capitalization, policy);
+  int nvs = 0;
+  for (int i = 0; i < atom_count; i++) {
+    atomic_numbers[i] = tmp_znum[i];
+    nvs += (atomic_numbers[i] == 0);
+  }
+  if (nvs > 0) {
     
   }
   
@@ -226,19 +294,103 @@ MdlMolObj::MdlMolObj(const char* filename):
 {}
 
 //-------------------------------------------------------------------------------------------------
+int MdlMolObj::getAtomCount() const {
+  return atom_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMolObj::getBondCount() const {
+  return bond_count;
+}
+
+//-------------------------------------------------------------------------------------------------
+double3 MdlMolObj::getCoordinates(const int index) const {
+  return coordinates[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<double3>& MdlMolObj::getCoordinates() const {
+  return coordinates;
+}
+
+//-------------------------------------------------------------------------------------------------
+std::vector<double> MdlMolObj::getCoordinates(const CartesianDimension dim) const {
+  std::vector<double> result(atom_count);
+  for (int i = 0; i < atom_count; i++) {
+    switch (dim) {
+    case CartesianDimension::X:
+      result[i] = coordinates[i].x;
+      break;
+    case CartesianDimension::Y:
+      result[i] = coordinates[i].y;
+      break;
+    case CartesianDimension::Z:
+      result[i] = coordinates[i].z;
+      break;
+    }
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+PhaseSpace MdlMolObj::exportPhaseSpace() {
+  PhaseSpace result(atom_count);
+  PhaseSpaceWriter rw = result.data();
+  for (int i = 0; i < atom_count; i++) {
+    rw.xcrd[i] = coordinates[i].x;
+    rw.ycrd[i] = coordinates[i].y;
+    rw.zcrd[i] = coordinates[i].z;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+CoordinateFrame MdlMolObj::exportCoordinateFrame() {
+  CoordinateFrame result(atom_count);
+  CoordinateFrameWriter rw = result.data();
+  for (int i = 0; i < atom_count; i++) {
+    rw.xcrd[i] = coordinates[i].x;
+    rw.ycrd[i] = coordinates[i].y;
+    rw.zcrd[i] = coordinates[i].z;
+  }
+  return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+char4 MdlMolObj::getAtomSymbol(const int index) const {
+  return atomic_symbols[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<char4>& MdlMolObj::getAtomSymbols() const {
+  return atomic_symbols;
+}
+
+//-------------------------------------------------------------------------------------------------
+int MdlMolObj::getAtomicNumber(const int index) const {
+  return atomic_numbers[index];
+}
+
+//-------------------------------------------------------------------------------------------------
+const std::vector<int>& MdlMolObj::getAtomicNumbers() const {
+  return atomic_numbers;
+}
+
+//-------------------------------------------------------------------------------------------------
 void MdlMolObj::allocate() {
   coordinates.resize(atom_count);
-  atomic_symbols.resize(atom_count);
-  atomic_numbers.resize(atom_count);
-  formal_charges.resize(atom_count);
-  isotopic_shifts.resize(atom_count);
-  parities.resize(atom_count);
-  implicit_hydrogens.resize(atom_count);
-  stereo_considerations.resize(atom_count);
-  valence_connections.resize(atom_count);
-  atom_atom_mapping_count.resize(atom_count);
-  exact_change_enforced.resize(atom_count);
-  orientation_stability.resize(atom_count);
+  atomic_symbols.resize(atom_count, default_mdl_atomic_symbol);
+  atomic_numbers.resize(atom_count, default_mdl_atomic_number);
+  formal_charges.resize(atom_count, default_mdl_formal_charge);
+  doublet_radicals.resize(atom_count, default_mdl_doublet_radical_state);
+  isotopic_shifts.resize(atom_count, default_mdl_isotopic_shift);
+  parities.resize(atom_count, default_mdl_stereo_parity);
+  implicit_hydrogens.resize(atom_count, default_mdl_implicit_hydrogen);
+  stereo_considerations.resize(atom_count, default_mdl_stereo_considerations);
+  valence_connections.resize(atom_count, default_mdl_valence_connections);
+  atom_atom_mapping_count.resize(atom_count, default_mdl_map_count);
+  exact_change_enforced.resize(atom_count, default_mdl_exact_change);
+  orientation_stability.resize(atom_count, default_mdl_stereo_retention);
   bonds.resize(bond_count);
   properties.resize(properties_count);
 }
@@ -291,12 +443,12 @@ MolObjAtomStereo MdlMolObj::interpretStereoParity(const int setting_in) {
 
 //-------------------------------------------------------------------------------------------------
 int MdlMolObj::interpretImplicitHydrogenContent(const int nh_in) {
-  if (nh_in >= 5 || nh_in < 1) {
+  if (nh_in >= 5 || nh_in < 0) {
     rtErr("An implicit hydrogen content of " + std::to_string(nh_in) + " would imply " +
           std::to_string(nh_in - 1) + " hydrogens can be inferred around an atom in MDL MOL "
-          "entry " + title + "\".", "MdlMolObj", "interpretImplicitHydrogenContent");
+          "entry \"" + title + "\".", "MdlMolObj", "interpretImplicitHydrogenContent");
   }
-  return nh_in - 1;
+  return std::max(nh_in - 1, 0);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -325,17 +477,111 @@ int MdlMolObj::interpretValenceNumber(const int count_in) {
 }
 
 //-------------------------------------------------------------------------------------------------
-StereoChemicalRetention MdlMolObj::interpretStereoStability(const int code_in) {
+StereoRetention MdlMolObj::interpretStereoStability(const int code_in) {
   switch (code_in) {
   case 0:
-    return StereoChemicalRetention::NOT_APPLIED;
+    return StereoRetention::NOT_APPLIED;
   case 1:
-    return StereoChemicalRetention::INVERTED;
+    return StereoRetention::INVERTED;
   case 2:
-    return StereoChemicalRetention::RETAINED;
+    return StereoRetention::RETAINED;
   default:
     rtErr("A stereochemistry retention code of " + std::to_string(code_in) + " is invalid in MDL "
           "MOL entry \"" + title + "\".", "MdlMolObj", "interpretStereoStability");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBondOrder MdlMolObj::interpretBondOrder(const int code_in) {
+  switch (code_in) {
+  case 1:
+    return MolObjBondOrder::SINGLE;
+  case 2:
+    return MolObjBondOrder::DOUBLE;
+  case 3:
+    return MolObjBondOrder::TRIPLE;
+  case 4:
+    return MolObjBondOrder::AROMATIC;
+  case 5:
+    return MolObjBondOrder::SINGLE_OR_DOUBLE;
+  case 6:
+    return MolObjBondOrder::SINGLE_OR_AROMATIC;
+  case 7:
+    return MolObjBondOrder::DOUBLE_OR_AROMATIC;
+  case 8:
+    return MolObjBondOrder::ANY;
+  default:
+    rtErr("An invalid bond order code " + std::to_string(code_in) + " was specified in an MDL MOL "
+          "entry titled \"" + title + "\".", "MdlMolObj", "interpretBondOrder");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjBondStereo MdlMolObj::interpretBondStereochemistry(const int code_in) {
+  switch (code_in) {
+  case 0:
+    return MolObjBondStereo::NOT_STEREO;
+  case 1:
+    return MolObjBondStereo::UP;
+  case 3:
+    return MolObjBondStereo::CIS_OR_TRANS;
+  case 4:
+    return MolObjBondStereo::EITHER;
+  case 6:
+    return MolObjBondStereo::DOWN;
+  default:
+    rtErr("An invalid bond stereochemistry code " + std::to_string(code_in) + " was specified in "
+          "an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
+          "interpretBondStereoChemistry");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjRingState MdlMolObj::interpretRingState(const int code_in) {
+  switch (code_in) {
+  case 0:
+    return MolObjRingState::EITHER;
+  case 1:
+    return MolObjRingState::RING;
+  case 2:
+    return MolObjRingState::CHAIN;
+  default:
+    rtErr("An invalid bond ring status code " + std::to_string(code_in) + " was specified in an "
+          "MDL MOL entry titled \"" + title + "\".", "MdlMolObj", "interpretRingState");
+  }
+  __builtin_unreachable();
+}
+
+//-------------------------------------------------------------------------------------------------
+MolObjReactionCenter MdlMolObj::interpretBondReactivePotential(const int code_in) {
+  switch (code_in) {
+  case -1:
+    return MolObjReactionCenter::NON_CENTER;
+  case 0:
+    return MolObjReactionCenter::UNMARKED;
+  case 1:
+    return MolObjReactionCenter::CENTER;
+  case 2:
+    return MolObjReactionCenter::UNREACTIVE;
+  case 4:
+    return MolObjReactionCenter::BOND_MADE_OR_BROKEN;
+  case 5:
+    return MolObjReactionCenter::CENTER_WITH_FORMATION;
+  case 8:
+    return MolObjReactionCenter::BOND_ORDER_CHANGE;
+  case 9:
+    return MolObjReactionCenter::CENTER_WITH_ORDER_CHANGE;
+  case 12:
+    return MolObjReactionCenter::BOND_FORMATION_AND_ORDER_CHANGE;
+  case 13:
+    return MolObjReactionCenter::CENTER_WITH_FORMATION_AND_ORDER_CHANGE;
+  default:
+    rtErr("An invalid bond reactive potential code " + std::to_string(code_in) + " was specified "
+          "in an MDL MOL entry titled \"" + title + "\".", "MdlMolObj",
+          "interpretBondReactivePotential");
   }
   __builtin_unreachable();
 }

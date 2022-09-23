@@ -5,15 +5,25 @@
 #include <string>
 #include <vector>
 #include "copyright.h"
+#include "Chemistry/znumber.h"
+#include "Constants/behavior.h"
 #include "DataTypes/stormm_vector_types.h"
 #include "Parsing/ascii_numbers.h"
 #include "Parsing/parse.h"
+#include "Trajectory/coordinateframe.h"
+#include "Trajectory/phasespace.h"
 
 namespace stormm {
 namespace structure {
 
+using chemistry::symbolToZNumber;
+using constants::CartesianDimension;
+using constants::CaseSensitivity;
+using constants::ExceptionResponse;
 using parse::TextFile;
-
+using trajectory::CoordinateFrame;
+using trajectory::PhaseSpace;
+  
 /// \brief A molecule's chirality
 enum class MolObjChirality {
   ACHIRAL = 0, CHIRAL = 1
@@ -26,7 +36,7 @@ enum class MolObjBondOrder {
 };
 
 /// \brief Enumerate possible stereochemistries arising from a bond
-enum class MolObjStereo {
+enum class MolObjBondStereo {
   NOT_STEREO = 0, UP = 1, CIS_OR_TRANS = 3, EITHER = 4, DOWN = 6
 };
 
@@ -48,10 +58,30 @@ enum class MolObjReactionCenter {
 };
 
 /// \brief Enumerate the outcomes for stereochemistry during a reaction
-enum class StereoChemicalRetention {
+enum class StereoRetention {
   NOT_APPLIED = 0, INVERTED = 1, RETAINED = 2
 };
-  
+
+/// \brief Default settings for the MDL MOL object atom initializations
+/// \{
+constexpr char4 default_mdl_atomic_symbol = { ' ', ' ', ' ', ' ' };
+constexpr int default_mdl_atomic_number = -1;
+constexpr double default_mdl_formal_charge = 0.0;
+constexpr bool default_mdl_doublet_radical_state = false;
+constexpr int default_mdl_isotopic_shift = 0;
+constexpr MolObjAtomStereo default_mdl_stereo_parity = MolObjAtomStereo::NOT_STEREO;
+constexpr int default_mdl_implicit_hydrogen = 0;
+constexpr int default_mdl_valence_connections = 0;
+constexpr int default_mdl_map_count = 0;
+constexpr bool default_mdl_stereo_considerations = false;
+constexpr bool default_mdl_exact_change = false;
+constexpr StereoRetention default_mdl_stereo_retention = StereoRetention::NOT_APPLIED;
+constexpr MolObjBondOrder default_mdl_bond_order = MolObjBondOrder::SINGLE;
+constexpr MolObjBondStereo default_mdl_bond_stereochemistry = MolObjBondStereo::NOT_STEREO;
+constexpr MolObjRingState default_mdl_ring_status = MolObjRingState::EITHER;
+constexpr MolObjReactionCenter default_mdl_bond_reactivity = MolObjReactionCenter::NON_CENTER;
+/// \}
+
 /// \brief A bond, as presented in the MDL molecule file format.  This unguarded struct will be
 ///        returned to the developer from a private array inside of the MdlMolObj object, so
 ///        further protection would be a hindrance.
@@ -68,7 +98,7 @@ public:
   /// \{
   MolObjBond();
   MolObjBond(int i_atom_in, int j_atom_in);
-  MolObjBond(int i_atom_in, int j_atom_in, MolObjBondOrder order_in, MolObjStereo stereo_in,
+  MolObjBond(int i_atom_in, int j_atom_in, MolObjBondOrder order_in, MolObjBondStereo stereo_in,
              MolObjRingState ring_state_in, MolObjReactionCenter reactivity_in);
   /// \}
 
@@ -92,7 +122,7 @@ public:
   MolObjBondOrder getOrder() const;
 
   /// \brief Get the order of the bond.
-  MolObjStereo getStereochemistry() const;
+  MolObjBondStereo getStereochemistry() const;
 
   /// \brief Get the ring status--is the bond known to be part of a ring?
   MolObjRingState getRingStatus() const;
@@ -111,7 +141,7 @@ public:
   void setOrder(MolObjBondOrder order_in);
 
   /// \brief Set the stereochemical details of the bond.
-  void setStereochemistry(MolObjStereo stereo_in);
+  void setStereochemistry(MolObjBondStereo stereo_in);
 
   /// \brief Mark the status of the bond with respect to any ring features.
   void setRingStatus(MolObjRingState status_in);
@@ -123,7 +153,7 @@ private:
   int i_atom;                       ///< The first atom in the bond
   int j_atom;                       ///< The second atom in the bond
   MolObjBondOrder order;            ///< The bond order (single, double, aromatic, etc.)
-  MolObjStereo stereo;              ///< Indicator of the bond stereochemistry
+  MolObjBondStereo stereo;          ///< Indicator of the bond stereochemistry
   MolObjRingState ring_state;       ///< Indicator of whether the atom is part of a ring
   MolObjReactionCenter reactivity;  ///< Indicator of a bond as a center of reactivity
 };
@@ -134,6 +164,12 @@ struct MolObjProperty {
 };
 
 /// \brief A molecule read from an MDL .mol file, or one of many read from a concatenated SDF file.
+///        Many of the enumerators above are translated according to member functions of this
+///        object based on the documentation in the ctfileformats.pdf file in this library's
+///        directory, also available at:
+///
+///        http://help.accelrysonline.com/ (...)
+///          ulm/onelab/1.0/content/ulm_pdfs/direct/reference/ctfileformats2016.pdf
 class MdlMolObj {
 public:
 
@@ -154,21 +190,55 @@ public:
   MdlMolObj();
   MdlMolObj(const std::string &filename);
   MdlMolObj(const char* filename);
-  MdlMolObj(const TextFile &tf, int line_start = 0, int line_end = -1);
+  MdlMolObj(const TextFile &tf, int line_start = 0, int line_end = -1,
+            CaseSensitivity capitalization = CaseSensitivity::YES,
+            ExceptionResponse policy = ExceptionResponse::WARN);
   /// \}
+
+  /// \brief Get the system's atom count.
+  int getAtomCount() const;
   
-  // Getter functions, some of which trigger complex filtering behavior
-  double3 getCoordinate(int index) const;
-  std::vector<double3> getCoordinate() const;
-  std::vector<double3> getCoordinates() const;
+  /// \brief Get the number of bonds in the system.
+  int getBondCount() const;
+
+  /// \brief Get the { X, Y, Z } coordinate tuple for a particular atom, or for all atoms.
+  ///
+  /// Overloaded:
+  ///   - Get a unique, modifiable tuple for a single atom.
+  ///   - Get a const reference to the array of tuples for coordinates of all atoms.
+  ///   - Get a modifiable vector of all Cartesian X, Y, or Z coordinates.
+  ///
+  /// \param index  Index of the atom of interest
+  /// \param dim    The Cartesian dimension of interest
+  /// \{
+  double3 getCoordinates(int index) const;
+  const std::vector<double3>& getCoordinates() const;
+  std::vector<double> getCoordinates(CartesianDimension dim) const;
+  /// \}
+
+  /// \brief Export the coordinates as a PhaseSpace object suitable for basic molecular mechanics
+  ///        force computations.
+  PhaseSpace exportPhaseSpace();
+
+  /// \brief Export the coordinates as a stripped-down CoordinateFrame object suitable for
+  ///        molecular mechanics energy computations.
+  CoordinateFrame exportCoordinateFrame();
+
+  /// \brief Get the atomic symbol for a particular atom.
+  ///
+  /// \param index  Index of the atom of interest
+  char4 getAtomSymbol(int index) const;
+
+  /// \brief Get a const reference to the atomic symbols for all atoms.
+  const std::vector<char4>& getAtomSymbols() const;
+  
+  /// \brief Get the atomic number of a particular atom.
+  ///
+  /// \param index  Index number of the atom of interest
   int getAtomicNumber(int index) const;
-  std::vector<int> getAtomicNumber() const;
-  std::vector<int> getAtomicNumbers(int index) const;
-  std::vector<MolObjBond> getBonds() const;
-  std::vector<MolObjBond> getRotatableBonds() const;
-  std::vector<MolObjBond> getBonds(int atom_index) const;
-  std::vector<MolObjBond> getBonds(MolObjBondOrder query_order) const;
-  std::vector<MolObjProperty> getProperties() const;
+
+  /// \brief Get a const reference to the vector of all atomic numbers in the system.
+  const std::vector<int>& getAtomicNumbers() const;
 
 private:
 
@@ -210,7 +280,7 @@ private:
                                             ///<   must be exactly as described in the reaction
   
   ///< Indication of whether stereochemistry is inverted or retained in a chemical reaction
-  std::vector<StereoChemicalRetention> orientation_stability;
+  std::vector<StereoRetention> orientation_stability;
 
   /// Bonds between atoms
   std::vector<MolObjBond> bonds;
@@ -242,9 +312,11 @@ private:
   /// \param setting_in  The code to parse
   MolObjAtomStereo interpretStereoParity(int setting_in);
 
-  /// \brief Interpret the implicit hydrogen count for an atom.
+  /// \brief Interpret the implicit hydrogen count for an atom.  At least this many additional
+  ///        hydrogens are implied to be present around an atom center, in addition to any hydrogen
+  ///        atoms explicitly placed in the structure.
   ///
-  /// \param nh_in  The number of hydrogens that can be inferred around the atom's structure.
+  /// \param nh_in  The number of hydrogens that are to be inferred around the atom's structure.
   ///               This number is decremented by one, meaning that 1 implies no implicit hydrogen
   ///               content.
   int interpretImplicitHydrogenContent(int nh_in);
@@ -264,7 +336,27 @@ private:
   /// \brief Interpret the stability of stereochemical arrangements listed for each atom.
   ///
   /// \param code_in  A numeric code to be translated into inversion or retention options
-  StereoChemicalRetention interpretStereoStability(int code_in);
+  StereoRetention interpretStereoStability(int code_in);
+
+  /// \brief Interpret a code for the order of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the bond order
+  MolObjBondOrder interpretBondOrder(int code_in);
+
+  /// \brief Interpret a code for the stereochemistry of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the bond stereochemistry
+  MolObjBondStereo interpretBondStereochemistry(int code_in);
+  
+  /// \brief Interpret a code for the ring status of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the ring status
+  MolObjRingState interpretRingState(int code_in);
+
+  /// \brief Interpret a code for the reactive potential of a bond in the structure.
+  ///
+  /// \param code_in  A numeric code to be translated into the reactive potential
+  MolObjReactionCenter interpretBondReactivePotential(int code_in);
 };
 
 /// \brief Overload the + operator to concatenate vectors of MDL and SDF bonds.

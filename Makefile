@@ -470,7 +470,8 @@ STORMM_TEST_PROGS = $(TESTDIR)/bin/test_unit_test \
 		    $(TESTDIR)/bin/test_generalized_born \
 		    $(TESTDIR)/bin/test_neighbor_list \
 		    $(TESTDIR)/bin/test_restraints \
-		    $(TESTDIR)/bin/test_minimization
+		    $(TESTDIR)/bin/test_minimization \
+		    $(TESTDIR)/bin/test_molecule_formats
 
 # Test programs using stormm.cuda
 STORMM_TEST_CUDA_PROGS = $(TESTDIR)/bin/test_hpc_status \
@@ -498,8 +499,8 @@ CUCC=nvcc
 CUDA_INCLUDES = -I$(SRCDIR) -I${CUDA_HOME}/include
 CUDA_LINKS = -L$(SRCDIR) -L${CUDA_HOME}/lib64 -L${CUDA_HOME}/lib64/stubs \
 	     -lcurand -lcublas -lcusolver -lcudart -lcudadevrt -lnvidia-ml
-CPP_FLAGS = -std=c++17 -fPIC -O3
-CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O3 --ptxas-options="-v"
+CPP_FLAGS = -std=c++17 -fPIC -O0 -g
+CUDA_FLAGS = -std=c++17 --compiler-options=-fPIC -O0 -g --ptxas-options="-v"
 CUDA_DEFINES = -DSTORMM_USE_HPC -DSTORMM_USE_CUDA
 CUDA_ARCHS = -gencode arch=compute_60,code=sm_60 \
 	     -gencode arch=compute_61,code=sm_61 \
@@ -694,6 +695,13 @@ $(TESTDIR)/bin/test_minimization : $(LIBDIR)/libstormm.so \
 	@echo "[STORMM]  Building test_minimization..."
 	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_minimization \
 	  $(TESTDIR)/MolecularMechanics/test_minimization.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
+
+# Target: molecular mechanics minimization and execution by CPU routines
+$(TESTDIR)/bin/test_molecule_formats : $(LIBDIR)/libstormm.so \
+				       $(TESTDIR)/MoleculeFormat/test_molecule_formats.cpp
+	@echo "[STORMM]  Building test_molecule_formats..."
+	$(VB)$(CC) $(CPP_FLAGS) -o $(TESTDIR)/bin/test_molecule_formats \
+	  $(TESTDIR)/MoleculeFormat/test_molecule_formats.cpp -L$(LIBDIR) -I$(SRCDIR) -lstormm
 
 # Target: HPC detection
 $(TESTDIR)/bin/test_hpc_status : $(LIBDIR)/libstormm_cuda.so \

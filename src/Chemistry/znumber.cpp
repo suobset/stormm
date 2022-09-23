@@ -1,4 +1,5 @@
 #include "copyright.h"
+#include "Parsing/parse.h"
 #include "UnitTesting/unit_test.h"
 #include "znumber.h"
 #include "periodic_table.h"
@@ -6,6 +7,7 @@
 namespace stormm {
 namespace chemistry {
 
+using parse::uppercase;
 using testing::Approx;
 using testing::ComparisonType;  
   
@@ -58,28 +60,64 @@ std::vector<char2> zNumberToSymbol(const std::vector<int> &atomic_numbers) {
 }
 
 //-------------------------------------------------------------------------------------------------
-std::vector<int> symbolToZNumber(const std::vector<char2> &atomic_symbols) {
+std::vector<int> symbolToZNumber(const std::vector<char2> &atomic_symbols,
+                                 const CaseSensitivity capitalization,
+                                 const ExceptionResponse policy) {
   const int natom = atomic_symbols.size();
   std::vector<int> result(natom, -1);
   for (int i = 0; i < natom; i++) {
     const char2 tmps = atomic_symbols[i];
     for (int j = 0; j < element_maximum_count; j++) {
-      if (tmps.x == elemental_symbols[j].x && tmps.y == elemental_symbols[j].y) {
-        result[i] = j;
+      switch (capitalization) {
+      case CaseSensitivity::YES:
+      case CaseSensitivity::AUTOMATIC:
+        if (tmps.x == elemental_symbols[j].x && tmps.y == elemental_symbols[j].y) {
+          result[i] = j;
+        }
+        break;
+      case CaseSensitivity::NO:
+        if (uppercase(tmps.x) == uppercase(elemental_symbols[j].x) &&
+            uppercase(tmps.y) == uppercase(elemental_symbols[j].y)) {
+          result[i] = j;
+        }
+        break;
       }
     }
     if (result[i] < 0) {
       std::string tsymbol;
       tsymbol += tmps.x;
       tsymbol += tmps.y;
-      rtWarn("No atomic symbol " + tsymbol + " is known.  Atom " + std::to_string(i) +
-             "will be represented as a virtual site (symbol VS) with atomic number 0.",
-             "symbolToZNumber");
-      result[i] = 0;
+      switch (policy) {
+      case ExceptionResponse::DIE:
+        rtErr("No atomic symbol " + tsymbol + " is known.  Atom " + std::to_string(i) + " cannot "
+              "be represented as an element with mass.");
+      case ExceptionResponse::WARN:
+        rtWarn("No atomic symbol " + tsymbol + " is known.  Atom " + std::to_string(i) +
+               "will be represented as a virtual site (symbol VS) with atomic number 0.",
+               "symbolToZNumber");
+        result[i] = 0;
+        break;
+      case ExceptionResponse::SILENT:
+        result[i] = 0;
+        break;
+      }
     }
   }
   return result;
 }
-  
+
+//-------------------------------------------------------------------------------------------------
+std::vector<int> symbolToZNumber(const std::vector<char4> &atomic_symbols,
+                                 const CaseSensitivity capitalization,
+                                 const ExceptionResponse policy) {
+  const size_t nsymb = atomic_symbols.size();
+  std::vector<char2> abridged_symbols(nsymb);
+  for (size_t i = 0LLU; i < nsymb; i++) {
+    abridged_symbols[i].x = atomic_symbols[i].x;
+    abridged_symbols[i].y = atomic_symbols[i].y;
+  }
+  return symbolToZNumber(abridged_symbols, capitalization, policy);
+}
+
 } // namespace chemistry
 } // namespace stormm
