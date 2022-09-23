@@ -8,15 +8,18 @@ namespace stormm {
 namespace parse {
 
 //-------------------------------------------------------------------------------------------------
-TextFileReader::TextFileReader(const int line_count_in, const int* line_limits_in,
-                               const char* text_in, const std::string file_name_in) :
-  line_count{line_count_in}, line_limits{line_limits_in}, text{text_in}, file_name{file_name_in}
+TextFileReader::TextFileReader(const int line_count_in, const int* line_lengths_in,
+                               const int* line_limits_in, const char* text_in,
+                               const std::string file_name_in) :
+  line_count{line_count_in}, line_lengths{line_lengths_in}, line_limits{line_limits_in},
+  text{text_in}, file_name{file_name_in}
 {}
 
 //-------------------------------------------------------------------------------------------------
 TextFile::TextFile() :
     orig_file{std::string("")},
     line_count{0},
+    line_lengths{},
     line_limits{std::vector<int>(1, 0)},
     text{std::vector<char>()}
 {}
@@ -26,6 +29,7 @@ TextFile::TextFile(const std::string &file_name, const TextOrigin source,
                    const std::string &content, const std::string &caller) :
   orig_file{setFileName(file_name, source, content)},
   line_count{0},
+  line_lengths{},
   line_limits{},
   text{}
 {
@@ -59,6 +63,10 @@ TextFile::TextFile(const std::string &file_name, const TextOrigin source,
         line_counter++;
       }
       line_count = line_counter;
+      line_lengths.resize(line_count);
+      for (int i = 0; i < line_count; i++) {
+        line_lengths[i] = line_limits[i + 1] - line_limits[i];
+      }
 
       // Close input file
       finp.close();
@@ -129,7 +137,8 @@ const char* TextFile::getLinePointer(const int line_index) const {
 
 //-------------------------------------------------------------------------------------------------
 const TextFileReader TextFile::data() const {
-  return TextFileReader(line_count, line_limits.data(), text.data(), orig_file);
+  return TextFileReader(line_count, line_lengths.data(), line_limits.data(), text.data(),
+                        orig_file);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -174,6 +183,7 @@ void TextFile::linesFromString(const std::string &text_in) {
     n_br += (text_in[i] == '\n');
   }
   line_count = n_br + (text_in[text_in.size() - 1] != '\n');
+  line_lengths.resize(line_count);
   line_limits.resize(line_count + 1);
   text.resize(n_char - n_br + 1);
   int n_tx = 0;
@@ -187,6 +197,9 @@ void TextFile::linesFromString(const std::string &text_in) {
     else {
       n_tx++;
     }
+  }
+  for (int i = 0; i < line_count; i++) {
+    line_lengths[i] = line_limits[i + 1] - line_limits[i];
   }
 
   // Ensure that the final line limit is catalogged

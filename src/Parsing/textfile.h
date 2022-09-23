@@ -26,8 +26,8 @@ enum class TextOrigin {
 struct TextFileReader {
 
   /// \brief The constructor takes length constants and constant pointers.
-  TextFileReader(int line_count_in, const int* line_limits_in, const char* text_in,
-                 const std::string file_name_in);
+  TextFileReader(int line_count_in, const int* line_lengths_in, const int* line_limits_in,
+                 const char* text_in, const std::string file_name_in);
 
   /// \brief Take the default copy and move constructors.  The assignment operators will get
   ///        implicitly deleted as this is just a collection of constants.
@@ -37,6 +37,7 @@ struct TextFileReader {
   /// \}
 
   const int line_count;
+  const int* line_lengths;
   const int* line_limits;
   const char* text;
   const std::string file_name;
@@ -67,6 +68,14 @@ public:
            const std::string &content = std::string(""),
            const std::string &caller = std::string(""));
 
+  /// \brief The default copy and move constructors as well as assignment operators are acceptable.
+  /// \{
+  TextFile(const TextFile &original) = default;
+  TextFile(TextFile &&original) = default;
+  TextFile& operator=(const TextFile &other) = default;
+  TextFile& operator=(TextFile &&other) = default;
+  /// \}
+  
   /// \brief Default destructor
   ~TextFile() = default;
 
@@ -133,9 +142,12 @@ private:
   /// The number of lines detected in the file
   int line_count;
 
+  /// Lengths for each line in the concatenated character array
+  std::vector<int> line_lengths;
+  
   /// Limits for each line's text in the concatenated character array
   std::vector<int> line_limits;
-
+  
   /// The text, sans carriage returns (see line limits to determine their locations)
   std::vector<char> text;
 
